@@ -6,7 +6,7 @@ import sys
 def find_version_references(directory: str) -> tuple[set[str], set[str]]:
     FORGE_versions = set()
     runtime_versions = set()
-    re.compile('Forge:(\\d{1})\\.(\\d{2})')
+    version_pattern_forge = re.compile('Forge:(\\d{1})\\.(\\d{2})')
     version_pattern_runtime = re.compile('runtime:(\\d{1})\\.(\\d{2})')
     for root, _, files in os.walk(directory):
         if '.git' in root or 'docs/build' in root:
