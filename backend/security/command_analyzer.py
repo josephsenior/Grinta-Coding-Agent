@@ -53,7 +53,7 @@ class CommandAssessment:
         from backend.events.action import ActionSecurityRisk
 
         level_name = _RISK_TO_ACTION_LEVEL.get(self.risk_category.value, "LOW")
-        return ActionSecurityRisk(level_name)
+        return ActionSecurityRisk[level_name]
 
 
 # ---------------------------------------------------------------------------
