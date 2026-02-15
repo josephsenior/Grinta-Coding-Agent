@@ -55,13 +55,13 @@ def test_prometheus_metrics_expose_request_stats():
         reset_request_metrics()
 
     # Make a few requests to generate metrics
-    r1 = client.get("/api/monitoring/health")
+    r1 = client.get("/api/v1/monitoring/health")
     assert r1.status_code == 200
     r2 = client.get("/docs")  # Swagger UI
     assert r2.status_code in (200, 404)  # swagger may be disabled in some configs
 
     # Fetch prom metrics
-    prom = client.get("/api/monitoring/metrics-prom")
+    prom = client.get("/api/v1/monitoring/metrics-prom")
     assert prom.status_code == 200
     body = prom.text
 

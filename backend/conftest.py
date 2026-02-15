@@ -96,7 +96,7 @@ def _has_pkg(name: str) -> bool:
 
 
 def pytest_configure(config):
-    markers = ["windows", "optional", "heavy", "integration", "benchmark"]
+    markers = ["windows", "optional", "heavy", "integration", "benchmark", "stress"]
     for m in markers:
         config.addinivalue_line("markers", f"{m}: mark test as {m}")
 
