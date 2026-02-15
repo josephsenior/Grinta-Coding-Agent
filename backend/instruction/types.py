@@ -56,7 +56,7 @@ class PlaybookContentResponse(BaseModel):
     content: str
     path: str
     triggers: list[str] = []
-    git_provider: str | None = None
+    vcs_provider: str | None = None
 
 
 # Resolve any forward references after imports are available

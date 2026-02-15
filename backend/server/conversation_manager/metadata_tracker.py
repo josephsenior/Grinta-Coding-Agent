@@ -29,7 +29,7 @@ from backend.utils.conversation_summary import (
 if TYPE_CHECKING:
     import socketio  # type: ignore[import-untyped]
 
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.server.session.session import Session
     from backend.storage.conversation.conversation_store import ConversationStore
     from backend.storage.data_models.conversation_metadata import ConversationMetadata
@@ -141,7 +141,7 @@ class ConversationMetadataTracker:
     # ------------------------------------------------------------------ #
 
     async def _handle_git_event(self, conversation_id: str, conversation: ConversationMetadata, event: Any) -> None:
-        if event and self._is_git_related_event(event):
+        if event and self._is_vcs_command_event(event):
             logger.info(
                 "Git-related event detected, updating conversation branch for %s",
                 conversation_id,
@@ -153,7 +153,7 @@ class ConversationMetadataTracker:
             await self._update_conversation_branch(conversation)
 
     @staticmethod
-    def _is_git_related_event(event: Any) -> bool:
+    def _is_vcs_command_event(event: Any) -> bool:
         if not event or not isinstance(event, CmdOutputObservation):
             return False
         if event.observation == ObservationType.RUN and event.metadata.exit_code == 0:

@@ -43,7 +43,7 @@ from backend.events.action.mcp import MCPAction
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.engines.orchestrator.tools.security_utils import RISK_LEVELS
 from backend.events.tool import build_tool_call_metadata
-from backend.models.tool_names import TASK_TRACKER_TOOL_NAME
+from backend.llm.tool_names import TASK_TRACKER_TOOL_NAME
 
 ToolHandler = Callable[[dict[str, Any]], Action]
 

@@ -6,10 +6,10 @@ from fastapi.responses import JSONResponse
 from backend.core.features import get_feature_flags
 from backend.server.shared import config
 
-app = APIRouter(prefix="/api/v1")
+router = APIRouter(prefix="/api/v1")
 
 
-@app.get("/features")
+@router.get("/features")
 async def get_features() -> JSONResponse:
     """Get feature flags status for clients.
 

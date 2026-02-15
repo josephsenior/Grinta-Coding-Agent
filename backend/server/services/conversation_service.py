@@ -34,7 +34,7 @@ from backend.storage.settings.settings_store import SettingsStore
 
 if TYPE_CHECKING:
     from backend.core.config.mcp_config import MCPConfig
-    from backend.server.data_models.agent_loop_info import AgentLoopInfo
+    from backend.server.schemas.agent_loop_info import AgentLoopInfo
 
 
 async def initialize_conversation(
@@ -43,7 +43,7 @@ async def initialize_conversation(
     selected_repository: str | None,
     selected_branch: str | None,
     conversation_trigger: ConversationTrigger = ConversationTrigger.GUI,
-    git_provider: ProviderType | None = None,
+    vcs_provider: ProviderType | None = None,
 ) -> ConversationMetadata | None:
     """Initialize a new conversation or retrieve existing one.
 
@@ -55,7 +55,7 @@ async def initialize_conversation(
         selected_repository: Repository for conversation
         selected_branch: Branch for conversation
         conversation_trigger: How conversation was triggered
-        git_provider: Git provider type
+        vcs_provider: Git provider type
 
     Returns:
         Conversation metadata or None if retrieval fails
@@ -79,7 +79,7 @@ async def initialize_conversation(
             user_id=user_id,
             selected_repository=selected_repository,
             selected_branch=selected_branch,
-            git_provider=git_provider,
+            vcs_provider=vcs_provider,
         )
         await conversation_store.save_metadata(conversation_metadata)
         return conversation_metadata
@@ -91,24 +91,24 @@ async def initialize_conversation(
 
 
 def _process_git_provider_tokens(
-    git_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
 ) -> PROVIDER_TOKEN_TYPE:
     """Process and normalize git provider tokens.
 
     Args:
-        git_provider_tokens: Raw provider tokens (dict, MappingProxy, or None)
+        vcs_provider_tokens: Raw provider tokens (dict, MappingProxy, or None)
 
     Returns:
         Normalized provider tokens as MappingProxyType
 
     """
-    if not git_provider_tokens:
+    if not vcs_provider_tokens:
         return MappingProxyType({})
 
-    if isinstance(git_provider_tokens, dict):
-        return MappingProxyType(git_provider_tokens)
+    if isinstance(vcs_provider_tokens, dict):
+        return MappingProxyType(vcs_provider_tokens)
 
-    return git_provider_tokens
+    return vcs_provider_tokens
 
 
 def _process_custom_secrets(
@@ -188,7 +188,7 @@ def _ensure_provider_tokens_for_providers(
 def _build_session_init_args(
     settings: Any,
     conversation_metadata: ConversationMetadata,
-    git_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
     custom_secrets: CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA | None,
     conversation_instructions: str | None,
     mcp_config: MCPConfig | None,
@@ -198,7 +198,7 @@ def _build_session_init_args(
     Args:
         settings: User settings
         conversation_metadata: Conversation metadata
-        git_provider_tokens: Provider tokens
+        vcs_provider_tokens: Provider tokens
         custom_secrets: Custom secrets
         conversation_instructions: Custom instructions
         mcp_config: MCP configuration
@@ -210,13 +210,13 @@ def _build_session_init_args(
     session_init_args: dict[str, Any] = {**settings.__dict__}
 
     # Add provider tokens and secrets
-    session_init_args["git_provider_tokens"] = _process_git_provider_tokens(git_provider_tokens)
+    session_init_args["vcs_provider_tokens"] = _process_git_provider_tokens(vcs_provider_tokens)
     session_init_args["custom_secrets"] = _process_custom_secrets(custom_secrets)
 
     # Add conversation metadata
     session_init_args["selected_repository"] = conversation_metadata.selected_repository
     session_init_args["selected_branch"] = conversation_metadata.selected_branch
-    session_init_args["git_provider"] = conversation_metadata.git_provider
+    session_init_args["vcs_provider"] = conversation_metadata.vcs_provider
     session_init_args["conversation_instructions"] = conversation_instructions
 
     # Add optional MCP config
@@ -248,7 +248,7 @@ def _create_initial_message_action(
 
 async def start_conversation(
     user_id: str | None,
-    git_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
     custom_secrets: CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA | None,
     initial_user_msg: str | None,
     image_urls: list[str] | None,
@@ -265,7 +265,7 @@ async def start_conversation(
 
     Args:
         user_id: User identifier
-        git_provider_tokens: Git provider authentication tokens
+        vcs_provider_tokens: Git provider authentication tokens
         custom_secrets: Custom user secrets
         initial_user_msg: Initial message from user
         image_urls: Initial image URLs
@@ -306,7 +306,7 @@ async def start_conversation(
     session_init_args = _build_session_init_args(
         settings,
         conversation_metadata,
-        git_provider_tokens,
+        vcs_provider_tokens,
         custom_secrets,
         conversation_instructions,
         mcp_config,
@@ -341,7 +341,7 @@ async def start_conversation(
 
 async def create_new_conversation(
     user_id: str | None,
-    git_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
     custom_secrets: CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA | None,
     selected_repository: str | None,
     selected_branch: str | None,
@@ -350,7 +350,7 @@ async def create_new_conversation(
     replay_json: str | None,
     conversation_instructions: str | None = None,
     conversation_trigger: ConversationTrigger = ConversationTrigger.GUI,
-    git_provider: ProviderType | None = None,
+    vcs_provider: ProviderType | None = None,
     conversation_id: str | None = None,
     mcp_config: MCPConfig | None = None,
 ) -> AgentLoopInfo:
@@ -360,7 +360,7 @@ async def create_new_conversation(
 
     Args:
         user_id: User identifier
-        git_provider_tokens: Git provider tokens
+        vcs_provider_tokens: Git provider tokens
         custom_secrets: Custom secrets
         selected_repository: Repository for conversation
         selected_branch: Branch for conversation
@@ -369,7 +369,7 @@ async def create_new_conversation(
         replay_json: Replay data
         conversation_instructions: Custom instructions
         conversation_trigger: How conversation was triggered
-        git_provider: Git provider type
+        vcs_provider: Git provider type
         conversation_id: Optional conversation ID
         mcp_config: MCP configuration
 
@@ -386,14 +386,14 @@ async def create_new_conversation(
         selected_repository,
         selected_branch,
         conversation_trigger,
-        git_provider,
+        vcs_provider,
     )
     if not conversation_metadata:
         msg = "Failed to initialize conversation"
         raise RuntimeError(msg)
     return await start_conversation(
         user_id,
-        git_provider_tokens,
+        vcs_provider_tokens,
         custom_secrets,
         initial_user_msg,
         image_urls,

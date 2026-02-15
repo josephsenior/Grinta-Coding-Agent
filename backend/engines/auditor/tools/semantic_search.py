@@ -4,7 +4,7 @@ Search codebase by semantic meaning, not just text patterns.
 Better than grep for conceptual searches.
 """
 
-from backend.models.tool_types import make_function_chunk, make_tool_param
+from backend.llm.tool_types import make_function_chunk, make_tool_param
 
 _SEMANTIC_SEARCH_DESCRIPTION = """Semantic code search - Find code by meaning, not just keywords
 

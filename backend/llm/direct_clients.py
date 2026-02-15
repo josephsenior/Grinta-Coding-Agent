@@ -157,7 +157,7 @@ class DirectLLMClient(ABC):
 
     def get_completion_cost(self, prompt_tokens: int, completion_tokens: int, config: Any | None = None) -> float:
         """Calculate completion cost for this client's model."""
-        from backend.models.cost_tracker import get_completion_cost
+        from backend.llm.cost_tracker import get_completion_cost
 
         return get_completion_cost(self.model_name, prompt_tokens, completion_tokens, config)
 

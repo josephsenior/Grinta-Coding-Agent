@@ -51,7 +51,7 @@ if TYPE_CHECKING:
             ...
 
 
-app: APIRouter
+sub_router: APIRouter
 if "pytest" in sys.modules:
 
     class NoOpAPIRouter(APIRouter):
@@ -61,7 +61,7 @@ if "pytest" in sys.modules:
             """Return endpoint without registering to allow direct invocation in tests."""
             return endpoint
 
-    app = cast(
+    sub_router = cast(
         APIRouter,
         NoOpAPIRouter(
             prefix="/api/conversations/{conversation_id}/files",
@@ -69,7 +69,7 @@ if "pytest" in sys.modules:
         ),
     )
 else:
-    app = APIRouter(
+    sub_router = APIRouter(
         prefix="/api/conversations/{conversation_id}/files",
         dependencies=get_dependencies(),
     )
@@ -205,7 +205,7 @@ def _get_runtime_timeout_error():
     )
 
 
-@app.get(
+@sub_router.get(
     "/list-files",
     response_model=None,
     responses={
@@ -311,7 +311,7 @@ async def list_files(
     return file_list
 
 
-@app.get(
+@sub_router.get(
     "/select-file",
     response_model=None,
     responses={
@@ -417,7 +417,7 @@ async def select_file(
     )
 
 
-@app.get(
+@sub_router.get(
     "/zip-directory",
     response_model=None,
     responses={
@@ -462,7 +462,7 @@ def zip_current_workspace(
         raise HTTPException(status_code=500, detail="Failed to zip workspace") from e
 
 
-@app.get(
+@sub_router.get(
     "/git/changes",
     response_model=None,
     responses={
@@ -532,7 +532,7 @@ async def git_changes(
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
-@app.get(
+@sub_router.get(
     "/git/diff",
     response_model=None,
     responses={
@@ -603,7 +603,7 @@ async def git_diff(
         )
 
 
-@app.post("/upload-files", response_model=POSTUploadFilesModel)
+@sub_router.post("/upload-files", response_model=POSTUploadFilesModel)
 async def upload_files(
     files: list[UploadFile],
     conversation: ServerConversation = Depends(get_conversation),

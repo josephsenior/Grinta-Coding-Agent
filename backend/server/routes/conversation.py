@@ -44,13 +44,13 @@ from backend.server.utils import (
 from backend.server.utils.responses import error
 
 if TYPE_CHECKING:
-    from backend.memory.memory import Memory
+    from backend.memory.agent_memory import Memory
     from backend.runtime.base import Runtime
     from backend.server.session.conversation import ServerConversation
     from backend.storage.data_models.conversation_metadata import ConversationMetadata
 
 
-app: APIRouter
+sub_router: APIRouter
 if "pytest" in sys.modules:
 
     class NoOpAPIRouter(APIRouter):
@@ -60,9 +60,9 @@ if "pytest" in sys.modules:
             """Return endpoint unchanged so tests can call handler directly."""
             return endpoint
 
-    app = cast(APIRouter, NoOpAPIRouter())
+    sub_router = cast(APIRouter, NoOpAPIRouter())
 else:
-    app = APIRouter(
+    sub_router = APIRouter(
         prefix="/api/conversations/{conversation_id}",
         dependencies=get_dependencies(),
     )
@@ -73,13 +73,13 @@ def _get_workspace_dir(conversation_id: str) -> str:
     return os.path.join(os.path.expanduser(file_store.root), conversation_id)
 
 
-@app.get("/simple-test")
+@sub_router.get("/simple-test")
 async def simple_test_endpoint() -> JSONResponse:
     """Simple test endpoint without any parameters."""
     return JSONResponse(content={"status": "simple_test_working"})
 
 
-@app.get("/config")
+@sub_router.get("/config")
 async def get_remote_runtime_config(
     request: Request,
     conversation_id: str,  # Extracted from path by FastAPI
@@ -116,7 +116,7 @@ async def get_remote_runtime_config(
         )
 
 
-@app.get("/web-hosts")
+@sub_router.get("/web-hosts")
 async def get_hosts(
     request: Request,
     conversation_id: str,  # Extracted from path by FastAPI
@@ -161,71 +161,7 @@ async def get_hosts(
         )
 
 
-@app.get("/git/changes")
-async def get_git_changes(
-    conversation_id: str,
-) -> JSONResponse:
-    """Get git changes in the workspace.
-
-    Returns the list of modified, added, and deleted files by running
-    ``git status --porcelain`` inside the conversation workspace.
-
-    Args:
-        conversation_id: The conversation ID.
-
-    Returns:
-        JSONResponse: A JSON response with the list of changes.
-    """
-    from backend.server.services.git_service import get_changes
-
-    workspace_dir = os.path.join(os.path.expanduser(file_store.root), conversation_id)
-    result = get_changes(workspace_dir)
-    if result.error:
-        code = 422 if "not installed" in result.error else (504 if "timed out" in result.error else 500)
-        return JSONResponse(status_code=code, content={"error": result.error})
-    return JSONResponse(
-        status_code=200,
-        content={"changes": [{"status": c.status, "path": c.path} for c in result.changes]},
-    )
-
-
-@app.get("/git/diff")
-async def get_git_diff(
-    conversation_id: str,  # Extracted from path by FastAPI
-    path: str = Query(..., min_length=1, description="File path to get diff for"),
-) -> JSONResponse:
-    """Get git diff for a specific file.
-
-    Runs ``git diff`` for the given file path inside the conversation workspace.
-
-    Args:
-        conversation_id: The conversation ID.
-        path: The file path to get diff for.
-
-    Returns:
-        JSONResponse: A JSON response with the diff content.
-    """
-    from backend.server.services.git_service import get_diff
-
-    workspace_dir = os.path.join(os.path.expanduser(file_store.root), conversation_id)
-    result = get_diff(workspace_dir, path)
-    if result.error:
-        code = (
-            404
-            if "not found" in result.error
-            else (422 if "not installed" in result.error else (504 if "timed out" in result.error else 500))
-        )
-        return JSONResponse(
-            status_code=code,
-            content={"error": result.error, "path": path},
-        )
-    return JSONResponse(
-        status_code=200,
-        content={"diff": result.diff, "path": result.path},
-    )
-
-
-@app.get("/events")
+@sub_router.get("/events")
 async def search_events(
     conversation_id: str,
     start_id: int = 0,
@@ -299,7 +235,7 @@ async def search_events(
     return {"events": events_json, "has_more": has_more}
 
 
-@app.post("/events")
+@sub_router.post("/events")
 async def add_event(request: Request, conversation: ServerConversation = Depends(get_conversation)):
     """Add an event to a conversation.
 
@@ -325,7 +261,7 @@ async def add_event(request: Request, conversation: ServerConversation = Depends
     return JSONResponse({"success": True})
 
 
-@app.post("/events/raw")
+@sub_router.post("/events/raw")
 async def add_event_raw(
     request: Request,
     conversation_id: str,
@@ -364,7 +300,7 @@ class PlaybookResponse(BaseModel):
     tools: list[str] = []
 
 
-@app.get("/playbooks")
+@sub_router.get("/playbooks")
 async def get_playbooks(
     conversation: ServerConversation = Depends(get_conversation),
 ) -> JSONResponse:
@@ -533,7 +469,7 @@ class CodeCompletionResponse(BaseModel):
     stopReason: str | None = None
 
 
-@app.post("/completions", response_model=CodeCompletionResponse)
+@sub_router.post("/completions", response_model=CodeCompletionResponse)
 async def get_code_completion(
     request: Request,
     request_body: CodeCompletionRequest,

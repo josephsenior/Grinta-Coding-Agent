@@ -82,8 +82,8 @@ class Settings(BaseModel):
     condenser_max_size: int | None = None
     email: str | None = None
     email_verified: bool | None = None
-    git_user_name: str | None = None
-    git_user_email: str | None = None
+    vcs_user_name: str | None = None
+    vcs_user_email: str | None = None
     model_config = ConfigDict(validate_assignment=True)
 
     @property

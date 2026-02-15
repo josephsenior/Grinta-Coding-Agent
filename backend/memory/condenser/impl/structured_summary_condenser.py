@@ -17,8 +17,8 @@ from backend.memory.condenser.condenser import BaseLLMCondenser, Condensation
 from backend.memory.view import View
 
 if TYPE_CHECKING:
-    from backend.models.llm import LLM
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm import LLM
+    from backend.llm.llm_registry import LLMRegistry
 
 
 class StateSummary(BaseModel):

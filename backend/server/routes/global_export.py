@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from backend.server.shared import config
 
-app = APIRouter(prefix="/api/global-export")
+router = APIRouter(prefix="/api/global-export")
 logger = logging.getLogger(__name__)
 
 
@@ -125,7 +125,7 @@ def _save_json_files(directory: str, data: list[dict]) -> tuple[int, int]:
     return imported, updated
 
 
-@app.get("/")
+@router.get("/")
 async def export_all_data() -> JSONResponse:
     r"""Export all user data as a downloadable JSON backup file.
 
@@ -170,7 +170,7 @@ async def export_all_data() -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/")
+@router.post("/")
 async def import_all_data(data: GlobalExportData) -> dict[str, dict[str, int]]:
     r"""Import all user data from a backup file.
 

@@ -32,7 +32,7 @@ RULES: list[tuple[str, str, str]] = [
         "backend.server",
         "controller must not depend on server layer",
     ),
-    ("backend/models", "backend.server", "models must not depend on server layer"),
+    ("backend/llm", "backend.server", "llm must not depend on server layer"),
     ("backend/engines", "backend.server", "engines must not depend on server layer"),
     ("backend/memory", "backend.server", "memory must not depend on server layer"),
     ("backend/events", "backend.server", "events must not depend on server layer"),

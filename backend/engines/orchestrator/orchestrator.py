@@ -29,7 +29,7 @@ from backend.core.logger import FORGE_logger as logger
 from backend.core.message import Message
 from backend.events.action import AgentThinkAction, MessageAction, PlaybookFinishAction
 from backend.events.event import EventSource
-from backend.models.llm_registry import LLMRegistry
+from backend.llm.llm_registry import LLMRegistry
 from backend.runtime.plugins import (
     PluginRequirement,
 )

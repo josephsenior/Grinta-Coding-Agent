@@ -44,7 +44,7 @@ def model_matches(model: str, patterns: list[str]) -> bool:
     return False
 
 
-from backend.models.capabilities import ModelCapabilities
+from backend.llm.capabilities import ModelCapabilities
 
 
 @dataclass(frozen=True)
@@ -115,7 +115,7 @@ RESPONSE_SCHEMA_PATTERNS: list[str] = [
 def get_model_token_limits(model: str) -> tuple[int | None, int | None]:
     """Get max input and output token limits for a model.
     """
-    from backend.models.catalog_loader import get_token_limits
+    from backend.llm.catalog_loader import get_token_limits
 
     return get_token_limits(model)
 

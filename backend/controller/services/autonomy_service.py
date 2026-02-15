@@ -60,11 +60,11 @@ class AutonomyService:
         if hasattr(agent.config, "enable_completion_validation") and agent.config.enable_completion_validation:
             from backend.validation.task_validator import (
                 CompositeValidator,
-                GitDiffValidator,
+                DiffValidator,
                 TestPassingValidator,
             )
 
-            validators = [TestPassingValidator(), GitDiffValidator()]
+            validators = [TestPassingValidator(), DiffValidator()]
             controller.task_validator = CompositeValidator(
                 validators=validators,
                 min_confidence=0.7,

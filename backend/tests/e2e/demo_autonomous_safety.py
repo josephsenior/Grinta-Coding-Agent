@@ -80,7 +80,7 @@ async def demo_simple_task():
     from backend.core.main import run_controller
     from backend.core.setup import create_agent, create_runtime
     from backend.events.action import MessageAction
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.tests.e2e._controller_test_helpers import create_safety_test_config
 
     # Create config with safety enabled

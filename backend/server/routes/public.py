@@ -7,15 +7,15 @@ from fastapi import APIRouter
 # Import engines to register all agents
 import backend.engines  # noqa: F401
 from backend.controller.agent import Agent
-from backend.models.model_catalog import get_supported_llm_models
+from backend.llm.model_catalog import get_supported_llm_models
 from backend.security.options import SecurityAnalyzers
 from backend.server.dependencies import get_dependencies
 from backend.server.shared import config, server_config
 
-app = APIRouter(prefix="/api/options", dependencies=get_dependencies())
+router = APIRouter(prefix="/api/options", dependencies=get_dependencies())
 
 
-@app.get("/models")
+@router.get("/models")
 async def get_models() -> list[str]:
     """Get all language models supported by the system.
 
@@ -39,7 +39,7 @@ async def get_models() -> list[str]:
     return get_supported_llm_models(config)
 
 
-@app.get("/agents")
+@router.get("/agents")
 async def get_agents() -> list[str]:
     """Get all available AI agents supported by the system.
 
@@ -62,7 +62,7 @@ async def get_agents() -> list[str]:
     return sorted(Agent.list_agents())
 
 
-@app.get("/security-analyzers")
+@router.get("/security-analyzers")
 async def get_security_analyzers() -> list[str]:
     """Get all supported security analyzers.
 
@@ -85,7 +85,7 @@ async def get_security_analyzers() -> list[str]:
     return sorted(SecurityAnalyzers.keys())
 
 
-@app.get("/config")
+@router.get("/config")
 async def get_config() -> dict[str, Any]:
     """Get current server configuration and settings.
 

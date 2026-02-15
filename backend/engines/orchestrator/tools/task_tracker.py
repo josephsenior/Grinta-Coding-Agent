@@ -5,7 +5,7 @@ from backend.engines.orchestrator.tools.common import (
     get_command_param,
 )
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
-from backend.models.tool_names import TASK_TRACKER_TOOL_NAME
+from backend.llm.tool_names import TASK_TRACKER_TOOL_NAME
 
 _TASK_TRACKER_DESCRIPTION = (
     "Maintain a structured list of tasks to track progress. "

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from backend.core.exceptions import LLMContextWindowExceedError
 from backend.core.logger import FORGE_logger as logger
-from backend.models.exceptions import (
+from backend.llm.exceptions import (
     APIConnectionError,
     APIError,
     AuthenticationError,

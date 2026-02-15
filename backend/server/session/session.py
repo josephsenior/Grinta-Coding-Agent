@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     import socketio  # type: ignore[import-untyped]
 
     from backend.core.config import ForgeConfig
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.server.services.conversation_stats import ConversationStats
     from backend.storage.data_models.settings import Settings
     from backend.storage.files import FileStore
@@ -132,12 +132,12 @@ class Session:
             cfg.security.security_analyzer = settings.security_analyzer
 
         # Git
-        git_user_name = getattr(settings, "git_user_name", None)
-        if git_user_name is not None:
-            cfg.git_user_name = git_user_name
-        git_user_email = getattr(settings, "git_user_email", None)
-        if git_user_email is not None:
-            cfg.git_user_email = git_user_email
+        vcs_user_name = getattr(settings, "vcs_user_name", None)
+        if vcs_user_name is not None:
+            cfg.vcs_user_name = vcs_user_name
+        vcs_user_email = getattr(settings, "vcs_user_email", None)
+        if vcs_user_email is not None:
+            cfg.vcs_user_email = vcs_user_email
 
         # MCP
         self.logger.debug("MCP configuration before setup - self.config.mcp_config: %s", cfg.mcp)
@@ -198,21 +198,21 @@ class Session:
         str | None,
     ]:
         """Extract conversation-specific data from settings."""
-        git_provider_tokens: PROVIDER_TOKEN_TYPE | None = None
+        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None
         selected_repository = None
         selected_branch = None
         custom_secrets: CUSTOM_SECRETS_TYPE | None = None
         conversation_instructions = None
 
         if isinstance(settings, ConversationInitData):
-            git_provider_tokens = settings.git_provider_tokens
+            vcs_provider_tokens = settings.vcs_provider_tokens
             selected_repository = settings.selected_repository
             selected_branch = settings.selected_branch
             custom_secrets = settings.custom_secrets
             conversation_instructions = settings.conversation_instructions
 
         return (
-            git_provider_tokens,
+            vcs_provider_tokens,
             selected_repository,
             selected_branch,
             custom_secrets,
@@ -224,7 +224,7 @@ class Session:
         agent,
         max_iterations: int,
         max_budget_per_task: float | None,
-        git_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
         custom_secrets: CUSTOM_SECRETS_TYPE | None,
         selected_repository: str | None,
         selected_branch: str | None,
@@ -243,7 +243,7 @@ class Session:
                 max_budget_per_task=max_budget_per_task,
                 agent_to_llm_config=self.config.get_agent_to_llm_config_map(),
                 agent_configs=self.config.get_agent_configs(),
-                git_provider_tokens=git_provider_tokens,
+                vcs_provider_tokens=vcs_provider_tokens,
                 custom_secrets=custom_secrets,
                 selected_repository=selected_repository,
                 selected_branch=selected_branch,
@@ -308,7 +308,7 @@ class Session:
 
         # Extract conversation data
         (
-            git_provider_tokens,
+            vcs_provider_tokens,
             selected_repository,
             selected_branch,
             custom_secrets,
@@ -320,7 +320,7 @@ class Session:
             agent,
             max_iterations,
             max_budget_per_task,
-            git_provider_tokens,
+            vcs_provider_tokens,
             custom_secrets,
             selected_repository,
             selected_branch,

@@ -24,7 +24,7 @@ from backend.events.event import Event, EventSource
 from backend.events.observation.agent import RecallObservation
 from backend.events.observation.observation import Observation
 from backend.memory.action_processors import convert_action_to_messages
-from backend.memory.memory_models import (
+from backend.memory.memory_types import (
     ContextAnchor,
     Decision,
     DecisionType,

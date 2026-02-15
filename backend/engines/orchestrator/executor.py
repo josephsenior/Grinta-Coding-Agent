@@ -18,7 +18,7 @@ from backend.engines.orchestrator.streaming_checkpoint import StreamingCheckpoin
 if TYPE_CHECKING:
     from backend.events.action import Action
     from backend.events.stream import EventStream
-    from backend.models.llm import LLM
+    from backend.llm.llm import LLM
 
     from .planner import OrchestratorPlanner
     from .safety import OrchestratorSafetyManager

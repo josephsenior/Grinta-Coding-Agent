@@ -20,7 +20,7 @@ from backend.core.schemas import AgentState
 from backend.events.action import MessageAction
 from backend.events.action.agent import PlaybookFinishAction
 from backend.events.event import Event, EventSource
-from backend.models.metrics import Metrics
+from backend.llm.metrics import Metrics
 from backend.memory.view import View
 from backend.storage.locations import get_conversation_agent_state_filename
 

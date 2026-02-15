@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any, cast
 from backend.core.logger import FORGE_logger as logger
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
 from backend.runtime import get_runtime_cls
-from backend.server.data_models.conversation_info import ConversationInfo
-from backend.server.data_models.conversation_info_result_set import (
+from backend.server.schemas.conversation_info import ConversationInfo
+from backend.server.schemas.conversation_info_result_set import (
     ConversationInfoResultSet,
 )
 from backend.server.services.shared_dependencies import (
@@ -31,7 +31,7 @@ from backend.utils.async_utils import wait_all
 from backend.utils.conversation_summary import get_default_conversation_title
 
 if TYPE_CHECKING:
-    from backend.server.data_models.agent_loop_info import AgentLoopInfo
+    from backend.server.schemas.agent_loop_info import AgentLoopInfo
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ async def get_conversation_info(
             created_at=conversation.created_at,
             selected_repository=conversation.selected_repository,
             selected_branch=conversation.selected_branch,
-            git_provider=conversation.git_provider,
+            vcs_provider=conversation.vcs_provider,
             status=getattr(agent_loop_info, "status", ConversationStatus.STOPPED),
             runtime_status=getattr(agent_loop_info, "runtime_status", None),
             agent_state=getattr(agent_loop_info, "agent_state", None),

@@ -14,7 +14,7 @@ from collections import deque
 from typing import Any
 from unittest.mock import MagicMock
 
-from backend.controller.circuit_breaker import (
+from backend.controller.agent_circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
 )

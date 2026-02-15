@@ -62,7 +62,7 @@ def extract_request_data(
     Returns:
         Tuple containing in order:
             - repository, selected_branch, initial_user_msg, image_urls,
-              replay_json, suggested_task, create_playbook, git_provider,
+              replay_json, suggested_task, create_playbook, vcs_provider,
               conversation_instructions
     """
     return (
@@ -73,7 +73,7 @@ def extract_request_data(
         data.replay_json,
         data.suggested_task,
         data.create_playbook,
-        data.git_provider,
+        data.vcs_provider,
         data.conversation_instructions,
     )
 
@@ -86,7 +86,7 @@ def determine_conversation_trigger(
     """Determine conversation trigger type and override repository/provider if needed."""
     conversation_trigger = ConversationTrigger.GUI
     repository = None
-    git_provider = None
+    vcs_provider = None
 
     if suggested_task:
         conversation_trigger = ConversationTrigger.SUGGESTED_TASK
@@ -94,13 +94,13 @@ def determine_conversation_trigger(
         conversation_trigger = ConversationTrigger.PLAYBOOK_MANAGEMENT
         if create_playbook.repo:
             repository = create_playbook.repo
-        if create_playbook.git_provider:
-            git_provider = create_playbook.git_provider
+        if create_playbook.vcs_provider:
+            vcs_provider = create_playbook.vcs_provider
 
     if auth_type == AuthType.BEARER:
         conversation_trigger = ConversationTrigger.REMOTE_API_KEY
 
-    return conversation_trigger, repository, git_provider
+    return conversation_trigger, repository, vcs_provider
 
 
 def validate_remote_api_request(
@@ -119,7 +119,7 @@ def validate_remote_api_request(
 
 async def verify_repository_access(
     repository: str | None,
-    git_provider: ProviderType | None,
+    vcs_provider: ProviderType | None,
     provider_tokens: PROVIDER_TOKEN_TYPE,
 ) -> None:
     """Verify user has access to the specified repository.
@@ -132,7 +132,7 @@ async def verify_repository_access(
 
 def apply_conversation_overrides(
     repository: str | None,
-    git_provider: ProviderType | None,
+    vcs_provider: ProviderType | None,
     override_repo: str | None,
     override_git_provider: ProviderType | None,
     suggested_task: SuggestedTask | None,
@@ -142,11 +142,11 @@ def apply_conversation_overrides(
     if override_repo:
         repository = override_repo
     if override_git_provider:
-        git_provider = override_git_provider
+        vcs_provider = override_git_provider
     if suggested_task:
         initial_user_msg = suggested_task.get_prompt_for_task()
 
-    return repository, git_provider, initial_user_msg
+    return repository, vcs_provider, initial_user_msg
 
 
 def normalize_provider_tokens(
@@ -197,7 +197,7 @@ async def handle_regular_conversation(
     replay_json: str | None,
     conversation_trigger: ConversationTrigger,
     conversation_instructions: str | None,
-    git_provider: ProviderType | None,
+    vcs_provider: ProviderType | None,
     provider_tokens: PROVIDER_TOKEN_TYPE,
     user_secrets: UserSecrets,
     mcp_config: Any | None,
@@ -209,7 +209,7 @@ async def handle_regular_conversation(
     """
     agent_loop_info = await create_new_conversation(
         user_id=user_id,
-        git_provider_tokens=provider_tokens,
+        vcs_provider_tokens=provider_tokens,
         custom_secrets=user_secrets.custom_secrets if user_secrets else None,
         selected_repository=repository,
         selected_branch=selected_branch,
@@ -218,7 +218,7 @@ async def handle_regular_conversation(
         replay_json=replay_json,
         conversation_trigger=conversation_trigger,
         conversation_instructions=conversation_instructions,
-        git_provider=git_provider,
+        vcs_provider=vcs_provider,
         conversation_id=conversation_id,
         mcp_config=mcp_config,
     )

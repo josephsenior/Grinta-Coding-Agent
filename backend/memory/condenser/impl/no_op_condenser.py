@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.core.config.condenser_config import NoOpCondenserConfig
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
 
 from backend.memory.condenser.condenser import Condensation, Condenser
 from backend.memory.view import View

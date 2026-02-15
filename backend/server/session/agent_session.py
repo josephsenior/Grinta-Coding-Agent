@@ -32,7 +32,7 @@ from backend.core.provider_types import (
     CustomSecret,
 )
 from backend.mcp import add_mcp_tools_to_agent
-from backend.memory.memory import Memory
+from backend.memory.agent_memory import Memory
 from backend.runtime import RuntimeAcquireResult, runtime_orchestrator
 from backend.server.shared import get_event_service_adapter
 from backend.server.types import LLMAuthenticationError
@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     from backend.controller.agent import Agent
     from backend.events.stream import EventStream
     from backend.instruction.playbook import BasePlaybook
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.runtime.base import Runtime
     from backend.server.services.conversation_stats import ConversationStats
     from backend.storage.data_models.settings import Settings
@@ -180,7 +180,7 @@ class AgentSession:
         config: ForgeConfig,
         agent: Agent,
         max_iterations: int,
-        git_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
         custom_secrets: CUSTOM_SECRETS_TYPE | None = None,
         max_budget_per_task: float | None = None,
         agent_to_llm_config: dict[str, LLMConfig] | None = None,
@@ -224,7 +224,7 @@ class AgentSession:
                 runtime_name,
                 config,
                 agent,
-                git_provider_tokens,
+                vcs_provider_tokens,
                 custom_secrets,
                 selected_repository,
                 selected_branch,
@@ -375,7 +375,7 @@ class AgentSession:
         runtime_name,
         config,
         agent,
-        git_provider_tokens,
+        vcs_provider_tokens,
         custom_secrets,
         selected_repository,
         selected_branch,
@@ -393,7 +393,7 @@ class AgentSession:
             llm_registry=self.llm_registry,
             status_callback=self._status_callback,
             session_logger=self.logger,
-            git_provider_tokens=git_provider_tokens,
+            vcs_provider_tokens=vcs_provider_tokens,
             custom_secrets=custom_secrets,
             selected_repository=selected_repository,
             selected_branch=selected_branch,
@@ -404,16 +404,16 @@ class AgentSession:
             self._repo_directory = result.repo_directory
 
         # Setup provider handlers
-        await self._setup_provider_handlers(git_provider_tokens, custom_secrets)
+        await self._setup_provider_handlers(vcs_provider_tokens, custom_secrets)
 
         return result.success
 
-    async def _setup_provider_handlers(self, git_provider_tokens, custom_secrets) -> None:
+    async def _setup_provider_handlers(self, vcs_provider_tokens, custom_secrets) -> None:
         """Setup provider handlers for git and custom secrets."""
-        if git_provider_tokens:
+        if vcs_provider_tokens:
             from backend.server.provider_handler import ProviderHandler
 
-            provider_handler = ProviderHandler(provider_tokens=git_provider_tokens)
+            provider_handler = ProviderHandler(provider_tokens=vcs_provider_tokens)
             await provider_handler.set_event_stream_secrets(self.event_stream)  # type: ignore[arg-type]
 
         if custom_secrets:
@@ -720,32 +720,32 @@ class AgentSession:
 
     def override_provider_tokens_with_custom_secret(
         self,
-        git_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
         custom_secrets: CUSTOM_SECRETS_TYPE | None,
     ):
         """Filter out provider tokens that have been overridden by custom secrets.
 
         Args:
-            git_provider_tokens: Provider tokens from configuration
+            vcs_provider_tokens: Provider tokens from configuration
             custom_secrets: Custom secrets that may override provider tokens
 
         Returns:
             Filtered provider tokens (immutable)
 
         """
-        if git_provider_tokens and custom_secrets:
+        if vcs_provider_tokens and custom_secrets:
             from backend.server.provider_handler import ProviderHandler
 
             tokens = {
                 provider: token
-                for provider, token in git_provider_tokens.items()
+                for provider, token in vcs_provider_tokens.items()
                 if not (
                     ProviderHandler.get_provider_env_key(provider) in custom_secrets
                     or ProviderHandler.get_provider_env_key(provider).upper() in custom_secrets
                 )
             }
             return MappingProxyType(tokens)
-        return git_provider_tokens
+        return vcs_provider_tokens
 
     def _create_controller(
         self,

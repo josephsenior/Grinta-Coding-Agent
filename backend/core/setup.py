@@ -23,8 +23,8 @@ from backend.core.constants import GENERAL_TIMEOUT
 from backend.core.exceptions import AgentNotRegisteredError
 from backend.core.logger import FORGE_logger as logger
 from backend.events import EventStream
-from backend.memory.memory import Memory
-from backend.models.llm_registry import LLMRegistry
+from backend.memory.agent_memory import Memory
+from backend.llm.llm_registry import LLMRegistry
 from backend.runtime.plugins import PluginRequirement
 from backend.storage import get_file_store
 from backend.storage.data_models.user_secrets import UserSecrets
@@ -110,7 +110,7 @@ def create_runtime(
     sid: str | None = None,
     headless_mode: bool = True,
     agent: Agent | None = None,
-    git_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
     *,
     event_stream: EventStream | None = None,
     env_vars: dict[str, str] | None = None,
@@ -126,7 +126,7 @@ def create_runtime(
         headless_mode: Whether the agent is run in headless mode.
             `create_runtime` is typically called within evaluation scripts, so it defaults to True.
         agent: (optional) The agent instance to use for configuring the runtime.
-        git_provider_tokens: Optional git provider tokens for authentication.
+        vcs_provider_tokens: Optional git provider tokens for authentication.
         event_stream: Optional event stream for real-time monitoring.
         env_vars: Optional environment variables for the runtime.
         user_id: Optional user ID for ownership and quotas.
@@ -164,7 +164,7 @@ def create_runtime(
         plugins=plugins,
         headless_mode=headless_mode,
         llm_registry=llm_registry or LLMRegistry(config),
-        git_provider_tokens=git_provider_tokens,
+        vcs_provider_tokens=vcs_provider_tokens,
         env_vars=env_vars,
         user_id=user_id,
         workspace_base=workspace_base,

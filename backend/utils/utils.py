@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from backend.models.llm_registry import LLMRegistry
+from backend.llm.llm_registry import LLMRegistry
 from backend.server.services.conversation_stats import ConversationStats
 from backend.storage import get_file_store
 

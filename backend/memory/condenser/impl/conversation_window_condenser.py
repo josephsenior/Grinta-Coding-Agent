@@ -15,7 +15,7 @@ from backend.memory.condenser.condenser import Condensation, RollingCondenser
 from backend.memory.view import View
 
 if TYPE_CHECKING:
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
 
 
 class ConversationWindowCondenser(RollingCondenser):

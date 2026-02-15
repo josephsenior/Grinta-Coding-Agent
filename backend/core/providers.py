@@ -14,7 +14,7 @@ VERIFIED_PROVIDERS = ["anthropic", "openai", "mistral"]
 
 def _get_verified(provider: str) -> list[str]:
     """Lazily load verified models from the catalog."""
-    from backend.models.catalog_loader import get_verified_models
+    from backend.llm.catalog_loader import get_verified_models
 
     return get_verified_models(provider)
 

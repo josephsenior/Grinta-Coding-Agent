@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logger import FORGE_logger as logger
 
 if TYPE_CHECKING:
-    from backend.models.metrics import TokenUsage
+    from backend.llm.metrics import TokenUsage
 
 
 class LLMRateGovernor:

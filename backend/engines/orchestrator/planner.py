@@ -4,13 +4,13 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import FORGE_logger as logger
-from backend.models.llm_utils import check_tools
+from backend.llm.llm_utils import check_tools
 
 ChatCompletionToolParam = Any
 
 if TYPE_CHECKING:
     from backend.controller.state.state import State
-    from backend.models.llm import LLM
+    from backend.llm.llm import LLM
 
     from .safety import OrchestratorSafetyManager
 

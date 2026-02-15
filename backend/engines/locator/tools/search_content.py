@@ -1,6 +1,6 @@
 """Tools for fetching entity contents and searching repository snippets."""
 
-from backend.models.tool_types import make_function_chunk, make_tool_param
+from backend.llm.tool_types import make_function_chunk, make_tool_param
 
 _SEARCH_ENTITY_DESCRIPTION = "\nSearches the codebase to retrieve the complete implementations of specified entities based on the provided entity names.\nThe tool can handle specific entity queries such as function names, class names, or file paths.\n\n**Usage Example:**\n# Search for a specific function implementation\nget_entity_contents(['src/my_file.py:MyClass.func_name'])\n\n# Search for a file's complete content\nget_entity_contents(['src/my_file.py'])\n\n**Entity Name Format:**\n- To specify a function or class, use the format: `file_path:QualifiedName`\n  (e.g., 'src/helpers/math_helpers.py:MathUtils.calculate_sum').\n- To search for a file's content, use only the file path (e.g., 'src/my_file.py').\n"
 SearchEntityTool = make_tool_param(

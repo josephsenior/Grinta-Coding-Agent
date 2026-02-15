@@ -8,11 +8,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.core.logger import FORGE_logger as logger
-from backend.models.catalog_loader import get_pricing
+from backend.llm.catalog_loader import get_pricing
 
 if TYPE_CHECKING:
     from backend.core.config import LLMConfig
-    from backend.models.metrics import Metrics
+    from backend.llm.metrics import Metrics
 
 
 def get_completion_cost(

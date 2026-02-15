@@ -7,19 +7,19 @@ from backend.core.logger import FORGE_logger as logger
 from backend.events.async_event_store_wrapper import AsyncEventStoreWrapper
 from backend.events.event_filter import EventFilter
 from backend.events.serialization import event_to_dict
-from backend.server.data_models.feedback import FeedbackDataModel, store_feedback
+from backend.server.schemas.feedback import FeedbackDataModel, store_feedback
 from backend.server.dependencies import get_dependencies
 from backend.server.session.conversation import ServerConversation
 from backend.server.utils import get_conversation
 from backend.utils.async_utils import call_sync_from_async
 
-app = APIRouter(
+router = APIRouter(
     prefix="/api/conversations/{conversation_id}/feedback",
     dependencies=get_dependencies(),
 )
 
 
-@app.post("/submit-feedback")
+@router.post("/submit-feedback")
 async def submit_feedback(
     request: Request,
     conversation: ServerConversation = Depends(get_conversation),

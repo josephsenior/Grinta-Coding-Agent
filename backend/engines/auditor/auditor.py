@@ -9,7 +9,7 @@ Capabilities:
 import os
 from typing import TYPE_CHECKING, Any
 
-from backend.models.llm_registry import LLMRegistry
+from backend.llm.llm_registry import LLMRegistry
 
 if TYPE_CHECKING:
     ChatCompletionToolParam = Any

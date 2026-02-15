@@ -20,8 +20,8 @@ if TYPE_CHECKING:
     from backend.controller.state.state import State
     from backend.core.config.condenser_config import CondenserConfig
     from backend.events.event import Event
-    from backend.models.llm import LLM
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm import LLM
+    from backend.llm.llm_registry import LLMRegistry
 
 
 CONDENSER_METADATA_KEY = "condenser_meta"

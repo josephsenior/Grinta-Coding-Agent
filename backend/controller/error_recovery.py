@@ -28,7 +28,7 @@ from backend.events.action import (
     CmdRunAction,
     MessageAction,
 )
-from backend.models.exceptions import AuthenticationError
+from backend.llm.exceptions import AuthenticationError
 
 logger = logging.getLogger(__name__)
 

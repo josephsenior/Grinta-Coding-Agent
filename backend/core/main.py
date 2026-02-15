@@ -27,8 +27,8 @@ if TYPE_CHECKING:
     from backend.events.event import Event
     from backend.events.stream import EventStream
     from backend.core.provider_types import PROVIDER_TOKEN_TYPE
-    from backend.memory.memory import Memory
-    from backend.models.llm_registry import LLMRegistry
+    from backend.memory.agent_memory import Memory
+    from backend.llm.llm_registry import LLMRegistry
     from backend.runtime.base import Runtime
     from backend.server.services.conversation_stats import ConversationStats
 
@@ -91,7 +91,7 @@ def _setup_runtime_and_repo(
     agent,
     headless_mode: bool,
     *,
-    git_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
     repo_initializer: Callable[[Runtime], str | None] | None = None,
     event_stream: EventStream | None = None,
     env_vars: dict[str, str] | None = None,
@@ -99,8 +99,8 @@ def _setup_runtime_and_repo(
 ) -> RuntimeAcquireResult:
     """Setup runtime and repository directory."""
     repo_tokens = (
-        git_provider_tokens
-        if git_provider_tokens is not None
+        vcs_provider_tokens
+        if vcs_provider_tokens is not None
         else get_provider_tokens()
     )
 
@@ -121,7 +121,7 @@ def _setup_runtime_and_repo(
         session_id=session_id,
         agent=agent,
         headless_mode=headless_mode,
-        git_provider_tokens=repo_tokens,
+        vcs_provider_tokens=repo_tokens,
         repo_initializer=repo_cb,
         event_stream=event_stream,
         env_vars=env_vars,

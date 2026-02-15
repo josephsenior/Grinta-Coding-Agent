@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from backend.controller.agent import Agent
     from backend.core.config import ForgeConfig
     from backend.events.stream import EventStream
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.runtime.base import Runtime
 
 
@@ -59,7 +59,7 @@ class RuntimeOrchestrator:
         session_id: str | None = None,
         agent: Agent,
         headless_mode: bool,
-        git_provider_tokens,
+        vcs_provider_tokens,
         repo_initializer: Callable[[Runtime], str | None] | None = None,
         event_stream: EventStream | None = None,
         env_vars: dict[str, str] | None = None,
@@ -85,7 +85,7 @@ class RuntimeOrchestrator:
             sid=session_id,
             headless_mode=headless_mode,
             agent=agent,
-            git_provider_tokens=git_provider_tokens,
+            vcs_provider_tokens=vcs_provider_tokens,
             event_stream=event_stream,
             env_vars=env_vars,
             user_id=user_id,

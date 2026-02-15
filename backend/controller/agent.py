@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from backend.controller.state.state import State
     from backend.events.action import Action
     from backend.events.action.message import SystemMessageAction
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.runtime.plugins import PluginRequirement
     from backend.utils.prompt import PromptManager
 from backend.controller.agent_tools import build_tool

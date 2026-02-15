@@ -1,6 +1,6 @@
 """Tool definitions for exploring repository structure in LoCAgent."""
 
-from backend.models.tool_types import make_function_chunk, make_tool_param
+from backend.llm.tool_types import make_function_chunk, make_tool_param
 
 _SIMPLIFIED_STRUCTURE_EXPLORER_DESCRIPTION = "\nA unified tool that traverses a pre-built code graph to retrieve dependency structure around specified entities,\nwith options to explore upstream or downstream, and control traversal depth and filters for entity and dependency types.\n"
 _SIMPLIFIED_TREE_EXAMPLE = "\nExample Usage:\n1. Exploring Downstream Dependencies:\n    ```\n    explore_tree_structure(\n        start_entities=['src/module_a.py:ClassA'],\n        direction='downstream',\n        traversal_depth=2,\n        dependency_type_filter=['invokes', 'imports']\n    )\n    ```\n2. Exploring the repository structure from the root directory (/) up to two levels deep:\n    ```\n    explore_tree_structure(\n      start_entities=['/'],\n      traversal_depth=2,\n      dependency_type_filter=['contains']\n    )\n    ```\n3. Generate Class Diagrams:\n    ```\n    explore_tree_structure(\n        start_entities=selected_entity_ids,\n        direction='both',\n        traverse_depth=-1,\n        dependency_type_filter=['inherits']\n    )\n    ```\n"

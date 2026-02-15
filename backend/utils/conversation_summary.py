@@ -10,7 +10,7 @@ from backend.events.event import EventSource
 from backend.events.event_store import EventStore
 
 if TYPE_CHECKING:
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.storage.data_models.settings import Settings
     from backend.storage.files import FileStore
 

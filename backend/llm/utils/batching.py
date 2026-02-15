@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logger import FORGE_logger as logger
 
 if TYPE_CHECKING:
-    from backend.models import LLM
+    from backend.llm import LLM
 
 
 @dataclass

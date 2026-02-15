@@ -123,7 +123,7 @@ class SuggestedTask(BaseModel):
     the GitHub integration layer.
     """
 
-    git_provider: ProviderType = Field(..., description="Git provider type")
+    vcs_provider: ProviderType = Field(..., description="Git provider type")
     task_type: TaskType = Field(..., description="Type of suggested task")
     repo: str = Field(..., min_length=1, description="Repository name in format 'owner/repo'")
     issue_number: int = Field(..., ge=1, description="Issue or PR number")
@@ -149,7 +149,7 @@ class CreatePlaybook(BaseModel):
     """Model for creating a new playbook."""
 
     repo: str = Field(..., min_length=1, description="Repository name in format 'owner/repo'")
-    git_provider: ProviderType | None = Field(
+    vcs_provider: ProviderType | None = Field(
         default=None, description="Git provider type (optional, will be auto-detected)"
     )
     title: str | None = Field(default=None, description="Optional title for the playbook")

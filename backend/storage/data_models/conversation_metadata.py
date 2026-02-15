@@ -33,7 +33,7 @@ class ConversationMetadata:
     selected_repository: str | None
     user_id: str | None = None
     selected_branch: str | None = None
-    git_provider: ProviderType | None = None
+    vcs_provider: ProviderType | None = None
     last_updated_at: datetime | None = None
     trigger: ConversationTrigger | None = None
     pr_number: list[int] = field(default_factory=list)

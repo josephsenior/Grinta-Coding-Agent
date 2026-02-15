@@ -28,8 +28,8 @@ from backend.utils.chunk_localizer import Chunk, get_top_k_chunk_matches
 
 if TYPE_CHECKING:
     from backend.core.config import ForgeConfig
-    from backend.models.llm import LLM
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm import LLM
+    from backend.llm.llm_registry import LLMRegistry
 
 USER_MSG = "\nCode changes will be provided in the form of a draft. You will need to apply the draft to the original code.\nThe original code will be enclosed within `<original_code>` tags.\nThe draft will be enclosed within `<update_snippet>` tags.\nYou need to output the update code within `<updated_code>` tags.\n\nWithin the `<updated_code>` tag, include only the final code after updation. Do not include any explanations or other content within these tags.\n\n<original_code>{old_contents}</original_code>\n\n<update_snippet>{draft_changes}</update_snippet>\n    "
 CORRECT_SYS_MSG = "You are a code repair assistant. Now you have an original file content and error information from a static code checking tool (lint tool). Your task is to automatically modify and return the repaired complete code based on these error messages and refer to the current file content.\n\nThe following are the specific task steps you need to complete:\n\nCarefully read the current file content to ensure that you fully understand its code structure.\n\nAccording to the lint error prompt, accurately locate and analyze the cause of the problem.\n\nModify the original file content and fix all errors prompted by the lint tool.\n\nReturn complete, runnable, and error-fixed code, paying attention to maintaining the overall style and specifications of the original code.\n\nPlease note:\n\nPlease strictly follow the lint error prompts to make modifications and do not miss any problems.\n\nThe modified code must be complete and cannot introduce new errors or bugs.\n\nThe modified code must maintain the original code function and logic, and no changes unrelated to error repair should be made."
@@ -442,7 +442,7 @@ class FileEditRuntimeMixin(ABC):
         """
         import backend.engines.orchestrator.function_calling as codeact_function_calling
         from backend.engines.orchestrator.tools import create_llm_based_edit_tool
-        from backend.models.llm_utils import check_tools
+        from backend.llm.llm_utils import check_tools
 
         _retry_num = retry_num + 1
         if self.check_retry_num(_retry_num):

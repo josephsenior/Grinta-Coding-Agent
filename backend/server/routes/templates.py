@@ -19,7 +19,7 @@ from backend.storage.data_models.conversation_template import (
     UpdateTemplateRequest,
 )
 
-app = APIRouter(prefix="/api/templates")
+router = APIRouter(prefix="/api/templates")
 logger = logging.getLogger(__name__)
 
 
@@ -72,7 +72,7 @@ def _load_all_templates() -> list[ConversationTemplate]:
     return templates
 
 
-@app.get("/")
+@router.get("/")
 async def list_templates(
     category: TemplateCategory | None = None,
     is_favorite: bool | None = None,
@@ -87,7 +87,7 @@ async def list_templates(
     return templates
 
 
-@app.post("/", status_code=201)
+@router.post("/", status_code=201)
 async def create_template(request: CreateTemplateRequest) -> ConversationTemplate:
     """Create a new template."""
     template = ConversationTemplate(
@@ -106,7 +106,7 @@ async def create_template(request: CreateTemplateRequest) -> ConversationTemplat
     return template
 
 
-@app.get("/{template_id}")
+@router.get("/{template_id}")
 async def get_template(
     template_id: Annotated[str, Path(..., min_length=1, description="Template ID")],
 ) -> ConversationTemplate:
@@ -117,7 +117,7 @@ async def get_template(
     raise HTTPException(status_code=404, detail="Template not found")
 
 
-@app.patch("/{template_id}")
+@router.patch("/{template_id}")
 async def update_template(
     template_id: Annotated[str, Path(..., min_length=1, description="Template ID")],
     request: UpdateTemplateRequest,
@@ -145,7 +145,7 @@ async def update_template(
     return template
 
 
-@app.delete("/{template_id}", status_code=204, response_model=None)
+@router.delete("/{template_id}", status_code=204, response_model=None)
 async def delete_template(
     template_id: Annotated[str, Path(..., min_length=1, description="Template ID")],
 ) -> None:
@@ -157,7 +157,7 @@ async def delete_template(
         raise HTTPException(status_code=404, detail="Template not found")
 
 
-@app.post("/{template_id}/use")
+@router.post("/{template_id}/use")
 async def track_template_usage(
     template_id: Annotated[str, Path(..., min_length=1, description="Template ID")],
 ) -> ConversationTemplate:

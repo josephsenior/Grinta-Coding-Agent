@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from backend.core.config.llm_config import LLMConfig
     from backend.events.action import MessageAction
     from backend.server.config.server_config import ServerConfig
-    from backend.server.data_models.agent_loop_info import AgentLoopInfo
+    from backend.server.schemas.agent_loop_info import AgentLoopInfo
     from backend.server.monitoring import MonitoringListener
     from backend.server.session.agent_session import AgentSession
     from backend.server.session.conversation import ServerConversation

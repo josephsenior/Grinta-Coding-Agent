@@ -145,7 +145,7 @@ class TestPassingValidator(TaskValidator):
         return test_executions
 
 
-class GitDiffValidator(TaskValidator):
+class DiffValidator(TaskValidator):
     """Validates that meaningful changes were made."""
 
     async def validate_completion(self, task: Task, state: State) -> ValidationResult:
@@ -160,7 +160,7 @@ class GitDiffValidator(TaskValidator):
 
         """
         # Look for git diff in recent history
-        git_diff = self._get_git_diff(state)
+        git_diff = self._get_diff_output(state)
 
         if not git_diff:
             return ValidationResult(
@@ -190,7 +190,7 @@ class GitDiffValidator(TaskValidator):
             confidence=0.8,
         )
 
-    def _get_git_diff(self, state: State) -> str | None:
+    def _get_diff_output(self, state: State) -> str | None:
         """Get git diff from history.
 
         Args:

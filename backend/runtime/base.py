@@ -80,7 +80,7 @@ if TYPE_CHECKING:
         ProviderToken,
         ProviderType,
     )
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
 else:
     BasePlaybook = Any
 
@@ -196,7 +196,7 @@ class Runtime(
         attach_to_existing: bool = False,
         headless_mode: bool = False,
         user_id: str | None = None,
-        git_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
         workspace_base: str | None = None,
     ) -> None:
         """Initialize runtime state, subscriptions, plugins, and provider credentials."""
@@ -222,7 +222,7 @@ class Runtime(
         self.initial_env_vars = _default_env_vars(config.runtime_config)
         if env_vars is not None:
             self.initial_env_vars.update(env_vars)
-        provider_tokens = _normalize_provider_tokens(git_provider_tokens)
+        provider_tokens = _normalize_provider_tokens(vcs_provider_tokens)
         self.provider_handler = ProviderHandler(
             provider_tokens=provider_tokens,
         )
@@ -241,7 +241,7 @@ class Runtime(
             llm_registry=llm_registry,
         )
         self.user_id = user_id
-        self.git_provider_tokens = provider_tokens
+        self.vcs_provider_tokens = provider_tokens
 
         # 🧹 CRITICAL FIX: Process manager for tracking and cleaning up long-running processes
         from backend.runtime.utils.process_manager import ProcessManager
@@ -398,7 +398,7 @@ class Runtime(
         if not providers_called:
             return
         provider_handler = ProviderHandler(
-            provider_tokens=self.git_provider_tokens,
+            provider_tokens=self.vcs_provider_tokens,
         )
         logger.info("Fetching latest provider tokens for runtime")
         env_vars = cast(

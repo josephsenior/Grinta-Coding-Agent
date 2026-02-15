@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from backend.core.logger import FORGE_logger as logger
-from backend.models.llm import LLM
+from backend.llm.llm import LLM
 
 if TYPE_CHECKING:
     from backend.core.config.agent_config import AgentConfig

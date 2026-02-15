@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.events.event import Event
-    from backend.models.metrics import Metrics, TokenUsage
+    from backend.llm.metrics import Metrics, TokenUsage
 
 
 def _get_tool_response_id(event: Event) -> str | None:

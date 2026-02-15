@@ -15,7 +15,7 @@ from backend.core.exceptions import (
 from backend.events import EventSource
 from backend.events.action.agent import CondensationRequestAction
 from backend.events.observation import ErrorObservation
-from backend.models.exceptions import (
+from backend.llm.exceptions import (
     APIConnectionError,
     APIError,
     AuthenticationError,

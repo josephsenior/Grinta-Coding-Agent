@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, Callable
 from backend.core.logger import FORGE_logger as logger
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
 from backend.events.action import Action
-from backend.models.model_response import ModelResponse
-from backend.models.tool_types import make_function_chunk, make_tool_param
+from backend.llm.model_response import ModelResponse
+from backend.llm.tool_types import make_function_chunk, make_tool_param
 
 if TYPE_CHECKING:
     from backend.events.serialization.event import ToolCallMetadata

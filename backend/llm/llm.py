@@ -20,9 +20,9 @@ from typing import (
 from backend.core.exceptions import LLMNoResponseError
 from backend.core.logger import FORGE_logger as logger
 from backend.core.message import Message
-from backend.models.debug_mixin import DebugMixin
-from backend.models.direct_clients import get_direct_client
-from backend.models.exceptions import (
+from backend.llm.debug_mixin import DebugMixin
+from backend.llm.direct_clients import get_direct_client
+from backend.llm.exceptions import (
     APIConnectionError,
     APIError,
     AuthenticationError,
@@ -36,10 +36,10 @@ from backend.models.exceptions import (
     Timeout,
     is_context_window_error,
 )
-from backend.models.llm_utils import create_pretrained_tokenizer, get_token_count
-from backend.models.metrics import Metrics
-from backend.models.model_features import ModelFeatures, get_features
-from backend.models.retry_mixin import RetryMixin
+from backend.llm.llm_utils import create_pretrained_tokenizer, get_token_count
+from backend.llm.metrics import Metrics
+from backend.llm.model_features import ModelFeatures, get_features
+from backend.llm.retry_mixin import RetryMixin
 
 if TYPE_CHECKING:
     from backend.core.config import LLMConfig
@@ -104,7 +104,7 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
 
 
 def _map_provider_exception(exc: Exception, model: str) -> Exception:
-    """Map provider SDK exceptions to our :mod:`backend.models.exceptions` hierarchy.
+    """Map provider SDK exceptions to our :mod:`backend.llm.exceptions` hierarchy.
 
     If the exception is already one of ours, it passes through unchanged.
     Unknown exceptions are wrapped in :class:`APIError` for uniformity.
@@ -221,7 +221,7 @@ class LLM(RetryMixin, DebugMixin):
                 self.config.model,
                 exc,
             )
-            from backend.models.model_features import ModelFeatures
+            from backend.llm.model_features import ModelFeatures
 
             self._cached_features = ModelFeatures()
 

@@ -19,7 +19,7 @@ from backend.runtime.utils.process_manager import (
 )
 from backend.server.shared import get_conversation_manager, server_config
 
-app = APIRouter(prefix="/api/monitoring")
+router = APIRouter(prefix="/api/monitoring")
 
 # For testing monkeypatching
 conversation_manager = None
@@ -50,7 +50,7 @@ class MetricsResponse(BaseModel):
     agents: list[AgentMetrics] = Field(default_factory=list)
 
 
-@app.get("/health")
+@router.get("/health")
 async def get_health():
     """Detailed health check for all system components."""
     event_stream = await event_stream_health()
@@ -138,7 +138,7 @@ def _event_stream_severity(warnings: list[str]) -> str:
     return "green"
 
 
-@app.get("/metrics", response_model=MetricsResponse)
+@router.get("/metrics", response_model=MetricsResponse)
 async def get_metrics():
     """JSON-formatted system and agent metrics."""
     try:
@@ -185,7 +185,7 @@ async def get_metrics():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/cost-summary")
+@router.get("/cost-summary")
 async def get_cost_summary():
     """Per-session cost and budget summary for all active conversations.
 
@@ -237,7 +237,7 @@ async def get_cost_summary():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/metrics-prom", response_class=PlainTextResponse)
+@router.get("/metrics-prom", response_class=PlainTextResponse)
 async def get_prometheus_metrics():
     """Prometheus-compatible metrics endpoint."""
     metrics = await get_metrics()
@@ -487,7 +487,7 @@ runtime_orchestrator = OrchestratorPlaceholder()
 runtime_watchdog = WatchdogPlaceholder()
 
 
-@app.get("/cache/stats")
+@router.get("/cache/stats")
 async def get_cache_stats():
     """Statistics for internal caches."""
     return {
@@ -498,7 +498,7 @@ async def get_cache_stats():
     }
 
 
-@app.get("/failures/taxonomy")
+@router.get("/failures/taxonomy")
 async def get_failure_taxonomy():
     """Distribution of failure types encountered by agents."""
     return {
@@ -509,7 +509,7 @@ async def get_failure_taxonomy():
     }
 
 
-@app.get("/parallel/stats")
+@router.get("/parallel/stats")
 async def get_parallel_stats():
     """Statistics for parallel execution features."""
     return {
@@ -520,7 +520,7 @@ async def get_parallel_stats():
     }
 
 
-@app.websocket("/ws/metrics")
+@router.websocket("/ws/metrics")
 async def live_metrics_stream(websocket: WebSocket):
     """Real-time metrics stream via WebSocket."""
     await websocket.accept()
@@ -548,7 +548,7 @@ async def live_metrics_stream(websocket: WebSocket):
         pass
 
 
-@app.get("/controller/{sid}/health")
+@router.get("/controller/{sid}/health")
 async def controller_health(sid: str):
     """Health status of a specific agent controller."""
     manager = _get_manager()
@@ -574,7 +574,7 @@ def collect_controller_health(controller: Any) -> dict[str, Any]:
     return _collect_controller_health(controller)
 
 
-@app.get("/processes/health")
+@router.get("/processes/health")
 async def process_manager_health():
     """Health status of the process manager."""
     health: dict[str, Any] = {"status": "healthy"}
@@ -638,7 +638,7 @@ def _collect_event_stream_warnings(stats: dict[str, Any], thresholds: dict[str, 
     return warnings
 
 
-@app.get("/event-stream/health")
+@router.get("/event-stream/health")
 async def event_stream_health():
     """Aggregate EventStream backpressure and durability health across sessions."""
     stats = get_aggregated_event_stream_stats()

@@ -13,7 +13,7 @@ from backend.runtime.utils.system_stats import update_last_execution_time
 if TYPE_CHECKING:
     from backend.core.config import ForgeConfig
     from backend.events import EventStream
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
 
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ class ActionExecutionClient(Runtime):
         attach_to_existing: bool = False,
         headless_mode: bool = False,
         user_id: str | None = None,
-        git_provider_tokens: Any | None = None,
+        vcs_provider_tokens: Any | None = None,
         workspace_base: str | None = None,
         *args,
         **kwargs,
@@ -93,7 +93,7 @@ class ActionExecutionClient(Runtime):
             attach_to_existing=attach_to_existing,
             headless_mode=headless_mode,
             user_id=user_id,
-            git_provider_tokens=git_provider_tokens,
+            vcs_provider_tokens=vcs_provider_tokens,
             workspace_base=workspace_base,
         )
         self._vscode_token: str | None = None

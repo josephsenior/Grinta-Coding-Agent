@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from backend.controller.state.state import State
     from backend.core.config.condenser_config import CondenserPipelineConfig
     from backend.memory.view import View
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
 
 from backend.memory.condenser.condenser import Condensation, Condenser
 

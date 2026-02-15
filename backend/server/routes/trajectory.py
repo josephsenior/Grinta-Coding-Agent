@@ -12,13 +12,13 @@ from backend.server.session.conversation import ServerConversation
 from backend.server.session.session_contract import normalize_replay_cursor
 from backend.server.utils import get_conversation
 
-app = APIRouter(
+router = APIRouter(
     prefix="/api/conversations/{conversation_id}/trajectory",
     dependencies=get_dependencies(),
 )
 
 
-@app.get("/")
+@router.get("/")
 async def get_trajectory(
     conversation_id: Annotated[str, Path(..., min_length=1, description="Conversation ID")],
     since_id: Annotated[

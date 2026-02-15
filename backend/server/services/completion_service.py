@@ -12,7 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from backend.controller.circuit_breaker import (
+from backend.controller.agent_circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
 )
@@ -21,7 +21,7 @@ from backend.core.cache.async_smart_cache import AsyncSmartCache
 from backend.core.constants import COMPLETION_TIMEOUT
 from backend.core.logger import FORGE_logger as logger
 from backend.events.action import ActionSecurityRisk
-from backend.models.cost_tracker import record_llm_cost_from_response
+from backend.llm.cost_tracker import record_llm_cost_from_response
 
 if TYPE_CHECKING:
     from backend.core.config.llm_config import LLMConfig
@@ -188,7 +188,7 @@ def record_success(conversation_id: str) -> None:
 
 
 def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
-    from backend.models.cost_tracker import get_completion_cost
+    from backend.llm.cost_tracker import get_completion_cost
 
     return get_completion_cost(model, prompt_tokens, completion_tokens)
 

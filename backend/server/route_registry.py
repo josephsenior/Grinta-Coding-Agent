@@ -17,25 +17,25 @@ if TYPE_CHECKING:
 
 def register_routes(app: FastAPI) -> None:
     """Mount all API routers on the FastAPI application."""
-    from backend.server.routes.conversation import app as conversation_api_router
-    from backend.server.routes.features import app as features_router
-    from backend.server.routes.feedback import app as feedback_api_router
-    from backend.server.routes.files import app as files_api_router
-    from backend.server.routes.global_export import app as global_export_router
+    from backend.server.routes.conversation import sub_router as conversation_api_router
+    from backend.server.routes.features import router as features_router
+    from backend.server.routes.feedback import router as feedback_api_router
+    from backend.server.routes.files import sub_router as files_api_router
+    from backend.server.routes.global_export import router as global_export_router
     from backend.server.routes.health import add_health_endpoints
     from backend.server.routes.knowledge_base import router as knowledge_base_router
     from backend.server.routes.manage_conversations import (
-        app as manage_conversation_api_router,
+        sub_router as manage_conversation_api_router,
     )
-    from backend.server.routes.memory import app as memory_router
-    from backend.server.routes.monitoring import app as monitoring_router
+    from backend.server.routes.memory import router as memory_router
+    from backend.server.routes.monitoring import router as monitoring_router
     from backend.server.routes.notifications import router as notifications_router
-    from backend.server.routes.public import app as public_api_router
+    from backend.server.routes.public import router as public_api_router
     from backend.server.routes.search import router as search_router
     from backend.server.routes.secrets import router as secrets_router
-    from backend.server.routes.settings import app as settings_router
-    from backend.server.routes.templates import app as templates_router
-    from backend.server.routes.trajectory import app as trajectory_router
+    from backend.server.routes.settings import router as settings_router
+    from backend.server.routes.templates import router as templates_router
+    from backend.server.routes.trajectory import router as trajectory_router
 
     app.include_router(public_api_router, tags=["v1", "public"])
     app.include_router(features_router, tags=["v1", "features"])

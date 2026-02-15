@@ -66,8 +66,8 @@ from backend.server.utils import (
     validate_conversation_id,
 )
 from backend.server.utils.responses import error
-from backend.server.data_models.conversation_info_result_set import ConversationInfoResultSet
-from backend.server.data_models.conversation_info import ConversationInfo
+from backend.server.schemas.conversation_info_result_set import ConversationInfoResultSet
+from backend.server.schemas.conversation_info import ConversationInfo
 from backend.storage.data_models.conversation_metadata import (
     ConversationMetadata,
     ConversationTrigger,
@@ -83,7 +83,7 @@ if TYPE_CHECKING:
 # Router
 # ---------------------------------------------------------------------------
 
-app: APIRouter
+sub_router: APIRouter
 if "pytest" in sys.modules:
 
     class NoOpAPIRouter(APIRouter):
@@ -92,9 +92,9 @@ if "pytest" in sys.modules:
         def add_api_route(self, path: str, endpoint, **kwargs):  # type: ignore[override]
             return endpoint
 
-    app = cast(APIRouter, NoOpAPIRouter())
+    sub_router = cast(APIRouter, NoOpAPIRouter())
 else:
-    app = APIRouter(prefix="/api")
+    sub_router = APIRouter(prefix="/api")
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ class InitSessionRequest(BaseModel):
     """Request payload for creating or resuming a conversation session."""
 
     repository: str | None = Field(None, description="Repository identifier")
-    git_provider: ProviderType | None = Field(None, description="Git provider type")
+    vcs_provider: ProviderType | None = Field(None, description="Git provider type")
     selected_branch: str | None = Field(None, description="Selected branch name")
     initial_user_msg: str | None = Field(None, description="Initial user message")
     image_urls: list[str] | None = Field(None, description="List of image URLs")
@@ -178,7 +178,7 @@ class UpdateConversationRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@app.post("/conversations", response_model=None)
+@sub_router.post("/conversations", response_model=None)
 async def new_conversation(
     request: Request,
     data: InitSessionRequest,
@@ -221,7 +221,7 @@ async def new_conversation(
         replay_json,
         suggested_task,
         create_playbook,
-        git_provider,
+        vcs_provider,
         conversation_instructions,
     ) = extract_request_data(data)
 
@@ -229,9 +229,9 @@ async def new_conversation(
         suggested_task, create_playbook, auth_type
     )
 
-    repository, git_provider, initial_user_msg = apply_conversation_overrides(
+    repository, vcs_provider, initial_user_msg = apply_conversation_overrides(
         repository,
-        git_provider,
+        vcs_provider,
         override_repo,
         override_git_provider,
         suggested_task,
@@ -245,7 +245,7 @@ async def new_conversation(
 
     try:
         if repository:
-            await verify_repository_access(repository, git_provider, provider_tokens)
+            await verify_repository_access(repository, vcs_provider, provider_tokens)
 
         conversation_id = resolve_conversation_id(data)
 
@@ -259,7 +259,7 @@ async def new_conversation(
             replay_json=replay_json,
             conversation_trigger=conversation_trigger,
             conversation_instructions=conversation_instructions,
-            git_provider=git_provider,
+            vcs_provider=vcs_provider,
             provider_tokens=provider_tokens,
             user_secrets=user_secrets,
             mcp_config=data.mcp_config,
@@ -276,7 +276,7 @@ async def new_conversation(
         return handle_conversation_errors(e)
 
 
-@app.get("/conversations/test")
+@sub_router.get("/conversations/test")
 async def test_conversations_endpoint() -> JSONResponse:
     """Test endpoint to verify routing is working."""
     return JSONResponse(
@@ -287,13 +287,13 @@ async def test_conversations_endpoint() -> JSONResponse:
     )
 
 
-@app.get("/conversations/simple")
+@sub_router.get("/conversations/simple")
 async def simple_conversations_endpoint() -> dict:
     """Simple endpoint without dependencies to test routing."""
     return {"status": "simple_working", "count": 1}
 
 
-@app.get("/conversations", response_model=None)
+@sub_router.get("/conversations", response_model=None)
 async def search_conversations_route(
     request: Request,
     page_id: str | None = Query(None, description="Page cursor for pagination"),
@@ -340,7 +340,7 @@ async def search_conversations_route(
 search_conversations = _search_conversations_impl
 
 
-@app.get("/conversations/{conversation_id}", response_model=None)
+@sub_router.get("/conversations/{conversation_id}", response_model=None)
 async def _get_conversation_route(
     request: Request,
     conversation_id: str = Depends(validate_conversation_id),
@@ -353,7 +353,7 @@ async def _get_conversation_route(
     return result
 
 
-@app.delete("/conversations/{conversation_id}")
+@sub_router.delete("/conversations/{conversation_id}")
 async def _delete_conversation_route(
     request: Request,
     conversation_id: str = Depends(validate_conversation_id),
@@ -363,7 +363,7 @@ async def _delete_conversation_route(
     return await delete_conversation_entry(conversation_id, user_id, conversation_store)
 
 
-@app.get("/conversations/{conversation_id}/remember-prompt")
+@sub_router.get("/conversations/{conversation_id}/remember-prompt")
 async def get_prompt(
     event_id: int,
     conversation_id: Annotated[str, Depends(validate_conversation_id)],
@@ -381,7 +381,7 @@ async def get_prompt(
     return JSONResponse({"status": "success", "prompt": prompt})
 
 
-@app.post("/conversations/{conversation_id}/start", response_model=None)
+@sub_router.post("/conversations/{conversation_id}/start", response_model=None)
 async def start_conversation(
     providers_set: ProvidersSetModel,
     conversation_id: str = Depends(validate_conversation_id),
@@ -431,7 +431,7 @@ async def start_conversation(
         )
 
 
-@app.post("/conversations/{conversation_id}/stop", response_model=None)
+@sub_router.post("/conversations/{conversation_id}/stop", response_model=None)
 async def stop_conversation(
     conversation_id: Annotated[str, Depends(validate_conversation_id)],
     user_id: Annotated[str, Depends(get_user_id)],
@@ -461,7 +461,7 @@ async def stop_conversation(
         )
 
 
-@app.patch("/conversations/{conversation_id}", response_model=bool)
+@sub_router.patch("/conversations/{conversation_id}", response_model=bool)
 async def update_conversation(
     data: UpdateConversationRequest,
     conversation_id: Annotated[str, Depends(validate_conversation_id)],
@@ -508,7 +508,7 @@ async def update_conversation(
         )
 
 
-@app.get("/playbook-management/conversations")
+@sub_router.get("/playbook-management/conversations")
 async def get_playbook_management_conversations(
     selected_repository: str,
     page_id: str | None = None,

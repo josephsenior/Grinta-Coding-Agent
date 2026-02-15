@@ -30,7 +30,7 @@ from backend.events.action import (
 )
 from backend.events.event import Event, EventSource
 from backend.events.observation import BrowserOutputObservation
-from backend.models.llm_registry import LLMRegistry
+from backend.llm.llm_registry import LLMRegistry
 from backend.runtime.plugins import PluginRequirement
 from backend.utils.prompt import PromptManager
 

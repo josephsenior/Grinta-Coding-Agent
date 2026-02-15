@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 # Rebuild GETSettingsModel to resolve forward references
 GETSettingsModel.model_rebuild()
 
-app = APIRouter(prefix="/api", dependencies=get_dependencies())
+router = APIRouter(prefix="/api", dependencies=get_dependencies())
 
 # 🚀 PERFORMANCE FIX: Global cache for settings to avoid repeated database calls
 #   Cache key: user_id (or 'default' for single-tenant), Cache value: (settings_response, timestamp)
@@ -288,17 +288,17 @@ def _process_llm_model_configuration(settings: Settings) -> None:
 
 def _apply_runtime_and_git_overrides(settings: Settings) -> None:
     git_config_updated = False
-    if settings.git_user_name is not None:
-        config.git_user_name = settings.git_user_name
+    if settings.vcs_user_name is not None:
+        config.vcs_user_name = settings.vcs_user_name
         git_config_updated = True
-    if settings.git_user_email is not None:
-        config.git_user_email = settings.git_user_email
+    if settings.vcs_user_email is not None:
+        config.vcs_user_email = settings.vcs_user_email
         git_config_updated = True
     if git_config_updated:
         logger.info(
             "Updated global git configuration: name=%s, email=%s",
-            config.git_user_name,
-            config.git_user_email,
+            config.vcs_user_name,
+            config.vcs_user_email,
         )
 
 
@@ -317,7 +317,7 @@ def invalidate_settings_cache(user_id: str | None = None) -> None:
         logger.info("Cleared all settings cache entries")
 
 
-@app.get(
+@router.get(
     "/settings",
     response_model=GETSettingsModel,
     responses={
@@ -518,7 +518,7 @@ async def store_llm_settings(
     return settings
 
 
-@app.post(
+@router.post(
     "/settings",
     response_model=None,
     responses={
@@ -704,8 +704,8 @@ def _build_default_settings_response() -> GETSettingsModel:
         email="",
         email_verified=True,
         mcp_config=None,
-        git_user_name="forge",
-        git_user_email="Forge@forge.dev",
+        vcs_user_name="forge",
+        vcs_user_email="Forge@forge.dev",
         # Autonomy Configuration
         autonomy_level="balanced",
         enable_permissions=True,

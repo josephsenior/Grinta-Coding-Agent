@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from backend.core.config import ForgeConfig
     from backend.events import EventStream
     from backend.core.provider_types import PROVIDER_TOKEN_TYPE
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.runtime.plugins import PluginRequirement
 
 
@@ -74,7 +74,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         attach_to_existing: bool = False,
         headless_mode: bool = True,
         user_id: str | None = None,
-        git_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
         workspace_base: str | None = None,
     ) -> None:
         """Initialize in-process local runtime."""
@@ -125,7 +125,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             attach_to_existing,
             headless_mode,
             user_id,
-            git_provider_tokens,
+            vcs_provider_tokens,
             workspace_base=workspace_base,
         )
 

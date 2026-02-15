@@ -5,7 +5,7 @@
 
 def __getattr__(name: str):  # noqa: N807
     if name == "Memory":
-        from backend.memory.memory import Memory
+        from backend.memory.agent_memory import Memory
 
         return Memory
     if name == "ConversationMemory":

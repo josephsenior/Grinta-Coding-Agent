@@ -23,8 +23,8 @@ from backend.core.constants import (
     DEFAULT_ENABLE_BROWSER,
     DEFAULT_ENABLE_DEFAULT_CONDENSER,
     DEFAULT_FILE_STORE,
-    DEFAULT_GIT_USER_EMAIL,
-    DEFAULT_GIT_USER_NAME,
+    DEFAULT_VCS_USER_EMAIL,
+    DEFAULT_VCS_USER_NAME,
     DEFAULT_LOG_FORMAT,
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_CONCURRENT_CONVERSATIONS,
@@ -39,8 +39,8 @@ from backend.core.constants import (
 class GitIdentityConfig(BaseModel):
     """Grouped git identity and init behavior settings."""
 
-    user_name: str = Field(default=DEFAULT_GIT_USER_NAME)
-    user_email: str = Field(default=DEFAULT_GIT_USER_EMAIL)
+    user_name: str = Field(default=DEFAULT_VCS_USER_NAME)
+    user_email: str = Field(default=DEFAULT_VCS_USER_EMAIL)
     init_in_empty_workspace: bool = Field(default=False)
 
 
@@ -91,8 +91,8 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         enable_browser: Whether to enable the browser environment
         max_iterations: Maximum number of iterations allowed.
         mcp: MCP configuration settings.
-        git_user_name: Git user name for commits made by the agent.
-        git_user_email: Git user email for commits made by the agent.
+        vcs_user_name: Git user name for commits made by the agent.
+        vcs_user_email: Git user email for commits made by the agent.
     """
 
     llms: dict[str, LLMConfig] = Field(default_factory=dict)
@@ -120,12 +120,12 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     file_uploads: FileUploadsConfig = Field(default_factory=lambda: FileUploadsConfig())
     trajectory: TrajectoryConfig = Field(default_factory=lambda: TrajectoryConfig())
     event_stream: EventStreamConfig = Field(default_factory=lambda: EventStreamConfig())
-    git_user_name: str = Field(
-        default=DEFAULT_GIT_USER_NAME,
+    vcs_user_name: str = Field(
+        default=DEFAULT_VCS_USER_NAME,
         description="Git user name for commits made by the agent",
     )
-    git_user_email: str = Field(
-        default=DEFAULT_GIT_USER_EMAIL,
+    vcs_user_email: str = Field(
+        default=DEFAULT_VCS_USER_EMAIL,
         description="Git user email for commits made by the agent",
     )
     jwt_secret: SecretStr | None = Field(
@@ -254,8 +254,8 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         """Post-initialization hook, called when the instance is created with only default values."""
         super().model_post_init(__context)
 
-        self.git.user_name = self.git_user_name
-        self.git.user_email = self.git_user_email
+        self.git.user_name = self.vcs_user_name
+        self.git.user_email = self.vcs_user_email
         self.git.init_in_empty_workspace = self.init_git_in_empty_workspace
 
         self.file_uploads.max_file_size_mb = self.file_uploads_max_file_size_mb

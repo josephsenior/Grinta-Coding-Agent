@@ -9,11 +9,11 @@ from threading import Lock
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.logger import FORGE_logger as logger
-from backend.models.metrics import Metrics
+from backend.llm.metrics import Metrics
 from backend.storage.locations import get_conversation_stats_filename
 
 if TYPE_CHECKING:
-    from backend.models.llm_registry import RegistryEvent
+    from backend.llm.llm_registry import RegistryEvent
     from backend.storage.files import FileStore
 
 

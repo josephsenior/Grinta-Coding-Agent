@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.controller.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+from backend.controller.agent_circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.controller.safety_validator import ExecutionContext, SafetyValidator
 from backend.events.action import ActionSecurityRisk, CmdRunAction
@@ -21,7 +21,7 @@ from backend.security.command_analyzer import CommandAnalyzer
 from backend.security.safety_config import SafetyConfig
 from backend.validation.task_validator import (
     CompositeValidator,
-    GitDiffValidator,
+    DiffValidator,
     Task,
     TestPassingValidator,
 )
@@ -264,8 +264,8 @@ class TestTaskValidation:
 
     @pytest.mark.asyncio
     async def test_git_diff_validator(self):
-        """Test GitDiffValidator."""
-        validator = GitDiffValidator()
+        """Test DiffValidator."""
+        validator = DiffValidator()
 
         # Create mock state with no git diff
         state = MagicMock()
@@ -281,7 +281,7 @@ class TestTaskValidation:
     async def test_composite_validator(self):
         """Test CompositeValidator with multiple validators."""
         validator = CompositeValidator(
-            validators=[TestPassingValidator(), GitDiffValidator()],
+            validators=[TestPassingValidator(), DiffValidator()],
             min_confidence=0.7,
             require_all_pass=False,
         )

@@ -11,8 +11,8 @@ from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.core.config.condenser_config import SmartCondenserConfig
-    from backend.models.llm import LLM
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm import LLM
+    from backend.llm.llm_registry import LLMRegistry
 
 from backend.core.logger import FORGE_logger as logger
 from backend.events.action import Action, MessageAction

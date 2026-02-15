@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS conversation_metadata (
     selected_repository TEXT,
     user_id TEXT,
     selected_branch TEXT,
-    git_provider TEXT,
+    vcs_provider TEXT,
     last_updated_at TIMESTAMPTZ NOT NULL,
     trigger TEXT,
     pr_number JSONB DEFAULT '[]',
@@ -96,7 +96,7 @@ class DatabaseConversationStore(ConversationStore):
                     """
                     INSERT INTO conversation_metadata (
                         conversation_id, title, selected_repository, user_id,
-                        selected_branch, git_provider, last_updated_at, trigger,
+                        selected_branch, vcs_provider, last_updated_at, trigger,
                         pr_number, created_at, llm_model, accumulated_cost,
                         prompt_tokens, completion_tokens, total_tokens, name
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
@@ -105,7 +105,7 @@ class DatabaseConversationStore(ConversationStore):
                         selected_repository = EXCLUDED.selected_repository,
                         user_id = EXCLUDED.user_id,
                         selected_branch = EXCLUDED.selected_branch,
-                        git_provider = EXCLUDED.git_provider,
+                        vcs_provider = EXCLUDED.vcs_provider,
                         last_updated_at = EXCLUDED.last_updated_at,
                         trigger = EXCLUDED.trigger,
                         pr_number = EXCLUDED.pr_number,
@@ -121,7 +121,7 @@ class DatabaseConversationStore(ConversationStore):
                     metadata.selected_repository,
                     metadata.user_id,
                     metadata.selected_branch,
-                    metadata.git_provider.value if metadata.git_provider else None,
+                    metadata.vcs_provider.value if metadata.vcs_provider else None,
                     metadata.last_updated_at or datetime.now(UTC),
                     metadata.trigger.value if metadata.trigger else None,
                     json.dumps(metadata.pr_number),
@@ -204,7 +204,7 @@ class DatabaseConversationStore(ConversationStore):
             selected_repository=row["selected_repository"],
             user_id=row["user_id"],
             selected_branch=row["selected_branch"],
-            git_provider=ProviderType(row["git_provider"]) if row["git_provider"] else None,
+            vcs_provider=ProviderType(row["vcs_provider"]) if row["vcs_provider"] else None,
             last_updated_at=row["last_updated_at"],
             trigger=ConversationTrigger(row["trigger"]) if row["trigger"] else None,
             pr_number=pr_number,

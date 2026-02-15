@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
     from backend.controller.agent import Agent
     from backend.core.config import ForgeConfig
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.runtime.base import Runtime
 
 
@@ -52,7 +52,7 @@ async def create_runtime(
     llm_registry: LLMRegistry,
     status_callback: Callable[..., Any] | None,
     session_logger: LoggerAdapter,
-    git_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
     custom_secrets: CUSTOM_SECRETS_TYPE | None = None,
     selected_repository: str | None = None,
     selected_branch: str | None = None,
@@ -65,9 +65,9 @@ async def create_runtime(
     """
     _ensure_no_existing_runtime(None)  # placeholder — caller should guard
 
-    env_vars = await _prepare_runtime_env(custom_secrets, git_provider_tokens)
+    env_vars = await _prepare_runtime_env(custom_secrets, vcs_provider_tokens)
     runtime_cls = get_runtime_cls(runtime_name)
-    repo_tokens = _resolve_repo_tokens(runtime_cls, git_provider_tokens, custom_secrets)
+    repo_tokens = _resolve_repo_tokens(runtime_cls, vcs_provider_tokens, custom_secrets)
 
     session_logger.debug(
         "Initializing runtime `%s` now...",
@@ -144,16 +144,16 @@ def _ensure_no_existing_runtime(runtime: Runtime | None) -> None:
 
 async def _prepare_runtime_env(
     custom_secrets: CUSTOM_SECRETS_TYPE | None,
-    git_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
 ) -> dict[str, str]:
     custom_secret_dict = dict(custom_secrets or {})
     custom_secrets_handler = UserSecrets(custom_secrets=custom_secret_dict)
     env_vars = custom_secrets_handler.get_env_vars()
 
     provider_tokens = (
-        git_provider_tokens
-        if isinstance(git_provider_tokens, MappingProxyType)
-        else MappingProxyType(dict(git_provider_tokens or {}))
+        vcs_provider_tokens
+        if isinstance(vcs_provider_tokens, MappingProxyType)
+        else MappingProxyType(dict(vcs_provider_tokens or {}))
     )
     from backend.server.provider_handler import ProviderHandler
 
@@ -166,12 +166,12 @@ async def _prepare_runtime_env(
 
 def _resolve_repo_tokens(
     runtime_cls: type,
-    git_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
     custom_secrets: CUSTOM_SECRETS_TYPE | None,
 ) -> MappingProxyType[ProviderType, ProviderToken] | None:
-    if isinstance(git_provider_tokens, MappingProxyType):
-        return git_provider_tokens
-    return MappingProxyType(dict(git_provider_tokens or {}))
+    if isinstance(vcs_provider_tokens, MappingProxyType):
+        return vcs_provider_tokens
+    return MappingProxyType(dict(vcs_provider_tokens or {}))
 
 
 def _can_use_shared_helper(config: ForgeConfig) -> bool:
@@ -237,7 +237,7 @@ async def _create_direct(
         headless_mode=False,
         attach_to_existing=False,
         env_vars=env_vars,
-        git_provider_tokens=repo_tokens,
+        vcs_provider_tokens=repo_tokens,
     )
     try:
         connect_start = time.time()
@@ -295,7 +295,7 @@ def _create_with_helper(
             llm_registry,
             agent,
             headless_mode=False,
-            git_provider_tokens=repo_tokens,
+            vcs_provider_tokens=repo_tokens,
             repo_initializer=repo_initializer,
             event_stream=event_stream,  # type: ignore[arg-type]
             env_vars=env_vars,

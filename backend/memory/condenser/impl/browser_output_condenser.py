@@ -13,7 +13,7 @@ from backend.memory.view import View
 
 if TYPE_CHECKING:
     from backend.events.event import Event
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
 
 
 class BrowserOutputCondenser(Condenser):

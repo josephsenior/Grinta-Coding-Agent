@@ -4,7 +4,7 @@ Uses Ultimate Editor for structure-aware code exploration.
 Tree-sitter parsing for symbol finding, navigation, and analysis.
 """
 
-from backend.models.tool_types import make_function_chunk, make_tool_param
+from backend.llm.tool_types import make_function_chunk, make_tool_param
 
 _ULTIMATE_EXPLORER_DESCRIPTION = """Structure-aware code explorer powered by Tree-sitter (40+ languages)
 

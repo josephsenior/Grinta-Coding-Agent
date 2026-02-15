@@ -6,7 +6,7 @@ import os
 from typing import TYPE_CHECKING
 
 from backend.storage.local import LocalFileStore
-from backend.storage.memory import InMemoryFileStore
+from backend.storage.in_memory import InMemoryFileStore
 
 if TYPE_CHECKING:
     from backend.storage.files import FileStore

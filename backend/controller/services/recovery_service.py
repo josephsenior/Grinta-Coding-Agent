@@ -73,7 +73,7 @@ class RecoveryService:
         return f"{type(exc).__name__}: {exc!s}"
 
     def _format_llm_error(self, exc: Exception) -> str | None:
-        from backend.models.exceptions import (
+        from backend.llm.exceptions import (
             APIConnectionError,
             AuthenticationError,
             RateLimitError,
@@ -168,7 +168,7 @@ class RecoveryService:
         return time_until_reset
 
     async def _try_error_recovery(self, exc: Exception, error_type: ErrorType) -> bool:
-        from backend.models.exceptions import AuthenticationError
+        from backend.llm.exceptions import AuthenticationError
 
         controller = self._context.get_controller()
 
@@ -262,7 +262,7 @@ class RecoveryService:
                 return
 
             # Check if it's a RateLimitError that should be handled
-            from backend.models.exceptions import RateLimitError
+            from backend.llm.exceptions import RateLimitError
 
             if isinstance(exc, RateLimitError):
                 await self._handle_rate_limit_error(exc)
@@ -299,7 +299,7 @@ class RecoveryService:
         self._emit_recovery_event("halted", next_state=AgentState.ERROR.value)
 
     def _determine_runtime_status(self, exc: Exception) -> RuntimeStatus:
-        from backend.models.exceptions import (
+        from backend.llm.exceptions import (
             APIConnectionError,
             APIError,
             AuthenticationError,

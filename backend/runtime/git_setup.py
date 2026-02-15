@@ -52,14 +52,14 @@ class GitSetupMixin:
 
     async def clone_or_init_repo(
         self,
-        git_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
         selected_repository: str | None,
         selected_branch: str | None,
     ) -> str:
         """Clone repository or initialize workspace.
 
         Args:
-            git_provider_tokens: Provider authentication tokens
+            vcs_provider_tokens: Provider authentication tokens
             selected_repository: Repository to clone (None to use workspace)
             selected_branch: Branch to checkout
 
@@ -222,9 +222,9 @@ class GitSetupMixin:
 
     def _setup_git_config(self) -> None:
         """Configure git user settings during initial environment setup."""
-        git_user_name = self.config.git_user_name
-        git_user_email = self.config.git_user_email
-        cmd = f'git config --global user.name "{git_user_name}" && git config --global user.email "{git_user_email}"'
+        vcs_user_name = self.config.vcs_user_name
+        vcs_user_email = self.config.vcs_user_email
+        cmd = f'git config --global user.name "{vcs_user_name}" && git config --global user.email "{vcs_user_email}"'
         try:
             action = CmdRunAction(command=cmd)
             obs = cast(Any, self.run(action))
@@ -233,8 +233,8 @@ class GitSetupMixin:
             else:
                 logger.info(
                     "Successfully configured git: name=%s, email=%s",
-                    git_user_name,
-                    git_user_email,
+                    vcs_user_name,
+                    vcs_user_email,
                 )
         except Exception as e:
             logger.warning("Failed to execute git config command: %s, error: %s", cmd, e)

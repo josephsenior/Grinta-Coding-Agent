@@ -8,7 +8,7 @@ from backend.engines.orchestrator.tools.common import (
     create_tool_definition,
     get_security_risk_param,
 )
-from backend.models.tool_names import BROWSER_TOOL_NAME
+from backend.llm.tool_names import BROWSER_TOOL_NAME
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
 
 _browser_action_space = HighLevelActionSet(subsets=["bid", "nav"], strict=False, multiaction=True)

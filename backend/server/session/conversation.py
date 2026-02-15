@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.logger import FORGE_logger as logger
-from backend.models.llm_registry import LLMRegistry
+from backend.llm.llm_registry import LLMRegistry
 from backend.runtime import get_runtime_cls
 from backend.server.shared import get_event_service_adapter
 

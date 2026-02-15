@@ -102,7 +102,7 @@ class RollbackManager:
         self.checkpoints: list[Checkpoint] = self._load_checkpoints()
 
         # Check if git is available
-        self.git_available = self._check_git_available()
+        self.vcs_available = self._check_git_available()
 
     def _check_git_available(self) -> bool:
         """Check if git is available and workspace is a git repo."""
@@ -159,7 +159,7 @@ class RollbackManager:
             Git commit SHA if successful, None otherwise
 
         """
-        if not self.git_available:
+        if not self.vcs_available:
             return None
 
         try:
@@ -262,7 +262,7 @@ class RollbackManager:
 
         # Create git snapshot if available
         git_commit_sha = None
-        if use_git and self.git_available:
+        if use_git and self.vcs_available:
             git_commit_sha = self._create_git_snapshot()
 
         # Create file snapshot as fallback or if git is not available
@@ -347,7 +347,7 @@ class RollbackManager:
             True if git rollback succeeded, False otherwise
 
         """
-        if not (checkpoint.git_commit_sha and self.git_available):
+        if not (checkpoint.git_commit_sha and self.vcs_available):
             return False
 
         result = subprocess.run(

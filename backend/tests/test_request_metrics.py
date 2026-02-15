@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.server.middleware.request_metrics import RequestMetricsMiddleware
-from backend.server.routes.monitoring import app as monitoring_router
+from backend.server.routes.monitoring import router as monitoring_router
 
 # Access registry reset for deterministic tests
 from typing import Callable

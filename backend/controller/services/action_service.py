@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from backend.core.constants import LOG_ALL_EVENTS
 from backend.events import EventSource
 from backend.events.action import Action, NullAction
-from backend.models.metrics import Metrics
+from backend.llm.metrics import Metrics
 
 if TYPE_CHECKING:
     from backend.controller.services.confirmation_service import ConfirmationService

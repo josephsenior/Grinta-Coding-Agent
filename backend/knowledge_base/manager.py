@@ -14,7 +14,7 @@ from backend.storage.data_models.knowledge_base import (
     KnowledgeBaseDocument,
     KnowledgeBaseSearchResult,
 )
-from backend.storage.knowledge_base_store import get_knowledge_base_store
+from backend.storage.knowledge_base.knowledge_base_store import get_knowledge_base_store
 
 logger = logging.getLogger(__name__)
 

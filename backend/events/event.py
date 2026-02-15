@@ -25,7 +25,7 @@ from backend.core.schemas import EventSource, RecallType
 from backend.events.tool import ToolCallMetadata
 
 if TYPE_CHECKING:
-    from backend.models.metrics import Metrics
+    from backend.llm.metrics import Metrics
 
 
 @dataclass
@@ -155,7 +155,7 @@ class Event:
     def llm_metrics(self) -> Metrics | None:
         """Get LLM metrics attached to this event."""
         try:
-            from backend.models.metrics import Metrics
+            from backend.llm.metrics import Metrics
 
             if hasattr(self, "_llm_metrics"):
                 metrics = self._llm_metrics

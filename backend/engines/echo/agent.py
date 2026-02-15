@@ -24,7 +24,7 @@ from backend.events.observation import (
     Observation,
 )
 from backend.events.serialization.event import event_to_dict
-from backend.models.llm_registry import LLMRegistry
+from backend.llm.llm_registry import LLMRegistry
 
 # FIXME: There are a few problems this surfaced
 # * FileWrites seem to add an unintended newline at the end of the file

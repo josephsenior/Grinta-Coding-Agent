@@ -6278,7 +6278,7 @@
             "title": "Repo",
             "description": "Repository name in format 'owner/repo'"
           },
-          "git_provider": {
+          "vcs_provider": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ProviderType"
@@ -6840,7 +6840,7 @@
             ],
             "title": "Email Verified"
           },
-          "git_user_name": {
+          "vcs_user_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -6851,7 +6851,7 @@
             ],
             "title": "Git User Name"
           },
-          "git_user_email": {
+          "vcs_user_email": {
             "anyOf": [
               {
                 "type": "string"
@@ -6975,7 +6975,7 @@
             "title": "Repository",
             "description": "Repository identifier"
           },
-          "git_provider": {
+          "vcs_provider": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ProviderType"
@@ -7425,7 +7425,7 @@
             "title": "Triggers",
             "default": []
           },
-          "git_provider": {
+          "vcs_provider": {
             "anyOf": [
               {
                 "type": "string"
@@ -7558,7 +7558,7 @@
             "title": "Full Name",
             "description": "Full repository name in format 'owner/repo'"
           },
-          "git_provider": {
+          "vcs_provider": {
             "$ref": "#/components/schemas/ProviderType",
             "description": "Git provider type (GitHub)"
           },
@@ -7632,7 +7632,7 @@
         "required": [
           "id",
           "full_name",
-          "git_provider",
+          "vcs_provider",
           "is_public"
         ],
         "title": "Repository",
@@ -8118,7 +8118,7 @@
             ],
             "title": "Email Verified"
           },
-          "git_user_name": {
+          "vcs_user_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -8129,7 +8129,7 @@
             ],
             "title": "Git User Name"
           },
-          "git_user_email": {
+          "vcs_user_email": {
             "anyOf": [
               {
                 "type": "string"
@@ -8147,7 +8147,7 @@
       },
       "SuggestedTask": {
         "properties": {
-          "git_provider": {
+          "vcs_provider": {
             "$ref": "#/components/schemas/ProviderType",
             "description": "Git provider type"
           },
@@ -8176,7 +8176,7 @@
         },
         "type": "object",
         "required": [
-          "git_provider",
+          "vcs_provider",
           "task_type",
           "repo",
           "issue_number",

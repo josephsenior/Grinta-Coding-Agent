@@ -19,7 +19,7 @@ from backend.server.user_auth import get_user_settings_store
 if TYPE_CHECKING:
     pass
 
-app = APIRouter(prefix="/api/memory")
+router = APIRouter(prefix="/api/memory")
 
 
 class MemoryCategory(str, Enum):
@@ -135,7 +135,7 @@ class MemoryStats(BaseModel):
     recently_used: list[dict]
 
 
-@app.get("/")
+@router.get("/")
 async def list_memories(
     settings_store: Annotated[Any, Depends(get_user_settings_store)],
 ) -> list[dict]:
@@ -145,7 +145,7 @@ async def list_memories(
     return getattr(settings, "MEMORIES", []) if settings else []
 
 
-@app.post("/")
+@router.post("/")
 async def create_memory(
     memory: CreateMemoryRequest,
     settings_store: Annotated[Any, Depends(get_user_settings_store)],
@@ -182,7 +182,7 @@ async def create_memory(
     return {"status": "success", "memory": memory_model.model_dump()}
 
 
-@app.post("/search")
+@router.post("/search")
 async def search_memories(
     search: SearchMemoriesRequest,
     settings_store: Annotated[Any, Depends(get_user_settings_store)],
@@ -329,7 +329,7 @@ def _memory_matches_importance(memory: dict, importance: str | None) -> bool:
     return memory.get("importance") == importance
 
 
-@app.get("/stats")
+@router.get("/stats")
 async def get_memory_stats(
     settings_store: Annotated[Any, Depends(get_user_settings_store)],
 ) -> MemoryStats:
@@ -378,7 +378,7 @@ async def get_memory_stats(
     )
 
 
-@app.post("/{memory_id}/track-usage")
+@router.post("/{memory_id}/track-usage")
 async def track_memory_usage(
     memory_id: str,
     settings_store: Annotated[Any, Depends(get_user_settings_store)],
@@ -406,7 +406,7 @@ async def track_memory_usage(
     return {"status": "success"}
 
 
-@app.get("/export")
+@router.get("/export")
 async def export_memories(
     settings_store: Annotated[Any, Depends(get_user_settings_store)],
 ) -> dict:
@@ -428,7 +428,7 @@ async def export_memories(
     }
 
 
-@app.post("/import")
+@router.post("/import")
 async def import_memories(
     import_data: dict,
     merge: bool = False,
@@ -477,7 +477,7 @@ async def import_memories(
 # ============================================================================
 
 
-@app.get("/{memory_id}")
+@router.get("/{memory_id}")
 async def get_memory(
     memory_id: Annotated[str, Path(..., min_length=1, description="Memory ID")],
     settings_store: Annotated[Any, Depends(get_user_settings_store)],
@@ -496,7 +496,7 @@ async def get_memory(
     raise HTTPException(status_code=404, detail="Memory not found")
 
 
-@app.patch("/{memory_id}")
+@router.patch("/{memory_id}")
 async def update_memory(
     memory_id: Annotated[str, Path(..., min_length=1, description="Memory ID")],
     updates: UpdateMemoryRequest,
@@ -569,7 +569,7 @@ def _apply_memory_updates(memory: dict, updates: UpdateMemoryRequest) -> None:
         memory["importance"] = updates.importance
 
 
-@app.delete("/{memory_id}")
+@router.delete("/{memory_id}")
 async def delete_memory(
     memory_id: Annotated[str, Path(..., min_length=1, description="Memory ID")],
     settings_store: Annotated[Any, Depends(get_user_settings_store)],

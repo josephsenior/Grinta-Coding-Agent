@@ -12,7 +12,7 @@ from backend.engines.orchestrator.tools.common import (
     get_timeout_param,
 )
 from backend.engines.orchestrator.tools.prompt import refine_prompt
-from backend.models.tool_names import EXECUTE_BASH_TOOL_NAME
+from backend.llm.tool_names import EXECUTE_BASH_TOOL_NAME
 
 ChatCompletionToolParam = Any
 

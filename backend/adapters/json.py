@@ -12,7 +12,7 @@ from backend.core.pydantic_compat import model_dump_with_options
 from backend.events.event import Event
 from backend.events.observation import CmdOutputMetadata
 from backend.events.serialization import event_to_dict
-from backend.models.metrics import Metrics
+from backend.llm.metrics import Metrics
 
 
 class ForgeJSONEncoder(json.JSONEncoder):

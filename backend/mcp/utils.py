@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from backend.controller.agent import Agent
     from backend.events.action.mcp import MCPAction
     from backend.events.observation.observation import Observation
-    from backend.memory.memory import Memory
+    from backend.memory.agent_memory import Memory
     from backend.runtime.base import Runtime
 from mcp import McpError
 

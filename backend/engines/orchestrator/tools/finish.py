@@ -2,7 +2,7 @@
 
 from backend.engines.orchestrator.tools.common import create_tool_definition
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
-from backend.models.tool_names import FINISH_TOOL_NAME
+from backend.llm.tool_names import FINISH_TOOL_NAME
 
 _FINISH_DESCRIPTION = (
     "Signals the completion of the current task or conversation.\n\nUse this tool when:\n"

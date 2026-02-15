@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from backend.core.config import AgentConfig
     from backend.events.action import Action
     from backend.events.event import Event
-    from backend.models.llm_registry import LLMRegistry
+    from backend.llm.llm_registry import LLMRegistry
     from backend.utils.prompt import PromptManager
 
 

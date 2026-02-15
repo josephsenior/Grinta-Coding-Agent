@@ -31,7 +31,7 @@ class ConversationInfo:
     agent_state: AgentState | None = None
     selected_repository: str | None = None
     selected_branch: str | None = None
-    git_provider: ProviderType | None = None
+    vcs_provider: ProviderType | None = None
     trigger: ConversationTrigger | None = None
     num_connections: int = 0
     url: str | None = None

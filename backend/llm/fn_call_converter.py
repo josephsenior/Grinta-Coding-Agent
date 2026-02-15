@@ -16,7 +16,7 @@ from backend.core.exceptions import (
     FunctionCallConversionError,
     FunctionCallValidationError,
 )
-from backend.models.tool_names import (
+from backend.llm.tool_names import (
     BROWSER_TOOL_NAME,
     EXECUTE_BASH_TOOL_NAME,
     FINISH_TOOL_NAME,

@@ -25,8 +25,8 @@ from backend.storage.data_models.conversation_metadata import ConversationTrigge
 from backend.storage.data_models.conversation_status import ConversationStatus
 
 if TYPE_CHECKING:
-    from backend.server.data_models.agent_loop_info import AgentLoopInfo
-    from backend.server.data_models.conversation_info_result_set import (
+    from backend.server.schemas.agent_loop_info import AgentLoopInfo
+    from backend.server.schemas.conversation_info_result_set import (
         ConversationInfoResultSet,
     )
     from backend.storage.conversation.conversation_store import ConversationStore

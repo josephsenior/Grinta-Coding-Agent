@@ -82,7 +82,7 @@ class RetryService:
         from backend.controller.tool_telemetry import ToolTelemetry
         from backend.events import EventSource
         from backend.events.observation import AgentThinkObservation
-        from backend.models.exceptions import (
+        from backend.llm.exceptions import (
             APIConnectionError,
             APIError,
             InternalServerError,

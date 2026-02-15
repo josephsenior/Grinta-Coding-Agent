@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from backend.core.config import ForgeConfig
-from backend.models.llm_registry import LLMRegistry
+from backend.llm.llm_registry import LLMRegistry
 from backend.server.services.conversation_stats import ConversationStats
 from backend.server.session.session import Session
 from backend.storage.local import LocalFileStore
