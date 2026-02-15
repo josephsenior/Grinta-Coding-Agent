@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from backend.events.action.action import (
-    Action,
-    ActionConfirmationStatus,
-    ActionSecurityRisk,
-)
+from backend.core.enums import ActionConfirmationStatus, ActionSecurityRisk
+from backend.events.action.action import Action
 from backend.events.action.agent import (
     AgentRejectAction,
     AgentThinkAction,

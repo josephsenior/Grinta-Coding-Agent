@@ -3,8 +3,9 @@
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
+from backend.core.enums import ActionSecurityRisk
 from backend.core.schemas import ActionType
-from backend.events.action.action import Action, ActionSecurityRisk
+from backend.events.action.action import Action
 
 
 @dataclass

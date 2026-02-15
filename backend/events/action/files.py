@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar
 
+from backend.core.enums import ActionSecurityRisk, FileEditSource, FileReadSource
 from backend.core.schemas import ActionType
-from backend.events.action.action import Action, ActionSecurityRisk
-from backend.core.enums import FileEditSource, FileReadSource
+from backend.events.action.action import Action
 
 
 @dataclass

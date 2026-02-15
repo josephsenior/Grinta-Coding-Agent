@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from backend.core.enums import ActionSecurityRisk
 from backend.core.exceptions import LLMMalformedActionError
-from backend.events.action.action import Action, ActionSecurityRisk
+from backend.events.action.action import Action
 from backend.events.action.agent import (
     AgentRejectAction,
     AgentThinkAction,
