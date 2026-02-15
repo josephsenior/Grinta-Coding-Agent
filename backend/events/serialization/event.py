@@ -29,7 +29,7 @@ TOP_KEYS = [
     "tool_call_metadata",
     "llm_metrics",
 ]
-from backend.events.serialization.common import UNDERSCORE_KEYS
+from backend.events.serialization.common import UNDERSCORE_KEYS  # noqa: E402
 
 DELETE_FROM_TRAJECTORY_EXTRAS = {
     "dom_object",

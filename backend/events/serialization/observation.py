@@ -112,7 +112,7 @@ def _get_observation_class(observation_type: str):
     return observation_class
 
 
-from backend.events.serialization.common import (
+from backend.events.serialization.common import (  # noqa: E402
     COMMON_METADATA_FIELDS as METADATA_FIELDS,
 )
 

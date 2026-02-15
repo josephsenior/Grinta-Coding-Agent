@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
-from pydantic import (
+from pydantic import (  # noqa: E402
     BaseModel,
     ConfigDict,
     Field,
@@ -16,13 +16,12 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from pydantic.json import pydantic_encoder
+from pydantic.json import pydantic_encoder  # noqa: E402
 
-from backend.core.config.mcp_config import MCPConfig
-from backend.core.config.utils import load_FORGE_config
-from backend.storage.data_models.knowledge_base import KnowledgeBaseSettings
-from backend.storage.data_models.user_secrets import UserSecrets
-
+from backend.core.config.mcp_config import MCPConfig  # noqa: E402
+from backend.core.config.utils import load_FORGE_config  # noqa: E402
+from backend.storage.data_models.knowledge_base import KnowledgeBaseSettings  # noqa: E402
+from backend.storage.data_models.user_secrets import UserSecrets  # noqa: E402
 try:
     from unittest.mock import Mock
 except ImportError:  # pragma: no cover

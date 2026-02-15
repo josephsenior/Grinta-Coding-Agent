@@ -28,9 +28,9 @@ file_store = _state.file_store
 monitoring_listener = _state.monitoring_listener
 
 # Store implementation classes with proper type annotations
-from backend.storage.conversation.conversation_store import ConversationStore
-from backend.storage.secrets.secrets_store import SecretsStore
-from backend.storage.settings.settings_store import SettingsStore
+from backend.storage.conversation.conversation_store import ConversationStore  # noqa: E402
+from backend.storage.secrets.secrets_store import SecretsStore  # noqa: E402
+from backend.storage.settings.settings_store import SettingsStore  # noqa: E402
 
 SettingsStoreImpl: type[SettingsStore] = _state.SettingsStoreImpl
 SecretsStoreImpl: type[SecretsStore] = _state.SecretsStoreImpl

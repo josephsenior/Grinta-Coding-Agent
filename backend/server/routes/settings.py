@@ -41,7 +41,7 @@ router = APIRouter(prefix="/api/v1", dependencies=get_dependencies())
 # 🚀 PERFORMANCE FIX: Global cache for settings to avoid repeated database calls
 #   Cache key: user_id (or 'default' for single-tenant), Cache value: (settings_response, timestamp)
 #   TTL: 60 seconds (OPTIMIZED: increased from 30s for 2-3x improvement)
-import time as time_module
+import time as time_module  # noqa: E402
 
 _settings_cache: dict[str, tuple[GETSettingsModel, float]] = {}
 _PROVIDER_TOKEN_MAPPING: dict[str, str] = {

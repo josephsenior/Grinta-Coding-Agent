@@ -37,6 +37,7 @@ from backend.server.middleware.security_headers import (
     CSRFProtection,
     SecurityHeadersMiddleware,
 )
+from backend.server.middleware.audit_logger import AuditLoggerMiddleware
 from backend.server.middleware.token_auth import SimpleTokenAuthMiddleware
 from backend.server.route_registry import register_routes
 from backend.server.routes.mcp import mcp_server
