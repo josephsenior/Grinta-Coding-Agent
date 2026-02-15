@@ -1,7 +1,6 @@
 """Forge automation framework package."""
 
 import os
-import sys
 from pathlib import Path
 
 __package_name__ = "FORGE_ai"

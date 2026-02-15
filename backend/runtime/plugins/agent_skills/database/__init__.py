@@ -12,7 +12,7 @@ Usage:
 
 import json
 import os
-from typing import Any, Dict
+from typing import Any
 
 # Global connection registry
 _connections: dict[str, dict[str, Any]] = {}

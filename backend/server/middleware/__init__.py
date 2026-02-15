@@ -9,7 +9,6 @@ package-import issues and circular initialization.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from backend.server.middleware.cost_quota import CostQuotaMiddleware, QuotaPlan
 from backend.server.middleware.cost_recording import record_llm_cost

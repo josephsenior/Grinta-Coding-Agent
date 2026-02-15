@@ -100,7 +100,7 @@ class ForgeClient:
     def __post_init__(self) -> None:
         self.base_url = self.base_url.rstrip("/")
         self._http = httpx.AsyncClient(
-            base_url=f"{self.base_url}/api",
+            base_url=f"{self.base_url}/api/v1",
             timeout=httpx.Timeout(30.0, connect=10.0),
             follow_redirects=True,
         )

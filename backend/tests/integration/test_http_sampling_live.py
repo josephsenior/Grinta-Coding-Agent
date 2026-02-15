@@ -1,11 +1,15 @@
 import importlib
 import os
+from typing import TYPE_CHECKING
 
 from fastapi.testclient import TestClient
 
+if TYPE_CHECKING:
+    pass
+
 
 class _TestSpan:
-    def __init__(self, name: str, store: list[_TestSpan]):
+    def __init__(self, name: str, store: "list[_TestSpan]"):
         self.name = name
         self._store = store
         self.attributes: dict[str, object] = {}

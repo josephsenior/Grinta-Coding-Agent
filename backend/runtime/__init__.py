@@ -50,6 +50,7 @@ __all__ = [
     "WarmPoolPolicy",
     "WarmRuntimePool",
     "get_runtime_cls",
+    "get_impl",
 ]
 
 

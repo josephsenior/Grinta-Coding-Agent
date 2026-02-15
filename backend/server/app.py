@@ -345,8 +345,6 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=RequestTracingMiddleware(enabled
 
 # 0.7. Audit Logging (log sensitive operations for security audit)
 
-from backend.server.middleware.audit_logger import AuditLoggerMiddleware
-
 app.add_middleware(AuditLoggerMiddleware)
 
 # Initialize distributed tracing (opt-in — requires `telemetry` extras)

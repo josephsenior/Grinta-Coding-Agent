@@ -94,7 +94,12 @@ __all__ = [
     # Agent lifecycle
     "AgentState",
     "AppMode",
+    "EventSource",
     "ExitReason",
+    "FileEditSource",
+    "FileReadSource",
+    "RecallType",
+    "RuntimeStatus",
     "ActionConfirmationStatus",
     "ActionSecurityRisk",
     # Retry

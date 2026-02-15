@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from fastapi import Depends, HTTPException, Path, Request, status
+from fastapi import Depends, HTTPException, Request, status
 
 from backend.core.logger import FORGE_logger as logger
 from backend.server.shared import ConversationStoreImpl, config

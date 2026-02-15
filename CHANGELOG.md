@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Agent performance metrics service (`MetricsService`) with comprehensive task tracking
+- `/api/v1/monitoring/agent-metrics` endpoint for aggregate performance metrics
+- Audit logging middleware for sensitive operations (settings, secrets, conversations)
+- Cursor-based conversation pagination with `page_id` and `next_page_id`
 - `CHANGELOG.md` following keepachangelog.com format
 - `ARCHITECTURE.md` with full system walkthrough for contributors
 - Plugin authoring guide (`docs/PLUGIN_GUIDE.md`)
@@ -20,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: All API endpoints migrated from `/api/*` to `/api/v1/*` for versioning
+  - Update client code to use `/api/v1/` base URL (e.g., `/api/conversations` → `/api/v1/conversations`)
+- Removed all cloud runtime dependencies (e2b, modal, runloop-api-client, daytona) for local-first architecture
+- Renamed `get_remote_runtime_config` → `get_runtime_config` (function retrieves local runtime config)
+- Deleted dead code: `service_circuit_breaker.py` (0 imports)
 - Rewrote `README.md` with comparison table, architecture diagram, and feature showcase
 - Broke up `action_execution_server.py` (1944→4 focused modules)
 - Broke up `conversation_memory.py` (1709→4 focused modules)

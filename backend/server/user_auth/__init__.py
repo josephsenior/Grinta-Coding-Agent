@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from backend.storage import get_file_store
 from backend.storage.secrets.file_secrets_store import FileSecretsStore
