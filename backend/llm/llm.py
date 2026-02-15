@@ -195,7 +195,17 @@ class LLM(RetryMixin, DebugMixin):
 
         # Initialize client
         api_key_value = self._extract_api_key()
-        if not api_key_value:
+
+        # Local models (Ollama, LM Studio, vLLM) don't require real API keys.
+        _is_local = "ollama" in self.config.model.lower() or (
+            self.config.base_url
+            and any(
+                h in self.config.base_url
+                for h in ("localhost", "127.0.0.1", "0.0.0.0")
+            )
+        )
+
+        if not api_key_value and not _is_local:
             logger.error("No API key available for model: %s", self.config.model)
             raise AuthenticationError(
                 f"No API key provided for model '{self.config.model}'. "
@@ -205,7 +215,7 @@ class LLM(RetryMixin, DebugMixin):
 
         self.client = get_direct_client(
             model=self.config.model,
-            api_key=api_key_value or "",
+            api_key=api_key_value or "not-needed",
             base_url=self.config.base_url,
         )
 

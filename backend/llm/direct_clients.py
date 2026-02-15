@@ -558,6 +558,16 @@ def get_direct_client(
         return OpenAIClient(
             model_name=model, api_key=api_key, base_url="https://api.x.ai/v1"
         )
+    elif "ollama" in model_lower:
+        # Ollama exposes an OpenAI-compatible API at /v1.
+        # Strip the "ollama/" prefix so the actual model name is sent.
+        stripped = model.split("/", 1)[1] if "/" in model else model
+        ollama_base = base_url or "http://localhost:11434/v1"
+        return OpenAIClient(
+            model_name=stripped,
+            api_key=api_key or "ollama",  # Ollama ignores auth
+            base_url=ollama_base,
+        )
     else:
-        # Default to OpenAI
+        # Default to OpenAI (also covers LM Studio, vLLM, etc.)
         return OpenAIClient(model_name=model, api_key=api_key, base_url=base_url)

@@ -21,6 +21,35 @@ from textual.widgets import (
 from backend.tui.client import ConversationInfo, ForgeClient
 
 
+def _fuzzy_subsequence_score(query: str, target: str) -> float:
+    """Score how well query characters appear in order within target.
+
+    Returns a score 0-50 based on character matching and gap penalties.
+    Returns 0 if not all characters are found in sequence.
+    """
+    if not query or not target:
+        return 0.0
+
+    qi = 0
+    total_gap = 0
+    last_match = -1
+
+    for ti, char in enumerate(target):
+        if qi < len(query) and char == query[qi]:
+            if last_match >= 0:
+                total_gap += ti - last_match - 1
+            last_match = ti
+            qi += 1
+
+    if qi < len(query):
+        return 0.0  # Not all chars matched
+
+    # Score: penalize large gaps between matched characters
+    base_score = 50.0
+    gap_penalty = min(total_gap * 2.0, 40.0)
+    return max(base_score - gap_penalty, 5.0)
+
+
 class ConversationListItem(ListItem):
     """Single row in the conversation list."""
 
@@ -147,16 +176,16 @@ class HomeScreen(Screen[str]):
         list_view = self.query_one("#conversation-list-view", ListView)
         list_view.clear()
 
-        # Filter conversations by search query
+        # Filter conversations by search query (fuzzy matching)
         filtered = self._conversations
         if self._search_query:
-            query_lower = self._search_query.lower()
-            filtered = [
-                conv for conv in self._conversations
-                if query_lower in (conv.title or "").lower()
-                or query_lower in conv.status.lower()
-                or query_lower in conv.conversation_id.lower()
-            ]
+            scored = []
+            for conv in self._conversations:
+                score = self._fuzzy_match_score(self._search_query, conv)
+                if score > 0:
+                    scored.append((score, conv))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            filtered = [conv for _, conv in scored]
 
         if not filtered and self._conversations:
             list_view.mount(
@@ -178,6 +207,44 @@ class HomeScreen(Screen[str]):
 
         for info in filtered:
             list_view.append(ConversationListItem(info))
+
+    @staticmethod
+    def _fuzzy_match_score(query: str, conv: ConversationInfo) -> float:
+        """Score a conversation against a search query using fuzzy matching.
+
+        Returns a score > 0 if the conversation matches, 0 otherwise.
+        Higher scores indicate better matches.
+        """
+        query_lower = query.lower()
+        title = (conv.title or "").lower()
+        status = conv.status.lower()
+        cid = conv.conversation_id.lower()
+
+        # Exact substring match (highest priority)
+        if query_lower in title:
+            return 100.0
+        if query_lower in status:
+            return 80.0
+        if query_lower in cid:
+            return 70.0
+
+        # Fuzzy: all query characters appear in order in the target
+        score = _fuzzy_subsequence_score(query_lower, title)
+        if score > 0:
+            return score
+
+        # Word-level matching: each query word found somewhere
+        words = query_lower.split()
+        if words:
+            matched = sum(
+                1 for w in words if w in title or w in status or w in cid
+            )
+            if matched == len(words):
+                return 60.0
+            if matched > 0:
+                return 30.0 * (matched / len(words))
+
+        return 0.0
 
     # ── input handling ────────────────────────────────────────────
 

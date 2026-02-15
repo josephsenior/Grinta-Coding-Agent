@@ -220,27 +220,31 @@ api_key = ""
 model = "gpt-4o-mini"
 
 ################################ Ollama Local Models ##########################
-# Example configuration for running Forge with Ollama local models
-# https://ollama.ai
+# Forge has native Ollama support. Use the "ollama/" prefix and Forge will:
+#   - Auto-detect the Ollama provider
+#   - Strip the "ollama/" prefix before sending to Ollama's API
+#   - Default base_url to http://localhost:11434/v1
+#   - Skip API key validation (Ollama doesn't require auth)
+#
+# Setup:
+#   1. Install Ollama from https://ollama.ai
+#   2. Start Ollama: `ollama serve`
+#   3. Pull a model: `ollama pull llama3.2`
+#   4. Set model below (api_key and base_url are optional for Ollama)
 ##############################################################################
 
-# Step 1: Install Ollama from https://ollama.ai
-# Step 2: Start Ollama: `ollama serve` (runs on http://localhost:11434 by default)
-# Step 3: Pull a model: `ollama pull llama3.2` or `ollama pull deepseek-coder`
-# Step 4: Uncomment and configure the [llm.ollama] section below
-# Step 5: Set the default model or use in agent config: llm_config = "ollama"
-
 # Recommended models for coding:
-# - llama3.2: Good balance of speed and quality
-# - deepseek-coder: Excellent for coding tasks
-# - qwen2.5-coder: Strong code completion
-# - codellama: Specialized for code generation
+# - ollama/llama3.2: Good balance of speed and quality
+# - ollama/deepseek-coder: Excellent for coding tasks
+# - ollama/qwen2.5-coder: Strong code completion
+# - ollama/codellama: Specialized for code generation
 
-# Example Ollama configuration:
+# To use Ollama as your default model, set in [llm] section:
+#   model = "ollama/llama3.2"
+
+# Example named Ollama configuration:
 #[llm.ollama]
 #model = "ollama/llama3.2"
-#base_url = "http://localhost:11434"
-#api_key = "not-needed"  # Ollama doesn't require API keys
 #temperature = 0.1       # Lower temp for more deterministic code
 #max_output_tokens = 4000
 #timeout = 120           # Increase for slower hardware
@@ -248,16 +252,13 @@ model = "gpt-4o-mini"
 # For better code quality, use deepseek-coder:
 #[llm.ollama-coder]
 #model = "ollama/deepseek-coder"
-#base_url = "http://localhost:11434"
-#api_key = "not-needed"
 #temperature = 0.0       # Very low for consistent coding
 #max_output_tokens = 8000
 
-# For faster responses on lower-end hardware:
-#[llm.ollama-fast]
-#model = "ollama/llama3.2:latest"
-#base_url = "http://localhost:11434"
-#api_key = "not-needed"
+# Custom Ollama host (non-default port or remote):
+#[llm.ollama-remote]
+#model = "ollama/llama3.2"
+#base_url = "http://192.168.1.100:11434/v1"
 #temperature = 0.1
 #max_output_tokens = 2048  # Smaller context for speed
 

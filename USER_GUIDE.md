@@ -57,42 +57,58 @@ api_key = "your-google-api-key"
 
 ### Local Models with Ollama
 
+Forge has native Ollama support. The `ollama/` prefix is automatically recognized
+and the model name is correctly stripped before being sent to Ollama's API.
+
 1. **Install Ollama**: Download from [ollama.ai](https://ollama.ai)
-2. **Start Ollama**: `ollama serve`
+2. **Start Ollama**: `ollama serve` (runs on port 11434 by default)
 3. **Pull a model**: `ollama pull llama3.2`
 4. **Configure Forge**:
 
 ```toml
 [llm]
 model = "ollama/llama3.2"
-base_url = "http://localhost:11434"
-api_key = "not-needed"  # Ollama doesn't require API keys
+# base_url defaults to http://localhost:11434/v1 for Ollama models
+# api_key is not required for local models
 temperature = 0.1       # Lower for more consistent code
 max_output_tokens = 4000
 ```
 
-**Recommended local models**:
-- `llama3.2`: Good balance of speed/quality
-- `deepseek-coder`: Excellent for coding tasks
-- `qwen2.5-coder`: Strong code completion
-- `codellama`: Specialized for code generation
+> **Note**: You do NOT need to set `api_key` or `base_url` for Ollama models.
+> Forge auto-detects the `ollama/` prefix, strips it before sending to the API,
+> and defaults the base URL to `http://localhost:11434/v1`.
 
-### Other Local Setups
+**Recommended local models**:
+
+- `ollama/llama3.2`: Good balance of speed/quality
+- `ollama/deepseek-coder`: Excellent for coding tasks
+- `ollama/qwen2.5-coder`: Strong code completion
+- `ollama/codellama`: Specialized for code generation
+
+**Hardware requirements**:
+- **Minimum**: 8GB RAM, CPU-only (slow but works)
+- **Recommended**: 16GB+ RAM with NVIDIA/AMD GPU for 10-100x speedup
+- **Context**: Larger `max_output_tokens` = slower but better quality output
+
+### Other Local Setups (OpenAI-Compatible)
+
+Any server exposing an OpenAI-compatible API at `/v1/chat/completions` works.
+Forge auto-detects localhost URLs and skips API key validation.
 
 #### LM Studio
+
 ```toml
 [llm]
-model = "local/model-name"
+model = "your-model-name"              # Use the model name shown in LM Studio
 base_url = "http://localhost:1234/v1"
-api_key = "not-needed"
 ```
 
 #### vLLM
+
 ```toml
 [llm]
 model = "your-model-name"
 base_url = "http://localhost:8000/v1"
-api_key = "not-needed"
 ```
 
 ## Autonomy Modes
@@ -151,6 +167,68 @@ max_budget_per_task = 5.0  # $5 USD default
 # Maximum iterations before auto-stop
 max_iterations = 500
 ```
+
+### Circuit Breaker (Deep Dive)
+
+The circuit breaker is an autonomous safety system that automatically pauses the agent
+when it detects anomalous behavior. It monitors four independent trip conditions:
+
+#### Trip Conditions
+
+| Condition | Default Threshold | Action | Description |
+| --- | --- | --- | --- |
+| Consecutive errors | 5 errors | Pause | Same error repeated without recovery |
+| High-risk actions | 10 actions | Pause | Too many dangerous commands (rm, sudo, etc.) |
+| Stuck detections | 3 detections | **Stop** | Agent stuck in loops (escalated severity) |
+| Error rate | 50% of last 10 | Pause | Overall failure rate too high |
+
+#### Tuning Thresholds
+
+```toml
+[agent]
+enable_circuit_breaker = true
+
+# How many consecutive errors before pausing (default: 5)
+max_consecutive_errors = 5
+
+# How many high-risk actions before pausing (default: 10)
+max_high_risk_actions = 10
+
+# How many stuck detections before stopping (default: 3)
+max_stuck_detections = 3
+```
+
+#### Environment Variable Overrides
+
+For the low-level network/service circuit breaker (separate from agent safety):
+
+```bash
+FORGE_CB_FAILURE_THRESHOLD=3    # Failures before opening circuit
+FORGE_CB_BASE_OPEN_SECONDS=2    # Initial backoff duration
+FORGE_CB_MAX_OPEN_SECONDS=60    # Maximum backoff cap
+FORGE_CB_HALF_OPEN_PROBES=1     # Probes allowed in half-open state
+```
+
+### Stuck Detection (Deep Dive)
+
+Forge uses **6 independent strategies** to detect when the agent is stuck:
+
+1. **Action-Observation Loop**: Same action producing same result 4+ times
+2. **Action-Error Loop**: Same action causing same error 3+ times
+3. **Agent Monologue**: Agent sending identical messages without doing anything
+4. **Pattern Repetition**: Alternating A-B-A-B action patterns (6+ events)
+5. **Context Window Loop**: Repeated condensation without progress (10+ times)
+6. **Semantic Loop**: Different actions but same no-progress outcome
+   - Measures *intent diversity* (< 0.4 = low variety) and *failure rate* (> 0.6 = high failures)
+   - Catches: trying different commands that all fail the same way
+
+Plus two additional safety checks:
+- **Token Repetition**: Identical agent messages output 3+ times
+- **Cost Acceleration**: Context growing >10k tokens in 5 steps, or >100k total with continued growth
+
+When stuck is detected, the circuit breaker increments its stuck counter.
+After 3 stuck detections (default), the agent is **stopped** (not just paused)
+with a recommendation to restart with a different strategy.
 
 ## Playbooks
 
