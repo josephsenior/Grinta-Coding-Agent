@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from backend.events.observation import CmdOutputMetadata, CmdOutputObservation
 
 if TYPE_CHECKING:
-    from backend.events.observation import Observation
+    pass
 
 
 def format_shell_output(
@@ -18,14 +18,14 @@ def format_shell_output(
     working_dir: str,
 ) -> CmdOutputObservation:
     """Format the results of a command execution into an observation.
-    
+
     Args:
         command: The command that was executed
         stdout: Standard output from the command
         stderr: Standard error from the command
         exit_code: Exit code of the command
         working_dir: Current working directory
-        
+
     Returns:
         Formatted CmdOutputObservation
     """
@@ -36,10 +36,12 @@ def format_shell_output(
         content_parts.append("[ERROR STREAM]\n" + stderr)
 
     final_content = "\n".join(content_parts).strip()
-    
+
     # Normalize working directory for Windows if needed
-    normalized_cwd = working_dir.replace("\\", "\\\\") if "\\" in working_dir else working_dir
-    
+    normalized_cwd = (
+        working_dir.replace("\\", "\\\\") if "\\" in working_dir else working_dir
+    )
+
     metadata = CmdOutputMetadata(
         exit_code=exit_code,
         working_dir=normalized_cwd,

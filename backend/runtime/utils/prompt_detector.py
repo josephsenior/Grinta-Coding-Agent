@@ -165,7 +165,9 @@ class InteractivePromptDetector:
     enable autonomous agent operation.
     """
 
-    def __init__(self, enable_auto_response: bool = True, min_confidence: float = 0.8) -> None:
+    def __init__(
+        self, enable_auto_response: bool = True, min_confidence: float = 0.8
+    ) -> None:
         """Initialize the prompt detector.
 
         Args:
@@ -177,7 +179,9 @@ class InteractivePromptDetector:
         self.min_confidence = min_confidence
         self.patterns = PROMPT_PATTERNS
 
-    def detect_prompt(self, output: str, last_n_lines: int = 10) -> PromptPattern | None:
+    def detect_prompt(
+        self, output: str, last_n_lines: int = 10
+    ) -> PromptPattern | None:
         """Detect if the output contains an interactive prompt.
 
         Args:
@@ -197,9 +201,14 @@ class InteractivePromptDetector:
 
         # Try to match against known patterns
         for pattern in self.patterns:
-            if pattern.confidence >= self.min_confidence and pattern.matches(recent_output):
+            if pattern.confidence >= self.min_confidence and pattern.matches(
+                recent_output
+            ):
                 logger.info(
-                    "🤖 Auto-detected interactive prompt: %s (confidence: %s)", pattern.description, pattern.confidence)
+                    "🤖 Auto-detected interactive prompt: %s (confidence: %s)",
+                    pattern.description,
+                    pattern.confidence,
+                )
                 return pattern
 
         # Check for generic prompt indicators
@@ -225,7 +234,10 @@ class InteractivePromptDetector:
         ]
 
         last_line = text.strip().split("\n")[-1].strip()
-        return any(re.search(indicator, last_line, re.IGNORECASE) for indicator in prompt_indicators)
+        return any(
+            re.search(indicator, last_line, re.IGNORECASE)
+            for indicator in prompt_indicators
+        )
 
     def should_auto_respond(self, pattern: PromptPattern | None) -> bool:
         """Determine if we should automatically respond to this prompt.
@@ -242,7 +254,9 @@ class InteractivePromptDetector:
 
         # Don't auto-respond to password prompts (security risk)
         if pattern.prompt_type in [PromptType.PASSWORD, PromptType.SUDO_PASSWORD]:
-            logger.warning("🔒 Password prompt detected - auto-response disabled for security")
+            logger.warning(
+                "🔒 Password prompt detected - auto-response disabled for security"
+            )
             return False
 
         # Only auto-respond if confidence is above threshold
@@ -313,7 +327,12 @@ def suggest_noninteractive_command(command: str) -> str | None:
     for pattern, replacement in NONINTERACTIVE_COMMAND_TRANSFORMS.items():
         if re.match(pattern, command):
             # Check if non-interactive flag already present
-            if "--yes" in command or "-y" in command or "--force" in command or "-f" in command:
+            if (
+                "--yes" in command
+                or "-y" in command
+                or "--force" in command
+                or "-f" in command
+            ):
                 return None  # Already non-interactive
 
             modified = re.sub(pattern, replacement, command)

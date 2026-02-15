@@ -84,7 +84,9 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         min_length=1,
         description="Name of the agent to use",
     )
-    llm_config: LLMConfig | None = Field(default=None, description="LLM configuration for the agent")
+    llm_config: LLMConfig | None = Field(
+        default=None, description="LLM configuration for the agent"
+    )
     memory_max_threads: int = Field(
         default=DEFAULT_AGENT_MEMORY_MAX_THREADS,
         ge=1,
@@ -94,8 +96,12 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_MEMORY_ENABLED,
         description="Whether to enable conversation memory",
     )
-    condenser_config: CondenserConfig = Field(default_factory=ConversationWindowCondenserConfig)
-    enable_prompt_extensions: bool = Field(default=DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED)
+    condenser_config: CondenserConfig = Field(
+        default_factory=ConversationWindowCondenserConfig
+    )
+    enable_prompt_extensions: bool = Field(
+        default=DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED
+    )
     enable_browsing: bool = Field(default=DEFAULT_AGENT_BROWSING_ENABLED)
     enable_vector_memory: bool = Field(
         default=DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
@@ -109,7 +115,9 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_PROMPT_CACHING_ENABLED,
         description="Enable prompt caching hints for LLMs",
     )
-    disabled_playbooks: list[str] = Field(default_factory=list, description="List of playbooks disabled for this agent")
+    disabled_playbooks: list[str] = Field(
+        default_factory=list, description="List of playbooks disabled for this agent"
+    )
     enable_auto_lint: bool = Field(default=DEFAULT_AGENT_AUTO_LINT_ENABLED)
     confirm_actions: bool = Field(default=DEFAULT_AGENT_CONFIRM_ACTIONS)
     llm_draft_config: LLMConfig | None = Field(default=None)
@@ -127,12 +135,16 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_cmd: bool = Field(default=DEFAULT_AGENT_CMD_ENABLED)
     enable_think: bool = Field(default=DEFAULT_AGENT_THINK_ENABLED)
     enable_finish: bool = Field(default=DEFAULT_AGENT_FINISH_ENABLED)
-    enable_condensation_request: bool = Field(default=DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED)
+    enable_condensation_request: bool = Field(
+        default=DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED
+    )
 
     # Editor is always enabled via UltimateEditor now
 
     # Advanced capabilities
-    enable_history_truncation: bool = Field(default=DEFAULT_AGENT_HISTORY_TRUNCATION_ENABLED)
+    enable_history_truncation: bool = Field(
+        default=DEFAULT_AGENT_HISTORY_TRUNCATION_ENABLED
+    )
     enable_plan_mode: bool = Field(
         default=DEFAULT_AGENT_PLAN_MODE_ENABLED,
         description="Enable task planning and decomposition (task tracker tool)",

@@ -79,7 +79,9 @@ def invalid_session_api_key(
 
     # Prefer auth payload
     if auth and isinstance(auth, dict):
-        provided_key = auth.get("session_api_key") or auth.get("apiKey") or auth.get("token")
+        provided_key = (
+            auth.get("session_api_key") or auth.get("apiKey") or auth.get("token")
+        )
         if provided_key is not None:
             return not secrets.compare_digest(str(provided_key), expected_key)
 

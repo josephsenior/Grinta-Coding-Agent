@@ -141,7 +141,9 @@ class Orchestrator(Agent):
 
             run_production_health_check(raise_on_failure=True)
         except ImportError:
-            logger.warning("Health check module not found - skipping dependency validation")
+            logger.warning(
+                "Health check module not found - skipping dependency validation"
+            )
         except RuntimeError as exc:
             logger.error("Production health check failed: %s", exc)
             raise
@@ -168,12 +170,16 @@ class Orchestrator(Agent):
 
         except ContextLimitError:
             # Auto-heal: condense once and retry before giving up
-            logger.warning("Auto-Healing: Context limit reached. Attempting condensation + retry.")
+            logger.warning(
+                "Auto-Healing: Context limit reached. Attempting condensation + retry."
+            )
             try:
                 condensed = self.memory_manager.condense_history(state)
                 return self._execute_llm_step(state, condensed)
             except Exception:
-                logger.warning("Auto-Healing retry failed after condensation. Falling back to think action.")
+                logger.warning(
+                    "Auto-Healing retry failed after condensation. Falling back to think action."
+                )
                 return AgentThinkAction(
                     thought="I have reached the context limit. I must condense my memory before proceeding.",
                 )
@@ -194,7 +200,9 @@ class Orchestrator(Agent):
         if condensed.pending_action:
             return condensed.pending_action
 
-        initial_user_message = self.memory_manager.get_initial_user_message(state.history)
+        initial_user_message = self.memory_manager.get_initial_user_message(
+            state.history
+        )
         messages = self.memory_manager.build_messages(
             condensed_history=condensed.events,
             initial_user_message=initial_user_message,
@@ -278,11 +286,18 @@ class Orchestrator(Agent):
         return fallback_lines
 
     def _flatten_content_list(self, content_val: list[Any]) -> str:
-        texts = [str(item["text"]) for item in content_val if isinstance(item, dict) and "text" in item]
+        texts = [
+            str(item["text"])
+            for item in content_val
+            if isinstance(item, dict) and "text" in item
+        ]
         return "\n".join(texts)
 
     def _sync_executor_llm(self) -> None:
-        if hasattr(self, "executor") and getattr(self.executor, "_llm", None) is not self.llm:
+        if (
+            hasattr(self, "executor")
+            and getattr(self.executor, "_llm", None) is not self.llm
+        ):
             try:  # pragma: no cover - defensive assignment
                 self.executor._llm = self.llm  # type: ignore[attr-defined]
             except Exception:
@@ -307,7 +322,9 @@ class Orchestrator(Agent):
                 message_text = getattr(message, "content", "") or ""
 
         if not message_text.strip():
-            logger.warning("LLM returned an empty response with no tool calls — injecting diagnostic think action")
+            logger.warning(
+                "LLM returned an empty response with no tool calls — injecting diagnostic think action"
+            )
             return AgentThinkAction(
                 thought=(
                     "The LLM returned an empty response with no actions. "
@@ -334,4 +351,6 @@ class Orchestrator(Agent):
 
     def response_to_actions(self, response) -> list[Action]:
         """Convert an LLM response into executable actions."""
-        return codeact_function_calling.response_to_actions(response, mcp_tool_names=list(self.mcp_tools.keys()))
+        return codeact_function_calling.response_to_actions(
+            response, mcp_tool_names=list(self.mcp_tools.keys())
+        )

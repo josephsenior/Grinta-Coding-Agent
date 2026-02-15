@@ -66,7 +66,9 @@ class Locator(Orchestrator):
         self._prompt_manager = _UNINITIALIZED  # type: ignore[assignment]
 
         # Override tools with Locator-specific tools
-        self.tools: list[ChatCompletionToolParam] = locagent_function_calling.get_tools()
+        self.tools: list[ChatCompletionToolParam] = (
+            locagent_function_calling.get_tools()
+        )
 
         # Initialize graph cache (NEW!)
         self.graph_cache = GraphCache(
@@ -98,7 +100,9 @@ class Locator(Orchestrator):
     def prompt_manager(self) -> PromptManager:
         """Get prompt manager with graph-reasoning templates."""
         if isinstance(self._prompt_manager, _UninitializedPromptManager):
-            self._prompt_manager = PromptManager(prompt_dir=os.path.join(os.path.dirname(__file__), "prompts"))
+            self._prompt_manager = PromptManager(
+                prompt_dir=os.path.join(os.path.dirname(__file__), "prompts")
+            )
         return self._prompt_manager
 
     def response_to_actions(self, response: "ModelResponse") -> list["Action"]:
@@ -111,7 +115,9 @@ class Locator(Orchestrator):
             List of actions
 
         """
-        actions = locagent_function_calling.response_to_actions(response, mcp_tool_names=list(self.mcp_tools.keys()))
+        actions = locagent_function_calling.response_to_actions(
+            response, mcp_tool_names=list(self.mcp_tools.keys())
+        )
 
         # Track cache stats periodically
         stats = self.graph_cache.get_stats()
@@ -119,7 +125,12 @@ class Locator(Orchestrator):
         if total_requests > 0 and total_requests % 20 == 0:
             hit_rate = stats.get("hit_rate_percent", 0.0)
             hits = stats.get("hits", 0)
-            logger.info("📊 Graph cache stats: %s%% hit rate (%s/%s requests)", hit_rate, hits, total_requests)
+            logger.info(
+                "📊 Graph cache stats: %s%% hit rate (%s/%s requests)",
+                hit_rate,
+                hits,
+                total_requests,
+            )
 
         return actions
 

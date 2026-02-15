@@ -103,7 +103,9 @@ class AtomicRefactor:
         backup_dir = os.path.join(self.backup_root, f"backup_{transaction_id}")
         os.makedirs(backup_dir, exist_ok=True)
 
-        transaction = RefactorTransaction(transaction_id=transaction_id, backup_dir=backup_dir)
+        transaction = RefactorTransaction(
+            transaction_id=transaction_id, backup_dir=backup_dir
+        )
 
         self.active_transactions[transaction_id] = transaction
         logger.info("📦 Started transaction: %s", transaction_id)
@@ -127,7 +129,9 @@ class AtomicRefactor:
 
         """
         if transaction.committed or transaction.rolled_back:
-            raise ValueError(f"Transaction {transaction.transaction_id} is already finalized")
+            raise ValueError(
+                f"Transaction {transaction.transaction_id} is already finalized"
+            )
 
         # Read original content for rollback
         original_content = None
@@ -146,9 +150,16 @@ class AtomicRefactor:
         )
 
         transaction.edits.append(edit)
-        logger.debug("Added %s edit for %s to transaction %s", operation, file_path, transaction.transaction_id)
+        logger.debug(
+            "Added %s edit for %s to transaction %s",
+            operation,
+            file_path,
+            transaction.transaction_id,
+        )
 
-    def add_rename(self, transaction: RefactorTransaction, old_path: str, new_path: str) -> None:
+    def add_rename(
+        self, transaction: RefactorTransaction, old_path: str, new_path: str
+    ) -> None:
         """Add a file rename to the transaction.
 
         Args:
@@ -158,7 +169,9 @@ class AtomicRefactor:
 
         """
         if transaction.committed or transaction.rolled_back:
-            raise ValueError(f"Transaction {transaction.transaction_id} is already finalized")
+            raise ValueError(
+                f"Transaction {transaction.transaction_id} is already finalized"
+            )
 
         # Read original content
         original_content = None
@@ -177,9 +190,16 @@ class AtomicRefactor:
         )
 
         transaction.edits.append(edit)
-        logger.debug("Added rename %s → %s to transaction %s", old_path, new_path, transaction.transaction_id)
+        logger.debug(
+            "Added rename %s → %s to transaction %s",
+            old_path,
+            new_path,
+            transaction.transaction_id,
+        )
 
-    def _check_transaction_state(self, transaction: RefactorTransaction) -> RefactorResult | None:
+    def _check_transaction_state(
+        self, transaction: RefactorTransaction
+    ) -> RefactorResult | None:
         """Check if transaction is in valid state for committing.
 
         Args:
@@ -216,17 +236,25 @@ class AtomicRefactor:
             transaction: Transaction containing edits
 
         """
-        logger.info("💾 Creating backups for transaction %s", transaction.transaction_id)
+        logger.info(
+            "💾 Creating backups for transaction %s", transaction.transaction_id
+        )
         for edit in transaction.edits:
             if edit.original_content and transaction.backup_dir:
-                backup_path = os.path.join(transaction.backup_dir, os.path.basename(edit.file_path))
+                backup_path = os.path.join(
+                    transaction.backup_dir, os.path.basename(edit.file_path)
+                )
                 try:
                     with open(backup_path, "w", encoding="utf-8") as f:
                         f.write(edit.original_content)
                 except Exception as e:
-                    logger.warning("Failed to create backup for %s: %s", edit.file_path, e)
+                    logger.warning(
+                        "Failed to create backup for %s: %s", edit.file_path, e
+                    )
 
-    def _apply_modify_or_create(self, edit: RefactorEdit, validate: bool, validator: Callable | None) -> None:
+    def _apply_modify_or_create(
+        self, edit: RefactorEdit, validate: bool, validator: Callable | None
+    ) -> None:
         """Apply modify or create operation.
 
         Args:
@@ -316,14 +344,14 @@ class AtomicRefactor:
                 applied_edits.append(edit)
 
             except Exception as e:
-                error_msg = (
-                    f"Failed to apply edit {i + 1}/{len(transaction.edits)} ({edit.operation} {edit.file_path}): {e}"
-                )
+                error_msg = f"Failed to apply edit {i + 1}/{len(transaction.edits)} ({edit.operation} {edit.file_path}): {e}"
                 errors.append(error_msg)
                 logger.error(error_msg)
 
                 # Rollback on failure
-                logger.warning("⚠️  Rolling back %s edits due to failure", len(applied_edits))
+                logger.warning(
+                    "⚠️  Rolling back %s edits due to failure", len(applied_edits)
+                )
                 self._rollback_edits(applied_edits, transaction)
                 break
 
@@ -359,7 +387,9 @@ class AtomicRefactor:
             self._create_backups(transaction)
 
             # Phase 2: Apply edits
-            applied_edits, errors = self._apply_all_edits(transaction, validate, validator)
+            applied_edits, errors = self._apply_all_edits(
+                transaction, validate, validator
+            )
 
             # Check if all edits succeeded
             if errors:
@@ -374,7 +404,10 @@ class AtomicRefactor:
             # Success!
             transaction.committed = True
             logger.info(
-                "✅ Transaction %s committed successfully (%s files)", transaction.transaction_id, len(applied_edits))
+                "✅ Transaction %s committed successfully (%s files)",
+                transaction.transaction_id,
+                len(applied_edits),
+            )
 
             return RefactorResult(
                 success=True,
@@ -463,7 +496,9 @@ class AtomicRefactor:
             os.remove(edit.file_path)
             logger.debug("Removed created file %s", edit.file_path)
 
-    def _rollback_delete_edit(self, edit: FileEdit, transaction: RefactorTransaction) -> None:
+    def _rollback_delete_edit(
+        self, edit: FileEdit, transaction: RefactorTransaction
+    ) -> None:
         """Rollback a DELETE edit.
 
         Args:
@@ -487,7 +522,9 @@ class AtomicRefactor:
             shutil.move(edit.new_path, edit.file_path)
             logger.debug("Reversed rename %s → %s", edit.new_path, edit.file_path)
 
-    def _rollback_single_edit(self, edit: FileEdit, transaction: RefactorTransaction) -> None:
+    def _rollback_single_edit(
+        self, edit: FileEdit, transaction: RefactorTransaction
+    ) -> None:
         """Rollback a single edit.
 
         Args:
@@ -504,7 +541,9 @@ class AtomicRefactor:
         elif edit.operation == "rename":
             self._rollback_rename_edit(edit)
 
-    def _rollback_edits(self, edits: list[FileEdit], transaction: RefactorTransaction) -> None:
+    def _rollback_edits(
+        self, edits: list[FileEdit], transaction: RefactorTransaction
+    ) -> None:
         """Rollback a list of edits."""
         for edit in reversed(edits):
             try:

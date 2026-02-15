@@ -78,7 +78,9 @@ class FileSecretsStore(SecretsStore):
         await call_sync_from_async(self.file_store.write, self.path, json_str)
 
     @classmethod
-    async def get_instance(cls, config: ForgeConfig, user_id: str | None) -> FileSecretsStore:
+    async def get_instance(
+        cls, config: ForgeConfig, user_id: str | None
+    ) -> FileSecretsStore:
         """Get FileSecretsStore singleton instance.
 
         Args:

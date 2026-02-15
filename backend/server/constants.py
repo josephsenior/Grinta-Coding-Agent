@@ -13,6 +13,8 @@ from backend.core.constants import (
 # API versioning enforcement — strict by default.  Override with
 # FORGE_PERMISSIVE_API=1 env var for unversioned routes.
 ENFORCE_API_VERSIONING: bool = os.environ.get("FORGE_PERMISSIVE_API", "") != "1"
+
+
 # API Version prefix for new endpoints
 def get_api_prefix(version: str = CURRENT_API_VERSION) -> str:
     """Get the API prefix for a given version.

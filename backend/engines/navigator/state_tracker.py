@@ -63,7 +63,9 @@ class BrowsingStateTracker:
             goal: The browsing goal
 
         """
-        self.session = BrowsingSession(session_id=session_id, goal=goal, start_time=datetime.now())
+        self.session = BrowsingSession(
+            session_id=session_id, goal=goal, start_time=datetime.now()
+        )
         self.current_page: PageVisit | None = None
 
         logger.info("🌐 Started browsing session: %s", session_id)
@@ -177,7 +179,9 @@ class BrowsingStateTracker:
         if self.session.form_fields_filled:
             summary += "\n## Form Data Remembered:\n"
             for field, value in self.session.form_fields_filled.items():
-                summary += f"- {field}: {value[:50]}{'...' if len(value) > 50 else ''}\n"
+                summary += (
+                    f"- {field}: {value[:50]}{'...' if len(value) > 50 else ''}\n"
+                )
 
         if self.session.errors_encountered:
             summary += f"\n## Recent Errors: {len(self.session.errors_encountered)}\n"
@@ -193,5 +197,7 @@ class BrowsingStateTracker:
             "unique_urls": len(set(self.session.navigation_path)),
             "forms_filled": len(self.session.form_fields_filled),
             "errors": len(self.session.errors_encountered),
-            "duration_seconds": (datetime.now() - self.session.start_time).total_seconds(),
+            "duration_seconds": (
+                datetime.now() - self.session.start_time
+            ).total_seconds(),
         }

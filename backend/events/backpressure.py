@@ -56,9 +56,19 @@ class BackpressureManager:
         is_critical_event: Callable[[Event], bool] | None = None,
     ) -> None:
         defaults = get_event_runtime_defaults()
-        self.max_queue_size = max_queue_size if max_queue_size is not None else int(defaults.max_queue_size)
-        _policy = (drop_policy if drop_policy is not None else defaults.drop_policy).lower()
-        self.drop_policy = _policy if _policy in {"drop_oldest", "drop_newest", "block"} else "drop_oldest"
+        self.max_queue_size = (
+            max_queue_size
+            if max_queue_size is not None
+            else int(defaults.max_queue_size)
+        )
+        _policy = (
+            drop_policy if drop_policy is not None else defaults.drop_policy
+        ).lower()
+        self.drop_policy = (
+            _policy
+            if _policy in {"drop_oldest", "drop_newest", "block"}
+            else "drop_oldest"
+        )
         self.hwm_ratio = max(
             0.1,
             min(
@@ -66,7 +76,9 @@ class BackpressureManager:
                 float(hwm_ratio if hwm_ratio is not None else defaults.hwm_ratio),
             ),
         )
-        self.block_timeout = float(block_timeout if block_timeout is not None else defaults.block_timeout)
+        self.block_timeout = float(
+            block_timeout if block_timeout is not None else defaults.block_timeout
+        )
         self._is_critical_event = is_critical_event or (lambda _e: False)
 
         # ---- stats ----------------------------------------------------------
@@ -80,7 +92,11 @@ class BackpressureManager:
         }
         self._rate_window_seconds: int = 60
         try:
-            raw = rate_window_seconds if rate_window_seconds is not None else int(defaults.rate_window_seconds)
+            raw = (
+                rate_window_seconds
+                if rate_window_seconds is not None
+                else int(defaults.rate_window_seconds)
+            )
             self._rate_window_seconds = max(10, min(600, int(raw)))
         except Exception:
             self._rate_window_seconds = 60
@@ -120,13 +136,19 @@ class BackpressureManager:
         snap["events_window_count"] = len(self._recent_enqueued)
         snap["drops_window_count"] = len(self._recent_drops)
         if self._rate_window_seconds > 0:
-            snap["events_per_minute"] = int(round(len(self._recent_enqueued) * 60 / self._rate_window_seconds))
-            snap["drops_per_minute"] = int(round(len(self._recent_drops) * 60 / self._rate_window_seconds))
+            snap["events_per_minute"] = int(
+                round(len(self._recent_enqueued) * 60 / self._rate_window_seconds)
+            )
+            snap["drops_per_minute"] = int(
+                round(len(self._recent_drops) * 60 / self._rate_window_seconds)
+            )
         else:
             snap["events_per_minute"] = 0
             snap["drops_per_minute"] = 0
         if self.max_queue_size > 0:
-            snap["queue_utilization_pct"] = int(round((self.queue_size / self.max_queue_size) * 100))
+            snap["queue_utilization_pct"] = int(
+                round((self.queue_size / self.max_queue_size) * 100)
+            )
         else:
             snap["queue_utilization_pct"] = 0
         return snap
@@ -151,7 +173,10 @@ class BackpressureManager:
         if is_critical:
             self.stats["critical_events"] += 1
 
-        if self.max_queue_size > 0 and queue.qsize() / self.max_queue_size >= self.hwm_ratio:
+        if (
+            self.max_queue_size > 0
+            and queue.qsize() / self.max_queue_size >= self.hwm_ratio
+        ):
             self.stats["high_watermark_hits"] += 1
             logger.debug(
                 "EventStream queue high-watermark: size=%s max=%s policy=%s",

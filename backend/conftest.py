@@ -119,7 +119,9 @@ def _clear_forge_modules() -> None:
     )
     try:
         for name in list(sys.modules.keys()):
-            if any(name == pkg or name.startswith(pkg + ".") for pkg in TARGET_PACKAGES):
+            if any(
+                name == pkg or name.startswith(pkg + ".") for pkg in TARGET_PACKAGES
+            ):
                 if any(name == p or name.startswith(p + ".") for p in EXCLUDE_PREFIXES):
                     continue
                 sys.modules.pop(name, None)

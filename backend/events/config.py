@@ -39,7 +39,9 @@ def get_event_runtime_defaults() -> EventRuntimeDefaults:
                 workers=max(1, int(getattr(event_cfg, "workers", 8))),
                 async_write=bool(getattr(event_cfg, "async_write", False)),
                 coalesce=bool(getattr(event_cfg, "coalesce", False)),
-                coalesce_window_ms=float(getattr(event_cfg, "coalesce_window_ms", 100.0)),
+                coalesce_window_ms=float(
+                    getattr(event_cfg, "coalesce_window_ms", 100.0)
+                ),
                 coalesce_max_batch=max(
                     1,
                     int(getattr(event_cfg, "coalesce_max_batch", 20)),
@@ -53,10 +55,14 @@ def get_event_runtime_defaults() -> EventRuntimeDefaults:
         drop_policy=os.getenv("FORGE_EVENTSTREAM_POLICY", "drop_oldest").lower(),
         hwm_ratio=float(os.getenv("FORGE_EVENTSTREAM_HWM_RATIO", "0.8")),
         block_timeout=float(os.getenv("FORGE_EVENTSTREAM_BLOCK_TIMEOUT", "0.1")),
-        rate_window_seconds=int(os.getenv("FORGE_EVENTSTREAM_RATE_WINDOW_SECONDS", "60")),
+        rate_window_seconds=int(
+            os.getenv("FORGE_EVENTSTREAM_RATE_WINDOW_SECONDS", "60")
+        ),
         workers=max(1, int(os.getenv("FORGE_EVENTSTREAM_WORKERS", "8"))),
-        async_write=os.getenv("FORGE_EVENTSTREAM_ASYNC_WRITE", "false").lower() in ("1", "true", "yes"),
-        coalesce=os.getenv("FORGE_EVENT_COALESCE", "false").lower() in ("1", "true", "yes"),
+        async_write=os.getenv("FORGE_EVENTSTREAM_ASYNC_WRITE", "false").lower()
+        in ("1", "true", "yes"),
+        coalesce=os.getenv("FORGE_EVENT_COALESCE", "false").lower()
+        in ("1", "true", "yes"),
         coalesce_window_ms=float(os.getenv("FORGE_EVENT_COALESCE_WINDOW_MS", "100")),
         coalesce_max_batch=max(
             1,

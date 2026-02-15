@@ -48,7 +48,6 @@ from backend.server.shared import (
 from backend.server.versioning import version_middleware
 from backend.server.otel_config import (
     OTEL_ENABLED as _otel_enabled,
-    SAMPLE_HTTP as _sample_http,
     get_effective_http_sample,
 )
 
@@ -113,7 +112,9 @@ def _validate_config() -> None:
             logger.warning("  %s", w)
         logger.warning("=" * 60)
         if strict:
-            raise SystemExit("Forge strict mode: resolve all warnings above or unset FORGE_STRICT.")
+            raise SystemExit(
+                "Forge strict mode: resolve all warnings above or unset FORGE_STRICT."
+            )
     else:
         logger.info("Config validation passed.")
 
@@ -132,7 +133,9 @@ def _collect_validation_issues(strict: bool) -> tuple[list[str], list[str]]:
     return warnings, errors
 
 
-def _check_api_key_security(warnings: list[str], errors: list[str], strict: bool) -> None:
+def _check_api_key_security(
+    warnings: list[str], errors: list[str], strict: bool
+) -> None:
     """Check if SESSION_API_KEY is insecure."""
     if getattr(server_config, "session_api_key", "") == "forge_dev_key":
         msg = (
@@ -170,7 +173,9 @@ def _check_database_availability(warnings: list[str]) -> None:
 def _check_system_dependencies(warnings: list[str]) -> None:
     """Check required system tools like tmux."""
     if not shutil.which("tmux"):
-        warnings.append("tmux is not installed or not on PATH. Some agent terminal features may not work.")
+        warnings.append(
+            "tmux is not installed or not on PATH. Some agent terminal features may not work."
+        )
 
 
 def _check_config_file_existence(warnings: list[str]) -> None:
@@ -178,7 +183,9 @@ def _check_config_file_existence(warnings: list[str]) -> None:
     from pathlib import Path
 
     if not Path("config.toml").exists():
-        warnings.append("No config.toml found. Copy config.template.toml → config.toml and set your LLM API key.")
+        warnings.append(
+            "No config.toml found. Copy config.template.toml → config.toml and set your LLM API key."
+        )
 
 
 @asynccontextmanager
@@ -211,7 +218,9 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
             )
             logger.info("Sentry error tracking initialized")
         except ImportError:
-            logger.warning("sentry-sdk not installed. Install with: pip install sentry-sdk")
+            logger.warning(
+                "sentry-sdk not installed. Install with: pip install sentry-sdk"
+            )
         except Exception as e:
             logger.warning("Sentry initialization failed: %s", e)
 
@@ -254,7 +263,9 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
                     try:
                         await manager.close_session(sid)
                     except Exception as e:
-                        logger.error("Error stopping conversation %s: %s", sid, e, exc_info=True)
+                        logger.error(
+                            "Error stopping conversation %s: %s", sid, e, exc_info=True
+                        )
         except Exception as e:
             logger.error("Error during conversation cleanup: %s", e, exc_info=True)
 
@@ -332,19 +343,31 @@ app.add_middleware(RequestIDMiddleware)
 
 app.add_middleware(BaseHTTPMiddleware, dispatch=RequestTracingMiddleware(enabled=True))
 
+# 0.7. Audit Logging (log sensitive operations for security audit)
+
+from backend.server.middleware.audit_logger import AuditLoggerMiddleware
+
+app.add_middleware(AuditLoggerMiddleware)
+
 # Initialize distributed tracing (opt-in — requires `telemetry` extras)
-_tracing_enabled = os.getenv("TRACING_ENABLED", os.getenv("OTEL_ENABLED", "false")).lower() in (
+_tracing_enabled = os.getenv(
+    "TRACING_ENABLED", os.getenv("OTEL_ENABLED", "false")
+).lower() in (
     "true",
     "1",
     "yes",
 )
 if _tracing_enabled:
     try:
-        _tracing_sample_rate = float(os.getenv("TRACING_SAMPLE_RATE", os.getenv("OTEL_SAMPLE_DEFAULT", "0.1")))
+        _tracing_sample_rate = float(
+            os.getenv("TRACING_SAMPLE_RATE", os.getenv("OTEL_SAMPLE_DEFAULT", "0.1"))
+        )
     except Exception:
         _tracing_sample_rate = 0.1
     initialize_tracing(
-        service_name=os.getenv("TRACING_SERVICE_NAME", os.getenv("SERVICE_NAME", "forge-server")),
+        service_name=os.getenv(
+            "TRACING_SERVICE_NAME", os.getenv("SERVICE_NAME", "forge-server")
+        ),
         service_version=os.getenv("TRACING_SERVICE_VERSION", __version__),
         exporter=os.getenv("TRACING_EXPORTER", os.getenv("OTEL_EXPORTER", "console")),
         endpoint=os.getenv("TRACING_ENDPOINT", os.getenv("OTEL_EXPORTER_ENDPOINT")),
@@ -416,10 +439,14 @@ metrics_enabled = os.getenv("REQUEST_METRICS_ENABLED", "false").lower() in (
     "yes",
 )
 if metrics_enabled:
-    app.add_middleware(BaseHTTPMiddleware, dispatch=RequestMetricsMiddleware(enabled=True))
+    app.add_middleware(
+        BaseHTTPMiddleware, dispatch=RequestMetricsMiddleware(enabled=True)
+    )
 
 # Request size limiting (prevent DoS via large request bodies)
-request_size_limit_enabled = os.getenv("REQUEST_SIZE_LIMIT_ENABLED", "true").lower() == "true"
+request_size_limit_enabled = (
+    os.getenv("REQUEST_SIZE_LIMIT_ENABLED", "true").lower() == "true"
+)
 app.add_middleware(
     RequestSizeLimiter,
     enabled=request_size_limit_enabled,
@@ -443,9 +470,15 @@ app.add_middleware(
 # CSP policy can be toggled via env: CSP_POLICY=permissive|strict
 # Default: strict in production-like environments, permissive otherwise
 env_hint = (
-    os.getenv("FORGE_ENV") or os.getenv("ENV") or os.getenv("PYTHON_ENV") or os.getenv("NODE_ENV") or "development"
+    os.getenv("FORGE_ENV")
+    or os.getenv("ENV")
+    or os.getenv("PYTHON_ENV")
+    or os.getenv("NODE_ENV")
+    or "development"
 ).lower()
-default_csp = "strict" if any(x in env_hint for x in ("prod", "production")) else "permissive"
+default_csp = (
+    "strict" if any(x in env_hint for x in ("prod", "production")) else "permissive"
+)
 csp_policy = os.getenv("CSP_POLICY", default_csp).lower()
 if csp_policy not in ("permissive", "strict"):
     csp_policy = default_csp

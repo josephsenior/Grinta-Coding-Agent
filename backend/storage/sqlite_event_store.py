@@ -134,7 +134,9 @@ class SQLiteEventStore:
             for event_id, event_dict in events:
                 payload = json.dumps(event_dict, ensure_ascii=False)
                 timestamp = event_dict.get("timestamp", _time.time())
-                event_type = event_dict.get("action", event_dict.get("observation", "unknown"))
+                event_type = event_dict.get(
+                    "action", event_dict.get("observation", "unknown")
+                )
                 source = event_dict.get("source", None)
                 conn.execute(
                     "INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)",
@@ -154,7 +156,9 @@ class SQLiteEventStore:
         """
         with self._lock:
             conn = self._get_conn()
-            row = conn.execute("SELECT payload FROM events WHERE id = ?", (event_id,)).fetchone()
+            row = conn.execute(
+                "SELECT payload FROM events WHERE id = ?", (event_id,)
+            ).fetchone()
         if row is None:
             return None
         return json.loads(row["payload"])

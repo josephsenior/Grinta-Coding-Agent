@@ -44,7 +44,10 @@ def _is_dict_or_list_type(field_type: Any) -> bool:
 def _process_list_items(cast_value: list, field_type: Any) -> list:
     inner_type = get_args(field_type)[0]
     if isinstance(inner_type, type) and issubclass(inner_type, BaseModel):
-        return [inner_type(**item) if isinstance(item, dict) else item for item in cast_value]
+        return [
+            inner_type(**item) if isinstance(item, dict) else item
+            for item in cast_value
+        ]
     return cast_value
 
 
@@ -98,7 +101,9 @@ def _process_field_value(
 
                 if hasattr(sub_config, "model") and cast_value is not None:
                     api_key_manager.set_api_key(sub_config.model, cast_value)
-                    api_key_manager.set_environment_variables(sub_config.model, cast_value)
+                    api_key_manager.set_environment_variables(
+                        sub_config.model, cast_value
+                    )
             except Exception:
                 logger.FORGE_logger.debug("Failed to sync API key manager")
     except (ValueError, TypeError):
@@ -122,10 +127,14 @@ def _set_attr_from_env(
         if isinstance(field_value, BaseModel):
             _set_attr_from_env(field_value, env_dict, prefix=f"{field_name}_")
         elif env_var_name in env_dict:
-            _process_field_value(sub_config, field_name, field_type, env_var_name, env_dict)
+            _process_field_value(
+                sub_config, field_name, field_type, env_var_name, env_dict
+            )
 
 
-def load_from_env(cfg: ForgeConfig, env_or_toml_dict: dict | MutableMapping[str, str]) -> None:
+def load_from_env(
+    cfg: ForgeConfig, env_or_toml_dict: dict | MutableMapping[str, str]
+) -> None:
     """Set config attributes from environment variables or TOML dictionary."""
     env_dict = dict(env_or_toml_dict)
 
@@ -171,4 +180,6 @@ def export_llm_api_keys(cfg: ForgeConfig) -> None:
                 api_key_manager.set_api_key(llm.model, llm.api_key)
                 api_key_manager.set_environment_variables(llm.model, llm.api_key)
     except Exception:
-        logger.FORGE_logger.debug("Failed to export LLM API keys after configuration load")
+        logger.FORGE_logger.debug(
+            "Failed to export LLM API keys after configuration load"
+        )

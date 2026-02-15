@@ -31,7 +31,9 @@ def extract_assistant_message(response: ModelResponse) -> Any:
     choice = response.choices[0]
     assistant_msg = getattr(choice, "message", None)
     if assistant_msg is None:
-        raise FunctionCallValidationError("Model response choice is missing a message payload")
+        raise FunctionCallValidationError(
+            "Model response choice is missing a message payload"
+        )
     return assistant_msg
 
 
@@ -188,7 +190,9 @@ def get_common_pattern_param(description: str) -> dict[str, Any]:
     }
 
 
-def get_common_timeout_param(description: str = "Optional timeout in seconds.") -> dict[str, Any]:
+def get_common_timeout_param(
+    description: str = "Optional timeout in seconds.",
+) -> dict[str, Any]:
     """Get a standardized timeout parameter definition."""
     return {
         "type": "number",

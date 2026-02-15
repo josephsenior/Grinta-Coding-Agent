@@ -104,7 +104,10 @@ class BrowserEnv:
             import nltk  # type: ignore[import-untyped]
 
             nltk.download("punkt_tab")
-        elif "webarena" not in self.browsergym_eval_env and "miniwob" not in self.browsergym_eval_env:
+        elif (
+            "webarena" not in self.browsergym_eval_env
+            and "miniwob" not in self.browsergym_eval_env
+        ):
             msg = f"Unsupported browsergym eval env: {self.browsergym_eval_env}"
             raise ValueError(msg)
 
@@ -146,7 +149,9 @@ class BrowserEnv:
 
             # Ensure the directory is writable
             if not os.access(downloads_path, os.W_OK):
-                raise PermissionError(f"Downloads directory {downloads_path} is not writable")
+                raise PermissionError(
+                    f"Downloads directory {downloads_path} is not writable"
+                )
 
             # Ensure path ends with / for Playwright
             if not downloads_path.endswith("/"):
@@ -223,7 +228,9 @@ class BrowserEnv:
 
     def _handle_eval_rewards_request(self, unique_request_id: str) -> None:
         """Handle evaluation rewards request."""
-        self.browser_side.send((unique_request_id, {"text_content": json.dumps(self.eval_rewards)}))
+        self.browser_side.send(
+            (unique_request_id, {"text_content": json.dumps(self.eval_rewards)})
+        )
 
     def _process_observation(self, obs: dict) -> dict:
         """Process observation data for browser environment."""
@@ -233,12 +240,16 @@ class BrowserEnv:
             overlay_som(obs["screenshot"], obs.get("extra_element_properties", {})),
             add_data_prefix=True,
         )
-        obs["screenshot"] = image_to_png_base64_url(obs["screenshot"], add_data_prefix=True)
+        obs["screenshot"] = image_to_png_base64_url(
+            obs["screenshot"], add_data_prefix=True
+        )
         obs["active_page_index"] = obs["active_page_index"].item()
         obs["elapsed_time"] = obs["elapsed_time"].item()
         return obs
 
-    def _handle_browser_action(self, env: Any, action_data: dict, unique_request_id: str) -> None:
+    def _handle_browser_action(
+        self, env: Any, action_data: dict, unique_request_id: str
+    ) -> None:
         """Handle browser action and send response."""
         action = action_data["action"]
 
@@ -269,7 +280,9 @@ class BrowserEnv:
             return action
 
         url = goto_match.group(1)
-        logger.info("🔍 Detected localhost navigation to %s, checking server readiness...", url)
+        logger.info(
+            "🔍 Detected localhost navigation to %s, checking server readiness...", url
+        )
 
         # Run async server check
         try:
@@ -281,13 +294,20 @@ class BrowserEnv:
             if server_ready:
                 logger.info("✅ Server at %s is ready and responding!", url)
             else:
-                logger.warning("⚠️ Server at %s not responding, but proceeding with navigation...", url)
+                logger.warning(
+                    "⚠️ Server at %s not responding, but proceeding with navigation...",
+                    url,
+                )
         except Exception as e:
-            logger.warning("⚠️ Error checking server readiness: %s, proceeding anyway...", e)
+            logger.warning(
+                "⚠️ Error checking server readiness: %s, proceeding anyway...", e
+            )
 
         return action
 
-    async def _check_server_ready_async(self, url: str, max_wait: int = 30, check_interval: float = 0.5) -> bool:
+    async def _check_server_ready_async(
+        self, url: str, max_wait: int = 30, check_interval: float = 0.5
+    ) -> bool:
         """Async non-blocking server readiness check.
 
         Args:
@@ -304,7 +324,9 @@ class BrowserEnv:
         start_time = time.time()
         attempt = 0
 
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3)) as session:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=3)
+        ) as session:
             while time.time() - start_time < max_wait:
                 attempt += 1
                 try:
@@ -318,7 +340,11 @@ class BrowserEnv:
                             )
                             return True
                 except Exception as e:
-                    logger.debug("⏳ Attempt %s: Server not ready yet - %s", attempt, type(e).__name__)
+                    logger.debug(
+                        "⏳ Attempt %s: Server not ready yet - %s",
+                        attempt,
+                        type(e).__name__,
+                    )
 
                 await asyncio.sleep(check_interval)
 
@@ -415,7 +441,9 @@ class BrowserEnv:
             self.agent_side.send(("SHUTDOWN", None))
             self.process.join(5)
             if self.process.is_alive():
-                logger.error("Browser process did not terminate, forcefully terminating...")
+                logger.error(
+                    "Browser process did not terminate, forcefully terminating..."
+                )
                 self.process.terminate()
                 self.process.join(5)
                 if self.process.is_alive():

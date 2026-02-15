@@ -77,13 +77,19 @@ async def resolve_conversation_store(
 
     """
     if request is None:
-        return await get_conversation_store_instance(ConversationStoreImpl, config, None)
+        return await get_conversation_store_instance(
+            ConversationStoreImpl, config, None
+        )
 
-    conversation_store: ConversationStore | None = getattr(request.state, "conversation_store", None)
+    conversation_store: ConversationStore | None = getattr(
+        request.state, "conversation_store", None
+    )
     if conversation_store:
         return conversation_store
     user_id = get_user_id(request)
-    conversation_store = await get_conversation_store_instance(ConversationStoreImpl, config, user_id)
+    conversation_store = await get_conversation_store_instance(
+        ConversationStoreImpl, config, user_id
+    )
     request.state.conversation_store = conversation_store
     return conversation_store
 
@@ -125,14 +131,22 @@ async def get_conversation_metadata(
         ) from e
 
 
-async def get_conversation(conversation_id: str, user_id: str | None = Depends(get_user_id)):
+async def get_conversation(
+    conversation_id: str, user_id: str | None = Depends(get_user_id)
+):
     """Grabs conversation id set by middleware. Adds the conversation_id to the openapi schema."""
     # For testing, default to "dev-user" if no user_id
     user_id = user_id or "dev-user"
-    logger.info("get_conversation called with conversation_id=%s, user_id=%s", conversation_id, user_id)
+    logger.info(
+        "get_conversation called with conversation_id=%s, user_id=%s",
+        conversation_id,
+        user_id,
+    )
 
     # First check if conversation exists in conversation store
-    conversation_store = await get_conversation_store_instance(ConversationStoreImpl, config, user_id)
+    conversation_store = await get_conversation_store_instance(
+        ConversationStoreImpl, config, user_id
+    )
     conversation_metadata = await conversation_store.get_metadata(conversation_id)
     if not conversation_metadata:
         logger.warning(

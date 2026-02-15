@@ -179,7 +179,9 @@ class ActionExecutor:
             work_dir=cwd or self._initial_cwd,
             tools=self.tool_registry,
             username=self.username,
-            no_change_timeout_seconds=int(os.environ.get("NO_CHANGE_TIMEOUT_SECONDS", 10)),
+            no_change_timeout_seconds=int(
+                os.environ.get("NO_CHANGE_TIMEOUT_SECONDS", 10)
+            ),
             max_memory_mb=self.max_memory_gb * 1024 if self.max_memory_gb else None,
             cancellation_service=self.cancellation_service,
         )
@@ -200,7 +202,8 @@ class ActionExecutor:
         try:
             # Set memory limit from environment or system stats
             import psutil as _psutil
-            total_mem_gb = int(_psutil.virtual_memory().total / (1024 ** 3))
+
+            total_mem_gb = int(_psutil.virtual_memory().total / (1024**3))
             # Reserve 2GB for system/other processes
             self.max_memory_gb = max(1, total_mem_gb - 2)
 
@@ -225,7 +228,9 @@ class ActionExecutor:
                 # However `_init_browser_async` logs success.
                 # I'll await it if it's fast, or start it.
                 # Ideally start it.
-                self._browser_init_task = asyncio.create_task(self._init_browser_async())
+                self._browser_init_task = asyncio.create_task(
+                    self._init_browser_async()
+                )
             else:
                 logger.info("Step 2/5: Browser disabled, skipping...")
 
@@ -287,7 +292,9 @@ class ActionExecutor:
             action_type = action.action
             return await getattr(self, action_type)(action)
 
-    async def run(self, action: CmdRunAction) -> CmdOutputObservation | ErrorObservation:
+    async def run(
+        self, action: CmdRunAction
+    ) -> CmdOutputObservation | ErrorObservation:
         """Execute bash/shell command."""
         try:
             bash_session = self.bash_session
@@ -302,7 +309,10 @@ class ActionExecutor:
             # Check for detected servers and add to observation extras
             detected_server = cast(Any, bash_session.get_detected_server())
             if detected_server:
-                logger.info("🚀 Adding detected server to observation extras: %s", detected_server.url)
+                logger.info(
+                    "🚀 Adding detected server to observation extras: %s",
+                    detected_server.url,
+                )
                 # Add server info to observation extras for client processing
                 if not hasattr(observation, "extras"):
                     observation.extras = {}  # type: ignore[attr-defined]
@@ -330,7 +340,9 @@ class ActionExecutor:
             path=action.path,
             view_range=action.view_range,
         )
-        return FileReadObservation(content=result_str, path=action.path, impl_source=FileReadSource.FILE_EDITOR)
+        return FileReadObservation(
+            content=result_str, path=action.path, impl_source=FileReadSource.FILE_EDITOR
+        )
 
     async def read(self, action: FileReadAction) -> Observation:
         """Read a file and return its content as an observation."""
@@ -392,7 +404,8 @@ class ActionExecutor:
         is_mutating_file_edit = action.command != "view"
         is_preview = (
             is_mutating_file_edit
-            and getattr(action, "confirmation_state", None) == ActionConfirmationStatus.AWAITING_CONFIRMATION
+            and getattr(action, "confirmation_state", None)
+            == ActionConfirmationStatus.AWAITING_CONFIRMATION
         )
 
         # Handle directory viewing specially
@@ -412,9 +425,13 @@ class ActionExecutor:
             dry_run=is_preview,
         )
         if is_preview and not result_str.startswith("ERROR:"):
-            result_str = "Preview generated (no changes applied). Confirm to apply these edits."
+            result_str = (
+                "Preview generated (no changes applied). Confirm to apply these edits."
+            )
 
-        safe_old, safe_new, safe_diff = self._prepare_edit_observation_contents(old_content, new_content, action.path)
+        safe_old, safe_new, safe_diff = self._prepare_edit_observation_contents(
+            old_content, new_content, action.path
+        )
 
         return FileEditObservation(
             content=result_str,
@@ -446,7 +463,11 @@ class ActionExecutor:
         max_chars = get_max_edit_observation_chars()
 
         def truncate(text, label):
-            return truncate_large_text(text, max_chars, label=label) if text is not None else None
+            return (
+                truncate_large_text(text, max_chars, label=label)
+                if text is not None
+                else None
+            )
 
         safe_old = truncate(old_content, "edit.old_content")
         safe_new = truncate(new_content, "edit.new_content")
@@ -459,7 +480,9 @@ class ActionExecutor:
     async def browse(self, action: BrowseURLAction) -> Observation:
         """Browse URL and return page content."""
         if self.browser is None:
-            return ErrorObservation("Browser functionality is not supported or disabled.")
+            return ErrorObservation(
+                "Browser functionality is not supported or disabled."
+            )
         await self._ensure_browser_ready()
         from backend.runtime.browser import browse
 
@@ -476,7 +499,9 @@ class ActionExecutor:
 
         """
         if self.browser is None:
-            return ErrorObservation("Browser functionality is not supported or disabled.")
+            return ErrorObservation(
+                "Browser functionality is not supported or disabled."
+            )
         await self._ensure_browser_ready()
         from backend.runtime.browser import browse
 
@@ -502,7 +527,9 @@ class ActionExecutor:
                     file_ext = ext
         except Exception:
             pass
-        tgt_path = os.path.join("/workspace", f"file_{len(self.downloaded_files)}{file_ext}")
+        tgt_path = os.path.join(
+            "/workspace", f"file_{len(self.downloaded_files)}{file_ext}"
+        )
         shutil.copy(src_path, tgt_path)
         return FileDownloadObservation(
             content=f"Execution of the previous action {action.browser_actions} resulted in a file download. The downloaded file is saved at location: {tgt_path}",
@@ -544,6 +571,7 @@ async def lifespan(app: FastAPI):
     # Start initialization in background task
     initialize_background = globals().get("_initialize_background")
     if not callable(initialize_background):
+
         async def _noop_initialize(_: FastAPI) -> None:
             return
 
@@ -645,7 +673,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     logger.info("Starting file viewer server")
-    _file_viewer_port = find_available_tcp_port(min_port=args.port + 1, max_port=min(args.port + 1024, 65535))
+    _file_viewer_port = find_available_tcp_port(
+        min_port=args.port + 1, max_port=min(args.port + 1024, 65535)
+    )
     server_url, _ = start_file_viewer_server(port=_file_viewer_port)
     logger.info("File viewer server started at %s", server_url)
 
@@ -675,7 +705,9 @@ if __name__ == "__main__":
                 enable_browser=args.enable_browser,
                 browsergym_eval_env=args.browsergym_eval_env,
             )
-            logger.info("ActionExecutor instance created. Starting async initialization...")
+            logger.info(
+                "ActionExecutor instance created. Starting async initialization..."
+            )
 
             init_timeout = int(os.environ.get("ACTION_EXECUTOR_INIT_TIMEOUT", "300"))
             try:

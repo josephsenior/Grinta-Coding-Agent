@@ -108,7 +108,12 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
             response = await asyncio.wait_for(call_next(request), timeout=timeout)
             return response
         except TimeoutError as exc:
-            logger.warning("Request timeout: %s %s exceeded %ss timeout", request.method, request.url.path, timeout)
+            logger.warning(
+                "Request timeout: %s %s exceeded %ss timeout",
+                request.method,
+                request.url.path,
+                timeout,
+            )
             raise HTTPException(
                 status_code=504,
                 detail=f"Request timeout. The operation exceeded the {timeout}s time limit. "

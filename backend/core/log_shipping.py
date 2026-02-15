@@ -60,7 +60,9 @@ class LogShipper(ExternalServiceBase):
         def build_payload(parsed_endpoint: ParseResult) -> dict[str, Any]:
             return self._build_payload(parsed_endpoint, logs)
 
-        async def execute_request(session: aiohttp.ClientSession, payload: Any, headers: dict[str, str]) -> bool:
+        async def execute_request(
+            session: aiohttp.ClientSession, payload: Any, headers: dict[str, str]
+        ) -> bool:
             return await self._post_payload(session, payload, headers, len(logs))
 
         return await self._send_request(
@@ -69,7 +71,9 @@ class LogShipper(ExternalServiceBase):
             error_msg=f"Error shipping logs to {self.endpoint}",
         )
 
-    def _build_payload(self, parsed_endpoint: ParseResult, logs: list[dict[str, Any]]) -> dict[str, Any]:
+    def _build_payload(
+        self, parsed_endpoint: ParseResult, logs: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         if "datadog" in parsed_endpoint.netloc.lower():
             return self._datadog_payload(logs)
         return {"logs": logs}
@@ -99,7 +103,9 @@ class LogShipper(ExternalServiceBase):
         log_count: int,
     ) -> bool:
         assert self.endpoint is not None  # For type checkers
-        async with session.post(self.endpoint, json=payload, headers=headers) as response:
+        async with session.post(
+            self.endpoint, json=payload, headers=headers
+        ) as response:
             if response.status in (200, 201):
                 logger.debug("Shipped %s logs to %s", log_count, self.endpoint)
                 return True
@@ -121,7 +127,9 @@ class LogShipper(ExternalServiceBase):
 
     async def _wait_for_batch_window(self) -> bool:
         try:
-            await asyncio.wait_for(self._shutdown_event.wait(), timeout=self.batch_timeout)
+            await asyncio.wait_for(
+                self._shutdown_event.wait(), timeout=self.batch_timeout
+            )
             return True
         except TimeoutError:
             return False
@@ -143,7 +151,9 @@ class LogShipper(ExternalServiceBase):
             logs_to_ship.append(self._log_queue.popleft())
         return logs_to_ship
 
-    async def _attempt_ship_with_retries(self, logs_to_ship: list[dict[str, Any]]) -> bool:
+    async def _attempt_ship_with_retries(
+        self, logs_to_ship: list[dict[str, Any]]
+    ) -> bool:
         for attempt in range(self.max_retries):
             if await self._ship_logs(logs_to_ship):
                 return True

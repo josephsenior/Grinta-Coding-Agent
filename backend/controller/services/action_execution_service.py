@@ -56,7 +56,9 @@ class ActionExecutionService:
             FunctionCallValidationError,
             FunctionCallNotExistsError,
         ) as exc:
-            self._context.event_stream.add_event(ErrorObservation(content=str(exc)), EventSource.AGENT)
+            self._context.event_stream.add_event(
+                ErrorObservation(content=str(exc)), EventSource.AGENT
+            )
             return None
         except (ContextWindowExceededError, BadRequestError, OpenAIError) as exc:
             return await self._handle_context_window_error(exc)
@@ -98,5 +100,7 @@ class ActionExecutionService:
             raise exc
         if not self._context.agent.config.enable_history_truncation:
             raise LLMContextWindowExceedError from exc
-        self._context.event_stream.add_event(CondensationRequestAction(), EventSource.AGENT)
+        self._context.event_stream.add_event(
+            CondensationRequestAction(), EventSource.AGENT
+        )
         return None

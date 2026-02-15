@@ -43,7 +43,9 @@ class ActionService:
         if not isinstance(action, NullAction):
             await self._finalize_action(action, ctx)
 
-    async def _handle_runnable_action(self, action: Action, ctx: ToolInvocationContext | None) -> None:
+    async def _handle_runnable_action(
+        self, action: Action, ctx: ToolInvocationContext | None
+    ) -> None:
         controller = self._context.get_controller()
         pipeline = getattr(controller, "tool_pipeline", None)
 
@@ -56,7 +58,9 @@ class ActionService:
 
         self.set_pending_action(action)
 
-    async def _finalize_action(self, action: Action, ctx: ToolInvocationContext | None) -> None:
+    async def _finalize_action(
+        self, action: Action, ctx: ToolInvocationContext | None
+    ) -> None:
         controller = self._context.get_controller()
 
         await self._confirmation_service.handle_pending_confirmation(action)
@@ -85,7 +89,9 @@ class ActionService:
 
         clean_metrics = Metrics()
         clean_metrics.accumulated_cost = metrics.accumulated_cost
-        clean_metrics._accumulated_token_usage = copy.deepcopy(metrics.accumulated_token_usage)
+        clean_metrics._accumulated_token_usage = copy.deepcopy(
+            metrics.accumulated_token_usage
+        )
         if controller.state.budget_flag:
             clean_metrics.max_budget_per_task = controller.state.budget_flag.max_value
         action.llm_metrics = clean_metrics

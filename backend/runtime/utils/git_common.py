@@ -58,20 +58,28 @@ def get_valid_git_ref(repo_dir: str) -> str | None:
     """
     refs = []
     try:
-        current_branch = run_git_cmd("git --no-pager rev-parse --abbrev-ref HEAD", repo_dir)
+        current_branch = run_git_cmd(
+            "git --no-pager rev-parse --abbrev-ref HEAD", repo_dir
+        )
         refs.append(f"origin/{current_branch}")
     except RuntimeError:
         pass
     try:
-        default_branch = run_git_cmd('git --no-pager remote show origin | grep "HEAD branch"', repo_dir).split()[-1].strip()
-        ref_non_default_branch = (
-            f'$(git --no-pager merge-base HEAD "$(git --no-pager rev-parse --abbrev-ref origin/{default_branch})")'
+        default_branch = (
+            run_git_cmd(
+                'git --no-pager remote show origin | grep "HEAD branch"', repo_dir
+            )
+            .split()[-1]
+            .strip()
         )
+        ref_non_default_branch = f'$(git --no-pager merge-base HEAD "$(git --no-pager rev-parse --abbrev-ref origin/{default_branch})")'
         ref_default_branch = f"origin/{default_branch}"
         refs.extend((ref_non_default_branch, ref_default_branch))
     except RuntimeError:
         pass
-    ref_new_repo = "$(git --no-pager rev-parse --verify 4b825dc642cb6eb9a060e54bf8d69288fbee4904)"
+    ref_new_repo = (
+        "$(git --no-pager rev-parse --verify 4b825dc642cb6eb9a060e54bf8d69288fbee4904)"
+    )
     refs.append(ref_new_repo)
     for ref in refs:
         try:

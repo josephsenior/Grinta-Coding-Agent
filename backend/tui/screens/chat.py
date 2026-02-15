@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
-from textual import on, work
+from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -14,12 +13,9 @@ from textual.widgets import (
     Footer,
     Header,
     Input,
-    Label,
-    Static,
 )
 
 from backend.tui.client import ForgeClient
-from backend.tui.widgets.action_card import ActionCard
 from backend.tui.widgets.confirm_bar import ConfirmBar
 from backend.tui.widgets.message_list import MessageList
 from backend.tui.widgets.status_bar import AgentStatusBar
@@ -81,7 +77,9 @@ class ChatScreen(Screen[None]):
 
     async def on_mount(self) -> None:
         """Connect to the conversation event stream."""
-        self._add_system_message(f"Connecting to conversation {self.conversation_id[:8]}…")
+        self._add_system_message(
+            f"Connecting to conversation {self.conversation_id[:8]}…"
+        )
         try:
             await self.client.join_conversation(
                 self.conversation_id,
@@ -206,7 +204,9 @@ class ChatScreen(Screen[None]):
 
         elif action_type in ("finish", "reject"):
             content = args.get("content", args.get("outputs", {}).get("content", ""))
-            self._add_system_message(f"Agent {action_type}: {content}" if content else f"Agent {action_type}")
+            self._add_system_message(
+                f"Agent {action_type}: {content}" if content else f"Agent {action_type}"
+            )
 
         else:
             # Generic action
@@ -249,7 +249,9 @@ class ChatScreen(Screen[None]):
         if obs_type == "mcp":
             tool = extras.get("tool_name", "mcp")
             msg_list = self.query_one("#message-list", MessageList)
-            msg_list.add_observation(f"MCP: {tool}", content[:300] if content else "done")
+            msg_list.add_observation(
+                f"MCP: {tool}", content[:300] if content else "done"
+            )
             return
 
         if obs_type in ("chat", "message"):

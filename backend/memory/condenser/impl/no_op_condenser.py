@@ -20,7 +20,9 @@ class NoOpCondenser(Condenser):
         return view
 
     @classmethod
-    def from_config(cls, config: NoOpCondenserConfig, llm_registry: LLMRegistry) -> NoOpCondenser:
+    def from_config(
+        cls, config: NoOpCondenserConfig, llm_registry: LLMRegistry
+    ) -> NoOpCondenser:
         """Return a new no-op condenser regardless of configuration."""
         return NoOpCondenser()
 

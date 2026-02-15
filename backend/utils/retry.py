@@ -36,7 +36,9 @@ class RetryExhaustedError(RetryError):
     def __init__(self, attempts: int, last_exception: Exception | None):
         self.attempts = attempts
         self.last_exception = last_exception
-        super().__init__(f"Retry exhausted after {attempts} attempts. Last error: {last_exception}")
+        super().__init__(
+            f"Retry exhausted after {attempts} attempts. Last error: {last_exception}"
+        )
 
 
 def _noop_record_event(ev: dict[str, Any]) -> None:
@@ -73,7 +75,9 @@ def _record_success_metrics(op_name: str, attempt: int, max_attempts: int) -> No
         )
 
 
-def _record_error_metrics(op_name: str, attempt: int, max_attempts: int, error: Exception) -> None:
+def _record_error_metrics(
+    op_name: str, attempt: int, max_attempts: int, error: Exception
+) -> None:
     """Record metrics for retry error."""
     with contextlib.suppress(Exception):
         _record_metrics_event(
@@ -180,11 +184,15 @@ def retry(
                         result = await f(*args, **kwargs)
                         if attempt > 0:
                             logger.info("Retry succeeded on attempt %d", attempt + 1)
-                        _record_success_metrics(op_name, attempt + 1, config.max_attempts)
+                        _record_success_metrics(
+                            op_name, attempt + 1, config.max_attempts
+                        )
                         return result
                     except retryable_exceptions as e:
                         last_error = e
-                        _record_error_metrics(op_name, attempt + 1, config.max_attempts, e)
+                        _record_error_metrics(
+                            op_name, attempt + 1, config.max_attempts, e
+                        )
 
                         if attempt == config.max_attempts - 1:
                             break
@@ -220,11 +228,15 @@ def retry(
                         result = f(*args, **kwargs)
                         if attempt > 0:
                             logger.info("Retry succeeded on attempt %d", attempt + 1)
-                        _record_success_metrics(op_name, attempt + 1, config.max_attempts)
+                        _record_success_metrics(
+                            op_name, attempt + 1, config.max_attempts
+                        )
                         return result
                     except retryable_exceptions as e:
                         last_error = e
-                        _record_error_metrics(op_name, attempt + 1, config.max_attempts, e)
+                        _record_error_metrics(
+                            op_name, attempt + 1, config.max_attempts, e
+                        )
 
                         if attempt == config.max_attempts - 1:
                             break

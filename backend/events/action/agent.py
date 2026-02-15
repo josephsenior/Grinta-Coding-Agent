@@ -147,11 +147,14 @@ class CondensationAction(Action):
     def _validate_field_polymorphism(self) -> bool:
         """Check if the optional fields are instantiated in a valid configuration."""
         using_event_ids = self.forgotten_event_ids is not None
-        using_event_range = self.forgotten_events_start_id is not None and self.forgotten_events_end_id is not None
-        forgotten_event_configuration = using_event_ids ^ using_event_range
-        summary_configuration = (self.summary is None and self.summary_offset is None) or (
-            self.summary is not None and self.summary_offset is not None
+        using_event_range = (
+            self.forgotten_events_start_id is not None
+            and self.forgotten_events_end_id is not None
         )
+        forgotten_event_configuration = using_event_ids ^ using_event_range
+        summary_configuration = (
+            self.summary is None and self.summary_offset is None
+        ) or (self.summary is not None and self.summary_offset is not None)
         return forgotten_event_configuration and summary_configuration
 
     def __post_init__(self):
@@ -170,7 +173,9 @@ class CondensationAction(Action):
             return self.forgotten_event_ids
         assert self.forgotten_events_start_id is not None
         assert self.forgotten_events_end_id is not None
-        return list(range(self.forgotten_events_start_id, self.forgotten_events_end_id + 1))
+        return list(
+            range(self.forgotten_events_start_id, self.forgotten_events_end_id + 1)
+        )
 
     @property
     def message(self) -> str:

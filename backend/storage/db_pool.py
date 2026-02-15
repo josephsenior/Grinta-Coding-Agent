@@ -39,15 +39,21 @@ async def get_db_pool() -> Any:
 
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
-            raise RuntimeError("DATABASE_URL is required when using database-backed storage")
+            raise RuntimeError(
+                "DATABASE_URL is required when using database-backed storage"
+            )
 
         min_size = int(os.getenv("DB_POOL_MIN_SIZE", os.getenv("DB_POOL_SIZE", "5")))
         max_size = int(os.getenv("DB_POOL_MAX_SIZE", os.getenv("DB_POOL_SIZE", "20")))
 
         asyncpg = __import__("asyncpg")
-        _pool = await asyncpg.create_pool(dsn=database_url, min_size=min_size, max_size=max_size)
+        _pool = await asyncpg.create_pool(
+            dsn=database_url, min_size=min_size, max_size=max_size
+        )
 
-        logger.info("Database pool initialized: min_size=%s max_size=%s", min_size, max_size)
+        logger.info(
+            "Database pool initialized: min_size=%s max_size=%s", min_size, max_size
+        )
         return _pool
 
 

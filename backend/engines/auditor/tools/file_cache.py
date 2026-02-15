@@ -56,11 +56,17 @@ class FileCache:
                 ttl_seconds=ttl_seconds,
             )
             if self.distributed_cache:
-                logger.info("📦 File cache using REDIS distributed backend (perfect for 1000+ users!)")
+                logger.info(
+                    "📦 File cache using REDIS distributed backend (perfect for 1000+ users!)"
+                )
 
         # Local cache (used when distributed unavailable OR as L1 cache)
-        self.content_cache: dict[str, tuple[str, datetime, float]] = {}  # path → (content, cached_at, mtime)
-        self.symbol_cache: dict[str, dict[str, Any]] = {}  # path → {symbol_name → location}
+        self.content_cache: dict[
+            str, tuple[str, datetime, float]
+        ] = {}  # path → (content, cached_at, mtime)
+        self.symbol_cache: dict[
+            str, dict[str, Any]
+        ] = {}  # path → {symbol_name → location}
         self.structure_cache: dict[str, dict[str, Any]] = {}  # path → file structure
 
         # Access tracking for LRU
@@ -77,7 +83,12 @@ class FileCache:
         }
 
         cache_mode = "distributed (Redis)" if self.distributed_cache else "local"
-        logger.info("📦 File cache initialized (mode=%s, max_size=%s, ttl=%ss)", cache_mode, max_cache_size, ttl_seconds)
+        logger.info(
+            "📦 File cache initialized (mode=%s, max_size=%s, ttl=%ss)",
+            cache_mode,
+            max_cache_size,
+            ttl_seconds,
+        )
 
     def _check_distributed_cache(self, file_path: str) -> str | None:
         """Check distributed cache (L2) for file content.
@@ -312,7 +323,9 @@ class FileCache:
     def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         total_requests = self.stats["hits"] + self.stats["misses"]
-        hit_rate = (self.stats["hits"] / total_requests * 100) if total_requests > 0 else 0
+        hit_rate = (
+            (self.stats["hits"] / total_requests * 100) if total_requests > 0 else 0
+        )
 
         return {
             **self.stats,

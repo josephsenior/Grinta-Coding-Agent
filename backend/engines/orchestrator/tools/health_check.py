@@ -161,7 +161,9 @@ if __name__ == "__main__":
 
     print("\n📊 HEALTH CHECK RESULTS:")
     component_results = {
-        component: data for component, data in check_results.items() if isinstance(data, dict)
+        component: data
+        for component, data in check_results.items()
+        if isinstance(data, dict)
     }
     for component, data in component_results.items():
         status_emoji = "✅" if data["status"] == "PASS" else "❌"

@@ -31,7 +31,9 @@ class SecretsManager:
         if master_key is None:
             master_key = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET")
             if not master_key:
-                raise ValueError("Master key required. Set SECRET_KEY or JWT_SECRET environment variable.")
+                raise ValueError(
+                    "Master key required. Set SECRET_KEY or JWT_SECRET environment variable."
+                )
 
         # Derive encryption key from master key
         self._cipher = self._create_cipher(master_key)
@@ -104,7 +106,9 @@ class SecretsManager:
             3. Re-encrypt with new key
             4. Update storage
         """
-        logger.warning("Key rotation not fully implemented. Manual re-encryption required.")
+        logger.warning(
+            "Key rotation not fully implemented. Manual re-encryption required."
+        )
         return {}
 
 

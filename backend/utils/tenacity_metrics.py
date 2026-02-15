@@ -87,15 +87,31 @@ def tenacity_after_factory(operation: str) -> Callable[[RetryCallState], None]:
             op = sanitize_operation_label(operation)
             outcome = getattr(retry_state, "outcome", None)
             try:
-                if outcome is not None and hasattr(outcome, "successful") and outcome.successful():
-                    _record_metrics_event_runtime({"status": "retry_success", "operation": op})
+                if (
+                    outcome is not None
+                    and hasattr(outcome, "successful")
+                    and outcome.successful()
+                ):
+                    _record_metrics_event_runtime(
+                        {"status": "retry_success", "operation": op}
+                    )
                     return
             except Exception as exc:
-                logger.debug("tenacity after-hook: outcome.successful() raised: %s", exc)
+                logger.debug(
+                    "tenacity after-hook: outcome.successful() raised: %s", exc
+                )
             attempt_idx = getattr(retry_state, "attempt_number", None)
             stop_state = getattr(retry_state, "stop", None)
-            max_attempts = getattr(stop_state, "max_attempts", None) if stop_state is not None else None
-            if isinstance(attempt_idx, int) and isinstance(max_attempts, int) and (attempt_idx >= max_attempts):
+            max_attempts = (
+                getattr(stop_state, "max_attempts", None)
+                if stop_state is not None
+                else None
+            )
+            if (
+                isinstance(attempt_idx, int)
+                and isinstance(max_attempts, int)
+                and (attempt_idx >= max_attempts)
+            ):
                 _record_metrics_event_runtime(
                     {
                         "status": "retry_failure",
@@ -103,7 +119,9 @@ def tenacity_after_factory(operation: str) -> Callable[[RetryCallState], None]:
                         "attempt_index": attempt_idx,
                         "max_attempts": max_attempts,
                         "error": str(
-                            getattr(retry_state, "outcome", None) or getattr(retry_state, "exception", None) or "",
+                            getattr(retry_state, "outcome", None)
+                            or getattr(retry_state, "exception", None)
+                            or "",
                         ),
                     },
                 )

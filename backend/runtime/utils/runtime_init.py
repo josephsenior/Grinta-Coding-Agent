@@ -9,7 +9,9 @@ import sys
 from backend.core.logger import FORGE_logger as logger
 
 
-def _run_subprocess(command: list[str], *, log: bool = False) -> subprocess.CompletedProcess[bytes]:
+def _run_subprocess(
+    command: list[str], *, log: bool = False
+) -> subprocess.CompletedProcess[bytes]:
     """Helper to run subprocess commands with consistent parameters."""
     result = subprocess.run(command, check=False, shell=False, capture_output=True)
     if log:
@@ -25,7 +27,9 @@ def _run_subprocess(command: list[str], *, log: bool = False) -> subprocess.Comp
     return result
 
 
-def init_user_and_working_directory(username: str, user_id: int, initial_cwd: str) -> int | None:
+def init_user_and_working_directory(
+    username: str, user_id: int, initial_cwd: str
+) -> int | None:
     """Create working directory and user if not exists."""
     if _handle_windows_platform(initial_cwd):
         return None
@@ -106,19 +110,25 @@ def _has_root_capabilities(username: str) -> bool:
 
 
 def _lookup_existing_user(username: str) -> int | None:
-    logger.debug("Attempting to create user `%s` – checking if it already exists.", username)
+    logger.debug(
+        "Attempting to create user `%s` – checking if it already exists.", username
+    )
     result = _run_subprocess(["id", "-u", username])
     if result.returncode == 0:
         try:
             return int(result.stdout.decode().strip())
         except ValueError:
-            logger.error("Unexpected output when checking user `%s`: %s", username, result.stdout)
+            logger.error(
+                "Unexpected output when checking user `%s`: %s", username, result.stdout
+            )
             raise
 
     if result.returncode == 1:
         return None
 
-    logger.error("Error checking user `%s`, skipping setup:\n%s\n", username, result.stderr)
+    logger.error(
+        "Error checking user `%s`, skipping setup:\n%s\n", username, result.stderr
+    )
     raise subprocess.CalledProcessError(
         result.returncode,
         result.args,
@@ -135,7 +145,9 @@ def _add_passwordless_sudo_entry() -> None:
     ]
     sudo_result = _run_subprocess(sudoer_line)
     if sudo_result.returncode != 0:
-        logger.warning("Failed to add sudoer entry: %s", sudo_result.stderr.decode().strip())
+        logger.warning(
+            "Failed to add sudoer entry: %s", sudo_result.stderr.decode().strip()
+        )
     else:
         logger.debug(
             "Added sudoer successfully. Output: [%s]",

@@ -64,9 +64,9 @@ class IterationControlFlag(ControlFlag[int]):
 
         """
         if self.reached_limit():
-            msg = f"Agent reached maximum iteration. Current iteration: {self.current_value}, max iteration: {
-                self.max_value
-            }"
+            msg = f"Agent reached maximum iteration. Current iteration: {
+                self.current_value
+            }, max iteration: {self.max_value}"
             raise RuntimeError(
                 msg,
             )

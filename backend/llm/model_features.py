@@ -39,7 +39,9 @@ def model_matches(model: str, patterns: list[str]) -> bool:
     name = normalize_model_name(model)
     for pat in patterns:
         pat_l = pat.lower()
-        if ("/" in pat_l and fnmatch(raw, pat_l)) or ("/" not in pat_l and fnmatch(name, pat_l)):
+        if ("/" in pat_l and fnmatch(raw, pat_l)) or (
+            "/" not in pat_l and fnmatch(name, pat_l)
+        ):
             return True
     return False
 
@@ -113,8 +115,7 @@ RESPONSE_SCHEMA_PATTERNS: list[str] = [
 
 
 def get_model_token_limits(model: str) -> tuple[int | None, int | None]:
-    """Get max input and output token limits for a model.
-    """
+    """Get max input and output token limits for a model."""
     from backend.llm.catalog_loader import get_token_limits
 
     return get_token_limits(model)
@@ -137,6 +138,8 @@ def get_features(model: str) -> ModelFeatures:
         supports_function_calling=model_matches(model, FUNCTION_CALLING_PATTERNS),
         supports_reasoning_effort=model_matches(model, REASONING_EFFORT_PATTERNS),
         supports_prompt_cache=model_matches(model, PROMPT_CACHE_PATTERNS),
-        supports_stop_words=not model_matches(model, SUPPORTS_STOP_WORDS_FALSE_PATTERNS),
+        supports_stop_words=not model_matches(
+            model, SUPPORTS_STOP_WORDS_FALSE_PATTERNS
+        ),
         supports_response_schema=model_matches(model, RESPONSE_SCHEMA_PATTERNS),
     )

@@ -123,7 +123,9 @@ class TaskCancellationService:
                 try:
                     process.wait(timeout=1.0)
                 except subprocess.TimeoutExpired:
-                    logger.warning("[TaskCancellationService] Force killing pid=%s", pid)
+                    logger.warning(
+                        "[TaskCancellationService] Force killing pid=%s", pid
+                    )
                     process.kill()
             except Exception as exc:
                 logger.error(
@@ -152,11 +154,15 @@ class TaskCancellationService:
                     timeout=5,
                     check=False,
                 )
-                logger.warning("[TaskCancellationService:%s] taskkill pid=%s", self._label, pid)
+                logger.warning(
+                    "[TaskCancellationService:%s] taskkill pid=%s", self._label, pid
+                )
                 return
 
             os.kill(pid, signal.SIGTERM)
-            logger.warning("[TaskCancellationService:%s] SIGTERM pid=%s", self._label, pid)
+            logger.warning(
+                "[TaskCancellationService:%s] SIGTERM pid=%s", self._label, pid
+            )
             try:
                 os.kill(pid, 0)
             except OSError:
@@ -164,7 +170,9 @@ class TaskCancellationService:
             sigkill = getattr(signal, "SIGKILL", None)
             if sigkill is not None:
                 os.kill(pid, sigkill)
-            logger.warning("[TaskCancellationService:%s] SIGKILL pid=%s", self._label, pid)
+            logger.warning(
+                "[TaskCancellationService:%s] SIGKILL pid=%s", self._label, pid
+            )
         except Exception as exc:
             logger.debug(
                 "[TaskCancellationService:%s] Best-effort kill failed for pid=%s: %s",

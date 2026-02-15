@@ -45,7 +45,9 @@ class IterationGuardService:
             raise
 
     def _is_limit_error(self, error_str: str) -> bool:
-        return any(key in error_str for key in ("limit", "maximum", "budget", "iteration"))
+        return any(
+            key in error_str for key in ("limit", "maximum", "budget", "iteration")
+        )
 
     def _graceful_shutdown_enabled(self) -> bool:
         # Check agent config first, then fall back to env var (default: ON)

@@ -74,7 +74,9 @@ def generate_prompt_template(events: str) -> str:
     return template.render(events=events)
 
 
-def generate_prompt(llm_config: LLMConfig, prompt_template: str, conversation_id: str) -> str:
+def generate_prompt(
+    llm_config: LLMConfig, prompt_template: str, conversation_id: str
+) -> str:
     """Generate a prompt using LLM configuration and template.
 
     Args:
@@ -105,7 +107,9 @@ def generate_prompt(llm_config: LLMConfig, prompt_template: str, conversation_id
         llm_config,
         messages,
     )
-    if prompt := re.search("<update_prompt>(.*?)</update_prompt>", raw_prompt, re.DOTALL):
+    if prompt := re.search(
+        "<update_prompt>(.*?)</update_prompt>", raw_prompt, re.DOTALL
+    ):
         return prompt[1].strip()
     msg = "No valid prompt found in the response."
     raise ValueError(msg)

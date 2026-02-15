@@ -120,7 +120,11 @@ class ActionExecutionClient(Runtime):
 
         # Add default SSE server if none from server
         if not config.sse_servers:
-            config.sse_servers.append(MCPSSEServerConfig(url=f"{getattr(self, 'action_execution_server_url', '')}/mcp"))
+            config.sse_servers.append(
+                MCPSSEServerConfig(
+                    url=f"{getattr(self, 'action_execution_server_url', '')}/mcp"
+                )
+            )
 
         if extra_stdio_servers:
             config.stdio_servers.extend(extra_stdio_servers)
@@ -146,7 +150,9 @@ class ActionExecutionClient(Runtime):
     def edit(self, action: Any) -> Any:
         return self._execute_action_on_server(action)
 
-    def copy_to(self, host_src: str, runtime_dest: str, recursive: bool = False) -> None:
+    def copy_to(
+        self, host_src: str, runtime_dest: str, recursive: bool = False
+    ) -> None:
         import os
         import tempfile
         from zipfile import ZipFile
@@ -184,7 +190,9 @@ class ActionExecutionClient(Runtime):
         )
 
     def list_files(self, path: str | None = None, recursive: bool = False) -> list[str]:
-        resp = self._send_action_server_request("GET", "/list_files", params={"path": path, "recursive": recursive})
+        resp = self._send_action_server_request(
+            "GET", "/list_files", params={"path": path, "recursive": recursive}
+        )
         return resp.json()
 
     def browse(self, action: Any) -> Any:
@@ -272,7 +280,9 @@ class ActionExecutionClient(Runtime):
         except httpx.TimeoutException:
             raise TimeoutError(f"Request to action server timed out: {method} {path}")
 
-    def _upload_file_to_runtime(self, file_handle: Any, runtime_dest: str, recursive: bool, host_src: str) -> None:
+    def _upload_file_to_runtime(
+        self, file_handle: Any, runtime_dest: str, recursive: bool, host_src: str
+    ) -> None:
         raise UnsupportedActionError(
             "_upload_file_to_runtime is not implemented in the base "
             "ActionExecutionClient.  Use LocalRuntimeInProcess.copy_to() "

@@ -46,10 +46,14 @@ class ObservationService:
         controller = self._context.get_controller()
         observation_to_print = self._prepare_observation_for_logging(observation)
         log_level = self._get_log_level()
-        controller.log(log_level, str(observation_to_print), extra={"msg_type": "OBSERVATION"})
+        controller.log(
+            log_level, str(observation_to_print), extra={"msg_type": "OBSERVATION"}
+        )
         await self._handle_pending_action_observation(observation)
 
-    async def _handle_pending_action_observation(self, observation: Observation) -> None:
+    async def _handle_pending_action_observation(
+        self, observation: Observation
+    ) -> None:
         pending_action = self._pending_service.get()
         if not (pending_action and pending_action.id == observation.cause):
             return
@@ -58,7 +62,9 @@ class ObservationService:
         try:
             from backend.core.plugin import get_plugin_registry
 
-            observation = await get_plugin_registry().dispatch_action_post(pending_action, observation)
+            observation = await get_plugin_registry().dispatch_action_post(
+                pending_action, observation
+            )
         except Exception:  # noqa: BLE001 — plugins must not break the pipeline
             pass
 
@@ -75,7 +81,9 @@ class ObservationService:
         # Delegate confirmation state transitions to confirmation service
         confirmation_service = getattr(controller, "confirmation_service", None)
         if confirmation_service:
-            await confirmation_service.handle_observation_for_pending_action(observation, ctx)
+            await confirmation_service.handle_observation_for_pending_action(
+                observation, ctx
+            )
         else:
             await transition_agent_state_logic(controller, ctx, observation)
 
@@ -84,7 +92,9 @@ class ObservationService:
         observation_to_print = copy.deepcopy(observation)
         max_chars = controller.agent.llm.config.max_message_chars
         if len(observation_to_print.content) > max_chars:
-            observation_to_print.content = truncate_content(observation_to_print.content, max_chars)
+            observation_to_print.content = truncate_content(
+                observation_to_print.content, max_chars
+            )
         return observation_to_print
 
     def _get_log_level(self) -> str:

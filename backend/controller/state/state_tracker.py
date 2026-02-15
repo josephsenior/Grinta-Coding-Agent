@@ -43,7 +43,9 @@ class StateTracker:
 
     """
 
-    def __init__(self, sid: str | None, file_store: FileStore | None, user_id: str | None) -> None:
+    def __init__(
+        self, sid: str | None, file_store: FileStore | None, user_id: str | None
+    ) -> None:
         """Initialize state tracker.
 
         Args:
@@ -131,13 +133,19 @@ class StateTracker:
         if not self._validate_history_range(start_id, end_id):
             return
 
-        self.state.history = self._fetch_events_from_stream(event_stream, start_id, end_id)
+        self.state.history = self._fetch_events_from_stream(
+            event_stream, start_id, end_id
+        )
         self.state.start_id = start_id
 
     def _get_history_range(self, event_stream: EventStream) -> tuple[int, int]:
         """Get the start and end ID range for history."""
         start_id = max(self.state.start_id, 0)
-        end_id = self.state.end_id if self.state.end_id >= 0 else event_stream.get_latest_event_id()
+        end_id = (
+            self.state.end_id
+            if self.state.end_id >= 0
+            else event_stream.get_latest_event_id()
+        )
         return start_id, end_id
 
     def _validate_history_range(self, start_id: int, end_id: int) -> bool:
@@ -152,7 +160,9 @@ class StateTracker:
             return False
         return True
 
-    def _fetch_events_from_stream(self, event_stream: EventStream, start_id: int, end_id: int) -> list[Event]:
+    def _fetch_events_from_stream(
+        self, event_stream: EventStream, start_id: int, end_id: int
+    ) -> list[Event]:
         """Fetch events from the event stream."""
         return list(
             event_stream.search_events(
@@ -176,7 +186,11 @@ class StateTracker:
 
         """
         start_id = max(self.state.start_id, 0)
-        end_id = self.state.end_id if self.state.end_id >= 0 else event_stream.get_latest_event_id()
+        end_id = (
+            self.state.end_id
+            if self.state.end_id >= 0
+            else event_stream.get_latest_event_id()
+        )
         self.state.history = list(
             event_stream.search_events(
                 start_id=start_id,
@@ -318,4 +332,6 @@ class StateTracker:
         Budget flag will monitor for when budget is exceeded.
         """
         if self.state.budget_flag and self.state.conversation_stats:
-            self.state.budget_flag.current_value = self.state.conversation_stats.get_combined_metrics().accumulated_cost
+            self.state.budget_flag.current_value = (
+                self.state.conversation_stats.get_combined_metrics().accumulated_cost
+            )

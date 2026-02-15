@@ -116,7 +116,9 @@ class InvalidStateTransitionError(RuntimeError):
     def __init__(self, old: AgentState, new: AgentState, agent_name: str) -> None:
         self.old_state = old
         self.new_state = new
-        super().__init__(f"Invalid state transition {old.value} → {new.value} for agent '{agent_name}'")
+        super().__init__(
+            f"Invalid state transition {old.value} → {new.value} for agent '{agent_name}'"
+        )
 
 
 class StateTransitionService:
@@ -172,10 +174,18 @@ class StateTransitionService:
         if new_state in (AgentState.STOPPED, AgentState.ERROR):
             self._context.reset_controller()
 
-    def _handle_error_recovery(self, old_state: AgentState, new_state: AgentState) -> None:
+    def _handle_error_recovery(
+        self, old_state: AgentState, new_state: AgentState
+    ) -> None:
         state_tracker = self._context.state_tracker
-        if state_tracker and old_state == AgentState.ERROR and new_state == AgentState.RUNNING:
-            state_tracker.maybe_increase_control_flags_limits(self._context.headless_mode)
+        if (
+            state_tracker
+            and old_state == AgentState.ERROR
+            and new_state == AgentState.RUNNING
+        ):
+            state_tracker.maybe_increase_control_flags_limits(
+                self._context.headless_mode
+            )
 
     def _handle_pending_action_confirmation(self, new_state: AgentState) -> None:
         pending_action = self._context.pending_action

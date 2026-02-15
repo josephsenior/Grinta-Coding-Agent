@@ -114,7 +114,9 @@ class ConversationResumer:
             return []
 
         # Sort by numeric ID
-        json_files = [f for f in files if f.endswith(".json") and not f.endswith(".pending")]
+        json_files = [
+            f for f in files if f.endswith(".json") and not f.endswith(".pending")
+        ]
         json_files.sort(key=lambda f: int(f.replace(".json", "")))
 
         events: list[Event] = []
@@ -127,7 +129,9 @@ class ConversationResumer:
                 logger.warning("Skipping corrupt event %s: %s", fname, exc)
         return events
 
-    async def _load_latest_checkpoint(self, sid: str) -> tuple[dict[str, Any] | None, str | None]:
+    async def _load_latest_checkpoint(
+        self, sid: str
+    ) -> tuple[dict[str, Any] | None, str | None]:
         """Load the most recent checkpoint state, if any."""
         from backend.controller.state.session_checkpoint_manager import (
             SessionCheckpointManager,
@@ -145,5 +149,7 @@ class ConversationResumer:
         # Convert State to dict for portability
         state_dict: dict[str, Any] = {}
         if hasattr(state, "__dict__"):
-            state_dict = {k: v for k, v in state.__dict__.items() if not k.startswith("_")}
+            state_dict = {
+                k: v for k, v in state.__dict__.items() if not k.startswith("_")
+            }
         return state_dict, latest

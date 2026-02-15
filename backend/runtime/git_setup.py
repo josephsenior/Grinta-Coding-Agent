@@ -44,7 +44,9 @@ class GitSetupMixin:
         def write(self, action: FileWriteAction) -> Any: ...
         def run(self, action: CmdRunAction) -> Any: ...
         def run_action(self, action: Any) -> Any: ...
-        def set_runtime_status(self, status: RuntimeStatus, msg: str = "", level: str = "info") -> None: ...
+        def set_runtime_status(
+            self, status: RuntimeStatus, msg: str = "", level: str = "info"
+        ) -> None: ...
 
     # ------------------------------------------------------------------
     # Git clone / init
@@ -68,32 +70,46 @@ class GitSetupMixin:
         """
         if not selected_repository:
             if self.config.init_git_in_empty_workspace:
-                logger.debug("No repository selected. Initializing a new git repository in the workspace.")
+                logger.debug(
+                    "No repository selected. Initializing a new git repository in the workspace."
+                )
                 action = CmdRunAction(
                     command=f"git init && git config --global --add safe.directory {self.workspace_root}",
                 )
                 await call_sync_from_async(self.run_action, action)
             else:
-                logger.info("In workspace mount mode, not initializing a new git repository.")
+                logger.info(
+                    "In workspace mount mode, not initializing a new git repository."
+                )
             return ""
-        remote_repo_url = await self.provider_handler.get_authenticated_git_url(selected_repository)
+        remote_repo_url = await self.provider_handler.get_authenticated_git_url(
+            selected_repository
+        )
         if not remote_repo_url:
             msg = "Missing either Git token or valid repository"
             raise ValueError(msg)
         if self.status_callback:
             from backend.core.enums import RuntimeStatus
 
-            self.status_callback("info", RuntimeStatus.SETTING_UP_WORKSPACE, "Setting up workspace...")
+            self.status_callback(
+                "info", RuntimeStatus.SETTING_UP_WORKSPACE, "Setting up workspace..."
+            )
         dir_name = selected_repository.split("/")[-1].lower()
-        random_str = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        random_str = "".join(
+            random.choices(string.ascii_lowercase + string.digits, k=8)
+        )
         FORGE_workspace_branch = f"Forge-workspace-{random_str}"
         clone_command = f"git clone {remote_repo_url} {dir_name}"
         checkout_command = (
-            f"git checkout {selected_branch}" if selected_branch else f"git checkout -b {FORGE_workspace_branch}"
+            f"git checkout {selected_branch}"
+            if selected_branch
+            else f"git checkout -b {FORGE_workspace_branch}"
         )
         clone_action = CmdRunAction(command=clone_command)
         await call_sync_from_async(self.run_action, clone_action)
-        cd_checkout_action = CmdRunAction(command=f"cd {dir_name} && {checkout_command}")
+        cd_checkout_action = CmdRunAction(
+            command=f"cd {dir_name} && {checkout_command}"
+        )
         action = cd_checkout_action
         self.log("info", f"Cloning repo: {selected_repository}")
         await call_sync_from_async(self.run_action, action)
@@ -112,7 +128,9 @@ class GitSetupMixin:
         if self.status_callback:
             from backend.core.enums import RuntimeStatus
 
-            self.status_callback("info", RuntimeStatus.SETTING_UP_WORKSPACE, "Setting up workspace...")
+            self.status_callback(
+                "info", RuntimeStatus.SETTING_UP_WORKSPACE, "Setting up workspace..."
+            )
         action = CmdRunAction(
             command=f"chmod +x {setup_script} && source {setup_script}",
             blocking=True,
@@ -157,8 +175,12 @@ class GitSetupMixin:
         obs = cast(Any, self.run_action(action))
         if isinstance(obs, CmdOutputObservation):
             if obs.exit_code == 0:
-                return bool(GitSetupMixin._make_script_executable(self, pre_commit_local))
-            self.log("error", f"Failed to preserve existing pre-commit hook: {obs.content}")
+                return bool(
+                    GitSetupMixin._make_script_executable(self, pre_commit_local)
+                )
+            self.log(
+                "error", f"Failed to preserve existing pre-commit hook: {obs.content}"
+            )
             return False
 
         try:
@@ -168,13 +190,17 @@ class GitSetupMixin:
             self.log("error", f"Failed to preserve existing pre-commit hook: {exc}")
             return False
 
-    def _install_pre_commit_hook(self, pre_commit_script: str, pre_commit_hook: str) -> bool:
+    def _install_pre_commit_hook(
+        self, pre_commit_script: str, pre_commit_hook: str
+    ) -> bool:
         """Install the pre-commit hook file."""
         pre_commit_hook_content = f'#!/bin/bash\n# This hook was installed by Forge\n# It calls the pre-commit script in the .Forge directory\n\nif [ -x "{pre_commit_script}" ]; then\n    source "{pre_commit_script}"\n    exit $?\nelse\n    echo "Warning: {pre_commit_script} not found or not executable"\n    exit 0\nfi\n'
 
         write_obs = cast(
             Any,
-            self.write(FileWriteAction(path=pre_commit_hook, content=pre_commit_hook_content)),
+            self.write(
+                FileWriteAction(path=pre_commit_hook, content=pre_commit_hook_content)
+            ),
         )
         if isinstance(write_obs, ErrorObservation):
             self.log("error", f"Failed to write pre-commit hook: {write_obs.content}")
@@ -195,7 +221,9 @@ class GitSetupMixin:
         if self.status_callback:
             from backend.core.enums import RuntimeStatus
 
-            self.status_callback("info", RuntimeStatus.SETTING_UP_GIT_HOOKS, "Setting up git hooks...")
+            self.status_callback(
+                "info", RuntimeStatus.SETTING_UP_GIT_HOOKS, "Setting up git hooks..."
+            )
 
         # Setup hooks directory
         if not GitSetupMixin._setup_git_hooks_directory(self):
@@ -207,13 +235,18 @@ class GitSetupMixin:
 
         # Preserve existing hook if needed
         read_obs = cast(Any, self.read(FileReadAction(path=pre_commit_hook)))
-        if not isinstance(read_obs, ErrorObservation) and "This hook was installed by Forge" not in read_obs.content:
+        if (
+            not isinstance(read_obs, ErrorObservation)
+            and "This hook was installed by Forge" not in read_obs.content
+        ):
             self.log("info", "Preserving existing pre-commit hook")
             if not GitSetupMixin._preserve_existing_hook(self, pre_commit_hook):
                 return
 
         # Install new hook
-        if GitSetupMixin._install_pre_commit_hook(self, pre_commit_script, pre_commit_hook):
+        if GitSetupMixin._install_pre_commit_hook(
+            self, pre_commit_script, pre_commit_hook
+        ):
             self.log("info", "Git pre-commit hook installed successfully")
 
     # ------------------------------------------------------------------
@@ -229,7 +262,9 @@ class GitSetupMixin:
             action = CmdRunAction(command=cmd)
             obs = cast(Any, self.run(action))
             if isinstance(obs, CmdOutputObservation) and obs.exit_code != 0:
-                logger.warning("Git config command failed: %s, error: %s", cmd, obs.content)
+                logger.warning(
+                    "Git config command failed: %s, error: %s", cmd, obs.content
+                )
             else:
                 logger.info(
                     "Successfully configured git: name=%s, email=%s",
@@ -237,4 +272,6 @@ class GitSetupMixin:
                     vcs_user_email,
                 )
         except Exception as e:
-            logger.warning("Failed to execute git config command: %s, error: %s", cmd, e)
+            logger.warning(
+                "Failed to execute git config command: %s, error: %s", cmd, e
+            )

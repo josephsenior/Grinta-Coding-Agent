@@ -102,7 +102,9 @@ class AuthRateLimiter:
 
         # Check rate limits
         if not await self._check_rate_limit(rate_limit_key, endpoint_type):
-            logger.warning("Auth rate limit exceeded for %s on %s", rate_limit_key, endpoint_type)
+            logger.warning(
+                "Auth rate limit exceeded for %s on %s", rate_limit_key, endpoint_type
+            )
 
             # Calculate retry after time
             retry_after = self._get_retry_after(rate_limit_key, endpoint_type)
@@ -251,7 +253,9 @@ class AuthRateLimiter:
         store["failed_attempts"].append(current_time)
 
         # Keep only last hour of failed attempts
-        store["failed_attempts"][:] = [t for t in store["failed_attempts"] if current_time - t < 3600]
+        store["failed_attempts"][:] = [
+            t for t in store["failed_attempts"] if current_time - t < 3600
+        ]
 
     def _get_retry_after(self, key: str, endpoint_type: str) -> int:
         """Calculate retry after time based on failed attempts.
@@ -322,7 +326,9 @@ class RedisAuthRateLimiter(AuthRateLimiter):
         self._redis_client: redis.Redis | None = None
 
         if enabled:
-            logger.info("RedisAuthRateLimiter initialized with redis_url: %s", self.redis_url)
+            logger.info(
+                "RedisAuthRateLimiter initialized with redis_url: %s", self.redis_url
+            )
 
     async def _get_redis_client(self) -> redis.Redis | None:
         """Get or create Redis client."""
@@ -336,7 +342,9 @@ class RedisAuthRateLimiter(AuthRateLimiter):
                 # Test connection
                 await self._redis_client.ping()
             except Exception as e:
-                logger.warning("Redis connection failed, falling back to in-memory: %s", e)
+                logger.warning(
+                    "Redis connection failed, falling back to in-memory: %s", e
+                )
                 return None
 
         return self._redis_client

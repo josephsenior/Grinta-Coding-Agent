@@ -62,7 +62,9 @@ class ReplayManager:
             for index in range(len(replay_events) - 1):
                 event = replay_events[index]
                 if isinstance(event, MessageAction) and event.wait_for_response:
-                    logger.info("Replay events contains wait_for_response message action, ignoring wait_for_response")
+                    logger.info(
+                        "Replay events contains wait_for_response message action, ignoring wait_for_response"
+                    )
                     event.wait_for_response = False
         self.replay_events = replay_events
         self.replay_mode = bool(replay_events)

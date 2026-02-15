@@ -7,7 +7,7 @@ from typing import Any
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
     Footer,
@@ -30,8 +30,12 @@ class DiffFileItem(ListItem):
         self.file_status = status
 
     def compose(self) -> ComposeResult:
-        icon = {"added": "+", "modified": "~", "deleted": "-"}.get(self.file_status, "?")
-        colour = {"added": "green", "modified": "yellow", "deleted": "red"}.get(self.file_status, "white")
+        icon = {"added": "+", "modified": "~", "deleted": "-"}.get(
+            self.file_status, "?"
+        )
+        colour = {"added": "green", "modified": "yellow", "deleted": "red"}.get(
+            self.file_status, "white"
+        )
         yield Label(f"[{colour}]{icon}[/] {self.filepath}")
 
 
@@ -105,7 +109,9 @@ class DiffScreen(Screen[None]):
         file_list = self.query_one("#file-list", ListView)
         file_list.clear()
         try:
-            self._changes = await self.client.get_workspace_changes(self.conversation_id)
+            self._changes = await self.client.get_workspace_changes(
+                self.conversation_id
+            )
         except Exception as e:
             self.notify(f"Error loading changes: {e}", severity="error")
             return

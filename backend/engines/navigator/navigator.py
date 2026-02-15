@@ -96,7 +96,9 @@ def get_system_message(goal: str, action_space: str) -> str:
     )
 
 
-def get_prompt(error_prefix: str, cur_url: str, cur_axtree_txt: str, prev_action_str: str) -> str:
+def get_prompt(
+    error_prefix: str, cur_url: str, cur_axtree_txt: str, prev_action_str: str
+) -> str:
     """Helper used by tests to render the browsing prompt."""
     prompt = (
         f"{error_prefix}\n\n# Current Page URL:\n{cur_url}\n\n"
@@ -142,7 +144,9 @@ class Navigator(Agent):
         action_subsets = ["chat", "bid"]
         if USE_NAV:
             action_subsets.append("nav")
-        self.action_space = HighLevelActionSet(subsets=action_subsets, strict=False, multiaction=True)
+        self.action_space = HighLevelActionSet(
+            subsets=action_subsets, strict=False, multiaction=True
+        )
 
         # State tracking (NEW!)
         self.state_tracker: BrowsingStateTracker | None = None
@@ -171,7 +175,9 @@ class Navigator(Agent):
     def prompt_manager(self) -> PromptManager:
         """Get prompt manager with ReAct templates."""
         if self._prompt_manager is None:
-            self._prompt_manager = PromptManager(prompt_dir=os.path.join(os.path.dirname(__file__), "prompts"))
+            self._prompt_manager = PromptManager(
+                prompt_dir=os.path.join(os.path.dirname(__file__), "prompts")
+            )
         return self._prompt_manager
 
     def reset(self) -> None:
@@ -208,7 +214,9 @@ class Navigator(Agent):
             if goal is None:
                 goal = state.inputs.get("task", "Browse web")
 
-            self.state_tracker = BrowsingStateTracker(session_id=state.session_id, goal=goal)
+            self.state_tracker = BrowsingStateTracker(
+                session_id=state.session_id, goal=goal
+            )
 
         # Handle eval mode special case
         if EVAL_MODE and len(state.view) == 1:
@@ -346,13 +354,21 @@ class Navigator(Agent):
     def _should_return_user_message(self, context: BrowsingContext) -> bool:
         """Check if we should return a user message."""
         last_action = context["last_action"]
-        return bool(isinstance(last_action, BrowseInteractiveAction) and last_action.browsergym_send_msg_to_user)
+        return bool(
+            isinstance(last_action, BrowseInteractiveAction)
+            and last_action.browsergym_send_msg_to_user
+        )
 
     def _should_handle_browser_error(self, context: BrowsingContext) -> bool:
         """Check if we should handle browser error."""
-        return isinstance(context["last_obs"], BrowserOutputObservation) and context["last_obs"].error
+        return (
+            isinstance(context["last_obs"], BrowserOutputObservation)
+            and context["last_obs"].error
+        )
 
-    def _handle_browser_error_smart(self, context: BrowsingContext, state: State) -> Action | None:
+    def _handle_browser_error_smart(
+        self, context: BrowsingContext, state: State
+    ) -> Action | None:
         """Handle browser error with smart recovery.
 
         Improvements over basic error handling:
@@ -380,23 +396,36 @@ class Navigator(Agent):
 
         # Too many errors total
         if self.error_accumulator > 8:
-            return MessageAction("❌ Too many errors encountered. Browsing task failed.")
+            return MessageAction(
+                "❌ Too many errors encountered. Browsing task failed."
+            )
 
         # Too many retries of same action
         if self.retry_count >= self.max_retries:
             # Try going back as recovery
             if self.state_tracker and self.state_tracker.can_go_back():
-                logger.info("🔄 Retries exhausted, trying alternative path (going back)")
+                logger.info(
+                    "🔄 Retries exhausted, trying alternative path (going back)"
+                )
                 self.retry_count = 0
                 return BrowseInteractiveAction(browser_actions="go_back()")
             else:
-                return MessageAction(f"❌ Failed action after {self.max_retries} attempts. Cannot proceed.")
+                return MessageAction(
+                    f"❌ Failed action after {self.max_retries} attempts. Cannot proceed."
+                )
 
         # Continue with error context (let agent try alternative)
-        logger.warning("⚠️  Browser error (attempt %d/%d): %s", self.retry_count + 1, self.max_retries, error_msg[:100])
+        logger.warning(
+            "⚠️  Browser error (attempt %d/%d): %s",
+            self.retry_count + 1,
+            self.max_retries,
+            error_msg[:100],
+        )
         return None  # Continue to generate new action
 
-    def _generate_browsing_action_react(self, state: State, context: BrowsingContext) -> Action:
+    def _generate_browsing_action_react(
+        self, state: State, context: BrowsingContext
+    ) -> Action:
         """Generate browsing action using ReAct prompt.
 
         Improvements:
@@ -435,7 +464,9 @@ class Navigator(Agent):
 
         return action
 
-    def _generate_browsing_action(self, state: State, context: BrowsingContext) -> Action:
+    def _generate_browsing_action(
+        self, state: State, context: BrowsingContext
+    ) -> Action:
         """Generate the browsing action prompt from current state and context."""
         goal, _ = state.get_current_user_intent()
         if goal is None:
@@ -463,7 +494,9 @@ class Navigator(Agent):
         response = self.llm.completion(messages=messages, stop=[")```", ")\n```"])
         return self.response_parser.parse(response)
 
-    def _build_react_messages(self, goal: str, context: BrowsingContext) -> list[Message]:
+    def _build_react_messages(
+        self, goal: str, context: BrowsingContext
+    ) -> list[Message]:
         """Build ReAct-structured messages.
 
         Args:
@@ -482,12 +515,16 @@ class Navigator(Agent):
             # Fallback to basic prompt if template not found
             system_content = self._build_fallback_system_message(goal)
 
-        messages.append(Message(role="system", content=[TextContent(text=system_content)]))
+        messages.append(
+            Message(role="system", content=[TextContent(text=system_content)])
+        )
 
         # Add state tracking context (NEW!)
         if self.state_tracker:
             state_context = self.state_tracker.get_context_summary()
-            messages.append(Message(role="system", content=[TextContent(text=state_context)]))
+            messages.append(
+                Message(role="system", content=[TextContent(text=state_context)])
+            )
 
         # Current observation with vision (Enhanced!)
         observation_content = self._build_observation_content(context)
@@ -495,7 +532,9 @@ class Navigator(Agent):
 
         return messages
 
-    def _build_observation_content(self, context: BrowsingContext) -> list[TextContent | ImageContent]:
+    def _build_observation_content(
+        self, context: BrowsingContext
+    ) -> list[TextContent | ImageContent]:
         """Build observation content with vision support.
 
         Args:
@@ -512,14 +551,18 @@ class Navigator(Agent):
 
         # Add error if present
         if context["error_prefix"]:
-            text_parts.append(f"## Error from Previous Action:\n{context['error_prefix']}")
+            text_parts.append(
+                f"## Error from Previous Action:\n{context['error_prefix']}"
+            )
 
         # Add current page info
         text_parts.append(f"## Current Page:\nURL: {context['cur_url']}")
 
         # Add accessibility tree
         if context["cur_axtree_txt"]:
-            text_parts.append(f"\n## Page Elements (Accessibility Tree):\n{context['cur_axtree_txt']}")
+            text_parts.append(
+                f"\n## Page Elements (Accessibility Tree):\n{context['cur_axtree_txt']}"
+            )
 
         # Add previous actions
         if context["prev_actions"]:
@@ -551,7 +594,9 @@ class Navigator(Agent):
 
     def _build_fallback_system_message(self, goal: str) -> str:
         """Build fallback system message if template not found."""
-        action_space_desc = self.action_space.describe(with_long_description=False, with_examples=True)
+        action_space_desc = self.action_space.describe(
+            with_long_description=False, with_examples=True
+        )
 
         return f"""You are a web browsing agent. Follow the ReAct pattern:
 
@@ -578,7 +623,9 @@ Be precise with bid numbers. Verify critical actions."""
         parsed_input = cast(str | LLMResponsePayload, response)
         return [self.response_parser.parse(parsed_input)]
 
-    def track_action_performance(self, action_type: str, duration_ms: float, success: bool) -> None:
+    def track_action_performance(
+        self, action_type: str, duration_ms: float, success: bool
+    ) -> None:
         """Track performance metrics for browsing actions.
 
         Args:
@@ -597,7 +644,8 @@ Be precise with bid numbers. Verify critical actions."""
 
         # Update average
         self.performance_metrics["avg_action_time_ms"] = (
-            self.performance_metrics["total_time_ms"] / self.performance_metrics["total_actions"]
+            self.performance_metrics["total_time_ms"]
+            / self.performance_metrics["total_actions"]
         )
 
         # Log slow operations
@@ -669,7 +717,9 @@ Be precise with bid numbers. Verify critical actions."""
 
         return session_data
 
-    def _collect_session_interactions(self, page_visits: Sequence[PageVisit]) -> list[dict[str, str]]:
+    def _collect_session_interactions(
+        self, page_visits: Sequence[PageVisit]
+    ) -> list[dict[str, str]]:
         """Serialize element interactions captured during browsing."""
         interactions: list[dict[str, str]] = []
         for page in page_visits:

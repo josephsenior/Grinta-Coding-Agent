@@ -60,9 +60,9 @@ class FileWriteAction(Action):
 
     def __repr__(self) -> str:
         """Return a readable summary of the write parameters."""
-        return f"**FileWriteAction**\nPath: {self.path}\nRange: [L{self.start}:L{self.end}]\nThought: {
-            self.thought
-        }\nContent:\n```\n{self.content}\n```\n"
+        return f"**FileWriteAction**\nPath: {self.path}\nRange: [L{self.start}:L{
+            self.end
+        }]\nThought: {self.thought}\nContent:\n```\n{self.content}\n```\n"
 
     __test__ = False
 

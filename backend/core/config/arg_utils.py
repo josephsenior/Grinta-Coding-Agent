@@ -37,7 +37,9 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> None:
         default=DEFAULT_CONFIG_FILE,
         help=f"Path to the config file (default: {DEFAULT_CONFIG_FILE} in the current directory)",
     )
-    parser.add_argument("-t", "--task", type=str, default="", help="The task for the agent to perform")
+    parser.add_argument(
+        "-t", "--task", type=str, default="", help="The task for the agent to perform"
+    )
     parser.add_argument(
         "-f",
         "--file",
@@ -59,12 +61,16 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> None:
         type=str,
         help='Replace default Agent ([agent] section in config.toml) config with the specified Agent config, e.g. "CodeAct" for [agent.CodeAct] section in config.toml',
     )
-    parser.add_argument("-v", "--version", action="store_true", help="Show version information")
+    parser.add_argument(
+        "-v", "--version", action="store_true", help="Show version information"
+    )
 
 
 def add_headless_specific_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments specific to headless mode (full evaluation suite)."""
-    parser.add_argument("-d", "--directory", type=str, help="The working directory for the agent")
+    parser.add_argument(
+        "-d", "--directory", type=str, help="The working directory for the agent"
+    )
     parser.add_argument(
         "-c",
         "--agent-cls",
@@ -114,7 +120,9 @@ def get_cli_parser() -> argparse.ArgumentParser:
     )
     subparsers.add_parser("serve", help="Launch the Forge GUI server (web interface)")
 
-    subparsers.add_parser("health", help="Run production health checks for critical dependencies")
+    subparsers.add_parser(
+        "health", help="Run production health checks for critical dependencies"
+    )
 
     init_parser = subparsers.add_parser("init", help="Initialize a new Forge project")
     init_parser.add_argument(
@@ -122,9 +130,13 @@ def get_cli_parser() -> argparse.ArgumentParser:
         nargs="?",
         help="Name of the project (defaults to current directory)",
     )
-    init_parser.add_argument("--template", default="basic", help="Project template to use")
+    init_parser.add_argument(
+        "--template", default="basic", help="Project template to use"
+    )
 
-    parser.add_argument("--conversation", help="The conversation id to continue", type=str, default=None)
+    parser.add_argument(
+        "--conversation", help="The conversation id to continue", type=str, default=None
+    )
     return parser
 
 

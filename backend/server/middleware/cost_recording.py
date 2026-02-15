@@ -41,7 +41,9 @@ def get_cost_quota_middleware() -> CostQuotaMiddleware:
         _GLOBAL_QUOTA_MIDDLEWARE = _try_redis_middleware(default_plan)
 
     if _GLOBAL_QUOTA_MIDDLEWARE is None:
-        _GLOBAL_QUOTA_MIDDLEWARE = CostQuotaMiddleware(enabled=True, default_plan=default_plan)
+        _GLOBAL_QUOTA_MIDDLEWARE = CostQuotaMiddleware(
+            enabled=True, default_plan=default_plan
+        )
         logger.info("Using in-memory cost quota middleware (Redis not available)")
 
     return _GLOBAL_QUOTA_MIDDLEWARE
@@ -59,7 +61,8 @@ def _try_redis_middleware(default_plan: QuotaPlan) -> CostQuotaMiddleware | None
             default_plan=default_plan,
             connection_pool_size=int(os.getenv("REDIS_POOL_SIZE", "10")),
             connection_timeout=float(os.getenv("REDIS_TIMEOUT", "5.0")),
-            fallback_enabled=os.getenv("REDIS_QUOTA_FALLBACK", "true").lower() == "true",
+            fallback_enabled=os.getenv("REDIS_QUOTA_FALLBACK", "true").lower()
+            == "true",
         )
         logger.info("Using Redis-backed cost quota middleware")
         return middleware

@@ -57,8 +57,12 @@ class TaskType(str, Enum):
 class ProviderToken(BaseModel):
     """Typed container for provider access tokens plus optional metadata."""
 
-    token: SecretStr | None = Field(default=None, description="Provider access token (secret)")
-    user_id: str | None = Field(default=None, description="User ID associated with the token")
+    token: SecretStr | None = Field(
+        default=None, description="Provider access token (secret)"
+    )
+    user_id: str | None = Field(
+        default=None, description="User ID associated with the token"
+    )
     host: str | None = Field(
         default=None,
         description="Custom host/domain for the provider (e.g., github.company.com)",
@@ -97,7 +101,9 @@ class CustomSecret(BaseModel):
         default_factory=lambda: SecretStr(""),
         description="The secret value (encrypted)",
     )
-    description: str = Field(default="", description="Description of what this secret is used for")
+    description: str = Field(
+        default="", description="Description of what this secret is used for"
+    )
     model_config = ConfigDict(frozen=True, validate_assignment=True)
 
     @classmethod
@@ -125,7 +131,9 @@ class SuggestedTask(BaseModel):
 
     vcs_provider: ProviderType = Field(..., description="Git provider type")
     task_type: TaskType = Field(..., description="Type of suggested task")
-    repo: str = Field(..., min_length=1, description="Repository name in format 'owner/repo'")
+    repo: str = Field(
+        ..., min_length=1, description="Repository name in format 'owner/repo'"
+    )
     issue_number: int = Field(..., ge=1, description="Issue or PR number")
     title: str = Field(..., min_length=1, description="Task title")
 
@@ -148,11 +156,15 @@ class SuggestedTask(BaseModel):
 class CreatePlaybook(BaseModel):
     """Model for creating a new playbook."""
 
-    repo: str = Field(..., min_length=1, description="Repository name in format 'owner/repo'")
+    repo: str = Field(
+        ..., min_length=1, description="Repository name in format 'owner/repo'"
+    )
     vcs_provider: ProviderType | None = Field(
         default=None, description="Git provider type (optional, will be auto-detected)"
     )
-    title: str | None = Field(default=None, description="Optional title for the playbook")
+    title: str | None = Field(
+        default=None, description="Optional title for the playbook"
+    )
 
     @field_validator("repo")
     @classmethod

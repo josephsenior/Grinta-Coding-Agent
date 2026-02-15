@@ -29,8 +29,10 @@ from backend.utils.import_utils import get_impl
 from backend.utils.shutdown_listener import should_continue
 from backend.utils.utils import create_registry_and_conversation_stats
 
-from .conversation_manager import ConversationManager
-from .metadata_tracker import ConversationMetadataTracker
+from backend.server.conversation_manager.conversation_manager import ConversationManager
+from backend.server.conversation_manager.metadata_tracker import (
+    ConversationMetadataTracker,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -66,8 +68,12 @@ class LocalConversationManager(ConversationManager):
     monitoring_listener: MonitoringListener = MonitoringListener()
     _local_agent_loops_by_sid: dict[str, Session] = field(default_factory=dict)
     _local_connection_id_to_session_id: dict[str, str] = field(default_factory=dict)
-    _active_conversations: dict[str, tuple[ServerConversation, int]] = field(default_factory=dict)
-    _detached_conversations: dict[str, tuple[ServerConversation, float]] = field(default_factory=dict)
+    _active_conversations: dict[str, tuple[ServerConversation, int]] = field(
+        default_factory=dict
+    )
+    _detached_conversations: dict[str, tuple[ServerConversation, float]] = field(
+        default_factory=dict
+    )
     _conversations_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _sessions_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _background_tasks: set[asyncio.Task] = field(default_factory=set)
@@ -116,7 +122,9 @@ class LocalConversationManager(ConversationManager):
                     logger.warning("Agent session for %s failed initialization", sid)
                     break
                 if getattr(session.agent_session, "_closed", False):
-                    logger.warning("Agent session for %s was closed during initialization", sid)
+                    logger.warning(
+                        "Agent session for %s was closed during initialization", sid
+                    )
                     break
             if runtime is None:
                 logger.warning(
@@ -150,17 +158,24 @@ class LocalConversationManager(ConversationManager):
         )
 
         if not c.runtime:
-            logger.error("ServerConversation for %s was created without a runtime!", sid)
+            logger.error(
+                "ServerConversation for %s was created without a runtime!", sid
+            )
             await c.disconnect()
             return None
 
         try:
             await c.connect()
-            if hasattr(c.runtime, "runtime_initialized") and not c.runtime.runtime_initialized:
+            if (
+                hasattr(c.runtime, "runtime_initialized")
+                and not c.runtime.runtime_initialized
+            ):
                 await self._wait_for_runtime_initialization(sid, c, session)
 
             if not c.runtime:
-                logger.error("Runtime for conversation %s is None after connect()!", sid)
+                logger.error(
+                    "Runtime for conversation %s is None after connect()!", sid
+                )
                 await c.disconnect()
                 return None
         except AgentRuntimeUnavailableError as e:
@@ -180,7 +195,9 @@ class LocalConversationManager(ConversationManager):
             )
         return c
 
-    async def _wait_for_runtime_initialization(self, sid: str, c: ServerConversation, session: Session | None) -> None:
+    async def _wait_for_runtime_initialization(
+        self, sid: str, c: ServerConversation, session: Session | None
+    ) -> None:
         """Wait for runtime initialization and potentially update to session runtime."""
         max_wait = 5
         wait_interval = 0.1
@@ -193,9 +210,15 @@ class LocalConversationManager(ConversationManager):
                 c._attach_to_existing = True
                 break
         if not c.runtime.runtime_initialized:
-            logger.warning("Runtime for conversation %s still not initialized after %ss.", sid, max_wait)
+            logger.warning(
+                "Runtime for conversation %s still not initialized after %ss.",
+                sid,
+                max_wait,
+            )
 
-    async def attach_to_conversation(self, sid: str, user_id: str | None = None) -> ServerConversation | None:
+    async def attach_to_conversation(
+        self, sid: str, user_id: str | None = None
+    ) -> ServerConversation | None:
         """Attach to an existing conversation or establish a new connection.
 
         Args:
@@ -325,7 +348,9 @@ class LocalConversationManager(ConversationManager):
             for conversation, _ in self._detached_conversations.values():
                 await conversation.disconnect()
             self._detached_conversations.clear()
-        await wait_all(self._close_session(sid) for sid in self._local_agent_loops_by_sid)
+        await wait_all(
+            self._close_session(sid) for sid in self._local_agent_loops_by_sid
+        )
 
     async def _cleanup_stale(self) -> None:
         while should_continue():
@@ -342,9 +367,13 @@ class LocalConversationManager(ConversationManager):
                 sid_to_close = self._find_stale_sessions(close_threshold)
 
                 # Filter out connected sessions
-                connections = await self.get_connections(filter_to_sids=set(sid_to_close))
+                connections = await self.get_connections(
+                    filter_to_sids=set(sid_to_close)
+                )
                 connected_sids = {sid for _, sid in connections.items()}
-                sid_to_close = [sid for sid in sid_to_close if sid not in connected_sids]
+                sid_to_close = [
+                    sid for sid in sid_to_close if sid not in connected_sids
+                ]
 
                 # Close stale sessions
                 await wait_all(
@@ -398,7 +427,11 @@ class LocalConversationManager(ConversationManager):
         """Return mapping from connection IDs to session IDs with optional filters."""
         connections = dict(**self._local_connection_id_to_session_id)
         if filter_to_sids is not None:
-            connections = {connection_id: sid for connection_id, sid in connections.items() if sid in filter_to_sids}
+            connections = {
+                connection_id: sid
+                for connection_id, sid in connections.items()
+                if sid in filter_to_sids
+            }
         if user_id:
             for connection_id, sid in list(connections.items()):
                 session = self._local_agent_loops_by_sid.get(sid)
@@ -422,7 +455,9 @@ class LocalConversationManager(ConversationManager):
                 extra={"session_id": sid},
             )
             raise RuntimeError("Conversation settings were not initialized")
-        session = self._local_agent_loops_by_sid.get(sid) or await self._start_agent_loop(
+        session = self._local_agent_loops_by_sid.get(
+            sid
+        ) or await self._start_agent_loop(
             sid,
             settings,
             user_id,
@@ -483,11 +518,13 @@ class LocalConversationManager(ConversationManager):
                         to=ROOM_KEY.format(sid=oldest_conversation_id),
                     )
                 await self.close_session(oldest_conversation_id)
-        llm_registry, conversation_stats, config = create_registry_and_conversation_stats(
-            self.config,
-            sid,
-            user_id,
-            settings,
+        llm_registry, conversation_stats, config = (
+            create_registry_and_conversation_stats(
+                self.config,
+                sid,
+                user_id,
+                settings,
+            )
         )
         session = Session(
             sid=sid,
@@ -501,13 +538,17 @@ class LocalConversationManager(ConversationManager):
         async with self._sessions_lock:
             self._local_agent_loops_by_sid[sid] = session
 
-        task = asyncio.create_task(session.initialize_agent(settings, initial_user_msg, replay_json))
+        task = asyncio.create_task(
+            session.initialize_agent(settings, initial_user_msg, replay_json)
+        )
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
         with contextlib.suppress(ValueError):
             session.agent_session.event_stream.subscribe(  # type: ignore[attr-defined]
                 EventStreamSubscriber.SERVER,
-                self._create_conversation_update_callback(user_id, sid, settings, session.llm_registry),
+                self._create_conversation_update_callback(
+                    user_id, sid, settings, session.llm_registry
+                ),
                 UPDATED_AT_CALLBACK_ID,
             )
         return session
@@ -541,7 +582,9 @@ class LocalConversationManager(ConversationManager):
             msg = f"no_conversation:{sid}"
             raise RuntimeError(msg)
         llm_registry = session.llm_registry
-        return llm_registry.request_extraneous_completion(service_id, llm_config, messages)
+        return llm_registry.request_extraneous_completion(
+            service_id, llm_config, messages
+        )
 
     async def disconnect_from_session(self, connection_id: str) -> None:
         """Remove connection mapping and detach the conversation if no connections remain."""
@@ -656,9 +699,13 @@ class LocalConversationManager(ConversationManager):
         llm_registry: LLMRegistry,
     ) -> Callable:
         """Delegate to :class:`ConversationMetadataTracker`."""
-        return self._metadata_tracker.create_update_callback(user_id, conversation_id, settings, llm_registry)
+        return self._metadata_tracker.create_update_callback(
+            user_id, conversation_id, settings, llm_registry
+        )
 
-    async def get_agent_loop_info(self, user_id: str | None = None, filter_to_sids: set[str] | None = None):
+    async def get_agent_loop_info(
+        self, user_id: str | None = None, filter_to_sids: set[str] | None = None
+    ):
         """Collect agent loop info objects filtered by user or sessions."""
         results = []
         for session in self._local_agent_loops_by_sid.values():
@@ -681,7 +728,9 @@ class LocalConversationManager(ConversationManager):
             session_api_key=None,
             event_store=session.agent_session.event_stream,  # type: ignore[arg-type]
             status=_get_status_from_session(session),
-            runtime_status=getattr(session.agent_session.runtime, "runtime_status", None),
+            runtime_status=getattr(
+                session.agent_session.runtime, "runtime_status", None
+            ),
             agent_state=agent_state,
         )
 
@@ -694,7 +743,9 @@ def _get_status_from_session(session: Session) -> ConversationStatus:
     if agent_session.runtime and agent_session.runtime.runtime_initialized:
         return ConversationStatus.RUNNING
     if getattr(agent_session, "_startup_failed", False):
-        return ConversationStatus.STOPPED  # Use STOPPED instead of ERROR which doesn't exist
+        return (
+            ConversationStatus.STOPPED
+        )  # Use STOPPED instead of ERROR which doesn't exist
     return ConversationStatus.STARTING
 
 

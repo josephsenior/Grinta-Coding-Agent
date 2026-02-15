@@ -124,11 +124,15 @@ class Auditor(Orchestrator):
             mcp_tools (list[dict]): The list of MCP tools.
 
         """
-        logger.warning("Auditor does not support MCP tools. MCP tools will be ignored by the agent.")
+        logger.warning(
+            "Auditor does not support MCP tools. MCP tools will be ignored by the agent."
+        )
 
     def response_to_actions(self, response: "ModelResponse") -> list["Action"]:
         """Convert response to actions, with caching support."""
-        actions = readonly_function_calling.response_to_actions(response, mcp_tool_names=list(self.mcp_tools.keys()))
+        actions = readonly_function_calling.response_to_actions(
+            response, mcp_tool_names=list(self.mcp_tools.keys())
+        )
 
         # Track cache stats periodically
         stats = self.file_cache.get_stats()

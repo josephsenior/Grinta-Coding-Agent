@@ -172,7 +172,9 @@ class SettingsScreen(Screen[None]):
         model = llm.get("model", "")
         base_url = llm.get("base_url", llm.get("api_base", ""))
         api_key = llm.get("api_key", "")
-        confirmation = self._settings.get("security", {}).get("confirmation_mode", False)
+        confirmation = self._settings.get("security", {}).get(
+            "confirmation_mode", False
+        )
         max_iter = str(self._settings.get("agent", {}).get("max_iterations", 100))
 
         if model:

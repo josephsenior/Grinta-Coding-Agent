@@ -63,7 +63,9 @@ class FileVerificationGuard:
             "strict_mode_activations": 0,
         }
 
-    def should_enforce_tools(self, last_user_message: str, state: State, strict_mode: bool = True) -> str:
+    def should_enforce_tools(
+        self, last_user_message: str, state: State, strict_mode: bool = True
+    ) -> str:
         """Determine tool_choice value with AGGRESSIVE enforcement.
 
         Args:
@@ -129,7 +131,9 @@ class FileVerificationGuard:
 
         # Check if there are pending file operations - require tools for verification
         if self.pending_file_operations:
-            logger.debug("🔒 Pending file operations - enforcing tools for verification")
+            logger.debug(
+                "🔒 Pending file operations - enforcing tools for verification"
+            )
             return "required"
 
         # STRICT MODE: Default to "required" instead of "auto"
@@ -139,7 +143,9 @@ class FileVerificationGuard:
 
         return "auto"
 
-    def inject_verification_commands(self, actions: list[Action], turn: int) -> list[Action]:
+    def inject_verification_commands(
+        self, actions: list[Action], turn: int
+    ) -> list[Action]:
         """Automatically inject verification commands after file operations.
 
         Args:
@@ -176,14 +182,20 @@ class FileVerificationGuard:
             return True
 
         class_name = type(action).__name__
-        if class_name in {"FileEditAction", "FileWriteAction"} and hasattr(action, "path"):
+        if class_name in {"FileEditAction", "FileWriteAction"} and hasattr(
+            action, "path"
+        ):
             return True
 
         return bool(
-            hasattr(action, "path") and isinstance(getattr(action, "path"), str) and getattr(action, "path").strip()
+            hasattr(action, "path")
+            and isinstance(getattr(action, "path"), str)
+            and getattr(action, "path").strip()
         )
 
-    def _append_verification_action(self, enhanced_actions: list[Action], action: Action, turn: int) -> None:
+    def _append_verification_action(
+        self, enhanced_actions: list[Action], action: Action, turn: int
+    ) -> None:
         file_path = self._safe_file_path(action)
         if not file_path:
             return
@@ -226,7 +238,9 @@ class FileVerificationGuard:
         self.stats["verifications_injected"] += 1
         logger.info("✓ Auto-injected verification for %s", file_path)
 
-    def validate_response(self, response_text: str, actions: list[Action]) -> tuple[bool, str | None]:
+    def validate_response(
+        self, response_text: str, actions: list[Action]
+    ) -> tuple[bool, str | None]:
         """Validate response before returning to user.
 
         Checks for hallucination patterns and validates tool usage.
@@ -247,7 +261,9 @@ class FileVerificationGuard:
             from backend.core.schemas import ActionType
             from backend.events.action import CmdRunAction
 
-            has_file_edit = any(getattr(a, "action", None) == ActionType.EDIT for a in actions)
+            has_file_edit = any(
+                getattr(a, "action", None) == ActionType.EDIT for a in actions
+            )
             has_cmd_run = any(isinstance(a, CmdRunAction) for a in actions)
 
             if not has_file_edit and not has_cmd_run:
@@ -300,7 +316,9 @@ class FileVerificationGuard:
     def cleanup_old_operations(self, current_turn: int, max_age: int = 3) -> None:
         """Remove old operation contexts."""
         self.pending_file_operations = [
-            op for op in self.pending_file_operations if current_turn - op.turn_started <= max_age
+            op
+            for op in self.pending_file_operations
+            if current_turn - op.turn_started <= max_age
         ]
 
     def get_stats(self) -> dict:

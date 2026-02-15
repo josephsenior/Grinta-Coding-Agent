@@ -224,9 +224,13 @@ def verify_app_registration() -> tuple[bool, list[str]]:
             ):
                 # Some routers might have different names in app.py
                 # Check for partial matches
-                router_base = router_name.replace("_router", "").replace("_api_router", "")
+                router_base = router_name.replace("_router", "").replace(
+                    "_api_router", ""
+                )
                 if router_base not in source.lower():
-                    issues.append(f"Router {router_name} may not be registered in app.py")
+                    issues.append(
+                        f"Router {router_name} may not be registered in app.py"
+                    )
 
     except Exception as e:
         issues.append(f"Error checking app.py: {str(e)}")
@@ -318,7 +322,9 @@ def main():
         print(f"  ✅ App has {route_count} registered routes")
 
         # Check for health endpoints
-        health_routes = [r for r in app.routes if hasattr(r, "path") and "health" in r.path.lower()]
+        health_routes = [
+            r for r in app.routes if hasattr(r, "path") and "health" in r.path.lower()
+        ]
         if health_routes:
             print(f"  ✅ Found {len(health_routes)} health endpoint(s)")
         else:

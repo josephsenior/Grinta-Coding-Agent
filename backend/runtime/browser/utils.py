@@ -176,7 +176,9 @@ def _prepare_browser_action(
     assert_never(action)
 
 
-async def _save_screenshot_if_needed(obs: dict[str, Any], workspace_dir: str | None) -> str | None:
+async def _save_screenshot_if_needed(
+    obs: dict[str, Any], workspace_dir: str | None
+) -> str | None:
     """Save screenshot to workspace if available.
 
     Returns: Path to saved screenshot or None.

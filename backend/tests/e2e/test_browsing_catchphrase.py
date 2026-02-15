@@ -72,21 +72,25 @@ def _wait_for_browsing_event(page: Page, timeout_s: int = 240) -> None:
 def _wait_for_catchphrase(page: Page, timeout_s: int = 300) -> None:
     print(f"Waiting for catchphrase (up to {timeout_s}s)...")
     pattern = re.compile("|".join(CATCHPHRASE_PATTERNS), re.IGNORECASE)
-    
+
     content = wait_for_agent_response(page, timeout=timeout_s)
     if content and pattern.search(content):
         _screenshot(page, "catchphrase_found")
         return
-    
+
     # Check global text as fallback
     try:
-        if page.get_by_text("Code Less, Make More", exact=False).is_visible(timeout=5000):
+        if page.get_by_text("Code Less, Make More", exact=False).is_visible(
+            timeout=5000
+        ):
             _screenshot(page, "catchphrase_found_global")
             return
     except Exception:
         pass
-        
-    raise AssertionError("Agent did not return the expected catchphrase within time limit")
+
+    raise AssertionError(
+        "Agent did not return the expected catchphrase within time limit"
+    )
 
 
 def test_browsing_catchphrase(page: Page):

@@ -92,7 +92,9 @@ def discover_plugins() -> dict[str, Callable[[], Plugin]]:
                 continue
             try:
                 merged[ep.name] = ep.load()
-                logger.info("Discovered plugin %r via entry-point: %s", ep.name, ep.value)
+                logger.info(
+                    "Discovered plugin %r via entry-point: %s", ep.name, ep.value
+                )
             except Exception:
                 logger.warning(
                     "Failed to load plugin entry-point %r (%s)",

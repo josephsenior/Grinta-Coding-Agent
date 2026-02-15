@@ -143,10 +143,14 @@ class View(BaseModel):
         summary, summary_offset = View._find_summary_info(events)
         if summary is not None and summary_offset is not None:
             logger.info("Inserting summary at offset %s", summary_offset)
-            kept_events.insert(summary_offset, AgentCondensationObservation(content=summary))
+            kept_events.insert(
+                summary_offset, AgentCondensationObservation(content=summary)
+            )
 
         # Check for unhandled condensation requests
-        unhandled_condensation_request = View._check_unhandled_condensation_request(events)
+        unhandled_condensation_request = View._check_unhandled_condensation_request(
+            events
+        )
 
         return View(
             events=kept_events,

@@ -12,7 +12,6 @@ from typing import ClassVar
 from backend._canonical import CanonicalMeta
 from backend.core.schemas import (
     ActionConfirmationStatus,
-    ActionSecurityRisk,
 )
 from backend.events.event import Event
 
@@ -30,7 +29,9 @@ class Action(Event, metaclass=CanonicalMeta):
     __test__: ClassVar[bool] = False
 
     # Declared as a proper field so subclass __post_init__ chains are safe.
-    confirmation_state: ActionConfirmationStatus = field(default=ActionConfirmationStatus.CONFIRMED, init=False)
+    confirmation_state: ActionConfirmationStatus = field(
+        default=ActionConfirmationStatus.CONFIRMED, init=False
+    )
 
     def __post_init__(self) -> None:
         # Ensure confirmation_state always has a value (idempotent with field default)

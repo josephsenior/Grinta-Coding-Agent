@@ -88,7 +88,9 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         min_length=1,
         description="The LLM model identifier to use",
     )
-    api_key: SecretStr | None = Field(default=None, description="The API key to use for authentication")
+    api_key: SecretStr | None = Field(
+        default=None, description="The API key to use for authentication"
+    )
     base_url: str | None = Field(default=None, description="The base URL for the API")
     api_version: str | None = Field(default=None, description="The version of the API")
     num_retries: int = Field(
@@ -111,7 +113,9 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ge=0,
         description="The maximum time to wait between retries, in seconds",
     )
-    timeout: int | None = Field(default=None, ge=1, description="The timeout in seconds for the API requests")
+    timeout: int | None = Field(
+        default=None, ge=1, description="The timeout in seconds for the API requests"
+    )
     max_message_chars: int = Field(
         default=DEFAULT_LLM_MAX_MESSAGE_CHARS,
         ge=1,
@@ -129,36 +133,54 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         le=1.0,
         description="The top_p (nucleus sampling) parameter for the API (0.0 to 1.0)",
     )
-    top_k: float | None = Field(default=None, ge=1.0, description="The top_k parameter for the API")
+    top_k: float | None = Field(
+        default=None, ge=1.0, description="The top_k parameter for the API"
+    )
     custom_llm_provider: str | None = Field(
         default=None,
         description="The custom LLM provider to use (openai, anthropic, gemini, xai)",
     )
-    max_input_tokens: int | None = Field(default=None, ge=1, description="The maximum number of input tokens")
-    max_output_tokens: int | None = Field(default=None, ge=1, description="The maximum number of output tokens")
-    input_cost_per_token: float | None = Field(default=None, ge=0.0, description="The cost per input token")
-    output_cost_per_token: float | None = Field(default=None, ge=0.0, description="The cost per output token")
+    max_input_tokens: int | None = Field(
+        default=None, ge=1, description="The maximum number of input tokens"
+    )
+    max_output_tokens: int | None = Field(
+        default=None, ge=1, description="The maximum number of output tokens"
+    )
+    input_cost_per_token: float | None = Field(
+        default=None, ge=0.0, description="The cost per input token"
+    )
+    output_cost_per_token: float | None = Field(
+        default=None, ge=0.0, description="The cost per output token"
+    )
     drop_params: bool = Field(
         default=True,
         description="Drop any unmapped (unsupported) params without causing an exception",
     )
-    modify_params: bool = Field(default=True, description="Modify params allows the SDK to do transformations")
+    modify_params: bool = Field(
+        default=True, description="Modify params allows the SDK to do transformations"
+    )
     disable_vision: bool | None = Field(
         default=None,
         description="If model is vision capable, this option allows to disable image processing",
     )
-    disable_stop_word: bool | None = Field(default=False, description="Whether to disable stop word handling")
+    disable_stop_word: bool | None = Field(
+        default=False, description="Whether to disable stop word handling"
+    )
     caching_prompt: bool = Field(
         default=True,
         description="Use the prompt caching feature if provided by the LLM",
     )
-    log_completions: bool = Field(default=False, description="Whether to log LLM completions to the state")
+    log_completions: bool = Field(
+        default=False, description="Whether to log LLM completions to the state"
+    )
     log_completions_folder: str = Field(
         default=os.path.join(LOG_DIR, "completions"),
         min_length=1,
         description="The folder to log LLM completions to",
     )
-    custom_tokenizer: str | None = Field(default=None, description="A custom tokenizer to use for token counting")
+    custom_tokenizer: str | None = Field(
+        default=None, description="A custom tokenizer to use for token counting"
+    )
     native_tool_calling: bool | None = Field(
         default=None,
         description="Whether to use native tool calling if supported by the model",
@@ -177,7 +199,10 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             # Gemini models keep None for optimization
             if not (
                 "gemini" in self.model.lower()
-                or (self.custom_llm_provider and "gemini" in self.custom_llm_provider.lower())
+                or (
+                    self.custom_llm_provider
+                    and "gemini" in self.custom_llm_provider.lower()
+                )
             ):
                 self.reasoning_effort = "high"
 
@@ -308,7 +333,9 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             if not has_explicit_key:
                 try:
                     # Get the correct API key for this model/provider
-                    correct_api_key = api_key_manager.get_api_key_for_model(self.model, self.api_key)
+                    correct_api_key = api_key_manager.get_api_key_for_model(
+                        self.model, self.api_key
+                    )
 
                     if correct_api_key:
                         self.api_key = correct_api_key
@@ -319,9 +346,13 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                         env_key = api_key_manager._get_provider_key_from_env(provider)
                         if env_key:
                             self.api_key = SecretStr(env_key)
-                            logger.debug("Loaded API key from environment for %s", provider)
+                            logger.debug(
+                                "Loaded API key from environment for %s", provider
+                            )
                         else:
-                            logger.warning("No API key available for model: %s", self.model)
+                            logger.warning(
+                                "No API key available for model: %s", self.model
+                            )
                 except Exception as e:
                     logger.error("Error in API key handling: %s", e)
 
@@ -354,7 +385,12 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         # Use provider configuration to validate and clean base_url
         cleaned_url = provider_config.validate_base_url(self.base_url)
         if cleaned_url != self.base_url:
-            logger.info("Cleaned base_url for %s: '%s' -> %s", provider, self.base_url, cleaned_url)
+            logger.info(
+                "Cleaned base_url for %s: '%s' -> %s",
+                provider,
+                self.base_url,
+                cleaned_url,
+            )
             self.base_url = cleaned_url
 
         # Additional validation for custom_llm_provider based on provider configuration

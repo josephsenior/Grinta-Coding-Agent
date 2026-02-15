@@ -45,7 +45,9 @@ def main() -> None:
         workers = 1
 
     # Print custom startup message before uvicorn starts
-    sys.stderr.write(f"\n\033[32mINFO\033[0m:     Uvicorn running on http://{host}:{port} (Press CTRL+C to quit)\n")
+    sys.stderr.write(
+        f"\n\033[32mINFO\033[0m:     Uvicorn running on http://{host}:{port} (Press CTRL+C to quit)\n"
+    )
     sys.stderr.flush()
 
     # Configure logging to suppress uvicorn's startup message

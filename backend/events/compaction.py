@@ -163,7 +163,11 @@ class EventCompactor:
 
             # Consume run of edits to the same path
             current_path = _edit_path(events[i])
-            while i < len(events) and _is_file_edit(events[i]) and _edit_path(events[i]) == current_path:
+            while (
+                i < len(events)
+                and _is_file_edit(events[i])
+                and _edit_path(events[i]) == current_path
+            ):
                 i += 1
 
             # Keep only the last edit in the run

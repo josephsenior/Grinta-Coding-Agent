@@ -193,7 +193,9 @@ def read_pdf_file(filepath: str) -> FileReadObservation:
     """Read and encode a PDF file."""
     with open(filepath, "rb") as file:
         pdf_data = file.read()
-        encoded_pdf = encode_binary_file(filepath, pdf_data, "application/pdf", "application/pdf")
+        encoded_pdf = encode_binary_file(
+            filepath, pdf_data, "application/pdf", "application/pdf"
+        )
     return FileReadObservation(path=filepath, content=encoded_pdf)
 
 
@@ -245,11 +247,15 @@ def handle_file_read_errors(filepath: str, working_dir: str) -> ErrorObservation
         if candidates:
             import difflib
 
-            matches = difflib.get_close_matches(os.path.basename(filepath), candidates, n=3)
+            matches = difflib.get_close_matches(
+                os.path.basename(filepath), candidates, n=3
+            )
             if matches:
                 hint = f" Did you mean: {', '.join(matches)}?"
         return ErrorObservation(f"File not found: {filepath}.{hint}")
-    return ErrorObservation(f"Cannot read file: {filepath} (permission denied or other error)")
+    return ErrorObservation(
+        f"Cannot read file: {filepath} (permission denied or other error)"
+    )
 
 
 def ensure_directory_exists(filepath: str) -> None:
@@ -377,11 +383,17 @@ def _list_directory_recursive(
     return entries, hidden_count
 
 
-def _format_directory_listing(display_path: str, file_list: list[str], hidden_count: int) -> str:
+def _format_directory_listing(
+    display_path: str, file_list: list[str], hidden_count: int
+) -> str:
     """Format directory listing for display."""
     # Sort: directories first (with /), then files
-    directories = sorted([f for f in file_list if f.endswith("/")], key=lambda s: s.lower())
-    files = sorted([f for f in file_list if not f.endswith("/")], key=lambda s: s.lower())
+    directories = sorted(
+        [f for f in file_list if f.endswith("/")], key=lambda s: s.lower()
+    )
+    files = sorted(
+        [f for f in file_list if not f.endswith("/")], key=lambda s: s.lower()
+    )
     sorted_entries = directories + files
 
     display_path_normalized = display_path.replace("\\", "/")

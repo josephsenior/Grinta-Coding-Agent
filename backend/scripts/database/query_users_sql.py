@@ -25,7 +25,9 @@ def _print_table_structure(columns: list[Any]) -> None:
     for col in columns:
         default = (col["column_default"] or "")[:18]
         null_status = "NULL" if col["is_nullable"] == "YES" else "NOT NULL"
-        print(f"{col['column_name']:<25} {col['data_type']:<20} {null_status:<10} {default:<20}")
+        print(
+            f"{col['column_name']:<25} {col['data_type']:<20} {null_status:<10} {default:<20}"
+        )
 
 
 def _format_user_row(row: Any) -> list[Any]:
@@ -67,13 +69,18 @@ def _print_users_table(users: list[Any]) -> None:
     col_widths = [12, 30, 20, 10, 8, 8, 19, 19, 19, 12, 19]
 
     print("\nUsers in Database:")
-    header_row = " | ".join(h.ljust(w) for h, w in zip(headers, col_widths, strict=False))
+    header_row = " | ".join(
+        h.ljust(w) for h, w in zip(headers, col_widths, strict=False)
+    )
     print(header_row)
     print("-" * len(header_row))
 
     for row in users:
         formatted = _format_user_row(row)
-        data_row = " | ".join(str(cell).ljust(w)[:w] for cell, w in zip(formatted, col_widths, strict=False))
+        data_row = " | ".join(
+            str(cell).ljust(w)[:w]
+            for cell, w in zip(formatted, col_widths, strict=False)
+        )
         print(data_row)
 
 

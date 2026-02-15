@@ -137,8 +137,12 @@ async def create_backup():
             print("ERROR: pg_dump not found. Please install PostgreSQL client tools.")
             print("  On Ubuntu/Debian: sudo apt-get install postgresql-client")
             print("  On macOS: brew install postgresql")
-            print("  On Windows: Install PostgreSQL from https://www.postgresql.org/download/")
-            print("  Or set POSTGRES_BIN environment variable to PostgreSQL bin directory")
+            print(
+                "  On Windows: Install PostgreSQL from https://www.postgresql.org/download/"
+            )
+            print(
+                "  Or set POSTGRES_BIN environment variable to PostgreSQL bin directory"
+            )
             sys.exit(1)
 
         # Run pg_dump
@@ -206,7 +210,9 @@ async def create_backup():
         print("ERROR: pg_dump not found. Please install PostgreSQL client tools.")
         print("  On Ubuntu/Debian: sudo apt-get install postgresql-client")
         print("  On macOS: brew install postgresql")
-        print("  On Windows: Install PostgreSQL from https://www.postgresql.org/download/")
+        print(
+            "  On Windows: Install PostgreSQL from https://www.postgresql.org/download/"
+        )
         sys.exit(1)
     except Exception as e:
         print(f"ERROR: Backup failed: {e}")
@@ -240,15 +246,21 @@ async def restore_backup(backup_file: str):
         env["PGPASSWORD"] = password
 
         # Determine backup format
-        is_custom_format = backup_path.suffix == ".sql" and backup_path.stat().st_size < 1000  # Heuristic
+        is_custom_format = (
+            backup_path.suffix == ".sql" and backup_path.stat().st_size < 1000
+        )  # Heuristic
 
         # Find PostgreSQL tools
         pg_restore_exe = find_pg_tool("pg_restore")
         psql_exe = find_pg_tool("psql")
 
         if not pg_restore_exe or not psql_exe:
-            print("ERROR: pg_restore/psql not found. Please install PostgreSQL client tools.")
-            print("  Or set POSTGRES_BIN environment variable to PostgreSQL bin directory")
+            print(
+                "ERROR: pg_restore/psql not found. Please install PostgreSQL client tools."
+            )
+            print(
+                "  Or set POSTGRES_BIN environment variable to PostgreSQL bin directory"
+            )
             sys.exit(1)
 
         if is_custom_format or backup_path.suffix == ".dump":
@@ -294,7 +306,9 @@ async def restore_backup(backup_file: str):
         print(f"✓ Database restored successfully from {backup_file}")
 
     except FileNotFoundError:
-        print("ERROR: pg_restore/psql not found. Please install PostgreSQL client tools.")
+        print(
+            "ERROR: pg_restore/psql not found. Please install PostgreSQL client tools."
+        )
         sys.exit(1)
     except Exception as e:
         print(f"ERROR: Restore failed: {e}")
@@ -323,7 +337,9 @@ def list_backups():
 
         print(f"  {backup.name}")
         print(f"    Size: {size_mb:.2f} MB")
-        print(f"    Created: {mtime.strftime('%Y-%m-%d %H:%M:%S')} ({age.days} days ago)")
+        print(
+            f"    Created: {mtime.strftime('%Y-%m-%d %H:%M:%S')} ({age.days} days ago)"
+        )
         print()
 
 
@@ -336,7 +352,9 @@ def cleanup_old_backups(days: int = BACKUP_RETENTION_DAYS):
     cutoff_date = datetime.now() - timedelta(days=days)
     backups = list(BACKUP_DIR.glob("forge_backup_*.*"))
 
-    old_backups = [b for b in backups if datetime.fromtimestamp(b.stat().st_mtime) < cutoff_date]
+    old_backups = [
+        b for b in backups if datetime.fromtimestamp(b.stat().st_mtime) < cutoff_date
+    ]
 
     if not old_backups:
         print(f"No backups older than {days} days found.")

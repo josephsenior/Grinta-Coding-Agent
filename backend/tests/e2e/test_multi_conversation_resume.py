@@ -82,7 +82,7 @@ def _ask_first_question_and_wait_for_response(page: Page) -> str | None:
 def _wait_for_first_response(page: Page) -> str | None:
     """Wait for agent response to first question."""
     print("Step 7: Waiting for agent response to first question...")
-    
+
     content = wait_for_agent_response(page, timeout=180)
     if content:
         project_name = _extract_project_name_from_response(content)
@@ -96,7 +96,9 @@ def _wait_for_first_response(page: Page) -> str | None:
     print("❌ Did not find agent response about pyproject.toml within time limit")
     page.screenshot(path="test-results/multi_conv_09_first_response_timeout.png")
     print("Screenshot saved: multi_conv_09_first_response_timeout.png")
-    raise AssertionError("Agent response did not include pyproject.toml project name within time limit")
+    raise AssertionError(
+        "Agent response did not include pyproject.toml project name within time limit"
+    )
 
 
 def _extract_project_name_from_response(content: str) -> str | None:
@@ -107,7 +109,9 @@ def _extract_project_name_from_response(content: str) -> str | None:
         and ("name" in content_lower or "project" in content_lower)
         and ("forge" in content_lower or "Forge-ai" in content_lower)
     ):
-        if name_match := re.search(r'name.*?["\']([^"\']+)["\']', content, re.IGNORECASE):
+        if name_match := re.search(
+            r'name.*?["\']([^"\']+)["\']', content, re.IGNORECASE
+        ):
             return name_match[1]
         else:
             return "Forge-ai" if "Forge-ai" in content_lower else "forge"
@@ -120,13 +124,15 @@ def _extract_conversation_id_and_navigate_away(page: Page) -> str:
     current_url = page.url
     print(f"Current URL: {current_url}")
 
-    if conversation_id_match := re.search(r"/conversations?/([a-f0-9]+)", current_url) or re.search(
-        r"/chat/([a-f0-9]+)", current_url
-    ):
+    if conversation_id_match := re.search(
+        r"/conversations?/([a-f0-9]+)", current_url
+    ) or re.search(r"/chat/([a-f0-9]+)", current_url):
         conversation_id = conversation_id_match[1]
 
     else:
-        print("Could not extract conversation ID from URL, trying to find it in the page")
+        print(
+            "Could not extract conversation ID from URL, trying to find it in the page"
+        )
         conversation_id = page.evaluate(
             "() => {\n            const url = window.location.href;\n            const match = url.match(/\\/(?:conversations?|chat)\\/([a-f0-9]+)/);\n            if (match) return match[1];\n            const stored = localStorage.getItem('currentConversationId');\n            if (stored) return stored;\n            const sessionStored = sessionStorage.getItem('conversationId');\n            if (sessionStored) return sessionStored;\n            return null;\n        }"
         )
@@ -156,10 +162,14 @@ def _resume_conversation_and_verify_history(page: Page, conversation_id: str) ->
 
 def _open_conversation_panel(page: Page) -> None:
     """Open conversation panel."""
-    conversation_panel_button = page.locator('[data-testid="toggle-conversation-panel"]')
+    conversation_panel_button = page.locator(
+        '[data-testid="toggle-conversation-panel"]'
+    )
     try:
         if conversation_panel_button.is_visible(timeout=10000):
-            print("Found conversation panel button, clicking to open conversations list")
+            print(
+                "Found conversation panel button, clicking to open conversations list"
+            )
             conversation_panel_button.click()
             page.wait_for_timeout(3000)
         else:
@@ -189,14 +199,22 @@ def _find_and_click_conversation(page: Page, conversation_id: str) -> None:
                 try:
                     element_text = element.text_content() or ""
                     element_href = element.get_attribute("href") or ""
-                    if conversation_id in element_href or conversation_id in element_text:
+                    if (
+                        conversation_id in element_href
+                        or conversation_id in element_text
+                    ):
                         print(f"Found conversation link with selector: {selector}")
                         element.click()
                         conversation_link_found = True
                         page.wait_for_timeout(2000)
                         break
-                    elif selector == 'a[href*="/conversations/"]' and not conversation_link_found:
-                        print(f"Clicking first conversation found with selector: {selector}")
+                    elif (
+                        selector == 'a[href*="/conversations/"]'
+                        and not conversation_link_found
+                    ):
+                        print(
+                            f"Clicking first conversation found with selector: {selector}"
+                        )
                         element.click()
                         conversation_link_found = True
                         page.wait_for_timeout(2000)
@@ -209,7 +227,9 @@ def _find_and_click_conversation(page: Page, conversation_id: str) -> None:
             continue
 
     if not conversation_link_found:
-        print("Could not find conversation in list, navigating directly to conversation URL as fallback")
+        print(
+            "Could not find conversation in list, navigating directly to conversation URL as fallback"
+        )
         conversation_url = f"http://localhost:12000/conversations/{conversation_id}"
         print(f"Navigating to conversation URL: {conversation_url}")
         page.goto(conversation_url)
@@ -229,7 +249,9 @@ def _wait_for_resumed_conversation_ready(page: Page) -> None:
     while time.time() - start_time < max_wait_time:
         try:
             input_field = page.locator('[data-testid="chat-input"] textarea')
-            submit_button = page.locator('[data-testid="chat-input"] button[type="submit"]')
+            submit_button = page.locator(
+                '[data-testid="chat-input"] button[type="submit"]'
+            )
             if (
                 input_field.is_visible(timeout=2000)
                 and input_field.is_enabled(timeout=2000)
@@ -255,12 +277,16 @@ def _verify_conversation_history(page: Page) -> None:
     try:
         user_messages = page.locator('[data-testid="user-message"]').all()
         agent_messages = page.locator('[data-testid="agent-message"]').all()
-        print(f"Found {len(user_messages)} user messages and {len(agent_messages)} agent messages")
+        print(
+            f"Found {len(user_messages)} user messages and {len(agent_messages)} agent messages"
+        )
 
         if len(user_messages) == 0 or len(agent_messages) == 0:
             page.screenshot(path="test-results/multi_conv_15_no_history.png")
             print("Screenshot saved: multi_conv_15_no_history.png")
-            raise AssertionError("Conversation history not preserved - no previous messages found")
+            raise AssertionError(
+                "Conversation history not preserved - no previous messages found"
+            )
 
         first_question_found = False
         for msg in user_messages:
@@ -276,9 +302,13 @@ def _verify_conversation_history(page: Page) -> None:
         print(f"Error checking conversation history: {e}")
 
 
-def _ask_followup_question_and_verify_context(page: Page, project_name: str | None) -> None:
+def _ask_followup_question_and_verify_context(
+    page: Page, project_name: str | None
+) -> None:
     """Ask follow-up question and verify context awareness."""
-    print("Step 11: Asking follow-up question that requires context from first interaction...")
+    print(
+        "Step 11: Asking follow-up question that requires context from first interaction..."
+    )
 
     if project_name:
         follow_up_question = f"Based on the project name you just told me ({project_name}), can you tell me what type of project this is? Is it a Python package, web application, or something else?"
@@ -305,7 +335,9 @@ def _wait_for_followup_response(page: Page) -> None:
     while time.time() - response_start_time < response_wait_time:
         elapsed = int(time.time() - response_start_time)
         if elapsed % 30 == 0 and elapsed > 0:
-            page.screenshot(path=f"test-results/multi_conv_followup_response_wait_{elapsed}s.png")
+            page.screenshot(
+                path=f"test-results/multi_conv_followup_response_wait_{elapsed}s.png"
+            )
             print(
                 f"Screenshot saved: multi_conv_followup_response_wait_{elapsed}s.png (waiting {elapsed}s for follow-up response)"
             )
@@ -313,7 +345,9 @@ def _wait_for_followup_response(page: Page) -> None:
         try:
             agent_completed = _check_agent_completion_status(page)
             if agent_completed or elapsed > 240:
-                followup_response_found = _check_followup_response_content(page, agent_completed)
+                followup_response_found = _check_followup_response_content(
+                    page, agent_completed
+                )
             if followup_response_found and agent_completed:
                 break
         except Exception as e:
@@ -328,13 +362,17 @@ def _wait_for_followup_response(page: Page) -> None:
         print("❌ Did not find agent response to follow-up question within time limit")
         page.screenshot(path="test-results/multi_conv_18_followup_response_timeout.png")
         print("Screenshot saved: multi_conv_18_followup_response_timeout.png")
-        raise AssertionError("Agent response to follow-up question not found within time limit")
+        raise AssertionError(
+            "Agent response to follow-up question not found within time limit"
+        )
 
     if not agent_completed:
         print("⚠️  Found response content but agent may not have completed processing")
         print("This could indicate the agent is still working on the response")
 
-    print("✅ Test completed successfully - agent resumed conversation and maintained context!")
+    print(
+        "✅ Test completed successfully - agent resumed conversation and maintained context!"
+    )
 
 
 def _check_agent_completion_status(page: Page) -> bool:
@@ -407,12 +445,18 @@ def _check_followup_response_content(page: Page, agent_completed: bool) -> bool:
                     "forge",
                 ]
                 if any(indicator in content_lower for indicator in context_indicators):
-                    print("✅ Found agent response to follow-up question with context awareness!")
+                    print(
+                        "✅ Found agent response to follow-up question with context awareness!"
+                    )
                     if agent_completed:
-                        page.screenshot(path="test-results/multi_conv_18_followup_response.png")
+                        page.screenshot(
+                            path="test-results/multi_conv_18_followup_response.png"
+                        )
                         print("Screenshot saved: multi_conv_18_followup_response.png")
                     else:
-                        print("Found response content but agent still processing, continuing to wait...")
+                        print(
+                            "Found response content but agent still processing, continuing to wait..."
+                        )
                     return True
         except Exception as e:
             print(f"Error processing agent message {i}: {e}")
@@ -452,4 +496,6 @@ def test_multi_conversation_resume(page: Page):
     print("4. ✅ Successfully resumed the same conversation via conversation list")
     print("5. ✅ Conversation history was preserved")
     print("6. ✅ Asked follow-up question requiring context from first interaction")
-    print("7. ✅ Agent responded with context awareness, showing conversation continuity")
+    print(
+        "7. ✅ Agent responded with context awareness, showing conversation continuity"
+    )

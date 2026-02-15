@@ -74,9 +74,13 @@ def set_security_risk(action: Action, arguments: dict) -> None:
     if "security_risk" in arguments:
         if arguments["security_risk"] in RISK_LEVELS:
             if hasattr(action, "security_risk"):
-                action.security_risk = getattr(ActionSecurityRisk, arguments["security_risk"])
+                action.security_risk = getattr(
+                    ActionSecurityRisk, arguments["security_risk"]
+                )
         else:
-            logger.warning("Invalid security_risk value: %s", arguments["security_risk"])
+            logger.warning(
+                "Invalid security_risk value: %s", arguments["security_risk"]
+            )
 
 
 def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
@@ -149,7 +153,9 @@ def _validate_str_replace_editor_args(arguments: dict) -> tuple[str, str]:
 def _filter_valid_editor_kwargs(other_kwargs: dict) -> dict:
     """Filter and validate kwargs for file editor."""
     str_replace_editor_tool = create_str_replace_editor_tool()
-    valid_params = set(str_replace_editor_tool["function"]["parameters"]["properties"].keys())
+    valid_params = set(
+        str_replace_editor_tool["function"]["parameters"]["properties"].keys()
+    )
     valid_kwargs_for_editor = {}
     tool_name = str_replace_editor_tool["function"]["name"]
 
@@ -224,7 +230,9 @@ def _handle_browser_tool(arguments: dict) -> BrowseInteractiveAction:
 def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
     """Handle TASK_TRACKER_TOOL tool call."""
     if "command" not in arguments:
-        msg = f'Missing required argument "command" in tool call {TASK_TRACKER_TOOL_NAME}'
+        msg = (
+            f'Missing required argument "command" in tool call {TASK_TRACKER_TOOL_NAME}'
+        )
         raise FunctionCallValidationError(msg)
     if arguments["command"] == "plan" and "task_list" not in arguments:
         msg = f'Missing required argument "task_list" for "plan" command in tool call {TASK_TRACKER_TOOL_NAME}'
@@ -250,18 +258,26 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
                 "notes": task.get("notes", ""),
             }
         else:
-            logger.warning("Unexpected task format in task_list: %s - %s", type(task), task)
+            logger.warning(
+                "Unexpected task format in task_list: %s - %s", type(task), task
+            )
             msg = f"Unexpected task format in task_list: {type(task)}. Each task shoud be a dictionary."
             raise FunctionCallValidationError(
                 msg,
             )
         normalized_task_list.append(normalized_task)
-    return TaskTrackingAction(command=arguments["command"], task_list=normalized_task_list)
+    return TaskTrackingAction(
+        command=arguments["command"], task_list=normalized_task_list
+    )
 
 
-def _handle_mcp_tool(tool_call_name: str, arguments: Mapping[str, Any] | None) -> MCPAction:
+def _handle_mcp_tool(
+    tool_call_name: str, arguments: Mapping[str, Any] | None
+) -> MCPAction:
     """Handle MCP tool call."""
-    logger.debug("Creating MCP action for tool: %s with arguments: %s", tool_call_name, arguments)
+    logger.debug(
+        "Creating MCP action for tool: %s with arguments: %s", tool_call_name, arguments
+    )
 
     # Basic validation - ensure arguments is a dict
     if isinstance(arguments, Mapping):
@@ -288,10 +304,14 @@ def _validate_ultimate_editor_args(arguments: dict, tool_name: str) -> tuple[str
 
     """
     if "command" not in arguments:
-        raise FunctionCallValidationError(f'Missing required argument "command" in tool call {tool_name}')
+        raise FunctionCallValidationError(
+            f'Missing required argument "command" in tool call {tool_name}'
+        )
 
     if "file_path" not in arguments:
-        raise FunctionCallValidationError(f'Missing required argument "file_path" in tool call {tool_name}')
+        raise FunctionCallValidationError(
+            f'Missing required argument "file_path" in tool call {tool_name}'
+        )
 
     return arguments["command"], arguments["file_path"]
 
@@ -302,12 +322,16 @@ def _handle_edit_function_command(editor, file_path: str, arguments: dict) -> Ac
     new_body = arguments.get("new_body")
 
     if not function_name or not new_body:
-        raise FunctionCallValidationError("edit_function requires 'function_name' and 'new_body' arguments")
+        raise FunctionCallValidationError(
+            "edit_function requires 'function_name' and 'new_body' arguments"
+        )
 
     result = editor.edit_function(file_path, function_name, new_body)
 
     if result.success:
-        return FileReadAction(path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message)
+        return FileReadAction(
+            path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
+        )
     else:
         return MessageAction(content=f"❌ Edit failed: {result.message}")
 
@@ -318,12 +342,16 @@ def _handle_rename_symbol_command(editor, file_path: str, arguments: dict) -> Ac
     new_name = arguments.get("new_name")
 
     if not old_name or not new_name:
-        raise FunctionCallValidationError("rename_symbol requires 'old_name' and 'new_name' arguments")
+        raise FunctionCallValidationError(
+            "rename_symbol requires 'old_name' and 'new_name' arguments"
+        )
 
     result = editor.rename_symbol(file_path, old_name, new_name)
 
     if result.success:
-        return FileReadAction(path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message)
+        return FileReadAction(
+            path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
+        )
     else:
         return MessageAction(content=f"❌ Rename failed: {result.message}")
 
@@ -347,7 +375,9 @@ def _handle_find_symbol_command(editor, file_path: str, arguments: dict) -> Acti
             message += f"\n  Parent: {result.parent_name}"
         return MessageAction(content=message)
     else:
-        return MessageAction(content=f"❌ Symbol '{symbol_name}' not found in {file_path}")
+        return MessageAction(
+            content=f"❌ Symbol '{symbol_name}' not found in {file_path}"
+        )
 
 
 def _handle_replace_range_command(editor, file_path: str, arguments: dict) -> Action:
@@ -357,12 +387,16 @@ def _handle_replace_range_command(editor, file_path: str, arguments: dict) -> Ac
     new_code = arguments.get("new_code")
 
     if start_line is None or end_line is None or new_code is None:
-        raise FunctionCallValidationError("replace_range requires 'start_line', 'end_line', and 'new_code' arguments")
+        raise FunctionCallValidationError(
+            "replace_range requires 'start_line', 'end_line', and 'new_code' arguments"
+        )
 
     result = editor.replace_code_range(file_path, start_line, end_line, new_code)
 
     if result.success:
-        return FileReadAction(path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message)
+        return FileReadAction(
+            path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
+        )
     else:
         return MessageAction(content=f"❌ Replace failed: {result.message}")
 
@@ -374,7 +408,9 @@ def _handle_normalize_indent_command(editor, file_path: str, arguments: dict) ->
     result = editor.normalize_file_indent(file_path, style, size)
 
     if result.success:
-        return FileReadAction(path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message)
+        return FileReadAction(
+            path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
+        )
     else:
         return MessageAction(content=f"❌ Normalization failed: {result.message}")
 
@@ -392,7 +428,9 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
 
         editor = StructureEditor()
     except Exception as e:
-        raise FunctionCallValidationError(f"Failed to initialize Structure Editor: {e}") from e
+        raise FunctionCallValidationError(
+            f"Failed to initialize Structure Editor: {e}"
+        ) from e
 
     # Command dispatch map
     command_handlers = {
@@ -406,7 +444,9 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
     # Execute command
     try:
         if command not in command_handlers:
-            raise FunctionCallValidationError(f"Unknown command '{command}' for structure_editor tool")
+            raise FunctionCallValidationError(
+                f"Unknown command '{command}' for structure_editor tool"
+            )
 
         handler = command_handlers[command]
         return handler(editor, file_path, arguments)
@@ -420,17 +460,27 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     return {
         create_cmd_run_tool()["function"]["name"]: _handle_cmd_run_tool,
         create_finish_tool()["function"]["name"]: _handle_finish_tool,
-        create_llm_based_edit_tool()["function"]["name"]: _handle_llm_based_file_edit_tool,
-        create_str_replace_editor_tool()["function"]["name"]: _handle_str_replace_editor_tool,
-        create_structure_editor_tool()["function"]["name"]: _handle_structure_editor_tool,
+        create_llm_based_edit_tool()["function"][
+            "name"
+        ]: _handle_llm_based_file_edit_tool,
+        create_str_replace_editor_tool()["function"][
+            "name"
+        ]: _handle_str_replace_editor_tool,
+        create_structure_editor_tool()["function"][
+            "name"
+        ]: _handle_structure_editor_tool,
         create_think_tool()["function"]["name"]: _handle_think_tool,
-        create_condensation_request_tool()["function"]["name"]: _handle_condensation_request_tool,
+        create_condensation_request_tool()["function"][
+            "name"
+        ]: _handle_condensation_request_tool,
         create_browser_tool()["function"]["name"]: _handle_browser_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
     }
 
 
-def response_to_actions(response: ModelResponse, mcp_tool_names: list[str] | None = None) -> list[Action]:
+def response_to_actions(
+    response: ModelResponse, mcp_tool_names: list[str] | None = None
+) -> list[Action]:
     """Convert LLM response to agent actions."""
     return common_response_to_actions(
         response=response,
@@ -458,10 +508,9 @@ def _process_single_tool_call(tool_call, arguments: dict[str, Any]) -> Action:
     )
 
 
-
-
-
-def _set_tool_call_metadata(action: Action, tool_call, response: ModelResponse, total_calls: int) -> None:
+def _set_tool_call_metadata(
+    action: Action, tool_call, response: ModelResponse, total_calls: int
+) -> None:
     """Set tool call metadata for the action.
 
     Falls back to direct construction if the patched ToolCallMetadata lacks
@@ -480,6 +529,3 @@ def _create_message_action_from_content(content) -> list[Action]:
     """Create message action from content when no tool calls are present."""
     content_str = str(content) if content else ""
     return [MessageAction(content=content_str, wait_for_response=True)]
-
-
-

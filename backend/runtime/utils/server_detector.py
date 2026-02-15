@@ -108,7 +108,11 @@ def extract_port_from_output(output: str) -> tuple[int, str, str] | None:
 
                     # Validate port is in valid range (1024-65535, excluding system ports)
                     if 1024 <= port <= 65535:
-                        logger.info("Detected server start: port=%d, line='%s'", port, line.strip())
+                        logger.info(
+                            "Detected server start: port=%d, line='%s'",
+                            port,
+                            line.strip(),
+                        )
                         return (port, protocol, line.strip())
                 except (ValueError, IndexError):
                     continue
@@ -158,7 +162,9 @@ def health_check_http(port: int, host: str = "localhost", timeout: float = 2.0) 
         response = requests.get(url, timeout=timeout, allow_redirects=False)
         # Accept 2xx, 3xx, and even 404 (single-page apps often show 404 for API routes)
         if response.status_code < 500:
-            logger.info("Health check passed: %s returned %d", url, response.status_code)
+            logger.info(
+                "Health check passed: %s returned %d", url, response.status_code
+            )
             return "healthy"
         logger.warning("Health check failed: %s returned %d", url, response.status_code)
         return "unhealthy"

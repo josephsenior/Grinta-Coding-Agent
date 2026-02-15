@@ -92,7 +92,9 @@ class RecallObservation(Observation):
     conversation_instructions: str = ""
     working_dir: str = ""
     playbook_knowledge: list[PlaybookKnowledge] = field(default_factory=list)
-    knowledge_base_results: list["KnowledgeBaseSearchResult"] = field(default_factory=list)
+    knowledge_base_results: list["KnowledgeBaseSearchResult"] = field(
+        default_factory=list
+    )
     '\n    A list of PlaybookKnowledge objects, each containing information from a triggered playbook.\n\n    Example:\n    [\n        PlaybookKnowledge(\n            name="python_best_practices",\n            trigger="python",\n            content="Always use virtual environments for Python projects."\n        ),\n        PlaybookKnowledge(\n            name="git_workflow",\n            trigger="git",\n            content="Create a new branch for each feature or bugfix."\n        )\n    ]\n    '
     observation: ClassVar[str] = ObservationType.RECALL
 
@@ -123,7 +125,11 @@ class RecallObservation(Observation):
         else:
             fields.extend([f"recall_type={self.recall_type}"])
         if self.playbook_knowledge:
-            fields.extend([f"playbook_knowledge={', '.join([m.name for m in self.playbook_knowledge])}"])
+            fields.extend(
+                [
+                    f"playbook_knowledge={', '.join([m.name for m in self.playbook_knowledge])}"
+                ]
+            )
         return f"**RecallObservation**\n{', '.join(fields)}"
 
     __test__ = False

@@ -82,7 +82,11 @@ def _extract_imports(filepath: Path) -> list[tuple[int, str, bool]]:
                 is_tc = True
             if is_tc:
                 start = node.lineno
-                end = max(getattr(n, "end_lineno", n.lineno) for n in ast.walk(node) if hasattr(n, "lineno"))
+                end = max(
+                    getattr(n, "end_lineno", n.lineno)
+                    for n in ast.walk(node)
+                    if hasattr(n, "lineno")
+                )
                 type_checking_ranges.append((start, end))
 
     def _in_type_checking(lineno: int) -> bool:
@@ -91,10 +95,14 @@ def _extract_imports(filepath: Path) -> list[tuple[int, str, bool]]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                results.append((node.lineno, alias.name, _in_type_checking(node.lineno)))
+                results.append(
+                    (node.lineno, alias.name, _in_type_checking(node.lineno))
+                )
         elif isinstance(node, ast.ImportFrom):
             if node.module:
-                results.append((node.lineno, node.module, _in_type_checking(node.lineno)))
+                results.append(
+                    (node.lineno, node.module, _in_type_checking(node.lineno))
+                )
 
     return results
 
@@ -123,7 +131,9 @@ def check() -> list[str]:
                 if is_tc:
                     continue  # TYPE_CHECKING imports are allowed
                 if imported_module.startswith(forbidden_prefix):
-                    violations.append(f"  {rel_str}:{lineno}  imports '{imported_module}' — {reason}")
+                    violations.append(
+                        f"  {rel_str}:{lineno}  imports '{imported_module}' — {reason}"
+                    )
 
     return violations
 
@@ -135,7 +145,9 @@ def main() -> None:
         print(f"\n✗ {len(violations)} layer boundary violation(s) found:\n")
         for v in violations:
             print(v)
-        print("\nFix the imports or add an exemption in backend/scripts/verify/check_layer_imports.py")
+        print(
+            "\nFix the imports or add an exemption in backend/scripts/verify/check_layer_imports.py"
+        )
         sys.exit(1)
     else:
         print("✓ No layer boundary violations found.")

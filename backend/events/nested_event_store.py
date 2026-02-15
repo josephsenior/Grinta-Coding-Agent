@@ -68,7 +68,9 @@ class NestedEventStore(EventStoreABC):
     ) -> tuple[bool, bool]:
         """Process a single event and return (should_yield, should_stop)."""
         if end_id == event.id:
-            return (True, True) if not filter or filter.include(event) else (False, True)
+            return (
+                (True, True) if not filter or filter.include(event) else (False, True)
+            )
         if filter and filter.exclude(event):
             return False, False
 
@@ -107,7 +109,9 @@ class NestedEventStore(EventStoreABC):
 
         while True:
             # Build search parameters and make API request
-            search_params = self._build_search_params(start_cursor, end_cursor, reverse, limit)
+            search_params = self._build_search_params(
+                start_cursor, end_cursor, reverse, limit
+            )
             result_set = self._make_api_request(search_params)
 
             if result_set is None:
@@ -122,12 +126,16 @@ class NestedEventStore(EventStoreABC):
 
                 # Update cursors based on direction
                 if reverse:
-                    page_min_id = event.id if page_min_id is None else min(page_min_id, event.id)
+                    page_min_id = (
+                        event.id if page_min_id is None else min(page_min_id, event.id)
+                    )
                 else:
                     forward_next_start = max(forward_next_start, event.id + 1)
 
                 # Process event and check if we should yield/stop
-                should_yield, should_stop = self._process_event(event, end_id, filter, limit)
+                should_yield, should_stop = self._process_event(
+                    event, end_id, filter, limit
+                )
 
                 if should_yield:
                     yield event
@@ -136,7 +144,9 @@ class NestedEventStore(EventStoreABC):
                     return
 
             # Update cursors for next iteration
-            start_cursor, end_cursor = self._update_cursors(reverse, page_min_id, forward_next_start, start_cursor)
+            start_cursor, end_cursor = self._update_cursors(
+                reverse, page_min_id, forward_next_start, start_cursor
+            )
 
             # Check if there are more pages
             if not result_set["has_more"]:

@@ -64,7 +64,9 @@ def register_routes(app: FastAPI) -> None:
         pass
 
     # Optional: expose a lightweight debug endpoint for sampling configuration
-    _sampling_debug_enabled = os.getenv("OTEL_DEBUG_SAMPLING", "false").lower() == "true"
+    _sampling_debug_enabled = (
+        os.getenv("OTEL_DEBUG_SAMPLING", "false").lower() == "true"
+    )
     if _sampling_debug_enabled:
         _register_sampling_debug(app)
 
@@ -76,7 +78,9 @@ def _register_sampling_debug(app: FastAPI) -> None:
 
     @app.get("/api/monitoring/sampling_debug", tags=["v1", "monitoring"])
     async def sampling_debug(
-        path: str | None = Query(default=None, description="Optional path to compute effective sample"),
+        path: str | None = Query(
+            default=None, description="Optional path to compute effective sample"
+        ),
     ):
         # Access sampling config from the dedicated otel_config module
         try:
@@ -94,7 +98,8 @@ def _register_sampling_debug(app: FastAPI) -> None:
                     for pattern, rate, is_prefix in otel_config.ROUTE_SAMPLE_PATTERNS
                 ],
                 "regex_patterns": [
-                    {"pattern": cregex.pattern, "rate": rate} for cregex, rate in otel_config.ROUTE_SAMPLE_REGEX
+                    {"pattern": cregex.pattern, "rate": rate}
+                    for cregex, rate in otel_config.ROUTE_SAMPLE_REGEX
                 ],
             }
             if path:

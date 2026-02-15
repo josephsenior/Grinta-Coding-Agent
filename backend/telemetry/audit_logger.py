@@ -297,7 +297,11 @@ class AuditLogger:
 
         """
         all_entries = self.read_session_audit(session_id)
-        return [entry for entry in all_entries if entry.risk_level == ActionSecurityRisk.HIGH]
+        return [
+            entry
+            for entry in all_entries
+            if entry.risk_level == ActionSecurityRisk.HIGH
+        ]
 
     def export_audit_trail(self, session_id: str, output_path: str) -> None:
         """Export audit trail to a file for compliance.

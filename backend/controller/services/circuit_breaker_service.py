@@ -6,7 +6,10 @@ from backend.core.logger import FORGE_logger as logger
 
 if TYPE_CHECKING:
     from backend.controller.agent_controller import AgentController
-    from backend.controller.agent_circuit_breaker import CircuitBreaker, CircuitBreakerResult
+    from backend.controller.agent_circuit_breaker import (
+        CircuitBreaker,
+        CircuitBreakerResult,
+    )
     from backend.controller.services.controller_context import ControllerContext
     from backend.core.config.agent_config import AgentConfig
 

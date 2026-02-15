@@ -10,9 +10,7 @@ import json
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.core.config.condenser_config import SmartCondenserConfig
     from backend.llm.llm import LLM
-    from backend.llm.llm_registry import LLMRegistry
 
 from backend.core.logger import FORGE_logger as logger
 from backend.events.action import Action, MessageAction
@@ -62,7 +60,6 @@ class SmartCondenser(BaseLLMCondenser):
             llm.config.model if llm else "none",
         )
 
-
     @staticmethod
     def _get_extra_config_args(config: Any) -> dict[str, Any]:
         """Get extra configuration arguments for the smart condenser."""
@@ -105,9 +102,14 @@ class SmartCondenser(BaseLLMCondenser):
         forgotten_event_ids = sorted(all_event_ids - events_to_keep)
 
         logger.info(
-            "SmartCondenser: Keeping %s events, forgetting %s events", len(events_to_keep), len(forgotten_event_ids))
+            "SmartCondenser: Keeping %s events, forgetting %s events",
+            len(events_to_keep),
+            len(forgotten_event_ids),
+        )
 
-        return Condensation(action=CondensationAction(forgotten_event_ids=forgotten_event_ids))
+        return Condensation(
+            action=CondensationAction(forgotten_event_ids=forgotten_event_ids)
+        )
 
     def _identify_essential_events(self, events: list[Event]) -> set[int]:
         """Identify essential events that must always be kept.
@@ -127,7 +129,11 @@ class SmartCondenser(BaseLLMCondenser):
 
         # Keep first user message
         first_user_msg = next(
-            (e for e in events if isinstance(e, MessageAction) and e.source == EventSource.USER),
+            (
+                e
+                for e in events
+                if isinstance(e, MessageAction) and e.source == EventSource.USER
+            ),
             None,
         )
         if first_user_msg:
@@ -139,7 +145,10 @@ class SmartCondenser(BaseLLMCondenser):
             if isinstance(event, ErrorObservation):
                 error_content = event.content.lower()
                 # Keep critical errors
-                if any(keyword in error_content for keyword in ["critical", "crash", "fatal", "stuck"]):
+                if any(
+                    keyword in error_content
+                    for keyword in ["critical", "crash", "fatal", "stuck"]
+                ):
                     essential.add(event.id)
 
         return essential
@@ -456,5 +465,6 @@ Respond ONLY with a JSON array of scores in order:
             if isinstance(prev_event, Action) and prev_event.id == observation.cause:
                 paired_ids.add(prev_event.id)
                 break
+
 
 # Lazy registration to avoid circular imports

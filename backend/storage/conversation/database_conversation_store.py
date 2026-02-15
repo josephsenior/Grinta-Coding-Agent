@@ -162,7 +162,9 @@ class DatabaseConversationStore(ConversationStore):
             )
             return bool(val)
 
-    async def search(self, page_id: str | None = None, limit: int = 20) -> ConversationMetadataResultSet:
+    async def search(
+        self, page_id: str | None = None, limit: int = 20
+    ) -> ConversationMetadataResultSet:
         """Search conversations with lightweight pagination."""
         offset = int(page_id) if page_id and page_id.isdigit() else 0
 
@@ -180,10 +182,14 @@ class DatabaseConversationStore(ConversationStore):
             results = [self._row_to_metadata(row) for row in rows[:limit]]
             next_page_id = str(offset + limit) if len(rows) > limit else None
 
-            return ConversationMetadataResultSet(results=results, next_page_id=next_page_id)
+            return ConversationMetadataResultSet(
+                results=results, next_page_id=next_page_id
+            )
 
     @classmethod
-    async def get_instance(cls, config: ForgeConfig, user_id: str | None) -> DatabaseConversationStore:
+    async def get_instance(
+        cls, config: ForgeConfig, user_id: str | None
+    ) -> DatabaseConversationStore:
         """Get a store for the user represented by the token given."""
         from backend.storage.db_pool import get_db_pool
 
@@ -204,7 +210,9 @@ class DatabaseConversationStore(ConversationStore):
             selected_repository=row["selected_repository"],
             user_id=row["user_id"],
             selected_branch=row["selected_branch"],
-            vcs_provider=ProviderType(row["vcs_provider"]) if row["vcs_provider"] else None,
+            vcs_provider=ProviderType(row["vcs_provider"])
+            if row["vcs_provider"]
+            else None,
             last_updated_at=row["last_updated_at"],
             trigger=ConversationTrigger(row["trigger"]) if row["trigger"] else None,
             pr_number=pr_number,

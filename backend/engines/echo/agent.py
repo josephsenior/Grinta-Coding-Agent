@@ -65,12 +65,16 @@ class Echo(Agent):
                 ],
             },
             {
-                "action": FileWriteAction(content='echo "Hello, World!"', path="hello.sh"),
+                "action": FileWriteAction(
+                    content='echo "Hello, World!"', path="hello.sh"
+                ),
                 "observations": [FileWriteObservation(content="", path="hello.sh")],
             },
             {
                 "action": FileReadAction(path="hello.sh"),
-                "observations": [FileReadObservation('echo "Hello, World!"\n', path="hello.sh")],
+                "observations": [
+                    FileReadObservation('echo "Hello, World!"\n', path="hello.sh")
+                ],
             },
             {
                 "action": CmdRunAction(command="bash hello.sh"),
@@ -87,7 +91,9 @@ class Echo(Agent):
                 "observations": [AgentStateChangedObservation("", AgentState.REJECTED)],
             },
             {
-                "action": PlaybookFinishAction(outputs={}, thought="Task completed", final_thought="Task completed"),
+                "action": PlaybookFinishAction(
+                    outputs={}, thought="Task completed", final_thought="Task completed"
+                ),
                 "observations": [AgentStateChangedObservation("", AgentState.FINISHED)],
             },
         ]

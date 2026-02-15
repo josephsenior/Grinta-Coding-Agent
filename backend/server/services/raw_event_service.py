@@ -72,7 +72,9 @@ async def dispatch_raw_message_event(
         )
         event_stream = adapter.get_event_stream(conversation_id)
         event_stream.add_event(event_obj, EventSource.USER)
-        logger.info("Raw event persisted directly to event stream for %s", conversation_id)
+        logger.info(
+            "Raw event persisted directly to event stream for %s", conversation_id
+        )
         return JSONResponse(
             {
                 "success": True,

@@ -19,7 +19,7 @@ from backend.storage.data_models.conversation_template import (
     UpdateTemplateRequest,
 )
 
-router = APIRouter(prefix="/api/templates")
+router = APIRouter(prefix="/api/v1/templates")
 logger = logging.getLogger(__name__)
 
 

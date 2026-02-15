@@ -44,7 +44,9 @@ CONVERSATION_EXAMPLES = {
     "simple_conversation": {
         "summary": "Simple code task",
         "description": "Create a basic conversation for a coding task",
-        "value": {"initial_query": "Create a Python function to calculate fibonacci numbers"},
+        "value": {
+            "initial_query": "Create a Python function to calculate fibonacci numbers"
+        },
     },
     "with_repository": {
         "summary": "Repository task",

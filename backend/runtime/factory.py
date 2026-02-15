@@ -6,9 +6,11 @@ from typing import Any
 from backend.runtime.base import Runtime
 from backend.utils.import_utils import get_impl
 
+
 def _lazy_import(module_path: str, attr: str) -> Any:
     module = importlib.import_module(module_path)
     return getattr(module, attr)
+
 
 # Map runtime keys to (module, attribute) for lazy loading
 _DEFAULT_RUNTIME_IMPORTS: dict[str, tuple[str, str]] = {
@@ -19,6 +21,7 @@ _DEFAULT_RUNTIME_IMPORTS: dict[str, tuple[str, str]] = {
 }
 
 _ALL_RUNTIME_KEYS = set(_DEFAULT_RUNTIME_IMPORTS.keys())
+
 
 def get_runtime_cls(name: str) -> type[Runtime]:
     """If name is one of the predefined runtime names (e.g. 'local'), return its class.

@@ -66,13 +66,17 @@ class SmartConfigCache:
                     host=redis_host,
                     port=redis_port,
                     password=redis_password if redis_password else None,
-                    **get_redis_connection_params(redis_host, redis_port, redis_password),
+                    **get_redis_connection_params(
+                        redis_host, redis_port, redis_password
+                    ),
                 )
                 # Test connection
                 self.redis.ping()
                 logger.info("🚀 SmartConfigCache: Redis connected successfully")
             except Exception as e:
-                logger.warning("Redis connection failed: %s, falling back to in-memory cache", e)
+                logger.warning(
+                    "Redis connection failed: %s, falling back to in-memory cache", e
+                )
                 self.redis_available = False
 
         if not self.redis_available:
@@ -127,7 +131,10 @@ class SmartConfigCache:
         current_time = time.time()
 
         # Check cache (5min TTL)
-        if self._global_config_cache is not None and current_time - self._global_config_time < 300:
+        if (
+            self._global_config_cache is not None
+            and current_time - self._global_config_time < 300
+        ):
             logger.debug("🚀 Global config memory cache HIT")
             return self._global_config_cache
 
@@ -142,7 +149,9 @@ class SmartConfigCache:
         logger.debug("🚀 Global config memory cache MISS - loaded and cached")
         return config
 
-    def get_user_settings(self, user_id: str, settings_store, secrets_store) -> Settings | None:
+    def get_user_settings(
+        self, user_id: str, settings_store, secrets_store
+    ) -> Settings | None:
         """Get user settings with hybrid caching.
 
         Args:
@@ -157,9 +166,13 @@ class SmartConfigCache:
         if self.redis_available:
             return self._get_user_settings_redis(user_id, settings_store, secrets_store)
         else:
-            return self._get_user_settings_memory(user_id, settings_store, secrets_store)
+            return self._get_user_settings_memory(
+                user_id, settings_store, secrets_store
+            )
 
-    def _get_user_settings_redis(self, user_id: str, settings_store, secrets_store) -> Settings | None:
+    def _get_user_settings_redis(
+        self, user_id: str, settings_store, secrets_store
+    ) -> Settings | None:
         """Get user settings from Redis cache."""
         try:
             user_key = f"smart_cache:user_settings:{user_id}"
@@ -189,7 +202,9 @@ class SmartConfigCache:
 
             # Cache for 1 minute (user settings change more frequently)
             self.redis.setex(user_key, 60, serialize_model(merged_settings))
-            logger.debug("🚀 User settings cache MISS for %s - loaded and cached", user_id)
+            logger.debug(
+                "🚀 User settings cache MISS for %s - loaded and cached", user_id
+            )
             return merged_settings
 
         except Exception as e:
@@ -200,7 +215,9 @@ class SmartConfigCache:
                 return settings.merge_with_config_settings()
             return None
 
-    def _get_user_settings_memory(self, user_id: str, settings_store, secrets_store) -> Settings | None:
+    def _get_user_settings_memory(
+        self, user_id: str, settings_store, secrets_store
+    ) -> Settings | None:
         """Get user settings from memory cache."""
         current_time = time.time()
 
@@ -221,7 +238,9 @@ class SmartConfigCache:
         merged_settings = merge_settings_with_cache(
             user_id, settings, global_config, self._user_settings_cache, current_time
         )
-        logger.debug("🚀 User settings memory cache MISS for %s - loaded and cached", user_id)
+        logger.debug(
+            "🚀 User settings memory cache MISS for %s - loaded and cached", user_id
+        )
         return merged_settings
 
     def invalidate_user_cache(self, user_id: str) -> None:

@@ -77,7 +77,7 @@ class ConversationValidator:
         Raises:
             ConversationAccessDenied: In strict mode when access is rejected.
         """
-        user_id = self._extract_user_id(authorization_header)
+        user_id: str | None = self._extract_user_id(authorization_header)
 
         if self._mode == "strict":
             return await self._validate_strict(conversation_id, user_id)
@@ -90,13 +90,19 @@ class ConversationValidator:
     # Strict-mode helpers
     # ------------------------------------------------------------------
 
-    async def _validate_strict(self, conversation_id: str, user_id: str | None) -> str | None:
+    async def _validate_strict(
+        self, conversation_id: str, user_id: str | None
+    ) -> str | None:
         if user_id is None:
-            raise ConversationAccessDenied("Anonymous access is not allowed in strict validation mode.")
+            raise ConversationAccessDenied(
+                "Anonymous access is not allowed in strict validation mode."
+            )
 
         config = load_FORGE_config()
         server_config = ServerConfig()
-        store_cls: type[ConversationStore] = get_impl(ConversationStore, server_config.conversation_store_class)
+        store_cls: type[ConversationStore] = get_impl(
+            ConversationStore, server_config.conversation_store_class
+        )
         store = await store_cls.get_instance(config, user_id)
 
         try:
@@ -106,7 +112,9 @@ class ConversationValidator:
             metadata = await self._create_metadata(store, conversation_id, user_id)
 
         if metadata.user_id is not None and metadata.user_id != user_id:
-            raise ConversationAccessDenied(f"User {user_id} does not own conversation {conversation_id}.")
+            raise ConversationAccessDenied(
+                f"User {user_id} does not own conversation {conversation_id}."
+            )
         return user_id
 
     # ------------------------------------------------------------------
@@ -121,14 +129,18 @@ class ConversationValidator:
         """
         return None
 
-    async def _ensure_metadata_exists(self, conversation_id: str, user_id: str | None) -> ConversationMetadata:
+    async def _ensure_metadata_exists(
+        self, conversation_id: str, user_id: str | None
+    ) -> ConversationMetadata:
         config = load_FORGE_config()
         server_config = ServerConfig()
         conversation_store_class: type[ConversationStore] = get_impl(
             ConversationStore,
             server_config.conversation_store_class,
         )
-        conversation_store = await conversation_store_class.get_instance(config, user_id)
+        conversation_store = await conversation_store_class.get_instance(
+            config, user_id
+        )
         try:
             metadata = await conversation_store.get_metadata(conversation_id)
         except FileNotFoundError:
@@ -137,7 +149,9 @@ class ConversationValidator:
                 conversation_id,
                 extra={"session_id": conversation_id},
             )
-            metadata = await self._create_metadata(conversation_store, conversation_id, user_id)
+            metadata = await self._create_metadata(
+                conversation_store, conversation_id, user_id
+            )
         return metadata
 
     @staticmethod
@@ -167,5 +181,7 @@ def create_conversation_validator() -> ConversationValidator:
         "FORGE_CONVERSATION_VALIDATOR_CLS",
         "forge.storage.conversation.conversation_validator.ConversationValidator",
     )
-    ConversationValidatorImpl = get_impl(ConversationValidator, conversation_validator_cls)
+    ConversationValidatorImpl = get_impl(
+        ConversationValidator, conversation_validator_cls
+    )
     return ConversationValidatorImpl()

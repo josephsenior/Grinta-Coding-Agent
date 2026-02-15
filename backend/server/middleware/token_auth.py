@@ -59,7 +59,9 @@ class SimpleTokenAuthMiddleware(BaseHTTPMiddleware):
         is_valid = False
         if header_key and secrets.compare_digest(header_key, expected_key):
             is_valid = True
-        elif scheme.lower() == "bearer" and secrets.compare_digest(bearer_token, expected_key):
+        elif scheme.lower() == "bearer" and secrets.compare_digest(
+            bearer_token, expected_key
+        ):
             is_valid = True
 
         if not is_valid:

@@ -5,20 +5,17 @@ from __future__ import annotations
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.engines.orchestrator.contracts import ChatCompletionToolParam
+    pass
 
 from backend.engines.orchestrator.tools.security_utils import (
     RISK_LEVELS,
     SECURITY_RISK_DESC,
 )
 
-from backend.engines.common import (
-    get_common_path_param as get_path_param,
-    get_common_timeout_param as get_timeout_param,
-)
 
-
-def get_is_input_param(description: str = "Whether the command is input to a running process.") -> dict[str, Any]:
+def get_is_input_param(
+    description: str = "Whether the command is input to a running process.",
+) -> dict[str, Any]:
     """Get a standardized is_input parameter definition.
 
     Args:
@@ -47,7 +44,9 @@ def get_security_risk_param() -> dict[str, Any]:
     }
 
 
-def get_command_param(description: str, enum: list[str] | None = None) -> dict[str, Any]:
+def get_command_param(
+    description: str, enum: list[str] | None = None
+) -> dict[str, Any]:
     """Get the standard command parameter definition.
 
     Args:
@@ -66,8 +65,6 @@ def get_command_param(description: str, enum: list[str] | None = None) -> dict[s
     return param
 
 
-
-
 def get_url_param(description: str = "The URL to navigate to.") -> dict[str, Any]:
     """Get the standard URL parameter definition.
 
@@ -81,6 +78,3 @@ def get_url_param(description: str = "The URL to navigate to.") -> dict[str, Any
         "type": "string",
         "description": description,
     }
-
-
-from backend.engines.common import create_tool_definition

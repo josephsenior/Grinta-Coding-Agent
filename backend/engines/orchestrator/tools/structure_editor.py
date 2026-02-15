@@ -84,10 +84,15 @@ class StructureEditor:
         self.refactor = AtomicRefactor()
         self.errors = SmartErrorHandler()
 
-        self._undo_history: dict[str, list[tuple[str, str]]] = {}  # file_path -> [(hash, content)]
+        self._undo_history: dict[
+            str, list[tuple[str, str]]
+        ] = {}  # file_path -> [(hash, content)]
 
         logger.info("🚀 Ultimate Editor initialized")
-        logger.info("   - Tree-sitter: %s languages", len(self.universal.get_supported_languages()))
+        logger.info(
+            "   - Tree-sitter: %s languages",
+            len(self.universal.get_supported_languages()),
+        )
         logger.info("   - Auto-indent: %s", self.config.auto_indent)
         logger.info("   - Validation: %s", self.config.validate_syntax)
 
@@ -127,7 +132,9 @@ class StructureEditor:
         except Exception as e:
             return EditResult(success=False, message=f"Failed to create file: {e}")
 
-    def view_file(self, file_path: str, line_range: list[int] | None = None) -> EditResult:
+    def view_file(
+        self, file_path: str, line_range: list[int] | None = None
+    ) -> EditResult:
         """View file content or directory listing.
 
         Args:
@@ -167,7 +174,9 @@ class StructureEditor:
         except Exception as e:
             return EditResult(success=False, message=f"Error reading file: {e}")
 
-    def insert_code(self, file_path: str, insert_line: int, new_code: str) -> EditResult:
+    def insert_code(
+        self, file_path: str, insert_line: int, new_code: str
+    ) -> EditResult:
         """Insert code after a specific line.
 
         Args:
@@ -234,7 +243,9 @@ class StructureEditor:
 
         return EditResult(success=True, message="\n".join(output))
 
-    def edit_function(self, file_path: str, function_name: str, new_body: str) -> EditResult:
+    def edit_function(
+        self, file_path: str, function_name: str, new_body: str
+    ) -> EditResult:
         """Edit a function by name (works for ANY language).
 
         Args:
@@ -251,13 +262,17 @@ class StructureEditor:
         # Detect language
         language = self.universal.detect_language(file_path)
         if not language:
-            return EditResult(success=False, message=f"Cannot detect language for {file_path}")
+            return EditResult(
+                success=False, message=f"Cannot detect language for {file_path}"
+            )
 
         # Auto-indent new body if requested
         new_body = self._handle_auto_indent(file_path, language, new_body)
 
         # Perform edit
-        result = self.universal.edit_function(file_path, function_name, new_body, validate=self.config.validate_syntax)
+        result = self.universal.edit_function(
+            file_path, function_name, new_body, validate=self.config.validate_syntax
+        )
 
         # Clean whitespace if successful and requested
         self._handle_whitespace_cleanup(file_path, language, result.success)
@@ -300,7 +315,9 @@ class StructureEditor:
 
         return result
 
-    def find_symbol(self, file_path: str, symbol_name: str, symbol_type: str | None = None) -> SymbolLocation | None:
+    def find_symbol(
+        self, file_path: str, symbol_name: str, symbol_type: str | None = None
+    ) -> SymbolLocation | None:
         """Find a symbol in a file.
 
         Args:
@@ -318,14 +335,18 @@ class StructureEditor:
             # Provide smart error
             try:
                 available_symbols = self._get_available_symbols(file_path, symbol_type)
-                suggestion = self.errors.symbol_not_found(symbol_name, available_symbols)
+                suggestion = self.errors.symbol_not_found(
+                    symbol_name, available_symbols
+                )
                 logger.warning(suggestion.message)
             except Exception:
                 logger.warning("Symbol '%s' not found in %s", symbol_name, file_path)
 
         return result
 
-    def _validate_line_range(self, start_line: int, end_line: int, total_lines: int) -> tuple[bool, str]:
+    def _validate_line_range(
+        self, start_line: int, end_line: int, total_lines: int
+    ) -> tuple[bool, str]:
         """Validate line range is valid.
 
         Args:
@@ -344,7 +365,9 @@ class StructureEditor:
             )
         return True, ""
 
-    def _apply_auto_indent(self, new_code: str, lines: list[str], start_line: int, file_path: str) -> str:
+    def _apply_auto_indent(
+        self, new_code: str, lines: list[str], start_line: int, file_path: str
+    ) -> str:
         """Apply auto-indentation to new code.
 
         Args:
@@ -365,7 +388,9 @@ class StructureEditor:
         indent_config = self.whitespace.detect_indent(original_content, language)
 
         if start_line <= len(lines):
-            base_indent = self.whitespace.get_line_indent(lines[start_line - 1], indent_config)
+            base_indent = self.whitespace.get_line_indent(
+                lines[start_line - 1], indent_config
+            )
             return self.whitespace.auto_indent_block(
                 new_code,
                 base_indent=base_indent,
@@ -393,7 +418,9 @@ class StructureEditor:
 
         language = self.universal.detect_language(file_path)
         if language:
-            validation = self.universal._validate_syntax(new_content, file_path, language)
+            validation = self.universal._validate_syntax(
+                new_content, file_path, language
+            )
             if not validation[0]:
                 return False, f"Syntax error after edit: {validation[1]}"
 
@@ -425,7 +452,9 @@ class StructureEditor:
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(cleaned)
 
-    def replace_code_range(self, file_path: str, start_line: int, end_line: int, new_code: str) -> EditResult:
+    def replace_code_range(
+        self, file_path: str, start_line: int, end_line: int, new_code: str
+    ) -> EditResult:
         """Replace a range of lines with new code.
 
         Args:
@@ -442,7 +471,9 @@ class StructureEditor:
             with open(file_path, encoding="utf-8") as f:
                 lines = f.readlines()
 
-            is_valid, error_msg = self._validate_line_range(start_line, end_line, len(lines))
+            is_valid, error_msg = self._validate_line_range(
+                start_line, end_line, len(lines)
+            )
             if not is_valid:
                 return EditResult(success=False, message=error_msg)
 
@@ -451,7 +482,9 @@ class StructureEditor:
             new_lines = lines[: start_line - 1] + [new_code + "\n"] + lines[end_line:]
             new_content = "".join(new_lines)
 
-            is_valid, error_msg = self._validate_syntax_after_edit(new_content, lines, file_path)
+            is_valid, error_msg = self._validate_syntax_after_edit(
+                new_content, lines, file_path
+            )
             if not is_valid:
                 return EditResult(
                     success=False,
@@ -540,7 +573,9 @@ class StructureEditor:
     # HELPER METHODS
     # ========================================================================
 
-    def _get_available_symbols(self, file_path: str, symbol_type: str | None = None) -> list[str]:
+    def _get_available_symbols(
+        self, file_path: str, symbol_type: str | None = None
+    ) -> list[str]:
         """Get list of available symbols in a file."""
         try:
             parse_result = self.universal.parse_file(file_path)
@@ -567,7 +602,9 @@ class StructureEditor:
                 ]:
                     name_node = self.universal._get_name_node(node)
                     if name_node:
-                        name = file_bytes[name_node.start_byte : name_node.end_byte].decode("utf-8")
+                        name = file_bytes[
+                            name_node.start_byte : name_node.end_byte
+                        ].decode("utf-8")
                         if not symbol_type or symbol_type == "function":
                             symbols.append(name)
 
@@ -575,7 +612,9 @@ class StructureEditor:
                 elif node.type in ["class_definition", "class_declaration"]:
                     name_node = self.universal._get_name_node(node)
                     if name_node:
-                        name = file_bytes[name_node.start_byte : name_node.end_byte].decode("utf-8")
+                        name = file_bytes[
+                            name_node.start_byte : name_node.end_byte
+                        ].decode("utf-8")
                         if not symbol_type or symbol_type == "class":
                             symbols.append(name)
 
@@ -622,16 +661,22 @@ class StructureEditor:
                 from .whitespace_handler import IndentStyle
 
                 current = self.whitespace.detect_indent(original, language)
-                style = IndentStyle.TABS if target_style == "tabs" else IndentStyle.SPACES
+                style = (
+                    IndentStyle.TABS if target_style == "tabs" else IndentStyle.SPACES
+                )
                 size = target_size or current.size
                 from .whitespace_handler import IndentConfig
 
-                target_config = IndentConfig(style=style, size=size, line_ending=current.line_ending)
+                target_config = IndentConfig(
+                    style=style, size=size, line_ending=current.line_ending
+                )
             else:
                 target_config = None
 
             # Normalize
-            normalized = self.whitespace.normalize_indent(original, target_config, language)
+            normalized = self.whitespace.normalize_indent(
+                original, target_config, language
+            )
 
             # Write back
             with open(file_path, "w", encoding="utf-8") as f:
@@ -645,14 +690,18 @@ class StructureEditor:
             )
 
         except Exception as e:
-            return EditResult(success=False, message=f"Failed to normalize indentation: {e}")
+            return EditResult(
+                success=False, message=f"Failed to normalize indentation: {e}"
+            )
 
     def clear_caches(self):
         """Clear all internal caches."""
         self.universal.clear_cache()
         logger.debug("Cleared editor caches")
 
-    def _determine_view_range(self, line_range: list[int] | None, total_lines: int) -> tuple[int, int]:
+    def _determine_view_range(
+        self, line_range: list[int] | None, total_lines: int
+    ) -> tuple[int, int]:
         """Determine and clamp start/end lines for viewing."""
         start_line = 1
         end_line = total_lines
@@ -668,7 +717,9 @@ class StructureEditor:
         end_line = min(total_lines, end_line)
         return start_line, end_line
 
-    def _format_view_output(self, lines: list[str], start_line: int, end_line: int) -> str:
+    def _format_view_output(
+        self, lines: list[str], start_line: int, end_line: int
+    ) -> str:
         """Format lines with line numbers for output."""
         output = []
         for i in range(start_line - 1, end_line):
@@ -683,12 +734,16 @@ class StructureEditor:
             with open(file_path, encoding="utf-8") as f:
                 content = f.read()
             indent_config = self.whitespace.detect_indent(content, language)
-            return self.whitespace.auto_indent_block(code, base_indent=1, config=indent_config, language=language)
+            return self.whitespace.auto_indent_block(
+                code, base_indent=1, config=indent_config, language=language
+            )
         except Exception as e:
             logger.warning("Auto-indent failed: %s", e)
             return code
 
-    def _handle_whitespace_cleanup(self, file_path: str, language: str, success: bool) -> None:
+    def _handle_whitespace_cleanup(
+        self, file_path: str, language: str, success: bool
+    ) -> None:
         """Clean whitespace if edit was successful and requested."""
         if success and self.config.clean_whitespace:
             try:
@@ -700,7 +755,9 @@ class StructureEditor:
             except Exception as e:
                 logger.warning("Whitespace cleanup failed: %s", e)
 
-    def _enrich_error_with_symbol_suggestions(self, file_path: str, symbol_name: str, result: EditResult) -> None:
+    def _enrich_error_with_symbol_suggestions(
+        self, file_path: str, symbol_name: str, result: EditResult
+    ) -> None:
         """Add symbol suggestions to error message if applicable."""
         try:
             available_symbols = self._get_available_symbols(file_path, "function")

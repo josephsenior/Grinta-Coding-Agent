@@ -40,12 +40,13 @@ def serialize_model(model: BaseModel) -> bytes:
     preserved (not masked) — required for cache round-tripping.
     """
     data = model.model_dump(mode="python")
-    return json.dumps(data, default=_json_fallback, separators=(",", ":")).encode("utf-8")
+    return json.dumps(data, default=_json_fallback, separators=(",", ":")).encode(
+        "utf-8"
+    )
 
 
 def deserialize_model(raw: bytes, model_class: type[T]) -> T:
-    """Deserialize JSON bytes back to a Pydantic model instance.
-    """
+    """Deserialize JSON bytes back to a Pydantic model instance."""
     try:
         data = json.loads(raw)
         return model_class.model_validate(data)

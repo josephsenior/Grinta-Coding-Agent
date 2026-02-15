@@ -145,7 +145,9 @@ class FileEditor:
             must_be_relative=True,
         )
 
-    def _extract_content(self, file_text: str | Sentinel | None, new_str: str | Sentinel | None) -> str:
+    def _extract_content(
+        self, file_text: str | Sentinel | None, new_str: str | Sentinel | None
+    ) -> str:
         """Extract content from sentinel-aware parameters.
 
         Args:
@@ -157,14 +159,18 @@ class FileEditor:
         """
         # Check file_text first
         if not is_missing(file_text) and file_text is not None:
-            return str(file_text)  # Type narrowing: if not MISSING and not None, it's str
+            return str(
+                file_text
+            )  # Type narrowing: if not MISSING and not None, it's str
         # Check new_str
         if not is_missing(new_str) and new_str is not None:
             return str(new_str)  # Type narrowing: if not MISSING and not None, it's str
         # Both are MISSING or None
         return ""
 
-    def _handle_view(self, file_path: Path, view_range: list[int] | None, display_path: str) -> ToolResult:
+    def _handle_view(
+        self, file_path: Path, view_range: list[int] | None, display_path: str
+    ) -> ToolResult:
         """Handle view command - read file or specific line range."""
         try:
             content = self._prepare_view_content(file_path)
@@ -219,7 +225,9 @@ class FileEditor:
             formatted_output += "\n"
         return formatted_output
 
-    def _apply_view_range(self, content: str, lines: list[str], view_range: list[int], header: str) -> ToolResult:
+    def _apply_view_range(
+        self, content: str, lines: list[str], view_range: list[int], header: str
+    ) -> ToolResult:
         """Apply a line range filter to the view output."""
         start, end = view_range[0], view_range[1]
         start_idx = max(0, start - 1)
@@ -232,7 +240,10 @@ class FileEditor:
             selected_lines.append(f"{i + 1}\t{line_content}")
 
         selected_output = "\n".join(selected_lines)
-        if lines and any(line.endswith("\n") or line.endswith("\r") for line in lines[start_idx:end_idx]):
+        if lines and any(
+            line.endswith("\n") or line.endswith("\r")
+            for line in lines[start_idx:end_idx]
+        ):
             selected_output += "\n"
 
         return ToolResult(
@@ -258,10 +269,14 @@ class FileEditor:
             old_content_str = old_content or ""
 
             # Extract params
-            file_text_val, old_str_val, new_str_val = self._extract_edit_params(file_text, old_str, new_str)
+            file_text_val, old_str_val, new_str_val = self._extract_edit_params(
+                file_text, old_str, new_str
+            )
 
             # Apply edit logic
-            new_content = self._apply_edit_logic(old_content_str, file_text_val, old_str_val, new_str_val, insert_line)
+            new_content = self._apply_edit_logic(
+                old_content_str, file_text_val, old_str_val, new_str_val, insert_line
+            )
             if isinstance(new_content, ToolResult):
                 new_content.old_content = old_content
                 return new_content
@@ -291,9 +306,17 @@ class FileEditor:
         new_str: str | Sentinel | None,
     ) -> tuple[str | None, str | None, str | None]:
         """Extract actual values from sentinel-aware edit parameters."""
-        file_text_val = str(file_text) if not is_missing(file_text) and file_text is not None else None
-        old_str_val = str(old_str) if not is_missing(old_str) and old_str is not None else None
-        new_str_val = str(new_str) if not is_missing(new_str) and new_str is not None else None
+        file_text_val = (
+            str(file_text)
+            if not is_missing(file_text) and file_text is not None
+            else None
+        )
+        old_str_val = (
+            str(old_str) if not is_missing(old_str) and old_str is not None else None
+        )
+        new_str_val = (
+            str(new_str) if not is_missing(new_str) and new_str is not None else None
+        )
         return file_text_val, old_str_val, new_str_val
 
     def _apply_edit_logic(
@@ -324,7 +347,9 @@ class FileEditor:
             new_content=old_content_str,
         )
 
-    def _write_edit_result(self, file_path: Path, old_content: str | None, new_content: str) -> ToolResult:
+    def _write_edit_result(
+        self, file_path: Path, old_content: str | None, new_content: str
+    ) -> ToolResult:
         """Write the result of an edit operation to disk."""
         # Backup original if in transaction
         if self._transaction_stack:

@@ -232,7 +232,9 @@ class AgentSession:
 
             if not ctx.runtime_connected:
                 msg = "Runtime failed to connect"
-                self.logger.warning("Runtime failed to connect — skipping controller setup")
+                self.logger.warning(
+                    "Runtime failed to connect — skipping controller setup"
+                )
                 ctx.fail(msg)
                 raise RuntimeConnectError(msg)
 
@@ -322,9 +324,13 @@ class AgentSession:
             elif "gemini" in model_name.lower():
                 pass
 
-            raise LLMAuthenticationError("Error authenticating with the LLM provider. Please check your API key")
+            raise LLMAuthenticationError(
+                "Error authenticating with the LLM provider. Please check your API key"
+            )
 
-    async def _handle_auth_phase(self, agent_to_llm_config: dict[str, LLMConfig] | None) -> None:
+    async def _handle_auth_phase(
+        self, agent_to_llm_config: dict[str, LLMConfig] | None
+    ) -> None:
         """Handle the AUTH phase of session startup."""
         if not agent_to_llm_config:
             return
@@ -359,7 +365,9 @@ class AgentSession:
         try:
             from backend.core.plugin import get_plugin_registry
 
-            await get_plugin_registry().dispatch_session_start(self.sid, {"user_id": self.user_id})
+            await get_plugin_registry().dispatch_session_start(
+                self.sid, {"user_id": self.user_id}
+            )
         except Exception as plugin_err:  # noqa: BLE001 — plugins must not break startup
             self.logger.warning("Plugin session_start hook failed: %s", plugin_err)
 
@@ -408,7 +416,9 @@ class AgentSession:
 
         return result.success
 
-    async def _setup_provider_handlers(self, vcs_provider_tokens, custom_secrets) -> None:
+    async def _setup_provider_handlers(
+        self, vcs_provider_tokens, custom_secrets
+    ) -> None:
         """Setup provider handlers for git and custom secrets."""
         if vcs_provider_tokens:
             from backend.server.provider_handler import ProviderHandler
@@ -635,17 +645,25 @@ class AgentSession:
         try:
             from backend.core.plugin import get_plugin_registry
 
-            await get_plugin_registry().dispatch_session_end(self.sid, {"user_id": self.user_id})
+            await get_plugin_registry().dispatch_session_end(
+                self.sid, {"user_id": self.user_id}
+            )
         except Exception as plugin_err:  # noqa: BLE001 — plugins must not break shutdown
             self.logger.warning("Plugin session_end hook failed: %s", plugin_err)
 
     async def _wait_for_startup_completion(self) -> None:
         """Wait for initialization to finish or timeout before closing."""
         while self._starting and should_continue():
-            self.logger.debug("Waiting for initialization to finish before closing session %s", self.sid)
+            self.logger.debug(
+                "Waiting for initialization to finish before closing session %s",
+                self.sid,
+            )
             await asyncio.sleep(WAIT_TIME_BEFORE_CLOSE_INTERVAL)
             if time.time() >= self._started_at + WAIT_TIME_BEFORE_CLOSE:
-                self.logger.error("Waited too long for initialization to finish before closing session %s", self.sid)
+                self.logger.error(
+                    "Waited too long for initialization to finish before closing session %s",
+                    self.sid,
+                )
                 break
 
     def _hard_kill_runtime(self) -> None:
@@ -741,7 +759,8 @@ class AgentSession:
                 for provider, token in vcs_provider_tokens.items()
                 if not (
                     ProviderHandler.get_provider_env_key(provider) in custom_secrets
-                    or ProviderHandler.get_provider_env_key(provider).upper() in custom_secrets
+                    or ProviderHandler.get_provider_env_key(provider).upper()
+                    in custom_secrets
                 )
             }
             return MappingProxyType(tokens)
@@ -782,7 +801,11 @@ class AgentSession:
         }\nBase URL: {agent.llm.config.base_url}\nAgent: {agent.name}\nRuntime: {
             self.runtime.__class__.__name__
         }\nPlugins: {
-            ([p.name for p in agent.runtime_plugins] if agent.runtime_plugins else 'None')
+            (
+                [p.name for p in agent.runtime_plugins]
+                if agent.runtime_plugins
+                else 'None'
+            )
         }\n-------------------------------------------------------------------------------------------"
         self.logger.debug(msg)
         initial_state = self._maybe_restore_state()
@@ -803,7 +826,9 @@ class AgentSession:
                 status_callback=self._status_callback,
                 initial_state=initial_state,
                 replay_events=replay_events,
-                security_analyzer=self.runtime.security_analyzer if self.runtime else None,
+                security_analyzer=self.runtime.security_analyzer
+                if self.runtime
+                else None,
             )
         )
         return (controller, initial_state is not None)
@@ -835,7 +860,9 @@ class AgentSession:
                 memory.set_knowledge_base_settings(kb_settings)
 
         if self.runtime:
-            memory.set_runtime_info(self.runtime, custom_secrets_descriptions, working_dir)
+            memory.set_runtime_info(
+                self.runtime, custom_secrets_descriptions, working_dir
+            )
             memory.set_conversation_instructions(conversation_instructions)
             playbooks: list[BasePlaybook] = await call_sync_from_async(
                 self.runtime.get_playbooks_from_selected_repo,
@@ -843,7 +870,9 @@ class AgentSession:
             )
             memory.load_user_workspace_playbooks(playbooks)
             if selected_repository and repo_directory:
-                memory.set_repository_info(selected_repository, repo_directory, selected_branch)
+                memory.set_repository_info(
+                    selected_repository, repo_directory, selected_branch
+                )
         return memory
 
     def get_state(self) -> AgentState | None:
@@ -863,7 +892,9 @@ class AgentSession:
         """Helper method to handle state restore logic."""
         restored_state = None
         try:
-            restored_state = State.restore_from_session(self.sid, self.file_store, self.user_id)
+            restored_state = State.restore_from_session(
+                self.sid, self.file_store, self.user_id
+            )
             self.logger.debug("Restored state from session, sid: %s", self.sid)
         except Exception as e:
             if self.event_stream.get_latest_event_id() > 0:  # type: ignore[attr-defined]

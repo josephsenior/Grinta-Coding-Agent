@@ -62,14 +62,18 @@ class ToolRegistry:
         """Detect the best available shell."""
         if sys.platform == "win32":
             # Windows: try pwsh -> powershell -> cmd
-            if self._check_command("pwsh", ["-NoProfile", "-Command", "$PSVersionTable.PSVersion"]):
+            if self._check_command(
+                "pwsh", ["-NoProfile", "-Command", "$PSVersionTable.PSVersion"]
+            ):
                 self._tools["shell"] = ToolInfo(
                     name="pwsh",
                     available=True,
                     path=shutil.which("pwsh"),
                     version=self._get_powershell_version("pwsh"),
                 )
-            elif self._check_command("powershell", ["-NoProfile", "-Command", "$PSVersionTable.PSVersion"]):
+            elif self._check_command(
+                "powershell", ["-NoProfile", "-Command", "$PSVersionTable.PSVersion"]
+            ):
                 self._tools["shell"] = ToolInfo(
                     name="powershell",
                     available=True,
@@ -120,7 +124,9 @@ class ToolRegistry:
                 fallback="python",  # Can fall back to pure Python
             )
         # Windows findstr
-        elif sys.platform == "win32" and self._check_command("findstr", ["/?"], check_stderr=True):
+        elif sys.platform == "win32" and self._check_command(
+            "findstr", ["/?"], check_stderr=True
+        ):
             self._tools["search"] = ToolInfo(
                 name="findstr",
                 available=True,
@@ -250,15 +256,28 @@ class ToolRegistry:
         for tool_name, tool_info in self._tools.items():
             if tool_info.available:
                 version_str = f" ({tool_info.version})" if tool_info.version else ""
-                logger.info("✅ %s: %s%s", tool_name.capitalize(), tool_info.name, version_str)
+                logger.info(
+                    "✅ %s: %s%s", tool_name.capitalize(), tool_info.name, version_str
+                )
             else:
-                fallback_str = f" (fallback: {tool_info.fallback})" if tool_info.fallback else ""
+                fallback_str = (
+                    f" (fallback: {tool_info.fallback})" if tool_info.fallback else ""
+                )
                 if tool_name == "git":
-                    logger.error("❌ %s: Not found (REQUIRED)%s", tool_name.capitalize(), fallback_str)
+                    logger.error(
+                        "❌ %s: Not found (REQUIRED)%s",
+                        tool_name.capitalize(),
+                        fallback_str,
+                    )
                 elif tool_name == "tmux" and sys.platform == "win32":
-                    logger.debug("⚠️  %s: Not available on Windows (expected)", tool_name.capitalize())
+                    logger.debug(
+                        "⚠️  %s: Not available on Windows (expected)",
+                        tool_name.capitalize(),
+                    )
                 else:
-                    logger.warning("⚠️  %s: Not found%s", tool_name.capitalize(), fallback_str)
+                    logger.warning(
+                        "⚠️  %s: Not found%s", tool_name.capitalize(), fallback_str
+                    )
 
     # Public API
 
@@ -305,4 +324,6 @@ class ToolRegistry:
     def require_git(self) -> None:
         """Ensure Git is available, raise if not."""
         if not self.has_git:
-            raise RuntimeError("Git is required but not found.\nInstall Git from: https://git-scm.com/downloads")
+            raise RuntimeError(
+                "Git is required but not found.\nInstall Git from: https://git-scm.com/downloads"
+            )

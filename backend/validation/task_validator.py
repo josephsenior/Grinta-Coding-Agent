@@ -183,7 +183,9 @@ class DiffValidator(TaskValidator):
                 suggestions=["Ensure all requirements are implemented"],
             )
 
-        logger.info("Git diff validation passed: %s meaningful changes", meaningful_changes)
+        logger.info(
+            "Git diff validation passed: %s meaningful changes", meaningful_changes
+        )
         return ValidationResult(
             passed=True,
             reason=f"Meaningful changes detected ({meaningful_changes} lines)",
@@ -223,7 +225,9 @@ class DiffValidator(TaskValidator):
             Count of meaningful changed lines
 
         """
-        return sum(1 for line in diff.split("\n") if self._is_meaningful_change_line(line))
+        return sum(
+            1 for line in diff.split("\n") if self._is_meaningful_change_line(line)
+        )
 
     def _is_meaningful_change_line(self, line: str) -> bool:
         """Check if line is a meaningful change.
@@ -369,7 +373,9 @@ class FileExistsValidator(TaskValidator):
         # Look for file operations on this path
         for event in recent_history:
             if isinstance(event, CmdRunAction):
-                if file_path in event.command and ("cat " in event.command or "ls " in event.command):
+                if file_path in event.command and (
+                    "cat " in event.command or "ls " in event.command
+                ):
                     # Look for successful output
                     return True
 
@@ -546,13 +552,17 @@ class CompositeValidator(TaskValidator):
         results = await self._run_all_validators(task, state)
 
         if not results:
-            return ValidationResult(passed=True, reason="No validators ran successfully", confidence=0.0)
+            return ValidationResult(
+                passed=True, reason="No validators ran successfully", confidence=0.0
+            )
 
         if self.require_all_pass:
             return self._validate_all_must_pass(results)
         return self._validate_weighted_vote(results)
 
-    async def _run_all_validators(self, task: Task, state: State) -> list[ValidationResult]:
+    async def _run_all_validators(
+        self, task: Task, state: State
+    ) -> list[ValidationResult]:
         """Run all validators and collect results.
 
         Args:
@@ -572,7 +582,9 @@ class CompositeValidator(TaskValidator):
                 logger.error("Validator %s failed: %s", validator.__class__.__name__, e)
         return results
 
-    def _validate_all_must_pass(self, results: list[ValidationResult]) -> ValidationResult:
+    def _validate_all_must_pass(
+        self, results: list[ValidationResult]
+    ) -> ValidationResult:
         """Validate with all-must-pass strategy.
 
         Args:
@@ -594,7 +606,9 @@ class CompositeValidator(TaskValidator):
             confidence=combined_confidence,
         )
 
-    def _build_all_pass_failure(self, results: list[ValidationResult], confidence: float) -> ValidationResult:
+    def _build_all_pass_failure(
+        self, results: list[ValidationResult], confidence: float
+    ) -> ValidationResult:
         """Build failure result for all-must-pass validation.
 
         Args:
@@ -615,7 +629,9 @@ class CompositeValidator(TaskValidator):
             suggestions=[sug for r in failed_validators for sug in r.suggestions],
         )
 
-    def _validate_weighted_vote(self, results: list[ValidationResult]) -> ValidationResult:
+    def _validate_weighted_vote(
+        self, results: list[ValidationResult]
+    ) -> ValidationResult:
         """Validate with weighted voting strategy.
 
         Args:
@@ -636,7 +652,9 @@ class CompositeValidator(TaskValidator):
 
         return self._build_weighted_vote_failure(results, passed_count, avg_confidence)
 
-    def _calculate_vote_metrics(self, results: list[ValidationResult]) -> tuple[int, float]:
+    def _calculate_vote_metrics(
+        self, results: list[ValidationResult]
+    ) -> tuple[int, float]:
         """Calculate voting metrics.
 
         Args:
@@ -650,7 +668,9 @@ class CompositeValidator(TaskValidator):
         avg_confidence = sum(r.confidence for r in results) / len(results)
         return passed_count, avg_confidence
 
-    def _vote_passes(self, passed_count: int, total_count: int, avg_confidence: float) -> bool:
+    def _vote_passes(
+        self, passed_count: int, total_count: int, avg_confidence: float
+    ) -> bool:
         """Check if weighted vote passes.
 
         Args:
@@ -687,8 +707,9 @@ class CompositeValidator(TaskValidator):
 
         return ValidationResult(
             passed=False,
-            reason=f"Task validation insufficient: {passed_count}/{len(results)} passed, avg confidence: {
-                avg_confidence:.2f}",
+            reason=f"Task validation insufficient: {passed_count}/{
+                len(results)
+            } passed, avg confidence: {avg_confidence:.2f}",
             confidence=avg_confidence,
             missing_items=[item for r in failed_validators for item in r.missing_items],
             suggestions=[sug for r in failed_validators for sug in r.suggestions],

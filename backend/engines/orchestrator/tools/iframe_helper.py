@@ -24,7 +24,9 @@ def add_iframe_headers(headers: dict[str, str] | None = None) -> dict[str, str]:
 
     # Allow the application to be embedded in iframes from localhost
     headers["X-Frame-Options"] = "SAMEORIGIN"
-    headers["Content-Security-Policy"] = "frame-ancestors 'self' localhost:* 127.0.0.1:*"
+    headers["Content-Security-Policy"] = (
+        "frame-ancestors 'self' localhost:* 127.0.0.1:*"
+    )
 
     # Remove any existing X-Frame-Options that might block iframe embedding
     headers.pop("X-Frame-Options", None)

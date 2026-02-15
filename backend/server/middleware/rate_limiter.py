@@ -33,7 +33,9 @@ def _purge_expired_keys(max_age: float = 3600.0) -> None:
         return
     _last_cleanup = now
     stale = [
-        key for key, timestamps in _rate_limit_store.items() if not timestamps or (now - max(timestamps)) > max_age
+        key
+        for key, timestamps in _rate_limit_store.items()
+        if not timestamps or (now - max(timestamps)) > max_age
     ]
     for key in stale:
         del _rate_limit_store[key]
@@ -200,14 +202,18 @@ class RateLimiter:
         timestamps = _rate_limit_store[key]
 
         # Remove old timestamps (outside the hour window)
-        timestamps[:] = [ts for ts in timestamps if current_time - ts < self.hour_window]
+        timestamps[:] = [
+            ts for ts in timestamps if current_time - ts < self.hour_window
+        ]
 
         # Check hourly limit
         if len(timestamps) >= self.requests_per_hour:
             return False
 
         # Check burst limit (requests in last minute)
-        recent_requests = [ts for ts in timestamps if current_time - ts < self.burst_window]
+        recent_requests = [
+            ts for ts in timestamps if current_time - ts < self.burst_window
+        ]
         if len(recent_requests) >= self.burst_limit:
             return False
 
@@ -230,7 +236,9 @@ class RateLimiter:
         timestamps = _rate_limit_store[key]
 
         # Count requests in current hour
-        hour_requests = [ts for ts in timestamps if current_time - ts < self.hour_window]
+        hour_requests = [
+            ts for ts in timestamps if current_time - ts < self.hour_window
+        ]
 
         return max(0, self.requests_per_hour - len(hour_requests))
 
@@ -248,7 +256,11 @@ class EndpointRateLimiter:
 
         requests_per_hour = int(os.getenv("RATE_LIMIT_REQUESTS", "1000"))
         burst_limit = int(os.getenv("RATE_LIMIT_BURST", "100"))
-        logger.info("Rate limiting configured: %s req/hour, %s burst", requests_per_hour, burst_limit)
+        logger.info(
+            "Rate limiting configured: %s req/hour, %s burst",
+            requests_per_hour,
+            burst_limit,
+        )
         return requests_per_hour, burst_limit
 
     def __init__(self, enabled: bool = True) -> None:
@@ -292,7 +304,9 @@ class EndpointRateLimiter:
         normalized_path = path.rstrip("/")
 
         # Exclude public options endpoints (called frequently on page load)
-        if normalized_path.startswith("/api/options") or path.startswith("/api/options"):
+        if normalized_path.startswith("/api/options") or path.startswith(
+            "/api/options"
+        ):
             return await call_next(request)
 
         # Get endpoint-specific limits
@@ -363,7 +377,11 @@ class RedisRateLimiter(RateLimiter):
         if burst_limit is None:
             burst_limit = int(os.getenv("RATE_LIMIT_BURST", "100"))
 
-        logger.info("RedisRateLimiter configured: %s req/hour, %s burst", requests_per_hour, burst_limit)
+        logger.info(
+            "RedisRateLimiter configured: %s req/hour, %s burst",
+            requests_per_hour,
+            burst_limit,
+        )
         super().__init__(requests_per_hour, burst_limit, enabled)
         self.redis_url = redis_url
         self._redis_client: redis.Redis | None = None
@@ -388,7 +406,9 @@ class RedisRateLimiter(RateLimiter):
                 await self._redis_client.ping()
                 logger.info("Connected to Redis for rate limiting")
             except Exception as e:
-                logger.warning("Failed to connect to Redis: %s. Falling back to in-memory.", e)
+                logger.warning(
+                    "Failed to connect to Redis: %s. Falling back to in-memory.", e
+                )
                 self._redis_client = None
 
         return self._redis_client
@@ -452,7 +472,9 @@ class RedisRateLimiter(RateLimiter):
             current_time,
         )
         if burst_count >= self.burst_limit:
-            logger.debug("Burst limit exceeded: %s/%s for %s", burst_count, self.burst_limit, key)
+            logger.debug(
+                "Burst limit exceeded: %s/%s for %s", burst_count, self.burst_limit, key
+            )
             self._record_rate_limit_span(
                 key,
                 allowed=False,
@@ -487,12 +509,16 @@ class RedisRateLimiter(RateLimiter):
 
     def _should_trace(self) -> bool:
         """Decide if we should emit an OTEL span based on env + sampling."""
-        enabled = os.getenv("OTEL_INSTRUMENT_REDIS", os.getenv("OTEL_ENABLED", "false")).lower() in ("true", "1", "yes")
+        enabled = os.getenv(
+            "OTEL_INSTRUMENT_REDIS", os.getenv("OTEL_ENABLED", "false")
+        ).lower() in ("true", "1", "yes")
         if not enabled:
             return False
 
         try:
-            sample_rate = float(os.getenv("OTEL_SAMPLE_REDIS", os.getenv("OTEL_SAMPLE_DEFAULT", "1.0")))
+            sample_rate = float(
+                os.getenv("OTEL_SAMPLE_REDIS", os.getenv("OTEL_SAMPLE_DEFAULT", "1.0"))
+            )
         except Exception:
             sample_rate = 1.0
 
@@ -523,7 +549,9 @@ class RedisRateLimiter(RateLimiter):
                 span.set_attribute("ratelimit.allowed", allowed)
                 if hour_count is not None:
                     span.set_attribute("ratelimit.hour.count", int(hour_count))
-                    span.set_attribute("ratelimit.hour.limit", int(self.requests_per_hour))
+                    span.set_attribute(
+                        "ratelimit.hour.limit", int(self.requests_per_hour)
+                    )
                 if burst_count is not None:
                     span.set_attribute("ratelimit.burst.count", int(burst_count))
                     span.set_attribute("ratelimit.burst.limit", int(self.burst_limit))

@@ -35,7 +35,11 @@ def find_candidate_files(root: Path) -> list[Path]:
     if not root.exists():
         return []
 
-    return [path for path in root.rglob("*") if path.is_file() and path.suffix.lower() in {".json", ".jsonl"}]
+    return [
+        path
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix.lower() in {".json", ".jsonl"}
+    ]
 
 
 def sanitize_json_content(obj: object) -> object | None:
@@ -184,7 +188,9 @@ def _process_regular_json_data(
     if sanitized_raw is not None and not isinstance(sanitized_raw, dict):
         raise ValueError("Sanitization must produce a dictionary or None")
     sanitized = sanitized_raw
-    changed = sanitized is None or json.dumps(sanitized, sort_keys=True) != json.dumps(data, sort_keys=True)
+    changed = sanitized is None or json.dumps(sanitized, sort_keys=True) != json.dumps(
+        data, sort_keys=True
+    )
     return sanitized, changed
 
 
@@ -200,7 +206,11 @@ def _process_json_file(raw: str, path: str | Path, apply: bool) -> bool:
     """Process JSON file and return changed status."""
     data = json.loads(raw)
 
-    if isinstance(data, dict) and "trajectory" in data and isinstance(data["trajectory"], list):
+    if (
+        isinstance(data, dict)
+        and "trajectory" in data
+        and isinstance(data["trajectory"], list)
+    ):
         # Process trajectory data
         data, changed = _process_trajectory_data(data)
         if changed and apply:
@@ -267,7 +277,9 @@ def _parse_arguments(argv: list[str] | None) -> argparse.Namespace:
         help="Paths to scan",
     )
     p.add_argument("--apply", action="store_true", help="Write changes to disk")
-    p.add_argument("--dry-run", action="store_true", help="Show changes without writing")
+    p.add_argument(
+        "--dry-run", action="store_true", help="Show changes without writing"
+    )
     return p.parse_args(argv)
 
 

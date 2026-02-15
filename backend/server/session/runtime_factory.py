@@ -91,7 +91,9 @@ async def create_runtime(
             selected_branch=selected_branch,
         )
 
-    repo_initializer = _build_repo_initializer(repo_tokens, selected_repository, selected_branch)
+    repo_initializer = _build_repo_initializer(
+        repo_tokens, selected_repository, selected_branch
+    )
     return _create_with_helper(
         config=config,
         agent=agent,
@@ -175,7 +177,9 @@ def _resolve_repo_tokens(
 
 
 def _can_use_shared_helper(config: ForgeConfig) -> bool:
-    return all(hasattr(config, attr) for attr in ("runtime", "runtime_config", "file_store"))
+    return all(
+        hasattr(config, attr) for attr in ("runtime", "runtime_config", "file_store")
+    )
 
 
 def _build_repo_initializer(
@@ -241,7 +245,9 @@ async def _create_direct(
     )
     try:
         connect_start = time.time()
-        session_logger.debug("Connecting to runtime...", extra={"signal": "runtime_connect_start"})
+        session_logger.debug(
+            "Connecting to runtime...", extra={"signal": "runtime_connect_start"}
+        )
         await runtime.connect()
         connect_duration = time.time() - connect_start
         session_logger.info(
@@ -258,10 +264,14 @@ async def _create_direct(
             status_callback("error", RuntimeStatus.ERROR_RUNTIME_DISCONNECTED, str(e))
         return RuntimeResult(success=False)
 
-    repo_dir = await runtime.clone_or_init_repo(repo_tokens, selected_repository, selected_branch)
+    repo_dir = await runtime.clone_or_init_repo(
+        repo_tokens, selected_repository, selected_branch
+    )
     await call_sync_from_async(runtime.maybe_run_setup_script)
     await call_sync_from_async(runtime.maybe_setup_git_hooks)
-    repo_directory = repo_dir or (selected_repository.split("/")[-1] if selected_repository else None)
+    repo_directory = repo_dir or (
+        selected_repository.split("/")[-1] if selected_repository else None
+    )
     session_logger.debug(
         "Runtime initialized with plugins: %s",
         [plugin.name for plugin in runtime.plugins],

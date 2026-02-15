@@ -403,6 +403,7 @@ async def run_controller(
         if acquire_result is not None:
             _RUNTIME_ORCHESTRATOR.release(acquire_result)
 
+
 def _validate_run_controller_inputs(
     config_: ForgeConfig | None, initial_action: Action | None
 ) -> tuple[ForgeConfig, Action]:
@@ -583,7 +584,9 @@ if __name__ == "__main__":
     initial_action_main: Action = NullAction()
     if config_main.replay_trajectory_path:
         if task_str:
-            error_msg = "User-specified task is not supported under trajectory replay mode"
+            error_msg = (
+                "User-specified task is not supported under trajectory replay mode"
+            )
             raise ValueError(error_msg)
     elif task_str:
         initial_action_main = MessageAction(content=task_str)

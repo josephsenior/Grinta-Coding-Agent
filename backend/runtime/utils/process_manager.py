@@ -95,7 +95,12 @@ class ProcessManager:
             command_id=command_id,
         )
         self._processes[command_id] = process
-        logger.info("📝 Registered long-running process: %s (process: %s, ID: %s)", command[:80], process_name, command_id)
+        logger.info(
+            "📝 Registered long-running process: %s (process: %s, ID: %s)",
+            command[:80],
+            process_name,
+            command_id,
+        )
         _PM_METRICS.on_register()
 
     def unregister_process(self, command_id: str) -> None:
@@ -110,7 +115,9 @@ class ProcessManager:
             logger.info("✅ Process terminated naturally: %s", process.command[:80])
             _PM_METRICS.on_natural_termination(time.time() - process.started_at)
 
-    async def cleanup_all(self, runtime=None, timeout_seconds: int = 5) -> dict[str, bool]:
+    async def cleanup_all(
+        self, runtime=None, timeout_seconds: int = 5
+    ) -> dict[str, bool]:
         """Cleanup all tracked processes using pkill.
 
         Args:
@@ -126,7 +133,9 @@ class ProcessManager:
                 logger.info("No long-running processes to cleanup")
                 return {}
 
-            logger.info("🧹 Starting cleanup of %s long-running processes", len(self._processes))
+            logger.info(
+                "🧹 Starting cleanup of %s long-running processes", len(self._processes)
+            )
             results = {}
             to_cleanup = list(self._processes.items())
             _PM_METRICS.on_cleanup_attempts(len(to_cleanup))
@@ -145,7 +154,9 @@ class ProcessManager:
                         safe_command = process.command.replace("'", "'\\''")
                         await call_sync_from_async(
                             runtime.run,
-                            CmdRunAction(command=f"pkill -TERM -f '{safe_command}' || true"),
+                            CmdRunAction(
+                                command=f"pkill -TERM -f '{safe_command}' || true"
+                            ),
                         )
 
                     # Step 2: Wait briefly for graceful shutdown
@@ -157,24 +168,34 @@ class ProcessManager:
                         safe_command = process.command.replace("'", "'\\''")
                         await call_sync_from_async(
                             runtime.run,
-                            CmdRunAction(command=f"pkill -9 -f '{safe_command}' || true"),
+                            CmdRunAction(
+                                command=f"pkill -9 -f '{safe_command}' || true"
+                            ),
                         )
                     _PM_METRICS.on_forced_kill_attempt()
 
                     logger.info("✅ Terminated process: %s", process.command[:80])
                     results[cmd_id] = True
-                    _PM_METRICS.on_cleanup_result(success=True, lifetime_sec=time.time() - process.started_at)
+                    _PM_METRICS.on_cleanup_result(
+                        success=True, lifetime_sec=time.time() - process.started_at
+                    )
 
                 except Exception as e:
                     logger.error("Error cleaning up process %s: %s", cmd_id, e)
                     results[cmd_id] = False
-                    _PM_METRICS.on_cleanup_result(success=False, lifetime_sec=time.time() - process.started_at)
+                    _PM_METRICS.on_cleanup_result(
+                        success=False, lifetime_sec=time.time() - process.started_at
+                    )
 
             # Clear all tracked processes
             self._processes.clear()
             _PM_METRICS.on_clear_all()
 
-            logger.info("✅ Cleanup completed. Success: %s/%s", sum(results.values()), len(results))
+            logger.info(
+                "✅ Cleanup completed. Success: %s/%s",
+                sum(results.values()),
+                len(results),
+            )
             return results
 
     def get_running_processes(self) -> list[ManagedProcess]:
@@ -269,7 +290,11 @@ class _ProcessManagerMetrics:
     def health_snapshot(self) -> dict[str, Any]:
         """Return structured health info for diagnostics."""
         snap = self.snapshot()
-        avg_lifetime_ms = snap["lifetime_ms_sum"] / snap["lifetime_ms_count"] if snap["lifetime_ms_count"] else 0.0
+        avg_lifetime_ms = (
+            snap["lifetime_ms_sum"] / snap["lifetime_ms_count"]
+            if snap["lifetime_ms_count"]
+            else 0.0
+        )
         return {
             "registered_total": snap["registered_total"],
             "natural_terminations_total": snap["natural_terminations_total"],
@@ -343,7 +368,9 @@ def _assess_pm_severity(metrics: dict[str, Any], warnings: list[str]) -> str:
     return "green"
 
 
-def _generate_pm_recommendations(metrics: dict[str, Any], warnings: list[str]) -> list[str]:
+def _generate_pm_recommendations(
+    metrics: dict[str, Any], warnings: list[str]
+) -> list[str]:
     """Provide actionable recommendations based on health assessment."""
     recommendations = []
     if "active_processes_without_details" in warnings:

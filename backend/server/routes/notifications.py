@@ -25,7 +25,7 @@ from backend.utils.async_utils import call_sync_from_async
 if TYPE_CHECKING:
     pass
 
-router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 
 
 class Notification(BaseModel):
@@ -39,7 +39,9 @@ class Notification(BaseModel):
     read: bool = Field(default=False, description="Whether notification has been read")
     created_at: str = Field(..., min_length=1, description="ISO timestamp of creation")
     action_url: str | None = Field(None, description="Optional action URL")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
     @field_validator("id", "user_id", "type", "title", "message", "created_at")
     @classmethod
@@ -88,10 +90,14 @@ class NotificationStore:
                 try:
                     with open(file_path, encoding="utf-8") as f:
                         data = json.load(f)
-                        notifications = [Notification(**n) for n in data.get("notifications", [])]
+                        notifications = [
+                            Notification(**n) for n in data.get("notifications", [])
+                        ]
                         self._notifications_cache[user_id] = notifications
                 except Exception as e:
-                    logger.warning("Error loading notifications from %s: %s", file_path, e)
+                    logger.warning(
+                        "Error loading notifications from %s: %s", file_path, e
+                    )
         except Exception as e:
             logger.error("Error loading notifications: %s", e)
 
@@ -489,7 +495,9 @@ async def mark_all_as_read(
 @router.delete("/{notification_id}")
 async def delete_notification(
     request: Request,
-    notification_id: Annotated[str, Path(..., min_length=1, description="Notification ID")],
+    notification_id: Annotated[
+        str, Path(..., min_length=1, description="Notification ID")
+    ],
     user_id: str = Depends(get_user_id),
 ) -> JSONResponse:
     """Delete a notification.

@@ -31,7 +31,9 @@ def register_exception_handlers(app: FastAPI) -> None:
     """Register all exception handlers on the FastAPI application."""
 
     @app.exception_handler(SessionInvariantError)
-    async def session_invariant_error_handler(request: Request, exc: SessionInvariantError):
+    async def session_invariant_error_handler(
+        request: Request, exc: SessionInvariantError
+    ):
         from backend.server.utils.error_formatter import format_error_for_user
 
         error_dict = format_error_for_user(exc, context={"path": request.url.path})
@@ -56,11 +58,15 @@ def register_exception_handlers(app: FastAPI) -> None:
         """Handle authentication errors by returning 401 status."""
         from backend.server.utils.error_formatter import format_authentication_error
 
-        user_error = format_authentication_error(exc, context={"path": request.url.path})
+        user_error = format_authentication_error(
+            exc, context={"path": request.url.path}
+        )
         return JSONResponse(status_code=401, content=user_error.to_dict())
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ):
         """Handle request validation errors with user-friendly messages."""
         try:
             body = await request.body()
@@ -95,7 +101,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=503, content=error_dict)
 
     @app.exception_handler(LLMContextWindowExceedError)
-    async def context_window_handler(request: Request, exc: LLMContextWindowExceedError):
+    async def context_window_handler(
+        request: Request, exc: LLMContextWindowExceedError
+    ):
         """Handle context window exceeded."""
         from backend.server.utils.error_formatter import format_error_for_user
 
@@ -111,7 +119,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=409, content=error_dict)
 
     @app.exception_handler(AgentRuntimeUnavailableError)
-    async def runtime_unavailable_handler(request: Request, exc: AgentRuntimeUnavailableError):
+    async def runtime_unavailable_handler(
+        request: Request, exc: AgentRuntimeUnavailableError
+    ):
         """Handle runtime unavailable."""
         from backend.server.utils.error_formatter import format_error_for_user
 
@@ -119,7 +129,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=503, content=error_dict)
 
     @app.exception_handler(FunctionCallValidationError)
-    async def function_call_error_handler(request: Request, exc: FunctionCallValidationError):
+    async def function_call_error_handler(
+        request: Request, exc: FunctionCallValidationError
+    ):
         """Handle function call errors."""
         from backend.server.utils.error_formatter import format_error_for_user
 

@@ -24,6 +24,10 @@ def refine_prompt(prompt: str):
     """
     # Use sys.platform (not platform.system) so tests can monkeypatch
     if sys.platform.lower().startswith("win"):
-        result = re.sub(r"\bexecute_bash\b", "execute_powershell", prompt, flags=re.IGNORECASE)
-        return re.sub(r"(?<!execute_)(?<!_)\bbash\b", "powershell", result, flags=re.IGNORECASE)
+        result = re.sub(
+            r"\bexecute_bash\b", "execute_powershell", prompt, flags=re.IGNORECASE
+        )
+        return re.sub(
+            r"(?<!execute_)(?<!_)\bbash\b", "powershell", result, flags=re.IGNORECASE
+        )
     return prompt

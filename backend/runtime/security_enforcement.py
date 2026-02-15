@@ -36,7 +36,8 @@ class SecurityEnforcementMixin:
 
         if (
             hasattr(action, "confirmation_state")
-            and action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
+            and action.confirmation_state
+            == ActionConfirmationStatus.AWAITING_CONFIRMATION
         ):
             # Allow file edits to run in runtime preview mode (dry-run) so users can
             # review diffs before confirming. Other actions remain blocked.
@@ -44,8 +45,13 @@ class SecurityEnforcementMixin:
                 return None
             return NullObservation("")
 
-        if getattr(action, "confirmation_state", None) == ActionConfirmationStatus.REJECTED:
-            return UserRejectObservation("Action has been rejected by the user! Waiting for further user input.")
+        if (
+            getattr(action, "confirmation_state", None)
+            == ActionConfirmationStatus.REJECTED
+        ):
+            return UserRejectObservation(
+                "Action has been rejected by the user! Waiting for further user input."
+            )
 
         return None
 
@@ -92,7 +98,9 @@ class SecurityEnforcementMixin:
                     action_desc,
                     risk.name,
                 )
-                return ErrorObservation(f"Action blocked by security policy (risk={risk.name}). Action: {action_desc}")
+                return ErrorObservation(
+                    f"Action blocked by security policy (risk={risk.name}). Action: {action_desc}"
+                )
             # Require user confirmation for HIGH-risk actions
             if (
                 hasattr(action, "confirmation_state")
@@ -102,7 +110,9 @@ class SecurityEnforcementMixin:
                     "Security: requiring confirmation for high-risk action: %s",
                     action_desc,
                 )
-                action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION  # type: ignore[union-attr]
+                action.confirmation_state = (
+                    ActionConfirmationStatus.AWAITING_CONFIRMATION
+                )  # type: ignore[union-attr]
                 return NullObservation("")
 
         elif risk >= ActionSecurityRisk.MEDIUM:

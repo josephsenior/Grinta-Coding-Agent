@@ -7,14 +7,18 @@ from typing import Pattern
 from backend.core.logger import FORGE_logger as logger
 
 # Initialize distributed tracing (opt-in — requires `telemetry` extras)
-OTEL_ENABLED = os.getenv("TRACING_ENABLED", os.getenv("OTEL_ENABLED", "false")).lower() in (
+OTEL_ENABLED = os.getenv(
+    "TRACING_ENABLED", os.getenv("OTEL_ENABLED", "false")
+).lower() in (
     "true",
     "1",
     "yes",
 )
 
 try:
-    SAMPLE_HTTP = float(os.getenv("OTEL_SAMPLE_HTTP", os.getenv("OTEL_SAMPLE_DEFAULT", "0.1")))
+    SAMPLE_HTTP = float(
+        os.getenv("OTEL_SAMPLE_HTTP", os.getenv("OTEL_SAMPLE_DEFAULT", "0.1"))
+    )
 except Exception:
     SAMPLE_HTTP = 1.0
 SAMPLE_HTTP = max(0.0, min(1.0, SAMPLE_HTTP))
@@ -72,7 +76,9 @@ def get_effective_http_sample(route_path: str) -> float:
                 return rate
         # Then exact/prefix patterns
         for pattern, rate, is_prefix in ROUTE_SAMPLE_PATTERNS:
-            if (is_prefix and route_path.startswith(pattern)) or (not is_prefix and route_path == pattern):
+            if (is_prefix and route_path.startswith(pattern)) or (
+                not is_prefix and route_path == pattern
+            ):
                 return rate
     except Exception as e:
         logger.debug("Error matching custom sample rate: %s", e)

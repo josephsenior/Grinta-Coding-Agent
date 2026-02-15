@@ -27,9 +27,13 @@ if TYPE_CHECKING:
 class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
 
-    failure_threshold: int = DEFAULT_CIRCUIT_FAILURE_THRESHOLD  # Open circuit after N failures
+    failure_threshold: int = (
+        DEFAULT_CIRCUIT_FAILURE_THRESHOLD  # Open circuit after N failures
+    )
     success_threshold: int = DEFAULT_CIRCUIT_SUCCESS_THRESHOLD  # Close circuit after N successes in half-open
-    timeout_seconds: int = DEFAULT_CIRCUIT_TIMEOUT_SECONDS  # Time before trying half-open state
+    timeout_seconds: int = (
+        DEFAULT_CIRCUIT_TIMEOUT_SECONDS  # Time before trying half-open state
+    )
     expected_exception: type[Exception] = Exception  # Exception type to catch
 
 
@@ -68,7 +72,9 @@ class CircuitBreaker:
                 self.last_state_change = time.time()
                 logger.info("Circuit breaker %s entering HALF_OPEN state", self.name)
             else:
-                raise CircuitBreakerOpenError(f"Circuit breaker {self.name} is OPEN. Service unavailable.")
+                raise CircuitBreakerOpenError(
+                    f"Circuit breaker {self.name} is OPEN. Service unavailable."
+                )
 
         try:
             result = func(*args, **kwargs)
@@ -101,11 +107,18 @@ class CircuitBreaker:
             self.state = CircuitState.OPEN
             self.last_state_change = time.time()
             logger.warning("Circuit breaker %s OPEN (failed in half-open)", self.name)
-        elif self.state == CircuitState.CLOSED and self.failure_count >= self.config.failure_threshold:
+        elif (
+            self.state == CircuitState.CLOSED
+            and self.failure_count >= self.config.failure_threshold
+        ):
             # Too many failures, open circuit
             self.state = CircuitState.OPEN
             self.last_state_change = time.time()
-            logger.error("Circuit breaker %s OPEN (failure threshold reached: %s)", self.name, self.failure_count)
+            logger.error(
+                "Circuit breaker %s OPEN (failure threshold reached: %s)",
+                self.name,
+                self.failure_count,
+            )
 
     def reset(self) -> None:
         """Manually reset circuit breaker to closed state."""

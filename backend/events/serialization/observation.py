@@ -112,7 +112,9 @@ def _get_observation_class(observation_type: str):
     return observation_class
 
 
-from backend.events.serialization.common import COMMON_METADATA_FIELDS as METADATA_FIELDS
+from backend.events.serialization.common import (
+    COMMON_METADATA_FIELDS as METADATA_FIELDS,
+)
 
 
 def _extract_observation_data(observation: dict) -> tuple[str, dict, dict]:
@@ -143,7 +145,9 @@ def _process_cmd_output_metadata(extras: dict) -> None:
     """Process CmdOutputObservation metadata."""
     if "metadata" in extras and isinstance(extras["metadata"], dict):
         extras["metadata"] = CmdOutputMetadata(**extras["metadata"])
-    elif "metadata" not in extras or not isinstance(extras["metadata"], CmdOutputMetadata):
+    elif "metadata" not in extras or not isinstance(
+        extras["metadata"], CmdOutputMetadata
+    ):
         extras["metadata"] = CmdOutputMetadata()
 
 
@@ -151,9 +155,12 @@ def _process_recall_observation_data(extras: dict) -> None:
     """Process RecallObservation specific data."""
     if "recall_type" in extras:
         extras["recall_type"] = RecallType(extras["recall_type"])
-    if "playbook_knowledge" in extras and isinstance(extras["playbook_knowledge"], list):
+    if "playbook_knowledge" in extras and isinstance(
+        extras["playbook_knowledge"], list
+    ):
         extras["playbook_knowledge"] = [
-            PlaybookKnowledge(**item) if isinstance(item, dict) else item for item in extras["playbook_knowledge"]
+            PlaybookKnowledge(**item) if isinstance(item, dict) else item
+            for item in extras["playbook_knowledge"]
         ]
 
 

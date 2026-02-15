@@ -38,13 +38,19 @@ if TYPE_CHECKING:
 
         config: Any  # pragma: no cover - protocol attribute
 
-        def list_files(self, path: str | None = None) -> list[str]:  # pragma: no cover - protocol method
+        def list_files(
+            self, path: str | None = None
+        ) -> list[str]:  # pragma: no cover - protocol method
             ...
 
-        def copy_from(self, path: str) -> str | os.PathLike[str]:  # pragma: no cover - protocol method
+        def copy_from(
+            self, path: str
+        ) -> str | os.PathLike[str]:  # pragma: no cover - protocol method
             ...
 
-        def get_git_diff(self, path: str, cwd: str) -> dict[str, Any]:  # pragma: no cover - protocol method
+        def get_git_diff(
+            self, path: str, cwd: str
+        ) -> dict[str, Any]:  # pragma: no cover - protocol method
             ...
 
         def run_action(self, action: Any) -> Any:  # pragma: no cover - protocol method
@@ -64,13 +70,13 @@ if "pytest" in sys.modules:
     sub_router = cast(
         APIRouter,
         NoOpAPIRouter(
-            prefix="/api/conversations/{conversation_id}/files",
+            prefix="/api/v1/conversations/{conversation_id}/files",
             dependencies=get_dependencies(),
         ),
     )
 else:
     sub_router = APIRouter(
-        prefix="/api/conversations/{conversation_id}/files",
+        prefix="/api/v1/conversations/{conversation_id}/files",
         dependencies=get_dependencies(),
     )
 
@@ -233,10 +239,14 @@ async def list_files(
                 SafePath,
             )
 
-            safe_path = SafePath.validate(str(path), workspace_root=workspace_root, must_be_relative=True)
+            safe_path = SafePath.validate(
+                str(path), workspace_root=workspace_root, must_be_relative=True
+            )
             path = safe_path.relative_to_workspace()
         except PathValidationError as e:
-            logger.warning("Invalid path provided to list_files: %s - %s", path, e.message)
+            logger.warning(
+                "Invalid path provided to list_files: %s - %s", path, e.message
+            )
             return error(
                 message=f"Invalid path: {e.message}",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -248,7 +258,9 @@ async def list_files(
         if hasattr(runtime, "check_if_alive"):
             await call_sync_from_async(runtime.check_if_alive)
     except Exception as health_check_error:
-        logger.warning("Runtime health check failed before listing files: %s", health_check_error)
+        logger.warning(
+            "Runtime health check failed before listing files: %s", health_check_error
+        )
 
     try:
         file_list = await call_sync_from_async(runtime.list_files, path)
@@ -345,7 +357,9 @@ async def select_file(
     """
     # Check if runtime is ready before accessing it
     if not conversation.runtime:
-        logger.warning("select-file request received before runtime ready for file: %s", file)
+        logger.warning(
+            "select-file request received before runtime ready for file: %s", file
+        )
         return error(
             message="Runtime not ready yet, please try again",
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -499,7 +513,9 @@ async def git_changes(
     try:
         conversation = await manager.attach_to_conversation(conversation_id, "dev-user")
         if not conversation:
-            return JSONResponse(content={"error": "Conversation not found"}, status_code=404)
+            return JSONResponse(
+                content={"error": "Conversation not found"}, status_code=404
+            )
 
         runtime = cast("RuntimeFileOps", conversation.runtime)
         cwd = runtime.config.workspace_mount_path_in_runtime
@@ -515,18 +531,24 @@ async def git_changes(
             await manager.detach_from_conversation(conversation)
 
             if changes is None:
-                return JSONResponse(status_code=404, content={"error": "Not a git repository"})
+                return JSONResponse(
+                    status_code=404, content={"error": "Not a git repository"}
+                )
             return changes
         except FileNotFoundError as e:
             if "git" in str(e):
-                logger.warning("Git not available in container, returning empty changes list")
+                logger.warning(
+                    "Git not available in container, returning empty changes list"
+                )
                 await manager.detach_from_conversation(conversation)
                 return JSONResponse(status_code=200, content=[])
             else:
                 raise
     except AgentRuntimeUnavailableError as e:
         logger.error("Runtime unavailable: %s", e)
-        return JSONResponse(status_code=500, content={"error": f"Error getting changes: {e}"})
+        return JSONResponse(
+            status_code=500, content={"error": f"Error getting changes: {e}"}
+        )
     except Exception as e:
         logger.error("Error getting changes: %s", e)
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -541,7 +563,9 @@ async def git_changes(
     },
 )
 async def git_diff(
-    path: Annotated[str, Field(..., min_length=1, description="Path to get git diff for")],
+    path: Annotated[
+        str, Field(..., min_length=1, description="Path to get git diff for")
+    ],
     conversation_store: Any = Depends(get_conversation_store),
     conversation: ServerConversation = Depends(get_conversation),
 ) -> Any:
@@ -559,7 +583,9 @@ async def git_diff(
     """
     # Check if runtime is ready
     if not conversation.runtime:
-        logger.warning("git_diff request received before runtime ready for path: %s", path)
+        logger.warning(
+            "git_diff request received before runtime ready for path: %s", path
+        )
         return error(
             message="Runtime not ready yet, please try again",
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -584,7 +610,9 @@ async def git_diff(
         )
         sanitized_path = safe_path.relative_to_workspace()
     except PathValidationError as e:
-        logger.warning("Invalid file path provided to git_diff: %s - %s", path, e.message)
+        logger.warning(
+            "Invalid file path provided to git_diff: %s - %s", path, e.message
+        )
         return error(
             message=f"Invalid file path: {e.message}",
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -653,13 +681,19 @@ async def upload_files(
             sanitized_filename = safe_path.relative_to_workspace()
         except (ValueError, PathValidationError) as e:
             error_message = e.message if isinstance(e, PathValidationError) else str(e)
-            skipped_files.append({"name": file.filename or "<unknown>", "reason": error_message})
+            skipped_files.append(
+                {"name": file.filename or "<unknown>", "reason": error_message}
+            )
             continue
 
-        file_path = os.path.join(runtime.config.workspace_mount_path_in_runtime, sanitized_filename)
+        file_path = os.path.join(
+            runtime.config.workspace_mount_path_in_runtime, sanitized_filename
+        )
         try:
             file_content = await file.read()
-            write_action = FileWriteAction(path=file_path, content=file_content.decode("utf-8", errors="replace"))
+            write_action = FileWriteAction(
+                path=file_path, content=file_content.decode("utf-8", errors="replace")
+            )
             await call_sync_from_async(runtime.run_action, write_action)
             uploaded_files.append(file_path)
         except Exception as e:

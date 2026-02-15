@@ -125,7 +125,9 @@ class RequestTracingMiddleware:
 
 
 # Context variable for request ID (accessible in logs)
-_request_id_ctx_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("request_id", default=None)
+_request_id_ctx_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "request_id", default=None
+)
 
 
 def get_current_request_id() -> str | None:
@@ -152,5 +154,3 @@ class RequestIDFilter(logging.Filter):
         if request_id:
             record.request_id = request_id
         return True
-
-

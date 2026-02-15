@@ -62,7 +62,9 @@ def _build_browsergym_args(browsergym_eval_env: str | None) -> list[str]:
 
     # Split and validate environment string to prevent command injection
     env_parts = browsergym_eval_env.split(" ")
-    validated_parts = [part.strip() for part in env_parts if _validate_env_part(part.strip())]
+    validated_parts = [
+        part.strip() for part in env_parts if _validate_env_part(part.strip())
+    ]
 
     if validated_parts:
         return ["--browsergym-eval-env"] + validated_parts
@@ -70,7 +72,9 @@ def _build_browsergym_args(browsergym_eval_env: str | None) -> list[str]:
     return []
 
 
-def _validate_and_get_username(override_username: str | None, run_as_forge: bool) -> str:
+def _validate_and_get_username(
+    override_username: str | None, run_as_forge: bool
+) -> str:
     """Validate and get username with security checks.
 
     Args:
@@ -147,7 +151,9 @@ def get_action_execution_server_startup_command(
     user_id = override_user_id or (1000 if app_config.run_as_Forge else 0)
 
     # Build base command
-    effective_prefix = python_prefix if python_prefix is not None else DEFAULT_PYTHON_PREFIX
+    effective_prefix = (
+        python_prefix if python_prefix is not None else DEFAULT_PYTHON_PREFIX
+    )
     base_cmd = [
         *effective_prefix,
         python_executable,

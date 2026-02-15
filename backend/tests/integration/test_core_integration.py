@@ -184,7 +184,7 @@ class TestMemoryPressureMonitor:
         monitor._last_rss_mb = 1200
         assert monitor._level_str() == "critical"
         # is_critical() calls _sample_rss() which may return None without psutil
-        object.__setattr__(monitor, '_sample_rss', lambda: 1200.0)
+        object.__setattr__(monitor, "_sample_rss", lambda: 1200.0)
         assert monitor.is_critical() is True
 
     def test_condensation_counter(self):
@@ -202,7 +202,7 @@ class TestMemoryPressureMonitor:
         monitor._process = None
         # With no psutil process, _sample_rss returns None → should_condense False
         # So let's mock _sample_rss directly
-        object.__setattr__(monitor, '_sample_rss', lambda: 300.0)
+        object.__setattr__(monitor, "_sample_rss", lambda: 300.0)
         assert monitor.should_condense() is True
 
 

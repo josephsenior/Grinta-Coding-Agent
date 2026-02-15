@@ -51,7 +51,9 @@ def test_async_writer_keeps_add_event_fast(temp_stream, monkeypatch):
 
     # Ensure writer eventually flushes every event (allow some slack).
     deadline = time.time() + 5
-    while temp_stream._durable_writer and not temp_stream._durable_writer._queue.empty():
+    while (
+        temp_stream._durable_writer and not temp_stream._durable_writer._queue.empty()
+    ):
         assert time.time() < deadline, "Durable writer did not drain in time"
         time.sleep(0.05)
 

@@ -90,7 +90,9 @@ async def demo_simple_task():
         print(f"Workspace: {tmpdir}\n")
 
         llm_registry = LLMRegistry(config)
-        runtime = create_runtime(config, llm_registry=llm_registry, workspace_base=tmpdir)
+        runtime = create_runtime(
+            config, llm_registry=llm_registry, workspace_base=tmpdir
+        )
         create_agent(config, llm_registry)
 
         task = """

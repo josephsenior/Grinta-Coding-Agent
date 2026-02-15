@@ -92,7 +92,9 @@ class DatabaseKnowledgeBaseStore:
                 await conn.execute(INIT_SCHEMA_SQL)
                 logger.info("Knowledge Base database schema verified/initialized.")
         except Exception as e:
-            logger.critical("Failed to initialize Knowledge Base database schema: %s", e)
+            logger.critical(
+                "Failed to initialize Knowledge Base database schema: %s", e
+            )
             raise
 
     async def create_collection(
@@ -130,7 +132,9 @@ class DatabaseKnowledgeBaseStore:
         logger.info("Created collection: %s (%s)", collection.name, collection.id)
         return collection
 
-    async def get_collection(self, collection_id: str) -> KnowledgeBaseCollection | None:
+    async def get_collection(
+        self, collection_id: str
+    ) -> KnowledgeBaseCollection | None:
         """Get a collection by ID."""
         pool = await self._get_pool()
         async with pool.acquire() as conn:
@@ -209,7 +213,9 @@ class DatabaseKnowledgeBaseStore:
                     logger.info("Deleted collection: %s", collection_id)
                 return deleted
 
-    async def add_document(self, document: KnowledgeBaseDocument) -> KnowledgeBaseDocument:
+    async def add_document(
+        self, document: KnowledgeBaseDocument
+    ) -> KnowledgeBaseDocument:
         """Add a document to a collection."""
         pool = await self._get_pool()
         async with pool.acquire() as conn:
@@ -304,7 +310,9 @@ class DatabaseKnowledgeBaseStore:
 
                 return False
 
-    async def get_document_by_hash(self, content_hash: str) -> KnowledgeBaseDocument | None:
+    async def get_document_by_hash(
+        self, content_hash: str
+    ) -> KnowledgeBaseDocument | None:
         """Find a document by its content hash (for deduplication)."""
         pool = await self._get_pool()
         async with pool.acquire() as conn:
@@ -322,8 +330,12 @@ class DatabaseKnowledgeBaseStore:
             description=row["description"],
             document_count=row["document_count"],
             total_size_bytes=row["total_size_bytes"],
-            created_at=row["created_at"].replace(tzinfo=UTC) if row["created_at"].tzinfo is None else row["created_at"],
-            updated_at=row["updated_at"].replace(tzinfo=UTC) if row["updated_at"].tzinfo is None else row["updated_at"],
+            created_at=row["created_at"].replace(tzinfo=UTC)
+            if row["created_at"].tzinfo is None
+            else row["created_at"],
+            updated_at=row["updated_at"].replace(tzinfo=UTC)
+            if row["updated_at"].tzinfo is None
+            else row["updated_at"],
         )
 
     def _row_to_document(self, row: asyncpg.Record) -> KnowledgeBaseDocument:

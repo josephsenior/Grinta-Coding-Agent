@@ -35,7 +35,9 @@ def get_conversation_events_dir(sid: str, user_id: str | None = None) -> str:
     return f"{get_conversation_dir(sid, user_id)}events/"
 
 
-def get_conversation_event_filename(sid: str, id: int, user_id: str | None = None) -> str:
+def get_conversation_event_filename(
+    sid: str, id: int, user_id: str | None = None
+) -> str:
     """Get the filename for a specific conversation event.
 
     Args:

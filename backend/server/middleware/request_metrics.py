@@ -86,7 +86,10 @@ class _RequestMetricsRegistry:
                 "in_flight": self._in_flight,
                 "request_bytes_sum": self.request_bytes_sum,
                 "response_bytes_sum": self.response_bytes_sum,
-                "by_method_status": {f"{m}:{s}": c for (m, s), c in self.request_count_by_method_status.items()},
+                "by_method_status": {
+                    f"{m}:{s}": c
+                    for (m, s), c in self.request_count_by_method_status.items()
+                },
                 "by_route_method_status": {
                     f"{m}|{s}|{r}": c
                     for (
@@ -157,7 +160,9 @@ class RequestMetricsMiddleware:
     def _record_request_size(self, request: Request) -> None:
         try:
             if "content-length" in request.headers:
-                _request_metrics_registry.add_request_bytes(int(request.headers.get("content-length", "0")))
+                _request_metrics_registry.add_request_bytes(
+                    int(request.headers.get("content-length", "0"))
+                )
         except Exception:
             pass
 
@@ -187,7 +192,9 @@ class RequestMetricsMiddleware:
     def _record_response_size(self, response: Response) -> None:
         try:
             if "content-length" in response.headers:
-                _request_metrics_registry.add_response_bytes(int(response.headers.get("content-length", "0")))
+                _request_metrics_registry.add_response_bytes(
+                    int(response.headers.get("content-length", "0"))
+                )
                 return
         except Exception:
             pass
@@ -206,11 +213,15 @@ class RequestMetricsMiddleware:
             with _request_metrics_registry._lock:
                 key = (method, status)
                 _request_metrics_registry.request_count_by_method_status[key] = (
-                    _request_metrics_registry.request_count_by_method_status.get(key, 0) + 1
+                    _request_metrics_registry.request_count_by_method_status.get(key, 0)
+                    + 1
                 )
                 rkey = (method, status, route_path)
                 _request_metrics_registry.request_count_by_route_method_status[rkey] = (
-                    _request_metrics_registry.request_count_by_route_method_status.get(rkey, 0) + 1
+                    _request_metrics_registry.request_count_by_route_method_status.get(
+                        rkey, 0
+                    )
+                    + 1
                 )
         except Exception:
             pass

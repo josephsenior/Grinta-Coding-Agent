@@ -81,7 +81,10 @@ class LLMBatchProcessor:
             List of batch results
         """
         # Split into batches
-        batches = [requests[i : i + self.batch_size] for i in range(0, len(requests), self.batch_size)]
+        batches = [
+            requests[i : i + self.batch_size]
+            for i in range(0, len(requests), self.batch_size)
+        ]
 
         # Process batches concurrently
         results = []
@@ -91,7 +94,9 @@ class LLMBatchProcessor:
 
         return results
 
-    async def _process_single_batch(self, batch: list[BatchRequest]) -> list[BatchResult]:
+    async def _process_single_batch(
+        self, batch: list[BatchRequest]
+    ) -> list[BatchResult]:
         """Process a single batch of requests.
 
         Args:
@@ -154,7 +159,9 @@ class LLMBatchProcessor:
 
             return BatchResult(
                 success=True,
-                response=response.choices[0].message.content if response.choices else None,
+                response=response.choices[0].message.content
+                if response.choices
+                else None,
                 provider="primary",
                 cost=cost,
                 latency_ms=latency,
@@ -187,11 +194,15 @@ class LLMBatchProcessor:
                             )
 
                     latency = (time.time() - start_time) * 1000
-                    cost = getattr(backup_llm, "metrics", {}).get("accumulated_cost", 0.0)
+                    cost = getattr(backup_llm, "metrics", {}).get(
+                        "accumulated_cost", 0.0
+                    )
 
                     return BatchResult(
                         success=True,
-                        response=response.choices[0].message.content if response.choices else None,
+                        response=response.choices[0].message.content
+                        if response.choices
+                        else None,
                         provider="backup",
                         cost=cost,
                         latency_ms=latency,

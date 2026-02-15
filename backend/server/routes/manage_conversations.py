@@ -66,7 +66,9 @@ from backend.server.utils import (
     validate_conversation_id,
 )
 from backend.server.utils.responses import error
-from backend.server.schemas.conversation_info_result_set import ConversationInfoResultSet
+from backend.server.schemas.conversation_info_result_set import (
+    ConversationInfoResultSet,
+)
 from backend.server.schemas.conversation_info import ConversationInfo
 from backend.storage.data_models.conversation_metadata import (
     ConversationMetadata,
@@ -94,7 +96,7 @@ if "pytest" in sys.modules:
 
     sub_router = cast(APIRouter, NoOpAPIRouter())
 else:
-    sub_router = APIRouter(prefix="/api")
+    sub_router = APIRouter(prefix="/api/v1")
 
 
 # ---------------------------------------------------------------------------
@@ -110,12 +112,22 @@ class InitSessionRequest(BaseModel):
     selected_branch: str | None = Field(None, description="Selected branch name")
     initial_user_msg: str | None = Field(None, description="Initial user message")
     image_urls: list[str] | None = Field(None, description="List of image URLs")
-    replay_json: str | None = Field(None, description="JSON string for replaying conversation")
-    suggested_task: SuggestedTask | None = Field(None, description="Suggested task object")
-    create_playbook: CreatePlaybook | None = Field(None, description="Playbook creation parameters")
-    conversation_instructions: str | None = Field(None, description="Custom conversation instructions")
+    replay_json: str | None = Field(
+        None, description="JSON string for replaying conversation"
+    )
+    suggested_task: SuggestedTask | None = Field(
+        None, description="Suggested task object"
+    )
+    create_playbook: CreatePlaybook | None = Field(
+        None, description="Playbook creation parameters"
+    )
+    conversation_instructions: str | None = Field(
+        None, description="Custom conversation instructions"
+    )
     mcp_config: MCPConfig | None = Field(None, description="MCP server configuration")
-    conversation_id: str | None = Field(None, description="Conversation ID (if resuming)")
+    conversation_id: str | None = Field(
+        None, description="Conversation ID (if resuming)"
+    )
     model_config = ConfigDict(extra="forbid")
 
     @field_validator(
@@ -143,7 +155,9 @@ class ConversationResponse(BaseModel):
     status: str = Field(..., min_length=1, description="Response status")
     conversation_id: str = Field(..., min_length=1, description="Conversation ID")
     message: str | None = Field(None, description="Optional message")
-    conversation_status: ConversationStatus | None = Field(None, description="Conversation status")
+    conversation_status: ConversationStatus | None = Field(
+        None, description="Conversation status"
+    )
 
     @field_validator("status", "conversation_id")
     @classmethod
@@ -162,7 +176,9 @@ class ProvidersSetModel(BaseModel):
 class UpdateConversationRequest(BaseModel):
     """Request model for updating conversation metadata."""
 
-    title: str = Field(..., min_length=1, max_length=200, description="New conversation title")
+    title: str = Field(
+        ..., min_length=1, max_length=200, description="New conversation title"
+    )
     model_config = ConfigDict(extra="forbid")
 
     @field_validator("title")
@@ -183,7 +199,9 @@ async def new_conversation(
     request: Request,
     data: InitSessionRequest,
     user_id: Annotated[str | None, Depends(get_user_id)] = None,
-    provider_tokens: Annotated[PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)] = None,
+    provider_tokens: Annotated[
+        PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
+    ] = None,
     user_secrets: Annotated[UserSecrets | None, Depends(get_user_secrets)] = None,
     auth_type: Annotated[AuthType | None, Depends(get_auth_type)] = None,
     settings: Annotated[Settings | None, Depends(get_user_settings)] = None,
@@ -200,7 +218,9 @@ async def new_conversation(
             settings = Settings.from_config()
             if settings:
                 settings = settings.merge_with_config_settings()
-                logger.info("Loaded default settings from config.toml for user_id: %s", user_id)
+                logger.info(
+                    "Loaded default settings from config.toml for user_id: %s", user_id
+                )
         except Exception as e:
             logger.error("Failed to load settings from config: %s", e)
 
@@ -225,8 +245,8 @@ async def new_conversation(
         conversation_instructions,
     ) = extract_request_data(data)
 
-    conversation_trigger, override_repo, override_git_provider = determine_conversation_trigger(
-        suggested_task, create_playbook, auth_type
+    conversation_trigger, override_repo, override_git_provider = (
+        determine_conversation_trigger(suggested_task, create_playbook, auth_type)
     )
 
     repository, vcs_provider, initial_user_msg = apply_conversation_overrides(
@@ -238,10 +258,14 @@ async def new_conversation(
         initial_user_msg,
     )
 
-    if error_response := validate_remote_api_request(conversation_trigger, initial_user_msg or ""):
+    if error_response := validate_remote_api_request(
+        conversation_trigger, initial_user_msg or ""
+    ):
         return error_response
 
-    user_id, provider_tokens, user_secrets = prepare_conversation_params(user_id, provider_tokens, user_secrets)
+    user_id, provider_tokens, user_secrets = prepare_conversation_params(
+        user_id, provider_tokens, user_secrets
+    )
 
     try:
         if repository:
@@ -299,15 +323,21 @@ async def search_conversations_route(
     page_id: str | None = Query(None, description="Page cursor for pagination"),
     limit: int = Query(20, ge=1, le=100, description="Maximum results per page"),
     selected_repository: str | None = Query(None, description="Filter by repository"),
-    conversation_trigger: ConversationTrigger | None = Query(None, description="Filter by conversation trigger type"),
+    conversation_trigger: ConversationTrigger | None = Query(
+        None, description="Filter by conversation trigger type"
+    ),
 ) -> ConversationInfoResultSet | JSONResponse:
     """HTTP endpoint to paginate conversation metadata with optional filters."""
     try:
         user_id = get_user_id(request)
         conversation_store = await get_conversation_store(request)
-        normalized_page_id = page_id if isinstance(page_id, str) and page_id.strip() else None
+        normalized_page_id = (
+            page_id if isinstance(page_id, str) and page_id.strip() else None
+        )
         normalized_repository = (
-            selected_repository if isinstance(selected_repository, str) and selected_repository.strip() else None
+            selected_repository
+            if isinstance(selected_repository, str) and selected_repository.strip()
+            else None
         )
 
         return await _search_conversations_impl(
@@ -347,9 +377,13 @@ async def _get_conversation_route(
 ) -> ConversationInfo | JSONResponse:
     user_id = get_user_id(request)
     conversation_store = await get_conversation_store(request)
-    result = await get_conversation_details(conversation_id, conversation_store, user_id)
+    result = await get_conversation_details(
+        conversation_id, conversation_store, user_id
+    )
     if result is None:
-        return JSONResponse(status_code=404, content={"error": "Conversation not found"})
+        return JSONResponse(
+            status_code=404, content={"error": "Conversation not found"}
+        )
     return result
 
 
@@ -386,7 +420,9 @@ async def start_conversation(
     providers_set: ProvidersSetModel,
     conversation_id: str = Depends(validate_conversation_id),
     user_id: str = Depends(get_user_id),
-    provider_tokens: Annotated[PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)] = None,
+    provider_tokens: Annotated[
+        PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
+    ] = None,
     settings: Settings = Depends(get_user_settings),
     conversation_store: Annotated[Any | None, Depends(get_conversation_store)] = None,
 ) -> ConversationResponse | JSONResponse:
@@ -514,7 +550,9 @@ async def get_playbook_management_conversations(
     page_id: str | None = None,
     limit: int = 20,
     conversation_store: Annotated[Any | None, Depends(get_conversation_store)] = None,
-    provider_tokens: Annotated[PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)] = None,
+    provider_tokens: Annotated[
+        PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
+    ] = None,
 ) -> ConversationInfoResultSet | JSONResponse:
     """Get conversations for the playbook management page with pagination."""
     return await search_playbook_conversations(

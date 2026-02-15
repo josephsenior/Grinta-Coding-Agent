@@ -26,7 +26,9 @@ def create_str_replace_editor_tool(
 
     """
     description = (
-        _SHORT_STR_REPLACE_EDITOR_DESCRIPTION if use_short_description else _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION
+        _SHORT_STR_REPLACE_EDITOR_DESCRIPTION
+        if use_short_description
+        else _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION
     )
     return create_tool_definition(
         name=STR_REPLACE_EDITOR_TOOL_NAME,

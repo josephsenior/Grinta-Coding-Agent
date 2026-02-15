@@ -46,7 +46,9 @@ class LifecycleService:
         controller.status_callback = status_callback
         controller.security_analyzer = security_analyzer
 
-        event_stream.subscribe(EventStreamSubscriber.AGENT_CONTROLLER, controller.on_event, controller.id)
+        event_stream.subscribe(
+            EventStreamSubscriber.AGENT_CONTROLLER, controller.on_event, controller.id
+        )
 
         from backend.core.enums import LifecyclePhase
 

@@ -73,7 +73,9 @@ class _FunctionCallingProxy:
             setattr(self.module, key, value)
 
 
-codeact_function_calling = _FunctionCallingProxy("forge.engines.orchestrator.function_calling")
+codeact_function_calling = _FunctionCallingProxy(
+    "forge.engines.orchestrator.function_calling"
+)
 
 
 class OrchestratorExecutor:
@@ -117,7 +119,9 @@ class OrchestratorExecutor:
                 params,
                 event_stream,
             )
-            response = self._build_final_response(accumulated_chunks, accumulated_content)
+            response = self._build_final_response(
+                accumulated_chunks, accumulated_content
+            )
             if response is None:
                 logger.warning("Streaming returned None, falling back to non-streaming")
                 response = self._fallback_non_streaming(params)
@@ -130,7 +134,7 @@ class OrchestratorExecutor:
         self._checkpoint.commit(ckpt_token)
 
         execution_time = time.time() - start_time
-        actions = self._response_to_actions(response)
+        actions = self._response_to_actions(response) if response is not None else []
         return ExecutionResult(actions, response, execution_time, error_message)
 
     # ------------------------------------------------------------------ #
@@ -181,7 +185,9 @@ class OrchestratorExecutor:
 
         return accumulated_content, accumulated_chunks
 
-    def _build_final_response(self, accumulated_chunks: list, accumulated_content: str) -> Any | None:
+    def _build_final_response(
+        self, accumulated_chunks: list, accumulated_content: str
+    ) -> Any | None:
         from types import SimpleNamespace
 
         if not accumulated_chunks:
@@ -211,7 +217,9 @@ class OrchestratorExecutor:
             from types import SimpleNamespace
 
             synthetic_message = SimpleNamespace(content="")
-            synthetic_choice = SimpleNamespace(message=synthetic_message, delta=SimpleNamespace(content=""))
+            synthetic_choice = SimpleNamespace(
+                message=synthetic_message, delta=SimpleNamespace(content="")
+            )
             # Provide a stable id so downstream telemetry attachment works.
             response = SimpleNamespace(id="fallback", choices=[synthetic_choice])
             logger.debug("Created synthetic fallback response with empty content.")
@@ -219,7 +227,9 @@ class OrchestratorExecutor:
             from types import SimpleNamespace
 
             synthetic_message = SimpleNamespace(content="")
-            synthetic_choice = SimpleNamespace(message=synthetic_message, delta=SimpleNamespace(content=""))
+            synthetic_choice = SimpleNamespace(
+                message=synthetic_message, delta=SimpleNamespace(content="")
+            )
             response.choices = [synthetic_choice]  # type: ignore[attr-defined]
             if not hasattr(response, "id"):
                 setattr(response, "id", "fallback")

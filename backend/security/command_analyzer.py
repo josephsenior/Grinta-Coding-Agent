@@ -105,7 +105,9 @@ _HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # Credential / env exfiltration
     (re.compile(r"\benv\b|\bprintenv\b", re.I), "environment variable dump"),
     (
-        re.compile(r"\bcat\s+.*(/etc/passwd|/etc/shadow|\.ssh/|\.env|\.aws/credentials)", re.I),
+        re.compile(
+            r"\bcat\s+.*(/etc/passwd|/etc/shadow|\.ssh/|\.env|\.aws/credentials)", re.I
+        ),
         "credential file read",
     ),
     (
@@ -167,7 +169,9 @@ class CommandAnalyzer:
         self._extra_critical: list[tuple[re.Pattern[str], str]] = []
         for pat_str in self.config.get("extra_critical_patterns", []):
             try:
-                self._extra_critical.append((re.compile(pat_str, re.I), f"custom rule: {pat_str[:40]}"))
+                self._extra_critical.append(
+                    (re.compile(pat_str, re.I), f"custom rule: {pat_str[:40]}")
+                )
             except re.error as exc:
                 logger.warning("Invalid extra_critical_pattern %r: %s", pat_str, exc)
 
@@ -204,7 +208,9 @@ class CommandAnalyzer:
 
         # Walk tiers
 
-        risk, reason, recs = self._match_tier(cmd, self._extra_critical + _CRITICAL_PATTERNS, RiskCategory.CRITICAL)
+        risk, reason, recs = self._match_tier(
+            cmd, self._extra_critical + _CRITICAL_PATTERNS, RiskCategory.CRITICAL
+        )
         if risk == RiskCategory.CRITICAL:
             return risk, reason, recs
 
@@ -218,7 +224,9 @@ class CommandAnalyzer:
                 )
             return risk, reason, recs
 
-        risk, reason, recs = self._match_tier(cmd, _MEDIUM_PATTERNS, RiskCategory.MEDIUM)
+        risk, reason, recs = self._match_tier(
+            cmd, _MEDIUM_PATTERNS, RiskCategory.MEDIUM
+        )
         if risk == RiskCategory.MEDIUM:
             if has_chaining:
                 return (
@@ -240,7 +248,9 @@ class CommandAnalyzer:
         risk, reason, recs = self.analyze(command)
 
         cmd = (command or "").strip()
-        is_network = bool(re.search(r"\bcurl\b|\bwget\b|\bnc\b|\bscp\b|\brsync\b", cmd, re.I))
+        is_network = bool(
+            re.search(r"\bcurl\b|\bwget\b|\bnc\b|\bscp\b|\brsync\b", cmd, re.I)
+        )
         is_encoded = bool(re.search(r"\bbase64\b|\bxxd\b|\b\\x[0-9a-f]", cmd, re.I))
 
         return CommandAssessment(

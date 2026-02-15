@@ -59,7 +59,10 @@ class RequestSizeLimiter(BaseHTTPMiddleware):
         self.max_request_size = max_request_size
 
         if self.enabled:
-            logger.info("Request size limiting enabled: max %.1fMB", self.max_request_size / (1024 * 1024))
+            logger.info(
+                "Request size limiting enabled: max %.1fMB",
+                self.max_request_size / (1024 * 1024),
+            )
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Check request size before processing.

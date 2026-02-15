@@ -183,7 +183,9 @@ class Metrics:
 
         """
         self._response_latencies.append(
-            ResponseLatency(latency=max(0.0, value), model=self.model_name, response_id=response_id),
+            ResponseLatency(
+                latency=max(0.0, value), model=self.model_name, response_id=response_id
+            ),
         )
 
     def add_token_usage(
@@ -227,17 +229,25 @@ class Metrics:
         self._costs += other._costs
         self.token_usages += other.token_usages
         self.response_latencies += other.response_latencies
-        self._accumulated_token_usage = self.accumulated_token_usage + other.accumulated_token_usage
+        self._accumulated_token_usage = (
+            self.accumulated_token_usage + other.accumulated_token_usage
+        )
 
     def get(self) -> dict:
         """Return the metrics in a dictionary."""
         return {
             "accumulated_cost": self._accumulated_cost,
             "max_budget_per_task": self._max_budget_per_task,
-            "accumulated_token_usage": model_dump_with_options(self.accumulated_token_usage),
+            "accumulated_token_usage": model_dump_with_options(
+                self.accumulated_token_usage
+            ),
             "costs": [asdict(cost) for cost in self._costs],
-            "response_latencies": [model_dump_with_options(latency) for latency in self._response_latencies],
-            "token_usages": [model_dump_with_options(usage) for usage in self._token_usages],
+            "response_latencies": [
+                model_dump_with_options(latency) for latency in self._response_latencies
+            ],
+            "token_usages": [
+                model_dump_with_options(usage) for usage in self._token_usages
+            ],
         }
 
     def log(self) -> str:
@@ -265,19 +275,26 @@ class Metrics:
         result._accumulated_cost = self._accumulated_cost - baseline._accumulated_cost
         if baseline._costs:
             last_baseline_timestamp = baseline._costs[-1].timestamp
-            result._costs = [cost for cost in self._costs if cost.timestamp > last_baseline_timestamp]
+            result._costs = [
+                cost for cost in self._costs if cost.timestamp > last_baseline_timestamp
+            ]
         else:
             result._costs = self._costs.copy()
-        result._response_latencies = self._response_latencies[len(baseline._response_latencies) :]
+        result._response_latencies = self._response_latencies[
+            len(baseline._response_latencies) :
+        ]
         result._token_usages = self._token_usages[len(baseline._token_usages) :]
         base_usage = baseline.accumulated_token_usage
         current_usage = self.accumulated_token_usage
         result._accumulated_token_usage = TokenUsage(
             model=self.model_name,
             prompt_tokens=current_usage.prompt_tokens - base_usage.prompt_tokens,
-            completion_tokens=current_usage.completion_tokens - base_usage.completion_tokens,
-            cache_read_tokens=current_usage.cache_read_tokens - base_usage.cache_read_tokens,
-            cache_write_tokens=current_usage.cache_write_tokens - base_usage.cache_write_tokens,
+            completion_tokens=current_usage.completion_tokens
+            - base_usage.completion_tokens,
+            cache_read_tokens=current_usage.cache_read_tokens
+            - base_usage.cache_read_tokens,
+            cache_write_tokens=current_usage.cache_write_tokens
+            - base_usage.cache_write_tokens,
             context_window=current_usage.context_window,
             per_turn_token=0,
             response_id="",
@@ -306,12 +323,16 @@ class Metrics:
         self._reset_internal_state(model_name=model)
         self._accumulated_cost = state.get("accumulated_cost", 0.0)
         self._max_budget_per_task = state.get("max_budget_per_task")
-        self._costs = [Cost(**c) if isinstance(c, dict) else c for c in state.get("costs", [])]
+        self._costs = [
+            Cost(**c) if isinstance(c, dict) else c for c in state.get("costs", [])
+        ]
         self._response_latencies = [
-            ResponseLatency.model_validate(r) if isinstance(r, dict) else r for r in state.get("response_latencies", [])
+            ResponseLatency.model_validate(r) if isinstance(r, dict) else r
+            for r in state.get("response_latencies", [])
         ]
         self._token_usages = [
-            TokenUsage.model_validate(t) if isinstance(t, dict) else t for t in state.get("token_usages", [])
+            TokenUsage.model_validate(t) if isinstance(t, dict) else t
+            for t in state.get("token_usages", [])
         ]
         atu = state.get("accumulated_token_usage", {})
         if isinstance(atu, dict):

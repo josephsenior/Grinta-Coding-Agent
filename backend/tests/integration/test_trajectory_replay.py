@@ -1,6 +1,5 @@
 import json
 import tempfile
-from types import SimpleNamespace
 
 from backend.events import EventSource
 from backend.events.observation import NullObservation
@@ -18,7 +17,9 @@ async def test_trajectory_replay_since_id_and_ordering() -> None:
         config = ForgeConfig()
         try:
             for content in ["e0", "e1", "e2", "e3", "e4"]:
-                event_stream.add_event(NullObservation(content=content), EventSource.AGENT)
+                event_stream.add_event(
+                    NullObservation(content=content), EventSource.AGENT
+                )
 
             conversation = ServerConversation(
                 sid="test-conversation",

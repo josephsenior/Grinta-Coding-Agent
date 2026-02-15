@@ -53,14 +53,20 @@ class ConversationStore(ABC):
         """Check if conversation exists."""
 
     @abstractmethod
-    async def search(self, page_id: str | None = None, limit: int = 20) -> ConversationMetadataResultSet:
+    async def search(
+        self, page_id: str | None = None, limit: int = 20
+    ) -> ConversationMetadataResultSet:
         """Search conversations."""
 
-    async def get_all_metadata(self, conversation_ids: Iterable[str]) -> list[ConversationMetadata]:
+    async def get_all_metadata(
+        self, conversation_ids: Iterable[str]
+    ) -> list[ConversationMetadata]:
         """Get metadata for multiple conversations in parallel."""
         return await wait_all([self.get_metadata(cid) for cid in conversation_ids])
 
     @classmethod
     @abstractmethod
-    async def get_instance(cls, config: ForgeConfig, user_id: str | None) -> ConversationStore:
+    async def get_instance(
+        cls, config: ForgeConfig, user_id: str | None
+    ) -> ConversationStore:
         """Get a store for the user represented by the token given."""

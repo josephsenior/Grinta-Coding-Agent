@@ -127,7 +127,11 @@ class ErrorRecoveryStrategy:
         error_type = ErrorRecoveryStrategy._classify_by_message_patterns(error_str)
 
         if error_type == ErrorType.UNKNOWN_ERROR:
-            logger.debug("Error type '%s' could not be classified: %s", type(error).__name__, error_str[:100])
+            logger.debug(
+                "Error type '%s' could not be classified: %s",
+                type(error).__name__,
+                error_str[:100],
+            )
 
         return error_type
 
@@ -150,7 +154,9 @@ class ErrorRecoveryStrategy:
             return ErrorType.PERMISSION_ERROR
         if isinstance(error, TimeoutError):
             return ErrorType.TIMEOUT_ERROR
-        if isinstance(error, (FileNotFoundError, IsADirectoryError, NotADirectoryError)):
+        if isinstance(
+            error, (FileNotFoundError, IsADirectoryError, NotADirectoryError)
+        ):
             return ErrorType.FILESYSTEM_ERROR
         if isinstance(error, (FunctionCallValidationError, FunctionCallNotExistsError)):
             return ErrorType.TOOL_CALL_ERROR
@@ -167,15 +173,25 @@ class ErrorRecoveryStrategy:
             ErrorType enum value
 
         """
-        if ErrorRecoveryStrategy._matches_patterns(error_str, ErrorRecoveryStrategy.RUNTIME_CRASH_PATTERNS):
+        if ErrorRecoveryStrategy._matches_patterns(
+            error_str, ErrorRecoveryStrategy.RUNTIME_CRASH_PATTERNS
+        ):
             return ErrorType.RUNTIME_CRASH
-        if ErrorRecoveryStrategy._matches_patterns(error_str, ErrorRecoveryStrategy.NETWORK_ERROR_PATTERNS):
+        if ErrorRecoveryStrategy._matches_patterns(
+            error_str, ErrorRecoveryStrategy.NETWORK_ERROR_PATTERNS
+        ):
             return ErrorType.NETWORK_ERROR
-        if ErrorRecoveryStrategy._matches_patterns(error_str, ErrorRecoveryStrategy.FILESYSTEM_ERROR_PATTERNS):
+        if ErrorRecoveryStrategy._matches_patterns(
+            error_str, ErrorRecoveryStrategy.FILESYSTEM_ERROR_PATTERNS
+        ):
             return ErrorRecoveryStrategy._classify_filesystem_error(error_str)
-        if ErrorRecoveryStrategy._matches_patterns(error_str, ErrorRecoveryStrategy.TOOL_CALL_ERROR_PATTERNS):
+        if ErrorRecoveryStrategy._matches_patterns(
+            error_str, ErrorRecoveryStrategy.TOOL_CALL_ERROR_PATTERNS
+        ):
             return ErrorType.TOOL_CALL_ERROR
-        if ErrorRecoveryStrategy._matches_patterns(error_str, ErrorRecoveryStrategy.TIMEOUT_ERROR_PATTERNS):
+        if ErrorRecoveryStrategy._matches_patterns(
+            error_str, ErrorRecoveryStrategy.TIMEOUT_ERROR_PATTERNS
+        ):
             return ErrorType.TIMEOUT_ERROR
 
         return ErrorType.UNKNOWN_ERROR
@@ -228,7 +244,9 @@ class ErrorRecoveryStrategy:
         # Do not attempt recovery actions that require LLM calls if there's an authentication error
         # This prevents infinite loops where tool call errors trigger recovery actions that fail due to auth issues
         if isinstance(error, AuthenticationError):
-            logger.info("Skipping recovery actions for AuthenticationError - requires user intervention")
+            logger.info(
+                "Skipping recovery actions for AuthenticationError - requires user intervention"
+            )
             return []
 
         recovery_map = {
@@ -387,8 +405,14 @@ class ErrorRecoveryStrategy:
         # To prevent infinite loops, we should avoid creating any actions that would trigger LLM calls
         # because tool call errors often happen during LLM processing, and creating more actions
         # (like AgentThinkAction or MessageAction) would cause more LLM calls and potentially more tool call errors.
-        logger.error("Tool call parameter error: %s%s", error_str[:200], "..." if len(error_str) > 200 else "")
-        logger.info("Skipping recovery actions for tool call error to prevent infinite loop")
+        logger.error(
+            "Tool call parameter error: %s%s",
+            error_str[:200],
+            "..." if len(error_str) > 200 else "",
+        )
+        logger.info(
+            "Skipping recovery actions for tool call error to prevent infinite loop"
+        )
 
         # Return empty list to prevent any recovery actions that could trigger more LLM calls
         return []
@@ -418,7 +442,9 @@ class ErrorRecoveryStrategy:
             AgentThinkAction(
                 thought=f"Permission denied for {file_path}. Checking current permissions...",
             ),
-            CmdRunAction(command=f"ls -l {file_path} 2>/dev/null || echo 'File not accessible'"),
+            CmdRunAction(
+                command=f"ls -l {file_path} 2>/dev/null || echo 'File not accessible'"
+            ),
             MessageAction(
                 content=f"Permission error for {file_path}. "
                 "Will try an alternative approach that doesn't require special permissions.",
@@ -433,7 +459,9 @@ class ErrorRecoveryStrategy:
                 thought="Disk full error detected. Checking disk usage and cleaning up temporary files...",
             ),
             CmdRunAction(command="df -h"),
-            CmdRunAction(command="du -sh /tmp/* 2>/dev/null | sort -hr | head -10 || true"),
+            CmdRunAction(
+                command="du -sh /tmp/* 2>/dev/null | sort -hr | head -10 || true"
+            ),
             CmdRunAction(command="rm -rf /tmp/tmp* /tmp/pip* 2>/dev/null || true"),
             MessageAction(
                 content="Disk space exhausted. Attempted to clean temporary files. "
@@ -461,7 +489,9 @@ class ErrorRecoveryStrategy:
                         thought=f"Syntax error detected in {file_path} at line {line_num}. "
                         "Reading surrounding code to identify the issue...",
                     ),
-                    CmdRunAction(command=f"sed -n '{start_line},{end_line}p' {file_path} || cat {file_path}"),
+                    CmdRunAction(
+                        command=f"sed -n '{start_line},{end_line}p' {file_path} || cat {file_path}"
+                    ),
                     MessageAction(
                         content=f"Syntax error in {file_path}:{line_num}. Reviewing code context to propose a fix.",
                     ),

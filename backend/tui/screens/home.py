@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
 
-from textual import on, work
+from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import (
     Footer,
@@ -98,7 +97,9 @@ class HomeScreen(Screen[str]):
         with Vertical(id="home-container"):
             with Vertical(id="home-header"):
                 yield Static("⚒  FORGE", id="home-header-text")
-                yield Static("AI-Powered Development — Terminal Edition", id="home-hint")
+                yield Static(
+                    "AI-Powered Development — Terminal Edition", id="home-hint"
+                )
             yield ListView(id="conversation-list-view")
             with Horizontal(id="new-bar"):
                 yield Input(
@@ -119,11 +120,18 @@ class HomeScreen(Screen[str]):
         try:
             self._conversations = await self.client.list_conversations(limit=50)
         except Exception as e:
-            list_view.mount(Static(f"Error loading conversations: {e}", classes="empty-hint"))
+            list_view.mount(
+                Static(f"Error loading conversations: {e}", classes="empty-hint")
+            )
             return
 
         if not self._conversations:
-            list_view.mount(Static("No conversations yet — type below to start one.", classes="empty-hint"))
+            list_view.mount(
+                Static(
+                    "No conversations yet — type below to start one.",
+                    classes="empty-hint",
+                )
+            )
             return
 
         for info in self._conversations:
@@ -156,7 +164,9 @@ class HomeScreen(Screen[str]):
             if cid:
                 self.dismiss(cid)
             else:
-                self.notify("Failed to get conversation_id from server", severity="error")
+                self.notify(
+                    "Failed to get conversation_id from server", severity="error"
+                )
         except Exception as e:
             self.notify(f"Error: {e}", severity="error")
 

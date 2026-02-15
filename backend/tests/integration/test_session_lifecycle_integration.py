@@ -25,7 +25,9 @@ async def test_start_conversation_success() -> None:
     store.get_metadata = AsyncMock(return_value=SimpleNamespace(id=conversation_id))
 
     manager = MagicMock()
-    manager.maybe_start_agent_loop = AsyncMock(return_value=SimpleNamespace(status=ConversationStatus.RUNNING))
+    manager.maybe_start_agent_loop = AsyncMock(
+        return_value=SimpleNamespace(status=ConversationStatus.RUNNING)
+    )
 
     with (
         patch(
@@ -62,7 +64,9 @@ async def test_stop_conversation_when_running_closes_session() -> None:
     user_id = "user-1"
 
     manager = MagicMock()
-    manager.get_agent_loop_info = AsyncMock(return_value=[SimpleNamespace(status=ConversationStatus.RUNNING)])
+    manager.get_agent_loop_info = AsyncMock(
+        return_value=[SimpleNamespace(status=ConversationStatus.RUNNING)]
+    )
     manager.close_session = AsyncMock()
 
     with patch(
@@ -86,7 +90,9 @@ async def test_stop_conversation_when_not_running_is_noop() -> None:
     user_id = "user-1"
 
     manager = MagicMock()
-    manager.get_agent_loop_info = AsyncMock(return_value=[SimpleNamespace(status=ConversationStatus.STOPPED)])
+    manager.get_agent_loop_info = AsyncMock(
+        return_value=[SimpleNamespace(status=ConversationStatus.STOPPED)]
+    )
     manager.close_session = AsyncMock()
 
     with patch(

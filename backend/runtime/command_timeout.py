@@ -75,7 +75,9 @@ class CommandTimeoutMixin:
             return
 
         # Check if this is a long-running command (server, etc.)
-        if isinstance(event, CmdRunAction) and self._is_long_running_command(event.command):
+        if isinstance(event, CmdRunAction) and self._is_long_running_command(
+            event.command
+        ):
             logger.info(
                 "Detected long-running command, removing timeout: %s",
                 event.command[:100],

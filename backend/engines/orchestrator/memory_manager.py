@@ -109,12 +109,16 @@ class ConversationMemoryManager:
                 if isinstance(event, MessageAction):
                     return event
 
-                if getattr(event, "action", None) == ActionType.MESSAGE and hasattr(event, "content"):
+                if getattr(event, "action", None) == ActionType.MESSAGE and hasattr(
+                    event, "content"
+                ):
                     cloned = MessageAction(
                         content=str(getattr(event, "content", "")),
                         file_urls=getattr(event, "file_urls", None),
                         image_urls=getattr(event, "image_urls", None),
-                        wait_for_response=bool(getattr(event, "wait_for_response", False)),
+                        wait_for_response=bool(
+                            getattr(event, "wait_for_response", False)
+                        ),
                     )
                     cloned.source = source
                     if hasattr(event, "id"):

@@ -116,7 +116,9 @@ async def read_file(
     return FileReadObservation(path=path, content=code_view)
 
 
-def insert_lines(to_insert: list[str], original: list[str], start: int = 0, end: int = -1) -> list[str]:
+def insert_lines(
+    to_insert: list[str], original: list[str], start: int = 0, end: int = -1
+) -> list[str]:
     """Insert the new content to the original content based on start and end."""
     new_lines = [""] if start == 0 else original[:start]
     new_lines += [i + "\n" for i in to_insert]
@@ -167,7 +169,9 @@ async def write_file(
         except FileNotFoundError:
             return ErrorObservation(f"File not found: {path}")
         except IsADirectoryError:
-            return ErrorObservation(f"Path is a directory: {path}. You can only write to files")
+            return ErrorObservation(
+                f"Path is a directory: {path}. You can only write to files"
+            )
         except UnicodeDecodeError:
             return ErrorObservation(f"File could not be decoded as utf-8: {path}")
     except PermissionError as e:

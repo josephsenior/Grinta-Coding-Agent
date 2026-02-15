@@ -78,7 +78,9 @@ class LLMSummarizingCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass
     """Configuration for LLMCondenser."""
 
     type: Literal["llm"] = Field(default="llm")
-    llm_config: LLMConfig = Field(..., description="Configuration for the LLM to use for condensing.")
+    llm_config: LLMConfig = Field(
+        ..., description="Configuration for the LLM to use for condensing."
+    )
     keep_first: int = Field(
         default=DEFAULT_CONDENSER_KEEP_FIRST,
         description="Number of initial events to always keep in history.",
@@ -127,7 +129,9 @@ class LLMAttentionCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for LLMAttentionCondenser."""
 
     type: Literal["llm_attention"] = Field(default="llm_attention")
-    llm_config: LLMConfig = Field(..., description="Configuration for the LLM to use for attention.")
+    llm_config: LLMConfig = Field(
+        ..., description="Configuration for the LLM to use for attention."
+    )
     max_size: int = Field(
         default=DEFAULT_CONDENSER_MAX_SIZE,
         description="Maximum size of the condensed history before triggering forgetting.",
@@ -150,7 +154,9 @@ class StructuredSummaryCondenserConfig(BaseModel, metaclass=CanonicalModelMetacl
     """Configuration for StructuredSummaryCondenser instances."""
 
     type: Literal["structured"] = Field(default="structured")
-    llm_config: LLMConfig = Field(..., description="Configuration for the LLM to use for condensing.")
+    llm_config: LLMConfig = Field(
+        ..., description="Configuration for the LLM to use for condensing."
+    )
     keep_first: int = Field(
         default=DEFAULT_CONDENSER_KEEP_FIRST,
         description="Number of initial events to always keep in history.",
@@ -246,7 +252,9 @@ CondenserConfig = (
 )
 
 
-def condenser_config_from_toml_section(data: dict, llm_configs: dict | None = None) -> dict[str, CondenserConfig]:
+def condenser_config_from_toml_section(
+    data: dict, llm_configs: dict | None = None
+) -> dict[str, CondenserConfig]:
     """Create a CondenserConfig instance from a toml dictionary representing the [condenser] section.
 
     For CondenserConfig, the handling is different since it's a union type. The type of condenser
@@ -296,7 +304,9 @@ def condenser_config_from_toml_section(data: dict, llm_configs: dict | None = No
             config = create_condenser_config(condenser_type, data)
         condenser_mapping["condenser"] = config
     except (ValidationError, ValueError) as e:
-        logger.FORGE_logger.warning("Invalid condenser configuration: %s. Using NoOpCondenserConfig.", e)
+        logger.FORGE_logger.warning(
+            "Invalid condenser configuration: %s. Using NoOpCondenserConfig.", e
+        )
         config = NoOpCondenserConfig(type="noop")
         condenser_mapping["condenser"] = config
     return condenser_mapping

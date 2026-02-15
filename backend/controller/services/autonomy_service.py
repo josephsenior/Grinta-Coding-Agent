@@ -47,7 +47,10 @@ class AutonomyService:
         controller = self._controller
         controller.safety_validator = None
 
-        if hasattr(agent.config, "safety") and agent.config.safety.enable_mandatory_validation:
+        if (
+            hasattr(agent.config, "safety")
+            and agent.config.safety.enable_mandatory_validation
+        ):
             from backend.controller.safety_validator import SafetyValidator
 
             controller.safety_validator = SafetyValidator(agent.config.safety)
@@ -57,7 +60,10 @@ class AutonomyService:
         controller = self._controller
         controller.task_validator = None
 
-        if hasattr(agent.config, "enable_completion_validation") and agent.config.enable_completion_validation:
+        if (
+            hasattr(agent.config, "enable_completion_validation")
+            and agent.config.enable_completion_validation
+        ):
             from backend.validation.task_validator import (
                 CompositeValidator,
                 DiffValidator,

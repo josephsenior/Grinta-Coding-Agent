@@ -95,7 +95,7 @@ def _ask_question(page: Page) -> None:
     line_count = get_readme_line_count()
     print(f"Step 7: Asking question about README.md line count ({line_count})...")
 
-    question = f"How many lines are in the main README.md file? Please check the file and tell me the exact number."
+    question = "How many lines are in the main README.md file? Please check the file and tell me the exact number."
     send_message(page, question)
 
     page.screenshot(path="test-results/conv_08_question_sent.png")
@@ -105,7 +105,7 @@ def _ask_question(page: Page) -> None:
 def _wait_for_agent_response(page: Page, expected_line_count: int) -> None:
     """Wait for agent response and verify it contains README line count."""
     print("Step 8: Waiting for agent response to README question...")
-    
+
     content = wait_for_agent_response(page, timeout=180)
     if content:
         if _check_readme_response(content, expected_line_count):
@@ -114,17 +114,23 @@ def _wait_for_agent_response(page: Page, expected_line_count: int) -> None:
             print("Screenshot saved: conv_09_agent_response.png")
             page.screenshot(path="test-results/conv_10_final_state.png")
             print("Screenshot saved: conv_10_final_state.png")
-            print("✅ Test completed successfully - agent provided correct README line count")
+            print(
+                "✅ Test completed successfully - agent provided correct README line count"
+            )
             return
         else:
-            print(f"Found response but it didn't match expected line count: {content[:100]}...")
+            print(
+                f"Found response but it didn't match expected line count: {content[:100]}..."
+            )
 
     print("❌ Did not find agent response with README line count within time limit")
     page.screenshot(path="test-results/conv_09_agent_response.png")
     print("Screenshot saved: conv_09_agent_response.png")
     page.screenshot(path="test-results/conv_10_final_state.png")
     print("Screenshot saved: conv_10_final_state.png")
-    raise AssertionError("Agent response did not include README line count within time limit")
+    raise AssertionError(
+        "Agent response did not include README line count within time limit"
+    )
 
 
 def _check_readme_response(content: str, expected_line_count: int) -> bool:

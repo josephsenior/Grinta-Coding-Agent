@@ -46,7 +46,9 @@ def wait_for_server_ready(
 
         time.sleep(check_interval)
 
-    logger.warning("Server at %s did not become ready within %s seconds", url, max_wait_time)
+    logger.warning(
+        "Server at %s did not become ready within %s seconds", url, max_wait_time
+    )
     return False
 
 
@@ -68,7 +70,9 @@ def check_server_ready(url: str, timeout: int = 5) -> bool:
         return False
 
 
-def safe_goto_localhost(url: str, max_wait: int = 30, check_interval: float = 1.0) -> str:
+def safe_goto_localhost(
+    url: str, max_wait: int = 30, check_interval: float = 1.0
+) -> str:
     """Safely navigate to a localhost URL by waiting for server readiness.
 
     Args:
@@ -80,13 +84,22 @@ def safe_goto_localhost(url: str, max_wait: int = 30, check_interval: float = 1.
         Browser code that safely navigates to the URL
 
     """
-    if not url.startswith(("http://localhost:", "https://localhost:", "http://127.0.0.1:", "https://127.0.0.1:")):
+    if not url.startswith(
+        (
+            "http://localhost:",
+            "https://localhost:",
+            "http://127.0.0.1:",
+            "https://127.0.0.1:",
+        )
+    ):
         return f"goto('{url}')"
 
     logger.info("Creating safe navigation code for %s", url)
-    
+
     # Generate the safe navigation code using the helper
-    return safe_navigate_to_url(f"goto('{url}')\nnoop(2000)", url, max_wait, check_interval)
+    return safe_navigate_to_url(
+        f"goto('{url}')\nnoop(2000)", url, max_wait, check_interval
+    )
 
 
 def safe_navigate_to_url(

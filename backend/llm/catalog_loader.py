@@ -113,7 +113,10 @@ def get_pricing(model: str) -> Optional[Dict[str, float]]:
     """
     entry = lookup(model)
     if entry and entry.input_price_per_m is not None:
-        return {"input": entry.input_price_per_m, "output": entry.output_price_per_m or 0.0}
+        return {
+            "input": entry.input_price_per_m,
+            "output": entry.output_price_per_m or 0.0,
+        }
 
     # Tier fallback — substring matching
     data = _load_raw()
@@ -135,11 +138,7 @@ def get_token_limits(model: str) -> tuple[int | None, int | None]:
 
 def get_featured_models() -> List[str]:
     """Return ``provider/name`` strings for models marked ``featured = true``."""
-    return [
-        f"{e.provider}/{e.name}"
-        for e in get_catalog()
-        if e.featured
-    ]
+    return [f"{e.provider}/{e.name}" for e in get_catalog() if e.featured]
 
 
 def get_verified_models(provider: str | None = None) -> List[str]:

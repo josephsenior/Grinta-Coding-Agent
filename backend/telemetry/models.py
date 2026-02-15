@@ -12,13 +12,17 @@ from backend.events.action import ActionSecurityRisk
 class AuditEntry(BaseModel):
     """Immutable audit log entry for an agent action."""
 
-    id: str = Field(..., min_length=1, description="Unique identifier for this audit entry")
+    id: str = Field(
+        ..., min_length=1, description="Unique identifier for this audit entry"
+    )
 
     timestamp: datetime = Field(..., description="When the action occurred")
 
     session_id: str = Field(..., min_length=1, description="Session ID of the agent")
 
-    iteration: int = Field(..., ge=0, description="Iteration number when action occurred")
+    iteration: int = Field(
+        ..., ge=0, description="Iteration number when action occurred"
+    )
 
     action_type: str = Field(
         ...,
@@ -28,7 +32,9 @@ class AuditEntry(BaseModel):
 
     action_content: str = Field(..., description="Content/details of the action")
 
-    risk_level: ActionSecurityRisk = Field(..., description="Assessed risk level of the action")
+    risk_level: ActionSecurityRisk = Field(
+        ..., description="Assessed risk level of the action"
+    )
 
     validation_result: str = Field(
         ...,
@@ -36,18 +42,26 @@ class AuditEntry(BaseModel):
         description="Result of validation: 'allowed', 'blocked', 'requires_review'",
     )
 
-    execution_result: str | None = Field(default=None, description="Result of action execution if it was allowed")
+    execution_result: str | None = Field(
+        default=None, description="Result of action execution if it was allowed"
+    )
 
-    blocked_reason: str | None = Field(default=None, description="Reason for blocking if action was blocked")
+    blocked_reason: str | None = Field(
+        default=None, description="Reason for blocking if action was blocked"
+    )
 
     filesystem_snapshot_id: str | None = Field(
         default=None,
         description="ID of filesystem snapshot if taken before high-risk action",
     )
 
-    rollback_available: bool = Field(default=False, description="Whether rollback is available for this action")
+    rollback_available: bool = Field(
+        default=False, description="Whether rollback is available for this action"
+    )
 
-    matched_risk_patterns: list[str] = Field(default_factory=list, description="Risk patterns that matched this action")
+    matched_risk_patterns: list[str] = Field(
+        default_factory=list, description="Risk patterns that matched this action"
+    )
 
     environment: str = Field(
         default="development",
@@ -84,7 +98,9 @@ class AuditEntry(BaseModel):
 
         validated = validate_non_empty_string(v, name="validation_result")
         if validated not in ["allowed", "blocked", "requires_review"]:
-            raise ValueError("validation_result must be one of: allowed, blocked, requires_review")
+            raise ValueError(
+                "validation_result must be one of: allowed, blocked, requires_review"
+            )
         return validated
 
     def to_dict(self) -> dict:

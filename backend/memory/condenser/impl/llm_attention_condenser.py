@@ -7,14 +7,13 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from backend.core.config.condenser_config import LLMAttentionCondenserConfig
+    pass
 from backend.events.action.agent import CondensationAction
 from backend.memory.condenser.condenser import BaseLLMCondenser, Condensation
 from backend.memory.view import View
 
 if TYPE_CHECKING:
-    from backend.llm.llm import LLM
-    from backend.llm.llm_registry import LLMRegistry
+    pass
 
 
 class ImportantEventSelection(BaseModel):
@@ -49,12 +48,22 @@ class LLMAttentionCondenser(BaseLLMCondenser):
         events_from_tail = target_size - len(head_event_ids)
 
         response_ids = self._get_llm_ranked_ids(view)
-        response_ids = self._filter_head_events(response_ids, head_event_ids, events_from_tail)
-        response_ids = self._backfill_recent_events(view, response_ids, events_from_tail)
+        response_ids = self._filter_head_events(
+            response_ids, head_event_ids, events_from_tail
+        )
+        response_ids = self._backfill_recent_events(
+            view, response_ids, events_from_tail
+        )
 
-        forgotten_ids = [event.id for event in view if event.id not in response_ids and event.id not in head_event_ids]
+        forgotten_ids = [
+            event.id
+            for event in view
+            if event.id not in response_ids and event.id not in head_event_ids
+        ]
 
-        return Condensation(action=CondensationAction(forgotten_event_ids=forgotten_ids))
+        return Condensation(
+            action=CondensationAction(forgotten_event_ids=forgotten_ids)
+        )
 
     def _get_llm_ranked_ids(self, view: View) -> list:
         """Get event IDs ranked by LLM importance.
@@ -97,9 +106,13 @@ class LLMAttentionCondenser(BaseLLMCondenser):
         )
 
         self.add_metadata("metrics", self.llm.metrics.get())
-        return ImportantEventSelection.model_validate_json(response.choices[0].message.content).ids
+        return ImportantEventSelection.model_validate_json(
+            response.choices[0].message.content
+        ).ids
 
-    def _filter_head_events(self, response_ids: list, head_event_ids: list, events_from_tail: int) -> list:
+    def _filter_head_events(
+        self, response_ids: list, head_event_ids: list, events_from_tail: int
+    ) -> list:
         """Filter out head events and limit to tail size.
 
         Args:
@@ -111,9 +124,13 @@ class LLMAttentionCondenser(BaseLLMCondenser):
             Filtered list of IDs
 
         """
-        return [rid for rid in response_ids if rid not in head_event_ids][:events_from_tail]
+        return [rid for rid in response_ids if rid not in head_event_ids][
+            :events_from_tail
+        ]
 
-    def _backfill_recent_events(self, view: View, response_ids: list, events_from_tail: int) -> list:
+    def _backfill_recent_events(
+        self, view: View, response_ids: list, events_from_tail: int
+    ) -> list:
         """Backfill with recent events if needed.
 
         Args:
@@ -131,6 +148,7 @@ class LLMAttentionCondenser(BaseLLMCondenser):
             if event.id not in response_ids:
                 response_ids.append(event.id)
         return response_ids
+
 
 # Lazy registration to avoid circular imports
 def _register_config():

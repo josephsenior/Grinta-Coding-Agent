@@ -24,8 +24,13 @@ def get_completion_cost(
     """Calculate the cost of a completion call in USD."""
     # Check for config overrides first
     if config:
-        if config.input_cost_per_token is not None and config.output_cost_per_token is not None:
-            return (prompt_tokens * config.input_cost_per_token) + (completion_tokens * config.output_cost_per_token)
+        if (
+            config.input_cost_per_token is not None
+            and config.output_cost_per_token is not None
+        ):
+            return (prompt_tokens * config.input_cost_per_token) + (
+                completion_tokens * config.output_cost_per_token
+            )
 
     prices = get_pricing(model)
     if prices:
@@ -61,7 +66,9 @@ def record_llm_cost_from_metrics(user_key: str, metrics: Metrics) -> None:
         logger.error("Failed to record LLM cost: %s", e)
 
 
-def record_llm_cost_from_response(user_key: str, response: dict, model: str, config: LLMConfig | None = None) -> None:
+def record_llm_cost_from_response(
+    user_key: str, response: dict, model: str, config: LLMConfig | None = None
+) -> None:
     """Record LLM cost from API response.
 
     Args:
@@ -82,7 +89,9 @@ def record_llm_cost_from_response(user_key: str, response: dict, model: str, con
 
         if cost > 0:
             record_llm_cost(user_key, cost)
-            logger.debug("Recorded LLM cost $%.4f for %s using %s", cost, user_key, model)
+            logger.debug(
+                "Recorded LLM cost $%.4f for %s using %s", cost, user_key, model
+            )
         else:
             logger.debug(
                 "LLM usage for %s using %s: %d prompt, %d completion",

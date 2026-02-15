@@ -79,7 +79,11 @@ def create_structure_editor_tool(
         ChatCompletionToolParam with the Ultimate Editor configuration
 
     """
-    description = _SHORT_ULTIMATE_EDITOR_DESCRIPTION if use_short_description else _DETAILED_ULTIMATE_EDITOR_DESCRIPTION
+    description = (
+        _SHORT_ULTIMATE_EDITOR_DESCRIPTION
+        if use_short_description
+        else _DETAILED_ULTIMATE_EDITOR_DESCRIPTION
+    )
 
     return create_tool_definition(
         name="ultimate_editor",

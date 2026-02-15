@@ -69,7 +69,9 @@ class PythonSearcher:
                 break
 
             try:
-                results.extend(self._search_file(file_path, regex, max_results - len(results)))
+                results.extend(
+                    self._search_file(file_path, regex, max_results - len(results))
+                )
             except Exception as e:
                 logger.debug("Error searching file %s: %s", file_path, e)
                 continue

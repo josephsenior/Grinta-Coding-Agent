@@ -86,7 +86,9 @@ class BaseShellSession(UnifiedShellSession, ABC):
         self.max_memory_mb = max_memory_mb
         from backend.runtime.utils.process_registry import TaskCancellationService
 
-        self._cancellation = cancellation_service or TaskCancellationService(label="runtime")
+        self._cancellation = cancellation_service or TaskCancellationService(
+            label="runtime"
+        )
 
     @property
     def cwd(self) -> str:
@@ -252,4 +254,6 @@ def create_shell_session(
 
     # Fallback: Should not happen if tools are detected correctly
     else:
-        raise RuntimeError(f"No suitable shell found for platform {sys.platform}. Detected shell: {tools.shell_type}")
+        raise RuntimeError(
+            f"No suitable shell found for platform {sys.platform}. Detected shell: {tools.shell_type}"
+        )

@@ -90,10 +90,14 @@ class TaskValidationService:
         feedback = f"TASK NOT COMPLETE: {validation.reason}\n\nConfidence: {validation.confidence:.1%}\n"
 
         if validation.missing_items:
-            feedback += "\nMissing items:\n" + "\n".join(f"- {item}" for item in validation.missing_items)
+            feedback += "\nMissing items:\n" + "\n".join(
+                f"- {item}" for item in validation.missing_items
+            )
 
         if validation.suggestions:
-            feedback += "\n\nSuggestions:\n" + "\n".join(f"- {sug}" for sug in validation.suggestions)
+            feedback += "\n\nSuggestions:\n" + "\n".join(
+                f"- {sug}" for sug in validation.suggestions
+            )
 
         feedback += "\n\nPlease continue working to complete the task."
         return feedback

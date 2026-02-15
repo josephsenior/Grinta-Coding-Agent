@@ -52,9 +52,13 @@ class DatabaseStoreAdapter:
 
     # Collection operations
 
-    def create_collection(self, user_id: str, name: str, description: str | None = None) -> KnowledgeBaseCollection:
+    def create_collection(
+        self, user_id: str, name: str, description: str | None = None
+    ) -> KnowledgeBaseCollection:
         """Create a new collection."""
-        return self._run_async(self._db_store.create_collection(user_id, name, description))
+        return self._run_async(
+            self._db_store.create_collection(user_id, name, description)
+        )
 
     def get_collection(self, collection_id: str) -> KnowledgeBaseCollection | None:
         """Get a collection by ID."""
@@ -71,7 +75,9 @@ class DatabaseStoreAdapter:
         description: str | None = None,
     ) -> KnowledgeBaseCollection | None:
         """Update a collection."""
-        return self._run_async(self._db_store.update_collection(collection_id, name, description))
+        return self._run_async(
+            self._db_store.update_collection(collection_id, name, description)
+        )
 
     def delete_collection(self, collection_id: str) -> bool:
         """Delete a collection and all its documents."""

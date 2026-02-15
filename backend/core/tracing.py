@@ -45,7 +45,9 @@ def initialize_tracing(
             _apply_span_processor(tracer_provider, span_exporter, sample_rate)
         _finalize_tracer(trace, tracer_provider, service_name, service_version)
         _set_initialized()
-        _log_tracing_initialized(service_name, service_version, exporter_type, sample_rate)
+        _log_tracing_initialized(
+            service_name, service_version, exporter_type, sample_rate
+        )
     except ImportError as exc:
         logger.warning("OpenTelemetry not available: %s. Tracing disabled.", exc)
     except Exception as exc:
@@ -98,7 +100,9 @@ def _configure_jaeger(endpoint: str | None):
     try:
         # Check if OTLP endpoint is explicitly configured
         otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-        use_otlp = otlp_endpoint is not None or (endpoint and ("4318" in endpoint or "/v1/traces" in endpoint))
+        use_otlp = otlp_endpoint is not None or (
+            endpoint and ("4318" in endpoint or "/v1/traces" in endpoint)
+        )
 
         if use_otlp:
             # Try OTLP exporter (recommended for Jaeger all-in-one with OTLP support)
@@ -107,7 +111,9 @@ def _configure_jaeger(endpoint: str | None):
                     OTLPSpanExporter,
                 )
 
-                otlp_endpoint = otlp_endpoint or endpoint or "http://localhost:4318/v1/traces"
+                otlp_endpoint = (
+                    otlp_endpoint or endpoint or "http://localhost:4318/v1/traces"
+                )
 
                 # Ensure endpoint ends with /v1/traces
                 if not otlp_endpoint.endswith("/v1/traces"):
@@ -125,7 +131,9 @@ def _configure_jaeger(endpoint: str | None):
         try:
             from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 
-            endpoint = endpoint or os.getenv("JAEGER_ENDPOINT", "http://localhost:14268/api/traces")
+            endpoint = endpoint or os.getenv(
+                "JAEGER_ENDPOINT", "http://localhost:14268/api/traces"
+            )
             exporter = JaegerExporter(
                 agent_host_name=os.getenv("JAEGER_AGENT_HOST", "localhost"),
                 agent_port=int(os.getenv("JAEGER_AGENT_PORT", "6831")),
@@ -134,7 +142,9 @@ def _configure_jaeger(endpoint: str | None):
             logger.info("Jaeger Thrift exporter configured: %s", endpoint)
             return exporter
         except ImportError:
-            logger.warning("Jaeger Thrift exporter not available, falling back to console")
+            logger.warning(
+                "Jaeger Thrift exporter not available, falling back to console"
+            )
             return _configure_console()
     except Exception as e:
         logger.error("Failed to configure Jaeger exporter: %s", e, exc_info=True)
@@ -145,7 +155,9 @@ def _configure_zipkin(endpoint: str | None):
     try:
         from opentelemetry.exporter.zipkin.json import ZipkinExporter
 
-        endpoint = endpoint or os.getenv("ZIPKIN_ENDPOINT", "http://localhost:9411/api/v2/spans")
+        endpoint = endpoint or os.getenv(
+            "ZIPKIN_ENDPOINT", "http://localhost:9411/api/v2/spans"
+        )
         exporter = ZipkinExporter(endpoint=endpoint)
         logger.info("Zipkin exporter configured: %s", endpoint)
         return exporter
@@ -160,7 +172,9 @@ def _configure_otlp(endpoint: str | None):
             OTLPSpanExporter,
         )
 
-        endpoint = endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+        endpoint = endpoint or os.getenv(
+            "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"
+        )
         exporter = OTLPSpanExporter(endpoint=endpoint)
         logger.info("OTLP exporter configured: %s", endpoint)
         return exporter
@@ -176,7 +190,9 @@ def _configure_console():
     return ConsoleSpanExporter()
 
 
-def _apply_span_processor(tracer_provider, span_exporter: Any, sample_rate: float) -> None:
+def _apply_span_processor(
+    tracer_provider, span_exporter: Any, sample_rate: float
+) -> None:
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
 
@@ -196,7 +212,9 @@ def _set_initialized():
     _tracing_initialized = True
 
 
-def _log_tracing_initialized(service_name: str, service_version: str, exporter: str, sample_rate: float) -> None:
+def _log_tracing_initialized(
+    service_name: str, service_version: str, exporter: str, sample_rate: float
+) -> None:
     logger.info(
         "Tracing initialized: service=%s, version=%s, exporter=%s, sample_rate=%s",
         service_name,

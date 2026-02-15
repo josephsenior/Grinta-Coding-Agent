@@ -60,15 +60,21 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
             return Timeout(str(exc), model=model, llm_provider="openai")
         if isinstance(exc, _oai.BadRequestError):
             if is_context_window_error(str(exc).lower(), exc):
-                return ContextWindowExceededError(str(exc), model=model, llm_provider="openai")
+                return ContextWindowExceededError(
+                    str(exc), model=model, llm_provider="openai"
+                )
             return BadRequestError(str(exc), model=model, llm_provider="openai")
         if isinstance(exc, _oai.InternalServerError):
             return InternalServerError(str(exc), model=model, llm_provider="openai")
         if isinstance(exc, _oai.APIStatusError):
             status = getattr(exc, "status_code", None)
             if status == 503:
-                return ServiceUnavailableError(str(exc), model=model, llm_provider="openai")
-            return APIError(str(exc), model=model, llm_provider="openai", status_code=status)
+                return ServiceUnavailableError(
+                    str(exc), model=model, llm_provider="openai"
+                )
+            return APIError(
+                str(exc), model=model, llm_provider="openai", status_code=status
+            )
     except ImportError:
         pass
     return None
@@ -89,15 +95,21 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
             return Timeout(str(exc), model=model, llm_provider="anthropic")
         if isinstance(exc, _anth.BadRequestError):
             if is_context_window_error(str(exc).lower(), exc):
-                return ContextWindowExceededError(str(exc), model=model, llm_provider="anthropic")
+                return ContextWindowExceededError(
+                    str(exc), model=model, llm_provider="anthropic"
+                )
             return BadRequestError(str(exc), model=model, llm_provider="anthropic")
         if isinstance(exc, _anth.InternalServerError):
             return InternalServerError(str(exc), model=model, llm_provider="anthropic")
         if isinstance(exc, _anth.APIStatusError):
             status = getattr(exc, "status_code", None)
             if status == 503:
-                return ServiceUnavailableError(str(exc), model=model, llm_provider="anthropic")
-            return APIError(str(exc), model=model, llm_provider="anthropic", status_code=status)
+                return ServiceUnavailableError(
+                    str(exc), model=model, llm_provider="anthropic"
+                )
+            return APIError(
+                str(exc), model=model, llm_provider="anthropic", status_code=status
+            )
     except ImportError:
         pass
     return None
@@ -124,13 +136,19 @@ def _map_provider_exception(exc: Exception, model: str) -> Exception:
     # Google Generative AI exceptions
     if "google" in exc_name or "generativeai" in exc_name:
         if is_context_window_error(exc_str, exc):
-            return ContextWindowExceededError(str(exc), model=model, llm_provider="google")
+            return ContextWindowExceededError(
+                str(exc), model=model, llm_provider="google"
+            )
         if "quota" in exc_str or "rate" in exc_str:
             return RateLimitError(str(exc), model=model, llm_provider="google")
         return APIError(str(exc), model=model, llm_provider="google")
 
     # Content-policy / safety-filter heuristics
-    if "content_filter" in exc_str or "content policy" in exc_str or "safety" in exc_str:
+    if (
+        "content_filter" in exc_str
+        or "content policy" in exc_str
+        or "safety" in exc_str
+    ):
         return ContentPolicyViolationError(str(exc), model=model)
 
     # Context-window overflow heuristic (catches providers we don't explicitly know)
@@ -169,7 +187,9 @@ class LLM(RetryMixin, DebugMixin):
     ) -> None:
         self.config: LLMConfig = copy.deepcopy(config)
         self.service_id = service_id
-        self.metrics: Metrics = metrics if metrics is not None else Metrics(model_name=config.model)
+        self.metrics: Metrics = (
+            metrics if metrics is not None else Metrics(model_name=config.model)
+        )
         self.retry_listener = retry_listener
         self._function_calling_active: bool = False
 
@@ -266,7 +286,9 @@ class LLM(RetryMixin, DebugMixin):
         ):
             return self.config.api_key.get_secret_value()
 
-        key_obj = api_key_manager.get_api_key_for_model(self.config.model, self.config.api_key)
+        key_obj = api_key_manager.get_api_key_for_model(
+            self.config.model, self.config.api_key
+        )
         return key_obj.get_secret_value() if key_obj else None
 
     def _get_call_kwargs(self, **kwargs) -> dict:
@@ -499,11 +521,16 @@ class LLM(RetryMixin, DebugMixin):
 
     async def _check_cancelled(self) -> bool:
         """Check if the request has been cancelled."""
-        if hasattr(self.config, "on_cancel_requested_fn") and self.config.on_cancel_requested_fn is not None:
+        if (
+            hasattr(self.config, "on_cancel_requested_fn")
+            and self.config.on_cancel_requested_fn is not None
+        ):
             return await self.config.on_cancel_requested_fn()
         return False
 
-    def _extract_messages(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> list[dict]:
+    def _extract_messages(
+        self, args: tuple[Any, ...], kwargs: dict[str, Any]
+    ) -> list[dict]:
         """Extract and normalize messages from args and kwargs."""
         if len(args) > 0:
             messages_kwarg = args[0]
@@ -546,7 +573,9 @@ class LLM(RetryMixin, DebugMixin):
                 custom_tokenizer=self.config.custom_tokenizer,
             )
         except Exception as e:
-            logger.error("Error getting token count for\n model %s\n%s", self.config.model, e)
+            logger.error(
+                "Error getting token count for\n model %s\n%s", self.config.model, e
+            )
             return 0
 
     def format_messages_for_llm(self, messages: Message | list[Message]) -> list[dict]:

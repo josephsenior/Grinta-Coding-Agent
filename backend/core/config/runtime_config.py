@@ -36,7 +36,9 @@ class RuntimeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=None,
         description="The BrowserGym environment to use for browser evaluation",
     )
-    selected_repo: str | None = Field(default=None, description="Selected repository for runtime operations")
+    selected_repo: str | None = Field(
+        default=None, description="Selected repository for runtime operations"
+    )
     close_delay: int = Field(
         default=DEFAULT_RUNTIME_CLOSE_DELAY,
         description="Delay in seconds before closing runtime",

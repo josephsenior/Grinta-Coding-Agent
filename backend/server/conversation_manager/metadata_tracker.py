@@ -106,13 +106,17 @@ class ConversationMetadataTracker:
         """Load metadata, apply metric / git / title updates, then save."""
         from datetime import datetime
 
-        conversation_store: ConversationStore = await self._get_conversation_store(user_id)
+        conversation_store: ConversationStore = await self._get_conversation_store(
+            user_id
+        )
         conversation = await conversation_store.get_metadata(conversation_id)
         conversation.last_updated_at = datetime.now(UTC)
 
         self._update_metrics_from_event(conversation, event)
         await self._handle_git_event(conversation_id, conversation, event)
-        await self._update_conversation_title(conversation_id, conversation, user_id, settings, llm_registry)
+        await self._update_conversation_title(
+            conversation_id, conversation, user_id, settings, llm_registry
+        )
 
         await conversation_store.save_metadata(conversation)
 
@@ -121,7 +125,9 @@ class ConversationMetadataTracker:
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    def _update_metrics_from_event(conversation: ConversationMetadata, event: Any) -> None:
+    def _update_metrics_from_event(
+        conversation: ConversationMetadata, event: Any
+    ) -> None:
         if not event or not hasattr(event, "llm_metrics") or not event.llm_metrics:
             return
 
@@ -134,13 +140,17 @@ class ConversationMetadataTracker:
             token_usage = metrics.accumulated_token_usage
             conversation.prompt_tokens = token_usage.prompt_tokens
             conversation.completion_tokens = token_usage.completion_tokens
-            conversation.total_tokens = token_usage.prompt_tokens + token_usage.completion_tokens
+            conversation.total_tokens = (
+                token_usage.prompt_tokens + token_usage.completion_tokens
+            )
 
     # ------------------------------------------------------------------ #
     # Git branch tracking
     # ------------------------------------------------------------------ #
 
-    async def _handle_git_event(self, conversation_id: str, conversation: ConversationMetadata, event: Any) -> None:
+    async def _handle_git_event(
+        self, conversation_id: str, conversation: ConversationMetadata, event: Any
+    ) -> None:
         if event and self._is_vcs_command_event(event):
             logger.info(
                 "Git-related event detected, updating conversation branch for %s",
@@ -169,12 +179,18 @@ class ConversationMetadataTracker:
             return any(git_cmd in command for git_cmd in git_commands)
         return False
 
-    async def _update_conversation_branch(self, conversation: ConversationMetadata) -> None:
+    async def _update_conversation_branch(
+        self, conversation: ConversationMetadata
+    ) -> None:
         try:
-            session, runtime = self._get_session_and_runtime(conversation.conversation_id)
+            session, runtime = self._get_session_and_runtime(
+                conversation.conversation_id
+            )
             if not session or not runtime:
                 return
-            current_branch = self._get_current_workspace_branch(runtime, conversation.selected_repository)
+            current_branch = self._get_current_workspace_branch(
+                runtime, conversation.selected_repository
+            )
             if self._should_update_branch(conversation.selected_branch, current_branch):
                 self._update_branch_in_conversation(conversation, current_branch)
         except Exception as e:
@@ -191,7 +207,9 @@ class ConversationMetadataTracker:
         return (session, session.agent_session.runtime)
 
     @staticmethod
-    def _get_current_workspace_branch(runtime: Any, selected_repository: str | None) -> str | None:
+    def _get_current_workspace_branch(
+        runtime: Any, selected_repository: str | None
+    ) -> str | None:
         if not selected_repository:
             primary_repo_path = None
         else:
@@ -199,11 +217,15 @@ class ConversationMetadataTracker:
         return runtime.get_workspace_branch(primary_repo_path)
 
     @staticmethod
-    def _should_update_branch(current_branch: str | None, new_branch: str | None) -> bool:
+    def _should_update_branch(
+        current_branch: str | None, new_branch: str | None
+    ) -> bool:
         return new_branch is not None and new_branch != current_branch
 
     @staticmethod
-    def _update_branch_in_conversation(conversation: ConversationMetadata, new_branch: str | None) -> None:
+    def _update_branch_in_conversation(
+        conversation: ConversationMetadata, new_branch: str | None
+    ) -> None:
         old_branch = conversation.selected_branch
         conversation.selected_branch = new_branch
         logger.info(
@@ -230,7 +252,9 @@ class ConversationMetadataTracker:
         if conversation.title != default_title:
             return
 
-        title = await auto_generate_title(conversation_id, user_id, self._file_store, settings, llm_registry)
+        title = await auto_generate_title(
+            conversation_id, user_id, self._file_store, settings, llm_registry
+        )
 
         if title and not title.isspace():
             conversation.title = title

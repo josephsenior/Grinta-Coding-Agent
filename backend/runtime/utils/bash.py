@@ -109,7 +109,11 @@ def escape_bash_special_chars(command: str) -> str:
 
             """
             nonlocal last_pos
-            if node.kind == "redirect" and hasattr(node, "heredoc") and (node.heredoc is not None):
+            if (
+                node.kind == "redirect"
+                and hasattr(node, "heredoc")
+                and (node.heredoc is not None)
+            ):
                 between = command[last_pos : node.pos[0]]
                 parts.append(between)
                 parts.append(command[node.pos[0] : node.heredoc.pos[0]])
@@ -250,7 +254,9 @@ class BashSession(BaseShellSession):
         self.window = window
         self.pane = pane
         logger.debug("pane: %s; history_limit: %s", pane, session.history_limit)
-        pane.send_keys(f'''export PROMPT_COMMAND='export PS1="{self.PS1}"'; export PS2=""''')
+        pane.send_keys(
+            f'''export PROMPT_COMMAND='export PS1="{self.PS1}"'; export PS2=""'''
+        )
         time.sleep(0.1)
         self._clear_screen()
         logger.debug("Bash session initialized with work dir: %s", self.work_dir)
@@ -301,7 +307,9 @@ class BashSession(BaseShellSession):
         logger.info("Closing BashSession...")
         if self._cancellation is not None and self._cancellation_callback_key:
             try:
-                self._cancellation.unregister_kill_callback(self._cancellation_callback_key)
+                self._cancellation.unregister_kill_callback(
+                    self._cancellation_callback_key
+                )
             except Exception:
                 logger.debug("Failed to unregister tmux kill callback", exc_info=True)
         session = self.session
@@ -322,7 +330,9 @@ class BashSession(BaseShellSession):
     def _get_pane_content(self) -> str:
         """Capture the current pane content and update the buffer."""
         pane = self._require_pane()
-        return "\n".join(line.rstrip() for line in pane.cmd("capture-pane", "-J", "-pS", "-").stdout)
+        return "\n".join(
+            line.rstrip() for line in pane.cmd("capture-pane", "-J", "-pS", "-").stdout
+        )
 
     def _get_window_and_pane_with_retry(
         self, session: Session, retries: int = 10, delay: float = 0.1
@@ -418,9 +428,7 @@ class BashSession(BaseShellSession):
         )
         if get_content_before_last_match:
             num_lines = len(raw_command_output.splitlines())
-            metadata.prefix = (
-                f"[Previous command outputs are truncated. Showing the last {num_lines} lines of the output below.]\n"
-            )
+            metadata.prefix = f"[Previous command outputs are truncated. Showing the last {num_lines} lines of the output below.]\n"
         metadata.suffix = (
             f"\n[The command completed with exit code {metadata.exit_code}. CTRL+{command[-1].upper()} was sent.]"
             if is_special_key
@@ -429,7 +437,11 @@ class BashSession(BaseShellSession):
         if is_input and command != "":
             continue_prefix = ""
         else:
-            continue_prefix = "[Below is the output of the previous command.]\n" if self.prev_output else ""
+            continue_prefix = (
+                "[Below is the output of the previous command.]\n"
+                if self.prev_output
+                else ""
+            )
         command_output = self._get_command_output(
             command,
             raw_command_output,
@@ -439,7 +451,9 @@ class BashSession(BaseShellSession):
         self.prev_status = BashCommandStatus.COMPLETED
         self.prev_output = ""
         self._ready_for_next_command()
-        return CmdOutputObservation(content=command_output, command=command, metadata=metadata, hidden=hidden)
+        return CmdOutputObservation(
+            content=command_output, command=command, metadata=metadata, hidden=hidden
+        )
 
     def _handle_nochange_timeout_command(
         self,
@@ -454,18 +468,22 @@ class BashSession(BaseShellSession):
                 len(ps1_matches),
                 pane_content,
             )
-        raw_command_output = self._combine_outputs_between_matches(pane_content, ps1_matches)
+        raw_command_output = self._combine_outputs_between_matches(
+            pane_content, ps1_matches
+        )
         metadata = CmdOutputMetadata()
-        metadata.suffix = f"\n[The command has no new output after {self.NO_CHANGE_TIMEOUT_SECONDS} seconds. {
-            TIMEOUT_MESSAGE_TEMPLATE
-        }]"
+        metadata.suffix = f"\n[The command has no new output after {
+            self.NO_CHANGE_TIMEOUT_SECONDS
+        } seconds. {TIMEOUT_MESSAGE_TEMPLATE}]"
         command_output = self._get_command_output(
             command,
             raw_command_output,
             metadata,
             continue_prefix="[Below is the output of the previous command.]\n",
         )
-        return CmdOutputObservation(content=command_output, command=command, metadata=metadata)
+        return CmdOutputObservation(
+            content=command_output, command=command, metadata=metadata
+        )
 
     def _handle_hard_timeout_command(
         self,
@@ -481,7 +499,9 @@ class BashSession(BaseShellSession):
                 len(ps1_matches),
                 pane_content,
             )
-        raw_command_output = self._combine_outputs_between_matches(pane_content, ps1_matches)
+        raw_command_output = self._combine_outputs_between_matches(
+            pane_content, ps1_matches
+        )
         metadata = CmdOutputMetadata()
         metadata.suffix = f"\n[The command timed out after {timeout} seconds. {TIMEOUT_MESSAGE_TEMPLATE}]"
         command_output = self._get_command_output(
@@ -490,7 +510,9 @@ class BashSession(BaseShellSession):
             metadata,
             continue_prefix="[Below is the output of the previous command.]\n",
         )
-        return CmdOutputObservation(command=command, content=command_output, metadata=metadata)
+        return CmdOutputObservation(
+            command=command, content=command_output, metadata=metadata
+        )
 
     def _ready_for_next_command(self) -> None:
         """Reset the content buffer for a new command."""
@@ -522,7 +544,9 @@ class BashSession(BaseShellSession):
             return pane_content
         combined_output = ""
         for i in range(len(ps1_matches) - 1):
-            output_segment = pane_content[ps1_matches[i].end() + 1 : ps1_matches[i + 1].start()]
+            output_segment = pane_content[
+                ps1_matches[i].end() + 1 : ps1_matches[i + 1].start()
+            ]
             combined_output += output_segment + "\n"
         combined_output += pane_content[ps1_matches[-1].end() + 1 :]
         logger.debug("COMBINED OUTPUT: %s", combined_output)
@@ -554,7 +578,9 @@ class BashSession(BaseShellSession):
         splited_commands = split_bash_commands(command)
         if len(splited_commands) > 1:
             msg = f"ERROR: Cannot execute multiple commands at once.\nPlease run each command separately OR chain them into a single command via && or ;\nProvided commands:\n{
-                '\n'.join((f'({i + 1}) {cmd}' for i, cmd in enumerate(splited_commands)))
+                '\n'.join(
+                    (f'({i + 1}) {cmd}' for i, cmd in enumerate(splited_commands))
+                )
             }"
             raise ValueError(
                 msg,
@@ -569,14 +595,17 @@ class BashSession(BaseShellSession):
     ) -> CmdOutputObservation | None:
         """Handle case where previous command timed out."""
         if (
-            self.prev_status in {BashCommandStatus.HARD_TIMEOUT, BashCommandStatus.NO_CHANGE_TIMEOUT}
+            self.prev_status
+            in {BashCommandStatus.HARD_TIMEOUT, BashCommandStatus.NO_CHANGE_TIMEOUT}
             and not last_pane_output.rstrip().endswith(CMD_OUTPUT_PS1_END.rstrip())
             and not is_input
             and command != ""
         ):
             _ps1_matches = CmdOutputMetadata.matches_ps1_metadata(last_pane_output)
             current_matches_for_output = _ps1_matches or initial_ps1_matches
-            raw_command_output = self._combine_outputs_between_matches(last_pane_output, current_matches_for_output)
+            raw_command_output = self._combine_outputs_between_matches(
+                last_pane_output, current_matches_for_output
+            )
             metadata = CmdOutputMetadata()
             metadata.suffix = f'\n[Your command "{command}" is NOT executed. The previous command is still running - You CANNOT send new commands until the previous command is completed. By setting `is_input` to `true`, you can interact with the current process: {TIMEOUT_MESSAGE_TEMPLATE}]'
             logger.debug("PREVIOUS COMMAND OUTPUT: %s", raw_command_output)
@@ -617,7 +646,9 @@ class BashSession(BaseShellSession):
     ) -> CmdOutputObservation | None:
         """Check if command has completed and return observation if so."""
         current_ps1_count = len(ps1_matches)
-        if current_ps1_count > initial_ps1_count or cur_pane_output.rstrip().endswith(CMD_OUTPUT_PS1_END.rstrip()):
+        if current_ps1_count > initial_ps1_count or cur_pane_output.rstrip().endswith(
+            CMD_OUTPUT_PS1_END.rstrip()
+        ):
             return self._handle_completed_command(
                 command,
                 pane_content=cur_pane_output,
@@ -645,16 +676,25 @@ class BashSession(BaseShellSession):
             action.blocking,
         )
 
-        if not action.blocking and time_since_last_change >= self.NO_CHANGE_TIMEOUT_SECONDS:
-            return self._handle_nochange_timeout_command(command, pane_content=cur_pane_output, ps1_matches=ps1_matches)
+        if (
+            not action.blocking
+            and time_since_last_change >= self.NO_CHANGE_TIMEOUT_SECONDS
+        ):
+            return self._handle_nochange_timeout_command(
+                command, pane_content=cur_pane_output, ps1_matches=ps1_matches
+            )
 
         # Skip hard timeout check if timeout is None (long-running commands like servers)
         if action.timeout is None:
-            logger.debug("No hard timeout set (long-running command), skipping timeout check")
+            logger.debug(
+                "No hard timeout set (long-running command), skipping timeout check"
+            )
             return None
 
         elapsed_time = time.time() - start_time
-        logger.debug("CHECKING HARD TIMEOUT (%ss): elapsed %s", action.timeout, elapsed_time)
+        logger.debug(
+            "CHECKING HARD TIMEOUT (%ss): elapsed %s", action.timeout, elapsed_time
+        )
 
         if action.timeout and elapsed_time >= action.timeout:
             logger.debug("Hard timeout triggered.")
@@ -764,7 +804,9 @@ class BashSession(BaseShellSession):
             self._validate_session_and_command(action)
         except ValueError as e:
             if "No previous running command" in str(e):
-                return CmdOutputObservation(content=str(e), command="", metadata=CmdOutputMetadata())
+                return CmdOutputObservation(
+                    content=str(e), command="", metadata=CmdOutputMetadata()
+                )
             return ErrorObservation(content=str(e))
 
         command = action.command.strip()
@@ -772,7 +814,9 @@ class BashSession(BaseShellSession):
 
         # Get initial state
         initial_pane_output = self._get_pane_content()
-        initial_ps1_matches = CmdOutputMetadata.matches_ps1_metadata(initial_pane_output)
+        initial_ps1_matches = CmdOutputMetadata.matches_ps1_metadata(
+            initial_pane_output
+        )
         initial_ps1_count = len(initial_ps1_matches)
         logger.debug("Initial PS1 count: %s", initial_ps1_count)
 
@@ -788,7 +832,9 @@ class BashSession(BaseShellSession):
         self._send_command_to_pane(command, is_input)
 
         # Monitor execution
-        return self._monitor_command_execution(command, initial_ps1_count, is_input, action)
+        return self._monitor_command_execution(
+            command, initial_ps1_count, is_input, action
+        )
 
     def get_detected_server(self):
         """Get and clear the last detected server.

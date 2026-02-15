@@ -30,6 +30,7 @@ TOP_KEYS = [
     "llm_metrics",
 ]
 from backend.events.serialization.common import UNDERSCORE_KEYS
+
 DELETE_FROM_TRAJECTORY_EXTRAS = {
     "dom_object",
     "axtree_object",

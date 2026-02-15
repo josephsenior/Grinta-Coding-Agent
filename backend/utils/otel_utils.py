@@ -30,6 +30,7 @@ def redis_span(span_name: str) -> Generator[Any, None, None]:
         # Inject common trace context if available
         try:
             from backend.core.logger import get_trace_context
+
             ctx = get_trace_context()
             if ctx.get("trace_id"):
                 span.set_attribute("forge.trace_id", str(ctx["trace_id"]))

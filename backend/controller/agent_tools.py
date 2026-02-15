@@ -40,7 +40,9 @@ def build_tool(tool: dict) -> dict | None:
     return tool_param
 
 
-def chunk_args_from_payload(function_payload: dict, original_tool: dict) -> AgentFunctionChunkArgs | None:
+def chunk_args_from_payload(
+    function_payload: dict, original_tool: dict
+) -> AgentFunctionChunkArgs | None:
     """Extract function chunk arguments from payload."""
     name_value = function_payload.get("name")
     if not isinstance(name_value, str) or not name_value:
@@ -60,7 +62,9 @@ def chunk_args_from_payload(function_payload: dict, original_tool: dict) -> Agen
     return chunk_kwargs
 
 
-def make_function_chunk_wrapper(chunk_kwargs: AgentFunctionChunkArgs, original_tool: dict):
+def make_function_chunk_wrapper(
+    chunk_kwargs: AgentFunctionChunkArgs, original_tool: dict
+):
     """Safely create a function chunk."""
     try:
         return make_function_chunk(**chunk_kwargs)

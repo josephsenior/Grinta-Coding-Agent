@@ -76,7 +76,9 @@ class SmartErrorHandler:
         return None
 
     @staticmethod
-    def _create_fuzzy_match_suggestion(symbol_name: str, close_matches: list[str]) -> ErrorSuggestion:
+    def _create_fuzzy_match_suggestion(
+        symbol_name: str, close_matches: list[str]
+    ) -> ErrorSuggestion:
         """Create suggestion from fuzzy matches.
 
         Args:
@@ -145,7 +147,9 @@ class SmartErrorHandler:
         return f" ({', '.join(available_info)} available)" if available_info else ""
 
     @staticmethod
-    def _build_symbol_list_message(symbol_name: str, available_symbols: list[str], context: str) -> str:
+    def _build_symbol_list_message(
+        symbol_name: str, available_symbols: list[str], context: str
+    ) -> str:
         """Build message listing available symbols.
 
         Args:
@@ -157,8 +161,9 @@ class SmartErrorHandler:
             Formatted message
 
         """
-        message = f"Symbol '{symbol_name}' not found{context}. Available symbols:\n" + "\n".join(
-            f"  - {s}" for s in available_symbols[:10]
+        message = (
+            f"Symbol '{symbol_name}' not found{context}. Available symbols:\n"
+            + "\n".join(f"  - {s}" for s in available_symbols[:10])
         )
 
         if len(available_symbols) > 10:
@@ -190,7 +195,9 @@ class SmartErrorHandler:
 
         functions, classes = SmartErrorHandler._group_symbols_by_type(available_symbols)
         context = SmartErrorHandler._build_symbol_context(classes, functions)
-        message = SmartErrorHandler._build_symbol_list_message(symbol_name, available_symbols, context)
+        message = SmartErrorHandler._build_symbol_list_message(
+            symbol_name, available_symbols, context
+        )
 
         return ErrorSuggestion(
             message=message,
@@ -199,7 +206,9 @@ class SmartErrorHandler:
         )
 
     @staticmethod
-    def symbol_not_found(symbol_name: str, available_symbols: list[str], max_suggestions: int = 5) -> ErrorSuggestion:
+    def symbol_not_found(
+        symbol_name: str, available_symbols: list[str], max_suggestions: int = 5
+    ) -> ErrorSuggestion:
         """Generate error message when a symbol is not found.
 
         Args:
@@ -216,13 +225,19 @@ class SmartErrorHandler:
             return typo_suggestion
 
         # Try fuzzy matching
-        close_matches = difflib.get_close_matches(symbol_name, available_symbols, n=max_suggestions, cutoff=0.6)
+        close_matches = difflib.get_close_matches(
+            symbol_name, available_symbols, n=max_suggestions, cutoff=0.6
+        )
 
         if close_matches:
-            return SmartErrorHandler._create_fuzzy_match_suggestion(symbol_name, close_matches)
+            return SmartErrorHandler._create_fuzzy_match_suggestion(
+                symbol_name, close_matches
+            )
 
         # No matches - show available symbols
-        return SmartErrorHandler._create_available_symbols_message(symbol_name, available_symbols, max_suggestions)
+        return SmartErrorHandler._create_available_symbols_message(
+            symbol_name, available_symbols, max_suggestions
+        )
 
     @staticmethod
     def _analyze_indent_error(error_lower: str) -> tuple[list[str], float]:
@@ -290,7 +305,9 @@ class SmartErrorHandler:
         return None
 
     @staticmethod
-    def _analyze_invalid_syntax(error_lower: str, code_context: str | None) -> tuple[list[str], float]:
+    def _analyze_invalid_syntax(
+        error_lower: str, code_context: str | None
+    ) -> tuple[list[str], float]:
         """Analyze invalid syntax errors."""
         if "invalid syntax" not in error_lower:
             return [], 0.5
@@ -389,12 +406,18 @@ class SmartErrorHandler:
                 confidence = max(confidence, conf)
 
         # Build formatted message
-        message = SmartErrorHandler._build_error_message(error_message, line_number, code_context, all_suggestions)
+        message = SmartErrorHandler._build_error_message(
+            error_message, line_number, code_context, all_suggestions
+        )
 
-        return ErrorSuggestion(message=message, suggestions=all_suggestions, confidence=confidence)
+        return ErrorSuggestion(
+            message=message, suggestions=all_suggestions, confidence=confidence
+        )
 
     @staticmethod
-    def file_not_found(file_path: str, similar_files: list[str] | None = None) -> ErrorSuggestion:
+    def file_not_found(
+        file_path: str, similar_files: list[str] | None = None
+    ) -> ErrorSuggestion:
         """Generate error message when file is not found.
 
         Args:
@@ -406,10 +429,14 @@ class SmartErrorHandler:
 
         """
         if not similar_files:
-            return ErrorSuggestion(message=f"File not found: {file_path}", suggestions=[], confidence=0.0)
+            return ErrorSuggestion(
+                message=f"File not found: {file_path}", suggestions=[], confidence=0.0
+            )
 
         # Fuzzy match file paths
-        close_matches = difflib.get_close_matches(file_path, similar_files, n=5, cutoff=0.5)
+        close_matches = difflib.get_close_matches(
+            file_path, similar_files, n=5, cutoff=0.5
+        )
 
         if close_matches:
             best_match = close_matches[0]
@@ -434,7 +461,9 @@ class SmartErrorHandler:
         )
 
     @staticmethod
-    def whitespace_mismatch(expected_indent: str, actual_indent: str, line_number: int) -> ErrorSuggestion:
+    def whitespace_mismatch(
+        expected_indent: str, actual_indent: str, line_number: int
+    ) -> ErrorSuggestion:
         """Generate error for whitespace/indentation mismatches.
 
         Args:
@@ -479,7 +508,9 @@ class SmartErrorHandler:
         )
 
     @staticmethod
-    def suggest_similar(target: str, candidates: list[str], threshold: float = 0.6) -> list[str]:
+    def suggest_similar(
+        target: str, candidates: list[str], threshold: float = 0.6
+    ) -> list[str]:
         """Find similar strings using fuzzy matching.
 
         Args:
@@ -494,7 +525,9 @@ class SmartErrorHandler:
         return difflib.get_close_matches(target, candidates, n=10, cutoff=threshold)
 
     @staticmethod
-    def format_edit_conflict(file_path: str, your_edit: str, other_edit: str) -> ErrorSuggestion:
+    def format_edit_conflict(
+        file_path: str, your_edit: str, other_edit: str
+    ) -> ErrorSuggestion:
         """Format message for edit conflicts in multi-file refactoring.
 
         Args:

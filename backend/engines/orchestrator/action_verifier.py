@@ -41,7 +41,9 @@ class ActionVerifier:
         self.runtime = runtime
         self.verification_enabled = True
 
-    async def verify_action(self, action: Action) -> tuple[bool, str, Observation | None]:
+    async def verify_action(
+        self, action: Action
+    ) -> tuple[bool, str, Observation | None]:
         """Verify an action actually succeeded.
 
         Args:
@@ -61,7 +63,9 @@ class ActionVerifier:
         # No verification needed for other action types
         return True, "No verification needed", None
 
-    async def _verify_file_edit_action(self, action: FileEditAction) -> tuple[bool, str, Observation | None]:
+    async def _verify_file_edit_action(
+        self, action: FileEditAction
+    ) -> tuple[bool, str, Observation | None]:
         """Verify a file was actually created/edited.
 
         Args:
@@ -89,7 +93,10 @@ class ActionVerifier:
                 )
 
             if "FILE_MISSING" in verify_obs.content:
-                logger.error("File verification failed: %s does not exist despite tool call", file_path)
+                logger.error(
+                    "File verification failed: %s does not exist despite tool call",
+                    file_path,
+                )
                 return (
                     False,
                     f"❌ CRITICAL: File {file_path} was NOT created despite edit_file tool call",
@@ -126,7 +133,9 @@ class ActionVerifier:
                     content_obs,
                 )
 
-            logger.info("✅ File verification successful: %s (%s lines)", file_path, lines)
+            logger.info(
+                "✅ File verification successful: %s (%s lines)", file_path, lines
+            )
             return (
                 True,
                 f"✅ Verified: {file_path} created successfully ({lines} lines)",

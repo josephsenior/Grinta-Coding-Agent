@@ -29,15 +29,29 @@ class ConversationTemplate(BaseModel):
 
     id: str = Field(..., min_length=1, description="Unique identifier")
     title: str = Field(..., min_length=1, max_length=200, description="Template title")
-    description: str | None = Field(None, max_length=1000, description="Template description")
-    category: TemplateCategory = Field(default=TemplateCategory.CUSTOM, description="Template category")
+    description: str | None = Field(
+        None, max_length=1000, description="Template description"
+    )
+    category: TemplateCategory = Field(
+        default=TemplateCategory.CUSTOM, description="Template category"
+    )
     prompt: str = Field(..., min_length=1, description="The initial prompt/message")
     icon: str | None = Field(None, description="Icon identifier")
-    is_favorite: bool = Field(default=False, description="Whether template is favorited")
-    usage_count: int = Field(default=0, ge=0, description="Number of times template was used")
-    created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
-    updated_at: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    is_favorite: bool = Field(
+        default=False, description="Whether template is favorited"
+    )
+    usage_count: int = Field(
+        default=0, ge=0, description="Number of times template was used"
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.now, description="Creation timestamp"
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.now, description="Last update timestamp"
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
     @field_validator("id", "title", "prompt")
     @classmethod
@@ -52,8 +66,12 @@ class CreateTemplateRequest(BaseModel):
     """Request to create a template."""
 
     title: str = Field(..., min_length=1, max_length=200, description="Template title")
-    description: str | None = Field(None, max_length=1000, description="Template description")
-    category: TemplateCategory = Field(default=TemplateCategory.CUSTOM, description="Template category")
+    description: str | None = Field(
+        None, max_length=1000, description="Template description"
+    )
+    category: TemplateCategory = Field(
+        default=TemplateCategory.CUSTOM, description="Template category"
+    )
     prompt: str = Field(..., min_length=1, description="The initial prompt/message")
     icon: str | None = Field(None, description="Icon identifier")
     is_favorite: bool = Field(default=False, description="Whether to mark as favorite")

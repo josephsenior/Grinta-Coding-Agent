@@ -46,7 +46,9 @@ class MCPClient(BaseModel):
     tool_map: dict[str, MCPClientTool] = Field(default_factory=dict)
     _session_active: bool = False
     _connect_kwargs: dict | None = None
-    _server_config: MCPStdioServerConfig | MCPSSEServerConfig | MCPSHTTPServerConfig | None = None
+    _server_config: (
+        MCPStdioServerConfig | MCPSSEServerConfig | MCPSHTTPServerConfig | None
+    ) = None
 
     # ------------------------------------------------------------------
     # Internal session management
@@ -108,7 +110,9 @@ class MCPClient(BaseModel):
                 return
             except Exception as exc:
                 logger.warning("MCP reconnect attempt %d failed: %s", attempt, exc)
-        raise RuntimeError(f"MCP server unreachable after {_MAX_RECONNECT_ATTEMPTS} reconnect attempts.")
+        raise RuntimeError(
+            f"MCP server unreachable after {_MAX_RECONNECT_ATTEMPTS} reconnect attempts."
+        )
 
     # ------------------------------------------------------------------
     # Public API — connect
@@ -152,7 +156,9 @@ class MCPClient(BaseModel):
             self._handle_connection_error(server_url, server, e, is_mcp_error=False)
             raise
 
-    def _build_http_headers(self, api_key: str | None, conversation_id: str | None) -> dict:
+    def _build_http_headers(
+        self, api_key: str | None, conversation_id: str | None
+    ) -> dict:
         """Build HTTP headers for connection."""
         headers = {}
         if api_key:
@@ -173,7 +179,9 @@ class MCPClient(BaseModel):
             return StreamableHttpTransport(url=server_url, headers=headers or None)
         return SSETransport(url=server_url, headers=headers or None)
 
-    def _handle_connection_error(self, server_url: str, server, error: Exception, is_mcp_error: bool = False) -> None:
+    def _handle_connection_error(
+        self, server_url: str, server, error: Exception, is_mcp_error: bool = False
+    ) -> None:
         """Handle and record connection errors."""
         error_prefix = "McpError" if is_mcp_error else "Error"
         error_msg = f"{error_prefix} connecting to {server_url}: {error}"
@@ -187,16 +195,22 @@ class MCPClient(BaseModel):
             exception_details=str(error),
         )
 
-    async def connect_stdio(self, server: MCPStdioServerConfig, timeout: float = 30.0) -> None:
+    async def connect_stdio(
+        self, server: MCPStdioServerConfig, timeout: float = 30.0
+    ) -> None:
         """Connect to MCP server using stdio transport."""
         try:
-            transport = StdioTransport(command=server.command, args=server.args or [], env=server.env)
+            transport = StdioTransport(
+                command=server.command, args=server.args or [], env=server.env
+            )
             self.client = Client(transport, timeout=timeout)
             self._server_config = server
             await self._open_session()
             await self._populate_tools()
         except Exception as e:
-            server_name = getattr(server, "name", f"{server.command} {' '.join(server.args or [])}")
+            server_name = getattr(
+                server, "name", f"{server.command} {' '.join(server.args or [])}"
+            )
             error_msg = f"Failed to connect to stdio server {server_name}: {e}"
             logger.error(error_msg)
             mcp_error_collector.add_error(
@@ -223,7 +237,9 @@ class MCPClient(BaseModel):
         try:
             return await self.client.call_tool_mcp(name=tool_name, arguments=args)
         except Exception as exc:
-            logger.warning("MCP call_tool(%s) failed: %s — attempting reconnect", tool_name, exc)
+            logger.warning(
+                "MCP call_tool(%s) failed: %s — attempting reconnect", tool_name, exc
+            )
             await self._reconnect()
             # Retry once after reconnect
             return await self.client.call_tool_mcp(name=tool_name, arguments=args)

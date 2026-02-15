@@ -47,7 +47,9 @@ class LocalFileStore(FileStore):
             return str(safe_path.path)
         except ImportError as imp_err:
             # SafePath module not available — fall back to manual validation
-            logger.warning("SafePath module not available, using manual path validation")
+            logger.warning(
+                "SafePath module not available, using manual path validation"
+            )
             path = path.removeprefix("/")
             full = os.path.normpath(os.path.join(self.root, path))
             # Ensure the resolved path is still under root
@@ -96,12 +98,16 @@ class LocalFileStore(FileStore):
                 try:
                     os.close(fd)
                 except Exception:
-                    logger.warning("Failed to close temp file descriptor", exc_info=True)
+                    logger.warning(
+                        "Failed to close temp file descriptor", exc_info=True
+                    )
             if tmp_path is not None:
                 try:
                     os.remove(tmp_path)
                 except Exception:
-                    logger.warning("Failed to remove temp file %s", tmp_path, exc_info=True)
+                    logger.warning(
+                        "Failed to remove temp file %s", tmp_path, exc_info=True
+                    )
 
     def read(self, path: str) -> str:
         """Read file from local filesystem.

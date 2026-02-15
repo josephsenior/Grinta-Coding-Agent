@@ -36,7 +36,9 @@ class RecoveryService:
             f"_react_to_exception called with: {type(exc).__name__}: {exc}",
         )
         error_type = ErrorRecoveryStrategy.classify_error(exc)
-        controller.state.set_last_error(self._format_user_message(exc, error_type), source="RecoveryService")
+        controller.state.set_last_error(
+            self._format_user_message(exc, error_type), source="RecoveryService"
+        )
         controller.log("info", f"Set error message: {controller.state.last_error}")
         self._emit_recovery_event(
             "start",
@@ -177,7 +179,9 @@ class RecoveryService:
                 "info",
                 "Skipping error recovery for AuthenticationError - requires user intervention",
             )
-            self._emit_recovery_event("skipped", error_type=error_type.value, reason="authentication_error")
+            self._emit_recovery_event(
+                "skipped", error_type=error_type.value, reason="authentication_error"
+            )
             return False
 
         if self._retry_service.retry_count >= self._max_retries:
@@ -185,31 +189,47 @@ class RecoveryService:
                 "warning",
                 f"Maximum retry limit ({self._max_retries}) reached for error: {type(exc).__name__}",
             )
-            self._emit_recovery_event("skipped", error_type=error_type.value, reason="max_retries")
+            self._emit_recovery_event(
+                "skipped", error_type=error_type.value, reason="max_retries"
+            )
             return False
 
         if error_type == ErrorType.TOOL_CALL_ERROR:
-            logger.info("Skipping recovery for tool call error to prevent infinite loop")
-            self._emit_recovery_event("skipped", error_type=error_type.value, reason="tool_call_error")
+            logger.info(
+                "Skipping recovery for tool call error to prevent infinite loop"
+            )
+            self._emit_recovery_event(
+                "skipped", error_type=error_type.value, reason="tool_call_error"
+            )
             return False
 
         autonomy = getattr(controller, "autonomy_controller", None)
-        if autonomy and autonomy.should_retry_on_error(exc, self._retry_service.retry_count):
+        if autonomy and autonomy.should_retry_on_error(
+            exc, self._retry_service.retry_count
+        ):
             await self._execute_recovery_actions(error_type, exc)
             return True
 
         if error_type != ErrorType.UNKNOWN_ERROR:
-            recovery_actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, exc)
+            recovery_actions = ErrorRecoveryStrategy.get_recovery_actions(
+                error_type, exc
+            )
             if recovery_actions:
                 await self._execute_recovery_actions(error_type, exc)
                 return True
 
         return False
 
-    async def _execute_recovery_actions(self, error_type: ErrorType, exc: Exception) -> None:
+    async def _execute_recovery_actions(
+        self, error_type: ErrorType, exc: Exception
+    ) -> None:
         controller = self._context.get_controller()
 
-        logger.info("Auto-recovery for %s: attempt %s", error_type, self._retry_service.retry_count + 1)
+        logger.info(
+            "Auto-recovery for %s: attempt %s",
+            error_type,
+            self._retry_service.retry_count + 1,
+        )
         recovery_actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, exc)
         for action in recovery_actions:
             controller.event_stream.add_event(action, EventSource.AGENT)
@@ -236,7 +256,9 @@ class RecoveryService:
         ):
             await asyncio.sleep(2**self._retry_service.retry_count)
             if error_type == ErrorType.TOOL_CALL_ERROR:
-                logger.info("Tool call error recovery: allowing time for user to review and potentially fix the issue")
+                logger.info(
+                    "Tool call error recovery: allowing time for user to review and potentially fix the issue"
+                )
                 await asyncio.sleep(3)
             controller.step()
         else:
@@ -250,7 +272,9 @@ class RecoveryService:
         from backend.events.observation import ErrorObservation
 
         controller = self._context.get_controller()
-        logger.error("Non-recoverable error encountered: %s. Transitioning to ERROR state.", exc)
+        logger.error(
+            "Non-recoverable error encountered: %s. Transitioning to ERROR state.", exc
+        )
         self._context.get_controller().circuit_breaker_service.record_error(exc)
         error_type = ErrorRecoveryStrategy.classify_error(exc)
 
@@ -267,7 +291,9 @@ class RecoveryService:
             if isinstance(exc, RateLimitError):
                 await self._handle_rate_limit_error(exc)
                 return
-            controller.status_callback("error", runtime_status, controller.state.last_error)
+            controller.status_callback(
+                "error", runtime_status, controller.state.last_error
+            )
         else:
             runtime_status = self._determine_runtime_status(exc)
 
@@ -280,11 +306,15 @@ class RecoveryService:
 
         if await self._retry_service.schedule_retry_after_failure(exc):
             await controller.set_agent_state_to(AgentState.PAUSED)
-            self._emit_recovery_event("retry_deferred", next_state=AgentState.PAUSED.value)
+            self._emit_recovery_event(
+                "retry_deferred", next_state=AgentState.PAUSED.value
+            )
             return
 
         # Send user-friendly error message to client before setting ERROR state
-        error_message = controller.state.last_error or f"An error occurred: {type(exc).__name__}"
+        error_message = (
+            controller.state.last_error or f"An error occurred: {type(exc).__name__}"
+        )
 
         # Log to audit store
         await controller.log_task_audit("FAILURE", error_message=error_message)
@@ -319,7 +349,8 @@ class RecoveryService:
         if isinstance(exc, BadRequestError) and "ExceededBudget" in str(exc):
             return RuntimeStatus.ERROR_LLM_OUT_OF_CREDITS
         if isinstance(exc, ContentPolicyViolationError) or (
-            isinstance(exc, BadRequestError) and "ContentPolicyViolationError" in str(exc)
+            isinstance(exc, BadRequestError)
+            and "ContentPolicyViolationError" in str(exc)
         ):
             return RuntimeStatus.ERROR_LLM_CONTENT_POLICY_VIOLATION
         if isinstance(exc, RateLimitError):
@@ -330,12 +361,18 @@ class RecoveryService:
         from backend.events.observation import ErrorObservation
 
         controller = self._context.get_controller()
-        if hasattr(exc, "retry_attempt") and hasattr(exc, "max_retries") and (exc.retry_attempt >= exc.max_retries):
+        if (
+            hasattr(exc, "retry_attempt")
+            and hasattr(exc, "max_retries")
+            and (exc.retry_attempt >= exc.max_retries)
+        ):
             # Retries exhausted - send user-friendly error message
             error_message = self._format_llm_error(exc) or str(exc)
 
             # Log to audit store
-            await controller.log_task_audit("FAILURE", error_message=f"Rate limit exceeded: {error_message}")
+            await controller.log_task_audit(
+                "FAILURE", error_message=f"Rate limit exceeded: {error_message}"
+            )
 
             error_obs = ErrorObservation(
                 content=error_message,
@@ -351,7 +388,9 @@ class RecoveryService:
             self._emit_recovery_event("halted", next_state=AgentState.ERROR.value)
         else:
             await controller.set_agent_state_to(AgentState.RATE_LIMITED)
-            self._emit_recovery_event("rate_limited", next_state=AgentState.RATE_LIMITED.value)
+            self._emit_recovery_event(
+                "rate_limited", next_state=AgentState.RATE_LIMITED.value
+            )
 
     def _emit_recovery_event(self, stage: str, **payload: Any) -> None:
         """Emit structured telemetry for recovery flow."""

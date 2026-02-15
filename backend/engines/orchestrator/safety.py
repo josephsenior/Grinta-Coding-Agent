@@ -47,7 +47,9 @@ class OrchestratorSafetyManager:
     # ------------------------------------------------------------------ #
     # Action validation pipeline
     # ------------------------------------------------------------------ #
-    def apply(self, response_text: str, actions: list[Action]) -> tuple[bool, list[Action]]:
+    def apply(
+        self, response_text: str, actions: list[Action]
+    ) -> tuple[bool, list[Action]]:
         """Run the full safety pipeline on proposed actions.
 
         Returns:
@@ -173,7 +175,11 @@ class OrchestratorSafetyManager:
         missing_tools: list[str],
     ) -> str:
         claimed_lines = "\n".join(f"  - {op}" for op in claimed_operations)
-        missing_section = "\n\nRequired tools not called: " + ", ".join(missing_tools) if missing_tools else ""
+        missing_section = (
+            "\n\nRequired tools not called: " + ", ".join(missing_tools)
+            if missing_tools
+            else ""
+        )
         return (
             "⚠️ RELIABILITY WARNING: You claimed operations without executing tools:\n"
             + claimed_lines

@@ -134,7 +134,11 @@ def _filter_playbooks(
 ) -> list[PlaybookKnowledge]:
     if not obs.playbook_knowledge:
         return []
-    return [agent for agent in obs.playbook_knowledge if agent.name not in agent_config.disabled_playbooks]
+    return [
+        agent
+        for agent in obs.playbook_knowledge
+        if agent.name not in agent_config.disabled_playbooks
+    ]
 
 
 def _has_workspace_content(
@@ -146,7 +150,9 @@ def _has_workspace_content(
 ) -> bool:
     has_repo = bool(repo_info and (repo_info.repo_name or repo_info.repo_directory))
     has_runtime = bool(runtime_info.date or runtime_info.custom_secrets_descriptions)
-    has_instructions = bool(repo_instructions.strip()) or conversation_instructions is not None
+    has_instructions = (
+        bool(repo_instructions.strip()) or conversation_instructions is not None
+    )
     has_agents = bool(filtered_agents)
     return has_repo or has_runtime or has_instructions or has_agents
 
@@ -161,9 +167,15 @@ def _build_message_content(
 ) -> list[TextContent | ImageContent]:
     message_content: list[TextContent | ImageContent] = []
 
-    has_repo = repo_info is not None and (repo_info.repo_name or repo_info.repo_directory)
-    has_runtime = runtime_info is not None and (runtime_info.date or runtime_info.custom_secrets_descriptions)
-    has_instructions = bool(repo_instructions.strip()) or conversation_instructions is not None
+    has_repo = repo_info is not None and (
+        repo_info.repo_name or repo_info.repo_directory
+    )
+    has_runtime = runtime_info is not None and (
+        runtime_info.date or runtime_info.custom_secrets_descriptions
+    )
+    has_instructions = (
+        bool(repo_instructions.strip()) or conversation_instructions is not None
+    )
 
     if has_repo or has_runtime or has_instructions:
         formatted_workspace_text = prompt_manager.build_workspace_context(
@@ -175,7 +187,9 @@ def _build_message_content(
         message_content.append(TextContent(text=formatted_workspace_text))
 
     if filtered_agents:
-        formatted_playbook_text = prompt_manager.build_playbook_info(triggered_agents=filtered_agents)
+        formatted_playbook_text = prompt_manager.build_playbook_info(
+            triggered_agents=filtered_agents
+        )
         message_content.append(TextContent(text=formatted_playbook_text))
 
     return message_content
@@ -195,19 +209,29 @@ def _process_knowledge_recall(
 ) -> list[Message]:
     filtered_agents = filter_agents_in_playbook_obs(obs, current_index, events)
     if filtered_agents:
-        filtered_agents = [agent for agent in filtered_agents if agent.name not in agent_config.disabled_playbooks]
+        filtered_agents = [
+            agent
+            for agent in filtered_agents
+            if agent.name not in agent_config.disabled_playbooks
+        ]
 
     formatted_parts: list[str] = []
     if filtered_agents:
-        formatted_parts.append(prompt_manager.build_playbook_info(triggered_agents=filtered_agents))
+        formatted_parts.append(
+            prompt_manager.build_playbook_info(triggered_agents=filtered_agents)
+        )
 
     kb_results = getattr(obs, "knowledge_base_results", [])
     if kb_results:
-        formatted_parts.append(prompt_manager.build_knowledge_base_info(kb_results=kb_results))
+        formatted_parts.append(
+            prompt_manager.build_knowledge_base_info(kb_results=kb_results)
+        )
 
     if formatted_parts:
         formatted_text = "\n\n".join(formatted_parts)
-        content_items: list[TextContent | ImageContent] = [TextContent(text=formatted_text)]
+        content_items: list[TextContent | ImageContent] = [
+            TextContent(text=formatted_text)
+        ]
         return [Message(role="user", content=content_items)]
     return []
 
@@ -221,7 +245,9 @@ def filter_agents_in_playbook_obs(
     if obs.recall_type != RecallType.KNOWLEDGE:
         return obs.playbook_knowledge
     return [
-        agent for agent in obs.playbook_knowledge if not _has_agent_in_earlier_events(agent.name, current_index, events)
+        agent
+        for agent in obs.playbook_knowledge
+        if not _has_agent_in_earlier_events(agent.name, current_index, events)
     ]
 
 
@@ -233,7 +259,10 @@ def _has_agent_in_earlier_events(
     """Check if an agent appears in any earlier RecallObservation."""
     return any(
         _is_recall_observation(event)
-        and any(agent.name == agent_name for agent in cast(RecallObservation, event).playbook_knowledge)
+        and any(
+            agent.name == agent_name
+            for agent in cast(RecallObservation, event).playbook_knowledge
+        )
         for event in events[:current_index]
     )
 

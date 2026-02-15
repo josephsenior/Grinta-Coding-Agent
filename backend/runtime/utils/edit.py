@@ -56,7 +56,9 @@ def _extract_code(string: str) -> str | None:
     return content
 
 
-def get_new_file_contents(llm: LLM, old_contents: str, draft_changes: str, num_retries: int = 3) -> str | None:
+def get_new_file_contents(
+    llm: LLM, old_contents: str, draft_changes: str, num_retries: int = 3
+) -> str | None:
     """Get new file contents using LLM to apply draft changes.
 
     Args:
@@ -73,7 +75,9 @@ def get_new_file_contents(llm: LLM, old_contents: str, draft_changes: str, num_r
         messages = [
             {
                 "role": "user",
-                "content": USER_MSG.format(old_contents=old_contents, draft_changes=draft_changes),
+                "content": USER_MSG.format(
+                    old_contents=old_contents, draft_changes=draft_changes
+                ),
             },
         ]
         resp = llm.completion(messages=messages)
@@ -123,8 +127,12 @@ class FileEditRuntimeMixin(ABC):
                 "It is not recommended to cache draft editor LLM prompts as it may incur high costs for the same prompt. Automatically setting caching_prompt=false.",
             )
             draft_editor_config.caching_prompt = False
-        self.draft_editor_llm = llm_registry.get_llm("draft_editor_llm", draft_editor_config)
-        logger.debug("[Draft edit functionality] enabled with LLM: %s", self.draft_editor_llm)
+        self.draft_editor_llm = llm_registry.get_llm(
+            "draft_editor_llm", draft_editor_config
+        )
+        logger.debug(
+            "[Draft edit functionality] enabled with LLM: %s", self.draft_editor_llm
+        )
 
     def _require_draft_editor_llm(self) -> LLM:
         """Return the configured draft editor LLM or raise if unavailable."""
@@ -142,8 +150,14 @@ class FileEditRuntimeMixin(ABC):
         """Write content to a file in the runtime filesystem."""
         raise NotImplementedError
 
-    def _validate_range(self, start: int, end: int, total_lines: int) -> Observation | None:
-        if (start < 1 and start != -1) or start > total_lines or (start > end and end != -1 and (start != -1)):
+    def _validate_range(
+        self, start: int, end: int, total_lines: int
+    ) -> Observation | None:
+        if (
+            (start < 1 and start != -1)
+            or start > total_lines
+            or (start > end and end != -1 and (start != -1))
+        ):
             return ErrorObservation(
                 f"Invalid range for editing: start={start}, end={end}, total lines={total_lines}. start must be >= 1 and <={total_lines} (total lines of the edited file), start <= end, or start == -1 (append to the end of the file).",
             )
@@ -178,7 +192,9 @@ class FileEditRuntimeMixin(ABC):
             original_file_copy.flush()
             updated_file_copy.write(new_content)
             updated_file_copy.flush()
-            updated_lint_error = linter.lint_file_diff(original_file_copy.name, updated_file_copy.name)
+            updated_lint_error = linter.lint_file_diff(
+                original_file_copy.name, updated_file_copy.name
+            )
             if len(updated_lint_error) > 0:
                 _obs = FileEditObservation(
                     content=diff,
@@ -207,7 +223,9 @@ class FileEditRuntimeMixin(ABC):
 
     def _handle_new_file_creation(self, action: FileEditAction) -> Observation:
         """Handle file edit when file doesn't exist - create new file."""
-        obs = self.write(FileWriteAction(path=action.path, content=action.content.strip()))
+        obs = self.write(
+            FileWriteAction(path=action.path, content=action.content.strip())
+        )
         if isinstance(obs, ErrorObservation):
             return obs
         if not isinstance(obs, FileWriteObservation):
@@ -234,7 +252,9 @@ class FileEditRuntimeMixin(ABC):
 
         if self.config.runtime_config.enable_auto_lint:
             suffix = os.path.splitext(action.path)[1]
-            error_obs = self._get_lint_error(suffix, original_content, updated_content, action.path, diff)
+            error_obs = self._get_lint_error(
+                suffix, original_content, updated_content, action.path, diff
+            )
             if error_obs is not None:
                 self.write(FileWriteAction(path=action.path, content=updated_content))
                 return self.correct_edit(
@@ -271,14 +291,18 @@ class FileEditRuntimeMixin(ABC):
             k=3,
             max_chunk_size=20,
         )
-        error_msg += "Here are some snippets that maybe relevant to the provided edit.\n"
+        error_msg += (
+            "Here are some snippets that maybe relevant to the provided edit.\n"
+        )
 
         for i, chunk in enumerate(topk_chunks):
             line_mid = (chunk.line_range[0] + chunk.line_range[1]) // 2
-            error_msg += f"[begin relevant snippet {i + 1}. Line range: L{chunk.line_range[0]}-L{
-                chunk.line_range[1]
-            }. Similarity: {chunk.normalized_lcs}]\n"
-            error_msg += f'[Browse around it via `open_file("{action.path}", {line_mid})`]\n'
+            error_msg += f"[begin relevant snippet {i + 1}. Line range: L{
+                chunk.line_range[0]
+            }-L{chunk.line_range[1]}. Similarity: {chunk.normalized_lcs}]\n"
+            error_msg += (
+                f'[Browse around it via `open_file("{action.path}", {line_mid})`]\n'
+            )
             error_msg += chunk.visualize() + "\n"
             error_msg += f"[end relevant snippet {i + 1}]\n"
             error_msg += "-" * 40 + "\n"
@@ -303,7 +327,9 @@ class FileEditRuntimeMixin(ABC):
         """Perform the actual LLM-based edit on the specified range."""
         content_to_edit = "\n".join(old_lines[start_idx:end_idx])
         draft_llm = self._require_draft_editor_llm()
-        _edited_content = get_new_file_contents(draft_llm, content_to_edit, action.content)
+        _edited_content = get_new_file_contents(
+            draft_llm, content_to_edit, action.content
+        )
 
         if _edited_content is None:
             ret_err = ErrorObservation(
@@ -312,13 +338,17 @@ class FileEditRuntimeMixin(ABC):
             ret_err.llm_metrics = draft_llm.metrics
             return ret_err
 
-        updated_lines = old_lines[:start_idx] + _edited_content.split("\n") + old_lines[end_idx:]
+        updated_lines = (
+            old_lines[:start_idx] + _edited_content.split("\n") + old_lines[end_idx:]
+        )
         updated_content = "\n".join(updated_lines)
         diff = get_diff(original_content, updated_content, action.path)
 
         if self.config.runtime_config.enable_auto_lint:
             suffix = os.path.splitext(action.path)[1]
-            error_obs = self._get_lint_error(suffix, original_content, updated_content, action.path, diff)
+            error_obs = self._get_lint_error(
+                suffix, original_content, updated_content, action.path, diff
+            )
             if error_obs is not None:
                 error_obs.llm_metrics = draft_llm.metrics
                 self.write(FileWriteAction(path=action.path, content=updated_content))
@@ -364,10 +394,14 @@ class FileEditRuntimeMixin(ABC):
 
         # Handle append mode (start == -1)
         if action.start == -1:
-            return self._handle_append_edit(action, original_file_content, old_file_lines, retry_num)
+            return self._handle_append_edit(
+                action, original_file_content, old_file_lines, retry_num
+            )
 
         # Calculate and check edit range
-        start_idx, end_idx, length_of_range = self._calculate_edit_range(action, old_file_lines)
+        start_idx, end_idx, length_of_range = self._calculate_edit_range(
+            action, old_file_lines
+        )
 
         # Check if range is too long
         if length_of_range > MAX_LINES_TO_EDIT + 1:
@@ -381,13 +415,20 @@ class FileEditRuntimeMixin(ABC):
             return ErrorObservation(error_msg)
 
         # Perform the edit
-        return self._perform_llm_edit(action, original_file_content, old_file_lines, start_idx, end_idx, retry_num)
+        return self._perform_llm_edit(
+            action, original_file_content, old_file_lines, start_idx, end_idx, retry_num
+        )
 
-    def _prepare_edit_content(self, action: FileEditAction) -> tuple[str, list[str]] | Observation:
+    def _prepare_edit_content(
+        self, action: FileEditAction
+    ) -> tuple[str, list[str]] | Observation:
         """Read file and prepare content lines. Returns Observation on error/creation."""
         obs = self.read(FileReadAction(path=action.path))
 
-        if isinstance(obs, ErrorObservation) and "File not found".lower() in obs.content.lower():
+        if (
+            isinstance(obs, ErrorObservation)
+            and "File not found".lower() in obs.content.lower()
+        ):
             logger.debug(
                 "Agent attempted to edit a file that does not exist. Creating the file. Error msg: %s",
                 obs.content,
@@ -404,7 +445,9 @@ class FileEditRuntimeMixin(ABC):
         lines = content.split("\n")
         return content, lines
 
-    def _calculate_edit_range(self, action: FileEditAction, old_file_lines: list[str]) -> tuple[int, int, int]:
+    def _calculate_edit_range(
+        self, action: FileEditAction, old_file_lines: list[str]
+    ) -> tuple[int, int, int]:
         """Calculate start_idx, end_idx and length_of_range."""
         start_idx = action.start - 1
         if action.end != -1:
@@ -428,7 +471,9 @@ class FileEditRuntimeMixin(ABC):
         correct_num = draft_llm.config.correct_num
         return correct_num < retry_num
 
-    def correct_edit(self, file_content: str, error_obs: ErrorObservation, retry_num: int = 0) -> Observation:
+    def correct_edit(
+        self, file_content: str, error_obs: ErrorObservation, retry_num: int = 0
+    ) -> Observation:
         """Attempt to automatically correct a failed edit using LLM.
 
         Args:
@@ -453,7 +498,9 @@ class FileEditRuntimeMixin(ABC):
             {"role": "system", "content": CORRECT_SYS_MSG},
             {
                 "role": "user",
-                "content": CORRECT_USER_MSG.format(file_content=file_content, lint_error=error_obs.content),
+                "content": CORRECT_USER_MSG.format(
+                    file_content=file_content, lint_error=error_obs.content
+                ),
             },
         ]
         params: dict = {"messages": messages, "tools": tools}

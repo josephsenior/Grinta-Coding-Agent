@@ -87,7 +87,9 @@ class PythonFileOps:
 
             # Filter hidden directories in-place to prevent further recursion
             if not include_hidden:
-                dirs[:] = [d for d in dirs if not PythonFileOps.is_hidden(root_path / d)]
+                dirs[:] = [
+                    d for d in dirs if not PythonFileOps.is_hidden(root_path / d)
+                ]
 
             for file in files:
                 file_path = root_path / file

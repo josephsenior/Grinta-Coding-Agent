@@ -66,12 +66,20 @@ class ProviderConfig:
 
         # If provider handles its own routing, don't use custom base_url
         if self.handles_own_routing:
-            logger.debug("Provider %s handles own routing - clearing base_url", self.name)
+            logger.debug(
+                "Provider %s handles own routing - clearing base_url", self.name
+            )
             return None
 
         # Check protocol requirement
-        if self.requires_protocol and not any(base_url.startswith(proto) for proto in ["http://", "https://"]):
-            logger.warning("Provider %s requires base_url with protocol - clearing invalid URL: %s", self.name, base_url)
+        if self.requires_protocol and not any(
+            base_url.startswith(proto) for proto in ["http://", "https://"]
+        ):
+            logger.warning(
+                "Provider %s requires base_url with protocol - clearing invalid URL: %s",
+                self.name,
+                base_url,
+            )
             return None
 
         return base_url
@@ -104,9 +112,13 @@ class ProviderConfigurationManager:
 
     def get_provider_config(self, provider: str) -> ProviderConfig:
         """Get configuration for a provider, falling back to unknown provider config."""
-        return self._provider_configs.get(provider.lower(), self._unknown_provider_config)
+        return self._provider_configs.get(
+            provider.lower(), self._unknown_provider_config
+        )
 
-    def _process_forbidden_param(self, param_name: str, provider: str, warnings: list[str]) -> bool:
+    def _process_forbidden_param(
+        self, param_name: str, provider: str, warnings: list[str]
+    ) -> bool:
         """Process forbidden parameter.
 
         Args:
@@ -118,8 +130,12 @@ class ProviderConfigurationManager:
             True if parameter should be skipped
 
         """
-        logger.debug("Removing forbidden parameter '%s' for provider %s", param_name, provider)
-        warnings.append(f"Parameter '{param_name}' is not allowed for {provider} provider")
+        logger.debug(
+            "Removing forbidden parameter '%s' for provider %s", param_name, provider
+        )
+        warnings.append(
+            f"Parameter '{param_name}' is not allowed for {provider} provider"
+        )
         return True
 
     def _process_base_url_param(
@@ -183,11 +199,19 @@ class ProviderConfigurationManager:
         """
         cleaned_params[param_name] = param_value
         if provider == "unknown":
-            logger.debug("Allowing unknown parameter '%s' for unknown provider", param_name)
+            logger.debug(
+                "Allowing unknown parameter '%s' for unknown provider", param_name
+            )
         else:
-            logger.debug("Parameter '%s' not specified for %s provider - allowing for flexibility", param_name, provider)
+            logger.debug(
+                "Parameter '%s' not specified for %s provider - allowing for flexibility",
+                param_name,
+                provider,
+            )
 
-    def validate_and_clean_params(self, provider: str, params: dict[str, Any]) -> dict[str, Any]:
+    def validate_and_clean_params(
+        self, provider: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
         """Validate and clean parameters for a specific provider.
 
         Args:
@@ -214,18 +238,32 @@ class ProviderConfigurationManager:
                     continue
 
             if (param_name in required) or (param_name in optional):
-                self._process_known_param(param_name, param_value, config, cleaned_params)
+                self._process_known_param(
+                    param_name, param_value, config, cleaned_params
+                )
             else:
-                self._process_unknown_param(param_name, param_value, provider, cleaned_params)
+                self._process_unknown_param(
+                    param_name, param_value, provider, cleaned_params
+                )
 
         missing_required = config.required_params - set(cleaned_params.keys())
         if missing_required:
-            warnings.append(f"Missing required parameters for {provider}: {', '.join(missing_required)}")
+            warnings.append(
+                f"Missing required parameters for {provider}: {', '.join(missing_required)}"
+            )
 
         if warnings:
-            logger.warning("Parameter validation warnings for %s: %s", provider, '; '.join(warnings))
+            logger.warning(
+                "Parameter validation warnings for %s: %s",
+                provider,
+                "; ".join(warnings),
+            )
 
-        logger.debug("Parameter validation complete for %s: %s params kept", provider, len(cleaned_params))
+        logger.debug(
+            "Parameter validation complete for %s: %s params kept",
+            provider,
+            len(cleaned_params),
+        )
         return cleaned_params
 
     def validate_api_key_format(self, provider: str, api_key: str | None) -> bool:
@@ -247,14 +285,22 @@ class ProviderConfigurationManager:
 
         # Check minimum length
         if len(api_key) < config.api_key_min_length:
-            logger.warning("API key for %s is shorter than expected minimum (%s)", provider, config.api_key_min_length)
+            logger.warning(
+                "API key for %s is shorter than expected minimum (%s)",
+                provider,
+                config.api_key_min_length,
+            )
             return False
 
         # Check prefixes if specified - warn but don't fail validation
         prefixes = config.api_key_prefixes
         if prefixes:
             if not any(api_key.startswith(prefix) for prefix in prefixes):
-                logger.warning("API key for %s doesn't match expected prefixes: %s", provider, config.api_key_prefixes)
+                logger.warning(
+                    "API key for %s doesn't match expected prefixes: %s",
+                    provider,
+                    config.api_key_prefixes,
+                )
                 # Don't return False here - just warn and continue
                 # This allows for API key variations and updates from providers
 

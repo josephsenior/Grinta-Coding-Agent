@@ -49,7 +49,9 @@ class RuntimeManager:
     # ------------------------------------------------------------------
     # Warm pool management
     # ------------------------------------------------------------------
-    def add_warm_server(self, kind: str, info: RuntimeServerInfo, metadata: dict[str, str] | None = None) -> None:
+    def add_warm_server(
+        self, kind: str, info: RuntimeServerInfo, metadata: dict[str, str] | None = None
+    ) -> None:
         """Register a warm (pre-started) runtime instance."""
         record = _ManagedServer(
             info=info,
@@ -138,7 +140,11 @@ class RuntimeManager:
         with self._lock:
             if kind is None:
                 return list(self._running.keys())
-            return [session_id for session_id, record in self._running.items() if record.kind == kind]
+            return [
+                session_id
+                for session_id, record in self._running.items()
+                if record.kind == kind
+            ]
 
     # ------------------------------------------------------------------
     # Metrics & observability
@@ -163,7 +169,9 @@ class RuntimeManager:
     # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
-    def iterate_warm_infos(self, kind: str | None = None) -> Iterable[RuntimeServerInfo]:
+    def iterate_warm_infos(
+        self, kind: str | None = None
+    ) -> Iterable[RuntimeServerInfo]:
         """Yield warm runtime infos without mutating the pool."""
         with self._lock:
             snapshot = list(self._warm)

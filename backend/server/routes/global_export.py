@@ -11,21 +11,25 @@ from pydantic import BaseModel, Field, field_validator
 
 from backend.server.shared import config
 
-router = APIRouter(prefix="/api/global-export")
+router = APIRouter(prefix="/api/v1/global-export")
 logger = logging.getLogger(__name__)
 
 
 class GlobalExportData(BaseModel):
     """Container for all exportable data."""
 
-    version: str = Field(default="1.0.0", min_length=1, description="Export format version")
+    version: str = Field(
+        default="1.0.0", min_length=1, description="Export format version"
+    )
     exported_at: str = Field(
         default_factory=lambda: datetime.now().isoformat(),
         min_length=1,
         description="ISO timestamp of export",
     )
     memories: list[dict] = Field(default_factory=list, description="Exported memories")
-    templates: list[dict] = Field(default_factory=list, description="Exported conversation templates")
+    templates: list[dict] = Field(
+        default_factory=list, description="Exported conversation templates"
+    )
     settings: dict = Field(default_factory=dict, description="Exported settings")
     metadata: dict = Field(default_factory=dict, description="Additional metadata")
 

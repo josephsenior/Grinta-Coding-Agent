@@ -13,19 +13,23 @@ from backend.server.session.session_contract import normalize_replay_cursor
 from backend.server.utils import get_conversation
 
 router = APIRouter(
-    prefix="/api/conversations/{conversation_id}/trajectory",
+    prefix="/api/v1/conversations/{conversation_id}/trajectory",
     dependencies=get_dependencies(),
 )
 
 
 @router.get("/")
 async def get_trajectory(
-    conversation_id: Annotated[str, Path(..., min_length=1, description="Conversation ID")],
+    conversation_id: Annotated[
+        str, Path(..., min_length=1, description="Conversation ID")
+    ],
     since_id: Annotated[
         int | None,
         Query(description="Return events with id > since_id (for reconnect)"),
     ] = None,
-    limit: Annotated[int | None, Query(ge=1, le=5000, description="Max events to return")] = None,
+    limit: Annotated[
+        int | None, Query(ge=1, le=5000, description="Max events to return")
+    ] = None,
     conversation: ServerConversation = Depends(get_conversation),
 ) -> JSONResponse:
     """Get trajectory history for a conversation.

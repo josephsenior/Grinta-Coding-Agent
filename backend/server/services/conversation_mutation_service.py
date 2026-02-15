@@ -128,7 +128,9 @@ async def update_conversation_title(
         original_title,
         metadata.title,
     )
-    return TitleUpdateResult(ok=True, original_title=original_title, new_title=metadata.title)
+    return TitleUpdateResult(
+        ok=True, original_title=original_title, new_title=metadata.title
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +158,9 @@ async def search_playbook_conversations(
     normalize_provider_tokens(provider_tokens)  # validate tokens
 
     result_set = await store.search(page_id, limit)
-    aged = filter_conversations_by_age(result_set.results, config.conversation_max_age_seconds)
+    aged = filter_conversations_by_age(
+        result_set.results, config.conversation_max_age_seconds
+    )
 
     final: list = []
     for conv in aged:
@@ -262,7 +266,9 @@ async def stop_agent_loop(
         user_id=user_id,
         filter_to_sids={conversation_id},
     )
-    conversation_status = agent_loop_info[0].status if agent_loop_info else ConversationStatus.STOPPED
+    conversation_status = (
+        agent_loop_info[0].status if agent_loop_info else ConversationStatus.STOPPED
+    )
     if conversation_status not in (
         ConversationStatus.STARTING,
         ConversationStatus.RUNNING,

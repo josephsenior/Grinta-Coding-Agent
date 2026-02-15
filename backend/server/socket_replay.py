@@ -66,7 +66,9 @@ async def send_agent_state(
             agent_state_changed.agent_state,
         )
         conn_manager.update_activity(connection_id)
-        await sio.emit("forge_event", event_to_dict(agent_state_changed), to=connection_id)
+        await sio.emit(
+            "forge_event", event_to_dict(agent_state_changed), to=connection_id
+        )
         return True
 
     try:
@@ -78,13 +80,19 @@ async def send_agent_state(
         return False
 
     try:
-        agent_loop_info_list = await manager.get_agent_loop_info(filter_to_sids={conversation_id})
+        agent_loop_info_list = await manager.get_agent_loop_info(
+            filter_to_sids={conversation_id}
+        )
         if agent_loop_info_list:
             info = agent_loop_info_list[0]
             if info.agent_state:
-                current_state = AgentStateChangedObservation("", info.agent_state, "Connection established")
+                current_state = AgentStateChangedObservation(
+                    "", info.agent_state, "Connection established"
+                )
                 conn_manager.update_activity(connection_id)
-                await sio.emit("forge_event", event_to_dict(current_state), to=connection_id)
+                await sio.emit(
+                    "forge_event", event_to_dict(current_state), to=connection_id
+                )
                 return True
             else:
                 logger.warning(
@@ -119,7 +127,9 @@ async def replay_event_stream(
     async_store = AsyncEventStoreWrapper(event_store, latest_event_id + 1)
     agent_state_changed = await replay_events(async_store, connection_id)
 
-    state_sent = await send_agent_state(agent_state_changed, conversation_id, connection_id)
+    state_sent = await send_agent_state(
+        agent_state_changed, conversation_id, connection_id
+    )
 
     if not state_sent:
         logger.info(
@@ -127,10 +137,14 @@ async def replay_event_stream(
             connection_id,
         )
         try:
-            default_state = AgentStateChangedObservation("", "awaiting_user_input", "Default state on connection")
+            default_state = AgentStateChangedObservation(
+                "", "awaiting_user_input", "Default state on connection"
+            )
             conn_manager = get_connection_manager()
             conn_manager.update_activity(connection_id)
-            await sio.emit("forge_event", event_to_dict(default_state), to=connection_id)
+            await sio.emit(
+                "forge_event", event_to_dict(default_state), to=connection_id
+            )
         except Exception as e:
             logger.error(
                 "Failed to send default agent state to %s: %s",

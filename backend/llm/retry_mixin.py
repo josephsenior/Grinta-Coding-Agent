@@ -52,7 +52,9 @@ class RetryMixin:
             if retry_listener:
                 retry_listener(retry_state.attempt_number, num_retries)
             exception = retry_state.outcome.exception()
-            if isinstance(exception, LLMNoResponseError) and hasattr(retry_state, "kwargs"):
+            if isinstance(exception, LLMNoResponseError) and hasattr(
+                retry_state, "kwargs"
+            ):
                 current_temp = retry_state.kwargs.get("temperature", 0)
                 if current_temp == 0:
                     retry_state.kwargs["temperature"] = 1.0
@@ -85,14 +87,18 @@ class RetryMixin:
             stop=stop_after_attempt(num_retries) | stop_if_should_exit(),
             reraise=True,
             retry=retry_if_exception_type(retry_exceptions),
-            wait=wait_exponential(multiplier=retry_multiplier, min=retry_min_wait, max=retry_max_wait),
+            wait=wait_exponential(
+                multiplier=retry_multiplier, min=retry_min_wait, max=retry_max_wait
+            ),
         )
         return retry_decorator
 
     def log_retry_attempt(self, retry_state: Any) -> None:
         """Log retry attempts."""
         exception = retry_state.outcome.exception()
-        if hasattr(retry_state, "retry_object") and hasattr(retry_state.retry_object, "stop"):
+        if hasattr(retry_state, "retry_object") and hasattr(
+            retry_state.retry_object, "stop"
+        ):
             stop_condition = retry_state.retry_object.stop
             stop_funcs = []
             if hasattr(stop_condition, "stops"):

@@ -28,9 +28,9 @@ class MCPAction(Action):
     @property
     def message(self) -> str:
         """Get MCP tool call message."""
-        return f"I am interacting with the MCP server with name:\n```\n{self.name}\n```\nand arguments:\n```\n{
-            self.arguments
-        }\n```"
+        return f"I am interacting with the MCP server with name:\n```\n{
+            self.name
+        }\n```\nand arguments:\n```\n{self.arguments}\n```"
 
     def __str__(self) -> str:
         """Return a readable summary of the MCP invocation."""

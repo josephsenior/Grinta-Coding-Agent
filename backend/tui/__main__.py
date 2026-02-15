@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import logging
-import sys
 
 
 def _parse_args() -> argparse.Namespace:

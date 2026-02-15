@@ -14,8 +14,8 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_http_request
 
-# Import Field early to ensure it's in the global namespace
-from pydantic import Field, SecretStr
+# Import SecretStr from pydantic
+from pydantic import SecretStr
 
 from backend.core.logger import FORGE_logger as logger
 from backend.core.logger import get_trace_context
@@ -42,12 +42,14 @@ def get_config():
     return config
 
 
-server_config = get_server_config()
-
-mcp_server = FastMCP("mcp", stateless_http=True, dependencies=None, mask_error_details=True)
+mcp_server = FastMCP(
+    "mcp", stateless_http=True, dependencies=None, mask_error_details=True
+)
 
 # Optional OpenTelemetry setup for MCP instrumentation
-_OTEL_MCP_ENABLED = os.getenv("OTEL_INSTRUMENT_MCP", os.getenv("OTEL_ENABLED", "false")).lower() in (
+_OTEL_MCP_ENABLED = os.getenv(
+    "OTEL_INSTRUMENT_MCP", os.getenv("OTEL_ENABLED", "false")
+).lower() in (
     "true",
     "1",
     "yes",
@@ -81,18 +83,23 @@ async def _request_context() -> _McpRequestContext:
     headers = request.headers
     conversation_id = headers.get("X-Forge-ServerConversation-ID", None)
     provider_tokens_raw = get_provider_tokens(request)
-    provider_tokens = dict(provider_tokens_raw) if provider_tokens_raw is not None else None
-    access_token = get_access_token(request)
+    provider_tokens = (
+        dict(provider_tokens_raw) if provider_tokens_raw is not None else None
+    )
+    access_token_raw: str | None = get_access_token(request)
+    access_token = SecretStr(access_token_raw) if access_token_raw else None
     user_id = get_user_id(request)
     return _McpRequestContext(
         conversation_id=conversation_id,
         provider_tokens=provider_tokens,
-        access_token=SecretStr(access_token) if access_token else None,
+        access_token=access_token,
         user_id=user_id,
     )
 
 
-def _provider_token(context: _McpRequestContext, provider: ProviderType) -> ProviderToken:
+def _provider_token(
+    context: _McpRequestContext, provider: ProviderType
+) -> ProviderToken:
     if not context.provider_tokens:
         return ProviderToken()
     return context.provider_tokens.get(provider, ProviderToken())
@@ -100,7 +107,9 @@ def _provider_token(context: _McpRequestContext, provider: ProviderType) -> Prov
 
 def _otel_sample_rate() -> float:
     try:
-        return float(os.getenv("OTEL_SAMPLE_MCP", os.getenv("OTEL_SAMPLE_DEFAULT", "1.0")))
+        return float(
+            os.getenv("OTEL_SAMPLE_MCP", os.getenv("OTEL_SAMPLE_DEFAULT", "1.0"))
+        )
     except Exception:
         return 1.0
 

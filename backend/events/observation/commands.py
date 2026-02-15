@@ -63,7 +63,11 @@ class CmdOutputMetadata(CmdOutputMetadataSchema):
                 json.loads(match.group(1).strip())
                 matches.append(match)
             except json.JSONDecodeError:
-                logger.warning("Failed to parse PS1 metadata: %s. Skipping.%s", match.group(1), traceback.format_exc())
+                logger.warning(
+                    "Failed to parse PS1 metadata: %s. Skipping.%s",
+                    match.group(1),
+                    traceback.format_exc(),
+                )
                 continue
         return matches
 
@@ -146,7 +150,11 @@ class CmdOutputObservation(Observation):
             return content
         half = max_size // 2
         original_length = len(content)
-        truncated = content[:half] + "\n[... Observation truncated due to length ...]\n" + content[-half:]
+        truncated = (
+            content[:half]
+            + "\n[... Observation truncated due to length ...]\n"
+            + content[-half:]
+        )
         logger.debug(
             "Truncated large command output: %s -> %s chars",
             original_length,
@@ -197,9 +205,11 @@ class CmdOutputObservation(Observation):
             metadata_json = json.dumps(model_dump_with_options(self.metadata), indent=2)
         except Exception:
             metadata_json = repr(self.metadata)
-        return f"**CmdOutputObservation (source={self.source}, exit code={self.exit_code}, metadata={
-            metadata_json
-        })**\n--BEGIN AGENT OBSERVATION--\n{self.to_agent_observation()}\n--END AGENT OBSERVATION--"
+        return f"**CmdOutputObservation (source={self.source}, exit code={
+            self.exit_code
+        }, metadata={metadata_json})**\n--BEGIN AGENT OBSERVATION--\n{
+            self.to_agent_observation()
+        }\n--END AGENT OBSERVATION--"
 
     def to_agent_observation(self) -> str:
         """Format observation for agent with metadata context.

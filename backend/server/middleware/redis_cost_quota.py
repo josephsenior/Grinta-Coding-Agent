@@ -106,7 +106,9 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             await self._establish_new_client(current_time)
 
         if self._redis_client is None and not self.fallback_enabled:
-            logger.error("Redis unavailable and fallback disabled. Quota tracking disabled.")
+            logger.error(
+                "Redis unavailable and fallback disabled. Quota tracking disabled."
+            )
             return None
 
         return self._redis_client
@@ -119,7 +121,11 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
         return False
 
     async def _health_check_existing_client(self, current_time: float) -> None:
-        if self._redis_client is None or current_time - self._last_health_check <= self._redis_health_check_interval:
+        if (
+            self._redis_client is None
+            or current_time - self._last_health_check
+            <= self._redis_health_check_interval
+        ):
             return
 
         try:
@@ -135,7 +141,9 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
     async def _establish_new_client(self, current_time: float) -> None:
         try:
             self._redis_client = await self._create_redis_client()
-            await asyncio.wait_for(self._redis_client.ping(), timeout=self.connection_timeout)
+            await asyncio.wait_for(
+                self._redis_client.ping(), timeout=self.connection_timeout
+            )
             self._redis_healthy = True
             self._last_health_check = current_time
             logger.info(
@@ -146,7 +154,9 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             logger.warning(
                 "Redis connection timeout after %ss. %s",
                 self.connection_timeout,
-                "Falling back to in-memory." if self.fallback_enabled else "Quota tracking disabled.",
+                "Falling back to in-memory."
+                if self.fallback_enabled
+                else "Quota tracking disabled.",
             )
             self._redis_client = None
             self._redis_pool = None
@@ -155,7 +165,9 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             logger.warning(
                 "Failed to connect to Redis: %s. %s",
                 exc,
-                "Falling back to in-memory." if self.fallback_enabled else "Quota tracking disabled.",
+                "Falling back to in-memory."
+                if self.fallback_enabled
+                else "Quota tracking disabled.",
             )
             self._redis_client = None
             self._redis_pool = None
@@ -185,7 +197,9 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
                 socket_timeout=self.connection_timeout,
             )
 
-        raise RuntimeError("Redis module is missing ConnectionPool.from_url and from_url.")
+        raise RuntimeError(
+            "Redis module is missing ConnectionPool.from_url and from_url."
+        )
 
     # ------------------------------------------------------------------
     # Quota checking
@@ -271,7 +285,9 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             allowed = self._apply_limit_checks(key, config, daily_cost, monthly_cost)
 
             if self._should_instrument_redis():
-                self._record_quota_span(key, plan, config, daily_cost, monthly_cost, allowed)
+                self._record_quota_span(
+                    key, plan, config, daily_cost, monthly_cost, allowed
+                )
 
             return allowed
 
@@ -311,7 +327,9 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             }
 
         except Exception as e:
-            logger.error("Redis remaining quota check failed: %s. Falling back to in-memory.", e)
+            logger.error(
+                "Redis remaining quota check failed: %s. Falling back to in-memory.", e
+            )
             return await super()._get_remaining_quota(key, plan)
 
     # ------------------------------------------------------------------
@@ -363,7 +381,11 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             redis_client, keys.daily_reset, keys.daily, self.day_window, current_time
         )
         await self._initialize_reset_key(
-            redis_client, keys.monthly_reset, keys.monthly, self.month_window, current_time
+            redis_client,
+            keys.monthly_reset,
+            keys.monthly,
+            self.month_window,
+            current_time,
         )
 
     async def _initialize_reset_key(
@@ -455,7 +477,9 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
         logger.error(
             "Redis quota check failed: %s. %s",
             exc,
-            "Allowing request (fail-open)." if self.fallback_enabled else "Blocking request (fail-closed).",
+            "Allowing request (fail-open)."
+            if self.fallback_enabled
+            else "Blocking request (fail-closed).",
         )
         if self.fallback_enabled:
             return await super()._check_quota(key, plan)

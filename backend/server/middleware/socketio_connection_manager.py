@@ -68,7 +68,9 @@ class SocketIOConnectionManager:
         if user_id:
             user_conns = self._user_connections.get(user_id, set())
             if len(user_conns) >= self._max_connections_per_user:
-                raise ValueError(f"Maximum connections per user ({self._max_connections_per_user}) exceeded")
+                raise ValueError(
+                    f"Maximum connections per user ({self._max_connections_per_user}) exceeded"
+                )
 
         conn_info = ConnectionInfo(
             sid=sid,
@@ -84,7 +86,12 @@ class SocketIOConnectionManager:
         if conversation_id:
             self._conversation_connections[conversation_id].add(sid)
 
-        logger.info("Connection registered: sid=%s, user_id=%s, conversation_id=%s", sid, user_id, conversation_id)
+        logger.info(
+            "Connection registered: sid=%s, user_id=%s, conversation_id=%s",
+            sid,
+            user_id,
+            conversation_id,
+        )
 
         return conn_info
 

@@ -137,7 +137,9 @@ class CostQuotaMiddleware:
         self.month_window = DEFAULT_QUOTA_MONTH_WINDOW
 
         if enabled:
-            logger.info("CostQuotaMiddleware initialized with default plan: %s", default_plan)
+            logger.info(
+                "CostQuotaMiddleware initialized with default plan: %s", default_plan
+            )
             from backend.telemetry.cost_recording import register_cost_recorder
 
             register_cost_recorder(self.record_cost)
@@ -159,7 +161,9 @@ class CostQuotaMiddleware:
         user_plan = await self._get_user_plan(request)
 
         if not await self._check_quota(quota_key, user_plan):
-            logger.warning("Cost quota exceeded for %s (plan: %s)", quota_key, user_plan)
+            logger.warning(
+                "Cost quota exceeded for %s (plan: %s)", quota_key, user_plan
+            )
             return await self._quota_exceeded_response(quota_key, user_plan)
 
         response = await call_next(request)
@@ -238,7 +242,9 @@ class CostQuotaMiddleware:
         self._reset_cost_windows(cost_data, current_time)
         return self._within_limits(cost_data, config)
 
-    def _reset_cost_windows(self, cost_data: dict[str, float], current_time: float) -> None:
+    def _reset_cost_windows(
+        self, cost_data: dict[str, float], current_time: float
+    ) -> None:
         if current_time - cost_data["last_reset_day"] > self.day_window:
             cost_data["daily_cost"] = 0.0
             cost_data["last_reset_day"] = current_time

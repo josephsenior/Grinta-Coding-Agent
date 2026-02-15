@@ -15,9 +15,15 @@ class ActionSchemaV1(EventSchemaV1):
 
     action_type: str = Field(..., min_length=1, description="Type of action")
     runnable: bool = Field(default=False, description="Whether action can be executed")
-    confirmation_state: str | None = Field(default=None, description="Action confirmation status")
-    security_risk: int | None = Field(default=None, ge=0, description="Security risk level for this action")
-    thought: str | None = Field(default=None, description="Agent's reasoning for this action")
+    confirmation_state: str | None = Field(
+        default=None, description="Action confirmation status"
+    )
+    security_risk: int | None = Field(
+        default=None, ge=0, description="Security risk level for this action"
+    )
+    thought: str | None = Field(
+        default=None, description="Agent's reasoning for this action"
+    )
 
     @field_validator("action_type")
     @classmethod
@@ -37,7 +43,9 @@ class FileReadActionSchema(ActionSchemaV1):
     start: int = Field(default=0, ge=0, description="Starting line number (0-indexed)")
     end: int = Field(default=-1, description="Ending line number (-1 for end of file)")
     impl_source: str | None = Field(default=None, description="Implementation source")
-    view_range: list[int] | None = Field(default=None, description="View range for file reading")
+    view_range: list[int] | None = Field(
+        default=None, description="View range for file reading"
+    )
 
     @field_validator("path")
     @classmethod
@@ -73,12 +81,22 @@ class FileEditActionSchema(ActionSchemaV1):
     action_type: Literal["edit"] = Field(ActionType.EDIT.value, frozen=True)
     runnable: bool = Field(True, frozen=True)
     path: str = Field(..., min_length=1, description="Path to file to edit")
-    command: str | None = Field(default=None, description="Editing command (FILE_EDITOR mode)")
-    file_text: str | None = Field(default=None, description="File content for create command")
-    old_str: str | None = Field(default=None, description="String to replace (str_replace command)")
+    command: str | None = Field(
+        default=None, description="Editing command (FILE_EDITOR mode)"
+    )
+    file_text: str | None = Field(
+        default=None, description="File content for create command"
+    )
+    old_str: str | None = Field(
+        default=None, description="String to replace (str_replace command)"
+    )
     new_str: str | None = Field(default=None, description="Replacement string")
-    insert_line: int | None = Field(default=None, ge=1, description="Line number for insert command")
-    content: str | None = Field(default=None, description="Content to write (LLM-based editing)")
+    insert_line: int | None = Field(
+        default=None, ge=1, description="Line number for insert command"
+    )
+    content: str | None = Field(
+        default=None, description="Content to write (LLM-based editing)"
+    )
     start: int = Field(default=1, ge=1, description="Starting line number (1-indexed)")
     end: int = Field(default=-1, description="Ending line number (-1 for end of file)")
     impl_source: str | None = Field(
@@ -101,9 +119,15 @@ class CmdRunActionSchema(ActionSchemaV1):
     action_type: Literal["run"] = Field(ActionType.RUN.value, frozen=True)
     runnable: bool = Field(True, frozen=True)
     command: str = Field(..., min_length=1, description="Shell command to execute")
-    is_input: bool = Field(default=False, description="Whether command is user input (for stdin)")
-    blocking: bool = Field(default=False, description="Whether to wait for command to complete")
-    is_static: bool = Field(default=False, description="Whether command is static (from static analysis)")
+    is_input: bool = Field(
+        default=False, description="Whether command is user input (for stdin)"
+    )
+    blocking: bool = Field(
+        default=False, description="Whether to wait for command to complete"
+    )
+    is_static: bool = Field(
+        default=False, description="Whether command is static (from static analysis)"
+    )
     cwd: str | None = Field(default=None, description="Working directory for command")
     hidden: bool = Field(default=False, description="Whether to hide command from user")
 
@@ -151,15 +175,21 @@ class SystemMessageActionSchema(ActionSchemaV1):
 class BrowseInteractiveActionSchema(ActionSchemaV1):
     """Schema for BrowseInteractiveAction."""
 
-    action_type: Literal["browse_interactive"] = Field(ActionType.BROWSE_INTERACTIVE.value, frozen=True)
+    action_type: Literal["browse_interactive"] = Field(
+        ActionType.BROWSE_INTERACTIVE.value, frozen=True
+    )
     runnable: bool = Field(True, frozen=True)
     browser_actions: str = Field(
         ...,
         min_length=1,
         description="Browser actions to perform (BrowserGym action code)",
     )
-    browsergym_send_msg_to_user: str | None = Field(default=None, description="Message to display to user")
-    return_axtree: bool = Field(default=False, description="Whether to return accessibility tree")
+    browsergym_send_msg_to_user: str | None = Field(
+        default=None, description="Message to display to user"
+    )
+    return_axtree: bool = Field(
+        default=False, description="Whether to return accessibility tree"
+    )
 
     @field_validator("browser_actions")
     @classmethod
@@ -189,7 +219,9 @@ class AgentRejectActionSchema(ActionSchemaV1):
 class ChangeAgentStateActionSchema(ActionSchemaV1):
     """Schema for ChangeAgentStateAction."""
 
-    action_type: Literal["change_agent_state"] = Field(ActionType.CHANGE_AGENT_STATE.value, frozen=True)
+    action_type: Literal["change_agent_state"] = Field(
+        ActionType.CHANGE_AGENT_STATE.value, frozen=True
+    )
     runnable: bool = Field(False, frozen=True)
     state: str = Field(..., min_length=1, description="New agent state")
 

@@ -32,7 +32,9 @@ class CmdOutputObservationSchema(ObservationSchemaV1):
     observation_type: Literal["run"] = Field(ObservationType.RUN.value, frozen=True)
     command: str = Field(..., min_length=1, description="Command that was executed")
     content: str = Field(..., description="Command output")
-    cmd_metadata: CmdOutputMetadataSchema | None = Field(default=None, description="Command metadata")
+    cmd_metadata: CmdOutputMetadataSchema | None = Field(
+        default=None, description="Command metadata"
+    )
     hidden: bool = Field(default=False, description="Whether observation is hidden")
 
     @field_validator("command")
@@ -95,7 +97,9 @@ class ErrorObservationSchema(ObservationSchemaV1):
 class MessageObservationSchema(ObservationSchemaV1):
     """Schema for MessageObservation."""
 
-    observation_type: Literal["message"] = Field(ObservationType.MESSAGE.value, frozen=True)
+    observation_type: Literal["message"] = Field(
+        ObservationType.MESSAGE.value, frozen=True
+    )
     content: str = Field(..., min_length=1, description="Message content")
 
     @field_validator("content")

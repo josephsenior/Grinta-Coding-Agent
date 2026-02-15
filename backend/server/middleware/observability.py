@@ -117,7 +117,9 @@ class RequestObservabilityMiddleware(BaseHTTPMiddleware):
             self._record_metrics(request, status_code, duration_ms)
             await self._maybe_alert(status_code, duration_ms)
 
-    def _record_metrics(self, request: Request, status_code: int, duration_ms: float) -> None:
+    def _record_metrics(
+        self, request: Request, status_code: int, duration_ms: float
+    ) -> None:
         path_template = request.scope.get("route", None)
         path = getattr(path_template, "path", request.url.path)
         method = request.method.upper()
@@ -126,14 +128,20 @@ class RequestObservabilityMiddleware(BaseHTTPMiddleware):
         if self._request_counter:
             self._request_counter.labels(method, path, status_str).inc()
         if self._latency_histogram:
-            self._latency_histogram.labels(method, path, status_str).observe(duration_ms / 1000.0)
+            self._latency_histogram.labels(method, path, status_str).observe(
+                duration_ms / 1000.0
+            )
 
         # Record to SLO tracker
         is_error = status_code >= 500
         self.slo_tracker.record_request(duration_ms, is_error=is_error)
 
     async def _maybe_alert(self, status_code: int, duration_ms: float) -> None:
-        if not self.alerting_enabled or not self.alert_client or not self.alert_policies:
+        if (
+            not self.alerting_enabled
+            or not self.alert_client
+            or not self.alert_policies
+        ):
             return
 
         metrics = self.slo_tracker.check_slo_violations()

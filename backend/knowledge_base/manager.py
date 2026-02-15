@@ -94,7 +94,9 @@ class KnowledgeBaseManager:
 
         try:
             for chunk in chunks:
-                if self._add_chunk_to_vector_store(vector_store, chunk, document, collection_id, filename):
+                if self._add_chunk_to_vector_store(
+                    vector_store, chunk, document, collection_id, filename
+                ):
                     chunks_added += 1
                 else:
                     failed_chunks.append(chunk.id)
@@ -128,7 +130,9 @@ class KnowledgeBaseManager:
 
     # Collection operations
 
-    def create_collection(self, name: str, description: str | None = None) -> KnowledgeBaseCollection:
+    def create_collection(
+        self, name: str, description: str | None = None
+    ) -> KnowledgeBaseCollection:
         """Create a new knowledge base collection."""
         return self.store.create_collection(
             user_id=self.user_id,
@@ -173,10 +177,18 @@ class KnowledgeBaseManager:
         try:
             vector_store = self._get_vector_store(collection_id)
             # Delete all chunks for this collection
-            deleted_count = vector_store.delete_by_metadata(filter_metadata={"collection_id": collection_id})
-            logger.info("Deleted %s vector chunks for collection %s", deleted_count, collection_id)
+            deleted_count = vector_store.delete_by_metadata(
+                filter_metadata={"collection_id": collection_id}
+            )
+            logger.info(
+                "Deleted %s vector chunks for collection %s",
+                deleted_count,
+                collection_id,
+            )
         except Exception as e:
-            logger.error("Failed to delete vectors for collection %s: %s", collection_id, e)
+            logger.error(
+                "Failed to delete vectors for collection %s: %s", collection_id, e
+            )
             # Continue with store deletion even if vector deletion fails
 
         # Remove vector store reference
@@ -242,7 +254,9 @@ class KnowledgeBaseManager:
         document = self.store.add_document(document)
 
         # Add chunks to vector store with error handling
-        chunks_added = self._add_chunks_to_vector_store(collection_id, chunks, document, filename)
+        chunks_added = self._add_chunks_to_vector_store(
+            collection_id, chunks, document, filename
+        )
         document.chunk_count = chunks_added
 
         if chunks_added < len(chunks):
@@ -341,8 +355,12 @@ class KnowledgeBaseManager:
         try:
             vector_store = self._get_vector_store(collection_id)
             # Delete all chunks for this document
-            deleted_count = vector_store.delete_by_metadata(filter_metadata={"document_id": document_id})
-            logger.info("Deleted %s vector chunks for document %s", deleted_count, document_id)
+            deleted_count = vector_store.delete_by_metadata(
+                filter_metadata={"document_id": document_id}
+            )
+            logger.info(
+                "Deleted %s vector chunks for document %s", deleted_count, document_id
+            )
         except Exception as e:
             logger.error("Failed to delete vectors for document %s: %s", document_id, e)
             # Continue with store deletion even if vector deletion fails

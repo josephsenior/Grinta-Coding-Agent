@@ -65,11 +65,18 @@ class FileTransaction:
         """Exit transaction context, committing or rolling back."""
         if exc_type is not None:
             # Exception occurred - rollback all changes
-            logger.error("File transaction failed: %s, rolling back %s operations", exc_value, len(self.operations))
+            logger.error(
+                "File transaction failed: %s, rolling back %s operations",
+                exc_value,
+                len(self.operations),
+            )
             await self.rollback()
         elif not self.committed:
             # No exception, but commit wasn't called explicitly - auto-commit
-            logger.info("Auto-committing file transaction with %s operations", len(self.operations))
+            logger.info(
+                "Auto-committing file transaction with %s operations",
+                len(self.operations),
+            )
             self.committed = True
 
         # Cleanup backup directory
@@ -99,7 +106,9 @@ class FileTransaction:
 
                 # Create backup
                 if self.backup_dir:
-                    backup_path = os.path.join(self.backup_dir, os.path.basename(file_path))
+                    backup_path = os.path.join(
+                        self.backup_dir, os.path.basename(file_path)
+                    )
                     with open(backup_path, "w", encoding="utf-8") as f:
                         f.write(old_content)
             except Exception as e:
@@ -216,7 +225,9 @@ class FileTransaction:
         This is optional - transactions auto-commit on success.
         """
         self.committed = True
-        logger.info("Committed file transaction with %s operations", len(self.operations))
+        logger.info(
+            "Committed file transaction with %s operations", len(self.operations)
+        )
 
     def _rollback_write_operation(self, operation) -> None:
         """Rollback a WRITE operation.
@@ -272,7 +283,12 @@ class FileTransaction:
                 elif operation.operation_type == FileOperationType.DELETE:
                     self._rollback_delete_operation(operation)
             except Exception as e:
-                logger.error("Failed to rollback operation %s on %s: %s", operation.operation_type, operation.file_path, e)
+                logger.error(
+                    "Failed to rollback operation %s on %s: %s",
+                    operation.operation_type,
+                    operation.file_path,
+                    e,
+                )
 
         logger.info("Rollback completed for %s operations", len(self.operations))
 

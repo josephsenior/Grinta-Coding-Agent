@@ -93,17 +93,25 @@ def _handle_simple_observation(
     return Message(role="user", content=[TextContent(text=text)])
 
 
-def _handle_file_read_observation(obs: FileReadObservation, max_message_chars: int | None) -> Message:
-    return Message(role="user", content=[TextContent(text=obs.content)])  # Content already formatted by read action
+def _handle_file_read_observation(
+    obs: FileReadObservation, max_message_chars: int | None
+) -> Message:
+    return Message(
+        role="user", content=[TextContent(text=obs.content)]
+    )  # Content already formatted by read action
 
 
-def _handle_file_edit_observation(obs: FileEditObservation, max_message_chars: int | None) -> Message:
+def _handle_file_edit_observation(
+    obs: FileEditObservation, max_message_chars: int | None
+) -> Message:
     content_str = str(obs)
     text = truncate_content(content_str, max_message_chars)
     return Message(role="user", content=[TextContent(text=text)])
 
 
-def _handle_cmd_output_observation(obs: CmdOutputObservation, max_message_chars: int | None) -> Message:
+def _handle_cmd_output_observation(
+    obs: CmdOutputObservation, max_message_chars: int | None
+) -> Message:
     if obs.tool_call_metadata is None:
         text = truncate_content(
             f"\nObserved result of command executed by user:\n{obs.to_agent_observation()}",
@@ -122,7 +130,10 @@ def _handle_browser_output_observation(
 ) -> Message:
     content: list[TextContent | ImageContent] = [TextContent(text=obs.content)]
 
-    if obs.trigger_by_action == ActionType.BROWSE_INTERACTIVE and enable_som_visual_browsing:
+    if (
+        obs.trigger_by_action == ActionType.BROWSE_INTERACTIVE
+        and enable_som_visual_browsing
+    ):
         _add_browser_visual_content(obs, content, vision_is_active)
 
     return Message(role="user", content=content)
@@ -196,7 +207,9 @@ def _add_browser_image_fallback(
             )
 
 
-def _handle_error_observation(obs: ErrorObservation, max_message_chars: int | None) -> Message:
+def _handle_error_observation(
+    obs: ErrorObservation, max_message_chars: int | None
+) -> Message:
     return _handle_simple_observation(
         obs,
         max_message_chars,
@@ -204,7 +217,9 @@ def _handle_error_observation(obs: ErrorObservation, max_message_chars: int | No
     )
 
 
-def _handle_user_reject_observation(obs: UserRejectObservation, max_message_chars: int | None) -> Message:
+def _handle_user_reject_observation(
+    obs: UserRejectObservation, max_message_chars: int | None
+) -> Message:
     return _handle_simple_observation(
         obs,
         max_message_chars,
@@ -213,10 +228,14 @@ def _handle_user_reject_observation(obs: UserRejectObservation, max_message_char
     )
 
 
-def _handle_file_download_observation(obs: FileDownloadObservation, max_message_chars: int | None) -> Message:
+def _handle_file_download_observation(
+    obs: FileDownloadObservation, max_message_chars: int | None
+) -> Message:
     return _handle_simple_observation(obs, max_message_chars)
 
 
-def _handle_mcp_observation(obs: MCPObservation, max_message_chars: int | None) -> Message:
+def _handle_mcp_observation(
+    obs: MCPObservation, max_message_chars: int | None
+) -> Message:
     text = truncate_content(obs.content, max_message_chars)
     return Message(role="user", content=[TextContent(text=text)])

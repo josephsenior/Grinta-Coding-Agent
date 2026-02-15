@@ -120,7 +120,11 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
         )
 
         if is_excluded:
-            logger.debug("Resource quota check skipped for excluded path: %s (normalized: %s)", path, normalized_path)
+            logger.debug(
+                "Resource quota check skipped for excluded path: %s (normalized: %s)",
+                path,
+                normalized_path,
+            )
             return await call_next(request)
 
         user_id = getattr(request.state, "user_id", None)
@@ -143,7 +147,9 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
         # Add quota headers to response
         response = await call_next(request)
         response.headers["X-Quota-Plan"] = user_plan
-        response.headers["X-Quota-Remaining-Calls"] = str(self._get_remaining_calls(user_id, quota))
+        response.headers["X-Quota-Remaining-Calls"] = str(
+            self._get_remaining_calls(user_id, quota)
+        )
 
         return response
 
@@ -153,7 +159,9 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
         # For now, return free for all users
         return os.getenv("DEFAULT_QUOTA_PLAN", "free")
 
-    def _check_rate_limits(self, user_id: str, quota: ResourceQuota) -> JSONResponse | None:
+    def _check_rate_limits(
+        self, user_id: str, quota: ResourceQuota
+    ) -> JSONResponse | None:
         """Check if user has exceeded rate limits."""
         now = time.time()
         user_quota = _quota_store[user_id]
@@ -176,7 +184,9 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
                 details={
                     "limit": quota.max_api_calls_per_hour,
                     "window": "1 hour",
-                    "retry_after": 3600 - int(now - api_calls[0]) if api_calls else 3600,
+                    "retry_after": 3600 - int(now - api_calls[0])
+                    if api_calls
+                    else 3600,
                 },
             )
 
@@ -190,7 +200,9 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
                 details={
                     "limit": quota.max_api_calls_per_minute,
                     "window": "1 minute",
-                    "retry_after": 60 - int(now - recent_calls[0]) if recent_calls else 60,
+                    "retry_after": 60 - int(now - recent_calls[0])
+                    if recent_calls
+                    else 60,
                 },
             )
 
@@ -219,7 +231,9 @@ def get_user_quota(user_id: str) -> ResourceQuota:
     return QUOTA_PLANS.get(plan, QUOTA_PLANS["free"])
 
 
-def check_conversation_quota(user_id: str, current_count: int) -> tuple[bool, str | None]:
+def check_conversation_quota(
+    user_id: str, current_count: int
+) -> tuple[bool, str | None]:
     """Check if user can create another conversation.
 
     Returns:

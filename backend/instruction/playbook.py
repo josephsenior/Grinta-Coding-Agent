@@ -167,7 +167,9 @@ class BasePlaybook(BaseModel):
         )
         if handle == INVALID_HANDLE_VALUE:
             error = ctypes.GetLastError()
-            raise PermissionError(f"Unable to open locked file {path}: error {error}")  # pragma: no cover
+            raise PermissionError(
+                f"Unable to open locked file {path}: error {error}"
+            )  # pragma: no cover
         try:
             import msvcrt
 
@@ -241,12 +243,16 @@ class BasePlaybook(BaseModel):
         loaded = frontmatter.load(file_io)
         content = loaded.content
         metadata_dict = loaded.metadata or {}
-        if "version" in metadata_dict and (not isinstance(metadata_dict["version"], str)):
+        if "version" in metadata_dict and (
+            not isinstance(metadata_dict["version"], str)
+        ):
             metadata_dict["version"] = str(metadata_dict["version"])
         metadata = _finalize_loaded_playbook(metadata_dict, path)
         inferred_type = _infer_playbook_type(metadata)
 
-        return cls._create_playbook_instance(derived_name, content, metadata, path, inferred_type)
+        return cls._create_playbook_instance(
+            derived_name, content, metadata, path, inferred_type
+        )
 
 
 class KnowledgePlaybook(BasePlaybook):
@@ -272,7 +278,9 @@ class KnowledgePlaybook(BasePlaybook):
         It returns the first trigger that matches the message.
         """
         message = message.lower()
-        return next((trigger for trigger in self.triggers if trigger.lower() in message), None)
+        return next(
+            (trigger for trigger in self.triggers if trigger.lower() in message), None
+        )
 
     @property
     def triggers(self) -> list[str]:
@@ -467,7 +475,9 @@ def load_playbooks_from_dir(
 
         if agent_type == "repo" and isinstance(categorized_agent, RepoPlaybook):
             repo_agents[categorized_agent.name] = categorized_agent
-        elif agent_type == "knowledge" and isinstance(categorized_agent, KnowledgePlaybook):
+        elif agent_type == "knowledge" and isinstance(
+            categorized_agent, KnowledgePlaybook
+        ):
             knowledge_agents[categorized_agent.name] = categorized_agent
 
     logger.debug(

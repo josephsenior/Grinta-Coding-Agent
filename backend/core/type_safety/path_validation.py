@@ -82,7 +82,9 @@ class SafePath:
         Raises:
             PathValidationError: If validation fails
         """
-        validated_path = validate_and_sanitize_path(path, workspace_root, must_exist, must_be_relative)
+        validated_path = validate_and_sanitize_path(
+            path, workspace_root, must_exist, must_be_relative
+        )
         workspace_path = Path(workspace_root) if workspace_root else None
         return cls(validated_path, workspace_path)
 
@@ -172,7 +174,9 @@ class PathValidator:
 
         # Ensure workspace root exists
         if not self.workspace_root.exists():
-            raise PathValidationError(f"Workspace root does not exist: {self.workspace_root}")
+            raise PathValidationError(
+                f"Workspace root does not exist: {self.workspace_root}"
+            )
 
     def validate(
         self,
@@ -251,12 +255,16 @@ def validate_and_sanitize_path(
 
     # Check path length
     if len(path) > MAX_PATH_LENGTH:
-        raise PathValidationError(f"Path too long (max {MAX_PATH_LENGTH}): {len(path)}", path)
+        raise PathValidationError(
+            f"Path too long (max {MAX_PATH_LENGTH}): {len(path)}", path
+        )
 
     # Check for dangerous characters
     for char in DANGEROUS_CHARS:
         if char in path:
-            raise PathValidationError(f"Path contains dangerous character: {repr(char)}", path)
+            raise PathValidationError(
+                f"Path contains dangerous character: {repr(char)}", path
+            )
 
     # Check for path traversal patterns
     normalized_input = path.replace("\\", "/")  # Normalize separators
@@ -268,7 +276,9 @@ def validate_and_sanitize_path(
     try:
         if must_be_relative:
             if workspace_root is None:
-                raise PathValidationError("workspace_root required for relative paths", path)
+                raise PathValidationError(
+                    "workspace_root required for relative paths", path
+                )
 
             # Resolve relative to workspace
             workspace = Path(workspace_root).resolve()
@@ -281,12 +291,16 @@ def validate_and_sanitize_path(
             try:
                 full_path.relative_to(workspace)
             except ValueError:
-                raise PathValidationError(f"Path outside workspace boundary: {path}", path) from None
+                raise PathValidationError(
+                    f"Path outside workspace boundary: {path}", path
+                ) from None
 
             # Check depth (prevent deep nesting attacks)
             depth = len(full_path.relative_to(workspace).parts)
             if depth > 100:  # Reasonable limit
-                raise PathValidationError(f"Path depth too great (max 100): {depth}", path)
+                raise PathValidationError(
+                    f"Path depth too great (max 100): {depth}", path
+                )
 
             validated_path = full_path
 

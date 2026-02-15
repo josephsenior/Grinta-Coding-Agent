@@ -60,7 +60,9 @@ class SingleUseRuntimePool(RuntimePool):
 class WarmRuntimePool(RuntimePool):
     """Simple warm pool keyed by runtime kind."""
 
-    def __init__(self, *, max_size_per_key: int = 2, ttl_seconds: float = 600.0) -> None:
+    def __init__(
+        self, *, max_size_per_key: int = 2, ttl_seconds: float = 600.0
+    ) -> None:
         default_policy = WarmPoolPolicy(
             max_size=max_size_per_key,
             ttl_seconds=ttl_seconds,

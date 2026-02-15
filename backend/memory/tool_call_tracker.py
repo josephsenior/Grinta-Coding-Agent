@@ -27,10 +27,15 @@ def flush_resolved_tool_calls(tool_state: _ToolCallTracking) -> list[Message]:
             "Tool calls should NOT be None when function calling is enabled &"
             f" the message is considered pending tool call. Pending message: {pending_message}"
         )
-        if all(tool_call.id in tool_state.tool_call_messages for tool_call in pending_message.tool_calls):
+        if all(
+            tool_call.id in tool_state.tool_call_messages
+            for tool_call in pending_message.tool_calls
+        ):
             resolved_messages.append(pending_message)
             for tool_call in pending_message.tool_calls:
-                resolved_messages.append(tool_state.tool_call_messages.pop(tool_call.id))
+                resolved_messages.append(
+                    tool_state.tool_call_messages.pop(tool_call.id)
+                )
             response_ids_to_remove.append(response_id)
     for response_id in response_ids_to_remove:
         tool_state.pending_action_messages.pop(response_id)
@@ -65,7 +70,11 @@ def collect_tool_call_ids(messages: list[Message]) -> set[str]:
 
 def collect_tool_response_ids(messages: list[Message]) -> set[str]:
     """Collect all tool response IDs from tool messages."""
-    return {message.tool_call_id for message in messages if message.role == "tool" and message.tool_call_id}
+    return {
+        message.tool_call_id
+        for message in messages
+        if message.role == "tool" and message.tool_call_id
+    }
 
 
 def _should_include_message(
@@ -89,7 +98,9 @@ def _maybe_trim_tool_calls(
     if message.role != "assistant" or not message.tool_calls:
         return message
 
-    matched_calls = [call for call in message.tool_calls if call.id in tool_response_ids]
+    matched_calls = [
+        call for call in message.tool_calls if call.id in tool_response_ids
+    ]
     if len(matched_calls) == len(message.tool_calls):
         return message
     if not matched_calls:
@@ -108,8 +119,16 @@ def _all_tool_calls_match(
     if not message.tool_calls:
         return True
 
-    all_match = all(tool_call.id in tool_response_ids for tool_call in message.tool_calls)
+    all_match = all(
+        tool_call.id in tool_response_ids for tool_call in message.tool_calls
+    )
     if all_match:
         return True
 
-    return bool([tool_call for tool_call in message.tool_calls if tool_call.id in tool_response_ids])
+    return bool(
+        [
+            tool_call
+            for tool_call in message.tool_calls
+            if tool_call.id in tool_response_ids
+        ]
+    )

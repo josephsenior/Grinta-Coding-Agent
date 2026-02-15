@@ -134,14 +134,18 @@ def cmd_test(args: argparse.Namespace) -> None:
 
         print("\n[3] on_llm_post...")
         try:
-            await _call_if_exists(plugin, "on_llm_post", {"choices": [{"message": {"content": "Hi!"}}]})
+            await _call_if_exists(
+                plugin, "on_llm_post", {"choices": [{"message": {"content": "Hi!"}}]}
+            )
             print("    ✓ OK")
         except Exception as e:
             print(f"    ✗ Error: {e}")
 
         print("\n[4] on_session_end...")
         try:
-            await _call_if_exists(plugin, "on_session_end", "test-session-001", {"reason": "test"})
+            await _call_if_exists(
+                plugin, "on_session_end", "test-session-001", {"reason": "test"}
+            )
             print("    ✓ OK")
         except Exception as e:
             print(f"    ✗ Error: {e}")

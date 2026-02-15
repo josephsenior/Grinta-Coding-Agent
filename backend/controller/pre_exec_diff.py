@@ -122,7 +122,9 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         # Try extracting workspace root from the controller's runtime
         try:
             runtime = ctx.controller.runtime
-            workspace = getattr(runtime, "workspace_dir", None) or getattr(runtime, "workspace_path", None)
+            workspace = getattr(runtime, "workspace_dir", None) or getattr(
+                runtime, "workspace_path", None
+            )
             if workspace:
                 return os.path.join(str(workspace), rel_path)
         except Exception:

@@ -195,7 +195,9 @@ class ProviderInfo(BaseModel):
     """Information about a provider and its models."""
 
     separator: str = Field(description="The separator used in model identifiers")
-    models: list[str] = Field(default_factory=list, description="List of model identifiers")
+    models: list[str] = Field(
+        default_factory=list, description="List of model identifiers"
+    )
 
     def __getitem__(self, key: str) -> str | list[str]:
         """Allow dictionary-like access to fields."""
@@ -237,7 +239,12 @@ def split_is_actually_version(split: list[str]) -> bool:
         bool: True if the split represents a version, False otherwise.
 
     """
-    return len(split) > 1 and bool(split[1]) and bool(split[1][0]) and is_number(split[1][0])
+    return (
+        len(split) > 1
+        and bool(split[1])
+        and bool(split[1][0])
+        and is_number(split[1][0])
+    )
 
 
 def read_file(file_path: str | Path) -> str:

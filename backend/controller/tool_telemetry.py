@@ -94,7 +94,9 @@ class ToolTelemetry:
 
         outcome = self._determine_outcome(observation)
         duration = self._elapsed_since(telemetry)
-        tool_identifier = telemetry.get("tool_name") if isinstance(telemetry, dict) else None
+        tool_identifier = (
+            telemetry.get("tool_name") if isinstance(telemetry, dict) else None
+        )
         if not isinstance(tool_identifier, str) or not tool_identifier:
             tool_identifier = getattr(ctx.action, "action", type(ctx.action).__name__)
         tool_name = str(tool_identifier)
@@ -193,7 +195,9 @@ class ToolTelemetry:
             if self._invocations is not None:
                 self._invocations.labels(tool=tool_name, outcome=outcome_name).inc()
             if self._latency is not None:
-                self._latency.labels(tool=tool_name, outcome=outcome_name).observe(duration)
+                self._latency.labels(tool=tool_name, outcome=outcome_name).observe(
+                    duration
+                )
         except Exception as exc:  # pragma: no cover - metrics failures shouldn't crash
             logger.debug("Skipping telemetry metric export: %s", exc)
 
@@ -230,7 +234,9 @@ class ToolTelemetry:
             if metadata:
                 action_dict["metadata"] = metadata
 
-            return cast(ActionSchemaUnion, self._model_validate(schema_class, action_dict))
+            return cast(
+                ActionSchemaUnion, self._model_validate(schema_class, action_dict)
+            )
         except Exception as exc:  # pragma: no cover - schema conversion is optional
             logger.debug("Failed to convert action to schema: %s", exc)
             return None
@@ -242,7 +248,9 @@ class ToolTelemetry:
             return act_type
         return None
 
-    def _schema_class_for_action_type(self, act_type: str) -> type[ActionSchemaUnion] | None:
+    def _schema_class_for_action_type(
+        self, act_type: str
+    ) -> type[ActionSchemaUnion] | None:
         schema_map = self._action_schema_map()
         return schema_map.get(act_type)
 
@@ -287,7 +295,9 @@ class ToolTelemetry:
             metadata["timestamp"] = action.timestamp
         source = getattr(action, "source", None)
         if source:
-            metadata["source"] = source.value if hasattr(source, "value") else str(source)
+            metadata["source"] = (
+                source.value if hasattr(source, "value") else str(source)
+            )
         return metadata
 
     def _observation_to_schema(self, observation: Any) -> ObservationSchemaUnion | None:
@@ -315,7 +325,9 @@ class ToolTelemetry:
             if metadata:
                 obs_dict["metadata"] = metadata
 
-            return cast(ObservationSchemaUnion, self._model_validate(schema_class, obs_dict))
+            return cast(
+                ObservationSchemaUnion, self._model_validate(schema_class, obs_dict)
+            )
         except Exception as exc:  # pragma: no cover - schema conversion is optional
             logger.exception("Failed to convert observation to schema: %s", exc)
             logger.debug("Observation dict: %s", locals().get("obs_dict"))
@@ -328,7 +340,9 @@ class ToolTelemetry:
             return obs_type
         return None
 
-    def _schema_class_for_observation(self, obs_type: str) -> type[ObservationSchemaUnion] | None:
+    def _schema_class_for_observation(
+        self, obs_type: str
+    ) -> type[ObservationSchemaUnion] | None:
         return self._observation_schema_map().get(obs_type)
 
     @staticmethod
@@ -359,7 +373,9 @@ class ToolTelemetry:
             metadata["timestamp"] = observation.timestamp
         source = getattr(observation, "source", None)
         if source:
-            metadata["source"] = source.value if hasattr(source, "value") else str(source)
+            metadata["source"] = (
+                source.value if hasattr(source, "value") else str(source)
+            )
         return metadata
 
     @staticmethod
@@ -462,13 +478,17 @@ class ToolTelemetry:
             return str(observation_type)
 
     @staticmethod
-    def _base_observation_payload(observation: Any, observation_type: str) -> dict[str, Any]:
+    def _base_observation_payload(
+        observation: Any, observation_type: str
+    ) -> dict[str, Any]:
         return {
             "observation_type": observation_type,
             "content": getattr(observation, "content", ""),
         }
 
-    def _append_observation_fields(self, obs_dict: dict[str, Any], observation: Any) -> None:
+    def _append_observation_fields(
+        self, obs_dict: dict[str, Any], observation: Any
+    ) -> None:
         optional_fields = [
             "command",
             "code",
@@ -510,7 +530,10 @@ class ToolTelemetry:
         if isinstance(metadata, dict):
             return metadata
         if hasattr(metadata, "model_fields"):
-            return {field: getattr(metadata, field, None) for field in metadata.model_fields.keys()}
+            return {
+                field: getattr(metadata, field, None)
+                for field in metadata.model_fields.keys()
+            }
         return metadata
 
     @staticmethod

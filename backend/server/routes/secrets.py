@@ -29,7 +29,7 @@ from backend.server.user_auth import (
 )
 from backend.storage.data_models.user_secrets import UserSecrets
 
-router = APIRouter(prefix="/api", dependencies=get_dependencies())
+router = APIRouter(prefix="/api/v1", dependencies=get_dependencies())
 
 
 def process_token_validation_result(
@@ -46,21 +46,29 @@ def process_token_validation_result(
         Error message if validation fails, empty string otherwise
 
     """
-    expected = token_type.value if isinstance(token_type, ProviderType) else str(token_type)
+    expected = (
+        token_type.value if isinstance(token_type, ProviderType) else str(token_type)
+    )
     if not confirmed_token_type or confirmed_token_type != token_type:
         return f"Invalid token. Please make sure it is a valid {expected} token."
     return ""
 
 
 def _coerce_provider_type(token_type_key: str | ProviderType) -> ProviderType:
-    return token_type_key if isinstance(token_type_key, ProviderType) else ProviderType(token_type_key)
+    return (
+        token_type_key
+        if isinstance(token_type_key, ProviderType)
+        else ProviderType(token_type_key)
+    )
 
 
 def _provider_key(provider_type: ProviderType) -> str:
     return provider_type.value
 
 
-async def _validate_incoming_token(token_value: ProviderToken, provider_type: ProviderType) -> str:
+async def _validate_incoming_token(
+    token_value: ProviderToken, provider_type: ProviderType
+) -> str:
     """Validate an incoming provider token.
 
     Provider token validation is skipped since the core GitHub integration
@@ -165,7 +173,9 @@ async def check_provider_tokens(
 async def store_provider_tokens(
     provider_info: POSTProviderModel,
     secrets_store: Annotated[Any, Depends(get_secrets_store)],
-    provider_tokens: Annotated[PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)],
+    provider_tokens: Annotated[
+        PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
+    ],
 ) -> JSONResponse:
     """Store or update git provider authentication tokens.
 
@@ -180,7 +190,9 @@ async def store_provider_tokens(
         JSON response with success/error message
 
     """
-    provider_err_msg, normalized_input_tokens = await check_provider_tokens(provider_info, provider_tokens)
+    provider_err_msg, normalized_input_tokens = await check_provider_tokens(
+        provider_info, provider_tokens
+    )
     if provider_err_msg:
         # nosec B628 - Not logging credentials, just error message
         logger.info("Returning 401 Unauthorized - Provider token error")
@@ -194,7 +206,9 @@ async def store_provider_tokens(
             normalized_input_tokens,
             user_secrets.provider_tokens,
         )
-        updated_secrets = user_secrets.model_copy(update={"provider_tokens": merged_tokens})
+        updated_secrets = user_secrets.model_copy(
+            update={"provider_tokens": merged_tokens}
+        )
         await secrets_store.store(updated_secrets)
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -291,7 +305,9 @@ async def create_custom_secret(
     """
     try:
         existing_secrets = await secrets_store.load()
-        custom_secrets = dict(existing_secrets.custom_secrets) if existing_secrets else {}
+        custom_secrets = (
+            dict(existing_secrets.custom_secrets) if existing_secrets else {}
+        )
         secret_name = incoming_secret.name
         secret_value = incoming_secret.value
         secret_description = incoming_secret.description
@@ -306,7 +322,9 @@ async def create_custom_secret(
         )
         updated_user_secrets = UserSecrets(
             custom_secrets=custom_secrets,
-            provider_tokens=(existing_secrets.provider_tokens if existing_secrets else {}),
+            provider_tokens=(
+                existing_secrets.provider_tokens if existing_secrets else {}
+            ),
         )
         await secrets_store.store(updated_user_secrets)
         return JSONResponse(

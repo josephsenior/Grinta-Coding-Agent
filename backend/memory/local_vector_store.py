@@ -29,7 +29,9 @@ class VectorBackend(ABC):
         """Add a document to the vector store."""
 
     @abstractmethod
-    def search(self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    def search(
+        self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """Search for similar documents."""
 
     @abstractmethod
@@ -84,7 +86,9 @@ class ChromaDBBackend(VectorBackend):
 
         try:
             self.collection = self.client.get_collection(name=collection_name)
-            logger.info("Loaded ChromaDB collection with %s documents", self.collection.count())
+            logger.info(
+                "Loaded ChromaDB collection with %s documents", self.collection.count()
+            )
         except Exception:
             self.collection = self.client.create_collection(
                 name=collection_name,
@@ -121,7 +125,9 @@ class ChromaDBBackend(VectorBackend):
             metadatas=[doc_metadata],
         )
 
-    def search(self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    def search(
+        self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """Search the collection for the most similar documents to the query."""
         if self.collection.count() == 0:
             return []
@@ -134,7 +140,12 @@ class ChromaDBBackend(VectorBackend):
             include=["documents", "metadatas", "distances"],
         )
 
-        if not results["ids"] or not results["documents"] or not results["metadatas"] or not results["distances"]:
+        if (
+            not results["ids"]
+            or not results["documents"]
+            or not results["metadatas"]
+            or not results["distances"]
+        ):
             return []
 
         return [
@@ -157,7 +168,9 @@ class ChromaDBBackend(VectorBackend):
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Non-blocking add using a thread to encode and persist."""
-        await asyncio.to_thread(self.add, step_id, role, artifact_hash, rationale, content_text, metadata)
+        await asyncio.to_thread(
+            self.add, step_id, role, artifact_hash, rationale, content_text, metadata
+        )
 
     async def async_search(
         self,

@@ -93,7 +93,9 @@ class ForgeClient:
     _sio: socketio.AsyncClient = field(init=False, repr=False)
     _event_callback: EventCallback | None = field(default=None, init=False, repr=False)
     _connected_conversation_id: str | None = field(default=None, init=False, repr=False)
-    _connect_event: asyncio.Event = field(default_factory=asyncio.Event, init=False, repr=False)
+    _connect_event: asyncio.Event = field(
+        default_factory=asyncio.Event, init=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         self.base_url = self.base_url.rstrip("/")
@@ -229,7 +231,9 @@ class ForgeClient:
 
     async def get_workspace_changes(self, conversation_id: str) -> list[dict[str, Any]]:
         """GET /api/git/changes?conversation_id=...."""
-        data = await self._get("/git/changes", params={"conversation_id": conversation_id})
+        data = await self._get(
+            "/git/changes", params={"conversation_id": conversation_id}
+        )
         return data if isinstance(data, list) else data.get("changes", [])
 
     async def get_file_diff(

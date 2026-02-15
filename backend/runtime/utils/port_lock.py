@@ -27,7 +27,9 @@ class PortLock:
     def __init__(self, port: int, lock_dir: str | None = None) -> None:
         """Prepare filesystem lock state for the given port under the optional directory."""
         self.port = port
-        self.lock_dir = lock_dir or os.path.join(tempfile.gettempdir(), "FORGE_port_locks")
+        self.lock_dir = lock_dir or os.path.join(
+            tempfile.gettempdir(), "FORGE_port_locks"
+        )
         self.lock_file_path = os.path.join(self.lock_dir, f"port_{port}.lock")
         self.lock_fd: int | None = None
         self._locked = False
@@ -55,14 +57,18 @@ class PortLock:
             msg = "fcntl is not available on this platform"
             raise RuntimeError(msg)
 
-        self.lock_fd = os.open(self.lock_file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC)
+        self.lock_fd = os.open(
+            self.lock_file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC
+        )
         assert fcntl is not None
         fcntl_module = cast(Any, fcntl)
         start_time = time.time()
 
         while time.time() - start_time < timeout:
             try:
-                fcntl_module.flock(self.lock_fd, fcntl_module.LOCK_EX | fcntl_module.LOCK_NB)
+                fcntl_module.flock(
+                    self.lock_fd, fcntl_module.LOCK_EX | fcntl_module.LOCK_NB
+                )
                 self._locked = True
                 self._write_lock_info()
                 logger.debug("Acquired lock for port %s", self.port)
@@ -91,7 +97,9 @@ class PortLock:
 
         while time.time() - start_time < timeout:
             try:
-                self.lock_fd = os.open(self.lock_file_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                self.lock_fd = os.open(
+                    self.lock_file_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY
+                )
                 self._locked = True
                 self._write_lock_info()
                 logger.debug("Acquired lock for port %s", self.port)

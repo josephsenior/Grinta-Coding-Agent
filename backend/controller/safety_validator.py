@@ -89,7 +89,9 @@ class SafetyValidator:
             config.enable_mandatory_validation,
         )
 
-    async def validate(self, action: Action, context: ExecutionContext) -> ValidationResult:
+    async def validate(
+        self, action: Action, context: ExecutionContext
+    ) -> ValidationResult:
         """Validate an action for safety.
 
         This is the main entry point for safety validation. It analyzes the action,
@@ -119,7 +121,9 @@ class SafetyValidator:
             "high": ActionSecurityRisk.HIGH,
             "critical": ActionSecurityRisk.HIGH,
         }
-        risk_level = risk_level_map.get(risk_category.value.lower(), ActionSecurityRisk.UNKNOWN)
+        risk_level = risk_level_map.get(
+            risk_category.value.lower(), ActionSecurityRisk.UNKNOWN
+        )
 
         # Determine if action should be blocked
         should_block = self._should_block_action(assessment, context)
@@ -132,7 +136,9 @@ class SafetyValidator:
             reason=reason,
             matched_patterns=matched_patterns,
             requires_review=self._requires_human_review(assessment),
-            blocked_reason=self._get_blocked_reason(assessment) if should_block else None,
+            blocked_reason=self._get_blocked_reason(assessment)
+            if should_block
+            else None,
         )
 
         # Log to audit trail
@@ -344,6 +350,8 @@ class SafetyValidator:
                     timeout=aiohttp.ClientTimeout(total=5),
                 ) as response:
                     if response.status != 200:
-                        logger.error("Failed to send webhook alert: %s", response.status)
+                        logger.error(
+                            "Failed to send webhook alert: %s", response.status
+                        )
         except Exception as e:
             logger.error("Error sending webhook alert: %s", e)

@@ -42,7 +42,9 @@ def get_diff(
     return _finalize_diff_text(diff_lines)
 
 
-def _prepare_diff_lines(old: str, new: str, ignore_whitespace: bool) -> tuple[list[str], list[str]]:
+def _prepare_diff_lines(
+    old: str, new: str, ignore_whitespace: bool
+) -> tuple[list[str], list[str]]:
     """Normalize and split input text into lines for diffing."""
     old_lines = old.splitlines(keepends=True) if old else []
     new_lines = new.splitlines(keepends=True) if new else []
@@ -68,7 +70,9 @@ def _check_binary(old: str, new: str, path: str | None) -> str | None:
 
     if path:
         mime_type, _ = mimetypes.guess_type(path)
-        if mime_type and not mime_type.startswith(("text/", "application/json", "application/xml")):
+        if mime_type and not mime_type.startswith(
+            ("text/", "application/json", "application/xml")
+        ):
             return f"Binary file {path} - diff not available\n"
 
     # Check for binary content
@@ -99,7 +103,9 @@ def _is_binary(content: str) -> bool:
     if not sample:
         return False
 
-    non_printable = sum(1 for c in sample if ord(c) < 32 and c not in "\n\r\t" and ord(c) != 0)
+    non_printable = sum(
+        1 for c in sample if ord(c) < 32 and c not in "\n\r\t" and ord(c) != 0
+    )
     ratio = non_printable / len(sample)
 
     # If more than 30% non-printable (excluding common whitespace), likely binary

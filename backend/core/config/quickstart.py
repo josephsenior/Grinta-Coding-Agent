@@ -81,7 +81,10 @@ def _interactive_init(dest: Path) -> None:
             return
 
     api_key = input("  LLM API key (leave blank to set later): ").strip()
-    model = input("  Model [claude-sonnet-4-20250514]: ").strip() or "claude-sonnet-4-20250514"
+    model = (
+        input("  Model [claude-sonnet-4-20250514]: ").strip()
+        or "claude-sonnet-4-20250514"
+    )
     base_url = input("  Base URL (blank for default): ").strip()
     budget_str = input("  Max budget per task in USD [5.0]: ").strip()
     max_budget = float(budget_str) if budget_str else 5.0

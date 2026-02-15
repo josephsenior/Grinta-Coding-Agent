@@ -88,7 +88,9 @@ class FileSettingsStore(SettingsStore):
             del _file_settings_cache[cache_key]
 
     @classmethod
-    async def get_instance(cls, config: ForgeConfig, user_id: str | None) -> FileSettingsStore:
+    async def get_instance(
+        cls, config: ForgeConfig, user_id: str | None
+    ) -> FileSettingsStore:
         """Get FileSettingsStore singleton instance.
 
         Args:

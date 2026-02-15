@@ -92,7 +92,9 @@ class Session:
         self.loop = asyncio.get_event_loop()
         self.user_id = user_id
         self._publish_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
-        self._monitor_publish_queue_task: asyncio.Task = self.loop.create_task(self._monitor_publish_queue())
+        self._monitor_publish_queue_task: asyncio.Task = self.loop.create_task(
+            self._monitor_publish_queue()
+        )
         self._wait_websocket_initial_complete: bool = True
         self._closed: bool = False
 
@@ -108,7 +110,9 @@ class Session:
         if self.sio:
             await self.sio.emit(
                 "forge_event",
-                event_to_dict(AgentStateChangedObservation("", AgentState.STOPPED.value)),
+                event_to_dict(
+                    AgentStateChangedObservation("", AgentState.STOPPED.value)
+                ),
                 to=ROOM_KEY.format(sid=self.sid),
             )
         self.is_alive = False
@@ -140,23 +144,29 @@ class Session:
             cfg.vcs_user_email = vcs_user_email
 
         # MCP
-        self.logger.debug("MCP configuration before setup - self.config.mcp_config: %s", cfg.mcp)
+        self.logger.debug(
+            "MCP configuration before setup - self.config.mcp_config: %s", cfg.mcp
+        )
         mcp_config = getattr(settings, "mcp_config", None)
         if mcp_config is not None:
             cfg.mcp = cfg.mcp.merge(mcp_config)
             self.logger.debug("Merged custom MCP Config: %s", mcp_config)
 
-        FORGE_mcp_server, FORGE_mcp_stdio_servers = ForgeMCPConfigImpl.create_default_mcp_server_config(
-            cfg.mcp_host,
-            cfg,
-            self.user_id,
+        FORGE_mcp_server, FORGE_mcp_stdio_servers = (
+            ForgeMCPConfigImpl.create_default_mcp_server_config(
+                cfg.mcp_host,
+                cfg,
+                self.user_id,
+            )
         )
         if FORGE_mcp_server:
             cfg.mcp.shttp_servers.append(FORGE_mcp_server)
             self.logger.debug("Added default MCP HTTP server to config")
             cfg.mcp.stdio_servers.extend(FORGE_mcp_stdio_servers)
 
-        self.logger.debug("MCP configuration after setup - self.config.mcp: %s", cfg.mcp)
+        self.logger.debug(
+            "MCP configuration after setup - self.config.mcp: %s", cfg.mcp
+        )
 
     def _apply_condenser(self, settings: Settings, agent_config, llm_config) -> None:
         """Configure agent condenser if enabled."""
@@ -183,7 +193,9 @@ class Session:
             self.logger.info(
                 f'Enabling pipeline condenser with: browser_output_masking(attention_window=2), llm(model="{
                     llm_config.model
-                }", base_url="{llm_config.base_url}", keep_first=4, max_size={max_events_for_condenser})',
+                }", base_url="{llm_config.base_url}", keep_first=4, max_size={
+                    max_events_for_condenser
+                })',
             )
             agent_config.condenser_config = default_condenser_config
 
@@ -260,13 +272,17 @@ class Session:
             self.logger.exception("Error creating agent_session: %s", e)
             error_message = str(e)
             if "playbook" in error_message.lower():
-                await self.send_error(f"Failed to create agent session: {error_message}")
+                await self.send_error(
+                    f"Failed to create agent session: {error_message}"
+                )
             else:
                 await self.send_error("Failed to create agent session: ValueError")
             return
         except Exception as e:
             self.logger.exception("Error creating agent_session: %s", e)
-            await self.send_error(f"Failed to create agent session: {e.__class__.__name__}")
+            await self.send_error(
+                f"Failed to create agent session: {e.__class__.__name__}"
+            )
             return
 
     async def initialize_agent(
@@ -331,7 +347,9 @@ class Session:
         )
 
     def _notify_on_llm_retry(self, retries: int, max: int) -> None:
-        self.queue_status_message("info", RuntimeStatus.LLM_RETRY, f"Retrying LLM request, {retries} / {max}")
+        self.queue_status_message(
+            "info", RuntimeStatus.LLM_RETRY, f"Retrying LLM request, {retries} / {max}"
+        )
 
     def on_event(self, event: Event) -> None:
         """Synchronous event callback that delegates to async handler.
@@ -370,7 +388,10 @@ class Session:
                     extra={"session_id": self.sid},
                 )
             await self.send(event_dict)
-            if isinstance(event, AgentStateChangedObservation) and event.agent_state == AgentState.ERROR:
+            if (
+                isinstance(event, AgentStateChangedObservation)
+                and event.agent_state == AgentState.ERROR
+            ):
                 self.logger.error(
                     f"Agent status error: {event.reason}",
                     extra={"signal": "agent_status_error"},
@@ -429,7 +450,9 @@ class Session:
 
         # Check if vision is disabled
         if controller.agent.llm.config.disable_vision:
-            await self.send_error("Support for images is disabled for this model, try without an image.")
+            await self.send_error(
+                "Support for images is disabled for this model, try without an image."
+            )
             return True
 
         # Check if model supports vision
@@ -522,9 +545,9 @@ class Session:
             and not bool(manager.rooms.get("/", {}).get(ROOM_KEY.format(sid=self.sid)))  # type: ignore[arg-type]
         ):
             self.logger.warning(
-                f"There is no listening client in the current room, waiting for the {_waiting_times}th attempt: {
-                    self.sid
-                }",
+                f"There is no listening client in the current room, waiting for the {
+                    _waiting_times
+                }th attempt: {self.sid}",
             )
             _waiting_times += 1
             await asyncio.sleep(0.1)
@@ -539,7 +562,9 @@ class Session:
             True if event should be dropped
 
         """
-        if isinstance(data, dict) and (data.get("observation") == "null" or data.get("action") == "null"):
+        if isinstance(data, dict) and (
+            data.get("observation") == "null" or data.get("action") == "null"
+        ):
             try:
                 self.logger.warning(
                     'Dropping event with literal "null" in observation/action',
@@ -566,7 +591,10 @@ class Session:
 
         # Special logging for state changes
         if data.get("observation") == "agent_state_changed":
-            self.logger.info("🔄 Agent state changed to: %s", data.get("extras", {}).get("agent_state", "unknown"))
+            self.logger.info(
+                "🔄 Agent state changed to: %s",
+                data.get("extras", {}).get("agent_state", "unknown"),
+            )
 
         if self.sio is None:
             self.logger.warning("Socket.IO server not available; dropping event.")
@@ -577,7 +605,9 @@ class Session:
         """Sends an error message to the client."""
         await self._send_status_message("error", RuntimeStatus.ERROR, message)
 
-    async def _send_status_message(self, msg_type: str, runtime_status: RuntimeStatus, message: str) -> None:
+    async def _send_status_message(
+        self, msg_type: str, runtime_status: RuntimeStatus, message: str
+    ) -> None:
         """Sends a status message to the client."""
         if msg_type == "error":
             agent_session = self.agent_session
@@ -598,7 +628,11 @@ class Session:
                         )
                     )
                 )
-            self.logger.error("Agent status error: %s", message, extra={"signal": "agent_status_error"})
+            self.logger.error(
+                "Agent status error: %s",
+                message,
+                extra={"signal": "agent_status_error"},
+            )
         await self.send(
             {
                 "status_update": True,
@@ -608,6 +642,10 @@ class Session:
             }
         )
 
-    def queue_status_message(self, msg_type: str, runtime_status: RuntimeStatus, message: str) -> None:
+    def queue_status_message(
+        self, msg_type: str, runtime_status: RuntimeStatus, message: str
+    ) -> None:
         """Queues a status message to be sent asynchronously."""
-        asyncio.run_coroutine_threadsafe(self._send_status_message(msg_type, runtime_status, message), self.loop)
+        asyncio.run_coroutine_threadsafe(
+            self._send_status_message(msg_type, runtime_status, message), self.loop
+        )

@@ -18,7 +18,9 @@ _BACKOFF_FACTOR = 1.5
 _MAX_CONSECUTIVE_ERRORS = 20  # Force ERROR state after this many step failures
 
 
-def _handle_error_status(controller: AgentController, runtime_status: RuntimeStatus, msg: str) -> None:
+def _handle_error_status(
+    controller: AgentController, runtime_status: RuntimeStatus, msg: str
+) -> None:
     """Handle error status in the status callback."""
     if controller:
         controller.state.set_last_error(msg, source="loop.status_callback")

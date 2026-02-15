@@ -39,7 +39,9 @@ class EnvManagerMixin:
 
     def _build_powershell_env_cmd(self, env_vars: dict[str, str]) -> str:
         """Build PowerShell command to set environment variables."""
-        cmd = "".join(f"$env:{key} = {json.dumps(value)}; " for key, value in env_vars.items())
+        cmd = "".join(
+            f"$env:{key} = {json.dumps(value)}; " for key, value in env_vars.items()
+        )
         return cmd.strip() if cmd else ""
 
     def _run_cmd_action(self, action: CmdRunAction) -> Observation:
@@ -70,9 +72,9 @@ class EnvManagerMixin:
         bashrc_cmd = ""
         for key, value in env_vars.items():
             cmd += f"export {key}={json.dumps(value)}; "
-            bashrc_cmd += f'touch ~/.bashrc; grep -q "^export {key}=" ~/.bashrc || echo "export {key}={
-                json.dumps(value)
-            }" >> ~/.bashrc; '
+            bashrc_cmd += f'touch ~/.bashrc; grep -q "^export {
+                key
+            }=" ~/.bashrc || echo "export {key}={json.dumps(value)}" >> ~/.bashrc; '
         return cmd.strip() if cmd else "", bashrc_cmd.strip() if bashrc_cmd else ""
 
     def _add_env_vars_to_bash(self, env_vars: dict[str, str]) -> None:
@@ -96,7 +98,9 @@ class EnvManagerMixin:
         bashrc_action.set_hard_timeout(30)
         obs = self._run_cmd_action(bashrc_action)
         if not isinstance(obs, CmdOutputObservation) or obs.exit_code != 0:
-            msg = f"Failed to add env vars [{env_vars.keys()}] to .bashrc: {obs.content}"
+            msg = (
+                f"Failed to add env vars [{env_vars.keys()}] to .bashrc: {obs.content}"
+            )
             raise RuntimeError(msg)
 
     # ------------------------------------------------------------------

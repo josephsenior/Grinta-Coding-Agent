@@ -48,7 +48,9 @@ class SimpleBashSession(BaseShellSession):
     def execute(self, action: CmdRunAction) -> CmdOutputObservation | ErrorObservation:
         """Execute a command in Bash."""
         if not self._initialized or self._closed:
-            return ErrorObservation(content="Bash session is not initialized or has been closed.")
+            return ErrorObservation(
+                content="Bash session is not initialized or has been closed."
+            )
 
         command = action.command.strip()
         timeout_seconds = self._normalize_timeout(action.timeout)  # type: ignore[arg-type]
@@ -76,7 +78,9 @@ class SimpleBashSession(BaseShellSession):
         stdout, stderr, exit_code = self._run_command(command, timeout=timeout_seconds)
         return self._format_execution_observation(command, stdout, stderr, exit_code)  # type: ignore[return-value]
 
-    def _handle_background_execution(self, command: str) -> CmdOutputObservation | ErrorObservation:
+    def _handle_background_execution(
+        self, command: str
+    ) -> CmdOutputObservation | ErrorObservation:
         """Handle execution of background commands via nohup."""
         bg_command = f"nohup {command} > /dev/null 2>&1 & echo $!"
         stdout, stderr, exit_code = self._run_command(bg_command, timeout=10)
@@ -145,7 +149,9 @@ class SimpleBashSession(BaseShellSession):
         """Update current working directory by querying the shell."""
         self._update_cwd_from_output(["bash", "-c", "pwd"])
 
-    def _handle_subprocess_timeout(self, command: str, timeout: int | None) -> tuple[str, str, int]:
+    def _handle_subprocess_timeout(
+        self, command: str, timeout: int | None
+    ) -> tuple[str, str, int]:
         """Handle subprocess timeout and ensure cleanup."""
         logger.warning("Command timed out after %s seconds: %s", timeout, command)
         # Process cleanup is handled by cancellation service if registered,

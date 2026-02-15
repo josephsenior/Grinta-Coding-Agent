@@ -55,7 +55,11 @@ class SemanticCondenser(RollingCondenser):
         self.max_size = max_size
         self.importance_threshold = importance_threshold
 
-        logger.info("Semantic condenser initialized (keep_first=%s, max_size=%s)", keep_first, max_size)
+        logger.info(
+            "Semantic condenser initialized (keep_first=%s, max_size=%s)",
+            keep_first,
+            max_size,
+        )
 
     def get_condensation(self, view: View) -> Condensation:
         """Apply semantic condensation.
@@ -82,9 +86,14 @@ class SemanticCondenser(RollingCondenser):
         forgotten_event_ids = sorted(all_event_ids - keep_event_ids)
 
         logger.info(
-            "Semantic condensation: Keeping %s events, forgetting %s events", len(keep_event_ids), len(forgotten_event_ids))
+            "Semantic condensation: Keeping %s events, forgetting %s events",
+            len(keep_event_ids),
+            len(forgotten_event_ids),
+        )
 
-        return Condensation(action=CondensationAction(forgotten_event_ids=forgotten_event_ids))
+        return Condensation(
+            action=CondensationAction(forgotten_event_ids=forgotten_event_ids)
+        )
 
     def _score_events(self, events: list[Event]) -> list[EventImportance]:
         """Score events by importance.
@@ -100,7 +109,9 @@ class SemanticCondenser(RollingCondenser):
 
         for event in events:
             score, reasons = self._calculate_importance(event)
-            scored.append(EventImportance(event=event, importance_score=score, reasons=reasons))
+            scored.append(
+                EventImportance(event=event, importance_score=score, reasons=reasons)
+            )
 
         return scored
 
@@ -134,7 +145,10 @@ class SemanticCondenser(RollingCondenser):
 
         if hasattr(event, "command"):
             cmd_lower = event.command.lower()
-            if any(keyword in cmd_lower for keyword in ["install", "build", "deploy", "setup"]):
+            if any(
+                keyword in cmd_lower
+                for keyword in ["install", "build", "deploy", "setup"]
+            ):
                 score += 0.3
                 reasons.append("setup_command")
 

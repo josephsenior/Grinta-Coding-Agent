@@ -108,13 +108,19 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     max_iterations: int = Field(default=FORGE_MAX_ITERATIONS)
     max_budget_per_task: float | None = Field(
         default=5.0,
-        description=("Maximum LLM cost (USD) allowed per task. Set to 0 or None for no limit (not recommended)."),
+        description=(
+            "Maximum LLM cost (USD) allowed per task. Set to 0 or None for no limit (not recommended)."
+        ),
     )
     debug: bool = Field(default=False)
     disable_color: bool = Field(default=False)
-    conversation_max_age_seconds: int = Field(default=DEFAULT_CONVERSATION_MAX_AGE_SECONDS)
+    conversation_max_age_seconds: int = Field(
+        default=DEFAULT_CONVERSATION_MAX_AGE_SECONDS
+    )
     enable_default_condenser: bool = Field(default=DEFAULT_ENABLE_DEFAULT_CONDENSER)
-    max_concurrent_conversations: int = Field(default=DEFAULT_MAX_CONCURRENT_CONVERSATIONS)
+    max_concurrent_conversations: int = Field(
+        default=DEFAULT_MAX_CONCURRENT_CONVERSATIONS
+    )
     mcp: MCPConfig = Field(default_factory=lambda: MCPConfig())
     git: GitIdentityConfig = Field(default_factory=lambda: GitIdentityConfig())
     file_uploads: FileUploadsConfig = Field(default_factory=lambda: FileUploadsConfig())
@@ -142,31 +148,57 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         description="Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL",
     )
     # Extended configuration for additional features
-    extended: ExtendedConfig | None = Field(default=None, description="Extended configuration for additional features")
+    extended: ExtendedConfig | None = Field(
+        default=None, description="Extended configuration for additional features"
+    )
     # Optional attributes accessed via extended config or direct access
-    workspace_base: str | None = Field(default=None, description="Base workspace directory")
-    workspace_mount_path_in_runtime: str | None = Field(default=None, description="Workspace mount path in runtime")
-    file_store_web_hook_url: str | None = Field(default=None, description="File store webhook URL")
-    file_store_web_hook_headers: dict[str, str] | None = Field(default=None, description="File store webhook headers")
-    file_store_web_hook_batch: bool = Field(default=False, description="Enable file store webhook batching")
+    workspace_base: str | None = Field(
+        default=None, description="Base workspace directory"
+    )
+    workspace_mount_path_in_runtime: str | None = Field(
+        default=None, description="Workspace mount path in runtime"
+    )
+    file_store_web_hook_url: str | None = Field(
+        default=None, description="File store webhook URL"
+    )
+    file_store_web_hook_headers: dict[str, str] | None = Field(
+        default=None, description="File store webhook headers"
+    )
+    file_store_web_hook_batch: bool = Field(
+        default=False, description="Enable file store webhook batching"
+    )
     # Trajectory replay/save configuration
-    replay_trajectory_path: str | None = Field(default=None, description="Path to trajectory file for replay")
-    save_trajectory_path: str | None = Field(default=None, description="Path to save trajectory file")
-    save_screenshots_in_trajectory: bool = Field(default=False, description="Save screenshots in trajectory")
+    replay_trajectory_path: str | None = Field(
+        default=None, description="Path to trajectory file for replay"
+    )
+    save_trajectory_path: str | None = Field(
+        default=None, description="Path to save trajectory file"
+    )
+    save_screenshots_in_trajectory: bool = Field(
+        default=False, description="Save screenshots in trajectory"
+    )
     # CLI configuration
-    cli_multiline_input: bool = Field(default=False, description="Enable multiline input in CLI")
+    cli_multiline_input: bool = Field(
+        default=False, description="Enable multiline input in CLI"
+    )
     # MCP configuration
     mcp_host: str | None = Field(default=None, description="MCP host address")
     # Runtime configuration
-    init_git_in_empty_workspace: bool = Field(default=False, description="Initialize git in empty workspace")
+    init_git_in_empty_workspace: bool = Field(
+        default=False, description="Initialize git in empty workspace"
+    )
     run_as_Forge: bool = Field(default=False, description="Run commands as Forge user")
     # File upload configuration
     file_uploads_max_file_size_mb: int = Field(
         default=DEFAULT_MAX_FILE_UPLOAD_SIZE_MB,
         description="Maximum file upload size in MB",
     )
-    file_uploads_restrict_file_types: bool = Field(default=False, description="Whether to restrict file types")
-    file_uploads_allowed_extensions: set[str] = Field(default_factory=set, description="Allowed file extensions")
+    file_uploads_restrict_file_types: bool = Field(
+        default=False, description="Whether to restrict file types"
+    )
+    file_uploads_allowed_extensions: set[str] = Field(
+        default_factory=set, description="Allowed file extensions"
+    )
     defaults_dict: ClassVar[dict] = {}
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
@@ -175,7 +207,9 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         if name in self.llms:
             return self.llms[name]
         if name is not None and name != "llm":
-            logger.FORGE_logger.warning("llm config group %s not found, using default config", name)
+            logger.FORGE_logger.warning(
+                "llm config group %s not found, using default config", name
+            )
         if "llm" not in self.llms:
             self.llms["llm"] = LLMConfig()
         return self.llms["llm"]

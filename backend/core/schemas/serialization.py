@@ -30,7 +30,9 @@ def serialize_event(event: BaseEventSchema) -> str:
         raise ValueError(f"Failed to serialize event: {e}") from e
 
 
-def deserialize_event(data: str | dict[str, Any], version: EventVersion | None = None) -> BaseEventSchema:
+def deserialize_event(
+    data: str | dict[str, Any], version: EventVersion | None = None
+) -> BaseEventSchema:
     """Deserialize an event schema from JSON string or dictionary.
 
     Args:
@@ -205,7 +207,9 @@ def migrate_schema_version(
     # V1 to V2 migration (placeholder for future)
     if from_version == EventVersion.V1 and to_version == EventVersion.V2:
         # Add migration logic here when V2 is introduced
-        raise ValueError(f"Migration from {from_version} to {to_version} is not yet supported")
+        raise ValueError(
+            f"Migration from {from_version} to {to_version} is not yet supported"
+        )
 
     # V2 to V1 migration (downgrade)
     if from_version == EventVersion.V2 and to_version == EventVersion.V1:

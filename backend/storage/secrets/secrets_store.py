@@ -35,5 +35,7 @@ class SecretsStore(ABC):
 
     @classmethod
     @abstractmethod
-    async def get_instance(cls, config: ForgeConfig, user_id: str | None) -> SecretsStore:
+    async def get_instance(
+        cls, config: ForgeConfig, user_id: str | None
+    ) -> SecretsStore:
         """Get a store for the user represented by the token given."""

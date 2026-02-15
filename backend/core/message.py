@@ -177,7 +177,9 @@ class Message(BaseModel):
         return self._string_serializer()
 
     def _string_serializer(self) -> dict[str, Any]:
-        content = "\n".join(item.text for item in self.content if isinstance(item, TextContent))
+        content = "\n".join(
+            item.text for item in self.content if isinstance(item, TextContent)
+        )
         message_dict: dict[str, Any] = {"content": content, "role": self.role}
         return self._add_tool_call_keys(message_dict)
 
@@ -187,7 +189,9 @@ class Message(BaseModel):
 
         for item in self.content:
             d = model_dump_with_options(item)
-            role_tool_with_prompt_caching = self._process_item_caching(item, d, role_tool_with_prompt_caching)
+            role_tool_with_prompt_caching = self._process_item_caching(
+                item, d, role_tool_with_prompt_caching
+            )
             self._add_item_to_content(item, d, content)
 
         message_dict: dict[str, Any] = {"content": content, "role": self.role}
@@ -195,7 +199,9 @@ class Message(BaseModel):
             message_dict["cache_control"] = {"type": "ephemeral"}
         return self._add_tool_call_keys(message_dict)
 
-    def _process_item_caching(self, item: Any, d: dict, role_tool_with_prompt_caching: bool) -> bool:
+    def _process_item_caching(
+        self, item: Any, d: dict, role_tool_with_prompt_caching: bool
+    ) -> bool:
         """Process caching for tool items."""
         if self.role == "tool" and item.cache_prompt:
             role_tool_with_prompt_caching = True
@@ -212,7 +218,9 @@ class Message(BaseModel):
                 if hasattr(d_item, "pop"):
                     d_item.pop("cache_control", None)
 
-    def _add_item_to_content(self, item: Any, d: dict, content: list[dict[str, Any]]) -> None:
+    def _add_item_to_content(
+        self, item: Any, d: dict, content: list[dict[str, Any]]
+    ) -> None:
         """Add item to content list based on type."""
         if isinstance(item, TextContent):
             content.append(d)
@@ -237,7 +245,9 @@ class Message(BaseModel):
                 for tool_call in self.tool_calls
             ]
         if self.tool_call_id is not None:
-            assert self.name is not None, "name is required when tool_call_id is not None"
+            assert self.name is not None, (
+                "name is required when tool_call_id is not None"
+            )
             message_dict["tool_call_id"] = self.tool_call_id
             message_dict["name"] = self.name
         return message_dict

@@ -12,7 +12,10 @@ from typing import Callable
 
 _reset_fn: Callable[[], None] | None = None
 try:
-    from backend.server.middleware.request_metrics import reset_request_metrics as _imported_reset
+    from backend.server.middleware.request_metrics import (
+        reset_request_metrics as _imported_reset,
+    )
+
     _reset_fn = _imported_reset
 except Exception:
     pass
@@ -73,7 +76,10 @@ def test_prometheus_metrics_expose_request_stats():
     assert exc_total is not None and exc_total >= 0
 
     # Histogram lines must be present with +Inf bucket, sum and count
-    assert any(line.startswith("forge_request_duration_ms_bucket{le=") for line in body.splitlines())
+    assert any(
+        line.startswith("forge_request_duration_ms_bucket{le=")
+        for line in body.splitlines()
+    )
     sum_v = _get_metric_value(body, "forge_request_duration_ms_sum")
     cnt_v = _get_metric_value(body, "forge_request_duration_ms_count")
     assert sum_v is not None and cnt_v is not None

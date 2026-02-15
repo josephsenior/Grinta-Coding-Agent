@@ -195,8 +195,12 @@ class WindowsPowershellSession(BaseShellSession):
             # Update CWD if command changed directory
             if "cd " in command.lower() or "Set-Location" in command:
                 self._update_cwd_from_output(  # type: ignore[attr-defined]
-                    [self.powershell_exe, "-NoProfile", "-Command",
-                     "Get-Location | Select-Object -ExpandProperty Path"]
+                    [
+                        self.powershell_exe,
+                        "-NoProfile",
+                        "-Command",
+                        "Get-Location | Select-Object -ExpandProperty Path",
+                    ]
                 )
 
             return (stdout, stderr, return_code)
@@ -239,12 +243,19 @@ class WindowsPowershellSession(BaseShellSession):
             return self._execute_background_command(command)
 
         # Regular foreground command
-        return self._execute_foreground_command(command, timeout_seconds_int, action.stdin if is_input else None)
+        return self._execute_foreground_command(
+            command, timeout_seconds_int, action.stdin if is_input else None
+        )
 
     def _update_cwd_if_needed(self) -> None:
         """Update current working directory by querying the shell."""
         self._update_cwd_from_output(
-            [self.powershell_exe, "-NoProfile", "-Command", "Get-Location | Select-Object -ExpandProperty Path"]
+            [
+                self.powershell_exe,
+                "-NoProfile",
+                "-Command",
+                "Get-Location | Select-Object -ExpandProperty Path",
+            ]
         )
 
     def _handle_timeout_exception(
@@ -260,7 +271,9 @@ class WindowsPowershellSession(BaseShellSession):
                 pass
         return ("", f"Command timed out after {timeout} seconds", 124)
 
-    def _handle_run_exception(self, process: subprocess.Popen | None, e: Exception) -> tuple[str, str, int]:
+    def _handle_run_exception(
+        self, process: subprocess.Popen | None, e: Exception
+    ) -> tuple[str, str, int]:
         """Handle general subprocess exceptions."""
         logger.error("Error running PowerShell command: %s", e)
         if process:
@@ -270,7 +283,9 @@ class WindowsPowershellSession(BaseShellSession):
                 pass
         return ("", str(e), 1)
 
-    def _execute_background_command(self, command: str) -> CmdOutputObservation | ErrorObservation:
+    def _execute_background_command(
+        self, command: str
+    ) -> CmdOutputObservation | ErrorObservation:
         """Start a background PowerShell process."""
         escaped_cwd = self._cwd.replace('"', '`"')
         child_script = f'Set-Location "{escaped_cwd}"; {command}'
@@ -299,7 +314,9 @@ class WindowsPowershellSession(BaseShellSession):
         logger.warning("Failed to start background job, running normally")
         return self._execute_foreground_command(command, 60, None)
 
-    def _execute_foreground_command(self, command: str, timeout: int, stdin: str | None) -> CmdOutputObservation:
+    def _execute_foreground_command(
+        self, command: str, timeout: int, stdin: str | None
+    ) -> CmdOutputObservation:
         """Execute a foreground command and format the observation."""
         stdout, stderr, exit_code = self._run_command(
             command,
@@ -313,6 +330,6 @@ class WindowsPowershellSession(BaseShellSession):
         return self._initialized and not self._closed
 
     def _session_not_ready_observation(self) -> ErrorObservation:
-        return ErrorObservation(content="PowerShell session is not initialized or has been closed.")
-
-
+        return ErrorObservation(
+            content="PowerShell session is not initialized or has been closed."
+        )

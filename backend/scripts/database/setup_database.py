@@ -35,7 +35,9 @@ async def create_database():
         print("✓ Connected to PostgreSQL")
 
         # Check if database exists
-        exists = await conn.fetchval("SELECT 1 FROM pg_database WHERE datname = $1", db_name)
+        exists = await conn.fetchval(
+            "SELECT 1 FROM pg_database WHERE datname = $1", db_name
+        )
 
         if exists:
             print(f"✓ Database '{db_name}' already exists")

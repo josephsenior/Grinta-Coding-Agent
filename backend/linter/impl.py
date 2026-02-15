@@ -132,10 +132,14 @@ class DefaultLinter:
         if backend == "auto":
             self._detected_backend = self._detect_best_backend()
         else:
-            self._detected_backend = backend if self._check_backend_available(backend) else None
+            self._detected_backend = (
+                backend if self._check_backend_available(backend) else None
+            )
 
         if not self._detected_backend:
-            logger.warning("No linter backend available. Linting will return empty results.")
+            logger.warning(
+                "No linter backend available. Linting will return empty results."
+            )
 
     def _detect_best_backend(self) -> str | None:
         """Detect the best available linter backend."""
@@ -170,7 +174,9 @@ class DefaultLinter:
             return False
         return False
 
-    def lint(self, file_path: str | None = None, content: str | None = None) -> LintResult:
+    def lint(
+        self, file_path: str | None = None, content: str | None = None
+    ) -> LintResult:
         """Lint a file or content string.
 
         Args:
@@ -191,7 +197,7 @@ class DefaultLinter:
             cached_result = self._get_from_cache(cache_key)
             if cached_result is not None:
                 self._cache_hits += 1
-                logger.debug("Linter cache HIT for: %s", file_path or 'content')
+                logger.debug("Linter cache HIT for: %s", file_path or "content")
                 return cached_result
 
         self._cache_misses += 1
@@ -244,7 +250,7 @@ class DefaultLinter:
             # Move to end (most recently used)
             self._cache.move_to_end(cache_key)
             return result
-        
+
         # Expired, remove
         del self._cache[cache_key]
         return None
@@ -304,7 +310,9 @@ class DefaultLinter:
         """Lint content string using the detected backend."""
         # Write content to temporary file and lint it
         suffix = Path(file_path).suffix if file_path else ".py"
-        with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=suffix, delete=False
+        ) as tmp_file:
             tmp_file.write(content)
             tmp_path = tmp_file.name
 
@@ -363,7 +371,9 @@ class DefaultLinter:
                     column = violation.get("location", {}).get("column", None)
                     code = violation.get("code", None)
                     message = violation.get("message", "")
-                    severity = "error" if code and code.startswith(("E", "F")) else "warning"
+                    severity = (
+                        "error" if code and code.startswith(("E", "F")) else "warning"
+                    )
 
                     lint_error = LintError(
                         line=line,
@@ -424,7 +434,9 @@ class DefaultLinter:
                         "convention": "warning",
                         "refactor": "warning",
                     }
-                    severity = severity_map.get(violation.get("type", "warning").lower(), "warning")
+                    severity = severity_map.get(
+                        violation.get("type", "warning").lower(), "warning"
+                    )
 
                     lint_error = LintError(
                         line=line,

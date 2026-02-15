@@ -16,7 +16,9 @@ from backend.core.logger import FORGE_logger as logger
 
 def create_app() -> FastAPI:
     """Create the FastAPI application."""
-    app = FastAPI(title="File Viewer Server", openapi_url=None, docs_url=None, redoc_url=None)
+    app = FastAPI(
+        title="File Viewer Server", openapi_url=None, docs_url=None, redoc_url=None
+    )
 
     @app.get("/")
     async def root() -> dict[str, str]:
@@ -47,7 +49,9 @@ def create_app() -> FastAPI:
                 status_code=400,
             )
         if not os.path.exists(path):
-            return HTMLResponse(content=f"<h1>Error: File not found</h1><p>{path}</p>", status_code=404)
+            return HTMLResponse(
+                content=f"<h1>Error: File not found</h1><p>{path}</p>", status_code=404
+            )
         if os.path.isdir(path):
             return HTMLResponse(
                 content=f"<h1>Error: Path is a directory</h1><p>{path}</p>",

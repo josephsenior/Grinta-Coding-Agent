@@ -52,7 +52,9 @@ async def generate_conversation_title(
                 "content": f"Generate a title (maximum {max_length} characters) for a conversation that starts with this message:\n\n{truncated_message}",
             },
         ]
-        title = llm_registry.request_extraneous_completion("conversation_title_creator", llm_config, messages)
+        title = llm_registry.request_extraneous_completion(
+            "conversation_title_creator", llm_config, messages
+        )
         if len(title) > max_length:
             title = f"{title[: max_length - 3]}..."
         return title
@@ -86,7 +88,9 @@ async def auto_generate_title(
     from importlib import import_module
 
     _mod = import_module("backend.utils.conversation_summary")
-    return await _mod._auto_generate_title_impl(conversation_id, user_id, file_store, settings, llm_registry)
+    return await _mod._auto_generate_title_impl(
+        conversation_id, user_id, file_store, settings, llm_registry
+    )
 
 
 async def _auto_generate_title_impl(
@@ -135,7 +139,9 @@ async def _auto_generate_title_impl(
 
     # Try LLM-based generation first; isolate exceptions to LLM path only
     try:
-        llm_title = await _try_llm_title_generation(first_message, settings, llm_registry)
+        llm_title = await _try_llm_title_generation(
+            first_message, settings, llm_registry
+        )
         if llm_title:
             return llm_title
     except Exception as e:
@@ -147,7 +153,9 @@ async def _auto_generate_title_impl(
     return _generate_truncated_title(first_message)
 
 
-def _get_first_user_message(conversation_id: str, user_id: str | None, file_store: FileStore) -> str | None:
+def _get_first_user_message(
+    conversation_id: str, user_id: str | None, file_store: FileStore
+) -> str | None:
     """Extract the first user message from conversation.
 
     Args:

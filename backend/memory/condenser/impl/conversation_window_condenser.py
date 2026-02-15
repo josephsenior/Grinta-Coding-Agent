@@ -41,9 +41,15 @@ class ConversationWindowCondenser(RollingCondenser):
         Observation | None,
     ]:
         """Find essential events: system message, first user message, and recall action/observation."""
-        system_message = next((e for e in events if isinstance(e, SystemMessageAction)), None)
+        system_message = next(
+            (e for e in events if isinstance(e, SystemMessageAction)), None
+        )
         first_user_msg = next(
-            (e for e in events if isinstance(e, MessageAction) and e.source == EventSource.USER),
+            (
+                e
+                for e in events
+                if isinstance(e, MessageAction) and e.source == EventSource.USER
+            ),
             None,
         )
 
@@ -89,7 +95,9 @@ class ConversationWindowCondenser(RollingCondenser):
 
         return essential_events
 
-    def _calculate_recent_events_slice(self, events: list, essential_events: list[int]) -> tuple[list, int]:
+    def _calculate_recent_events_slice(
+        self, events: list, essential_events: list[int]
+    ) -> tuple[list, int]:
         """Calculate which recent events to keep and find the first valid event index."""
         num_essential_events = len(essential_events)
         total_events = len(events)
@@ -100,7 +108,11 @@ class ConversationWindowCondenser(RollingCondenser):
         recent_events_slice = events[slice_start_index:]
 
         first_valid_event_index_in_slice = next(
-            (i for i, event in enumerate(recent_events_slice) if not isinstance(event, Observation)),
+            (
+                i
+                for i, event in enumerate(recent_events_slice)
+                if not isinstance(event, Observation)
+            ),
             len(recent_events_slice),
         )
 
@@ -133,7 +145,9 @@ class ConversationWindowCondenser(RollingCondenser):
 
         return events_to_keep
 
-    def _create_condensation_action(self, forgotten_event_ids: list[int]) -> CondensationAction:
+    def _create_condensation_action(
+        self, forgotten_event_ids: list[int]
+    ) -> CondensationAction:
         """Create the appropriate CondensationAction based on forgotten event IDs."""
         if not forgotten_event_ids:
             return CondensationAction(forgotten_event_ids=[])
@@ -141,7 +155,8 @@ class ConversationWindowCondenser(RollingCondenser):
         # Check if forgotten events form a contiguous range
         if (
             len(forgotten_event_ids) > 1
-            and forgotten_event_ids[-1] - forgotten_event_ids[0] == len(forgotten_event_ids) - 1
+            and forgotten_event_ids[-1] - forgotten_event_ids[0]
+            == len(forgotten_event_ids) - 1
         ):
             return CondensationAction(
                 forgotten_events_start_id=forgotten_event_ids[0],
@@ -164,10 +179,14 @@ class ConversationWindowCondenser(RollingCondenser):
             return Condensation(action=action)
 
         # Find essential events
-        system_message, first_user_msg, recall_action, recall_observation = self._find_essential_events(events)
+        system_message, first_user_msg, recall_action, recall_observation = (
+            self._find_essential_events(events)
+        )
 
         if first_user_msg is None:
-            logger.warning("No first user message found in history during condensation.")
+            logger.warning(
+                "No first user message found in history during condensation."
+            )
             action = CondensationAction(forgotten_event_ids=[])
             return Condensation(action=action)
 
@@ -180,10 +199,14 @@ class ConversationWindowCondenser(RollingCondenser):
         )
 
         # Calculate recent events to keep
-        _recent_events_slice, first_valid_event_index = self._calculate_recent_events_slice(events, essential_events)
+        _recent_events_slice, first_valid_event_index = (
+            self._calculate_recent_events_slice(events, essential_events)
+        )
 
         # Build events to keep
-        events_to_keep = self._build_events_to_keep(events, essential_events, first_valid_event_index)
+        events_to_keep = self._build_events_to_keep(
+            events, essential_events, first_valid_event_index
+        )
 
         # Calculate forgotten events
         all_event_ids = {e.id for e in events}
@@ -234,7 +257,10 @@ class ConversationWindowCondenser(RollingCondenser):
                 recall_action = event
                 for j in range(i + 1, len(events)):
                     obs_event = events[j]
-                    if isinstance(obs_event, Observation) and obs_event.cause == recall_action.id:
+                    if (
+                        isinstance(obs_event, Observation)
+                        and obs_event.cause == recall_action.id
+                    ):
                         recall_observation = obs_event
                         break
                 break

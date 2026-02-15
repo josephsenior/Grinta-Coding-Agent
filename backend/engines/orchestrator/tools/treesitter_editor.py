@@ -291,7 +291,9 @@ class TreeSitterEditor:
         self.parsers[language] = parser
         return parser
 
-    def parse_file(self, file_path: str, use_cache: bool = True) -> tuple[TreeType, bytes, str] | None:
+    def parse_file(
+        self, file_path: str, use_cache: bool = True
+    ) -> tuple[TreeType, bytes, str] | None:
         """Parse a file using Tree-sitter.
 
         Args:
@@ -341,7 +343,9 @@ class TreeSitterEditor:
             logger.error("Failed to parse %s: %s", file_path, e)
             return None
 
-    def find_symbol(self, file_path: str, symbol_name: str, symbol_type: str | None = None) -> SymbolLocation | None:
+    def find_symbol(
+        self, file_path: str, symbol_name: str, symbol_type: str | None = None
+    ) -> SymbolLocation | None:
         """Find a symbol in any language file.
 
         Args:
@@ -363,12 +367,18 @@ class TreeSitterEditor:
         if "." in symbol_name:
             parts = symbol_name.split(".")
             if len(parts) == 2:
-                return self._find_method_in_class(tree, file_bytes, parts[0], parts[1], file_path, language)
+                return self._find_method_in_class(
+                    tree, file_bytes, parts[0], parts[1], file_path, language
+                )
 
         # Search for symbol
-        return self._search_tree_for_symbol(tree, file_bytes, symbol_name, file_path, language, symbol_type)
+        return self._search_tree_for_symbol(
+            tree, file_bytes, symbol_name, file_path, language, symbol_type
+        )
 
-    def edit_function(self, file_path: str, function_name: str, new_body: str, validate: bool = True) -> EditResult:
+    def edit_function(
+        self, file_path: str, function_name: str, new_body: str, validate: bool = True
+    ) -> EditResult:
         """Edit a function's body (works for ANY language).
 
         Args:
@@ -407,7 +417,9 @@ class TreeSitterEditor:
         # Replace the body
         try:
             # Build new content
-            new_code = self._replace_node_content(original_code, body_node, new_body, preserve_indentation=True)
+            new_code = self._replace_node_content(
+                original_code, body_node, new_body, preserve_indentation=True
+            )
 
             # Validate if requested
             if validate:
@@ -440,7 +452,9 @@ class TreeSitterEditor:
 
         except Exception as e:
             logger.error("Error editing function: %s", e)
-            return EditResult(success=False, message=f"Error: {e}", original_code=original_code)
+            return EditResult(
+                success=False, message=f"Error: {e}", original_code=original_code
+            )
 
     def rename_symbol(self, file_path: str, old_name: str, new_name: str) -> EditResult:
         """Rename a symbol throughout a file (works for ANY language).
@@ -462,10 +476,14 @@ class TreeSitterEditor:
         original_code = file_bytes.decode("utf-8")
 
         # Find all occurrences of the symbol
-        occurrences = self._find_all_symbol_occurrences(tree, file_bytes, old_name, language)
+        occurrences = self._find_all_symbol_occurrences(
+            tree, file_bytes, old_name, language
+        )
 
         if not occurrences:
-            return EditResult(success=False, message=f"Symbol '{old_name}' not found in {file_path}")
+            return EditResult(
+                success=False, message=f"Symbol '{old_name}' not found in {file_path}"
+            )
 
         # Replace all occurrences (from end to start to preserve positions)
         new_code = original_code
@@ -519,7 +537,9 @@ class TreeSitterEditor:
             "php": ["function_definition", "method_declaration"],
         }
 
-        target_types = function_types.get(language, ["function_definition", "function_declaration"])
+        target_types = function_types.get(
+            language, ["function_definition", "function_declaration"]
+        )
 
         # Recursive search
         return self._find_node_by_name(root, file_bytes, function_name, target_types)
@@ -533,7 +553,9 @@ class TreeSitterEditor:
             # Try to extract name from node
             name_node = self._get_name_node(node)
             if name_node:
-                name_text = file_bytes[name_node.start_byte : name_node.end_byte].decode("utf-8")
+                name_text = file_bytes[
+                    name_node.start_byte : name_node.end_byte
+                ].decode("utf-8")
                 if name_text == target_name:
                     return node
 
@@ -588,10 +610,14 @@ class TreeSitterEditor:
             "php": ["class_declaration"],
         }
 
-        target_class_types = class_types.get(language, ["class_declaration", "class_definition"])
+        target_class_types = class_types.get(
+            language, ["class_declaration", "class_definition"]
+        )
 
         # Find the class
-        class_node = self._find_node_by_name(root, file_bytes, class_name, target_class_types)
+        class_node = self._find_node_by_name(
+            root, file_bytes, class_name, target_class_types
+        )
         if not class_node:
             return None
 
@@ -607,9 +633,13 @@ class TreeSitterEditor:
             "php": ["method_declaration"],
         }
 
-        target_method_types = method_types.get(language, ["method_definition", "method_declaration"])
+        target_method_types = method_types.get(
+            language, ["method_definition", "method_declaration"]
+        )
 
-        method_node = self._find_node_by_name(class_node, file_bytes, method_name, target_method_types)
+        method_node = self._find_node_by_name(
+            class_node, file_bytes, method_name, target_method_types
+        )
         if not method_node:
             return None
 
@@ -671,7 +701,9 @@ class TreeSitterEditor:
             parent_name=None,
         )
 
-    def _get_function_body_node(self, func_node: NodeType, language: str) -> NodeType | None:
+    def _get_function_body_node(
+        self, func_node: NodeType, language: str
+    ) -> NodeType | None:
         """Get the body node of a function (language-specific)."""
         # Common body node names across languages
         body_types = ["block", "body", "compound_statement", "expression_statement"]
@@ -700,13 +732,18 @@ class TreeSitterEditor:
 
             # Apply indentation to new content
             new_content_lines = new_content.split("\n")
-            indented_lines = [original_indent + line if i > 0 else line for i, line in enumerate(new_content_lines)]
+            indented_lines = [
+                original_indent + line if i > 0 else line
+                for i, line in enumerate(new_content_lines)
+            ]
             new_content = "\n".join(indented_lines)
 
         # Replace
         return original_code[:start_byte] + new_content + original_code[end_byte:]
 
-    def _validate_syntax(self, code: str, file_path: str, language: str) -> tuple[bool, str]:
+    def _validate_syntax(
+        self, code: str, file_path: str, language: str
+    ) -> tuple[bool, str]:
         """Validate syntax by parsing with Tree-sitter.
 
         Returns:

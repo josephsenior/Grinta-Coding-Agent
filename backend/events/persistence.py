@@ -85,7 +85,8 @@ class EventPersistence:
         self._get_filename_for_cache = get_filename_for_cache
         self._cache_size = cache_size
         self._recent_persist_failures = (
-            recent_persist_failures if recent_persist_failures is not None
+            recent_persist_failures
+            if recent_persist_failures is not None
             else deque(maxlen=500)
         )
         self.stats: dict[str, int] = {
@@ -98,7 +99,9 @@ class EventPersistence:
         # Optional SQLite accelerator
         self._sqlite_store: Any = None
         if str(os.getenv("FORGE_SQLITE_EVENTS", "false")).lower() in (
-            "1", "true", "yes",
+            "1",
+            "true",
+            "yes",
         ):
             try:
                 from backend.storage.sqlite_event_store import SQLiteEventStore
@@ -113,7 +116,8 @@ class EventPersistence:
                 )
                 self._sqlite_store = SQLiteEventStore(db_path=db_path)
                 logger.info(
-                    "SQLite event accelerator enabled for session %s", sid,
+                    "SQLite event accelerator enabled for session %s",
+                    sid,
                 )
             except Exception as exc:
                 logger.warning(
@@ -183,7 +187,8 @@ class EventPersistence:
         self._write_event_sync(filename, payload, cache_payload)
 
     def build_cache_payload(
-        self, current_write_page: list[dict] | None,
+        self,
+        current_write_page: list[dict] | None,
     ) -> tuple[str, str] | None:
         """Return ``(filename, contents)`` when a full cache page is ready."""
         if not current_write_page or len(current_write_page) < self._cache_size:
@@ -409,6 +414,7 @@ class EventPersistence:
 # ------------------------------------------------------------------
 # Module-level helpers
 # ------------------------------------------------------------------
+
 
 def _truncate_payload(payload: dict[str, Any], max_bytes: int) -> None:
     """Truncate the largest string values in *payload* in-place.

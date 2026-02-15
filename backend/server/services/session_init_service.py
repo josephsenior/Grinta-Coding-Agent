@@ -19,7 +19,6 @@ from fastapi.responses import JSONResponse
 from backend.core.provider_types import (
     PROVIDER_TOKEN_TYPE,
     CreatePlaybook,
-    ProviderToken,
     ProviderType,
     SuggestedTask,
 )
@@ -108,7 +107,10 @@ def validate_remote_api_request(
     initial_user_msg: str,
 ) -> JSONResponse | None:
     """Validate remote API requests have required parameters."""
-    if conversation_trigger == ConversationTrigger.REMOTE_API_KEY and not initial_user_msg:
+    if (
+        conversation_trigger == ConversationTrigger.REMOTE_API_KEY
+        and not initial_user_msg
+    ):
         return error(
             message="Missing initial user message",
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -228,7 +230,9 @@ async def handle_regular_conversation(
 def handle_conversation_errors(e: Exception) -> JSONResponse:
     """Convert conversation initialization errors to appropriate HTTP responses."""
     if isinstance(e, MissingSettingsError):
-        error_dict = format_error_for_user(e, context={"error_code": "CONFIGURATION$SETTINGS_NOT_FOUND"})
+        error_dict = format_error_for_user(
+            e, context={"error_code": "CONFIGURATION$SETTINGS_NOT_FOUND"}
+        )
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=error_dict,
@@ -251,4 +255,6 @@ def handle_conversation_errors(e: Exception) -> JSONResponse:
 def resolve_conversation_id(data: Any) -> str:
     """Generate or validate conversation ID based on env config."""
     allow_set_id = os.getenv("ALLOW_SET_CONVERSATION_ID", "0") == "1"
-    return (data.conversation_id if allow_set_id and data.conversation_id else None) or uuid.uuid4().hex
+    return (
+        data.conversation_id if allow_set_id and data.conversation_id else None
+    ) or uuid.uuid4().hex

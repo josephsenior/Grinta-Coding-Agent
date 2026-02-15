@@ -123,7 +123,9 @@ class InternalTaskTracker:
             "in_progress": counts["in_progress"],
             "pending": counts["pending"],
             "current": current_task.description if current_task else None,
-            "completion_percentage": self._calculate_completion_percentage(counts["completed"]),
+            "completion_percentage": self._calculate_completion_percentage(
+                counts["completed"]
+            ),
         }
 
     def _get_empty_progress(self) -> dict:
@@ -196,7 +198,9 @@ class InternalTaskTracker:
         # For now, just create a single task
         # In future, this could use LLM to intelligently break down tasks
         task_id = self.add_task(description)
-        logger.debug("Task decomposition: created task %s for: %s", task_id, description)
+        logger.debug(
+            "Task decomposition: created task %s for: %s", task_id, description
+        )
         return [task_id]
 
     def reset(self) -> None:

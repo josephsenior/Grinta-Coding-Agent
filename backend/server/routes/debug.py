@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 
 from backend.core.logger import FORGE_logger as logger
 
-router = APIRouter(prefix="/api/debug", tags=["debug"])
+router = APIRouter(prefix="/api/v1/debug", tags=["debug"])
 
 _DEBUG_ENABLED = os.getenv("FORGE_DEBUG", "false").lower() in ("true", "1", "yes")
 
@@ -30,7 +30,9 @@ def _collect_controller_snapshot(controller: Any) -> dict[str, Any]:
     if state:
         info["state"] = {
             "agent_state": str(getattr(state, "agent_state", "?")),
-            "iteration": getattr(getattr(state, "iteration_flag", None), "current_value", None),
+            "iteration": getattr(
+                getattr(state, "iteration_flag", None), "current_value", None
+            ),
             "max_iterations": getattr(state, "max_iterations", None),
             "last_error": getattr(state, "last_error", None),
         }
@@ -41,7 +43,8 @@ def _collect_controller_snapshot(controller: Any) -> dict[str, Any]:
                 info["token_usage"] = {
                     "prompt_tokens": getattr(usage, "prompt_tokens", 0),
                     "completion_tokens": getattr(usage, "completion_tokens", 0),
-                    "total": getattr(usage, "prompt_tokens", 0) + getattr(usage, "completion_tokens", 0),
+                    "total": getattr(usage, "prompt_tokens", 0)
+                    + getattr(usage, "completion_tokens", 0),
                 }
     return info
 
@@ -71,7 +74,9 @@ async def session_debug(session_id: str) -> JSONResponse:
 
         session = session_manager.get_session(session_id)
         if session is None:
-            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Session {session_id} not found"
+            )
 
         controller = getattr(session, "controller", None)
         if controller is None:

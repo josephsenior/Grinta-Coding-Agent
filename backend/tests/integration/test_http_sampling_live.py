@@ -51,6 +51,7 @@ def build_client(env: dict, tracer_store: list[_TestSpan] | None = None):
 
     # Force a fresh import of the app module
     import sys
+
     if "backend.server.app" in sys.modules:
         importlib.reload(importlib.import_module("backend.server.app"))
     from backend.server.app import app  # type: ignore
@@ -107,14 +108,18 @@ def test_debug_endpoint_reports_effective():
     }
     client = build_client(env)
 
-    resp = client.get("/api/monitoring/sampling_debug", params={"path": "/api/regex123"})
+    resp = client.get(
+        "/api/monitoring/sampling_debug", params={"path": "/api/regex123"}
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["base_http_sample"] == 0.25
     assert data["effective_for"]["path"] == "/api/regex123"
     assert data["effective_for"]["effective_rate"] == 0.9  # regex precedence
 
-    resp2 = client.get("/api/monitoring/sampling_debug", params={"path": "/api/prefix/abc"})
+    resp2 = client.get(
+        "/api/monitoring/sampling_debug", params={"path": "/api/prefix/abc"}
+    )
     assert resp2.status_code == 200
     data2 = resp2.json()
     assert data2["effective_for"]["effective_rate"] == 0.75
@@ -123,6 +128,8 @@ def test_debug_endpoint_reports_effective():
     data3 = resp3.json()
     assert data3["effective_for"]["effective_rate"] == 1.0
 
-    resp4 = client.get("/api/monitoring/sampling_debug", params={"path": "/api/unknown"})
+    resp4 = client.get(
+        "/api/monitoring/sampling_debug", params={"path": "/api/unknown"}
+    )
     data4 = resp4.json()
     assert data4["effective_for"]["effective_rate"] == 0.25

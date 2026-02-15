@@ -36,6 +36,7 @@ from backend.controller.services import (
     IterationGuardService,
     IterationService,
     LifecycleService,
+    MetricsService,
     ObservationService,
     PendingActionService,
     RecoveryService,
@@ -130,6 +131,7 @@ class ControllerServices:
         self.action_execution = ActionExecutionService(self.context)
         self.state = StateTransitionService(self.context)
         self.telemetry = TelemetryService(self.context)
+        self.metrics = MetricsService(self.context)
         self.retry = RetryService(self.context)
         self.recovery = RecoveryService(self.context, self.retry)
         self.circuit_breaker = CircuitBreakerService(self.context)
@@ -240,7 +242,9 @@ class AgentController:
             services = self.__dict__.get("services")
             if services is not None:
                 return getattr(services, svc_attr)
-        raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        )
 
     @property
     def stuck_service(self):
@@ -386,7 +390,9 @@ class AgentController:
         if set_stop_state:
             await self.set_agent_state_to(AgentState.STOPPED)
         self.state_tracker.close(self.event_stream)
-        self.event_stream.unsubscribe(EventStreamSubscriber.AGENT_CONTROLLER, self.id or "")
+        self.event_stream.unsubscribe(
+            EventStreamSubscriber.AGENT_CONTROLLER, self.id or ""
+        )
         await self.retry_service.shutdown()
         self._lifecycle = LifecyclePhase.CLOSED
 
@@ -781,7 +787,10 @@ class AgentController:
             task_name = task.description[:100] if task else "unknown_task"
 
             stats = self.state.metrics
-            tokens = stats.accumulated_token_usage.prompt_tokens + stats.accumulated_token_usage.completion_tokens
+            tokens = (
+                stats.accumulated_token_usage.prompt_tokens
+                + stats.accumulated_token_usage.completion_tokens
+            )
             cost = stats.accumulated_cost
 
             await self._invoke_audit_callback(

@@ -42,13 +42,13 @@ async def get_circuit_breaker_stats() -> list[CircuitBreakerHealth]:
         manager = get_circuit_breaker_manager()
         stats = []
         for name, breaker in manager.breakers.items():
-            state = getattr(breaker, 'state', None)
+            state = getattr(breaker, "state", None)
             stats.append(
                 CircuitBreakerHealth(
                     name=name,
-                    state=getattr(state, 'name', str(state)),
-                    failure_count=getattr(breaker, 'failure_count', 0),
-                    last_failure_time=getattr(breaker, 'last_failure_time', None),
+                    state=getattr(state, "name", str(state)),
+                    failure_count=getattr(breaker, "failure_count", 0),
+                    last_failure_time=getattr(breaker, "last_failure_time", None),
                 )
             )
         return stats
@@ -123,12 +123,16 @@ async def check_circuit_breaker_health(name: str) -> dict[str, Any]:
         manager = get_circuit_breaker_manager()
         if name in manager.breakers:
             breaker = manager.breakers[name]
-            state = getattr(breaker, 'state', None)
+            state = getattr(breaker, "state", None)
             return {
                 "name": name,
-                "state": getattr(state, 'name', str(state)),
-                "failures": getattr(breaker, 'failure_count', 0),
-                "last_failure": (lft.isoformat() if (lft := getattr(breaker, 'last_failure_time', None)) is not None else None),
+                "state": getattr(state, "name", str(state)),
+                "failures": getattr(breaker, "failure_count", 0),
+                "last_failure": (
+                    lft.isoformat()
+                    if (lft := getattr(breaker, "last_failure_time", None)) is not None
+                    else None
+                ),
             }
         return {"status": "not_found", "name": name}
     except Exception:

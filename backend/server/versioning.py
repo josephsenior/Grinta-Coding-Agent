@@ -83,7 +83,9 @@ async def version_middleware(request: Request, call_next: Callable) -> Response:
                 "error": "missing_api_version",
                 "message": f"Use /api/{CURRENT_VERSION.value}/… format.",
                 "current_version": CURRENT_VERSION.value,
-                "suggested_path": path.replace("/api/", f"/api/{CURRENT_VERSION.value}/", 1),
+                "suggested_path": path.replace(
+                    "/api/", f"/api/{CURRENT_VERSION.value}/", 1
+                ),
             },
         )
 

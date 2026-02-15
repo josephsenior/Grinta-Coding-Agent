@@ -19,7 +19,7 @@ from backend.runtime.utils.process_manager import (
 )
 from backend.server.shared import get_conversation_manager, server_config
 
-router = APIRouter(prefix="/api/monitoring")
+router = APIRouter(prefix="/api/v1/monitoring")
 
 # For testing monkeypatching
 conversation_manager = None
@@ -56,9 +56,15 @@ async def get_health():
     event_stream = await event_stream_health()
     process_health = await process_manager_health()
     overall = "healthy"
-    if event_stream.get("status") == "unhealthy" or process_health.get("status") == "unhealthy":
+    if (
+        event_stream.get("status") == "unhealthy"
+        or process_health.get("status") == "unhealthy"
+    ):
         overall = "unhealthy"
-    elif event_stream.get("status") == "degraded" or process_health.get("status") == "degraded":
+    elif (
+        event_stream.get("status") == "degraded"
+        or process_health.get("status") == "degraded"
+    ):
         overall = "degraded"
     return {
         "status": overall,
@@ -100,10 +106,16 @@ def _int_env(name: str, default: int) -> int:
 
 def _event_stream_thresholds() -> dict[str, int]:
     return {
-        "drops_per_minute_yellow": max(1, _int_env("FORGE_EVENTSTREAM_DROPS_YELLOW", 5)),
+        "drops_per_minute_yellow": max(
+            1, _int_env("FORGE_EVENTSTREAM_DROPS_YELLOW", 5)
+        ),
         "drops_per_minute_red": max(1, _int_env("FORGE_EVENTSTREAM_DROPS_RED", 20)),
-        "queue_utilization_yellow": max(1, min(100, _int_env("FORGE_EVENTSTREAM_QUEUE_UTIL_YELLOW", 80))),
-        "queue_utilization_red": max(1, min(100, _int_env("FORGE_EVENTSTREAM_QUEUE_UTIL_RED", 95))),
+        "queue_utilization_yellow": max(
+            1, min(100, _int_env("FORGE_EVENTSTREAM_QUEUE_UTIL_YELLOW", 80))
+        ),
+        "queue_utilization_red": max(
+            1, min(100, _int_env("FORGE_EVENTSTREAM_QUEUE_UTIL_RED", 95))
+        ),
     }
 
 
@@ -290,7 +302,9 @@ async def get_prometheus_metrics():
                     numeric.append((int(key.split("_", 1)[1]), int(value)))
         for bucket, value in sorted(numeric, key=lambda x: x[0]):
             lines.append(f'forge_request_duration_ms_bucket{{le="{bucket}"}} {value}')
-        lines.append(f'forge_request_duration_ms_bucket{{le="+Inf"}} {int(hist_buckets.get("le_inf", 0) or 0)}')
+        lines.append(
+            f'forge_request_duration_ms_bucket{{le="+Inf"}} {int(hist_buckets.get("le_inf", 0) or 0)}'
+        )
     except Exception:
         # Fall back to a minimal set if something goes wrong
         lines.extend(
@@ -353,14 +367,18 @@ def _extract_telemetry_prom_lines(stats: dict[str, Any]) -> list[str]:
                     total += count
                     if "|" in key:
                         kind, reason = key.split("|", 1)
-                        lines.append(f'forge_runtime_watchdog_terminations{{kind="{kind}",reason="{reason}"}} {count}')
+                        lines.append(
+                            f'forge_runtime_watchdog_terminations{{kind="{kind}",reason="{reason}"}} {count}'
+                        )
             lines.append(f"forge_runtime_watchdog_terminations_total {total}")
         elif k == "scaling":
             if isinstance(v, dict):
                 for key, count in v.items():
                     if "|" in key:
                         signal, kind = key.split("|", 1)
-                        lines.append(f'forge_runtime_scaling_signals{{kind="{kind}",signal="{signal}"}} {count}')
+                        lines.append(
+                            f'forge_runtime_scaling_signals{{kind="{kind}",signal="{signal}"}} {count}'
+                        )
         else:
             if isinstance(v, dict):
                 for label, val in v.items():
@@ -442,16 +460,22 @@ def _config_schema_prom_lines() -> list[str]:
                     lines.append(f"forge_agent_config_schema_missing_total {v}")
                 elif k == "schema_mismatch":
                     for ver, count in v.items():
-                        lines.append(f'forge_agent_config_schema_mismatch{{version="{ver}"}} {count}')
+                        lines.append(
+                            f'forge_agent_config_schema_mismatch{{version="{ver}"}} {count}'
+                        )
                 elif k == "invalid_agents":
                     for agent, count in v.items():
-                        lines.append(f'forge_agent_config_invalid_section{{agent="{agent}"}} {count}')
+                        lines.append(
+                            f'forge_agent_config_invalid_section{{agent="{agent}"}} {count}'
+                        )
                 elif k == "invalid_base":
                     lines.append(f"forge_agent_config_invalid_base_total {v}")
                 else:
                     if isinstance(v, dict):
                         for label, val in v.items():
-                            lines.append(f'forge_agent_config_{k}_total{{version="{label}"}} {val}')
+                            lines.append(
+                                f'forge_agent_config_{k}_total{{version="{label}"}} {val}'
+                            )
                     else:
                         lines.append(f"forge_agent_config_{k}_total {v}")
     except Exception:
@@ -599,15 +623,21 @@ def get_process_manager_health_snapshot() -> dict[str, Any]:
             for session in sessions.values():
                 runtime = getattr(session, "runtime", None)
                 process_manager = getattr(runtime, "process_manager", None)
-                if process_manager and hasattr(process_manager, "get_running_processes"):
+                if process_manager and hasattr(
+                    process_manager, "get_running_processes"
+                ):
                     try:
                         active_processes.extend(process_manager.get_running_processes())
                     except Exception:
-                        logger.debug("Failed to collect processes from session", exc_info=True)
+                        logger.debug(
+                            "Failed to collect processes from session", exc_info=True
+                        )
     return _get_process_manager_health_snapshot(active_processes=active_processes)
 
 
-def _collect_event_stream_warnings(stats: dict[str, Any], thresholds: dict[str, int]) -> list[str]:
+def _collect_event_stream_warnings(
+    stats: dict[str, Any], thresholds: dict[str, int]
+) -> list[str]:
     """Collect warnings based on event stream stats and thresholds."""
     warnings: list[str] = []
     if int(stats.get("dropped_oldest", 0) or 0) > 0:
@@ -659,3 +689,86 @@ async def event_stream_health():
         "recommendations": recommendations,
         "version": 1,
     }
+
+
+@router.get("/agent-metrics")
+async def get_agent_metrics():
+    """Aggregate agent performance metrics across all active sessions."""
+    try:
+        manager = _get_manager()
+        if not manager:
+            return {
+                "total_tasks": 0,
+                "success_rate": 0.0,
+                "average_duration_seconds": 0.0,
+                "average_cost_usd": 0.0,
+                "active_sessions": 0,
+            }
+
+        all_metrics: list[dict[str, Any]] = []
+        active_sessions = 0
+
+        if hasattr(manager, "_active_conversations"):
+            convos = dict(getattr(manager, "_active_conversations", {}))
+        elif hasattr(manager, "sessions"):
+            convos = dict(getattr(manager, "sessions", {}))
+        else:
+            convos = {}
+
+        for session in convos.values():
+            controller = getattr(session, "controller", None)
+            if controller is None:
+                continue
+
+            services = getattr(controller, "services", None)
+            if services is None:
+                continue
+
+            metrics_service = getattr(services, "metrics", None)
+            if metrics_service is None:
+                continue
+
+            active_sessions += 1
+            aggregate = metrics_service.get_aggregate_metrics()
+            if aggregate:
+                all_metrics.append(
+                    {
+                        "total_tasks": len(aggregate.tasks),
+                        "success_rate": aggregate.success_rate,
+                        "average_duration": aggregate.average_duration,
+                        "average_cost": aggregate.average_cost,
+                    }
+                )
+
+        # Compute overall aggregates
+        if not all_metrics:
+            return {
+                "total_tasks": 0,
+                "success_rate": 0.0,
+                "average_duration_seconds": 0.0,
+                "average_cost_usd": 0.0,
+                "active_sessions": active_sessions,
+            }
+
+        total_tasks = sum(m["total_tasks"] for m in all_metrics)
+        # Weighted average by number of tasks
+        weighted_success = sum(
+            m["success_rate"] * m["total_tasks"] for m in all_metrics
+        )
+        avg_success_rate = weighted_success / total_tasks if total_tasks > 0 else 0.0
+
+        avg_duration = sum(m["average_duration"] for m in all_metrics) / len(
+            all_metrics
+        )
+        avg_cost = sum(m["average_cost"] for m in all_metrics) / len(all_metrics)
+
+        return {
+            "total_tasks": total_tasks,
+            "success_rate": round(avg_success_rate, 4),
+            "average_duration_seconds": round(avg_duration, 2),
+            "average_cost_usd": round(avg_cost, 6),
+            "active_sessions": active_sessions,
+        }
+    except Exception as e:
+        logger.error("Failed to collect agent metrics", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e

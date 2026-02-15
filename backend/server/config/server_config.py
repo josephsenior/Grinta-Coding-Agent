@@ -41,7 +41,9 @@ def _resolve_session_api_key() -> str:
         # Append to .env.local so it persists across restarts
         with open(env_local, "a", encoding="utf-8") as f:
             f.write(f"\nSESSION_API_KEY={new_key}\n")
-        logger.info("Auto-generated SESSION_API_KEY and saved to .env.local. Set SESSION_API_KEY env var to override.")
+        logger.info(
+            "Auto-generated SESSION_API_KEY and saved to .env.local. Set SESSION_API_KEY env var to override."
+        )
     except OSError:
         logger.warning(
             "Could not write .env.local — auto-generated key will not persist. Set SESSION_API_KEY env var explicitly."
@@ -64,8 +66,12 @@ class ServerConfig(ServerConfigInterface):
     enable_jira = os.environ.get("ENABLE_JIRA", "true") == "true"
     enable_jira_dc = os.environ.get("ENABLE_JIRA_DC", "true") == "true"
     enable_linear = os.environ.get("ENABLE_LINEAR", "true") == "true"
-    settings_store_class: str = "backend.storage.settings.file_settings_store.FileSettingsStore"
-    secret_store_class: str = "backend.storage.secrets.file_secrets_store.FileSecretsStore"
+    settings_store_class: str = (
+        "backend.storage.settings.file_settings_store.FileSettingsStore"
+    )
+    secret_store_class: str = (
+        "backend.storage.secrets.file_secrets_store.FileSecretsStore"
+    )
     conversation_store_class: str = os.environ.get(
         "CONVERSATION_STORE_CLASS",
         "backend.storage.conversation.file_conversation_store.FileConversationStore",

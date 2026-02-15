@@ -25,7 +25,9 @@ if TYPE_CHECKING:
     from backend.core.config.utils import ConfigLoadSummary
 
 
-def process_core_section(core_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None) -> None:
+def process_core_section(
+    core_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+) -> None:
     """Process the [core] section of the TOML config."""
     try:
         cfg_type_hints = get_type_hints(cfg.__class__)
@@ -36,16 +38,18 @@ def process_core_section(core_config: dict, cfg: ForgeConfig, summary: ConfigLoa
             if expected_type := cfg_type_hints.get(key, None):
                 origin = get_origin(expected_type)
                 args = get_args(expected_type)
-                if (origin is UnionType and SecretStr in args and isinstance(value, str)) or (
-                    expected_type is SecretStr and isinstance(value, str)
-                ):
+                if (
+                    origin is UnionType and SecretStr in args and isinstance(value, str)
+                ) or (expected_type is SecretStr and isinstance(value, str)):
                     value = SecretStr(value)
             setattr(cfg, key, value)
         else:
             logger.warning('Unknown config key "%s" in [core] section', key)
 
 
-def process_agent_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None) -> None:
+def process_agent_section(
+    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+) -> None:
     """Process the [agent] section of the TOML config."""
     if "agent" in toml_config:
         try:
@@ -61,7 +65,9 @@ def process_agent_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLo
                 summary.record("agent", "invalid", str(e))
 
 
-def process_llm_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None) -> None:
+def process_llm_section(
+    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+) -> None:
     """Process the [llm] section of the TOML config."""
     if "llm" in toml_config:
         from backend.core.config.llm_config import suppress_llm_env_export
@@ -85,7 +91,9 @@ def process_llm_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLoad
                 summary.record("llm", "invalid", str(e))
 
 
-def process_security_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None) -> None:
+def process_security_section(
+    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+) -> None:
     """Process the [security] section of the TOML config."""
     if "security" in toml_config:
         try:
@@ -106,7 +114,9 @@ def process_security_section(toml_config: dict, cfg: ForgeConfig, summary: Confi
             raise ValueError(msg) from exc
 
 
-def process_runtime_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None) -> None:
+def process_runtime_section(
+    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+) -> None:
     """Process the [runtime] section of the TOML config."""
     if "runtime" in toml_config:
         try:
@@ -127,7 +137,9 @@ def process_runtime_section(toml_config: dict, cfg: ForgeConfig, summary: Config
             raise ValueError(msg) from e
 
 
-def process_mcp_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None) -> None:
+def process_mcp_section(
+    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+) -> None:
     """Process the [mcp] section of the TOML config."""
     if "mcp" in toml_config:
         try:
@@ -148,7 +160,9 @@ def process_mcp_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLoad
             raise ValueError(msg) from err
 
 
-def process_condenser_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None) -> None:
+def process_condenser_section(
+    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+) -> None:
     """Process the [condenser] section of the TOML config."""
     if "condenser" in toml_config:
         try:
@@ -156,7 +170,9 @@ def process_condenser_section(toml_config: dict, cfg: ForgeConfig, summary: Conf
                 condenser_config_from_toml_section,
             )
 
-            condenser_mapping = condenser_config_from_toml_section(toml_config["condenser"], cfg.llms)
+            condenser_mapping = condenser_config_from_toml_section(
+                toml_config["condenser"], cfg.llms
+            )
             if "condenser" in condenser_mapping:
                 default_agent_config = cfg.get_agent_config()
                 default_agent_config.condenser_config = condenser_mapping["condenser"]
@@ -174,14 +190,18 @@ def process_condenser_section(toml_config: dict, cfg: ForgeConfig, summary: Conf
         from backend.core.config.condenser_config import LLMSummarizingCondenserConfig
 
         default_agent_config = cfg.get_agent_config()
-        default_condenser = LLMSummarizingCondenserConfig(llm_config=cfg.get_llm_config(), type="llm")
+        default_condenser = LLMSummarizingCondenserConfig(
+            llm_config=cfg.get_llm_config(), type="llm"
+        )
         default_agent_config.condenser_config = default_condenser
         logger.debug(
             "Default LLM summarizing condenser assigned to default agent (no condenser in config)",
         )
 
 
-def process_extended_section(toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None) -> None:
+def process_extended_section(
+    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+) -> None:
     """Process the [extended] section of the TOML config."""
     if "extended" in toml_config:
         try:

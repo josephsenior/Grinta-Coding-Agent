@@ -40,7 +40,10 @@ def is_retryable_error(exception: Any) -> bool:
         bool: True if the exception is retryable, False otherwise.
 
     """
-    return isinstance(exception, httpx.HTTPStatusError) and exception.response.status_code == 429
+    return (
+        isinstance(exception, httpx.HTTPStatusError)
+        and exception.response.status_code == 429
+    )
 
 
 @retry(
@@ -50,7 +53,9 @@ def is_retryable_error(exception: Any) -> bool:
     before_sleep=tenacity_before_sleep_factory("runtime.request.send_request"),
     after=tenacity_after_factory("runtime.request.send_request"),
 )
-def send_request(session: HttpSession, method: str, url: str, timeout: int = 60, **kwargs: Any) -> httpx.Response:
+def send_request(
+    session: HttpSession, method: str, url: str, timeout: int = 60, **kwargs: Any
+) -> httpx.Response:
     """Send an HTTP request with retry logic for rate limiting.
 
     Args:

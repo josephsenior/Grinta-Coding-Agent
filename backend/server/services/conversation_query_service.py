@@ -7,7 +7,7 @@ Contains filtering, search, detail retrieval, deletion, and info assembly.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import FORGE_logger as logger
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
@@ -49,7 +49,9 @@ async def resolve_conversation_store(
     from backend.server.utils import resolve_conversation_store as _resolve_store
 
     if not is_missing(user_id) and user_id is not None:
-        return await get_conversation_store_instance(ConversationStoreImpl, config, str(user_id))
+        return await get_conversation_store_instance(
+            ConversationStoreImpl, config, str(user_id)
+        )
     return await _resolve_store(None)
 
 
@@ -67,7 +69,9 @@ def filter_conversations_by_age(
     for conversation in conversations:
         if not hasattr(conversation, "created_at"):
             continue
-        age_seconds = (now - conversation.created_at.replace(tzinfo=UTC)).total_seconds()
+        age_seconds = (
+            now - conversation.created_at.replace(tzinfo=UTC)
+        ).total_seconds()
         if age_seconds > max_age_seconds:
             continue
         filtered_results.append(conversation)
@@ -86,7 +90,9 @@ async def get_conversation_info(
 ) -> ConversationInfo | None:
     """Build a ``ConversationInfo`` from metadata + runtime state."""
     try:
-        title = conversation.title or get_default_conversation_title(conversation.conversation_id)
+        title = conversation.title or get_default_conversation_title(
+            conversation.conversation_id
+        )
         return ConversationInfo(
             trigger=conversation.trigger,
             conversation_id=conversation.conversation_id,
@@ -120,18 +126,29 @@ async def build_conversation_result_set(
 ) -> ConversationInfoResultSet:
     """Build a ``ConversationInfoResultSet`` from filtered conversations."""
     manager = _require_conversation_manager()
-    conversation_ids = {conversation.conversation_id for conversation in filtered_conversations}
-    connection_ids_to_conversation_ids = await manager.get_connections(filter_to_sids=conversation_ids)
-    agent_loop_info_list = await manager.get_agent_loop_info(filter_to_sids=conversation_ids)
-    agent_loop_info_by_conversation_id = {info.conversation_id: info for info in agent_loop_info_list}
+    conversation_ids = {
+        conversation.conversation_id for conversation in filtered_conversations
+    }
+    connection_ids_to_conversation_ids = await manager.get_connections(
+        filter_to_sids=conversation_ids
+    )
+    agent_loop_info_list = await manager.get_agent_loop_info(
+        filter_to_sids=conversation_ids
+    )
+    agent_loop_info_by_conversation_id = {
+        info.conversation_id: info for info in agent_loop_info_list
+    }
     return ConversationInfoResultSet(
         results=await wait_all(
             get_conversation_info(
                 conversation=conversation,
                 num_connections=sum(
-                    cid == conversation.conversation_id for cid in connection_ids_to_conversation_ids.values()
+                    cid == conversation.conversation_id
+                    for cid in connection_ids_to_conversation_ids.values()
                 ),
-                agent_loop_info=agent_loop_info_by_conversation_id.get(conversation.conversation_id),
+                agent_loop_info=agent_loop_info_by_conversation_id.get(
+                    conversation.conversation_id
+                ),
             )
             for conversation in filtered_conversations
         ),
@@ -166,7 +183,9 @@ async def search_conversations(
     if store is None:
         return ConversationInfoResultSet(results=[], next_page_id=None)
 
-    search_page_id: str | None = None if is_missing(page_id) else (None if page_id is None else str(page_id))
+    search_page_id: str | None = (
+        None if is_missing(page_id) else (None if page_id is None else str(page_id))
+    )
     conversation_metadata_result_set = await store.search(search_page_id, limit)
     logger.info(
         "conversation_store.search returned %d conversations",
@@ -191,7 +210,9 @@ async def search_conversations(
         ):
             continue
         final_filtered_results.append(conversation)
-    return await build_conversation_result_set(final_filtered_results, conversation_metadata_result_set.next_page_id)
+    return await build_conversation_result_set(
+        final_filtered_results, conversation_metadata_result_set.next_page_id
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +235,9 @@ async def get_conversation_details(
         return None
 
     manager = _require_conversation_manager()
-    agent_loop_info_list = await manager.get_agent_loop_info(filter_to_sids={conversation_id})
+    agent_loop_info_list = await manager.get_agent_loop_info(
+        filter_to_sids={conversation_id}
+    )
     agent_loop_info = agent_loop_info_list[0] if agent_loop_info_list else None
     connections = await manager.get_connections(conversation_id)
     num_connections = len(connections) if connections else 0

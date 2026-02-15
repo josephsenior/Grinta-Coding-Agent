@@ -287,16 +287,20 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         try:
             if "sse_servers" in data:
                 data["sse_servers"] = cls._normalize_servers(data["sse_servers"])
-                servers: list[MCPSSEServerConfig | MCPStdioServerConfig | MCPSHTTPServerConfig] = [
-                    MCPSSEServerConfig(**server) for server in data["sse_servers"]
-                ]
+                servers: list[
+                    MCPSSEServerConfig | MCPStdioServerConfig | MCPSHTTPServerConfig
+                ] = [MCPSSEServerConfig(**server) for server in data["sse_servers"]]
                 data["sse_servers"] = servers
             if "stdio_servers" in data:
-                servers = [MCPStdioServerConfig(**server) for server in data["stdio_servers"]]
+                servers = [
+                    MCPStdioServerConfig(**server) for server in data["stdio_servers"]
+                ]
                 data["stdio_servers"] = servers
             if "shttp_servers" in data:
                 data["shttp_servers"] = cls._normalize_servers(data["shttp_servers"])
-                servers = [MCPSHTTPServerConfig(**server) for server in data["shttp_servers"]]
+                servers = [
+                    MCPSHTTPServerConfig(**server) for server in data["shttp_servers"]
+                ]
                 data["shttp_servers"] = servers
             mcp_config = MCPConfig.model_validate(data)
             mcp_config.validate_servers()

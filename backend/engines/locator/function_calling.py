@@ -59,7 +59,9 @@ def _create_action_from_tool_call(tool_call, arguments: dict) -> Action:
     )
 
 
-def response_to_actions(response: ModelResponse, mcp_tool_names: list[str] | None = None) -> list[Action]:
+def response_to_actions(
+    response: ModelResponse, mcp_tool_names: list[str] | None = None
+) -> list[Action]:
     """Convert LLM response to agent actions."""
     return common_response_to_actions(
         response=response,

@@ -87,8 +87,12 @@ class CompressionMiddleware:
 
         # Check if it's a static asset
         for static_path in self.STATIC_PATHS:
-            if path.startswith(static_path) or path.endswith(static_path.replace("/", "")):
-                response.headers["Cache-Control"] = f"public, max-age={CACHE_LONG}, immutable"
+            if path.startswith(static_path) or path.endswith(
+                static_path.replace("/", "")
+            ):
+                response.headers["Cache-Control"] = (
+                    f"public, max-age={CACHE_LONG}, immutable"
+                )
                 response.headers["Vary"] = "Accept-Encoding"
                 return
 
@@ -96,7 +100,9 @@ class CompressionMiddleware:
         if request.method == "GET":
             for api_path, cache_time in self.CACHEABLE_API_PATHS.items():
                 if path.startswith(api_path):
-                    response.headers["Cache-Control"] = f"public, max-age={cache_time}, must-revalidate"
+                    response.headers["Cache-Control"] = (
+                        f"public, max-age={cache_time}, must-revalidate"
+                    )
                     response.headers["Vary"] = "Accept-Encoding"
                     # Add ETag for validation
                     if hasattr(response, "body"):
@@ -197,7 +203,9 @@ class ResponseSizeOptimizer:
     }
 
     @staticmethod
-    def optimize_list_response(items: list[dict], exclude_fields: set[str] | None = None) -> list[dict]:
+    def optimize_list_response(
+        items: list[dict], exclude_fields: set[str] | None = None
+    ) -> list[dict]:
         """Optimize list responses by removing unnecessary fields.
 
         Args:
@@ -213,7 +221,9 @@ class ResponseSizeOptimizer:
         else:
             all_exclude = ResponseSizeOptimizer.EXCLUDE_FIELDS
 
-        return [{k: v for k, v in item.items() if k not in all_exclude} for item in items]
+        return [
+            {k: v for k, v in item.items() if k not in all_exclude} for item in items
+        ]
 
     @staticmethod
     def paginate_response(

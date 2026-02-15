@@ -38,13 +38,19 @@ class ToolInvocationContext:
 class ToolInvocationMiddleware:
     """Base middleware with optional lifecycle hooks."""
 
-    async def plan(self, ctx: ToolInvocationContext) -> None:  # pragma: no cover - default no-op
+    async def plan(
+        self, ctx: ToolInvocationContext
+    ) -> None:  # pragma: no cover - default no-op
         return None
 
-    async def verify(self, ctx: ToolInvocationContext) -> None:  # pragma: no cover - default no-op
+    async def verify(
+        self, ctx: ToolInvocationContext
+    ) -> None:  # pragma: no cover - default no-op
         return None
 
-    async def execute(self, ctx: ToolInvocationContext) -> None:  # pragma: no cover - default no-op
+    async def execute(
+        self, ctx: ToolInvocationContext
+    ) -> None:  # pragma: no cover - default no-op
         return None
 
     async def observe(
@@ -85,7 +91,9 @@ class ToolInvocationPipeline:
             return
         await self._run_stage("execute", ctx)
 
-    async def run_observe(self, ctx: ToolInvocationContext, observation: Observation | None) -> None:
+    async def run_observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
         ctx.metadata["observation"] = observation
         await self._run_stage("observe", ctx, observation=observation)
 
@@ -138,8 +146,13 @@ class SafetyValidatorMiddleware(ToolInvocationMiddleware):
             session_id=self.controller.id or "",
             iteration=self.controller.state.iteration_flag.current_value,
             agent_state=self.controller.state.agent_state.value,
-            recent_errors=[self.controller.state.last_error] if self.controller.state.last_error else [],
-            is_autonomous=bool(getattr(self.controller.autonomy_controller, "autonomy_level", "") == "full"),
+            recent_errors=[self.controller.state.last_error]
+            if self.controller.state.last_error
+            else [],
+            is_autonomous=bool(
+                getattr(self.controller.autonomy_controller, "autonomy_level", "")
+                == "full"
+            ),
         )
 
         validation = await validator.validate(ctx.action, context)
@@ -177,7 +190,9 @@ class CircuitBreakerMiddleware(ToolInvocationMiddleware):
         if circuit_breaker and security_risk is not None:
             circuit_breaker.record_high_risk_action(security_risk)
 
-    async def observe(self, ctx: ToolInvocationContext, observation: Observation | None) -> None:
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
         service = getattr(self.controller, "circuit_breaker_service", None)
         if service and observation is not None:
             from backend.events.observation import ErrorObservation
@@ -211,7 +226,9 @@ class CostQuotaMiddleware(ToolInvocationMiddleware):
             return
         ctx.metadata["cost_snapshot"] = metrics.accumulated_cost
 
-    async def observe(self, ctx: ToolInvocationContext, observation: Observation | None) -> None:
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
         llm = getattr(self.controller.agent, "llm", None)
         metrics = getattr(llm, "metrics", None)
         snapshot = ctx.metadata.get("cost_snapshot")
@@ -224,7 +241,11 @@ class CostQuotaMiddleware(ToolInvocationMiddleware):
 
         user_key = ctx.metadata.get("quota_user_key")
         if not user_key:
-            user_key = f"user:{self.controller.user_id}" if self.controller.user_id else f"session:{self.controller.id}"
+            user_key = (
+                f"user:{self.controller.user_id}"
+                if self.controller.user_id
+                else f"session:{self.controller.id}"
+            )
             ctx.metadata["quota_user_key"] = user_key
 
         try:
@@ -264,7 +285,9 @@ class LoggingMiddleware(ToolInvocationMiddleware):
             extra={"msg_type": "PIPELINE_EXECUTE"},
         )
 
-    async def observe(self, ctx: ToolInvocationContext, observation: Observation | None) -> None:
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
         if observation is None:
             return
         log_level = "info" if LOG_ALL_EVENTS else "debug"
@@ -374,7 +397,9 @@ class ReflectionMiddleware(ToolInvocationMiddleware):
 
                     json.loads(content)
                 except json.JSONDecodeError:
-                    logger.warning("⚠️ Reflection: Potential JSON syntax error in %s", path)
+                    logger.warning(
+                        "⚠️ Reflection: Potential JSON syntax error in %s", path
+                    )
                     # Don't block, but log warning
 
         logger.debug("✅ Reflection: File action verified for %s", path)
@@ -402,7 +427,10 @@ class ReflectionMiddleware(ToolInvocationMiddleware):
 
         for pattern in destructive_patterns:
             if re.search(pattern, command):
-                logger.warning("⚠️ Reflection: Potentially destructive command detected: %s", command)
+                logger.warning(
+                    "⚠️ Reflection: Potentially destructive command detected: %s",
+                    command,
+                )
                 # Don't block, but log warning (safety validator should handle this)
 
         logger.debug("✅ Reflection: Command action verified: %s", command)
@@ -423,5 +451,7 @@ class TelemetryMiddleware(ToolInvocationMiddleware):
             return
         self.telemetry.on_execute(ctx)
 
-    async def observe(self, ctx: ToolInvocationContext, observation: Observation | None) -> None:
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
         self.telemetry.on_observe(ctx, observation)

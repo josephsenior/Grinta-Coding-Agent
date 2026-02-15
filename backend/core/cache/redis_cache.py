@@ -81,13 +81,17 @@ class DistributedCache:
         }
 
         if not REDIS_AVAILABLE:
-            logger.warning("Redis not available, using local fallback cache for %s", prefix)
+            logger.warning(
+                "Redis not available, using local fallback cache for %s", prefix
+            )
             return
 
         # Get connection details from environment
         host = host or os.getenv("REDIS_HOST")
         if not host:
-            logger.warning("REDIS_HOST not set, using local fallback cache for %s", prefix)
+            logger.warning(
+                "REDIS_HOST not set, using local fallback cache for %s", prefix
+            )
             self.enabled = False
             return
 
@@ -110,8 +114,14 @@ class DistributedCache:
 
             # Test connection
             self.client.ping()
-            logger.info("✅ Redis distributed cache initialized for %s (ttl=%ss)", prefix, ttl_seconds)
-            logger.info("   Connected to %s:%s, max_connections=%s", host, port, max_connections)
+            logger.info(
+                "✅ Redis distributed cache initialized for %s (ttl=%ss)",
+                prefix,
+                ttl_seconds,
+            )
+            logger.info(
+                "   Connected to %s:%s, max_connections=%s", host, port, max_connections
+            )
 
         except Exception as e:
             logger.error("Failed to connect to Redis: %s", e)
@@ -323,9 +333,13 @@ class DistributedCache:
         if self.enabled and self.client:
             try:
                 info = cast(Mapping[str, Any], self.client.info("stats"))
-                stats["redis_total_commands"] = cast(int, info.get("total_commands_processed", 0))
+                stats["redis_total_commands"] = cast(
+                    int, info.get("total_commands_processed", 0)
+                )
                 stats["redis_keyspace_hits"] = cast(int, info.get("keyspace_hits", 0))
-                stats["redis_keyspace_misses"] = cast(int, info.get("keyspace_misses", 0))
+                stats["redis_keyspace_misses"] = cast(
+                    int, info.get("keyspace_misses", 0)
+                )
 
                 # Memory info
                 memory_info = cast(Mapping[str, Any], self.client.info("memory"))

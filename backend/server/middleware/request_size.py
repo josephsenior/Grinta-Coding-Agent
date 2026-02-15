@@ -67,7 +67,9 @@ class RequestSizeLoggingMiddleware:
         request_id: str | None,
     ) -> bool:
         body_iterator = getattr(response, "body_iterator", None)
-        if body_iterator is None or not callable(getattr(body_iterator, "__aiter__", None)):
+        if body_iterator is None or not callable(
+            getattr(body_iterator, "__aiter__", None)
+        ):
             return False
 
         if self._response_size(response) is not None:

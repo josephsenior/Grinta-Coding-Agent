@@ -53,7 +53,10 @@ class RuntimeTelemetry:
         )
 
     def snapshot(self) -> dict[str, dict[str, int]]:
-        watchdog = {f"{key}|{reason}": count for (key, reason), count in self._watchdog_counter.items()}
+        watchdog = {
+            f"{key}|{reason}": count
+            for (key, reason), count in self._watchdog_counter.items()
+        }
         return {
             "acquire": dict(self._acquire_counter),
             "reuse": dict(self._reuse_counter),

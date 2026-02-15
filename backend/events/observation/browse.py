@@ -38,13 +38,13 @@ class BrowserOutputObservation(Observation):
 
     def __str__(self) -> str:
         """Return a readable summary of the browser state and agent notes."""
-        ret = f"**BrowserOutputObservation**\nURL: {self.url}\nError: {self.error}\nOpen pages: {
-            self.open_pages_urls
-        }\nActive page index: {self.active_page_index}\nLast browser action: {
-            self.last_browser_action
-        }\nLast browser action error: {self.last_browser_action_error}\nFocused element bid: {
-            self.focused_element_bid
-        }\n"
+        ret = f"**BrowserOutputObservation**\nURL: {self.url}\nError: {
+            self.error
+        }\nOpen pages: {self.open_pages_urls}\nActive page index: {
+            self.active_page_index
+        }\nLast browser action: {self.last_browser_action}\nLast browser action error: {
+            self.last_browser_action_error
+        }\nFocused element bid: {self.focused_element_bid}\n"
         if self.screenshot_path:
             ret += f"Screenshot saved to: {self.screenshot_path}\n"
         ret += "--- Agent Observation ---\n"

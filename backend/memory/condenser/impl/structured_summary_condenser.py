@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from backend.core.config.condenser_config import StructuredSummaryCondenserConfig
+    pass
 from backend.core.logger import FORGE_logger as logger
 from backend.core.message import Message, TextContent
 from backend.events.event import Event
@@ -17,8 +17,7 @@ from backend.memory.condenser.condenser import BaseLLMCondenser, Condensation
 from backend.memory.view import View
 
 if TYPE_CHECKING:
-    from backend.llm.llm import LLM
-    from backend.llm.llm_registry import LLMRegistry
+    pass
 
 
 class StateSummary(BaseModel):
@@ -28,15 +27,25 @@ class StateSummary(BaseModel):
         default="",
         description="Essential user requirements, goals, and clarifications in concise form.",
     )
-    completed_tasks: str = Field(default="", description="List of tasks completed so far with brief results.")
-    pending_tasks: str = Field(default="", description="List of tasks that still need to be done.")
+    completed_tasks: str = Field(
+        default="", description="List of tasks completed so far with brief results."
+    )
+    pending_tasks: str = Field(
+        default="", description="List of tasks that still need to be done."
+    )
     current_state: str = Field(
         default="",
         description="Current variables, data structures, or other relevant state information.",
     )
-    files_modified: str = Field(default="", description="List of files that have been created or modified.")
-    function_changes: str = Field(default="", description="List of functions that have been created or modified.")
-    data_structures: str = Field(default="", description="List of key data structures in use or modified.")
+    files_modified: str = Field(
+        default="", description="List of files that have been created or modified."
+    )
+    function_changes: str = Field(
+        default="", description="List of functions that have been created or modified."
+    )
+    data_structures: str = Field(
+        default="", description="List of key data structures in use or modified."
+    )
     tests_written: str = Field(
         default="",
         description="Whether tests have been written for the changes. True, false, or unknown.",
@@ -45,13 +54,19 @@ class StateSummary(BaseModel):
         default="",
         description="Whether all tests are currently passing. True, false, or unknown.",
     )
-    failing_tests: str = Field(default="", description="List of names or descriptions of any failing tests.")
-    error_messages: str = Field(default="", description="List of key error messages encountered.")
+    failing_tests: str = Field(
+        default="", description="List of names or descriptions of any failing tests."
+    )
+    error_messages: str = Field(
+        default="", description="List of key error messages encountered."
+    )
     branch_created: str = Field(
         default="",
         description="Whether a branch has been created for this work. True, false, or unknown.",
     )
-    branch_name: str = Field(default="", description="Name of the current working branch if known.")
+    branch_name: str = Field(
+        default="", description="Name of the current working branch if known."
+    )
     commits_made: str = Field(
         default="",
         description="Whether any commits have been made. True, false, or unknown.",
@@ -155,7 +170,9 @@ class StructuredSummaryCondenser(BaseLLMCondenser):
         # Create condensation result
         return self._create_condensation_result(forgotten_events, str(summary))
 
-    def _prepare_view_sections(self, view: View) -> tuple[list[Event], list[Event], AgentCondensationObservation]:
+    def _prepare_view_sections(
+        self, view: View
+    ) -> tuple[list[Event], list[Event], AgentCondensationObservation]:
         """Prepare view sections: head, forgotten events, and summary event."""
         head = list(view[: self.keep_first])
         target_size = self.max_size // 2
@@ -176,12 +193,16 @@ class StructuredSummaryCondenser(BaseLLMCondenser):
         # Get forgotten events (exclude summary events)
         forgotten_slice = view[self.keep_first : -events_from_tail]
         forgotten_events: list[Event] = [
-            event for event in forgotten_slice if not isinstance(event, AgentCondensationObservation)
+            event
+            for event in forgotten_slice
+            if not isinstance(event, AgentCondensationObservation)
         ]
 
         return head, forgotten_events, summary_event
 
-    def _build_condensation_prompt(self, summary_event: AgentCondensationObservation, forgotten_events: list) -> str:
+    def _build_condensation_prompt(
+        self, summary_event: AgentCondensationObservation, forgotten_events: list
+    ) -> str:
         """Build the prompt for LLM condensation."""
         base_prompt = (
             "You are maintaining a context-aware state summary for an interactive software agent. This summary is critical because it:\n"
@@ -201,12 +222,16 @@ class StructuredSummaryCondenser(BaseLLMCondenser):
 
         # Add previous summary
         summary_event_content = self._truncate(summary_event.message or "")
-        base_prompt += f"<PREVIOUS SUMMARY>\n{summary_event_content}\n</PREVIOUS SUMMARY>\n\n"
+        base_prompt += (
+            f"<PREVIOUS SUMMARY>\n{summary_event_content}\n</PREVIOUS SUMMARY>\n\n"
+        )
 
         # Add forgotten events
         for forgotten_event in forgotten_events:
             event_content = self._truncate(str(forgotten_event))
-            base_prompt += f"<EVENT id={forgotten_event.id}>\n{event_content}\n</EVENT>\n"
+            base_prompt += (
+                f"<EVENT id={forgotten_event.id}>\n{event_content}\n</EVENT>\n"
+            )
 
         return base_prompt
 
@@ -241,7 +266,11 @@ class StructuredSummaryCondenser(BaseLLMCondenser):
                 raise ValueError(msg)
 
             summary_tool_call = next(
-                (tool_call for tool_call in message.tool_calls if tool_call.function.name == "create_state_summary"),
+                (
+                    tool_call
+                    for tool_call in message.tool_calls
+                    if tool_call.function.name == "create_state_summary"
+                ),
                 None,
             )
             if not summary_tool_call:
@@ -253,9 +282,10 @@ class StructuredSummaryCondenser(BaseLLMCondenser):
             return StateSummary.model_validate(args_dict)
 
         except (ValueError, AttributeError, KeyError, json.JSONDecodeError) as e:
-            logger.warning("Failed to parse summary tool call: %s. Using empty summary.", e)
+            logger.warning(
+                "Failed to parse summary tool call: %s. Using empty summary.", e
+            )
             return StateSummary()
-
 
 
 # Lazy registration to avoid circular imports

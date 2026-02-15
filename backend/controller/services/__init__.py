@@ -12,6 +12,7 @@ from .exception_handler_service import ExceptionHandlerService
 from .iteration_guard_service import IterationGuardService
 from .iteration_service import IterationService
 from .lifecycle_service import LifecycleService
+from .metrics_service import MetricsService
 from .observation_service import ObservationService
 from .pending_action_service import PendingActionService
 from .recovery_service import RecoveryService
@@ -36,6 +37,7 @@ __all__ = [
     "ControllerContext",
     "EventRouterService",
     "ExceptionHandlerService",
+    "InvalidStateTransitionError",
     "IterationService",
     "IterationGuardService",
     "StepDecisionService",
@@ -44,7 +46,9 @@ __all__ = [
     "BudgetGuardService",
     "ConfirmationService",
     "LifecycleService",
+    "MetricsService",
     "ObservationService",
+    "PendingActionService",
     "RecoveryService",
     "SafetyService",
     "StateTransitionService",

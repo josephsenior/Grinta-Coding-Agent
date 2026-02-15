@@ -60,11 +60,15 @@ class RecentEventsCondenser(Condenser):
         return View(events=head + tail)
 
     @classmethod
-    def from_config(cls, config: RecentEventsCondenserConfig, llm_registry: LLMRegistry) -> RecentEventsCondenser:
+    def from_config(
+        cls, config: RecentEventsCondenserConfig, llm_registry: LLMRegistry
+    ) -> RecentEventsCondenser:
         """Create condenser using values from configuration object."""
         from backend.core.pydantic_compat import model_dump_with_options
 
-        return RecentEventsCondenser(**model_dump_with_options(config, exclude={"type"}))
+        return RecentEventsCondenser(
+            **model_dump_with_options(config, exclude={"type"})
+        )
 
 
 # Lazy registration to avoid circular imports

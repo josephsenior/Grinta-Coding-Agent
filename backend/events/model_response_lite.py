@@ -66,8 +66,12 @@ class ModelResponseLite(BaseModel):
                 for tc in raw_tool_calls:
                     tc_id = cls._getattr_or_get(tc, "id")
                     function = cls._getattr_or_get(tc, "function")
-                    tool_calls.append(AssistantToolCallLite(id=tc_id, function=function))
-            msg = AssistantMessageLite(role=role, content=content, tool_calls=tool_calls)
+                    tool_calls.append(
+                        AssistantToolCallLite(id=tc_id, function=function)
+                    )
+            msg = AssistantMessageLite(
+                role=role, content=content, tool_calls=tool_calls
+            )
             choices.append(ChoiceLite(message=msg))
         return cls(id=rid, model=rmodel, choices=choices)
 

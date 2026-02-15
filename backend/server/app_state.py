@@ -47,9 +47,15 @@ class AppState:
         from backend.storage.secrets.secrets_store import SecretsStore
         from backend.storage.settings.settings_store import SettingsStore
 
-        self.SettingsStoreImpl: type[SettingsStore] = get_impl(SettingsStore, self.server_config.settings_store_class)
-        self.SecretsStoreImpl: type[SecretsStore] = get_impl(SecretsStore, self.server_config.secret_store_class)
-        self.ConversationStoreImpl: type[ConversationStore] = get_impl(ConversationStore, self.server_config.conversation_store_class)
+        self.SettingsStoreImpl: type[SettingsStore] = get_impl(
+            SettingsStore, self.server_config.settings_store_class
+        )
+        self.SecretsStoreImpl: type[SecretsStore] = get_impl(
+            SecretsStore, self.server_config.secret_store_class
+        )
+        self.ConversationStoreImpl: type[ConversationStore] = get_impl(
+            ConversationStore, self.server_config.conversation_store_class
+        )
 
         # Socket.IO (created once)
         import socketio  # type: ignore[import-untyped]
@@ -57,7 +63,9 @@ class AppState:
         _default_cors = "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"
         _cors_str = os.environ.get("FORGE_CORS_ORIGINS", _default_cors)
         _allowed = [o.strip() for o in _cors_str.split(",") if o.strip()]
-        self.sio = socketio.AsyncServer(cors_allowed_origins=_allowed, async_mode="asgi")
+        self.sio = socketio.AsyncServer(
+            cors_allowed_origins=_allowed, async_mode="asgi"
+        )
 
         # Lazily initialized singletons
         self._event_service_adapter: EventServiceAdapter | None = None
@@ -71,7 +79,9 @@ class AppState:
     def get_event_service_adapter(self) -> EventServiceAdapter:
         with self._lock:
             if self._event_service_adapter is None:
-                self._event_service_adapter = EventServiceAdapter(lambda user_id: self.file_store)
+                self._event_service_adapter = EventServiceAdapter(
+                    lambda user_id: self.file_store
+                )
         return self._event_service_adapter
 
     @property
@@ -118,10 +128,14 @@ class AppState:
 
     # ----- Conversation store -----
 
-    async def get_conversation_store_async(self, user_id: str | None = None) -> ConversationStore:
+    async def get_conversation_store_async(
+        self, user_id: str | None = None
+    ) -> ConversationStore:
         if self._conversation_store is not None:
             return self._conversation_store
-        store = await get_conversation_store_instance(self.ConversationStoreImpl, self.config, user_id or "oss_user")
+        store = await get_conversation_store_instance(
+            self.ConversationStoreImpl, self.config, user_id or "oss_user"
+        )
         self._conversation_store = store
         return store
 
@@ -134,12 +148,16 @@ class AppState:
 
         loop = get_active_loop()
         if loop is not None:
-            logger.warning("get_conversation_store() called from running loop; use async variant")
+            logger.warning(
+                "get_conversation_store() called from running loop; use async variant"
+            )
             return None
         try:
             loop = asyncio.new_event_loop()
             self._conversation_store = loop.run_until_complete(
-                get_conversation_store_instance(self.ConversationStoreImpl, self.config, "oss_user")
+                get_conversation_store_instance(
+                    self.ConversationStoreImpl, self.config, "oss_user"
+                )
             )
             loop.close()
             return self._conversation_store

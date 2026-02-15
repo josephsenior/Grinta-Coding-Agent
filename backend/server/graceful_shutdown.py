@@ -51,7 +51,9 @@ async def graceful_shutdown() -> None:
                 handler()
             logger.debug("Shutdown handler %s completed", handler.__name__)
         except Exception as e:
-            logger.error("Error in shutdown handler %s: %s", handler.__name__, e, exc_info=True)
+            logger.error(
+                "Error in shutdown handler %s: %s", handler.__name__, e, exc_info=True
+            )
 
     logger.info("Graceful shutdown completed")
 

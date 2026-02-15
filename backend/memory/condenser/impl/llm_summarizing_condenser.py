@@ -10,8 +10,7 @@ from backend.memory.condenser.condenser import BaseLLMCondenser, Condensation
 from backend.memory.view import View
 
 if TYPE_CHECKING:
-    from backend.llm.llm import LLM
-    from backend.llm.llm_registry import LLMRegistry
+    pass
 
 
 class LLMSummarizingCondenser(BaseLLMCondenser):
@@ -58,8 +57,6 @@ class LLMSummarizingCondenser(BaseLLMCondenser):
 
         self._add_response_metadata(response)
         return self._create_condensation_result(forgotten_events, summary)
-
-
 
 
 # Lazy registration to avoid circular imports

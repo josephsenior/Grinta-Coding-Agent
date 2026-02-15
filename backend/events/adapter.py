@@ -32,7 +32,9 @@ class EventServiceAdapter:
         self.file_store_factory = file_store_factory
         if use_grpc:
             # We keep the parameter for compatibility but raise error if used
-            raise RuntimeError("gRPC mode is not available in this simplified EventServiceAdapter")
+            raise RuntimeError(
+                "gRPC mode is not available in this simplified EventServiceAdapter"
+            )
 
         self._sessions: dict[str, dict[str, Any]] = {}
         self._streams: dict[str, EventStream] = {}

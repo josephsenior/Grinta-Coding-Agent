@@ -46,7 +46,9 @@ class EventStreamSubscriber(str, Enum):
     TEST = "test"
 
 
-async def session_exists(sid: str, file_store: FileStore, user_id: str | None = None) -> bool:
+async def session_exists(
+    sid: str, file_store: FileStore, user_id: str | None = None
+) -> bool:
     """Check if a session exists in file storage.
 
     Args:
@@ -67,7 +69,9 @@ async def session_exists(sid: str, file_store: FileStore, user_id: str | None = 
 
 def _warn_unclosed_stream(sid: str) -> None:
     """weakref.finalize callback — fires if a stream is GC'd without close()."""
-    logger.warning("EventStream '%s' was GC'd without close(); resources may leak.", sid)
+    logger.warning(
+        "EventStream '%s' was GC'd without close(); resources may leak.", sid
+    )
 
 
 class EventStream(EventStore):
@@ -147,7 +151,9 @@ class EventStream(EventStore):
         )
 
         # ---- Composition: persistence / WAL --------------------------------
-        _async_write = str(async_write if async_write is not None else event_defaults.async_write).lower() in (
+        _async_write = str(
+            async_write if async_write is not None else event_defaults.async_write
+        ).lower() in (
             "1",
             "true",
             "yes",
@@ -193,7 +199,9 @@ class EventStream(EventStore):
         try:  # pragma: no cover - defensive
             EventStream._GLOBAL_STREAMS.add(self)
         except Exception:
-            logger.warning("Failed to register EventStream for global metrics", exc_info=True)
+            logger.warning(
+                "Failed to register EventStream for global metrics", exc_info=True
+            )
 
         # Safety finalizer — ensures close() is called if the stream is GC'd
         # without an explicit close().  weakref.finalize is safe: it won't
@@ -224,7 +232,9 @@ class EventStream(EventStore):
             self._finalizer.detach()
         self._stop_flag.set()
         if self._queue_loop and self._stop_event:
-            future = asyncio.run_coroutine_threadsafe(self._initiate_shutdown(), self._queue_loop)
+            future = asyncio.run_coroutine_threadsafe(
+                self._initiate_shutdown(), self._queue_loop
+            )
             try:
                 future.result(timeout=5)
             except Exception as exc:  # pragma: no cover - defensive
@@ -242,10 +252,14 @@ class EventStream(EventStore):
         snapshot = self._bp.get_snapshot(self._started_at_monotonic)
         # Merge persistence stats
         snapshot.update(self._persist.stats)
-        snapshot["persist_failures_window_count"] = int(len(self._persist._recent_persist_failures))
+        snapshot["persist_failures_window_count"] = int(
+            len(self._persist._recent_persist_failures)
+        )
         if snapshot.get("rate_window_seconds", 0) > 0:
             rw = snapshot["rate_window_seconds"]
-            snapshot["persist_failures_per_minute"] = int(round(len(self._persist._recent_persist_failures) * 60 / rw))
+            snapshot["persist_failures_per_minute"] = int(
+                round(len(self._persist._recent_persist_failures) * 60 / rw)
+            )
         else:
             snapshot["persist_failures_per_minute"] = 0
         dw = self._persist.durable_writer
@@ -307,7 +321,9 @@ class EventStream(EventStore):
             raise ValueError(msg)
         self._subscribers[subscriber_id][callback_id] = callback
 
-    def unsubscribe(self, subscriber_id: EventStreamSubscriber, callback_id: str) -> None:
+    def unsubscribe(
+        self, subscriber_id: EventStreamSubscriber, callback_id: str
+    ) -> None:
         """Unsubscribe callback from event stream and clean up resources.
 
         Args:
@@ -336,10 +352,12 @@ class EventStream(EventStore):
             event = merged  # Use the merged representative event
 
         self._ensure_event_can_be_added(event)
-        event.timestamp = datetime.now()
+        event.timestamp = datetime.now().isoformat()
         event.source = source
 
-        sanitized_event, payload, cache_page_data = self._serialize_and_cache_event(event)
+        sanitized_event, payload, cache_page_data = self._serialize_and_cache_event(
+            event
+        )
         cache_payload = self._persist.build_cache_payload(cache_page_data)
 
         # Persistence happens outside the lock intentionally: each event is
@@ -373,7 +391,9 @@ class EventStream(EventStore):
             )
             raise ValueError(msg)
 
-    def _serialize_and_cache_event(self, event: Event) -> tuple[Event, dict[str, Any], list[dict[str, Any]] | None]:
+    def _serialize_and_cache_event(
+        self, event: Event
+    ) -> tuple[Event, dict[str, Any], list[dict[str, Any]] | None]:
         from backend.events.action import (  # local import to avoid global cycle
             ChangeAgentStateAction,
         )
@@ -407,15 +427,21 @@ class EventStream(EventStore):
 
     def _enqueue_serialized_event(self, event: Event) -> None:
         if not self._queue_ready.wait(timeout=2):
-            logger.warning("EventStream queue not ready; dropping event id=%s", event.id)
+            logger.warning(
+                "EventStream queue not ready; dropping event id=%s", event.id
+            )
             return
 
         if not self._queue_loop or not self._async_queue:
-            logger.warning("EventStream queue loop missing; dropping event id=%s", event.id)
+            logger.warning(
+                "EventStream queue loop missing; dropping event id=%s", event.id
+            )
             return
 
         try:
-            future = asyncio.run_coroutine_threadsafe(self._enqueue_event(event), self._queue_loop)
+            future = asyncio.run_coroutine_threadsafe(
+                self._enqueue_event(event), self._queue_loop
+            )
             future.result()
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Failed to enqueue event id=%s: %s", event.id, exc)
@@ -451,7 +477,9 @@ class EventStream(EventStore):
         self._secret_masker.update_secrets(secrets)
         self.secrets = self._secret_masker.secrets
 
-    def _replace_secrets(self, data: dict[str, Any], is_top_level: bool = True) -> dict[str, Any]:
+    def _replace_secrets(
+        self, data: dict[str, Any], is_top_level: bool = True
+    ) -> dict[str, Any]:
         """Delegate to SecretMasker for secret replacement."""
         return self._secret_masker.replace_secrets(data, is_top_level=is_top_level)
 
@@ -462,7 +490,8 @@ class EventStream(EventStore):
         self._async_queue = asyncio.Queue(maxsize=self._bp.max_queue_size)
         self._stop_event = asyncio.Event()
         self._workers = [
-            self._queue_loop.create_task(self._worker_loop(worker_id)) for worker_id in range(self._worker_count)
+            self._queue_loop.create_task(self._worker_loop(worker_id))
+            for worker_id in range(self._worker_count)
         ]
         self._queue_ready.set()
         try:
@@ -470,7 +499,9 @@ class EventStream(EventStore):
         finally:
             for worker in self._workers:
                 worker.cancel()
-            self._queue_loop.run_until_complete(asyncio.gather(*self._workers, return_exceptions=True))
+            self._queue_loop.run_until_complete(
+                asyncio.gather(*self._workers, return_exceptions=True)
+            )
             self._delivery_pool.shutdown(wait=True)
             self._queue_loop.close()
 
@@ -604,14 +635,22 @@ def get_aggregated_event_stream_stats() -> dict[str, int]:
             totals["cache_write_failures"] += stats.get("cache_write_failures", 0)
             totals["critical_events"] += stats.get("critical_events", 0)
             totals["critical_queue_blocked"] += stats.get("critical_queue_blocked", 0)
-            totals["critical_sync_persistence"] += stats.get("critical_sync_persistence", 0)
-            totals["durable_enqueue_failures"] += stats.get("durable_enqueue_failures", 0)
+            totals["critical_sync_persistence"] += stats.get(
+                "critical_sync_persistence", 0
+            )
+            totals["durable_enqueue_failures"] += stats.get(
+                "durable_enqueue_failures", 0
+            )
             totals["durable_writer_drops"] += stats.get("durable_writer_drops", 0)
-            totals["durable_writer_queue_depth"] += stats.get("durable_writer_queue_depth", 0)
+            totals["durable_writer_queue_depth"] += stats.get(
+                "durable_writer_queue_depth", 0
+            )
             totals["durable_writer_errors"] += stats.get("durable_writer_errors", 0)
             totals["events_per_minute"] += stats.get("events_per_minute", 0)
             totals["drops_per_minute"] += stats.get("drops_per_minute", 0)
-            totals["persist_failures_per_minute"] += stats.get("persist_failures_per_minute", 0)
+            totals["persist_failures_per_minute"] += stats.get(
+                "persist_failures_per_minute", 0
+            )
             totals["queue_utilization_pct_avg"] += stats.get("queue_utilization_pct", 0)
             totals["uptime_seconds_sum"] += stats.get("uptime_seconds", 0)
             totals["queue_size"] += stats.get("queue_size", 0)
@@ -619,7 +658,9 @@ def get_aggregated_event_stream_stats() -> dict[str, int]:
             logger.debug("Aggregation: skipping broken EventStream: %s", exc)
             continue
     if totals["streams"] > 0:
-        totals["queue_utilization_pct_avg"] = int(round(totals["queue_utilization_pct_avg"] / totals["streams"]))
+        totals["queue_utilization_pct_avg"] = int(
+            round(totals["queue_utilization_pct_avg"] / totals["streams"])
+        )
     return totals
 
 

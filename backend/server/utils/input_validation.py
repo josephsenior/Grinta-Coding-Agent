@@ -99,7 +99,9 @@ def validate_command(command: str, allowed_commands: list[str] | None = None) ->
 
     for pattern in dangerous_patterns:
         if re.search(pattern, command):
-            raise ValidationError(f"Potentially dangerous command pattern detected: {command}")
+            raise ValidationError(
+                f"Potentially dangerous command pattern detected: {command}"
+            )
 
     # Check against allowed commands if provided
     if allowed_commands:
@@ -136,7 +138,9 @@ def _validate_type(value: str, param_type: str) -> None:
             raise ValidationError(f"Invalid URL: {value}")
 
 
-def _validate_length(value: str, min_length: int | None, max_length: int | None) -> None:
+def _validate_length(
+    value: str, min_length: int | None, max_length: int | None
+) -> None:
     """Validate parameter length.
 
     Raises:
@@ -218,7 +222,9 @@ def validate_file_upload(
 
     # Check file size
     if len(content) > max_size:
-        raise ValidationError(f"File too large (max {max_size} bytes): {len(content)} bytes")
+        raise ValidationError(
+            f"File too large (max {max_size} bytes): {len(content)} bytes"
+        )
 
     # Check extension
     if allowed_extensions:

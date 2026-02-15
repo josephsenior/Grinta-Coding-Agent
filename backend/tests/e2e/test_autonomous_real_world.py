@@ -49,7 +49,9 @@ class TestRealWorldAutonomousScenarios:
     @pytest.mark.e2e
     async def test_build_simple_todo_app(self, safety_enabled_config, temp_workspace):
         """Test building a simple TODO app from scratch."""
-        runtime = create_runtime_with_registry(safety_enabled_config, str(temp_workspace))
+        runtime = create_runtime_with_registry(
+            safety_enabled_config, str(temp_workspace)
+        )
 
         # Task: Build a simple TODO app
         task = """
@@ -66,7 +68,9 @@ class TestRealWorldAutonomousScenarios:
             state = await run_task(safety_enabled_config, runtime, task)
 
             # Verify task completed
-            assert state.agent_state.value == "FINISHED", "Agent should finish successfully"
+            assert state.agent_state.value == "FINISHED", (
+                "Agent should finish successfully"
+            )
 
             # Verify file was created
             todo_file = temp_workspace / "todo.html"
@@ -76,15 +80,23 @@ class TestRealWorldAutonomousScenarios:
             content = todo_file.read_text()
             assert "TODO" in content.upper(), "Should contain TODO functionality"
             assert "<html" in content.lower(), "Should be valid HTML"
-            assert "localStorage" in content or "sessionStorage" in content, "Should use storage"
+            assert "localStorage" in content or "sessionStorage" in content, (
+                "Should use storage"
+            )
 
             # Verify no safety violations
             audit_logs: list[dict] = []
-            blocked_actions = [log for log in audit_logs if not log.get("allowed", True)]
+            blocked_actions = [
+                log for log in audit_logs if not log.get("allowed", True)
+            ]
 
             # Should have no critical commands blocked (building HTML/JS is safe)
-            critical_blocked = [log for log in blocked_actions if log.get("risk_level") == "CRITICAL"]
-            assert len(critical_blocked) == 0, f"No critical commands should be blocked: {critical_blocked}"
+            critical_blocked = [
+                log for log in blocked_actions if log.get("risk_level") == "CRITICAL"
+            ]
+            assert len(critical_blocked) == 0, (
+                f"No critical commands should be blocked: {critical_blocked}"
+            )
 
             print(f"✅ Successfully built TODO app in {state.iteration} iterations")
             print(f"📝 File size: {todo_file.stat().st_size} bytes")
@@ -94,11 +106,15 @@ class TestRealWorldAutonomousScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.e2e
-    async def test_dangerous_command_blocked(self, safety_enabled_config, temp_workspace):
+    async def test_dangerous_command_blocked(
+        self, safety_enabled_config, temp_workspace
+    ):
         """Test that dangerous commands are blocked by safety validator."""
         from backend.events.observation import ErrorObservation
 
-        runtime = create_runtime_with_registry(safety_enabled_config, str(temp_workspace))
+        runtime = create_runtime_with_registry(
+            safety_enabled_config, str(temp_workspace)
+        )
 
         try:
             state = await run_task(
@@ -109,11 +125,15 @@ class TestRealWorldAutonomousScenarios:
 
             # Check that an error observation was created
             error_obs = [
-                obs for obs in state.history if isinstance(obs, ErrorObservation) and "SAFETY" in obs.content
+                obs
+                for obs in state.history
+                if isinstance(obs, ErrorObservation) and "SAFETY" in obs.content
             ]
 
             assert len(error_obs) > 0, "Safety validator should block dangerous command"
-            assert "BLOCKED" in error_obs[0].content, "Should explicitly state command was blocked"
+            assert "BLOCKED" in error_obs[0].content, (
+                "Should explicitly state command was blocked"
+            )
 
             print("✅ Dangerous command successfully blocked by safety validator")
 
@@ -122,9 +142,13 @@ class TestRealWorldAutonomousScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.e2e
-    async def test_error_recovery_and_retry(self, safety_enabled_config, temp_workspace):
+    async def test_error_recovery_and_retry(
+        self, safety_enabled_config, temp_workspace
+    ):
         """Test that agent recovers from errors and retries intelligently."""
-        runtime = create_runtime_with_registry(safety_enabled_config, str(temp_workspace))
+        runtime = create_runtime_with_registry(
+            safety_enabled_config, str(temp_workspace)
+        )
 
         # Task that will initially fail but can be recovered
         task = """
@@ -137,14 +161,18 @@ class TestRealWorldAutonomousScenarios:
             state = await run_task(safety_enabled_config, runtime, task)
 
             # Should complete despite initial failure
-            assert state.agent_state.value == "FINISHED", "Should recover from error and complete"
+            assert state.agent_state.value == "FINISHED", (
+                "Should recover from error and complete"
+            )
 
             # Verify file was created after recovery
             test_file = temp_workspace / "nonexistent.txt"
             assert test_file.exists(), "File should be created after recovery"
 
             # Check error recovery metrics
-            error_count = sum(1 for event in state.history if "error" in str(type(event)).lower())
+            error_count = sum(
+                1 for event in state.history if "error" in str(type(event)).lower()
+            )
             assert error_count > 0, "Should have encountered at least one error"
             assert error_count < 5, "Should not have excessive errors"
 
@@ -155,12 +183,16 @@ class TestRealWorldAutonomousScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.e2e
-    async def test_circuit_breaker_trips_on_repeated_errors(self, safety_enabled_config, temp_workspace):
+    async def test_circuit_breaker_trips_on_repeated_errors(
+        self, safety_enabled_config, temp_workspace
+    ):
         """Test that circuit breaker stops execution after too many errors."""
         # Lower error threshold for testing
         safety_enabled_config.agents[0].max_iterations = 10
 
-        runtime = create_runtime_with_registry(safety_enabled_config, str(temp_workspace))
+        runtime = create_runtime_with_registry(
+            safety_enabled_config, str(temp_workspace)
+        )
 
         # Task designed to fail repeatedly
         task = """
@@ -182,9 +214,13 @@ class TestRealWorldAutonomousScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.e2e
-    async def test_build_calculator_with_tests(self, safety_enabled_config, temp_workspace):
+    async def test_build_calculator_with_tests(
+        self, safety_enabled_config, temp_workspace
+    ):
         """Test building a calculator with automated tests."""
-        runtime = create_runtime_with_registry(safety_enabled_config, str(temp_workspace))
+        runtime = create_runtime_with_registry(
+            safety_enabled_config, str(temp_workspace)
+        )
 
         task = """
         Build a calculator application with the following:
@@ -215,16 +251,22 @@ class TestRealWorldAutonomousScenarios:
 
             assert len(test_runs) > 0, "Should have run pytest"
 
-            print(f"✅ Successfully built calculator with tests in {state.iteration} iterations")
+            print(
+                f"✅ Successfully built calculator with tests in {state.iteration} iterations"
+            )
 
         finally:
             await runtime.close()
 
     @pytest.mark.asyncio
     @pytest.mark.e2e
-    async def test_task_validation_prevents_premature_completion(self, safety_enabled_config, temp_workspace):
+    async def test_task_validation_prevents_premature_completion(
+        self, safety_enabled_config, temp_workspace
+    ):
         """Test that task validator prevents agent from finishing without completing task."""
-        runtime = create_runtime_with_registry(safety_enabled_config, str(temp_workspace))
+        runtime = create_runtime_with_registry(
+            safety_enabled_config, str(temp_workspace)
+        )
 
         task = """
         Create three files:
@@ -246,16 +288,24 @@ class TestRealWorldAutonomousScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.e2e
-    async def test_audit_logging_captures_actions(self, safety_enabled_config, temp_workspace):
+    async def test_audit_logging_captures_actions(
+        self, safety_enabled_config, temp_workspace
+    ):
         """Test that audit logger captures all agent actions."""
-        runtime = create_runtime_with_registry(safety_enabled_config, str(temp_workspace))
+        runtime = create_runtime_with_registry(
+            safety_enabled_config, str(temp_workspace)
+        )
 
         task = "Create a file called test.txt with content 'Audit test'"
 
         try:
             state = await run_task(safety_enabled_config, runtime, task)
-            file_actions = [event for event in state.history if "test.txt" in str(event)]
-            assert len(file_actions) > 0, "Should include file creation actions in history"
+            file_actions = [
+                event for event in state.history if "test.txt" in str(event)
+            ]
+            assert len(file_actions) > 0, (
+                "Should include file creation actions in history"
+            )
             print(f"✅ Captured {len(file_actions)} file-related events")
 
         finally:

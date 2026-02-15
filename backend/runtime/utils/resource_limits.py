@@ -40,7 +40,9 @@ class ResourceLimits:
     max_cpu_percent: float = DEFAULT_RUNTIME_MAX_CPU_PERCENT
     max_disk_gb: int = DEFAULT_RUNTIME_MAX_DISK_GB
     max_file_count: int = DEFAULT_RUNTIME_MAX_FILE_COUNT
-    max_network_requests_per_minute: int = DEFAULT_RUNTIME_MAX_NETWORK_REQUESTS_PER_MINUTE
+    max_network_requests_per_minute: int = (
+        DEFAULT_RUNTIME_MAX_NETWORK_REQUESTS_PER_MINUTE
+    )
 
 
 class ResourceLimiter:
@@ -64,10 +66,24 @@ class ResourceLimiter:
         """
         if limits is None:
             limits = ResourceLimits(
-                max_memory_mb=int(os.getenv("RUNTIME_MAX_MEMORY_MB", str(DEFAULT_RUNTIME_MAX_MEMORY_MB))),
-                max_cpu_percent=float(os.getenv("RUNTIME_MAX_CPU_PERCENT", str(DEFAULT_RUNTIME_MAX_CPU_PERCENT))),
-                max_disk_gb=int(os.getenv("RUNTIME_MAX_DISK_GB", str(DEFAULT_RUNTIME_MAX_DISK_GB))),
-                max_file_count=int(os.getenv("RUNTIME_MAX_FILE_COUNT", str(DEFAULT_RUNTIME_MAX_FILE_COUNT))),
+                max_memory_mb=int(
+                    os.getenv(
+                        "RUNTIME_MAX_MEMORY_MB", str(DEFAULT_RUNTIME_MAX_MEMORY_MB)
+                    )
+                ),
+                max_cpu_percent=float(
+                    os.getenv(
+                        "RUNTIME_MAX_CPU_PERCENT", str(DEFAULT_RUNTIME_MAX_CPU_PERCENT)
+                    )
+                ),
+                max_disk_gb=int(
+                    os.getenv("RUNTIME_MAX_DISK_GB", str(DEFAULT_RUNTIME_MAX_DISK_GB))
+                ),
+                max_file_count=int(
+                    os.getenv(
+                        "RUNTIME_MAX_FILE_COUNT", str(DEFAULT_RUNTIME_MAX_FILE_COUNT)
+                    )
+                ),
             )
 
         self.limits = limits
@@ -97,7 +113,9 @@ class ResourceLimiter:
                 disk_usage = psutil.disk_usage(str(self.workspace_path))
                 disk_gb = disk_usage.used / (1024 * 1024 * 1024)
 
-                file_count = sum(len(files) for _, _, files in os.walk(str(self.workspace_path)))
+                file_count = sum(
+                    len(files) for _, _, files in os.walk(str(self.workspace_path))
+                )
             except Exception as e:
                 logger.warning("Error calculating disk/file stats: %s", e)
 
@@ -120,7 +138,11 @@ class ResourceLimiter:
 
         # Check CPU (only warn, don't raise as CPU spikes are common)
         if stats.cpu_percent > self.limits.max_cpu_percent:
-            logger.warning("CPU usage high: %.1f%% > %s%%", stats.cpu_percent, self.limits.max_cpu_percent)
+            logger.warning(
+                "CPU usage high: %.1f%% > %s%%",
+                stats.cpu_percent,
+                self.limits.max_cpu_percent,
+            )
 
         # Check disk
         if stats.disk_gb > self.limits.max_disk_gb:

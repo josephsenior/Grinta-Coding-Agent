@@ -193,7 +193,9 @@ def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> flo
     return get_completion_cost(model, prompt_tokens, completion_tokens)
 
 
-def track_cost(model: str, prompt_tokens: int, completion_tokens: int, user_key: str) -> float:
+def track_cost(
+    model: str, prompt_tokens: int, completion_tokens: int, user_key: str
+) -> float:
     cost = estimate_cost(model, prompt_tokens, completion_tokens)
     try:
         mock_response = {
@@ -251,9 +253,15 @@ def format_error_message(exc: Exception, error_type: ErrorType) -> str:
     """Format user-friendly error message based on classified error type."""
     error_str = str(exc)
     messages = {
-        ErrorType.NETWORK_ERROR: ("Unable to connect to the AI service. Check connectivity or try again."),
-        ErrorType.TIMEOUT_ERROR: ("Code completion request timed out. Try a simpler request or wait a moment."),
-        ErrorType.PERMISSION_ERROR: ("Insufficient permissions. Check your API key and account access."),
+        ErrorType.NETWORK_ERROR: (
+            "Unable to connect to the AI service. Check connectivity or try again."
+        ),
+        ErrorType.TIMEOUT_ERROR: (
+            "Code completion request timed out. Try a simpler request or wait a moment."
+        ),
+        ErrorType.PERMISSION_ERROR: (
+            "Insufficient permissions. Check your API key and account access."
+        ),
         ErrorType.MODULE_NOT_FOUND: (f"Missing module: {error_str[:200]}"),
     }
     base = messages.get(error_type, f"Error: {error_str[:200]}")
@@ -330,7 +338,8 @@ async def get_code_completion(
         return CompletionResult(
             completion="",
             stop_reason="circuit_breaker_tripped",
-            error=block_reason or "Service temporarily unavailable due to high error rate.",
+            error=block_reason
+            or "Service temporarily unavailable due to high error rate.",
             status_code=503,
         )
 
@@ -443,7 +452,9 @@ async def get_code_completion(
         )
 
     # 6. Anti-hallucination
-    is_valid, err_msg = anti_hallucination.validate_response(response_text=completion, actions=[])
+    is_valid, err_msg = anti_hallucination.validate_response(
+        response_text=completion, actions=[]
+    )
     if not is_valid:
         record_error(conversation_sid, Exception(f"Hallucination: {err_msg}"))
         return CompletionResult(

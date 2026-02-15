@@ -149,7 +149,9 @@ def model_dump_json(obj: Any, **kwargs) -> str:
     except Exception:
         pass
     try:
-        data = model_dump_with_options(obj, **{k: v for k, v in kwargs.items() if k != "mode"})
+        data = model_dump_with_options(
+            obj, **{k: v for k, v in kwargs.items() if k != "mode"}
+        )
         return json.dumps(data, default=str)
     except Exception:
         return json.dumps(model_to_dict(obj), default=str)

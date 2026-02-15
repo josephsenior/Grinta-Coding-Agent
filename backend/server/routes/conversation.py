@@ -63,7 +63,7 @@ if "pytest" in sys.modules:
     sub_router = cast(APIRouter, NoOpAPIRouter())
 else:
     sub_router = APIRouter(
-        prefix="/api/conversations/{conversation_id}",
+        prefix="/api/v1/conversations/{conversation_id}",
         dependencies=get_dependencies(),
     )
 
@@ -80,7 +80,7 @@ async def simple_test_endpoint() -> JSONResponse:
 
 
 @sub_router.get("/config")
-async def get_remote_runtime_config(
+async def get_runtime_config(
     request: Request,
     conversation_id: str,  # Extracted from path by FastAPI
 ) -> JSONResponse:
@@ -92,13 +92,17 @@ async def get_remote_runtime_config(
     user_id = get_user_id(request)
 
     try:
-        conversation = await manager.attach_to_conversation(conversation_id, user_id or "dev-user")
+        conversation = await manager.attach_to_conversation(
+            conversation_id, user_id or "dev-user"
+        )
         if conversation:
             runtime = conversation.runtime
             runtime_id = runtime.runtime_id if hasattr(runtime, "runtime_id") else None
             session_id = runtime.sid if hasattr(runtime, "sid") else None
             await manager.detach_from_conversation(conversation)
-            return JSONResponse(content={"runtime_id": runtime_id, "session_id": session_id})
+            return JSONResponse(
+                content={"runtime_id": runtime_id, "session_id": session_id}
+            )
         else:
             return error(
                 message="Conversation not found",
@@ -137,7 +141,9 @@ async def get_hosts(
     user_id = get_user_id(request)
 
     try:
-        conversation = await manager.attach_to_conversation(conversation_id, user_id or "dev-user")
+        conversation = await manager.attach_to_conversation(
+            conversation_id, user_id or "dev-user"
+        )
         if conversation:
             runtime: Runtime = conversation.runtime
             web_hosts = getattr(runtime, "web_hosts", None) or []
@@ -218,7 +224,9 @@ async def search_events(
         except JSONDecodeError as exc:
             raise SessionInvariantError("filter must be valid JSON") from exc
 
-    event_store = EventStore(sid=conversation_id, file_store=file_store, user_id=user_id)
+    event_store = EventStore(
+        sid=conversation_id, file_store=file_store, user_id=user_id
+    )
     events = list(
         event_store.search_events(
             start_id=start_id,
@@ -236,7 +244,9 @@ async def search_events(
 
 
 @sub_router.post("/events")
-async def add_event(request: Request, conversation: ServerConversation = Depends(get_conversation)):
+async def add_event(
+    request: Request, conversation: ServerConversation = Depends(get_conversation)
+):
     """Add an event to a conversation.
 
     Args:
@@ -251,7 +261,9 @@ async def add_event(request: Request, conversation: ServerConversation = Depends
         data = await request.json()
     except JSONDecodeError as e:
         raw = (await request.body()).decode("utf-8", errors="replace")
-        logger.error("Failed to parse JSON body for add_event: %s; raw body: %s", e, raw)
+        logger.error(
+            "Failed to parse JSON body for add_event: %s; raw body: %s", e, raw
+        )
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"error": "Invalid JSON", "raw_body": raw[:2000]},
@@ -384,11 +396,15 @@ def _build_playbook_list(memory: Memory) -> list[PlaybookResponse]:
 
     """
     # Build repo playbooks
-    repo_playbooks = [_build_repo_playbook(name, r_agent) for name, r_agent in memory.repo_playbooks.items()]
+    repo_playbooks = [
+        _build_repo_playbook(name, r_agent)
+        for name, r_agent in memory.repo_playbooks.items()
+    ]
 
     # Build knowledge playbooks
     knowledge_playbooks = [
-        _build_knowledge_playbook(name, k_agent) for name, k_agent in memory.knowledge_playbooks.items()
+        _build_knowledge_playbook(name, k_agent)
+        for name, k_agent in memory.knowledge_playbooks.items()
     ]
 
     return repo_playbooks + knowledge_playbooks
@@ -496,13 +512,17 @@ async def get_code_completion(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"error": "User settings store not available."},
         )
-    settings = await cache.get_user_settings(user_id or "anonymous", user_settings_store)
+    settings = await cache.get_user_settings(
+        user_id or "anonymous", user_settings_store
+    )
     if not settings or not settings.llm_model:
         settings = await user_settings_store.load()
         if not settings or not settings.llm_model:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                content={"error": "LLM settings not configured. Please configure your LLM settings first."},
+                content={
+                    "error": "LLM settings not configured. Please configure your LLM settings first."
+                },
             )
 
     llm_config = LLMConfig(
@@ -553,7 +573,9 @@ async def get_code_completion(
             ErrorType.PERMISSION_ERROR: status.HTTP_403_FORBIDDEN,
         }
         return JSONResponse(
-            status_code=status_map.get(error_type, status.HTTP_500_INTERNAL_SERVER_ERROR),
+            status_code=status_map.get(
+                error_type, status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
             content={
                 "error": format_error_message(e, error_type),
                 "errorType": error_type.value,

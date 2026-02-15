@@ -46,7 +46,9 @@ def store_feedback(feedback: FeedbackDataModel) -> dict[str, str]:
     feedback.feedback = feedback.polarity
     display_feedback = model_dump_with_options(feedback)
     if "trajectory" in display_feedback:
-        display_feedback["trajectory"] = f"elided [length: {len(display_feedback['trajectory'])}"
+        display_feedback["trajectory"] = (
+            f"elided [length: {len(display_feedback['trajectory'])}"
+        )
     if "token" in display_feedback:
         display_feedback["token"] = "elided"
     logger.debug("Got feedback: %s", display_feedback)

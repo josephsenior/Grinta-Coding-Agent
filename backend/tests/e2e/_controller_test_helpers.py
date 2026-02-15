@@ -8,7 +8,9 @@ def create_runtime_with_registry(config: Any, workspace_base: str | None = None)
     from backend.llm.llm_registry import LLMRegistry
 
     llm_registry = LLMRegistry(config)
-    return create_runtime(config, llm_registry=llm_registry, workspace_base=workspace_base)
+    return create_runtime(
+        config, llm_registry=llm_registry, workspace_base=workspace_base
+    )
 
 
 def create_safety_test_config():

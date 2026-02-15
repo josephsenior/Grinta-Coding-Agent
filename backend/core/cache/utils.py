@@ -5,7 +5,9 @@ from typing import Any, TypeVar
 T = TypeVar("T")
 
 
-def extract_redis_stats(info: dict[str, Any], global_keys: list, user_keys: list) -> dict[str, Any]:
+def extract_redis_stats(
+    info: dict[str, Any], global_keys: list, user_keys: list
+) -> dict[str, Any]:
     """Extract standard statistics from Redis info and keys."""
     return {
         "redis_used_memory_mb": info.get("used_memory", 0) / 1024 / 1024,
@@ -38,7 +40,9 @@ def merge_settings_with_cache(
     return merged_settings
 
 
-def get_redis_connection_params(host: str, port: int, password: str | None = None) -> dict[str, Any]:
+def get_redis_connection_params(
+    host: str, port: int, password: str | None = None
+) -> dict[str, Any]:
     """Get standard Redis connection parameters.
 
     Returns:

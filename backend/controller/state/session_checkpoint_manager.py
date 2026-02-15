@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 class SessionCheckpointManager:
     """Manages named checkpoints for agent sessions."""
 
-    def __init__(self, sid: str, file_store: FileStore, user_id: str | None = None) -> None:
+    def __init__(
+        self, sid: str, file_store: FileStore, user_id: str | None = None
+    ) -> None:
         """Initialize the checkpoint manager.
 
         Args:
@@ -51,7 +53,9 @@ class SessionCheckpointManager:
             else:
                 # Fallback if method is missing (should not happen with correct State)
                 # This suggests State interface might have changed or we are mocking it
-                logger.warning("State object missing _to_json_str, creating ad-hoc dump")
+                logger.warning(
+                    "State object missing _to_json_str, creating ad-hoc dump"
+                )
                 import json
 
                 encoded = json.dumps(state.__dict__, default=str)

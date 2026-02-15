@@ -90,7 +90,9 @@ class RollbackManager:
         """
         self.workspace_path = Path(workspace_path)
         self.checkpoints_dir = (
-            Path(checkpoints_dir) if checkpoints_dir else self.workspace_path / ".Forge" / "checkpoints"
+            Path(checkpoints_dir)
+            if checkpoints_dir
+            else self.workspace_path / ".Forge" / "checkpoints"
         )
         self.max_checkpoints = max_checkpoints
         self.auto_cleanup = auto_cleanup
@@ -128,7 +130,9 @@ class RollbackManager:
             try:
                 with open(manifest_file, encoding="utf-8") as f:
                     data = json.load(f)
-                    checkpoints = [Checkpoint.from_dict(cp) for cp in data.get("checkpoints", [])]
+                    checkpoints = [
+                        Checkpoint.from_dict(cp) for cp in data.get("checkpoints", [])
+                    ]
             except Exception as e:
                 logger.warning("Failed to load checkpoints manifest: %s", e)
 
@@ -308,7 +312,9 @@ class RollbackManager:
         if not checkpoint:
             return False
 
-        logger.info("Rolling back to checkpoint: %s (%s)", checkpoint.description, checkpoint_id)
+        logger.info(
+            "Rolling back to checkpoint: %s (%s)", checkpoint.description, checkpoint_id
+        )
 
         try:
             # Try git-based rollback first
@@ -332,7 +338,9 @@ class RollbackManager:
             Checkpoint object or None if not found
 
         """
-        checkpoint = next((cp for cp in self.checkpoints if cp.id == checkpoint_id), None)
+        checkpoint = next(
+            (cp for cp in self.checkpoints if cp.id == checkpoint_id), None
+        )
         if not checkpoint:
             logger.error("Checkpoint not found: %s", checkpoint_id)
         return checkpoint

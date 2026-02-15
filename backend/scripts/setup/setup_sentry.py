@@ -95,8 +95,12 @@ def test_sentry():
 
 def main():
     parser = argparse.ArgumentParser(description="Sentry Setup and Verification")
-    parser.add_argument("--check", action="store_true", help="Check Sentry configuration")
-    parser.add_argument("--test", action="store_true", help="Test Sentry error reporting")
+    parser.add_argument(
+        "--check", action="store_true", help="Check Sentry configuration"
+    )
+    parser.add_argument(
+        "--test", action="store_true", help="Test Sentry error reporting"
+    )
 
     args = parser.parse_args()
 

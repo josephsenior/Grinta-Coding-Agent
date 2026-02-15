@@ -111,7 +111,10 @@ def get_git_changes(cwd: str) -> list[dict[str, str]]:
         list[dict[str, str]]: List of change dictionaries with 'status' and 'path' keys.
 
     """
-    git_dirs = {os.path.dirname(f)[2:] for f in glob.glob("./*/.git", root_dir=cwd, recursive=True)}
+    git_dirs = {
+        os.path.dirname(f)[2:]
+        for f in glob.glob("./*/.git", root_dir=cwd, recursive=True)
+    }
     changes = get_changes_in_repo(cwd)
     changes = [
         change

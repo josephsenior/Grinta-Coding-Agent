@@ -25,7 +25,9 @@ async def verify():
         conn = await asyncpg.connect(dsn)
 
         # Check if table exists
-        exists = await conn.fetchval("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')")
+        exists = await conn.fetchval(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')"
+        )
 
         if not exists:
             print("[ERROR] Users table does not exist")
@@ -45,7 +47,9 @@ async def verify():
             print(f"  - {col['column_name']} ({col['data_type']})")
 
         # Check indexes
-        indexes = await conn.fetch("SELECT indexname FROM pg_indexes WHERE tablename = 'users'")
+        indexes = await conn.fetch(
+            "SELECT indexname FROM pg_indexes WHERE tablename = 'users'"
+        )
         print(f"\nIndexes ({len(indexes)}):")
         for idx in indexes:
             print(f"  - {idx['indexname']}")

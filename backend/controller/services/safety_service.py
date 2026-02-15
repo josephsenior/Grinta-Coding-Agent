@@ -40,7 +40,9 @@ class SafetyService:
         security_risk = getattr(action, "security_risk", ActionSecurityRisk.UNKNOWN)
         analyzer = self._context.security_analyzer
         is_high_security_risk = security_risk == ActionSecurityRisk.HIGH
-        is_ask_for_every_action = security_risk == ActionSecurityRisk.UNKNOWN and (analyzer is None)
+        is_ask_for_every_action = security_risk == ActionSecurityRisk.UNKNOWN and (
+            analyzer is None
+        )
         return (is_high_security_risk, is_ask_for_every_action)
 
     async def analyze_security(self, action: Action) -> None:
@@ -53,7 +55,9 @@ class SafetyService:
 
         try:
             if hasattr(action, "security_risk") and action.security_risk is not None:
-                logger.debug("Original security risk for %s: %s", action, action.security_risk)
+                logger.debug(
+                    "Original security risk for %s: %s", action, action.security_risk
+                )
             if hasattr(action, "security_risk"):
                 action.security_risk = await analyzer.security_risk(action)
                 logger.debug(
@@ -63,7 +67,9 @@ class SafetyService:
                     action.security_risk,
                 )
         except Exception as exc:  # pragma: no cover - defensive logging
-            logger.warning("Failed to analyze security risk for action %s: %s", action, exc)
+            logger.warning(
+                "Failed to analyze security risk for action %s: %s", action, exc
+            )
             if hasattr(action, "security_risk"):
                 action.security_risk = ActionSecurityRisk.UNKNOWN
 
@@ -80,13 +86,19 @@ class SafetyService:
 
         if autonomy and autonomy.should_request_confirmation(action):
             if controller.agent.config.cli_mode:
-                action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
-            elif self._context.confirmation_mode and (is_high_security_risk or is_ask_for_every_action):
+                action.confirmation_state = (
+                    ActionConfirmationStatus.AWAITING_CONFIRMATION
+                )
+            elif self._context.confirmation_mode and (
+                is_high_security_risk or is_ask_for_every_action
+            ):
                 logger.debug(
                     "[non-CLI mode] Detected HIGH security risk in action: %s. Ask for confirmation",
                     action,
                 )
-                action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+                action.confirmation_state = (
+                    ActionConfirmationStatus.AWAITING_CONFIRMATION
+                )
         else:
             logger.debug(
                 "[Autonomous mode] Executing action without confirmation: %s",
@@ -103,7 +115,9 @@ class SafetyService:
             pending_action.thought = ""
 
         pending_action.confirmation_state = (
-            ActionConfirmationStatus.CONFIRMED if confirmed else ActionConfirmationStatus.REJECTED
+            ActionConfirmationStatus.CONFIRMED
+            if confirmed
+            else ActionConfirmationStatus.REJECTED
         )
         pending_action._id = None  # allow event re-emission
         self._context.emit_event(pending_action, EventSource.AGENT)

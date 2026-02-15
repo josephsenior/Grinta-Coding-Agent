@@ -26,7 +26,6 @@ from backend.events.action import (
     CmdRunAction,
     FileReadAction,
     MCPAction,
-    MessageAction,
     PlaybookFinishAction,
 )
 from backend.core.enums import FileReadSource
@@ -36,7 +35,9 @@ if TYPE_CHECKING:
     ModelResponse = Any
 
 
-def grep_to_cmdrun(pattern: str, path: str | None = None, include: str | None = None) -> str:
+def grep_to_cmdrun(
+    pattern: str, path: str | None = None, include: str | None = None
+) -> str:
     """Convert grep tool arguments to a shell command string.
 
     Args:
@@ -160,7 +161,9 @@ def _create_action_from_tool_call(tool_call: Any, arguments: dict[str, Any]) -> 
     )
 
 
-def response_to_actions(response: ModelResponse, mcp_tool_names: list[str] | None = None) -> list[Action]:
+def response_to_actions(
+    response: ModelResponse, mcp_tool_names: list[str] | None = None
+) -> list[Action]:
     """Convert model response to actions."""
     return common_response_to_actions(
         response=response,

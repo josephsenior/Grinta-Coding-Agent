@@ -60,16 +60,12 @@ dependencies = [
 
 optional-dependencies.all = [
   "chromadb>=1.4,<2",
-  "daytona==0.24.2",
   "docker>=7.1,<8",
-  "e2b>=1.0.5,<1.8",
-  "modal>=0.66.26,<1.2",
   "opentelemetry-api>=1.33.1,<2",
   "opentelemetry-exporter-otlp-proto-grpc>=1.33.1,<2",
   "protobuf>=5,<6",
   "qdrant-client>=1.16.2,<2",
   "redis>=5.2,<7",
-  "runloop-api-client==0.50",
   "sentence-transformers>=5.2,<6",
 ]
 optional-dependencies.browser = [
@@ -91,12 +87,6 @@ optional-dependencies.telemetry = [
   "opentelemetry-api>=1.33.1,<2",
   "opentelemetry-exporter-otlp-proto-grpc>=1.33.1,<2",
   "protobuf>=5,<6",
-]
-optional-dependencies.third_party_runtimes = [
-  "daytona==0.24.2",
-  "e2b>=1.0.5,<1.8",
-  "modal>=0.66.26,<1.2",
-  "runloop-api-client==0.50",
 ]
 urls = { Repository = "https://github.com/Forge/Forge" }
 scripts.forge = "backend.interface.entry:main"

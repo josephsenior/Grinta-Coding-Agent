@@ -54,7 +54,9 @@ _MAX_WORKERS = int(os.getenv("FORGE_THREAD_POOL_MAX_WORKERS", "32"))
 EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=_MAX_WORKERS)
 
 
-async def call_sync_from_async(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+async def call_sync_from_async(
+    fn: Callable[..., Any], *args: Any, **kwargs: Any
+) -> Any:
     """Run a synchronous function in the background thread-pool and await the result.
 
     The returned future is **not** cancellable because synchronous code cannot
@@ -120,7 +122,9 @@ async def call_coro_in_bg_thread(
     await delegate(call_async_from_sync, corofn, timeout, *args, **kwargs)
 
 
-async def wait_all(iterable: Iterable[Coroutine], timeout: int = GENERAL_TIMEOUT) -> list:
+async def wait_all(
+    iterable: Iterable[Coroutine], timeout: int = GENERAL_TIMEOUT
+) -> list:
     """Shorthand for waiting for all the coroutines in the iterable given in parallel.
 
     Creates a task for each coroutine. Returns a list of results in the original order. If any single task
@@ -189,7 +193,9 @@ class AsyncException(Exception):
         return "\n".join(str(e) for e in self.exceptions)
 
 
-async def run_in_loop(coro: Coroutine, loop: asyncio.AbstractEventLoop, timeout: float = GENERAL_TIMEOUT) -> Any:
+async def run_in_loop(
+    coro: Coroutine, loop: asyncio.AbstractEventLoop, timeout: float = GENERAL_TIMEOUT
+) -> Any:
     """Run `coro` on `loop`, using thread handoff when switching event loops."""
     running_loop = asyncio.get_running_loop()
     if running_loop == loop:
@@ -197,7 +203,9 @@ async def run_in_loop(coro: Coroutine, loop: asyncio.AbstractEventLoop, timeout:
     return await call_sync_from_async(_run_in_loop, coro, loop, timeout)
 
 
-def _run_in_loop(coro: Coroutine, loop: asyncio.AbstractEventLoop, timeout: float) -> Any:
+def _run_in_loop(
+    coro: Coroutine, loop: asyncio.AbstractEventLoop, timeout: float
+) -> Any:
     """Run a coroutine in a specific event loop with timeout.
 
     Args:

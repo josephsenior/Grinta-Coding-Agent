@@ -49,7 +49,9 @@ class TelemetryService:
         middlewares.append(RollbackMiddleware())
         # Pre-execution diff preview (before logging/telemetry)
         middlewares.append(PreExecDiffMiddleware())
-        middlewares.extend([LoggingMiddleware(controller), TelemetryMiddleware(controller)])
+        middlewares.extend(
+            [LoggingMiddleware(controller), TelemetryMiddleware(controller)]
+        )
         # Result validation runs in the observe stage (after execution)
         middlewares.append(ToolResultValidator())
         context.initialize_tool_pipeline(middlewares)

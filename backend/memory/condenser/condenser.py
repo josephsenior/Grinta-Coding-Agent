@@ -97,7 +97,9 @@ class Condenser(ABC):
         during very long sessions with many condensation cycles.
         """
         if CONDENSER_METADATA_KEY not in state.extra_data:
-            state.set_extra(CONDENSER_METADATA_KEY, [], source="Condenser.write_metadata")
+            state.set_extra(
+                CONDENSER_METADATA_KEY, [], source="Condenser.write_metadata"
+            )
         if self._metadata_batch:
             state.extra_data[CONDENSER_METADATA_KEY].append(self._metadata_batch)
         # Evict oldest batches to bound memory
@@ -135,7 +137,9 @@ class Condenser(ABC):
     def condensed_history(self, state: State) -> View | Condensation:
         """Condense the state's history."""
         model_name = self.llm.config.model if hasattr(self, "llm") else "unknown"
-        self._llm_metadata = state.to_llm_metadata(model_name=model_name, agent_name="condenser")
+        self._llm_metadata = state.to_llm_metadata(
+            model_name=model_name, agent_name="condenser"
+        )
         with self.metadata_batch(state):
             return self.condense(state.view)
 
@@ -146,7 +150,9 @@ class Condenser(ABC):
         This metadata is used to provide context about the condensation process and can be used by the LLM to understand how the history was condensed.
         """
         if not self._llm_metadata:
-            logger.warning("LLM metadata is empty. Ensure to set it in the condenser implementation.")
+            logger.warning(
+                "LLM metadata is empty. Ensure to set it in the condenser implementation."
+            )
         return self._llm_metadata
 
     @classmethod
@@ -168,7 +174,9 @@ class Condenser(ABC):
         CONDENSER_REGISTRY[configuration_type] = cls
 
     @classmethod
-    def from_config(cls, config: CondenserConfig, llm_registry: LLMRegistry) -> Condenser:
+    def from_config(
+        cls, config: CondenserConfig, llm_registry: LLMRegistry
+    ) -> Condenser:
         """Create a condenser from a configuration object.
 
         Args:
@@ -285,7 +293,9 @@ class BaseLLMCondenser(RollingCondenser, ABC):
             # Ensure caching is disabled for condenser LLM to avoid overhead
             llm_config_obj = llm_config_obj.model_copy()
             llm_config_obj.caching_prompt = False
-            llm_instance = llm_registry.get_llm(service_id=service_id, config=llm_config_obj)
+            llm_instance = llm_registry.get_llm(
+                service_id=service_id, config=llm_config_obj
+            )
 
         condenser = cls(
             llm=llm_instance,
@@ -327,7 +337,9 @@ class BaseLLMCondenser(RollingCondenser, ABC):
         if hasattr(self, "llm") and self.llm:
             self.add_metadata("metrics", self.llm.metrics.get())
 
-    def _create_condensation_result(self, forgotten_events: list[Event], summary: str) -> Condensation:
+    def _create_condensation_result(
+        self, forgotten_events: list[Event], summary: str
+    ) -> Condensation:
         """Create a condensation result from forgotten events and a summary string."""
         return Condensation(
             action=CondensationAction(

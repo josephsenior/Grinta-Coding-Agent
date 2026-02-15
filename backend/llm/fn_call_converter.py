@@ -369,7 +369,9 @@ def convert_tools_to_description(tools: list[dict]) -> str:
                 if "enum" in param_info:
                     enum_values = ", ".join(f"`{v}`" for v in param_info["enum"])
                     desc += f"\nAllowed values: [{enum_values}]"
-                ret += f"  ({j + 1}) {param_name} ({param_type}, {param_status}): {desc}\n"
+                ret += (
+                    f"  ({j + 1}) {param_name} ({param_type}, {param_status}): {desc}\n"
+                )
         else:
             ret += "No parameters are required for this function.\n"
         ret += f"---- END FUNCTION #{i + 1} ----\n"
@@ -439,7 +441,9 @@ def convert_fncall_messages_to_non_fncall_messages(
     """Convert function calling messages to non-function calling messages."""
     messages = copy.deepcopy(messages)
     formatted_tools = convert_tools_to_description(tools)
-    system_prompt_suffix = SYSTEM_PROMPT_SUFFIX_TEMPLATE.format(description=formatted_tools)
+    system_prompt_suffix = SYSTEM_PROMPT_SUFFIX_TEMPLATE.format(
+        description=formatted_tools
+    )
     converted_messages: list[dict[str, Any]] = []
     first_user_message_encountered = False
     for message in messages:
@@ -484,7 +488,11 @@ def _convert_single_message(
 
 
 def _convert_assistant_message(content: Any) -> dict:
-    if isinstance(content, str) and "<function=" in content and ("</function>" in content):
+    if (
+        isinstance(content, str)
+        and "<function=" in content
+        and ("</function>" in content)
+    ):
         return {"role": "assistant", "content": content, "tool_calls": []}
     return {"role": "assistant", "content": content}
 
@@ -511,7 +519,9 @@ def _format_tool_content(content: Any, tool_name: str) -> list[dict]:
     return [{"type": "text", "text": f"{prefix}{str(content)}"}]
 
 
-def _extract_and_validate_params(matching_tool: dict, param_matches: Iterable[re.Match], fn_name: str) -> dict:
+def _extract_and_validate_params(
+    matching_tool: dict, param_matches: Iterable[re.Match], fn_name: str
+) -> dict:
     """Extract and validate parameters from function call matches."""
     # Extract parameter schema information
     param_schema = _extract_parameter_schema(matching_tool)
@@ -528,7 +538,9 @@ def _extract_and_validate_params(matching_tool: dict, param_matches: Iterable[re
         _validate_parameter_allowed(param_name, param_schema["allowed_params"], fn_name)
 
         # Convert parameter value based on type
-        converted_value = _convert_parameter_value(param_name, param_value, param_schema["param_name_to_type"])
+        converted_value = _convert_parameter_value(
+            param_name, param_value, param_schema["param_name_to_type"]
+        )
 
         # Validate enum constraints
         _validate_enum_constraint(param_name, converted_value, matching_tool, fn_name)
@@ -537,7 +549,9 @@ def _extract_and_validate_params(matching_tool: dict, param_matches: Iterable[re
         found_params.add(param_name)
 
     # Validate all required parameters are present
-    _validate_required_parameters(found_params, param_schema["required_params"], fn_name)
+    _validate_required_parameters(
+        found_params, param_schema["required_params"], fn_name
+    )
 
     return params
 
@@ -558,7 +572,10 @@ def _extract_parameter_schema(matching_tool: dict) -> dict:
         # Extract allowed parameters and types
         if "properties" in params_def:
             allowed_params = set(params_def["properties"].keys())
-            param_name_to_type = {name: val.get("type", "string") for name, val in params_def["properties"].items()}
+            param_name_to_type = {
+                name: val.get("type", "string")
+                for name, val in params_def["properties"].items()
+            }
 
     return {
         "required_params": required_params,
@@ -567,7 +584,9 @@ def _extract_parameter_schema(matching_tool: dict) -> dict:
     }
 
 
-def _validate_parameter_allowed(param_name: str, allowed_params: set, fn_name: str) -> None:
+def _validate_parameter_allowed(
+    param_name: str, allowed_params: set, fn_name: str
+) -> None:
     """Validate that parameter is allowed for the function."""
     if allowed_params and param_name not in allowed_params:
         msg = f"Parameter '{param_name}' is not allowed for function '{fn_name}'. Allowed parameters: {allowed_params}"
@@ -576,7 +595,9 @@ def _validate_parameter_allowed(param_name: str, allowed_params: set, fn_name: s
         )
 
 
-def _convert_parameter_value(param_name: str, param_value: str, param_name_to_type: dict) -> Any:
+def _convert_parameter_value(
+    param_name: str, param_value: str, param_name_to_type: dict
+) -> Any:
     """Convert parameter value based on its expected type."""
     if param_name not in param_name_to_type:
         return param_value
@@ -608,7 +629,9 @@ def _convert_to_array(param_name: str, param_value: str) -> list[Any]:
         raise FunctionCallValidationError(msg) from e
 
 
-def _validate_enum_constraint(param_name: str, param_value: Any, matching_tool: dict, fn_name: str) -> None:
+def _validate_enum_constraint(
+    param_name: str, param_value: Any, matching_tool: dict, fn_name: str
+) -> None:
     """Validate enum constraints for parameter."""
     if "parameters" not in matching_tool:
         return
@@ -626,7 +649,9 @@ def _validate_enum_constraint(param_name: str, param_value: Any, matching_tool: 
         raise FunctionCallValidationError(msg)
 
 
-def _validate_required_parameters(found_params: set, required_params: set, fn_name: str) -> None:
+def _validate_required_parameters(
+    found_params: set, required_params: set, fn_name: str
+) -> None:
     """Validate that all required parameters are present."""
     if missing_params := (required_params - found_params):
         msg = f"Missing required parameters for function '{fn_name}': {missing_params}"
@@ -720,7 +745,9 @@ def _remove_examples_from_list(content: list, tools: list[dict]) -> list:
             if item["text"].startswith(example_prefix):
                 item["text"] = item["text"].replace(example_prefix, "", 1)
             if item["text"].endswith(IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX):
-                item["text"] = item["text"].replace(IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX, "", 1)
+                item["text"] = item["text"].replace(
+                    IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX, "", 1
+                )
     return content
 
 
@@ -741,7 +768,11 @@ def _find_tool_result_match(content: Any) -> Any:
                 _match
                 for item in content
                 if item.get("type") == "text"
-                and (_match := re.search(TOOL_RESULT_REGEX_PATTERN, item["text"], re.DOTALL))
+                and (
+                    _match := re.search(
+                        TOOL_RESULT_REGEX_PATTERN, item["text"], re.DOTALL
+                    )
+                )
             ),
             None,
         )
@@ -790,7 +821,8 @@ def _find_tool_call_match(content: Any) -> Any:
             (
                 _match
                 for item in content
-                if item.get("type") == "text" and (_match := re.search(FN_REGEX_PATTERN, item["text"], re.DOTALL))
+                if item.get("type") == "text"
+                and (_match := re.search(FN_REGEX_PATTERN, item["text"], re.DOTALL))
             ),
             None,
         )
@@ -807,17 +839,25 @@ def _extract_tool_call_info(tool_call_match: Any) -> tuple[str, str]:
 def _find_matching_tool(fn_name: str, tools: list[dict]) -> dict:
     """Find matching tool for function name."""
     matching_tool = next(
-        (tool["function"] for tool in tools if tool["type"] == "function" and tool["function"]["name"] == fn_name),
+        (
+            tool["function"]
+            for tool in tools
+            if tool["type"] == "function" and tool["function"]["name"] == fn_name
+        ),
         None,
     )
     if not matching_tool:
-        available_tools = [tool["function"]["name"] for tool in tools if tool["type"] == "function"]
+        available_tools = [
+            tool["function"]["name"] for tool in tools if tool["type"] == "function"
+        ]
         msg = f"Function '{fn_name}' not found in available tools: {available_tools}"
         raise FunctionCallValidationError(msg)
     return matching_tool
 
 
-def _create_tool_call(fn_name: str, fn_body: str, matching_tool: dict, tool_call_counter: int) -> tuple[dict, int]:
+def _create_tool_call(
+    fn_name: str, fn_body: str, matching_tool: dict, tool_call_counter: int
+) -> tuple[dict, int]:
     """Create tool call object and increment counter."""
     param_matches = re.finditer(FN_PARAM_REGEX_PATTERN, fn_body, re.DOTALL)
     params = _extract_and_validate_params(matching_tool, param_matches, fn_name)
@@ -866,13 +906,17 @@ def _process_assistant_message_for_conversion(
         matching_tool = _find_matching_tool(fn_name, tools)
 
         # Create tool call
-        tool_call, tool_call_counter = _create_tool_call(fn_name, fn_body, matching_tool, tool_call_counter)
+        tool_call, tool_call_counter = _create_tool_call(
+            fn_name, fn_body, matching_tool, tool_call_counter
+        )
 
         # Trim content before function call
         content = _trim_content_before_function(content)
 
         # Add to converted messages
-        converted_messages.append({"role": "assistant", "content": content, "tool_calls": [tool_call]})
+        converted_messages.append(
+            {"role": "assistant", "content": content, "tool_calls": [tool_call]}
+        )
     else:
         # No tool call found, add as regular message
         converted_messages.append({"role": "assistant", "content": content})
@@ -887,7 +931,9 @@ def convert_non_fncall_messages_to_fncall_messages(
     """Convert non-function calling messages back to function calling messages."""
     messages = copy.deepcopy(messages)
     formatted_tools = convert_tools_to_description(tools)
-    system_prompt_suffix = SYSTEM_PROMPT_SUFFIX_TEMPLATE.format(description=formatted_tools)
+    system_prompt_suffix = SYSTEM_PROMPT_SUFFIX_TEMPLATE.format(
+        description=formatted_tools
+    )
     converted_messages: list[dict[str, Any]] = []
     tool_call_counter = 1
     for message in messages:
@@ -940,7 +986,9 @@ def convert_from_multiple_tool_calls_to_single_tool_call_messages(
         elif role == "tool":
             _process_tool_message(message, pending_tool_calls, converted_messages)
         else:
-            _process_other_message(message, pending_tool_calls, converted_messages, role)
+            _process_other_message(
+                message, pending_tool_calls, converted_messages, role
+            )
 
     if not ignore_final_tool_result and pending_tool_calls:
         msg = f"Found pending tool calls but no tool result: pending_tool_calls={pending_tool_calls!r}"
@@ -993,7 +1041,9 @@ def _process_tool_message(
         _tool_call_message = pending_tool_calls.pop(message["tool_call_id"])
         converted_messages.append(_tool_call_message)
     else:
-        assert not pending_tool_calls, f"Found pending tool calls but not found in pending list: {pending_tool_calls:=}"
+        assert not pending_tool_calls, (
+            f"Found pending tool calls but not found in pending list: {pending_tool_calls:=}"
+        )
 
     converted_messages.append(message)
 

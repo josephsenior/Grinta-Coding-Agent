@@ -100,30 +100,48 @@ class TaskComplexityAnalyzer:
         return min(score, 10.0)
 
     def _is_simple_task(self, message_lower: str) -> bool:
-        return any(re.search(pattern, message_lower) for pattern in self.SIMPLE_TASK_PATTERNS)
+        return any(
+            re.search(pattern, message_lower) for pattern in self.SIMPLE_TASK_PATTERNS
+        )
 
     def _action_word_score(self, message_lower: str) -> float:
-        action_count = sum(1 for action_word in self.ACTION_WORDS if re.search(rf"\b{action_word}\b", message_lower))
+        action_count = sum(
+            1
+            for action_word in self.ACTION_WORDS
+            if re.search(rf"\b{action_word}\b", message_lower)
+        )
         return min(action_count * 0.5, 3.0)
 
     def _complex_pattern_score(self, message_lower: str) -> float:
-        complex_patterns = sum(1 for pattern in self.COMPLEX_TASK_PATTERNS if re.search(pattern, message_lower))
+        complex_patterns = sum(
+            1
+            for pattern in self.COMPLEX_TASK_PATTERNS
+            if re.search(pattern, message_lower)
+        )
         return min(complex_patterns * 0.8, 4.0)
 
     def _conjunction_score(self, message_lower: str) -> float:
-        conjunctions = len(re.findall(r"\b(and|plus|also|additionally|with)\b", message_lower))
+        conjunctions = len(
+            re.findall(r"\b(and|plus|also|additionally|with)\b", message_lower)
+        )
         return min(conjunctions * 0.6, 3.0)
 
     def _file_mention_score(self, message_lower: str) -> float:
-        file_mentions = len(re.findall(r"\b(file|files|file\.|\.py|\.js|\.ts|\.json)\b", message_lower))
+        file_mentions = len(
+            re.findall(r"\b(file|files|file\.|\.py|\.js|\.ts|\.json)\b", message_lower)
+        )
         return min(file_mentions * 0.3, 2.0)
 
     def _history_complexity_score(self, state: State | None) -> float:
         if not state or not hasattr(state, "history"):
             return 0.0
-        recent_actions = [event for event in state.history[-10:] if hasattr(event, "action")]
+        recent_actions = [
+            event for event in state.history[-10:] if hasattr(event, "action")
+        ]
         file_edit_count = sum(
-            1 for event in recent_actions if getattr(event, "action", None) in ("edit", "write", "create")
+            1
+            for event in recent_actions
+            if getattr(event, "action", None) in ("edit", "write", "create")
         )
         return min(file_edit_count * 0.2, 1.5)
 
@@ -144,10 +162,16 @@ class TaskComplexityAnalyzer:
         threshold = float(self._threshold)
 
         if complexity >= threshold:
-            logger.info("📋 Task complexity %.1f >= %s - triggering automatic planning", complexity, threshold)
+            logger.info(
+                "📋 Task complexity %.1f >= %s - triggering automatic planning",
+                complexity,
+                threshold,
+            )
             return True
         else:
-            logger.debug("Task complexity %.1f < %s - skipping planning", complexity, threshold)
+            logger.debug(
+                "Task complexity %.1f < %s - skipping planning", complexity, threshold
+            )
             return False
 
     def estimate_iterations(self, complexity: float, state: State) -> int:

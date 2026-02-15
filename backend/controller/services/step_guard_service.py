@@ -49,7 +49,9 @@ class StepGuardService:
         )
         controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
-        target_state = AgentState.STOPPED if result.action == "stop" else AgentState.PAUSED
+        target_state = (
+            AgentState.STOPPED if result.action == "stop" else AgentState.PAUSED
+        )
         await controller.set_agent_state_to(target_state)
         return False
 
@@ -65,5 +67,7 @@ class StepGuardService:
         if cb_service:
             cb_service.record_stuck_detection()
 
-        await controller._react_to_exception(AgentStuckInLoopError("Agent got stuck in a loop"))
+        await controller._react_to_exception(
+            AgentStuckInLoopError("Agent got stuck in a loop")
+        )
         return False

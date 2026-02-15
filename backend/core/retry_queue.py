@@ -81,7 +81,9 @@ class BaseRetryBackend:
     async def mark_success(self, task: RetryTask) -> None:
         raise NotImplementedError
 
-    async def mark_failure(self, task: RetryTask, backoff_seconds: float) -> RetryTask | None:
+    async def mark_failure(
+        self, task: RetryTask, backoff_seconds: float
+    ) -> RetryTask | None:
         raise NotImplementedError
 
     async def dead_letter(self, task: RetryTask) -> None:
@@ -130,7 +132,9 @@ class InMemoryRetryBackend(BaseRetryBackend):
             self._tasks.pop(task.id, None)
         logger.debug("Retry task %s succeeded, removed from queue", task.id)
 
-    async def mark_failure(self, task: RetryTask, backoff_seconds: float) -> RetryTask | None:
+    async def mark_failure(
+        self, task: RetryTask, backoff_seconds: float
+    ) -> RetryTask | None:
         async with self._lock:
             task.last_error = task.reason
             if task.attempts >= task.max_attempts:
@@ -236,9 +240,13 @@ class RedisRetryBackend(BaseRetryBackend):
     async def mark_success(self, task: RetryTask) -> None:
         tasks_key = self._tasks_key(task.controller_id)
         await self._client.hdel(tasks_key, task.id)
-        logger.debug("Retry task %s acknowledged by controller %s", task.id, task.controller_id)
+        logger.debug(
+            "Retry task %s acknowledged by controller %s", task.id, task.controller_id
+        )
 
-    async def mark_failure(self, task: RetryTask, backoff_seconds: float) -> RetryTask | None:
+    async def mark_failure(
+        self, task: RetryTask, backoff_seconds: float
+    ) -> RetryTask | None:
         tasks_key = self._tasks_key(task.controller_id)
         schedule_key = self._schedule_key(task.controller_id)
         if task.attempts >= task.max_attempts:
@@ -326,7 +334,9 @@ class RetryQueue:
     async def mark_success(self, task: RetryTask) -> None:
         await self.backend.mark_success(task)
 
-    async def mark_failure(self, task: RetryTask, *, error_message: str) -> RetryTask | None:
+    async def mark_failure(
+        self, task: RetryTask, *, error_message: str
+    ) -> RetryTask | None:
         task.reason = error_message
         backoff_seconds = self._compute_backoff(task.attempts)
         return await self.backend.mark_failure(task, backoff_seconds)
@@ -354,7 +364,9 @@ def get_retry_queue() -> RetryQueue | None:
         return None
 
     # Prefer in-memory backend when running under pytest to avoid Redis noise
-    is_pytest = os.getenv("PYTEST_CURRENT_TEST") is not None or os.getenv("PYTEST_RUNNING", "").lower() in (
+    is_pytest = os.getenv("PYTEST_CURRENT_TEST") is not None or os.getenv(
+        "PYTEST_RUNNING", ""
+    ).lower() in (
         "1",
         "true",
         "yes",
@@ -372,7 +384,9 @@ def get_retry_queue() -> RetryQueue | None:
         pool_size = int(os.getenv("REDIS_POOL_SIZE", "10"))
         timeout = float(os.getenv("REDIS_TIMEOUT", "5.0"))
         try:
-            backend = RedisRetryBackend(redis_url, pool_size=pool_size, connection_timeout=timeout)
+            backend = RedisRetryBackend(
+                redis_url, pool_size=pool_size, connection_timeout=timeout
+            )
             logger.info("RetryQueue configured with Redis backend (%s)", redis_url)
         except Exception as exc:  # pragma: no cover - fallback path
             logger.warning(

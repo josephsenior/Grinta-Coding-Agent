@@ -21,7 +21,9 @@ class AgentFinishedCritic(BaseCritic):
     def __init__(self) -> None:
         """Initialize the finish critic with no external dependencies."""
 
-    def evaluate(self, events: list[Event], diff_patch: str | None = None) -> CriticResult:
+    def evaluate(
+        self, events: list[Event], diff_patch: str | None = None
+    ) -> CriticResult:
         """Score run success by checking PlaybookFinishAction and optional git patch content."""
         last_action = next((h for h in reversed(events) if isinstance(h, Action)), None)
         if diff_patch is not None and len(diff_patch.strip()) == 0:

@@ -254,10 +254,16 @@ class AlertManager(ExternalServiceBase):
         """
 
         def build_payload(parsed_endpoint: ParseResult) -> dict[str, Any]:
-            return self._build_payload(parsed_endpoint, policy_name, metric, value, threshold, message)
+            return self._build_payload(
+                parsed_endpoint, policy_name, metric, value, threshold, message
+            )
 
-        async def execute_request(session: aiohttp.ClientSession, payload: Any, headers: dict[str, str]) -> bool:
-            return await self._execute_alert_request(session, headers, payload, policy_name, metric, value)
+        async def execute_request(
+            session: aiohttp.ClientSession, payload: Any, headers: dict[str, str]
+        ) -> bool:
+            return await self._execute_alert_request(
+                session, headers, payload, policy_name, metric, value
+            )
 
         return await self._send_request(
             build_payload=build_payload,
@@ -276,7 +282,9 @@ class AlertManager(ExternalServiceBase):
     ) -> dict[str, Any]:
         host = parsed_endpoint.netloc.lower()
         if "pagerduty" in host:
-            return self._pagerduty_payload(policy_name, metric, value, threshold, message)
+            return self._pagerduty_payload(
+                policy_name, metric, value, threshold, message
+            )
         if "slack" in host:
             return self._slack_payload(policy_name, metric, value, threshold, message)
         return self._generic_payload(policy_name, metric, value, threshold, message)
@@ -289,7 +297,9 @@ class AlertManager(ExternalServiceBase):
         threshold: float,
         message: str | None,
     ) -> dict[str, Any]:
-        summary = message or f"{policy_name}: {metric} = {value} (threshold: {threshold})"
+        summary = (
+            message or f"{policy_name}: {metric} = {value} (threshold: {threshold})"
+        )
         return {
             "routing_key": self.api_key,
             "event_action": "trigger",
@@ -355,12 +365,19 @@ class AlertManager(ExternalServiceBase):
         value: float,
     ) -> bool:
         assert self.endpoint is not None  # for type checkers
-        async with session.post(self.endpoint, json=payload, headers=headers) as response:
+        async with session.post(
+            self.endpoint, json=payload, headers=headers
+        ) as response:
             if response.status in (200, 201):
                 logger.info("Alert sent: %s (%s = %s)", policy_name, metric, value)
                 return True
             error_text = await response.text()
-            logger.warning("Failed to send alert to %s: %s - %s", self.endpoint, response.status, error_text)
+            logger.warning(
+                "Failed to send alert to %s: %s - %s",
+                self.endpoint,
+                response.status,
+                error_text,
+            )
             return False
 
     async def shutdown(self) -> None:
@@ -410,7 +427,9 @@ def get_slo_tracker() -> SLOTracker:
     if _slo_tracker is None:
         _slo_tracker = SLOTracker(
             availability_target=float(os.getenv("SLO_AVAILABILITY_TARGET", "0.99")),
-            latency_p95_target_ms=float(os.getenv("SLO_LATENCY_P95_TARGET_MS", "1000.0")),
+            latency_p95_target_ms=float(
+                os.getenv("SLO_LATENCY_P95_TARGET_MS", "1000.0")
+            ),
             error_rate_target=float(os.getenv("SLO_ERROR_RATE_TARGET", "0.01")),
         )
         logger.info("SLO tracker initialized")

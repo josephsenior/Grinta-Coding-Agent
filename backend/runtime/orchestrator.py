@@ -46,7 +46,9 @@ class RuntimeOrchestrator:
         self._pool_policy_fingerprint: str | None = None
         self._default_pool_policy: WarmPoolPolicy | None = None
         self._key_pool_policies: dict[str, WarmPoolPolicy] = {}
-        self._pool_policy_snapshot: tuple[WarmPoolPolicy, dict[str, WarmPoolPolicy]] | None = None
+        self._pool_policy_snapshot: (
+            tuple[WarmPoolPolicy, dict[str, WarmPoolPolicy]] | None
+        ) = None
         self._last_idle_reclaim_totals: dict[str, int] = {}
         self._last_eviction_totals: dict[str, int] = {}
         self._saturated_keys: set[str] = set()
@@ -71,7 +73,9 @@ class RuntimeOrchestrator:
         pooled = self._pool.acquire(key)
         if pooled:
             self._telemetry.record_acquire(key, reused=True)
-            result = RuntimeAcquireResult(runtime=pooled.runtime, repo_directory=pooled.repo_directory)
+            result = RuntimeAcquireResult(
+                runtime=pooled.runtime, repo_directory=pooled.repo_directory
+            )
             runtime_watchdog.watch_runtime(
                 result.runtime,
                 key=key,
@@ -102,7 +106,9 @@ class RuntimeOrchestrator:
 
     def release(self, result: RuntimeAcquireResult, key: str | None = None) -> None:
         key = key or result.runtime.config.runtime  # type: ignore[attr-defined]
-        pooled = PooledRuntime(runtime=result.runtime, repo_directory=result.repo_directory)
+        pooled = PooledRuntime(
+            runtime=result.runtime, repo_directory=result.repo_directory
+        )
         self._pool.release(key, pooled)
         self._telemetry.record_release(key)
         runtime_watchdog.unwatch_runtime(result.runtime)
@@ -112,7 +118,9 @@ class RuntimeOrchestrator:
         return self._pool.stats()
 
     def _maybe_emit_scaling_signals(self) -> None:
-        pool_stats, idle_reclaims, evictions, watched_counts = self._collect_scaling_inputs()
+        pool_stats, idle_reclaims, evictions, watched_counts = (
+            self._collect_scaling_inputs()
+        )
         self._handle_idle_reclaim_spikes(idle_reclaims)
         self._handle_eviction_spikes(evictions)
         self._handle_watchdog_saturation(pool_stats, watched_counts)
@@ -164,7 +172,9 @@ class RuntimeOrchestrator:
             )
         self._last_eviction_totals[key] = total
 
-    def _prune_missing_keys(self, cache: dict[str, int], latest_stats: dict[str, int]) -> None:
+    def _prune_missing_keys(
+        self, cache: dict[str, int], latest_stats: dict[str, int]
+    ) -> None:
         for missing in set(cache) - set(latest_stats):
             cache.pop(missing, None)
 
@@ -174,7 +184,9 @@ class RuntimeOrchestrator:
             return None
         return self._key_pool_policies.get(key, self._default_pool_policy)
 
-    def _handle_watchdog_saturation(self, pool_stats: dict[str, int], watched_counts: dict[str, int]) -> None:
+    def _handle_watchdog_saturation(
+        self, pool_stats: dict[str, int], watched_counts: dict[str, int]
+    ) -> None:
         new_saturated: set[str] = set()
         for key, count in watched_counts.items():
             policy = self._policy_for_key(key)

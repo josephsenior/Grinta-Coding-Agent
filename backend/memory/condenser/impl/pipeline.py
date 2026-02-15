@@ -76,7 +76,9 @@ class CondenserPipeline(Condenser):
         return result
 
     @classmethod
-    def from_config(cls, config: CondenserPipelineConfig, llm_registry: LLMRegistry) -> CondenserPipeline:
+    def from_config(
+        cls, config: CondenserPipelineConfig, llm_registry: LLMRegistry
+    ) -> CondenserPipeline:
         """Build a pipeline from config-defined condenser specs."""
         condensers = [Condenser.from_config(c, llm_registry) for c in config.condensers]
         return CondenserPipeline(*condensers)

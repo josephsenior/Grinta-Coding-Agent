@@ -67,7 +67,9 @@ class CircuitBreaker:
         self.high_risk_action_count = 0
         self.stuck_detection_count = 0
         self.recent_errors: deque[str] = deque(maxlen=config.error_rate_window * 2)
-        self.recent_actions_success: deque[bool] = deque(maxlen=config.error_rate_window * 2)
+        self.recent_actions_success: deque[bool] = deque(
+            maxlen=config.error_rate_window * 2
+        )
 
         logger.info(
             "CircuitBreaker initialized: max_consecutive_errors=%s, "
@@ -208,7 +210,9 @@ class CircuitBreaker:
         # Look at recent history to update metrics
         recent_history = state.history[-20:]
 
-        error_count = sum(1 for event in recent_history if isinstance(event, ErrorObservation))
+        error_count = sum(
+            1 for event in recent_history if isinstance(event, ErrorObservation)
+        )
 
         # Update error tracking
         if error_count > len(self.recent_errors):
@@ -226,7 +230,9 @@ class CircuitBreaker:
             return 0.0
 
         # deque does not support slicing; materialise the tail via list()
-        recent_window = list(self.recent_actions_success)[-self.config.error_rate_window :]
+        recent_window = list(self.recent_actions_success)[
+            -self.config.error_rate_window :
+        ]
         errors = sum(1 for success in recent_window if not success)
 
         return errors / len(recent_window) if recent_window else 0.0

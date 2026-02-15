@@ -70,7 +70,9 @@ class RollbackMiddleware(ToolInvocationMiddleware):
             try:
                 runtime = ctx.controller.runtime
                 workspace = str(
-                    getattr(runtime, "workspace_dir", None) or getattr(runtime, "workspace_path", None) or ""
+                    getattr(runtime, "workspace_dir", None)
+                    or getattr(runtime, "workspace_path", None)
+                    or ""
                 )
             except Exception:
                 pass
@@ -88,9 +90,13 @@ class RollbackMiddleware(ToolInvocationMiddleware):
                 max_checkpoints=30,
                 auto_cleanup=True,
             )
-            logger.info("RollbackMiddleware: RollbackManager initialised at %s", workspace)
+            logger.info(
+                "RollbackMiddleware: RollbackManager initialised at %s", workspace
+            )
         except Exception:
-            logger.warning("RollbackMiddleware: failed to create RollbackManager", exc_info=True)
+            logger.warning(
+                "RollbackMiddleware: failed to create RollbackManager", exc_info=True
+            )
             self._enabled = False
 
         return self._manager
@@ -143,7 +149,9 @@ class RollbackMiddleware(ToolInvocationMiddleware):
 
         try:
             validator = getattr(ctx.controller, "safety_validator", None)
-            audit_logger = getattr(validator, "telemetry_logger", None) if validator else None
+            audit_logger = (
+                getattr(validator, "telemetry_logger", None) if validator else None
+            )
             if audit_logger is None:
                 return
             session_id = getattr(ctx.controller, "id", "unknown")
@@ -153,7 +161,9 @@ class RollbackMiddleware(ToolInvocationMiddleware):
                 filesystem_snapshot_id=checkpoint_id,
                 rollback_available=True,
             )
-            logger.debug("Audit entry %s updated with checkpoint %s", audit_id, checkpoint_id)
+            logger.debug(
+                "Audit entry %s updated with checkpoint %s", audit_id, checkpoint_id
+            )
         except Exception:
             logger.debug("Failed to update audit entry with snapshot", exc_info=True)
 

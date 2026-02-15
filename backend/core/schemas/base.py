@@ -15,8 +15,12 @@ class EventMetadata(BaseModel):
 
     event_id: int | None = Field(None, description="Unique event identifier")
     sequence: int | None = Field(None, description="Event sequence number for ordering")
-    timestamp: datetime | None = Field(None, description="Event timestamp in ISO format")
-    source: EventSource | None = Field(None, description="Event source (AGENT, USER, ENVIRONMENT)")
+    timestamp: datetime | None = Field(
+        None, description="Event timestamp in ISO format"
+    )
+    source: EventSource | None = Field(
+        None, description="Event source (AGENT, USER, ENVIRONMENT)"
+    )
     cause: int | None = Field(None, description="ID of event that caused this event")
     hidden: bool = Field(False, description="Whether this event is hidden from the UI")
     timeout: float | None = Field(None, description="Timeout value in seconds")
@@ -37,8 +41,12 @@ def _create_default_event_metadata() -> EventMetadata:
 class BaseEventSchema(BaseModel):
     """Base schema for all Forge events with versioning support."""
 
-    schema_version: EventVersion = Field(EventVersion.V1, description="Schema version for this event")
-    metadata: EventMetadata = Field(default_factory=_create_default_event_metadata, description="Event metadata")
+    schema_version: EventVersion = Field(
+        EventVersion.V1, description="Schema version for this event"
+    )
+    metadata: EventMetadata = Field(
+        default_factory=_create_default_event_metadata, description="Event metadata"
+    )
 
     model_config = ConfigDict(
         use_enum_values=True,

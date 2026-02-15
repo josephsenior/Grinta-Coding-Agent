@@ -3,7 +3,9 @@
 from types import ModuleType
 
 
-def import_functions(module: ModuleType, function_names: list[str], target_globals: dict[str, object]) -> None:
+def import_functions(
+    module: ModuleType, function_names: list[str], target_globals: dict[str, object]
+) -> None:
     """Import specified functions from a module into target globals namespace.
 
     Args:

@@ -20,10 +20,18 @@ class SafetyConfig(BaseModel):
     )
     environment: str = "production"
     enable_mandatory_validation: bool = True
-    block_in_production: bool = Field(default=True, description="Block high-risk actions in production")
-    require_review_for_high_risk: bool = Field(default=False, description="Require review for high-risk actions")
-    enable_risk_alerts: bool = Field(default=False, description="Enable risk alert notifications")
-    alert_webhook_url: str | None = Field(default=None, description="Webhook URL for risk alerts")
+    block_in_production: bool = Field(
+        default=True, description="Block high-risk actions in production"
+    )
+    require_review_for_high_risk: bool = Field(
+        default=False, description="Require review for high-risk actions"
+    )
+    enable_risk_alerts: bool = Field(
+        default=False, description="Enable risk alert notifications"
+    )
+    alert_webhook_url: str | None = Field(
+        default=None, description="Webhook URL for risk alerts"
+    )
 
     @field_validator("audit_log_path")
     @classmethod
@@ -37,7 +45,9 @@ class SafetyConfig(BaseModel):
             or str(resolved).startswith("/tmp")
             or str(resolved).startswith("C:\\Users")
         ):
-            raise ValueError(f"audit_log_path must be relative or under the working directory, got: {v}")
+            raise ValueError(
+                f"audit_log_path must be relative or under the working directory, got: {v}"
+            )
         return v
 
 

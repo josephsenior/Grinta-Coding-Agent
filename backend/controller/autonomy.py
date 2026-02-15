@@ -47,7 +47,9 @@ class AutonomyController:
             config: Agent configuration containing autonomy settings
 
         """
-        self.autonomy_level = getattr(config, "autonomy_level", AutonomyLevel.BALANCED.value)
+        self.autonomy_level = getattr(
+            config, "autonomy_level", AutonomyLevel.BALANCED.value
+        )
         self.auto_retry = getattr(config, "auto_retry_on_error", False)
         self.max_iterations = getattr(config, "max_autonomous_iterations", 0)
         self.stuck_detection = getattr(config, "stuck_detection_enabled", False)

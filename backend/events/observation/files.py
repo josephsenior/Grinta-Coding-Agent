@@ -101,26 +101,38 @@ class FileEditObservation(Observation):
             line_num = j1 + idx + 1
             cur_group["after_edits"].append(f"{line_num:>{indent_pad_size}}|{line}")
 
-    def _add_deleted_lines(self, cur_group: dict, old_lines: list, i1: int, i2: int, indent_pad_size: int) -> None:
+    def _add_deleted_lines(
+        self, cur_group: dict, old_lines: list, i1: int, i2: int, indent_pad_size: int
+    ) -> None:
         """Add deleted lines to before_edits."""
         for idx, line in enumerate(old_lines[i1:i2]):
             line_num = i1 + idx + 1
-            cur_group["before_edits"].append(f"-{line_num:>{indent_pad_size - 1}}|{line}")
+            cur_group["before_edits"].append(
+                f"-{line_num:>{indent_pad_size - 1}}|{line}"
+            )
 
-    def _add_inserted_lines(self, cur_group: dict, new_lines: list, j1: int, j2: int, indent_pad_size: int) -> None:
+    def _add_inserted_lines(
+        self, cur_group: dict, new_lines: list, j1: int, j2: int, indent_pad_size: int
+    ) -> None:
         """Add inserted lines to after_edits."""
         for idx, line in enumerate(new_lines[j1:j2]):
             line_num = j1 + idx + 1
-            cur_group["after_edits"].append(f"+{line_num:>{indent_pad_size - 1}}|{line}")
+            cur_group["after_edits"].append(
+                f"+{line_num:>{indent_pad_size - 1}}|{line}"
+            )
 
-    def _process_opcode_group(self, group: list, old_lines: list, new_lines: list) -> dict[str, list[str]]:
+    def _process_opcode_group(
+        self, group: list, old_lines: list, new_lines: list
+    ) -> dict[str, list[str]]:
         """Process a single opcode group and return the edit group."""
         indent_pad_size = self._calculate_indent_pad_size(group)
         cur_group: dict[str, list[str]] = {"before_edits": [], "after_edits": []}
 
         for tag, i1, i2, j1, j2 in group:
             if tag == "equal":
-                self._add_equal_lines(cur_group, old_lines, new_lines, i1, i2, j1, j2, indent_pad_size)
+                self._add_equal_lines(
+                    cur_group, old_lines, new_lines, i1, i2, j1, j2, indent_pad_size
+                )
             elif tag in {"replace", "delete"}:
                 self._add_deleted_lines(cur_group, old_lines, i1, i2, indent_pad_size)
             if tag in {"replace", "insert"}:
@@ -145,13 +157,17 @@ class FileEditObservation(Observation):
         new_lines = self.new_content.split("\n")
         edit_groups: list[dict] = []
 
-        for group in SequenceMatcher(None, old_lines, new_lines).get_grouped_opcodes(n_context_lines):
+        for group in SequenceMatcher(None, old_lines, new_lines).get_grouped_opcodes(
+            n_context_lines
+        ):
             cur_group = self._process_opcode_group(group, old_lines, new_lines)
             edit_groups.append(cur_group)
 
         return edit_groups
 
-    def visualize_diff(self, n_context_lines: int = 2, change_applied: bool = True) -> str:
+    def visualize_diff(
+        self, n_context_lines: int = 2, change_applied: bool = True
+    ) -> str:
         """Visualize the diff of the file edit. Used in the LLM-based editing mode.
 
         Instead of showing the diff line by line, this function shows each hunk
@@ -169,7 +185,10 @@ class FileEditObservation(Observation):
         if self._diff_cache is not None:
             return self._diff_cache
         if change_applied and self.old_content == self.new_content:
-            msg = "(no changes detected. Please make sure your edits change " + "the content of the existing file.)\n"
+            msg = (
+                "(no changes detected. Please make sure your edits change "
+                + "the content of the existing file.)\n"
+            )
             self._diff_cache = msg
             return self._diff_cache
         edit_groups = self.get_edit_groups(n_context_lines=n_context_lines)
@@ -202,7 +221,9 @@ class FileEditObservation(Observation):
         if self.impl_source == FileEditSource.FILE_EDITOR:
             return self.content
         if not self.prev_exist:
-            assert self.old_content == "", "old_content should be empty if the file is new (prev_exist=False)."
+            assert self.old_content == "", (
+                "old_content should be empty if the file is new (prev_exist=False)."
+            )
             return f"[New file {self.path} is created with the provided content.]\n"
         return self.visualize_diff().rstrip() + "\n"
 

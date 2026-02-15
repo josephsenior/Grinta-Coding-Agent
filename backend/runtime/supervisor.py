@@ -34,7 +34,9 @@ class RuntimeSupervisor:
             return
 
         try:
-            await asyncio.wait_for(connect_coro(), timeout=self._config.connect_timeout_s)
+            await asyncio.wait_for(
+                connect_coro(), timeout=self._config.connect_timeout_s
+            )
         except TimeoutError:
             logger.warning(
                 "Runtime connect timed out after %.1fs for sid=%s",

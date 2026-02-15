@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import FORGE_logger as logger
 from backend.events.action.message import MessageAction
@@ -22,15 +22,16 @@ from backend.server.shared import (
     config,
     get_conversation_manager,
 )
-from backend.server.store_factory import get_conversation_store_instance, get_settings_store_instance
+from backend.server.store_factory import (
+    get_conversation_store_instance,
+    get_settings_store_instance,
+)
 from backend.server.types import MissingSettingsError
 from backend.storage.data_models.conversation_metadata import (
     ConversationMetadata,
     ConversationTrigger,
 )
 from backend.utils.conversation_summary import get_default_conversation_title
-from backend.storage.conversation.conversation_store import ConversationStore
-from backend.storage.settings.settings_store import SettingsStore
 
 if TYPE_CHECKING:
     from backend.core.config.mcp_config import MCPConfig
@@ -63,7 +64,9 @@ async def initialize_conversation(
     """
     if conversation_id is None:
         conversation_id = uuid.uuid4().hex
-    conversation_store = await get_conversation_store_instance(ConversationStoreImpl, config, user_id)
+    conversation_store = await get_conversation_store_instance(
+        ConversationStoreImpl, config, user_id
+    )
     if not await conversation_store.exists(conversation_id):
         logger.info(
             "New conversation ID: %s",
@@ -86,7 +89,9 @@ async def initialize_conversation(
     try:
         return await conversation_store.get_metadata(conversation_id)
     except Exception as e:
-        logger.warning("Failed to get conversation metadata for %s: %s", conversation_id, e)
+        logger.warning(
+            "Failed to get conversation metadata for %s: %s", conversation_id, e
+        )
     return None
 
 
@@ -210,7 +215,9 @@ def _build_session_init_args(
     session_init_args: dict[str, Any] = {**settings.__dict__}
 
     # Add provider tokens and secrets
-    session_init_args["vcs_provider_tokens"] = _process_git_provider_tokens(vcs_provider_tokens)
+    session_init_args["vcs_provider_tokens"] = _process_git_provider_tokens(
+        vcs_provider_tokens
+    )
     session_init_args["custom_secrets"] = _process_custom_secrets(custom_secrets)
 
     # Add conversation metadata
@@ -294,7 +301,9 @@ async def start_conversation(
 
     # Load and validate settings
     logger.info("Loading settings")
-    settings_store = await get_settings_store_instance(SettingsStoreImpl, config, user_id)
+    settings_store = await get_settings_store_instance(
+        SettingsStoreImpl, config, user_id
+    )
     settings = await settings_store.load()
     logger.info("Settings loaded")
 
@@ -322,7 +331,9 @@ async def start_conversation(
         extra={"user_id": user_id, "session_id": conversation_id},
     )
 
-    initial_message_action = _create_initial_message_action(initial_user_msg, image_urls)
+    initial_message_action = _create_initial_message_action(
+        initial_user_msg, image_urls
+    )
 
     manager = get_conversation_manager()
     if manager is None:
@@ -335,7 +346,9 @@ async def start_conversation(
         replay_json=replay_json,
     )
 
-    logger.info("Finished initializing conversation %s", agent_loop_info.conversation_id)
+    logger.info(
+        "Finished initializing conversation %s", agent_loop_info.conversation_id
+    )
     return agent_loop_info
 
 
@@ -436,12 +449,16 @@ async def setup_init_conversation_settings(
         MissingSettingsError: If user settings cannot be loaded.
         RuntimeError: If conversation metadata is unavailable.
     """
-    conversation_store = await get_conversation_store_instance(ConversationStoreImpl, config, user_id)
+    conversation_store = await get_conversation_store_instance(
+        ConversationStoreImpl, config, user_id
+    )
     conversation_metadata = await conversation_store.get_metadata(conversation_id)
     if not conversation_metadata:
         raise RuntimeError(f"Conversation metadata not found for {conversation_id}")
 
-    settings_store = await get_settings_store_instance(SettingsStoreImpl, config, user_id)
+    settings_store = await get_settings_store_instance(
+        SettingsStoreImpl, config, user_id
+    )
     settings = await settings_store.load()
 
     # If no user settings exist, try to load from config.toml
@@ -460,14 +477,20 @@ async def setup_init_conversation_settings(
             logger.error("Failed to load settings from config: %s", e)
 
     if settings is None:
-        raise MissingSettingsError("Settings not found (neither user settings nor config.toml)")
+        raise MissingSettingsError(
+            "Settings not found (neither user settings nor config.toml)"
+        )
 
     # Validate API key for the selected model
     # API key validation is handled by LLMConfig validation
     # No need for separate validation function
 
-    normalized_tokens = _get_normalized_provider_tokens(provider_tokens, settings.secrets_store.provider_tokens)
-    normalized_tokens = _ensure_provider_tokens_for_providers(normalized_tokens, providers_set, user_id)
+    normalized_tokens = _get_normalized_provider_tokens(
+        provider_tokens, settings.secrets_store.provider_tokens
+    )
+    normalized_tokens = _ensure_provider_tokens_for_providers(
+        normalized_tokens, providers_set, user_id
+    )
 
     session_init_args = _build_session_init_args(
         settings,

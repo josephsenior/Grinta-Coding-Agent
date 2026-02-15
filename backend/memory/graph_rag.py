@@ -102,7 +102,9 @@ class GraphRAG:
                     self.graph_store.add_node(imported_module, NodeType.FILE)
                     from backend.memory.graph_store import EdgeType
 
-                    self.graph_store.add_edge(file_path, imported_module, EdgeType.IMPORTS)
+                    self.graph_store.add_edge(
+                        file_path, imported_module, EdgeType.IMPORTS
+                    )
 
     def format_context(self, retrieval_result: dict) -> str:
         """Format retrieval results into a prompt-friendly string."""

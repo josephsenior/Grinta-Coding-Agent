@@ -11,7 +11,9 @@ from backend.engines.orchestrator.tools.common import (
 from backend.llm.tool_names import BROWSER_TOOL_NAME
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
 
-_browser_action_space = HighLevelActionSet(subsets=["bid", "nav"], strict=False, multiaction=True)
+_browser_action_space = HighLevelActionSet(
+    subsets=["bid", "nav"], strict=False, multiaction=True
+)
 _BROWSER_DESCRIPTION = (
     "Interact with the browser using Python code. Use it ONLY when you need to interact with a webpage.\n\n"
     'See the description of "code" parameter for more details.\n\n'
@@ -166,7 +168,8 @@ def create_browser_tool() -> ChatCompletionToolParam:
         properties={
             "code": {
                 "type": "string",
-                "description": "The Python code that interacts with the browser.\n" + _BROWSER_TOOL_DESCRIPTION,
+                "description": "The Python code that interacts with the browser.\n"
+                + _BROWSER_TOOL_DESCRIPTION,
             },
             "security_risk": get_security_risk_param(),
         },

@@ -38,7 +38,10 @@ def main():
 
         has_import = import_pattern in content
         has_include = include_pattern in content
-        has_tags = tags_pattern in content or f'tags=["v1", "{endpoint.replace("_", "-")}"]' in content
+        has_tags = (
+            tags_pattern in content
+            or f'tags=["v1", "{endpoint.replace("_", "-")}"]' in content
+        )
 
         if has_import and has_include and has_tags:
             print(f"[OK] {endpoint}: Properly registered with v1 tags")

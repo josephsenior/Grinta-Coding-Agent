@@ -81,7 +81,9 @@ class QueryCache:
 class ReRanker:
     """Cross-encoder re-ranker for improved accuracy."""
 
-    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2") -> None:
+    def __init__(
+        self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    ) -> None:
         """Configure the reranker with the chosen cross-encoder model name."""
         self.model_name = model_name
         self._model: Any | None = None
@@ -96,13 +98,17 @@ class ReRanker:
                 logger.info("Loading re-ranker model: %s", self.model_name)
                 self._model = CrossEncoder(self.model_name)
             except ImportError:
-                logger.warning("sentence-transformers not available, re-ranking disabled")
+                logger.warning(
+                    "sentence-transformers not available, re-ranking disabled"
+                )
                 self.enabled = False
             except Exception as e:
                 logger.warning("Failed to load re-ranker: %s", e)
                 self.enabled = False
 
-    def rerank(self, query: str, candidates: list[dict[str, Any]], top_k: int = 5) -> list[dict[str, Any]]:
+    def rerank(
+        self, query: str, candidates: list[dict[str, Any]], top_k: int = 5
+    ) -> list[dict[str, Any]]:
         """Re-rank candidates using cross-encoder.
 
         Args:
@@ -122,7 +128,10 @@ class ReRanker:
             return candidates[:top_k]
 
         # Prepare pairs for cross-encoder
-        pairs = [(query, candidate.get("excerpt", "") or candidate.get("rationale", "")) for candidate in candidates]
+        pairs = [
+            (query, candidate.get("excerpt", "") or candidate.get("rationale", ""))
+            for candidate in candidates
+        ]
 
         # Get scores from cross-encoder
         try:
@@ -183,7 +192,9 @@ class EnhancedVectorStore:
         self.backend: ChromaDBBackend = ChromaDBBackend(collection_name)
 
         # Initialize cache
-        self.cache: QueryCache | None = QueryCache(max_size=cache_size, ttl=cache_ttl) if enable_cache else None
+        self.cache: QueryCache | None = (
+            QueryCache(max_size=cache_size, ttl=cache_ttl) if enable_cache else None
+        )
 
         # Initialize re-ranker
         self.reranker: ReRanker | None = ReRanker() if enable_reranking else None
@@ -218,7 +229,9 @@ class EnhancedVectorStore:
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Add a document to the vector store."""
-        return self.backend.add(step_id, role, artifact_hash, rationale, content_text, metadata)
+        return self.backend.add(
+            step_id, role, artifact_hash, rationale, content_text, metadata
+        )
 
     async def async_add(
         self,
@@ -233,7 +246,9 @@ class EnhancedVectorStore:
 
         Offloads potentially CPU and I/O heavy operations to a worker thread.
         """
-        await asyncio.to_thread(self.add, step_id, role, artifact_hash, rationale, content_text, metadata)
+        await asyncio.to_thread(
+            self.add, step_id, role, artifact_hash, rationale, content_text, metadata
+        )
 
     def search(
         self,
@@ -266,7 +281,9 @@ class EnhancedVectorStore:
             cached_results = self.cache.get(query)
             if cached_results is not None:
                 # Apply k and filter if needed
-                filtered_results = self._apply_filters(cached_results, k, filter_metadata)
+                filtered_results = self._apply_filters(
+                    cached_results, k, filter_metadata
+                )
                 elapsed_ms = (time.time() - start_time) * 1000
                 logger.debug("Cache hit! Returned in %.1fms", elapsed_ms)
                 return filtered_results
@@ -278,7 +295,9 @@ class EnhancedVectorStore:
         elif not isinstance(initial_k_raw, int):
             initial_k_raw = int(initial_k_raw)
         initial_k = max(initial_k_raw, k * 2)
-        candidates = self.backend.search(query, k=initial_k, filter_metadata=filter_metadata)
+        candidates = self.backend.search(
+            query, k=initial_k, filter_metadata=filter_metadata
+        )
 
         if not candidates:
             return []
@@ -403,7 +422,11 @@ class EnhancedVectorStore:
 
         """
         if filter_metadata:
-            filtered = [r for r in results if all(r.get(key) == value for key, value in filter_metadata.items())]
+            filtered = [
+                r
+                for r in results
+                if all(r.get(key) == value for key, value in filter_metadata.items())
+            ]
             return filtered[:k]
         return results[:k]
 

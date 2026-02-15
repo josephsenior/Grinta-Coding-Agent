@@ -19,7 +19,7 @@ from backend.server.user_auth import get_user_settings_store
 if TYPE_CHECKING:
     pass
 
-router = APIRouter(prefix="/api/memory")
+router = APIRouter(prefix="/api/v1/memory")
 
 
 class MemoryCategory(str, Enum):
@@ -50,9 +50,13 @@ class MemoryImportance(str, Enum):
 class MemoryModel(BaseModel):
     """Memory data model."""
 
-    id: str = Field(default_factory=lambda: uuid4().hex, description="Unique memory identifier")
+    id: str = Field(
+        default_factory=lambda: uuid4().hex, description="Unique memory identifier"
+    )
     title: str = Field(..., min_length=1, max_length=200, description="Memory title")
-    content: str = Field(..., min_length=1, max_length=5000, description="Memory content")
+    content: str = Field(
+        ..., min_length=1, max_length=5000, description="Memory content"
+    )
     category: MemoryCategory = Field(..., description="Memory category")
     tags: list[str] = Field(default_factory=list, description="Memory tags")
     created_at: str = Field(
@@ -63,11 +67,17 @@ class MemoryModel(BaseModel):
         default_factory=lambda: datetime.now().isoformat(),
         description="Last update timestamp",
     )
-    usage_count: int = Field(default=0, ge=0, description="Number of times memory was used")
+    usage_count: int = Field(
+        default=0, ge=0, description="Number of times memory was used"
+    )
     last_used: str | None = Field(None, description="Last usage timestamp")
-    source: MemorySource = Field(default=MemorySource.MANUAL, description="Memory source")
+    source: MemorySource = Field(
+        default=MemorySource.MANUAL, description="Memory source"
+    )
     conversation_id: str | None = Field(None, description="Associated conversation ID")
-    importance: MemoryImportance = Field(default=MemoryImportance.MEDIUM, description="Memory importance level")
+    importance: MemoryImportance = Field(
+        default=MemoryImportance.MEDIUM, description="Memory importance level"
+    )
 
     @field_validator("title", "content")
     @classmethod
@@ -82,10 +92,14 @@ class CreateMemoryRequest(BaseModel):
     """Request to create a new memory."""
 
     title: str = Field(..., min_length=1, max_length=200, description="Memory title")
-    content: str = Field(..., min_length=1, max_length=5000, description="Memory content")
+    content: str = Field(
+        ..., min_length=1, max_length=5000, description="Memory content"
+    )
     category: MemoryCategory = Field(..., description="Memory category")
     tags: list[str] = Field(default_factory=list, description="Memory tags")
-    importance: MemoryImportance = Field(default=MemoryImportance.MEDIUM, description="Memory importance level")
+    importance: MemoryImportance = Field(
+        default=MemoryImportance.MEDIUM, description="Memory importance level"
+    )
     conversation_id: str | None = Field(None, description="Associated conversation ID")
 
     @field_validator("title", "content")
@@ -113,8 +127,12 @@ class SearchMemoriesRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Search query string")
     category: MemoryCategory | None = Field(None, description="Filter by category")
     tags: list[str] | None = Field(None, description="Filter by tags")
-    min_usage_count: int | None = Field(None, ge=0, description="Minimum usage count filter")
-    importance: MemoryImportance | None = Field(None, description="Filter by importance level")
+    min_usage_count: int | None = Field(
+        None, ge=0, description="Minimum usage count filter"
+    )
+    importance: MemoryImportance | None = Field(
+        None, description="Filter by importance level"
+    )
 
     @field_validator("query")
     @classmethod
@@ -348,19 +366,23 @@ async def get_memory_stats(
     memories = settings.MEMORIES
 
     by_category = {
-        category.value: sum(bool(m.get("category") == category.value) for m in memories) for category in MemoryCategory
+        category.value: sum(bool(m.get("category") == category.value) for m in memories)
+        for category in MemoryCategory
     }
     # Used today
     today = datetime.now().date()
     used_today = sum(
         bool(
-            m.get("last_used") and datetime.fromisoformat(m["last_used"]).date() == today,
+            m.get("last_used")
+            and datetime.fromisoformat(m["last_used"]).date() == today,
         )
         for m in memories
     )
 
     # Most used
-    most_used = sorted(memories, key=lambda m: m.get("usage_count", 0), reverse=True)[:5]
+    most_used = sorted(memories, key=lambda m: m.get("usage_count", 0), reverse=True)[
+        :5
+    ]
 
     # Recently used
     recently_used = sorted(
@@ -525,7 +547,9 @@ async def update_memory(
     return {"status": "success"}
 
 
-def _find_and_update_memory(memories: list[dict], memory_id: str, updates: UpdateMemoryRequest) -> dict:
+def _find_and_update_memory(
+    memories: list[dict], memory_id: str, updates: UpdateMemoryRequest
+) -> dict:
     """Find memory by ID and apply updates.
 
     Args:

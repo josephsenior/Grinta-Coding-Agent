@@ -66,7 +66,9 @@ def get_dependencies() -> list[DependsParam]:
 
 def _check_header_auth(session_api_key: str | None, expected_key: str) -> bool:
     """Check authentication via X-Session-API-Key header."""
-    return bool(session_api_key and secrets.compare_digest(session_api_key, expected_key))
+    return bool(
+        session_api_key and secrets.compare_digest(session_api_key, expected_key)
+    )
 
 
 def _check_bearer_auth(request: Request | None, expected_key: str) -> bool:

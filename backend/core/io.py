@@ -16,7 +16,9 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def print_json_stdout(obj: Any, *, pretty: bool = False, ensure_ascii: bool = False) -> None:
+def print_json_stdout(
+    obj: Any, *, pretty: bool = False, ensure_ascii: bool = False
+) -> None:
     """Serialize `obj` to JSON and write to stdout.
 
     This helper centralizes JSON formatting and flushing behavior. It logs a
@@ -41,7 +43,9 @@ def format_json(obj: Any, *, pretty: bool = False, ensure_ascii: bool = False) -
     try:
         if pretty:
             return json.dumps(obj, indent=2, ensure_ascii=ensure_ascii, default=str)
-        return json.dumps(obj, separators=(",", ":"), ensure_ascii=ensure_ascii, default=str)
+        return json.dumps(
+            obj, separators=(",", ":"), ensure_ascii=ensure_ascii, default=str
+        )
     except Exception:
         logger.exception("Failed to serialize object to JSON")
         return repr(obj)

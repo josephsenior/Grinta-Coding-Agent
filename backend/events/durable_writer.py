@@ -39,7 +39,9 @@ class DurableEventWriter:
         put_timeout: float = 2.0,
     ) -> None:
         self._file_store = file_store
-        self._queue: queue.Queue[PersistedEvent | None] = queue.Queue(maxsize=max_queue_size)
+        self._queue: queue.Queue[PersistedEvent | None] = queue.Queue(
+            maxsize=max_queue_size
+        )
         self._thread: threading.Thread | None = None
         self._stop_flag = threading.Event()
         self._drops = 0
@@ -50,7 +52,9 @@ class DurableEventWriter:
         if self._thread and self._thread.is_alive():
             return
         self._stop_flag.clear()
-        self._thread = threading.Thread(target=self._run, name="forge-event-writer", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name="forge-event-writer", daemon=True
+        )
         self._thread.start()
 
     def stop(self, timeout: float = 2.0) -> None:
@@ -116,7 +120,9 @@ class DurableEventWriter:
                 break
             try:
                 self._flush_with_retry(item)
-            except Exception as exc:  # pragma: no cover - persistence must not crash thread
+            except (
+                Exception
+            ) as exc:  # pragma: no cover - persistence must not crash thread
                 self._errors += 1
                 logger.error(
                     "Permanently failed to persist event id=%s filename=%s after %d retries: %s",
@@ -156,9 +162,14 @@ class DurableEventWriter:
     def _flush_event(self, persisted_event: PersistedEvent) -> None:
         serialized = json.dumps(persisted_event.payload)
         self._file_store.write(persisted_event.filename, serialized)
-        if persisted_event.cache_filename and persisted_event.cache_contents is not None:
+        if (
+            persisted_event.cache_filename
+            and persisted_event.cache_contents is not None
+        ):
             try:
-                self._file_store.write(persisted_event.cache_filename, persisted_event.cache_contents)
+                self._file_store.write(
+                    persisted_event.cache_filename, persisted_event.cache_contents
+                )
             except Exception as exc:  # pragma: no cover - cache best effort
                 logger.debug(
                     "Cache page write failed for event %s: %s",

@@ -66,7 +66,9 @@ async def _get_components_list(call_tool_func) -> list[str]:
     return components
 
 
-def _score_and_filter_components(components: Sequence[Any], query: str, fuzzy: bool) -> list[tuple[float, str]]:
+def _score_and_filter_components(
+    components: Sequence[Any], query: str, fuzzy: bool
+) -> list[tuple[float, str]]:
     """Score components based on query and filter by threshold."""
     query_l = query.lower()
     scored: list[tuple[float, str]] = []
@@ -115,7 +117,9 @@ async def search_components(mcps, args: dict[str, Any], call_tool_func) -> dict:
     # Build response
     top = [n for _, n in scored[:limit]]
     payload = {"query": query, "results": top, "total_matches": len(scored)}
-    return {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}]}
+    return {
+        "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}]
+    }
 
 
 WRAPPER_TOOL_REGISTRY: dict[str, Callable] = {

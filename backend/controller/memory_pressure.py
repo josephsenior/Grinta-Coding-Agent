@@ -52,7 +52,9 @@ class MemoryPressureMonitor:
     ) -> None:
         self._warn_mb = warn_mb or int(os.getenv("FORGE_MEM_WARN_MB", "768"))
         self._crit_mb = crit_mb or int(os.getenv("FORGE_MEM_CRIT_MB", "1536"))
-        self._check_interval = check_interval_s or float(os.getenv("FORGE_MEM_CHECK_INTERVAL", "10"))
+        self._check_interval = check_interval_s or float(
+            os.getenv("FORGE_MEM_CHECK_INTERVAL", "10")
+        )
         self._last_check: float = 0.0
         self._last_rss_mb: float = 0.0
         self._condensation_count: int = 0

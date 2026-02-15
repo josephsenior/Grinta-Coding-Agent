@@ -50,9 +50,15 @@ class PermissionRule(BaseModel, metaclass=CanonicalModelMetaclass):
     risk_level: RiskLevel
     requires_confirmation: bool = Field(default=False)
     enabled: bool = Field(default=True)
-    max_per_session: int | None = Field(default=None, description="Maximum uses per session, None for unlimited")
-    blocked_patterns: list[str] = Field(default_factory=list, description="Regex patterns to block")
-    allowed_patterns: list[str] = Field(default_factory=list, description="Regex patterns to allow (overrides blocks)")
+    max_per_session: int | None = Field(
+        default=None, description="Maximum uses per session, None for unlimited"
+    )
+    blocked_patterns: list[str] = Field(
+        default_factory=list, description="Regex patterns to block"
+    )
+    allowed_patterns: list[str] = Field(
+        default_factory=list, description="Regex patterns to allow (overrides blocks)"
+    )
 
     model_config = {"extra": "forbid"}
 
@@ -92,7 +98,9 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     file_delete_enabled: bool = Field(default=True)
     "Whether deleting files is allowed"
 
-    file_operations_max_size_mb: int = Field(default=DEFAULT_FILE_OPERATIONS_MAX_SIZE_MB)
+    file_operations_max_size_mb: int = Field(
+        default=DEFAULT_FILE_OPERATIONS_MAX_SIZE_MB
+    )
     "Maximum file size for read/write operations in MB"
 
     file_operations_blocked_paths: list[str] = Field(
@@ -133,7 +141,9 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     "List of blocked domains"
 
-    network_max_requests_per_minute: int = Field(default=DEFAULT_NETWORK_MAX_REQUESTS_PER_MINUTE)
+    network_max_requests_per_minute: int = Field(
+        default=DEFAULT_NETWORK_MAX_REQUESTS_PER_MINUTE
+    )
     "Rate limit for network requests"
 
     # Package management
@@ -278,7 +288,9 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         return True, None
 
-    def _check_category_permission(self, category: PermissionCategory) -> tuple[bool, str] | None:
+    def _check_category_permission(
+        self, category: PermissionCategory
+    ) -> tuple[bool, str] | None:
         """Check if a permission category is enabled.
 
         Args:

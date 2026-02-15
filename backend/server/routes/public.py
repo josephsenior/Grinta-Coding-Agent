@@ -12,7 +12,7 @@ from backend.security.options import SecurityAnalyzers
 from backend.server.dependencies import get_dependencies
 from backend.server.shared import config, server_config
 
-router = APIRouter(prefix="/api/options", dependencies=get_dependencies())
+router = APIRouter(prefix="/api/v1/options", dependencies=get_dependencies())
 
 
 @router.get("/models")

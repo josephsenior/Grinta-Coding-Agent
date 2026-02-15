@@ -76,9 +76,7 @@ def _get_action_class(action_type: str):
     """Get action class from action type."""
     action_class = ACTION_TYPE_TO_CLASS.get(action_type)
     if action_class is None:
-        msg = (
-            f"'action['action']={action_type!r}' is not defined. Available actions: {list(ACTION_TYPE_TO_CLASS.keys())}"
-        )
+        msg = f"'action['action']={action_type!r}' is not defined. Available actions: {list(ACTION_TYPE_TO_CLASS.keys())}"
         raise LLMMalformedActionError(msg)
     return action_class
 

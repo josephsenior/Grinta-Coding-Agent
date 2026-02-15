@@ -74,7 +74,9 @@ class ExternalServiceBase:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
 
-    async def _prepare_request(self) -> tuple[aiohttp.ClientSession, ParseResult, dict[str, str]] | None:
+    async def _prepare_request(
+        self,
+    ) -> tuple[aiohttp.ClientSession, ParseResult, dict[str, str]] | None:
         """Prepare session, parsed endpoint, and headers for a request.
 
         Returns:
@@ -91,7 +93,9 @@ class ExternalServiceBase:
     async def _send_request(
         self,
         build_payload: Callable[[ParseResult], Any],
-        execute_request: Callable[[aiohttp.ClientSession, Any, dict[str, str]], Coroutine[Any, Any, bool]],
+        execute_request: Callable[
+            [aiohttp.ClientSession, Any, dict[str, str]], Coroutine[Any, Any, bool]
+        ],
         error_msg: str = "Error in external service request",
     ) -> bool:
         """Common request execution pattern with preparation and error handling.

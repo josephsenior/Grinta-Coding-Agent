@@ -54,7 +54,9 @@ class ProviderHandler:
         """Map ProviderType value to the environment variable name in the runtime."""
         return f"{provider.value}_token".lower()
 
-    def expose_env_vars(self, env_secrets: dict[ProviderType, SecretStr]) -> dict[str, str]:
+    def expose_env_vars(
+        self, env_secrets: dict[ProviderType, SecretStr]
+    ) -> dict[str, str]:
         """Return string values instead of typed values for environment secrets."""
         exposed_envs: dict[str, str] = {}
         for provider, token in env_secrets.items():
@@ -109,7 +111,9 @@ class ProviderHandler:
     # -- action introspection -----------------------------------------------
 
     @classmethod
-    def check_cmd_action_for_provider_token_ref(cls, event: Action) -> list[ProviderType]:
+    def check_cmd_action_for_provider_token_ref(
+        cls, event: Action
+    ) -> list[ProviderType]:
         """Detect if an agent run action references a provider token env var.
 
         Returns a list of providers whose env vars appear in the command.

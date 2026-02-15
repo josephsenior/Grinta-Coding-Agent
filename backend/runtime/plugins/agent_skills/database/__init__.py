@@ -242,7 +242,9 @@ async def get_schema(connection_name: str) -> dict[str, Any]:
     raise ValueError(msg)
 
 
-async def execute_query(connection_name: str, query: str, limit: int = 100) -> dict[str, Any]:
+async def execute_query(
+    connection_name: str, query: str, limit: int = 100
+) -> dict[str, Any]:
     """Execute a query on a database connection.
 
     Args:
@@ -351,7 +353,9 @@ async def _execute_postgresql_query(conn, query: str, limit: int) -> dict[str, A
         # Convert non-JSON types to strings
         for row in data:
             for key, value in row.items():
-                if value is not None and not isinstance(value, (str, int, float, bool, type(None))):
+                if value is not None and not isinstance(
+                    value, (str, int, float, bool, type(None))
+                ):
                     row[key] = str(value)
 
         return {

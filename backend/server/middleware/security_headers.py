@@ -48,7 +48,9 @@ class SecurityHeadersMiddleware:
 
         # Force HTTPS in production
         if request.url.scheme == "https":
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains; preload"
+            )
 
         # Content Security Policy
         # Two profiles: permissive (dev-friendly) and strict (production)
@@ -92,7 +94,9 @@ class SecurityHeadersMiddleware:
 
         # Support report-only mode for staging
         if os.getenv("CSP_REPORT_ONLY", "0").lower() in {"1", "true", "yes"}:
-            response.headers["Content-Security-Policy-Report-Only"] = "; ".join(csp_directives)
+            response.headers["Content-Security-Policy-Report-Only"] = "; ".join(
+                csp_directives
+            )
         else:
             response.headers["Content-Security-Policy"] = "; ".join(csp_directives)
 
@@ -159,7 +163,9 @@ class CSRFProtection:
             return True
         return False
 
-    def _validate_origin_header(self, origin: str, request_host: str) -> tuple[bool, str]:
+    def _validate_origin_header(
+        self, origin: str, request_host: str
+    ) -> tuple[bool, str]:
         """Validate Origin header matches request host.
 
         Args:
@@ -170,11 +176,15 @@ class CSRFProtection:
             Tuple of (is_valid, error_message)
 
         """
-        if not origin.startswith(request_host) and not self._is_localhost_development(origin, request_host):
+        if not origin.startswith(request_host) and not self._is_localhost_development(
+            origin, request_host
+        ):
             return False, "CSRF validation failed: Origin mismatch"
         return True, ""
 
-    def _validate_referer_header(self, referer: str, request_host: str) -> tuple[bool, str]:
+    def _validate_referer_header(
+        self, referer: str, request_host: str
+    ) -> tuple[bool, str]:
         """Validate Referer header matches request host.
 
         Args:
@@ -185,7 +195,9 @@ class CSRFProtection:
             Tuple of (is_valid, error_message)
 
         """
-        if not referer.startswith(request_host) and not self._is_localhost_development(referer, request_host):
+        if not referer.startswith(request_host) and not self._is_localhost_development(
+            referer, request_host
+        ):
             return False, "CSRF validation failed: Referer mismatch"
         return True, ""
 
@@ -209,7 +221,9 @@ class CSRFProtection:
         if not origin and not referer:
             return JSONResponse(
                 status_code=403,
-                content={"detail": "CSRF validation failed: Missing Origin/Referer header"},
+                content={
+                    "detail": "CSRF validation failed: Missing Origin/Referer header"
+                },
             )
 
         request_host = f"{request.url.scheme}://{request.url.netloc}"

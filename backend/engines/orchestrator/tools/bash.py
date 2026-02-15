@@ -71,7 +71,9 @@ def create_cmd_run_tool(use_short_description: bool = False):
         ChatCompletionToolParam: The configured bash command tool.
 
     """
-    description = _SHORT_BASH_DESCRIPTION if use_short_description else _DETAILED_BASH_DESCRIPTION
+    description = (
+        _SHORT_BASH_DESCRIPTION if use_short_description else _DETAILED_BASH_DESCRIPTION
+    )
     return create_tool_definition(
         name=EXECUTE_BASH_TOOL_NAME,
         description=refine_prompt(description),

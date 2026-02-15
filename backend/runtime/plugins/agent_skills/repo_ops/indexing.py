@@ -47,7 +47,9 @@ try:
     TREE_SITTER_AVAILABLE = True
 except ImportError:
     TREE_SITTER_AVAILABLE = False
-    logger.debug("Tree-sitter not available. Code indexing will use basic file-based indexing.")
+    logger.debug(
+        "Tree-sitter not available. Code indexing will use basic file-based indexing."
+    )
 
 
 @dataclass
@@ -113,7 +115,9 @@ class CodeGraph:
 
         return deps
 
-    def _is_dependency_in_direction(self, dep: Dependency, entity_id: str, direction: str) -> bool:
+    def _is_dependency_in_direction(
+        self, dep: Dependency, entity_id: str, direction: str
+    ) -> bool:
         """Check if a dependency matches the specified direction for an entity."""
         if direction == "downstream":
             return dep.from_entity == entity_id
@@ -131,7 +135,9 @@ class CodeIndexer:
     Supports 40+ programming languages through Tree-sitter.
     """
 
-    def __init__(self, workspace_root: str = "/workspace", enable_incremental: bool = True):
+    def __init__(
+        self, workspace_root: str = "/workspace", enable_incremental: bool = True
+    ):
         """Initialize the code indexer.
 
         Args:
@@ -148,14 +154,20 @@ class CodeIndexer:
         self.file_entities: dict[str, list[str]] = defaultdict(list)
 
         if not TREE_SITTER_AVAILABLE:
-            logger.warning("Tree-sitter not available. Code indexing will use basic file-based indexing.")
+            logger.warning(
+                "Tree-sitter not available. Code indexing will use basic file-based indexing."
+            )
 
     def _get_parser(self, language: str) -> Parser | None:
         """Get or create a Tree-sitter parser for a language."""
         if language in self.parsers:
             return self.parsers[language]
 
-        if not TREE_SITTER_AVAILABLE or _get_language_func is None or _get_parser_func is None:
+        if (
+            not TREE_SITTER_AVAILABLE
+            or _get_language_func is None
+            or _get_parser_func is None
+        ):
             return None
 
         try:
@@ -233,7 +245,9 @@ class CodeIndexer:
         # Update timestamp after successful indexing
         self._update_file_timestamp(full_path, file_path)
 
-    def _check_incremental_skip(self, full_path: Path, file_path: str, force: bool) -> bool:
+    def _check_incremental_skip(
+        self, full_path: Path, file_path: str, force: bool
+    ) -> bool:
         """Check if file indexing can be skipped due to incremental indexing."""
         if not self.enable_incremental or force:
             return False
@@ -277,7 +291,9 @@ class CodeIndexer:
             self.graph.entities.pop(entity_id, None)
             # Remove dependencies involving this entity
             self.graph.dependencies = [
-                dep for dep in self.graph.dependencies if dep.from_entity != entity_id and dep.to_entity != entity_id
+                dep
+                for dep in self.graph.dependencies
+                if dep.from_entity != entity_id and dep.to_entity != entity_id
             ]
         # Clear file index
         self.graph.file_index.pop(file_path, None)
@@ -307,7 +323,7 @@ class CodeIndexer:
         files = [f for f in files if f.is_file()]
         total = len(files)
 
-        logger.info("Indexing %s files in %s...", total, directory or 'workspace root')
+        logger.info("Indexing %s files in %s...", total, directory or "workspace root")
 
         for i, file_path in enumerate(files):
             # Convert to relative path
@@ -320,7 +336,9 @@ class CodeIndexer:
             if progress_callback:
                 progress_callback(i + 1, total)
 
-    def _index_file_with_tree_sitter(self, full_path: Path, file_path: str, language: str) -> None:
+    def _index_file_with_tree_sitter(
+        self, full_path: Path, file_path: str, language: str
+    ) -> None:
         """Index a file using Tree-sitter parsing."""
         parser = self._get_parser(language)
         if not parser:
@@ -369,9 +387,13 @@ class CodeIndexer:
 
             # Track imports for dependency analysis
             if node_type == "import_statement":
-                self._handle_python_import(node, text, file_path, imports, import_dependencies)
+                self._handle_python_import(
+                    node, text, file_path, imports, import_dependencies
+                )
             elif node_type == "import_from_statement":
-                self._handle_python_import_from(node, text, file_path, imports, import_dependencies)
+                self._handle_python_import_from(
+                    node, text, file_path, imports, import_dependencies
+                )
             # Extract class definitions
             elif node_type == "class_definition":
                 self._handle_python_class(node, text, file_path, parent_id, traverse)
@@ -437,7 +459,9 @@ class CodeIndexer:
 
         return None
 
-    def _handle_python_import(self, node: Any, text: str, file_path: str, imports: list[str], deps: list) -> None:
+    def _handle_python_import(
+        self, node: Any, text: str, file_path: str, imports: list[str], deps: list
+    ) -> None:
         """Handle Python import statement."""
         module_node = node.child_by_field_name("module_name")
         if module_node:
@@ -445,7 +469,9 @@ class CodeIndexer:
             imports.append(f"import {module_name}")
             deps.append((file_path, module_name))
 
-    def _handle_python_import_from(self, node: Any, text: str, file_path: str, imports: list[str], deps: list) -> None:
+    def _handle_python_import_from(
+        self, node: Any, text: str, file_path: str, imports: list[str], deps: list
+    ) -> None:
         """Handle Python import-from statement."""
         module_node = node.child_by_field_name("module_name")
         if module_node:
@@ -493,14 +519,20 @@ class CodeIndexer:
         for child in node.children:
             traverse_func(child, entity_id)
 
-    def _handle_python_function(self, node: Any, text: str, file_path: str, parent_id: str | None) -> None:
+    def _handle_python_function(
+        self, node: Any, text: str, file_path: str, parent_id: str | None
+    ) -> None:
         """Handle Python function definition."""
         name_node = node.child_by_field_name("name")
         if not name_node:
             return
 
         name = text[name_node.start_byte : name_node.end_byte]
-        entity_id = f"{file_path}:{name}" if not parent_id else f"{file_path}:{parent_id.split(':')[-1]}.{name}"
+        entity_id = (
+            f"{file_path}:{name}"
+            if not parent_id
+            else f"{file_path}:{parent_id.split(':')[-1]}.{name}"
+        )
         entity = CodeEntity(
             entity_id=entity_id,
             entity_type="function",
@@ -566,7 +598,9 @@ class CodeIndexer:
                 if name_node:
                     name = text[name_node.start_byte : name_node.end_byte]
                     entity_id = (
-                        f"{file_path}:{name}" if not parent_id else f"{file_path}:{parent_id.split(':')[-1]}.{name}"
+                        f"{file_path}:{name}"
+                        if not parent_id
+                        else f"{file_path}:{parent_id.split(':')[-1]}.{name}"
                     )
                     entity = CodeEntity(
                         entity_id=entity_id,

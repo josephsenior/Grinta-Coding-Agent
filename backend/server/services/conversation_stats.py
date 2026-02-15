@@ -48,7 +48,9 @@ class ConversationStats:
         if not self.file_store:
             return
         with self._save_lock:
-            if duplicate_services := (set(self.restored_metrics.keys()) & set(self.service_to_metrics.keys())):
+            if duplicate_services := (
+                set(self.restored_metrics.keys()) & set(self.service_to_metrics.keys())
+            ):
                 logger.error(
                     "Duplicate service IDs found between restored and service metrics: %s. This should not happen as registered services should be removed from restored_metrics. Proceeding by preferring service_to_metrics values for duplicates.",
                     duplicate_services,
@@ -213,7 +215,9 @@ class ConversationStats:
             )
 
         def _drop_zero_cost(d: dict[str, Metrics]) -> None:
-            to_delete = [k for k, v in d.items() if getattr(v, "accumulated_cost", 0) == 0]
+            to_delete = [
+                k for k, v in d.items() if getattr(v, "accumulated_cost", 0) == 0
+            ]
             for k in to_delete:
                 del d[k]
 

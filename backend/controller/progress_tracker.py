@@ -76,7 +76,9 @@ class ProgressTracker:
         self.error_count = 0
         self.consecutive_errors = 0
 
-        logger.info("ProgressTracker initialized with max_iterations=%s", max_iterations)
+        logger.info(
+            "ProgressTracker initialized with max_iterations=%s", max_iterations
+        )
 
     def update(self, state: State) -> ProgressMetrics:
         """Update progress based on current state.
@@ -150,7 +152,10 @@ class ProgressTracker:
 
         for i, event in enumerate(recent_history):
             if isinstance(event, CmdRunAction):
-                if any(test_cmd in event.command.lower() for test_cmd in ["pytest", "npm test", "jest"]):
+                if any(
+                    test_cmd in event.command.lower()
+                    for test_cmd in ["pytest", "npm test", "jest"]
+                ):
                     # Look for observation
                     for j in range(i + 1, min(i + 5, len(recent_history))):
                         next_event = recent_history[j]
@@ -198,9 +203,15 @@ class ProgressTracker:
         """
         # Weighted factors
         factors = {
-            "iteration_progress": (state.iteration_flag.current_value / self.max_iterations) * 0.3,
-            "files_modified": min(len(self.files_modified) / 5.0, 1.0) * 0.2,  # Cap at 5 files
-            "tests_passing": (self.tests_passed / max(self.tests_run, 1)) * 0.3 if self.tests_run > 0 else 0.0,
+            "iteration_progress": (
+                state.iteration_flag.current_value / self.max_iterations
+            )
+            * 0.3,
+            "files_modified": min(len(self.files_modified) / 5.0, 1.0)
+            * 0.2,  # Cap at 5 files
+            "tests_passing": (self.tests_passed / max(self.tests_run, 1)) * 0.3
+            if self.tests_run > 0
+            else 0.0,
             "milestones": (len(self.milestones) / 5.0) * 0.2,  # Cap at 5 milestones
         }
 
@@ -240,7 +251,9 @@ class ProgressTracker:
 
         return iterations_since_progress < window
 
-    def _estimate_completion_time(self, completion_pct: float, velocity: float) -> datetime | None:
+    def _estimate_completion_time(
+        self, completion_pct: float, velocity: float
+    ) -> datetime | None:
         """Estimate completion time based on current progress and velocity.
 
         Args:
@@ -256,7 +269,9 @@ class ProgressTracker:
 
         remaining_pct = 1.0 - completion_pct
         remaining_iterations = self.max_iterations * remaining_pct
-        minutes_remaining = remaining_iterations / velocity if velocity > 0 else float("inf")
+        minutes_remaining = (
+            remaining_iterations / velocity if velocity > 0 else float("inf")
+        )
 
         if minutes_remaining > 10000:  # More than a week
             return None

@@ -51,7 +51,9 @@ def check_route_file(file_path: Path) -> dict:
 
     # Check if prefix includes /v1/
     has_versioned_prefix = any("/v1/" in prefix for prefix in prefixes)
-    has_non_versioned_prefix = any(prefix.startswith("/api/") and "/v1/" not in prefix for prefix in prefixes)
+    has_non_versioned_prefix = any(
+        prefix.startswith("/api/") and "/v1/" not in prefix for prefix in prefixes
+    )
 
     return {
         "file": str(file_path),
@@ -96,7 +98,9 @@ def main():
             print(f"{GREEN}✅ {route_file.name}: Has /api/v1/ prefix{RESET}")
             versioned_count += 1
         elif result["has_non_versioned_prefix"]:
-            print(f"{YELLOW}⚠️  {route_file.name}: Uses non-versioned /api/ prefix{RESET}")
+            print(
+                f"{YELLOW}⚠️  {route_file.name}: Uses non-versioned /api/ prefix{RESET}"
+            )
             if result["prefixes"]:
                 for prefix in result["prefixes"]:
                     print(f"   └─ Prefix: {prefix}")

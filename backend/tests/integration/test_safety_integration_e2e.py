@@ -54,7 +54,9 @@ class TestSafetyIntegrationE2E:
     @pytest.mark.asyncio
     async def test_safety_pipeline_allows_safe_commands(self):
         """Test that safe commands pass through the pipeline."""
-        safety_config = SafetyConfig(enable_mandatory_validation=True, environment="production")
+        safety_config = SafetyConfig(
+            enable_mandatory_validation=True, environment="production"
+        )
 
         validator = SafetyValidator(safety_config)
 
@@ -198,7 +200,9 @@ class TestComprehensiveSafetyScenarios:
     @pytest.mark.asyncio
     async def test_multiple_dangerous_commands_in_sequence(self):
         """Test handling of multiple dangerous commands."""
-        validator = SafetyValidator(SafetyConfig(enable_mandatory_validation=True, environment="production"))
+        validator = SafetyValidator(
+            SafetyConfig(enable_mandatory_validation=True, environment="production")
+        )
 
         dangerous_commands = [
             "rm -rf /",
@@ -245,7 +249,9 @@ def test_performance_overhead():
     # Should be < 5ms per validation
     assert avg_latency_ms < 5.0, f"Latency too high: {avg_latency_ms:.2f}ms"
 
-    print(f"✅ Performance test passed: {avg_latency_ms:.2f}ms avg latency (< 5ms target)")
+    print(
+        f"✅ Performance test passed: {avg_latency_ms:.2f}ms avg latency (< 5ms target)"
+    )
 
 
 if __name__ == "__main__":

@@ -53,8 +53,15 @@ class BrowserOutputCondenser(Condenser):
         results: list[Event] = []
         cnt: int = 0
         for event in reversed(view):
-            if isinstance(event, BrowserOutputObservation) and cnt >= self.attention_window:
-                results.append(AgentCondensationObservation(f"Visited URL {event.url}\nContent omitted"))
+            if (
+                isinstance(event, BrowserOutputObservation)
+                and cnt >= self.attention_window
+            ):
+                results.append(
+                    AgentCondensationObservation(
+                        f"Visited URL {event.url}\nContent omitted"
+                    )
+                )
             else:
                 results.append(event)
                 if isinstance(event, BrowserOutputObservation):
@@ -62,11 +69,15 @@ class BrowserOutputCondenser(Condenser):
         return View(events=list(reversed(results)))
 
     @classmethod
-    def from_config(cls, config: BrowserOutputCondenserConfig, llm_registry: LLMRegistry) -> BrowserOutputCondenser:
+    def from_config(
+        cls, config: BrowserOutputCondenserConfig, llm_registry: LLMRegistry
+    ) -> BrowserOutputCondenser:
         """Instantiate condenser from Pydantic config."""
         from backend.core.pydantic_compat import model_dump_with_options
 
-        return BrowserOutputCondenser(**model_dump_with_options(config, exclude={"type"}))
+        return BrowserOutputCondenser(
+            **model_dump_with_options(config, exclude={"type"})
+        )
 
 
 # Lazy registration to avoid circular imports

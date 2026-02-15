@@ -134,8 +134,12 @@ class WhitespaceHandler:
         lines = code.split("\n")
         line_ending = WhitespaceHandler._detect_line_ending(code)
 
-        tab_count, space_count, space_sizes = WhitespaceHandler._count_indent_styles(lines)
-        style, size = WhitespaceHandler._determine_indent_style(tab_count, space_count, space_sizes, language)
+        tab_count, space_count, space_sizes = WhitespaceHandler._count_indent_styles(
+            lines
+        )
+        style, size = WhitespaceHandler._determine_indent_style(
+            tab_count, space_count, space_sizes, language
+        )
 
         return IndentConfig(style=style, size=size, line_ending=line_ending)
 
@@ -222,7 +226,9 @@ class WhitespaceHandler:
             return " " * (indent_level * target_config.size)
 
     @staticmethod
-    def _normalize_line_indent(line: str, current_config: IndentConfig, target_config: IndentConfig) -> str:
+    def _normalize_line_indent(
+        line: str, current_config: IndentConfig, target_config: IndentConfig
+    ) -> str:
         """Normalize indentation for a single line.
 
         Args:
@@ -240,7 +246,9 @@ class WhitespaceHandler:
         leading_ws = len(line) - len(line.lstrip())
         content = line.lstrip()
 
-        indent_level = WhitespaceHandler._calculate_indent_level(leading_ws, current_config)
+        indent_level = WhitespaceHandler._calculate_indent_level(
+            leading_ws, current_config
+        )
         new_indent = WhitespaceHandler._apply_target_indent(indent_level, target_config)
 
         return new_indent + content
@@ -271,13 +279,18 @@ class WhitespaceHandler:
         # Early exit if styles already match
         if WhitespaceHandler._styles_match(current_config, target_config):
             if current_config.line_ending != target_config.line_ending:
-                return code.replace(current_config.line_ending, target_config.line_ending)
+                return code.replace(
+                    current_config.line_ending, target_config.line_ending
+                )
             return code
 
         # Normalize each line
         lines = code.split("\n")
         normalized_lines = [
-            WhitespaceHandler._normalize_line_indent(line, current_config, target_config) for line in lines
+            WhitespaceHandler._normalize_line_indent(
+                line, current_config, target_config
+            )
+            for line in lines
         ]
 
         result = "\n".join(normalized_lines)
@@ -313,7 +326,9 @@ class WhitespaceHandler:
             if config.style == IndentStyle.SPACES and config.size == 4 and language:
                 default_size = DEFAULT_INDENT_SIZES.get(language, 4)
                 if language == "go":
-                    config = IndentConfig(style=IndentStyle.TABS, size=1, line_ending=config.line_ending)
+                    config = IndentConfig(
+                        style=IndentStyle.TABS, size=1, line_ending=config.line_ending
+                    )
                 else:
                     config = IndentConfig(
                         style=config.style,
@@ -382,7 +397,9 @@ class WhitespaceHandler:
         return 0 if min_indent == float("inf") else int(min_indent)
 
     @staticmethod
-    def _reindent_line(line: str, min_indent: int, new_base_indent: int, config: IndentConfig) -> str:
+    def _reindent_line(
+        line: str, min_indent: int, new_base_indent: int, config: IndentConfig
+    ) -> str:
         """Reindent a single line with new base indent.
 
         Args:
@@ -434,12 +451,17 @@ class WhitespaceHandler:
         if not config:
             config = WhitespaceHandler.detect_indent(code_block, language)
             if language == "go" and config.style != IndentStyle.TABS:
-                config = IndentConfig(style=IndentStyle.TABS, size=1, line_ending=config.line_ending)
+                config = IndentConfig(
+                    style=IndentStyle.TABS, size=1, line_ending=config.line_ending
+                )
 
         lines = code_block.split("\n")
         min_indent = WhitespaceHandler._get_min_indent(lines, config)
 
-        result_lines = [WhitespaceHandler._reindent_line(line, min_indent, new_base_indent, config) for line in lines]
+        result_lines = [
+            WhitespaceHandler._reindent_line(line, min_indent, new_base_indent, config)
+            for line in lines
+        ]
 
         return "\n".join(result_lines)
 
@@ -456,7 +478,9 @@ class WhitespaceHandler:
         return code + "\n"
 
     @staticmethod
-    def clean_whitespace(code: str, config: IndentConfig | None = None, language: str | None = None) -> str:
+    def clean_whitespace(
+        code: str, config: IndentConfig | None = None, language: str | None = None
+    ) -> str:
         """Comprehensive whitespace cleanup.
 
         Args:

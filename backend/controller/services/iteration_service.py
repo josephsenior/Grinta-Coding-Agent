@@ -32,8 +32,12 @@ class IterationService:
         if complexity is None:
             return
 
-        target_iterations = self._determine_target_iterations(agent, config, complexity, state)
-        self._apply_iteration_flag(iteration_flag, config, complexity, target_iterations)
+        target_iterations = self._determine_target_iterations(
+            agent, config, complexity, state
+        )
+        self._apply_iteration_flag(
+            iteration_flag, config, complexity, target_iterations
+        )
 
     def _should_apply_iterations(self, agent, config, state) -> bool:
         if agent is None or config is None or state is None:
@@ -46,13 +50,17 @@ class IterationService:
             return None
         return iteration_flag
 
-    def _determine_target_iterations(self, agent, config, complexity: float, state) -> int:
+    def _determine_target_iterations(
+        self, agent, config, complexity: float, state
+    ) -> int:
         estimate = self._estimate_iterations_from_analyzer(agent, complexity, state)
         if estimate is not None:
             return estimate
         return self._fallback_iteration_target(config, complexity)
 
-    def _estimate_iterations_from_analyzer(self, agent, complexity, state) -> int | None:
+    def _estimate_iterations_from_analyzer(
+        self, agent, complexity, state
+    ) -> int | None:
         analyzer = getattr(agent, "task_complexity_analyzer", None)
         if not analyzer or not hasattr(analyzer, "estimate_iterations"):
             return None
@@ -79,7 +87,10 @@ class IterationService:
         new_max = max(min_iterations, bounded_target)
         # Use centralized mutation path when the flag lives on a State object
         state = getattr(self._context, "state", None)
-        if state is not None and getattr(state, "iteration_flag", None) is iteration_flag:
+        if (
+            state is not None
+            and getattr(state, "iteration_flag", None) is iteration_flag
+        ):
             state.adjust_iteration_limit(new_max, source="IterationService")
         else:
             iteration_flag.max_value = new_max

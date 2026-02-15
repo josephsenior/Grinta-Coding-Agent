@@ -126,7 +126,9 @@ class TestAutonomousWithChromeDevTools:
             error_count = len(self.console_errors)
 
             # Should handle errors gracefully
-            assert state.agent_state.value in ["FINISHED", "ERROR"], "Agent should complete or error gracefully"
+            assert state.agent_state.value in ["FINISHED", "ERROR"], (
+                "Agent should complete or error gracefully"
+            )
 
             print(f"✅ Captured {error_count} console errors")
             print(f"   Final state: {state.agent_state.value}")
@@ -190,10 +192,12 @@ class TestFullAutonomousWorkflow:
         from backend.core.config.llm_config import LLMConfig
 
         config = ForgeConfig()
-        config.llms = {"llm": LLMConfig(
-            model="claude-sonnet-4-20250514",
-            api_key=os.getenv("ANTHROPIC_API_KEY"),
-        )}
+        config.llms = {
+            "llm": LLMConfig(
+                model="claude-sonnet-4-20250514",
+                api_key=os.getenv("ANTHROPIC_API_KEY"),
+            )
+        }
 
         with tempfile.TemporaryDirectory() as tmpdir:
             runtime = create_runtime_with_registry(config, workspace_base=tmpdir)
@@ -247,7 +251,9 @@ class TestFullAutonomousWorkflow:
 
                 # Documentation
                 assert (workspace / "README.md").exists(), "README.md should exist"
-                assert (workspace / "requirements.txt").exists(), "requirements.txt should exist"
+                assert (workspace / "requirements.txt").exists(), (
+                    "requirements.txt should exist"
+                )
 
                 print("✅ Successfully built complete web application!")
                 print(f"   Iterations used: {state.iteration}/50")

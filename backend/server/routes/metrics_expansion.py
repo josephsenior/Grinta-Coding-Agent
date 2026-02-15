@@ -18,10 +18,16 @@ class MetricsCollector:
     """Collects and aggregates metrics for monitoring."""
 
     @staticmethod
-    def record_conversation_start(conversation_id: str, user_id: str | None = None) -> None:
+    def record_conversation_start(
+        conversation_id: str, user_id: str | None = None
+    ) -> None:
         """Record conversation start."""
-        _metrics_store["conversations"]["started"] = _metrics_store["conversations"].get("started", 0) + 1
-        _metrics_store["conversations"]["active"] = _metrics_store["conversations"].get("active", 0) + 1
+        _metrics_store["conversations"]["started"] = (
+            _metrics_store["conversations"].get("started", 0) + 1
+        )
+        _metrics_store["conversations"]["active"] = (
+            _metrics_store["conversations"].get("active", 0) + 1
+        )
         if user_id:
             _metrics_store["users"][user_id] = _metrics_store["users"].get(user_id, {})
             _metrics_store["users"][user_id]["conversations"] = (
@@ -29,15 +35,25 @@ class MetricsCollector:
             )
 
     @staticmethod
-    def record_conversation_end(conversation_id: str, success: bool, duration: float) -> None:
+    def record_conversation_end(
+        conversation_id: str, success: bool, duration: float
+    ) -> None:
         """Record conversation end."""
-        _metrics_store["conversations"]["ended"] = _metrics_store["conversations"].get("ended", 0) + 1
-        _metrics_store["conversations"]["active"] = max(0, _metrics_store["conversations"].get("active", 0) - 1)
+        _metrics_store["conversations"]["ended"] = (
+            _metrics_store["conversations"].get("ended", 0) + 1
+        )
+        _metrics_store["conversations"]["active"] = max(
+            0, _metrics_store["conversations"].get("active", 0) - 1
+        )
 
         if success:
-            _metrics_store["conversations"]["successful"] = _metrics_store["conversations"].get("successful", 0) + 1
+            _metrics_store["conversations"]["successful"] = (
+                _metrics_store["conversations"].get("successful", 0) + 1
+            )
         else:
-            _metrics_store["conversations"]["failed"] = _metrics_store["conversations"].get("failed", 0) + 1
+            _metrics_store["conversations"]["failed"] = (
+                _metrics_store["conversations"].get("failed", 0) + 1
+            )
 
         # Track duration
         durations = _metrics_store["conversations"].setdefault("durations", [])
@@ -143,7 +159,9 @@ def _calculate_conversation_metrics(conversations: dict) -> dict[str, Any]:
     """Calculate conversation metrics."""
     total_conversations = conversations.get("started", 0)
     successful = conversations.get("successful", 0)
-    success_rate = (successful / total_conversations * 100) if total_conversations > 0 else 0
+    success_rate = (
+        (successful / total_conversations * 100) if total_conversations > 0 else 0
+    )
     durations = conversations.get("durations", [])
     avg_duration = sum(durations) / len(durations) if durations else 0
 
@@ -164,7 +182,9 @@ def _calculate_llm_metrics(llm_calls: dict) -> dict[str, Any]:
     """Calculate LLM metrics."""
     total_llm_calls = sum(stats.get("total", 0) for stats in llm_calls.values())
     total_llm_cost = sum(stats.get("total_cost", 0.0) for stats in llm_calls.values())
-    total_llm_latency = sum(stats.get("total_latency_ms", 0.0) for stats in llm_calls.values())
+    total_llm_latency = sum(
+        stats.get("total_latency_ms", 0.0) for stats in llm_calls.values()
+    )
     avg_llm_latency = total_llm_latency / total_llm_calls if total_llm_calls > 0 else 0
 
     return {
@@ -174,9 +194,13 @@ def _calculate_llm_metrics(llm_calls: dict) -> dict[str, Any]:
         "by_provider": {
             key: {
                 "calls": stats.get("total", 0),
-                "success_rate": round(stats.get("successful", 0) / stats.get("total", 1) * 100, 2),
+                "success_rate": round(
+                    stats.get("successful", 0) / stats.get("total", 1) * 100, 2
+                ),
                 "total_cost": round(stats.get("total_cost", 0.0), 4),
-                "avg_latency_ms": round(stats.get("total_latency_ms", 0.0) / stats.get("total", 1), 2),
+                "avg_latency_ms": round(
+                    stats.get("total_latency_ms", 0.0) / stats.get("total", 1), 2
+                ),
             }
             for key, stats in llm_calls.items()
         },

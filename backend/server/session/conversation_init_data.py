@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING
 
 from pydantic import ConfigDict, Field
 
-from backend.core.provider_types import CUSTOM_SECRETS_TYPE, PROVIDER_TOKEN_TYPE, ProviderType
+from backend.core.provider_types import (
+    CUSTOM_SECRETS_TYPE,
+    PROVIDER_TOKEN_TYPE,
+    ProviderType,
+)
 from backend.storage.data_models.settings import Settings
 
 if TYPE_CHECKING:

@@ -21,12 +21,12 @@ async def get_conversation_store_instance(
     user_id: str | None,
 ) -> ConversationStore:
     """Get a conversation store instance using the implementation class.
-    
+
     Args:
         impl_class: The conversation store implementation class
         config: Forge configuration
         user_id: User identifier
-        
+
     Returns:
         Conversation store instance
     """
@@ -39,12 +39,12 @@ async def get_settings_store_instance(
     user_id: str | None,
 ) -> SettingsStore:
     """Get a settings store instance using the implementation class.
-    
+
     Args:
         impl_class: The settings store implementation class
         config: Forge configuration
         user_id: User identifier
-        
+
     Returns:
         Settings store instance
     """
@@ -57,12 +57,12 @@ async def get_secrets_store_instance(
     user_id: str | None,
 ) -> SecretsStore:
     """Get a secrets store instance using the implementation class.
-    
+
     Args:
         impl_class: The secrets store implementation class
         config: Forge configuration
         user_id: User identifier
-        
+
     Returns:
         Secrets store instance
     """

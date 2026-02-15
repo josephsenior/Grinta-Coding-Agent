@@ -49,7 +49,9 @@ class GraphMemoryStore:
         self.graph.add_node(node_id, type=node_type.value, **attributes)
         self._auto_save()
 
-    def add_edge(self, source_id: str, target_id: str, edge_type: EdgeType, **attributes):
+    def add_edge(
+        self, source_id: str, target_id: str, edge_type: EdgeType, **attributes
+    ):
         """Add a directed edge between nodes."""
         # Ensure nodes exist (auto-create as generic concepts if not)
         if source_id not in self.graph:
@@ -60,7 +62,9 @@ class GraphMemoryStore:
         self.graph.add_edge(source_id, target_id, type=edge_type.value, **attributes)
         self._auto_save()
 
-    def get_neighbors(self, node_id: str, edge_type: EdgeType | None = None) -> list[dict]:
+    def get_neighbors(
+        self, node_id: str, edge_type: EdgeType | None = None
+    ) -> list[dict]:
         """Get neighboring nodes, optionally filtered by edge type."""
         if node_id not in self.graph:
             return []
@@ -106,7 +110,9 @@ class GraphMemoryStore:
 
     def search_by_attribute(self, attr_name: str, attr_value: Any) -> list[str]:
         """Find nodes with a specific attribute value."""
-        return [n for n, d in self.graph.nodes(data=True) if d.get(attr_name) == attr_value]
+        return [
+            n for n, d in self.graph.nodes(data=True) if d.get(attr_name) == attr_value
+        ]
 
     def save(self):
         """Save graph to disk."""
@@ -131,7 +137,11 @@ class GraphMemoryStore:
             with open(self.persistence_path, encoding="utf-8") as f:
                 data = json.load(f)
             self.graph = nx.node_link_graph(data)
-            logger.info("Graph loaded from %s (%s nodes)", self.persistence_path, self.graph.number_of_nodes())
+            logger.info(
+                "Graph loaded from %s (%s nodes)",
+                self.persistence_path,
+                self.graph.number_of_nodes(),
+            )
         except Exception as e:
             logger.error("Failed to load graph: %s", e)
 

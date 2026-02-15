@@ -90,7 +90,10 @@ def _matches_qualified_name_in_mro(base_cls: type[T], impl_class: type[T]) -> bo
     base_mod = getattr(base_cls, "__module__", None)
     base_name = getattr(base_cls, "__name__", None)
     for candidate in getattr(impl_class, "__mro__", ()):
-        if getattr(candidate, "__module__", None) == base_mod and getattr(candidate, "__name__", None) == base_name:
+        if (
+            getattr(candidate, "__module__", None) == base_mod
+            and getattr(candidate, "__name__", None) == base_name
+        ):
             return True
     return False
 

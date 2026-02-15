@@ -28,27 +28,39 @@ def _load_toml_config(toml_file: str) -> dict | None:
         logger.FORGE_logger.error("Config file not found: %s. Error: %s", toml_file, e)
         return None
     except toml.TomlDecodeError as e:
-        logger.FORGE_logger.error("Cannot parse config file %s. Exception: %s", toml_file, e)
+        logger.FORGE_logger.error(
+            "Cannot parse config file %s. Exception: %s", toml_file, e
+        )
         return None
 
 
-def get_llm_config_arg(llm_config_arg: str, toml_file: str = "config.toml") -> LLMConfig | None:
+def get_llm_config_arg(
+    llm_config_arg: str, toml_file: str = "config.toml"
+) -> LLMConfig | None:
     """Get a group of llm settings from the config file."""
     llm_config_arg = llm_config_arg.strip("[]").removeprefix("llm.")
-    logger.FORGE_logger.debug('Loading llm config "%s" from %s', llm_config_arg, toml_file)
+    logger.FORGE_logger.debug(
+        'Loading llm config "%s" from %s', llm_config_arg, toml_file
+    )
     toml_config = _load_toml_config(toml_file)
     if toml_config is None:
         return None
     if "llm" in toml_config and llm_config_arg in toml_config["llm"]:
         return LLMConfig(**toml_config["llm"][llm_config_arg])
-    logger.FORGE_logger.debug('LLM config "%s" not found in %s', llm_config_arg, toml_file)
+    logger.FORGE_logger.debug(
+        'LLM config "%s" not found in %s', llm_config_arg, toml_file
+    )
     return None
 
 
-def _resolve_llm_config_from_cli(llm_config_name: str, config: ForgeConfig, config_file: str) -> LLMConfig:
+def _resolve_llm_config_from_cli(
+    llm_config_name: str, config: ForgeConfig, config_file: str
+) -> LLMConfig:
     """Resolve LLM config from CLI parameter."""
     if llm_config_name in config.llms:
-        logger.FORGE_logger.debug("Using LLM config '%s' from loaded configuration", llm_config_name)
+        logger.FORGE_logger.debug(
+            "Using LLM config '%s' from loaded configuration", llm_config_name
+        )
         return config.llms[llm_config_name]
 
     llm_config = get_llm_config_arg(llm_config_name, config_file)

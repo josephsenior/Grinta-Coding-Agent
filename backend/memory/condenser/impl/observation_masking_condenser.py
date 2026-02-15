@@ -73,7 +73,9 @@ class ObservationMaskingCondenser(Condenser):
         """Instantiate condenser from configuration values."""
         from backend.core.pydantic_compat import model_dump_with_options
 
-        return ObservationMaskingCondenser(**model_dump_with_options(config, exclude={"type"}))
+        return ObservationMaskingCondenser(
+            **model_dump_with_options(config, exclude={"type"})
+        )
 
 
 # Lazy registration to avoid circular imports

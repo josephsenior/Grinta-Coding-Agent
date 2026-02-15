@@ -50,7 +50,7 @@ def get_user_info() -> tuple[int, str | None]:
     """Get user ID and username in a cross-platform way."""
     username = os.getenv("USER") or os.getenv("USERNAME")
     uid_getter = getattr(os, "getuid", None)
-    if uid_getter:
+    if uid_getter and callable(uid_getter):
         return (uid_getter(), username)
     return (0, username)
 
@@ -197,7 +197,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                 self._temp_workspace = base
                 os.makedirs(base, exist_ok=True)
             else:
-                self._temp_workspace = tempfile.mkdtemp(prefix=f"FORGE_workspace_{self.sid}_")
+                self._temp_workspace = tempfile.mkdtemp(
+                    prefix=f"FORGE_workspace_{self.sid}_"
+                )
             self.config.workspace_mount_path_in_runtime = self._temp_workspace
             # NOTE: We intentionally do NOT call os.chdir() here.
             # Mutating the process-global cwd is unsafe when multiple
@@ -220,7 +222,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             if risk == ActionSecurityRisk.HIGH:
                 from backend.events.observation import ErrorObservation
 
-                return ErrorObservation(content="Security Violation: Action blocked by security analyzer (High Risk)")
+                return ErrorObservation(
+                    content="Security Violation: Action blocked by security analyzer (High Risk)"
+                )
         except Exception as e:
             logger.warning("Security analysis failed: %s", e)
 
@@ -299,7 +303,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             logger.warning("Cannot list directory %s: %s", full_path, e)
             return []
 
-        directories, files = self._process_directory_entries(full_path, entries, path or "", recursive)
+        directories, files = self._process_directory_entries(
+            full_path, entries, path or "", recursive
+        )
 
         directories.sort(key=lambda s: s.lower())
         files.sort(key=lambda s: s.lower())
@@ -352,7 +358,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                 continue
         return directories, files
 
-    def copy_to(self, host_src: str, runtime_dest: str, recursive: bool = False) -> None:
+    def copy_to(
+        self, host_src: str, runtime_dest: str, recursive: bool = False
+    ) -> None:
         """Copy file from host to runtime."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
@@ -420,7 +428,11 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                     # Last attempt failed, log warning but don't raise
                     try:
                         logger.warning(
-                            "Failed to remove workspace %s after %s attempts: %s", self._temp_workspace, max_retries, e)
+                            "Failed to remove workspace %s after %s attempts: %s",
+                            self._temp_workspace,
+                            max_retries,
+                            e,
+                        )
                     except Exception:
                         # Logger might be closed, ignore
                         pass
@@ -459,7 +471,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
         # Check for required tools
         if not self._tool_registry.has_git:
-            logger.error("Git is required but not found. Please install Git from: https://git-scm.com/downloads")
+            logger.error(
+                "Git is required but not found. Please install Git from: https://git-scm.com/downloads"
+            )
 
         # Log platform-specific warnings
         if self.is_windows:

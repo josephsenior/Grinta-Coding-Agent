@@ -55,7 +55,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         from tree_sitter import Language
     except Exception:
-        logger.error("py-tree-sitter not available; install with: pip install tree_sitter")
+        logger.error(
+            "py-tree-sitter not available; install with: pip install tree_sitter"
+        )
         return 2
 
     base = args.grammar_dir

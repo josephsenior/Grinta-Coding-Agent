@@ -34,7 +34,9 @@ def wait_for_conversation_interface(page: Page, timeout: int = 120) -> None:
                 try:
                     element = page.locator(selector)
                     if element.is_visible(timeout=2000):
-                        print(f"Found conversation interface element with selector: {selector}")
+                        print(
+                            f"Found conversation interface element with selector: {selector}"
+                        )
                         conversation_loaded = True
                         break
                 except Exception:
@@ -74,7 +76,9 @@ def wait_for_agent_input_ready(page: Page, max_wait_time: int = 480) -> None:
         elapsed = int(time.time() - start_time)
         if elapsed % 30 == 0 and elapsed > 0:
             page.screenshot(path=f"test-results/agent_waiting_{elapsed}s.png")
-            print(f"Screenshot saved: agent_waiting_{elapsed}s.png (waiting {elapsed}s)")
+            print(
+                f"Screenshot saved: agent_waiting_{elapsed}s.png (waiting {elapsed}s)"
+            )
 
         try:
             status_messages = _get_status_messages(page)
@@ -90,12 +94,20 @@ def wait_for_agent_input_ready(page: Page, max_wait_time: int = 480) -> None:
             connecting_or_starting = any(
                 msg
                 for msg in status_messages
-                if "connecting" in msg.lower() or "starting" in msg.lower() or "runtime to start" in msg.lower()
+                if "connecting" in msg.lower()
+                or "starting" in msg.lower()
+                or "runtime to start" in msg.lower()
             )
             has_ready_indicator = _check_ready_indicators(page, ready_indicators)
 
-            if (has_ready_indicator or not connecting_or_starting) and input_ready and submit_ready:
-                print("✅ Agent is ready for user input - input field and submit button are enabled")
+            if (
+                (has_ready_indicator or not connecting_or_starting)
+                and input_ready
+                and submit_ready
+            ):
+                print(
+                    "✅ Agent is ready for user input - input field and submit button are enabled"
+                )
                 agent_ready = True
                 break
         except Exception as e:
@@ -105,7 +117,9 @@ def wait_for_agent_input_ready(page: Page, max_wait_time: int = 480) -> None:
 
     if not agent_ready:
         page.screenshot(path="test-results/agent_timeout.png")
-        raise AssertionError(f"Agent did not become ready for input within {max_wait_time} seconds")
+        raise AssertionError(
+            f"Agent did not become ready for input within {max_wait_time} seconds"
+        )
 
 
 def _get_status_messages(page: Page) -> list[str]:
@@ -120,7 +134,9 @@ def _get_status_messages(page: Page) -> list[str]:
 def _check_input_ready(page: Page) -> tuple[bool, bool]:
     """Check if input field and submit button are ready."""
     try:
-        chat_input = page.locator('[data-testid="chat-input"] textarea, [data-testid="chat-input"] input')
+        chat_input = page.locator(
+            '[data-testid="chat-input"] textarea, [data-testid="chat-input"] input'
+        )
         submit_button = page.locator('[data-testid="chat-input"] button[type="submit"]')
 
         input_ready = chat_input.is_visible() and chat_input.is_enabled()
@@ -254,7 +270,9 @@ def wait_for_agent_response(page: Page, timeout: int = 300) -> str | None:
         try:
             agent_messages = page.locator('[data-testid="agent-message"]').all()
             if elapsed % 30 == 0 and elapsed > 0:
-                print(f"Found {len(agent_messages)} agent messages (waiting {elapsed}s)")
+                print(
+                    f"Found {len(agent_messages)} agent messages (waiting {elapsed}s)"
+                )
 
             # Check if we have at least one message with content
             for msg in reversed(agent_messages):
@@ -344,7 +362,9 @@ def launch_repository(page: Page, timeout: int = 30000) -> None:
                 print(f"Repository Launch button is enabled (attempt {attempt + 1})")
                 button_enabled = True
                 break
-            print(f"Launch button still disabled, waiting... (attempt {attempt + 1}/{max_wait_attempts})")
+            print(
+                f"Launch button still disabled, waiting... (attempt {attempt + 1}/{max_wait_attempts})"
+            )
             page.wait_for_timeout(2000)
         except Exception as e:
             print(f"Error checking button state (attempt {attempt + 1}): {e}")

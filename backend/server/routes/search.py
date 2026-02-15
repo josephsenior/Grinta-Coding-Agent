@@ -22,18 +22,22 @@ if TYPE_CHECKING:
 else:
     ConversationStore = Any
 
-router = APIRouter(prefix="/api/search", tags=["search"])
+router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
 
 class SearchResult(BaseModel):
     """Search result item."""
 
     id: str = Field(..., min_length=1, description="Result identifier")
-    type: str = Field(..., min_length=1, description="Result type (e.g., 'conversation', 'file')")
+    type: str = Field(
+        ..., min_length=1, description="Result type (e.g., 'conversation', 'file')"
+    )
     title: str = Field(..., min_length=1, description="Result title")
     description: str | None = Field(None, description="Result description")
     url: str | None = Field(None, description="Result URL")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
     @field_validator("id", "type", "title")
     @classmethod
@@ -48,7 +52,9 @@ class SearchResponse(BaseModel):
     """Search response."""
 
     query: str = Field(..., min_length=1, description="Search query that was executed")
-    results: dict[str, list[SearchResult]] = Field(default_factory=dict, description="Search results grouped by type")
+    results: dict[str, list[SearchResult]] = Field(
+        default_factory=dict, description="Search results grouped by type"
+    )
     total: int = Field(default=0, ge=0, description="Total number of results")
 
     @field_validator("query")
@@ -210,7 +216,9 @@ async def global_search(
 
         # Search conversations
         if type in ("conversations", "all"):
-            conversation_results = await _search_conversations(conversation_store, user_id, query, limit=limit)
+            conversation_results = await _search_conversations(
+                conversation_store, user_id, query, limit=limit
+            )
             results["conversations"] = conversation_results
             total += len(conversation_results)
 

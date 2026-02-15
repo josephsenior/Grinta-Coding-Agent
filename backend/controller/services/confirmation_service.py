@@ -73,7 +73,11 @@ class ConfirmationService:
         controller = self._context.get_controller()
         if not controller._replay_manager.replay_mode:
             return None
-        total = len(controller._replay_manager.replay_events) if controller._replay_manager.replay_events else 0
+        total = (
+            len(controller._replay_manager.replay_events)
+            if controller._replay_manager.replay_events
+            else 0
+        )
         return (controller._replay_manager.replay_index, total)
 
     @property
@@ -94,7 +98,9 @@ class ConfirmationService:
             return
 
         await self._safety_service.analyze_security(action)
-        is_high_security_risk, is_ask_for_every_action = self._safety_service.evaluate_security_risk(action)
+        is_high_security_risk, is_ask_for_every_action = (
+            self._safety_service.evaluate_security_risk(action)
+        )
         self._safety_service.apply_confirmation_state(
             action,
             is_high_security_risk=is_high_security_risk,
@@ -117,6 +123,8 @@ class ConfirmationService:
     ) -> None:
         """Handle state transitions when an observation arrives for a pending action."""
         controller = self._context.get_controller()
-        from backend.controller.services.observation_service import transition_agent_state_logic
+        from backend.controller.services.observation_service import (
+            transition_agent_state_logic,
+        )
 
         await transition_agent_state_logic(controller, ctx, observation)

@@ -63,7 +63,9 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
 
     """
     try:
-        logger.info("*** DEBUG: connect handler called with connection_id: %s", connection_id)
+        logger.info(
+            "*** DEBUG: connect handler called with connection_id: %s", connection_id
+        )
         logger.info("sio:connect: %s", connection_id)
         query_params = parse_qs(environ.get("QUERY_STRING", ""))
         auth = args[0] if args else {}
@@ -86,8 +88,12 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
         cookies_str = environ.get("HTTP_COOKIE", "")
         authorization_header = environ.get("HTTP_AUTHORIZATION")
         conversation_validator = create_conversation_validator()
-        user_id = await conversation_validator.validate(conversation_id, cookies_str, authorization_header)
-        logger.info("User %s is allowed to connect to conversation %s", user_id, conversation_id)
+        user_id = await conversation_validator.validate(
+            conversation_id, cookies_str, authorization_header
+        )
+        logger.info(
+            "User %s is allowed to connect to conversation %s", user_id, conversation_id
+        )
 
         # Register connection with connection manager
         conn_manager = get_connection_manager()
@@ -106,7 +112,9 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
         try:
             delivered = await conn_manager.deliver_queued_messages(connection_id, sio)
             if delivered > 0:
-                logger.info("Delivered %s queued messages to %s", delivered, connection_id)
+                logger.info(
+                    "Delivered %s queued messages to %s", delivered, connection_id
+                )
         except Exception as e:
             logger.error("Error delivering queued messages: %s", e)
 
@@ -127,11 +135,15 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
             raise SocketIOConnectionRefusedError(msg) from e
 
         # Replay events
-        await replay_event_stream(event_store, latest_event_id, connection_id, conversation_id)
+        await replay_event_stream(
+            event_store, latest_event_id, connection_id, conversation_id
+        )
 
         # Join conversation
         try:
-            conversation_init_data = await setup_init_conversation_settings(user_id, conversation_id, providers_set)
+            conversation_init_data = await setup_init_conversation_settings(
+                user_id, conversation_id, providers_set
+            )
         except Exception as e:
             logger.error(
                 "Failed to setup conversation settings for conversation %s (user_id: %s): %s",
@@ -140,7 +152,9 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
                 e,
                 exc_info=True,
             )
-            raise SocketIOConnectionRefusedError(f"Failed to setup conversation settings: {e}") from e
+            raise SocketIOConnectionRefusedError(
+                f"Failed to setup conversation settings: {e}"
+            ) from e
 
         agent_loop_info = await manager.join_conversation(
             conversation_id,
@@ -185,7 +199,9 @@ async def forge_user_action(connection_id: str, data: dict[str, Any]) -> None:
 
     """
     # Debug logging
-    logger.info("forge_user_action received: action=%s, data=%s", data.get("action"), data)
+    logger.info(
+        "forge_user_action received: action=%s, data=%s", data.get("action"), data
+    )
 
     manager = _get_conversation_manager_instance()
     if manager is not None:

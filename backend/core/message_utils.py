@@ -21,7 +21,9 @@ def _find_usage_by_response_id(metrics: Metrics, response_id: str) -> TokenUsage
     return next((u for u in metrics.token_usages if u.response_id == response_id), None)
 
 
-def get_token_usage_for_event(event: Event | None, metrics: Metrics | None) -> TokenUsage | None:
+def get_token_usage_for_event(
+    event: Event | None, metrics: Metrics | None
+) -> TokenUsage | None:
     """Return the relevant token usage record for the provided event, if any.
 
     The search order prefers `tool_call_metadata.model_response.id` and falls back
@@ -51,7 +53,9 @@ def _find_event_index_by_id(events: list[Event], event_id: int) -> int | None:
     return next((i for i, e in enumerate(events) if e.id == event_id), None)
 
 
-def _search_backwards_for_token_usage(events: list[Event], start_idx: int, metrics: Metrics) -> TokenUsage | None:
+def _search_backwards_for_token_usage(
+    events: list[Event], start_idx: int, metrics: Metrics
+) -> TokenUsage | None:
     """Search backwards from start_idx for the first token usage."""
     for i in range(start_idx, -1, -1):
         usage = get_token_usage_for_event(events[i], metrics)
@@ -60,7 +64,9 @@ def _search_backwards_for_token_usage(events: list[Event], start_idx: int, metri
     return None
 
 
-def get_token_usage_for_event_id(events: list[Event], event_id: int, metrics: Metrics | None) -> TokenUsage | None:
+def get_token_usage_for_event_id(
+    events: list[Event], event_id: int, metrics: Metrics | None
+) -> TokenUsage | None:
     """Starting from the event with .id == event_id and moving backwards in `events`,.
 
     find the first TokenUsage record (if any) associated either with:

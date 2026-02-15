@@ -89,7 +89,9 @@ class ControllerContext:
         else:
             setattr(self._controller, "_pending_action", action)
 
-    def initialize_tool_pipeline(self, middlewares: Sequence[Any]) -> ToolInvocationPipeline:
+    def initialize_tool_pipeline(
+        self, middlewares: Sequence[Any]
+    ) -> ToolInvocationPipeline:
         """Attach a tool invocation pipeline to the controller.
 
         Resets bookkeeping caches to avoid stale context leakage.
@@ -169,10 +171,20 @@ class ControllerContext:
     def telemetry_service(self):
         return getattr(self._controller, "telemetry_service", None)
 
-    def register_action_context(self, action: Action, ctx: ToolInvocationContext) -> None:
+    @property
+    def metrics_service(self):
+        """Access agent performance metrics service."""
+        services = getattr(self._controller, "services", None)
+        return getattr(services, "metrics", None) if services else None
+
+    def register_action_context(
+        self, action: Action, ctx: ToolInvocationContext
+    ) -> None:
         self._controller._register_action_context(action, ctx)
 
-    async def run_action(self, action: Action, ctx: ToolInvocationContext | None) -> None:
+    async def run_action(
+        self, action: Action, ctx: ToolInvocationContext | None
+    ) -> None:
         await self._controller.action_service.run(action, ctx)
 
     def get_controller(self) -> AgentController:

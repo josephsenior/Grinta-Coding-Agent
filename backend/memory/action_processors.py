@@ -124,7 +124,9 @@ def _handle_tool_based_action(
 
 
 def _should_emit_user_tool_request(action: Action) -> bool:
-    src_value = getattr(getattr(action, "source", None), "value", None) or getattr(action, "source", None)
+    src_value = getattr(getattr(action, "source", None), "value", None) or getattr(
+        action, "source", None
+    )
     return src_value == "user" and getattr(action, "tool_call_metadata", None) is None
 
 
@@ -137,7 +139,9 @@ def _build_user_tool_request_message(action: Action) -> list[Message]:
 
 def _build_think_action_message(action: Action) -> list[Message]:
     think_text = cast(str, getattr(action, "thought", "")) or ""
-    think_content: list[TextContent | ImageContent] = [TextContent(text=f"🤔 {think_text}")]
+    think_content: list[TextContent | ImageContent] = [
+        TextContent(text=f"🤔 {think_text}")
+    ]
     return [Message(role="assistant", content=think_content)]
 
 
@@ -232,7 +236,9 @@ def _convert_tool_calls(raw_tool_calls: Any) -> list[ToolCall] | None:
     return normalized
 
 
-def _ensure_tool_call_function(call_dict: dict[str, Any], source: Any, idx: int) -> None:
+def _ensure_tool_call_function(
+    call_dict: dict[str, Any], source: Any, idx: int
+) -> None:
     """Ensure tool call payload includes a proper function dict."""
     function_payload = call_dict.get("function")
     fallback_name = (
@@ -241,7 +247,9 @@ def _ensure_tool_call_function(call_dict: dict[str, Any], source: Any, idx: int)
         or getattr(source, "name", None)
         or f"tool_call_{idx}"
     )
-    fallback_arguments = call_dict.get("arguments") or getattr(source, "arguments", None) or "{}"
+    fallback_arguments = (
+        call_dict.get("arguments") or getattr(source, "arguments", None) or "{}"
+    )
 
     if not function_payload:
         function_payload = {
@@ -264,7 +272,9 @@ def _handle_agent_finish_action(action: PlaybookFinishAction) -> list[Message]:
     """Handle PlaybookFinishAction by converting thought/conclusion to message."""
     role = _role_from_source(getattr(action, "source", None))
     _merge_tool_metadata_thought(action)
-    content_items: list[TextContent | ImageContent] = [TextContent(text=action.thought or "")]
+    content_items: list[TextContent | ImageContent] = [
+        TextContent(text=action.thought or "")
+    ]
     return [Message(role=role, content=content_items)]
 
 
@@ -298,7 +308,9 @@ def _merge_tool_metadata_thought(action: PlaybookFinishAction) -> None:
     setattr(action, "tool_call_metadata", None)
 
 
-def _handle_message_action(action: MessageAction, vision_is_active: bool) -> list[Message]:
+def _handle_message_action(
+    action: MessageAction, vision_is_active: bool
+) -> list[Message]:
     """Handle MessageAction with optional image content."""
     src = getattr(action, "source", None)
     if isinstance(src, EventSource):

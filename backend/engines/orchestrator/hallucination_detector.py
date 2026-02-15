@@ -57,7 +57,9 @@ class HallucinationDetector:
         self.detection_enabled = True
         self.false_positive_threshold = 0.7  # Confidence threshold to trigger alert
 
-    def detect_text_hallucination(self, llm_response_text: str, tools_called: list[str], actions: list[Action]) -> dict:
+    def detect_text_hallucination(
+        self, llm_response_text: str, tools_called: list[str], actions: list[Action]
+    ) -> dict:
         """Detect if LLM claimed actions without executing tools.
 
         Args:
@@ -80,17 +82,23 @@ class HallucinationDetector:
         hallucinations = []
 
         # Check for file creation claims
-        creation_hallucination = self._detect_file_creation_hallucination(llm_response_text, tools_called, actions)
+        creation_hallucination = self._detect_file_creation_hallucination(
+            llm_response_text, tools_called, actions
+        )
         if creation_hallucination:
             hallucinations.append(creation_hallucination)
 
         # Check for file edit claims
-        edit_hallucination = self._detect_file_edit_hallucination(llm_response_text, tools_called, actions)
+        edit_hallucination = self._detect_file_edit_hallucination(
+            llm_response_text, tools_called, actions
+        )
         if edit_hallucination:
             hallucinations.append(edit_hallucination)
 
         # Check for code execution claims
-        exec_hallucination = self._detect_code_exec_hallucination(llm_response_text, tools_called, actions)
+        exec_hallucination = self._detect_code_exec_hallucination(
+            llm_response_text, tools_called, actions
+        )
         if exec_hallucination:
             hallucinations.append(exec_hallucination)
 
@@ -105,7 +113,9 @@ class HallucinationDetector:
             "hallucinated": True,
             "confidence": max(h["confidence"] for h in hallucinations),
             "claimed_operations": [h["claim"] for h in hallucinations],
-            "missing_tools": list(set(tool for h in hallucinations for tool in h["missing_tools"])),
+            "missing_tools": list(
+                set(tool for h in hallucinations for tool in h["missing_tools"])
+            ),
             "severity": severity,
             "details": hallucinations,
         }
@@ -125,7 +135,10 @@ class HallucinationDetector:
                 if not any(tool in tools_called for tool in file_tools):
                     # Check actions list too
                     if not any(isinstance(a, FileEditAction) for a in actions):
-                        logger.warning("Hallucination detected: Claimed '%s' without tool call", claim)
+                        logger.warning(
+                            "Hallucination detected: Claimed '%s' without tool call",
+                            claim,
+                        )
                         return {
                             "type": "file_creation",
                             "claim": claim,
@@ -135,7 +148,9 @@ class HallucinationDetector:
 
         return None
 
-    def _detect_file_edit_hallucination(self, text: str, tools_called: list[str], actions: list[Action]) -> dict | None:
+    def _detect_file_edit_hallucination(
+        self, text: str, tools_called: list[str], actions: list[Action]
+    ) -> dict | None:
         """Detect file edit claims without tool calls."""
         for pattern in self.FILE_EDIT_PATTERNS:
             matches = re.finditer(pattern, text, re.IGNORECASE)
@@ -145,7 +160,10 @@ class HallucinationDetector:
                 file_tools = ["edit_file", "str_replace_editor"]
                 if not any(tool in tools_called for tool in file_tools):
                     if not any(isinstance(a, FileEditAction) for a in actions):
-                        logger.warning("Hallucination detected: Claimed '%s' without tool call", claim)
+                        logger.warning(
+                            "Hallucination detected: Claimed '%s' without tool call",
+                            claim,
+                        )
                         return {
                             "type": "file_edit",
                             "claim": claim,
@@ -155,7 +173,9 @@ class HallucinationDetector:
 
         return None
 
-    def _detect_code_exec_hallucination(self, text: str, tools_called: list[str], actions: list[Action]) -> dict | None:
+    def _detect_code_exec_hallucination(
+        self, text: str, tools_called: list[str], actions: list[Action]
+    ) -> dict | None:
         """Detect code execution claims without tool calls."""
         for pattern in self.CODE_EXEC_PATTERNS:
             matches = re.finditer(pattern, text, re.IGNORECASE)
@@ -191,7 +211,9 @@ class HallucinationDetector:
         count = len(hallucinations)
 
         # File operations are critical
-        has_file_hallucination = any(h["type"] in ("file_creation", "file_edit") for h in hallucinations)
+        has_file_hallucination = any(
+            h["type"] in ("file_creation", "file_edit") for h in hallucinations
+        )
 
         if has_file_hallucination and max_confidence > 0.85:
             return "critical"
@@ -202,7 +224,9 @@ class HallucinationDetector:
         else:
             return "low"
 
-    def generate_correction_prompt(self, detection_result: dict, original_request: str) -> str:
+    def generate_correction_prompt(
+        self, detection_result: dict, original_request: str
+    ) -> str:
         """Generate a prompt to correct the hallucination.
 
         Args:

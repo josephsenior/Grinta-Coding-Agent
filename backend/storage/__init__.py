@@ -52,7 +52,9 @@ def get_file_store(
         if file_store_web_hook_headers is None:
             file_store_web_hook_headers = {}
             if os.getenv("SESSION_API_KEY"):
-                file_store_web_hook_headers["X-Session-API-Key"] = os.getenv("SESSION_API_KEY")
+                file_store_web_hook_headers["X-Session-API-Key"] = os.getenv(
+                    "SESSION_API_KEY"
+                )
         client = httpx.Client(headers=file_store_web_hook_headers or {})
         if file_store_web_hook_batch:
             store = BatchedWebHookFileStore(store, file_store_web_hook_url, client)

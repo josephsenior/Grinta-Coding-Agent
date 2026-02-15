@@ -51,7 +51,9 @@ class RuntimeWatchdog:
             else _env_float("FORGE_RUNTIME_MAX_ACTIVE_SECONDS", 3600.0)
         )
         self._poll_interval = (
-            poll_interval if poll_interval is not None else _env_float("FORGE_RUNTIME_WATCHDOG_INTERVAL", 30.0)
+            poll_interval
+            if poll_interval is not None
+            else _env_float("FORGE_RUNTIME_WATCHDOG_INTERVAL", 30.0)
         )
         self._telemetry = telemetry or runtime_telemetry
         self._watched: dict[str, WatchedRuntime] = {}
@@ -59,7 +61,9 @@ class RuntimeWatchdog:
         self._cleanup_hook: Callable[[], int] | None = None
         self._stop_event = threading.Event()
         self._tick = threading.Event()
-        self._thread = threading.Thread(target=self._run, name="RuntimeWatchdog", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name="RuntimeWatchdog", daemon=True
+        )
         self._tick.set()
         self._thread.start()
 
@@ -169,7 +173,9 @@ class RuntimeWatchdog:
                 try:
                     removed = self._cleanup_hook()
                     if removed:
-                        logger.debug("Runtime pool cleanup removed %s runtimes", removed)
+                        logger.debug(
+                            "Runtime pool cleanup removed %s runtimes", removed
+                        )
                 except Exception as exc:  # pragma: no cover - defensive
                     logger.debug("Runtime pool cleanup failed: %s", exc)
 

@@ -92,14 +92,20 @@ def explore_tree_structure(
         explored_entities[entity_id] = entity
 
         # Get dependencies
-        deps = indexer.graph.get_dependencies(entity_id, direction=direction, dependency_types=dependency_type_filter)
+        deps = indexer.graph.get_dependencies(
+            entity_id, direction=direction, dependency_types=dependency_type_filter
+        )
         explored_dependencies.extend(deps)
 
         # Traverse dependencies
         for dep in deps:
-            next_entity_id = dep.to_entity if direction == "downstream" else dep.from_entity
+            next_entity_id = (
+                dep.to_entity if direction == "downstream" else dep.from_entity
+            )
             if direction == "both":
-                next_entity_id = dep.to_entity if dep.from_entity == entity_id else dep.from_entity
+                next_entity_id = (
+                    dep.to_entity if dep.from_entity == entity_id else dep.from_entity
+                )
             traverse(next_entity_id, depth + 1, visited)
 
     # Start traversal from all start entities
@@ -132,7 +138,9 @@ def explore_tree_structure(
     }
 
 
-def get_entity_contents(entity_names: list[str], workspace_root: str = "/workspace") -> dict[str, Any]:
+def get_entity_contents(
+    entity_names: list[str], workspace_root: str = "/workspace"
+) -> dict[str, Any]:
     """Get the complete content of specified entities.
 
     Args:
@@ -175,11 +183,15 @@ def get_entity_contents(entity_names: list[str], workspace_root: str = "/workspa
             entity = indexer.graph.entities.get(entity_id)
             if entity:
                 lines = content.splitlines()
-                entity_content = "\n".join(lines[entity.line_start - 1 : entity.line_end])
+                entity_content = "\n".join(
+                    lines[entity.line_start - 1 : entity.line_end]
+                )
                 results[entity_name] = entity_content
             else:
                 # Fallback: try to find by name pattern
-                results[entity_name] = _extract_symbol_by_name(content, symbol_path, file_path)
+                results[entity_name] = _extract_symbol_by_name(
+                    content, symbol_path, file_path
+                )
 
         except Exception as e:
             results[entity_name] = f"Error reading {entity_name}: {e}"
@@ -202,7 +214,10 @@ def _extract_symbol_by_name(content: str, symbol_path: str, file_path: str) -> s
             end = start + 1
 
             for j in range(i + 1, len(lines)):
-                if lines[j].strip() and len(lines[j]) - len(lines[j].lstrip()) <= indent:
+                if (
+                    lines[j].strip()
+                    and len(lines[j]) - len(lines[j].lstrip()) <= indent
+                ):
                     if not lines[j].strip().startswith(("#", '"', "'")):
                         break
                 end = j + 1
@@ -273,7 +288,9 @@ def search_code_snippets(
     return {"snippets": results}
 
 
-def _search_in_content(content: str, lines: list[str], term: str, file_path: str) -> list[dict[str, Any]]:
+def _search_in_content(
+    content: str, lines: list[str], term: str, file_path: str
+) -> list[dict[str, Any]]:
     """Search for a term in file content."""
     results: list[dict[str, Any]] = []
     term_lower = term.lower()
@@ -301,5 +318,7 @@ def _get_line_context(lines: list[str], line_num: int, context_lines: int = 5) -
     context_lines_list = lines[start:end]
 
     # Add line numbers
-    numbered = [f"{i + start + 1:4d} | {line}" for i, line in enumerate(context_lines_list)]
+    numbered = [
+        f"{i + start + 1:4d} | {line}" for i, line in enumerate(context_lines_list)
+    ]
     return "\n".join(numbered)

@@ -213,8 +213,12 @@ class Runtime(
                 event_stream.unsubscribe(EventStreamSubscriber.RUNTIME, self.sid)
             except Exception:
                 pass  # Ignore if not subscribed
-            event_stream.subscribe(EventStreamSubscriber.RUNTIME, self.on_event, self.sid)
-        self.plugins = copy.deepcopy(plugins) if plugins is not None and len(plugins) > 0 else []
+            event_stream.subscribe(
+                EventStreamSubscriber.RUNTIME, self.on_event, self.sid
+            )
+        self.plugins = (
+            copy.deepcopy(plugins) if plugins is not None and len(plugins) > 0 else []
+        )
         self.status_callback = status_callback
         self.attach_to_existing = attach_to_existing
         self.config = copy.deepcopy(config)
@@ -237,7 +241,9 @@ class Runtime(
         self.initial_env_vars.update(raw_env_vars)
         FileEditRuntimeMixin.__init__(
             self,
-            enable_llm_editor=getattr(config.get_agent_config(), "enable_llm_editor", False),
+            enable_llm_editor=getattr(
+                config.get_agent_config(), "enable_llm_editor", False
+            ),
             llm_registry=llm_registry,
         )
         self.user_id = user_id
@@ -332,7 +338,9 @@ class Runtime(
             asyncio.set_event_loop(loop)
             return loop, True
 
-    def _run_cleanup_synchronously(self, loop: asyncio.AbstractEventLoop | None, created: bool) -> None:
+    def _run_cleanup_synchronously(
+        self, loop: asyncio.AbstractEventLoop | None, created: bool
+    ) -> None:
         import asyncio
 
         if loop is None:
@@ -344,7 +352,9 @@ class Runtime(
         finally:
             self._close_loop_if_needed(loop, created)
 
-    def _close_loop_if_needed(self, loop: asyncio.AbstractEventLoop, created: bool) -> None:
+    def _close_loop_if_needed(
+        self, loop: asyncio.AbstractEventLoop, created: bool
+    ) -> None:
         import asyncio
 
         if not created:
@@ -376,7 +386,9 @@ class Runtime(
         message = f"[runtime {self.sid}] {message}"
         getattr(logger, level)(message, stacklevel=2)
 
-    def set_runtime_status(self, runtime_status: RuntimeStatus, msg: str = "", level: str = "info") -> None:
+    def set_runtime_status(
+        self, runtime_status: RuntimeStatus, msg: str = "", level: str = "info"
+    ) -> None:
         """Sends a status message if the callback function was provided."""
         self.runtime_status = runtime_status
         if self.status_callback:
@@ -394,7 +406,9 @@ class Runtime(
 
     async def _export_latest_git_provider_tokens(self, event: Action) -> None:
         """Refresh runtime provider tokens when agent attemps to run action with provider token."""
-        providers_called = ProviderHandler.check_cmd_action_for_provider_token_ref(event)
+        providers_called = ProviderHandler.check_cmd_action_for_provider_token_ref(
+            event
+        )
         if not providers_called:
             return
         provider_handler = ProviderHandler(
@@ -411,7 +425,9 @@ class Runtime(
             return
         try:
             if self.event_stream:
-                await provider_handler.set_event_stream_secrets(self.event_stream, env_vars=env_vars)
+                await provider_handler.set_event_stream_secrets(
+                    self.event_stream, env_vars=env_vars
+                )
             self.add_env_vars(provider_handler.expose_env_vars(env_vars))
         except Exception:
             logger.warning("Failed to export latest provider tokens to runtime")
@@ -444,7 +460,9 @@ class Runtime(
         else:
             return await call_sync_from_async(self.run_action, event)
 
-    def _handle_runtime_error(self, event: Action, error: Exception, is_network_error: bool = False) -> None:
+    def _handle_runtime_error(
+        self, event: Action, error: Exception, is_network_error: bool = False
+    ) -> None:
         """Handle runtime error during action execution.
 
         Args:
@@ -453,7 +471,11 @@ class Runtime(
             is_network_error: Whether this is a network/disconnection error
 
         """
-        runtime_status = RuntimeStatus.ERROR_RUNTIME_DISCONNECTED if is_network_error else RuntimeStatus.ERROR
+        runtime_status = (
+            RuntimeStatus.ERROR_RUNTIME_DISCONNECTED
+            if is_network_error
+            else RuntimeStatus.ERROR
+        )
         error_message = f"{type(error).__name__}: {error!s}"
         self.log("error", f"Unexpected error while running action: {error_message}")
         self.log("error", f"Problematic action: {event!s}")
@@ -483,7 +505,8 @@ class Runtime(
         self._set_action_timeout(event)
 
         assert event.timeout is not None or (
-            isinstance(event, CmdRunAction) and self._is_long_running_command(event.command)
+            isinstance(event, CmdRunAction)
+            and self._is_long_running_command(event.command)
         )
 
         try:
@@ -550,7 +573,9 @@ class Runtime(
 
         return observation
 
-    def _verify_action_if_needed(self, action: Action, observation: Observation) -> Observation | None:
+    def _verify_action_if_needed(
+        self, action: Action, observation: Observation
+    ) -> Observation | None:
         """Verify critical actions to prevent hallucinations (Layer 3).
 
         Args:
@@ -578,7 +603,10 @@ class Runtime(
             if isinstance(verify_result, CmdOutputObservation):
                 if "ERROR:MISSING" in verify_result.content:
                     # CRITICAL: File was not created despite tool execution
-                    logger.error("HALLUCINATION DETECTED: File %s missing after edit_file", file_path)
+                    logger.error(
+                        "HALLUCINATION DETECTED: File %s missing after edit_file",
+                        file_path,
+                    )
                     error_msg = f"""❌ CRITICAL VERIFICATION FAILURE:
 File {file_path} does NOT exist despite edit_file tool execution.
 This indicates a hallucination or execution failure.
@@ -599,7 +627,9 @@ Please retry the file creation."""
                         enhanced_content = f"""{observation.content}
 
 ✅ VERIFICATION: File {file_path} confirmed to exist ({lines} lines)"""
-                        return FileWriteObservation(content=enhanced_content, path=file_path)
+                        return FileWriteObservation(
+                            content=enhanced_content, path=file_path
+                        )
                     except ValueError:
                         pass
 
@@ -624,7 +654,9 @@ Please retry the file creation."""
             return None
 
         if not hasattr(self, action_type):
-            return ErrorObservation(f"Action {action_type} is not supported in the current runtime.")
+            return ErrorObservation(
+                f"Action {action_type} is not supported in the current runtime."
+            )
 
         return None
 
@@ -663,7 +695,9 @@ Please retry the file creation."""
         pass
 
     @abstractmethod
-    def get_mcp_config(self, extra_stdio_servers: list[MCPStdioServerConfig] | None = None) -> MCPConfig:
+    def get_mcp_config(
+        self, extra_stdio_servers: list[MCPStdioServerConfig] | None = None
+    ) -> MCPConfig:
         """Get MCP configuration for this runtime."""
         pass
 
@@ -688,7 +722,9 @@ Please retry the file creation."""
         pass
 
     @abstractmethod
-    def copy_to(self, host_src: str, runtime_dest: str, recursive: bool = False) -> None:
+    def copy_to(
+        self, host_src: str, runtime_dest: str, recursive: bool = False
+    ) -> None:
         """Copy files from host into the runtime environment."""
         raise NotImplementedError
 
@@ -778,9 +814,13 @@ Please retry the file creation."""
         """Return a session API key if configured for the runtime (default: None)."""
         return None
 
-    def _execute_shell_fn_git_handler(self, command: str, cwd: str | None) -> CommandResult:
+    def _execute_shell_fn_git_handler(
+        self, command: str, cwd: str | None
+    ) -> CommandResult:
         """This function is used by the GitHandler to execute shell commands."""
-        obs = self.run(CmdRunAction(command=command, is_static=True, hidden=True, cwd=cwd))
+        obs = self.run(
+            CmdRunAction(command=command, is_static=True, hidden=True, cwd=cwd)
+        )
         exit_code = 0
         if isinstance(obs, ErrorObservation):
             exit_code = -1
@@ -800,7 +840,9 @@ Please retry the file creation."""
         """Provide runtime-specific instructions appended to agent prompts."""
         return ""
 
-    def subscribe_to_shell_stream(self, callback: Callable[[str], None] | None = None) -> bool:
+    def subscribe_to_shell_stream(
+        self, callback: Callable[[str], None] | None = None
+    ) -> bool:
         """Subscribe to shell command output stream.
 
         This method is meant to be overridden by runtime implementations

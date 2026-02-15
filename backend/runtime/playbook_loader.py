@@ -46,7 +46,9 @@ class PlaybookLoaderMixin:
     # Public API
     # ------------------------------------------------------------------
 
-    def _load_playbooks_from_directory(self, playbooks_dir: Path, source_description: str) -> list[BasePlaybook]:
+    def _load_playbooks_from_directory(
+        self, playbooks_dir: Path, source_description: str
+    ) -> list[BasePlaybook]:
         """Load playbooks from a directory.
 
         Args:
@@ -84,9 +86,9 @@ class PlaybookLoaderMixin:
             repo_agents, knowledge_agents = load_playbooks_from_dir(playbook_folder)
             self.log(
                 "info",
-                f"Loaded {len(repo_agents)} repo agents and {len(knowledge_agents)} knowledge agents from {
-                    source_description
-                }",
+                f"Loaded {len(repo_agents)} repo agents and {
+                    len(knowledge_agents)
+                } knowledge agents from {source_description}",
             )
             loaded_playbooks.extend(repo_agents.values())
             loaded_playbooks.extend(knowledge_agents.values())
@@ -96,7 +98,9 @@ class PlaybookLoaderMixin:
             shutil.rmtree(playbook_folder)
         return loaded_playbooks
 
-    def get_playbooks_from_org_or_user(self, selected_repository: str) -> list[BasePlaybook]:
+    def get_playbooks_from_org_or_user(
+        self, selected_repository: str
+    ) -> list[BasePlaybook]:
         """Load playbooks from the organization or user level repository.
 
         For example, if the repository is github.com/acme-co/api, this will check if
@@ -123,7 +127,9 @@ class PlaybookLoaderMixin:
 
         return self._clone_and_load_org_playbooks(org_name, org_FORGE_repo)
 
-    def get_playbooks_from_selected_repo(self, selected_repository: str | None) -> list[BasePlaybook]:
+    def get_playbooks_from_selected_repo(
+        self, selected_repository: str | None
+    ) -> list[BasePlaybook]:
         """Load playbooks from the selected repository.
 
         If selected_repository is None, load playbooks from the current workspace.
@@ -147,7 +153,9 @@ class PlaybookLoaderMixin:
         )
         obs = cast(
             Any,
-            self.read(FileReadAction(path=str(self.workspace_root / ".FORGE_instructions"))),
+            self.read(
+                FileReadAction(path=str(self.workspace_root / ".FORGE_instructions"))
+            ),
         )
         if isinstance(obs, ErrorObservation) and repo_root is not None:
             self.log(
@@ -167,7 +175,9 @@ class PlaybookLoaderMixin:
                     file_content=obs.content,
                 ),
             )
-        repo_playbooks = self._load_playbooks_from_directory(playbooks_dir, "repository")
+        repo_playbooks = self._load_playbooks_from_directory(
+            playbooks_dir, "repository"
+        )
         loaded_playbooks.extend(repo_playbooks)
         return loaded_playbooks
 
@@ -193,7 +203,9 @@ class PlaybookLoaderMixin:
         """Get org-level config repository path."""
         return f"{org_name}/.Forge"
 
-    def _clone_and_load_org_playbooks(self, org_name: str, org_FORGE_repo: str) -> list[BasePlaybook]:
+    def _clone_and_load_org_playbooks(
+        self, org_name: str, org_FORGE_repo: str
+    ) -> list[BasePlaybook]:
         """Clone org config repo and load playbooks."""
         org_repo_dir = self.workspace_root / f"org_FORGE_{org_name}"
         self.log("debug", f"Creating temporary directory for org repo: {org_repo_dir}")
@@ -216,9 +228,13 @@ class PlaybookLoaderMixin:
 
         return self._execute_clone_and_load(org_repo_dir, remote_url, org_FORGE_repo)
 
-    def _execute_clone_and_load(self, org_repo_dir, remote_url: str, org_FORGE_repo: str) -> list[BasePlaybook]:
+    def _execute_clone_and_load(
+        self, org_repo_dir, remote_url: str, org_FORGE_repo: str
+    ) -> list[BasePlaybook]:
         """Execute git clone and load playbooks."""
-        clone_cmd = f"GIT_TERMINAL_PROMPT=0 git clone --depth 1 {remote_url} {org_repo_dir}"
+        clone_cmd = (
+            f"GIT_TERMINAL_PROMPT=0 git clone --depth 1 {remote_url} {org_repo_dir}"
+        )
         self.log("info", "Executing clone command for org-level repo")
 
         action = CmdRunAction(command=clone_cmd)
@@ -229,13 +245,19 @@ class PlaybookLoaderMixin:
         self._log_clone_failure(obs, org_FORGE_repo)
         return []
 
-    def _load_and_cleanup_org_playbooks(self, org_repo_dir, org_FORGE_repo: str) -> list[BasePlaybook]:
+    def _load_and_cleanup_org_playbooks(
+        self, org_repo_dir, org_FORGE_repo: str
+    ) -> list[BasePlaybook]:
         """Load playbooks and cleanup cloned repo."""
-        self.log("info", f"Successfully cloned org-level playbooks from {org_FORGE_repo}")
+        self.log(
+            "info", f"Successfully cloned org-level playbooks from {org_FORGE_repo}"
+        )
         org_playbooks_dir = org_repo_dir / "playbooks"
         self.log("info", f"Looking for playbooks in directory: {org_playbooks_dir}")
 
-        loaded_playbooks = self._load_playbooks_from_directory(org_playbooks_dir, "org-level")
+        loaded_playbooks = self._load_playbooks_from_directory(
+            org_playbooks_dir, "org-level"
+        )
         self.log(
             "info",
             f"Loaded {len(loaded_playbooks)} playbooks from org-level repository {org_FORGE_repo}",
@@ -249,7 +271,9 @@ class PlaybookLoaderMixin:
 
     def _log_clone_failure(self, obs, org_FORGE_repo: str) -> None:
         """Log clone failure details."""
-        clone_error_msg = obs.content if isinstance(obs, CmdOutputObservation) else "Unknown error"
+        clone_error_msg = (
+            obs.content if isinstance(obs, CmdOutputObservation) else "Unknown error"
+        )
         exit_code = obs.exit_code if isinstance(obs, CmdOutputObservation) else "N/A"
         self.log(
             "info",

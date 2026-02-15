@@ -81,7 +81,9 @@ class CircuitBreaker:
         if st.failures >= self.failure_threshold and st.state == "closed":
             st.state = "open"
             st.opened_at = time.time()
-            st.open_seconds = max(self.base_open_seconds, st.open_seconds or self.base_open_seconds)
+            st.open_seconds = max(
+                self.base_open_seconds, st.open_seconds or self.base_open_seconds
+            )
             _CB_METRICS.on_open(self.key)
 
     def _on_success(self) -> None:
@@ -90,7 +92,9 @@ class CircuitBreaker:
             # Close and reset
             st.state = "closed"
             st.failures = 0
-            st.open_seconds = max(self.base_open_seconds, st.open_seconds or self.base_open_seconds)
+            st.open_seconds = max(
+                self.base_open_seconds, st.open_seconds or self.base_open_seconds
+            )
             _CB_METRICS.on_close_success(self.key)
         elif st.state == "closed":
             # Healthy path; reset failures

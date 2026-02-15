@@ -19,7 +19,9 @@ class BrowsingResponseParser(ResponseParser):
         self.action_parsers = [BrowsingActionParserMessage()]
         self.default_parser = BrowsingActionParserBrowseInteractive()
 
-    def parse(self, response: str | dict[str, list[dict[str, dict[str, str | None]]]]) -> Action:
+    def parse(
+        self, response: str | dict[str, list[dict[str, dict[str, str | None]]]]
+    ) -> Action:
         """Parse LLM response into a browsing action.
 
         Args:
@@ -35,7 +37,9 @@ class BrowsingResponseParser(ResponseParser):
             action_str = self.parse_response(response)
         return self.parse_action(action_str)
 
-    def parse_response(self, response: dict[str, list[dict[str, dict[str, str | None]]]]) -> str:
+    def parse_response(
+        self, response: dict[str, list[dict[str, dict[str, str | None]]]]
+    ) -> str:
         """Extract an action string from a structured LLM response.
 
         Args:
@@ -184,7 +188,11 @@ class BrowsingActionParserBrowseInteractive(ActionParser):
 
         stmt = tree.body[0] if tree.body else None
         call_node = stmt.value if isinstance(stmt, ast.Expr) else None
-        first_arg = call_node.args[0] if isinstance(call_node, ast.Call) and call_node.args else None
+        first_arg = (
+            call_node.args[0]
+            if isinstance(call_node, ast.Call) and call_node.args
+            else None
+        )
         if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
             return first_arg.value
         return None

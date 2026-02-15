@@ -53,7 +53,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ):
         logger.error("Validation error occurred: %s", exc)
         return JSONResponse(
             status_code=422,
@@ -142,10 +144,14 @@ def register_routes(
                 },
             )
         if mcp_proxy_manager is None:
-            raise HTTPException(status_code=500, detail="MCP Proxy Manager is not initialized")
+            raise HTTPException(
+                status_code=500, detail="MCP Proxy Manager is not initialized"
+            )
         mcp_tools_to_sync = await request.json()
         if not isinstance(mcp_tools_to_sync, list):
-            raise HTTPException(status_code=400, detail="Request must be a list of MCP tools to sync")
+            raise HTTPException(
+                status_code=400, detail="Request must be a list of MCP tools to sync"
+            )
         logger.info(
             "Updating MCP server with tools: %s",
             json.dumps(mcp_tools_to_sync, indent=2),
@@ -167,21 +173,29 @@ def register_routes(
         )
 
     @app.post("/upload_file")
-    async def upload_file(file: UploadFile, destination: str = "/", recursive: bool = False):
+    async def upload_file(
+        file: UploadFile, destination: str = "/", recursive: bool = False
+    ):
         client = get_client()
         assert client is not None
         try:
             filename = file.filename
             if not filename:
-                raise HTTPException(status_code=400, detail="Uploaded file must have a filename")
+                raise HTTPException(
+                    status_code=400, detail="Uploaded file must have a filename"
+                )
             if not os.path.isabs(destination):
-                raise HTTPException(status_code=400, detail="Destination must be an absolute path")
+                raise HTTPException(
+                    status_code=400, detail="Destination must be an absolute path"
+                )
             full_dest_path = destination
             if not os.path.exists(full_dest_path):
                 os.makedirs(full_dest_path, exist_ok=True)
             if recursive or (not recursive and filename.endswith(".zip")):
                 if not filename.endswith(".zip"):
-                    raise HTTPException(status_code=400, detail="Recursive uploads must be zip files")
+                    raise HTTPException(
+                        status_code=400, detail="Recursive uploads must be zip files"
+                    )
                 zip_path = os.path.join(full_dest_path, filename)
                 with open(zip_path, "wb") as buffer:
                     shutil.copyfileobj(file.file, buffer)
@@ -206,7 +220,9 @@ def register_routes(
     def download_file(path: str):
         try:
             if not os.path.isabs(path):
-                raise HTTPException(status_code=400, detail="Path must be an absolute path")
+                raise HTTPException(
+                    status_code=400, detail="Path must be an absolute path"
+                )
             if not os.path.exists(path):
                 raise HTTPException(status_code=404, detail="File not found")
             with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp_zip:
@@ -214,7 +230,9 @@ def register_routes(
                     for root, _, files in os.walk(path):
                         for file in files:
                             file_path = os.path.join(root, file)
-                            zipf.write(file_path, arcname=os.path.relpath(file_path, path))
+                            zipf.write(
+                                file_path, arcname=os.path.relpath(file_path, path)
+                            )
                 return FileResponse(
                     path=temp_zip.name,
                     media_type="application/zip",
@@ -235,7 +253,11 @@ def register_routes(
             )
 
             full_path = await _resolve_list_path(request, client)
-            if not full_path or not os.path.exists(full_path) or not os.path.isdir(full_path):
+            if (
+                not full_path
+                or not os.path.exists(full_path)
+                or not os.path.isdir(full_path)
+            ):
                 return JSONResponse(content=[])
             sorted_entries = _get_sorted_directory_entries(full_path)
             return JSONResponse(content=sorted_entries)

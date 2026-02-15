@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.schemas import EventSource, RecallType
+from backend.core.schemas import EventSource
 from backend.events.tool import ToolCallMetadata
 
 if TYPE_CHECKING:
@@ -108,7 +108,9 @@ class Event:
             except ValueError:
                 self._source = value  # preserve unknown sources from old payloads
         else:
-            raise TypeError(f"source must be EventSource, str, or None — got {type(value).__name__}")
+            raise TypeError(
+                f"source must be EventSource, str, or None — got {type(value).__name__}"
+            )
 
     @property
     def cause(self) -> int | None:
@@ -183,7 +185,9 @@ class Event:
             return metadata_raw
         required_attrs = {"function_name", "tool_call_id", "total_calls_in_response"}
         if all(hasattr(metadata_raw, attr) for attr in required_attrs):
-            return cast(ToolCallMetadata, metadata_raw)  # permissive acceptance for test doubles
+            return cast(
+                ToolCallMetadata, metadata_raw
+            )  # permissive acceptance for test doubles
         return None
 
     @tool_call_metadata.setter

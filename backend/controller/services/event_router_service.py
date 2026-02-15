@@ -101,15 +101,23 @@ class EventRouterService:
     async def _handle_message_action(self, action: MessageAction) -> None:
         """Handle message actions from users or agents."""
         if action.source == EventSource.USER:
-            log_level = "info" if os.getenv("LOG_ALL_EVENTS") in ("true", "1") else "debug"
+            log_level = (
+                "info" if os.getenv("LOG_ALL_EVENTS") in ("true", "1") else "debug"
+            )
             self._ctrl.log(
                 log_level,
                 str(action),
                 extra={"msg_type": "ACTION", "event_source": EventSource.USER},
             )
             first_user_message = self._ctrl._first_user_message()
-            is_first_user_message = action.id == first_user_message.id if first_user_message else False
-            recall_type = RecallType.WORKSPACE_CONTEXT if is_first_user_message else RecallType.KNOWLEDGE
+            is_first_user_message = (
+                action.id == first_user_message.id if first_user_message else False
+            )
+            recall_type = (
+                RecallType.WORKSPACE_CONTEXT
+                if is_first_user_message
+                else RecallType.KNOWLEDGE
+            )
             recall_action = RecallAction(query=action.content, recall_type=recall_type)
             self._ctrl._pending_action = recall_action
             self._ctrl.event_stream.add_event(recall_action, EventSource.USER)

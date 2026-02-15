@@ -46,7 +46,9 @@ class CanonicalMeta(type):
 
         # If it's an Action/Observation, we can also check the type attribute
         cls_type = getattr(cls, "action", getattr(cls, "observation", None))
-        inst_type_attr = getattr(instance, "action", getattr(instance, "observation", None))
+        inst_type_attr = getattr(
+            instance, "action", getattr(instance, "observation", None)
+        )
         if cls_type and inst_type_attr:
             return cls_type == inst_type_attr
 

@@ -48,7 +48,9 @@ class TaskTrackingMixin:
     # Plan / View handlers
     # ------------------------------------------------------------------
 
-    def _handle_task_plan_action(self, action: TaskTrackingAction, task_file_path: str) -> Observation:
+    def _handle_task_plan_action(
+        self, action: TaskTrackingAction, task_file_path: str
+    ) -> Observation:
         """Handle task plan command — create / update task list."""
         content = self._generate_task_list_content(action.task_list)
 
@@ -61,14 +63,20 @@ class TaskTrackingMixin:
                 task_list=action.task_list,
             )
         except Exception as e:
-            return ErrorObservation(f"Failed to write task list to session directory {task_file_path}: {e!s}")
+            return ErrorObservation(
+                f"Failed to write task list to session directory {task_file_path}: {e!s}"
+            )
 
-    def _handle_task_view_action(self, action: TaskTrackingAction, task_file_path: str) -> Observation:
+    def _handle_task_view_action(
+        self, action: TaskTrackingAction, task_file_path: str
+    ) -> Observation:
         """Handle task view command — read and display task list."""
         try:
             assert self.event_stream is not None
             content = self.event_stream.file_store.read(task_file_path)
-            return TaskTrackingObservation(content=content, command=action.command, task_list=[])
+            return TaskTrackingObservation(
+                content=content, command=action.command, task_list=[]
+            )
         except FileNotFoundError:
             return TaskTrackingObservation(
                 command=action.command,
@@ -95,5 +103,7 @@ class TaskTrackingMixin:
                 task.get("status", "todo"),
                 "⏳",
             )
-            content += f"{i}. {status_icon} {task.get('title', '')}\n{task.get('notes', '')}\n"
+            content += (
+                f"{i}. {status_icon} {task.get('title', '')}\n{task.get('notes', '')}\n"
+            )
         return content

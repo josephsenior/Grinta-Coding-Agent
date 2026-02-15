@@ -85,9 +85,13 @@ class ConversationMemory:
         logger.info("✓ Tracked decision: %s...", description[:50])
         return decision
 
-    def add_anchor(self, content: str, category: str, importance: float = 0.9) -> ContextAnchor:
+    def add_anchor(
+        self, content: str, category: str, importance: float = 0.9
+    ) -> ContextAnchor:
         """Create a context anchor for critical information."""
-        anchor_id = f"anchor_{len(self.anchors) + 1}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        anchor_id = (
+            f"anchor_{len(self.anchors) + 1}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
         anchor = ContextAnchor(
             anchor_id=anchor_id,
             content=content,
@@ -110,13 +114,17 @@ class ConversationMemory:
         # Add Anchors (High Priority)
         if self.anchors:
             summary_parts.append("## Critical Context (Anchors)")
-            for anchor in sorted(self.anchors.values(), key=lambda x: x.importance, reverse=True):
+            for anchor in sorted(
+                self.anchors.values(), key=lambda x: x.importance, reverse=True
+            ):
                 summary_parts.append(f"- [{anchor.category.upper()}] {anchor.content}")
 
         # Add Recent Decisions (Last 5)
         if self.decisions:
             summary_parts.append("## Recent Decisions")
-            recent = sorted(self.decisions.values(), key=lambda x: x.timestamp, reverse=True)[:5]
+            recent = sorted(
+                self.decisions.values(), key=lambda x: x.timestamp, reverse=True
+            )[:5]
             for d in recent:
                 summary_parts.append(f"- {d.description} (Rationale: {d.rationale})")
 
@@ -125,7 +133,9 @@ class ConversationMemory:
     def _initialize_vector_memory(self) -> None:
         """Initialize vector memory store for persistent context."""
         try:
-            hybrid_enabled = bool(getattr(self.agent_config, "enable_hybrid_retrieval", False))
+            hybrid_enabled = bool(
+                getattr(self.agent_config, "enable_hybrid_retrieval", False)
+            )
             self.vector_store = EnhancedVectorStore(
                 collection_name="conversation_memory",
                 enable_cache=True,
@@ -153,7 +163,9 @@ class ConversationMemory:
         self._cache_latest_user_message(messages)
 
     def _should_cache(self, messages: list[Message]) -> bool:
-        return bool(messages and getattr(self.agent_config, "enable_prompt_caching", True))
+        return bool(
+            messages and getattr(self.agent_config, "enable_prompt_caching", True)
+        )
 
     def _reset_cache_flags(self, messages: list[Message]) -> None:
         for message in messages:
@@ -177,7 +189,9 @@ class ConversationMemory:
             break
 
     @staticmethod
-    def _message_with_text(role: Literal["user", "system", "assistant", "tool"], text: str) -> Message:
+    def _message_with_text(
+        role: Literal["user", "system", "assistant", "tool"], text: str
+    ) -> Message:
         """Build a Message with a single TextContent entry."""
         content_items: list[TextContent | ImageContent] = [TextContent(text=text)]
         return Message(role=role, content=content_items)
@@ -227,7 +241,9 @@ class ConversationMemory:
 
         """
         events = self._prepare_event_history(condensed_history, initial_user_action)
-        logger.debug("Visual browsing: %s", self.agent_config.enable_som_visual_browsing)
+        logger.debug(
+            "Visual browsing: %s", self.agent_config.enable_som_visual_browsing
+        )
         messages: list[Message] = []
         tool_state = _ToolCallTracking()
         for i, event in enumerate(events):
@@ -299,9 +315,13 @@ class ConversationMemory:
                 type(event).__name__,
             )
             return [ConversationMemory._message_with_text("user", fallback_content)]
-        raise ValueError(f"Unknown event type without text content: {type(event).__name__}")
+        raise ValueError(
+            f"Unknown event type without text content: {type(event).__name__}"
+        )
 
-    def _flush_resolved_tool_calls(self, tool_state: _ToolCallTracking) -> list[Message]:
+    def _flush_resolved_tool_calls(
+        self, tool_state: _ToolCallTracking
+    ) -> list[Message]:
         """Release pending tool-call responses once all tool outputs arrive."""
         return flush_resolved_tool_calls(tool_state)
 
@@ -310,7 +330,9 @@ class ConversationMemory:
         if not messages:
             return messages
 
-        first_system_index = next((i for i, message in enumerate(messages) if message.role == "system"), -1)
+        first_system_index = next(
+            (i for i, message in enumerate(messages) if message.role == "system"), -1
+        )
         if first_system_index == -1:
             try:
                 system_prompt = self.prompt_manager.get_system_message(
@@ -319,7 +341,9 @@ class ConversationMemory:
                 )
             except Exception:
                 system_prompt = "You are Forge agent."
-            messages.insert(0, ConversationMemory._message_with_text("system", system_prompt))
+            messages.insert(
+                0, ConversationMemory._message_with_text("system", system_prompt)
+            )
             first_system_index = 0
         elif first_system_index != 0:
             sys_msg = messages.pop(first_system_index)
@@ -341,7 +365,9 @@ class ConversationMemory:
         deduped.extend(message for message in messages[1:] if message.role != "system")
         return deduped
 
-    def _remove_duplicate_system_prompt_user(self, messages: list[Message]) -> list[Message]:
+    def _remove_duplicate_system_prompt_user(
+        self, messages: list[Message]
+    ) -> list[Message]:
         """Drop leading user messages that accidentally duplicate the system prompt.
 
         Pytest can reload action modules when different suites run together, which
@@ -403,13 +429,23 @@ class ConversationMemory:
         for msg in messages:
             current_role = getattr(msg, "role", None)
             # Deep copy to avoid mutating original test fixtures / history lists.
-            new_msg = msg.model_copy(deep=True) if hasattr(msg, "model_copy") else copy.deepcopy(msg)
-            if current_role == "user" and prev_role == "user" and (len(new_msg.content) > 0):
+            new_msg = (
+                msg.model_copy(deep=True)
+                if hasattr(msg, "model_copy")
+                else copy.deepcopy(msg)
+            )
+            if (
+                current_role == "user"
+                and prev_role == "user"
+                and (len(new_msg.content) > 0)
+            ):
                 for content_item in new_msg.content:
                     if self._is_text_content(content_item):
                         # Add separator only if not already present to remain idempotent.
                         if not getattr(content_item, "text", "").startswith("\n\n"):
-                            content_item.text = "\n\n" + getattr(content_item, "text", "")
+                            content_item.text = "\n\n" + getattr(
+                                content_item, "text", ""
+                            )
                         break
             formatted_messages.append(new_msg)
             prev_role = current_role
@@ -420,7 +456,10 @@ class ConversationMemory:
         """Duck-typed check for text content objects across module reloads."""
         if isinstance(content_item, TextContent):
             return True
-        return bool(getattr(content_item, "type", None) == "text" and hasattr(content_item, "text"))
+        return bool(
+            getattr(content_item, "type", None) == "text"
+            and hasattr(content_item, "text")
+        )
 
     @staticmethod
     def _class_name_in_mro(obj: Any, target_name: str | None) -> bool:
@@ -438,7 +477,9 @@ class ConversationMemory:
         """Safely evaluate isinstance across duplicated module loads."""
         if isinstance(obj, cls):
             return True
-        return ConversationMemory._class_name_in_mro(obj, getattr(cls, "__name__", None))
+        return ConversationMemory._class_name_in_mro(
+            obj, getattr(cls, "__name__", None)
+        )
 
     @staticmethod
     def _is_action_event(event: Any) -> bool:
@@ -462,7 +503,9 @@ class ConversationMemory:
         vision_is_active: bool = False,
     ) -> list[Message]:
         """Converts an action into a message format that can be sent to the LLM."""
-        return convert_action_to_messages(action, pending_tool_call_action_messages, vision_is_active)
+        return convert_action_to_messages(
+            action, pending_tool_call_action_messages, vision_is_active
+        )
 
     def _process_recall_observation(
         self,
@@ -521,7 +564,9 @@ class ConversationMemory:
         """
         # Handle special cases first
         if self._is_instance_of(obs, RecallObservation):
-            return self._process_recall_observation(cast(RecallObservation, obs), current_index, events or [])
+            return self._process_recall_observation(
+                cast(RecallObservation, obs), current_index, events or []
+            )
 
         # Handle different observation types
         message = self._get_message_for_observation(
@@ -571,7 +616,9 @@ class ConversationMemory:
                 has_system_message = True
                 break
             # Class name match fallback (handles duplicate class loading / re-import edge cases)
-            if type(event).__name__ == "SystemMessageAction":  # pragma: no cover - defensive
+            if (
+                type(event).__name__ == "SystemMessageAction"
+            ):  # pragma: no cover - defensive
                 has_system_message = True
                 break
             # Duck-typed detection: an event with action == ActionType.SYSTEM is treated as system
@@ -589,7 +636,9 @@ class ConversationMemory:
                 events.insert(0, system_message)
                 logger.info("[ConversationMemory] Added SystemMessageAction")
 
-    def _ensure_initial_user_message(self, events: list[Event], initial_user_action: MessageAction) -> None:
+    def _ensure_initial_user_message(
+        self, events: list[Event], initial_user_action: MessageAction
+    ) -> None:
         """Ensure the initial user message is present and positioned consistently.
 
         Idempotent logic:
@@ -605,7 +654,9 @@ class ConversationMemory:
             return
 
         existing_index = self._find_existing_initial_action(events, initial_user_action)
-        if self._handle_existing_initial_action(events, initial_user_action, existing_index):
+        if self._handle_existing_initial_action(
+            events, initial_user_action, existing_index
+        ):
             return
 
         if self._has_user_message_at_index_one(events):
@@ -614,12 +665,16 @@ class ConversationMemory:
         self._insert_initial_user_at_index(events, initial_user_action)
 
     @staticmethod
-    def _append_initial_user_action(events: list[Event], initial_user_action: MessageAction) -> None:
+    def _append_initial_user_action(
+        events: list[Event], initial_user_action: MessageAction
+    ) -> None:
         logger.error("Cannot ensure initial user message: event list is empty.")
         events.append(initial_user_action)
 
     @staticmethod
-    def _find_existing_initial_action(events: list[Event], initial_user_action: MessageAction) -> int:
+    def _find_existing_initial_action(
+        events: list[Event], initial_user_action: MessageAction
+    ) -> int:
         for idx, event in enumerate(events):
             if event is initial_user_action:
                 return idx
@@ -640,13 +695,17 @@ class ConversationMemory:
         events.pop(existing_index)
         insert_pos = 1 if len(events) >= 1 else 0
         events.insert(insert_pos, initial_user_action)
-        logger.debug("Repositioned existing initial user action to index %s", insert_pos)
+        logger.debug(
+            "Repositioned existing initial user action to index %s", insert_pos
+        )
         return True
 
     def _has_user_message_at_index_one(self, events: list[Event]) -> bool:
         return len(events) > 1 and self._is_user_message(events[1])
 
-    def _insert_initial_user_at_index(self, events: list[Event], initial_user_action: MessageAction) -> None:
+    def _insert_initial_user_at_index(
+        self, events: list[Event], initial_user_action: MessageAction
+    ) -> None:
         insert_pos = 1 if len(events) >= 1 else 0
         events.insert(insert_pos, initial_user_action)
         logger.info("Inserted initial user action at index %s", insert_pos)
@@ -707,7 +766,9 @@ class ConversationMemory:
 
         try:
             results = self.vector_store.search(query, k=k)
-            logger.debug("Retrieved %d relevant memories for query: %s", len(results), query[:50])
+            logger.debug(
+                "Retrieved %d relevant memories for query: %s", len(results), query[:50]
+            )
             return results
         except Exception as e:
             logger.warning("Failed to retrieve from memory: %s", e)

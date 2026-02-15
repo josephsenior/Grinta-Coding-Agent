@@ -25,14 +25,24 @@ FILE_READER_EXPORTS = [
     "parse_video",
 ]
 
-import_functions(module=file_ops, function_names=FILE_OPS_EXPORTS, target_globals=globals())
-import_functions(module=file_reader, function_names=FILE_READER_EXPORTS, target_globals=globals())
+import_functions(
+    module=file_ops, function_names=FILE_OPS_EXPORTS, target_globals=globals()
+)
+import_functions(
+    module=file_reader, function_names=FILE_READER_EXPORTS, target_globals=globals()
+)
 exported_names = FILE_OPS_EXPORTS + FILE_READER_EXPORTS
 try:
     from backend.runtime.plugins.agent_skills import repo_ops
 
-    REPO_OPS_EXPORTS = ["explore_tree_structure", "get_entity_contents", "search_code_snippets"]
-    import_functions(module=repo_ops, function_names=REPO_OPS_EXPORTS, target_globals=globals())
+    REPO_OPS_EXPORTS = [
+        "explore_tree_structure",
+        "get_entity_contents",
+        "search_code_snippets",
+    ]
+    import_functions(
+        module=repo_ops, function_names=REPO_OPS_EXPORTS, target_globals=globals()
+    )
     exported_names += REPO_OPS_EXPORTS
 except ImportError:
     pass

@@ -87,7 +87,9 @@ class EventFilter:
 
     def _check_source_filter(self, event: Event) -> bool:
         """Check if event passes source filter."""
-        return not self.source or (event.source is not None and event.source.value == self.source)
+        return not self.source or (
+            event.source is not None and event.source.value == self.source
+        )
 
     def _check_date_filters(self, event: Event) -> bool:
         """Check if event passes date-based filters."""

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import time
@@ -212,6 +211,7 @@ class State:
     def _checkpoint_dir(sid: str, user_id: str | None) -> str:
         """Return the directory path for state checkpoints."""
         from backend.storage.locations import get_conversation_dir
+
         return f"{get_conversation_dir(sid, user_id)}state_checkpoints/"
 
     @staticmethod
@@ -246,7 +246,9 @@ class State:
                     logger.debug("Failed to prune old checkpoint %s", old_file)
         except Exception:
             # list() may fail if directory doesn't exist yet — that's fine
-            logger.debug("Could not list checkpoint dir %s (may not exist yet)", ckpt_dir)
+            logger.debug(
+                "Could not list checkpoint dir %s (may not exist yet)", ckpt_dir
+            )
 
     @staticmethod
     def restore_from_session(
@@ -349,9 +351,14 @@ class State:
 
         # Simple scalar fields
         for key in (
-            "session_id", "user_id", "confirmation_mode",
-            "delegate_level", "start_id", "end_id",
-            "parent_iteration", "last_error",
+            "session_id",
+            "user_id",
+            "confirmation_mode",
+            "delegate_level",
+            "start_id",
+            "end_id",
+            "parent_iteration",
+            "last_error",
         ):
             if key in data:
                 doc[key] = data[key]
@@ -374,10 +381,14 @@ class State:
 
         # Metrics — use its own .get() → dict
         metrics = data.get("metrics")
-        doc["metrics"] = metrics.get() if metrics is not None and hasattr(metrics, "get") else None
+        doc["metrics"] = (
+            metrics.get() if metrics is not None and hasattr(metrics, "get") else None
+        )
 
         pms = data.get("parent_metrics_snapshot")
-        doc["parent_metrics_snapshot"] = pms.get() if pms is not None and hasattr(pms, "get") else None
+        doc["parent_metrics_snapshot"] = (
+            pms.get() if pms is not None and hasattr(pms, "get") else None
+        )
 
         return json.dumps(doc, separators=(",", ":"))
 
@@ -410,9 +421,14 @@ class State:
 
         # Simple scalars
         for key in (
-            "session_id", "user_id", "confirmation_mode",
-            "delegate_level", "start_id", "end_id",
-            "parent_iteration", "last_error",
+            "session_id",
+            "user_id",
+            "confirmation_mode",
+            "delegate_level",
+            "start_id",
+            "end_id",
+            "parent_iteration",
+            "last_error",
         ):
             if key in doc:
                 setattr(state, key, doc[key])

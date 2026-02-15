@@ -60,7 +60,9 @@ def get_shared_http_client(provider: str, base_url: str | None = None) -> httpx.
     return _shared_sync_clients[key]
 
 
-def get_shared_async_http_client(provider: str, base_url: str | None = None) -> httpx.AsyncClient:
+def get_shared_async_http_client(
+    provider: str, base_url: str | None = None
+) -> httpx.AsyncClient:
     """Return a shared *async* httpx.AsyncClient for the given provider."""
     key = _pool_key(provider, base_url)
     if key not in _shared_async_clients:
@@ -136,11 +138,15 @@ class DirectLLMClient(ABC):
         pass
 
     @abstractmethod
-    async def acompletion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
+    async def acompletion(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> LLMResponse:
         pass
 
     @abstractmethod
-    async def astream(self, messages: list[dict[str, Any]], **kwargs) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
+    async def astream(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
         """Stream responses asynchronously. Returns an async iterator."""
         pass
 
@@ -155,11 +161,15 @@ class DirectLLMClient(ABC):
             raise NotImplementedError("Subclasses must set _model_name attribute")
         return self._model_name
 
-    def get_completion_cost(self, prompt_tokens: int, completion_tokens: int, config: Any | None = None) -> float:
+    def get_completion_cost(
+        self, prompt_tokens: int, completion_tokens: int, config: Any | None = None
+    ) -> float:
         """Calculate completion cost for this client's model."""
         from backend.llm.cost_tracker import get_completion_cost
 
-        return get_completion_cost(self.model_name, prompt_tokens, completion_tokens, config)
+        return get_completion_cost(
+            self.model_name, prompt_tokens, completion_tokens, config
+        )
 
 
 class OpenAIClient(DirectLLMClient):
@@ -211,7 +221,9 @@ class OpenAIClient(DirectLLMClient):
             model=response.model,
             usage={
                 "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                "completion_tokens": response.usage.completion_tokens
+                if response.usage
+                else 0,
                 "total_tokens": response.usage.total_tokens if response.usage else 0,
             },
             id=response.id,
@@ -219,7 +231,9 @@ class OpenAIClient(DirectLLMClient):
             tool_calls=tool_calls,
         )
 
-    async def acompletion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
+    async def acompletion(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> LLMResponse:
         model = kwargs.pop("model", self.model_name)
         response = await self.async_client.chat.completions.create(
             model=model,
@@ -233,7 +247,9 @@ class OpenAIClient(DirectLLMClient):
             model=response.model,
             usage={
                 "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                "completion_tokens": response.usage.completion_tokens
+                if response.usage
+                else 0,
                 "total_tokens": response.usage.total_tokens if response.usage else 0,
             },
             id=response.id,
@@ -241,7 +257,9 @@ class OpenAIClient(DirectLLMClient):
             tool_calls=tool_calls,
         )
 
-    async def astream(self, messages: list[dict[str, Any]], **kwargs) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
+    async def astream(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
         kwargs["stream"] = True
         model = kwargs.pop("model", self.model_name)
         stream = await self.async_client.chat.completions.create(
@@ -289,7 +307,9 @@ class AnthropicClient(DirectLLMClient):
                         "type": "function",
                         "function": {
                             "name": block.name,
-                            "arguments": json.dumps(block.input) if isinstance(block.input, dict) else str(block.input),
+                            "arguments": json.dumps(block.input)
+                            if isinstance(block.input, dict)
+                            else str(block.input),
                         },
                     }
                 )
@@ -299,7 +319,9 @@ class AnthropicClient(DirectLLMClient):
         self, messages: list[dict[str, Any]], kwargs: dict[str, Any]
     ) -> tuple[list, dict[str, Any]]:
         """Extract system message and set model for Anthropic calls."""
-        system_msg = next((m["content"] for m in messages if m["role"] == "system"), None)
+        system_msg = next(
+            (m["content"] for m in messages if m["role"] == "system"), None
+        )
         filtered = [m for m in messages if m["role"] != "system"]
         if "model" not in kwargs:
             kwargs["model"] = self.model_name
@@ -322,14 +344,17 @@ class AnthropicClient(DirectLLMClient):
             usage={
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
+                "total_tokens": response.usage.input_tokens
+                + response.usage.output_tokens,
             },
             id=response.id,
             finish_reason=response.stop_reason or "stop",
             tool_calls=tool_calls,
         )
 
-    async def acompletion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
+    async def acompletion(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> LLMResponse:
         filtered, kwargs = self._prepare_anthropic_kwargs(messages, kwargs)
         model = kwargs.pop("model", self.model_name)
         response = await self.async_client.messages.create(
@@ -344,15 +369,20 @@ class AnthropicClient(DirectLLMClient):
             usage={
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
+                "total_tokens": response.usage.input_tokens
+                + response.usage.output_tokens,
             },
             id=response.id,
             finish_reason=response.stop_reason or "stop",
             tool_calls=tool_calls,
         )
 
-    async def astream(self, messages: list[dict[str, Any]], **kwargs) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
-        system_msg = next((m["content"] for m in messages if m["role"] == "system"), None)
+    async def astream(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
+        system_msg = next(
+            (m["content"] for m in messages if m["role"] == "system"), None
+        )
         filtered_messages = [m for m in messages if m["role"] != "system"]
 
         if "model" not in kwargs:
@@ -386,7 +416,9 @@ class GeminiClient(DirectLLMClient):
         genai.configure(api_key=api_key)
         self.api_key = api_key
 
-    def _convert_messages(self, messages: list[dict[str, Any]]) -> tuple[str | None, list[dict[str, Any]]]:
+    def _convert_messages(
+        self, messages: list[dict[str, Any]]
+    ) -> tuple[str | None, list[dict[str, Any]]]:
         """Convert messages to Gemini format, extracting system instruction.
 
         Returns:
@@ -449,11 +481,15 @@ class GeminiClient(DirectLLMClient):
         meta = getattr(response, "usage_metadata", None)
         return {
             "prompt_tokens": getattr(meta, "prompt_token_count", 0) if meta else 0,
-            "completion_tokens": getattr(meta, "candidates_token_count", 0) if meta else 0,
+            "completion_tokens": getattr(meta, "candidates_token_count", 0)
+            if meta
+            else 0,
             "total_tokens": getattr(meta, "total_token_count", 0) if meta else 0,
         }
 
-    def _build_gemini_chat(self, messages: list[dict[str, Any]], kwargs: dict[str, Any]):
+    def _build_gemini_chat(
+        self, messages: list[dict[str, Any]], kwargs: dict[str, Any]
+    ):
         """Shared setup for Gemini completion / acompletion / astream."""
         model_name, gen_cfg = self._extract_gemini_generation_config(kwargs)
         model_name = model_name or self.model_name
@@ -481,7 +517,9 @@ class GeminiClient(DirectLLMClient):
             tool_calls=self._extract_gemini_tool_calls(response),
         )
 
-    async def acompletion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
+    async def acompletion(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> LLMResponse:
         model_name, chat, prompt = self._build_gemini_chat(messages, kwargs)
         response = await chat.send_message_async(prompt, **kwargs)
         return LLMResponse(
@@ -493,16 +531,22 @@ class GeminiClient(DirectLLMClient):
             tool_calls=self._extract_gemini_tool_calls(response),
         )
 
-    async def astream(self, messages: list[dict[str, Any]], **kwargs) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
+    async def astream(
+        self, messages: list[dict[str, Any]], **kwargs
+    ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
         model_name, chat, prompt = self._build_gemini_chat(messages, kwargs)
         response = await chat.send_message_async(prompt, stream=True, **kwargs)
 
         async for chunk in response:
-            yield {"choices": [{"delta": {"content": chunk.text}, "finish_reason": None}]}
+            yield {
+                "choices": [{"delta": {"content": chunk.text}, "finish_reason": None}]
+            }
         yield {"choices": [{"delta": {}, "finish_reason": "stop"}]}
 
 
-def get_direct_client(model: str, api_key: str, base_url: str | None = None) -> DirectLLMClient:
+def get_direct_client(
+    model: str, api_key: str, base_url: str | None = None
+) -> DirectLLMClient:
     """Factory function to get the correct direct client."""
     model_lower = model.lower()
 
@@ -511,7 +555,9 @@ def get_direct_client(model: str, api_key: str, base_url: str | None = None) -> 
     elif "google" in model_lower or "gemini" in model_lower:
         return GeminiClient(model_name=model, api_key=api_key)
     elif "xai" in model_lower or "grok" in model_lower:
-        return OpenAIClient(model_name=model, api_key=api_key, base_url="https://api.x.ai/v1")
+        return OpenAIClient(
+            model_name=model, api_key=api_key, base_url="https://api.x.ai/v1"
+        )
     else:
         # Default to OpenAI
         return OpenAIClient(model_name=model, api_key=api_key, base_url=base_url)

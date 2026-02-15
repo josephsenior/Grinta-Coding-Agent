@@ -116,7 +116,9 @@ class OrchestratorPlanner:
         if getattr(self._config, "enable_editor", True):
             from backend.engines.orchestrator.tools import create_structure_editor_tool
 
-            tools.append(create_structure_editor_tool(use_short_description=use_short_tool_desc))
+            tools.append(
+                create_structure_editor_tool(use_short_description=use_short_tool_desc)
+            )
 
     def build_llm_params(
         self,
@@ -128,7 +130,10 @@ class OrchestratorPlanner:
 
         # Cache check_tools output — only recompute when tools or model changes
         current_model = self._llm.config.model if self._llm else ""
-        if self._checked_tools_cache is None or self._checked_tools_model != current_model:
+        if (
+            self._checked_tools_cache is None
+            or self._checked_tools_model != current_model
+        ):
             self._checked_tools_cache = check_tools(tools, self._llm.config)
             self._checked_tools_model = current_model
 
@@ -159,7 +164,9 @@ class OrchestratorPlanner:
         if self._is_action(last_user_msg):
             return "required"
 
-        return self._safety.should_enforce_tools(last_user_msg, state, default="required")
+        return self._safety.should_enforce_tools(
+            last_user_msg, state, default="required"
+        )
 
     def _llm_supports_tool_choice(self) -> bool:
         model_lower = self._llm.config.model.lower()

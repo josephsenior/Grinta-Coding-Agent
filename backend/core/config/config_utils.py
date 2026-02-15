@@ -22,7 +22,9 @@ def get_field_info(field: FieldInfo) -> dict[str, Any]:
     optional = False
     if get_origin(field_type) is UnionType:
         types = get_args(field_type)
-        non_none_arg = next((t for t in types if t is not None and t is not type(None)), None)
+        non_none_arg = next(
+            (t for t in types if t is not None and t is not type(None)), None
+        )
         if non_none_arg is not None:
             field_type = non_none_arg
             optional = True

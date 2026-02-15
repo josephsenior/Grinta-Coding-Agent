@@ -66,7 +66,9 @@ class Memory:
         self.user_id = user_id
         self.status_callback = status_callback
         self.loop = None
-        self.event_stream.subscribe(EventStreamSubscriber.MEMORY, self.on_event, self.sid)
+        self.event_stream.subscribe(
+            EventStreamSubscriber.MEMORY, self.on_event, self.sid
+        )
         self.repo_playbooks = {}
         self.knowledge_playbooks = {}
         self.repository_info: RepositoryInfo | None = None
@@ -87,13 +89,17 @@ class Memory:
                 return
             observation = await self._process_recall_with_retry(event)
             if observation is None:
-                observation = cast(RecallObservation, self._build_failure_observation(event))
+                observation = cast(
+                    RecallObservation, self._build_failure_observation(event)
+                )
             observation.cause = event.id
             self.event_stream.add_event(observation, EventSource.ENVIRONMENT)
         except Exception as exc:
             await self._handle_recall_exception(event, exc)
 
-    async def _process_recall_with_retry(self, event: RecallAction, max_attempts: int = 3) -> RecallObservation | None:
+    async def _process_recall_with_retry(
+        self, event: RecallAction, max_attempts: int = 3
+    ) -> RecallObservation | None:
         attempt = 0
         while attempt < max_attempts:
             attempt += 1
@@ -118,7 +124,10 @@ class Memory:
         event: RecallAction,
         attempt: int,
     ) -> RecallObservation | None:
-        if event.recall_type == RecallType.WORKSPACE_CONTEXT and event.source == EventSource.USER:
+        if (
+            event.recall_type == RecallType.WORKSPACE_CONTEXT
+            and event.source == EventSource.USER
+        ):
             logger.debug("Workspace context recall (attempt %s)", attempt)
             return self._on_workspace_context_recall(event)
         if event.recall_type == RecallType.KNOWLEDGE and event.source in (
@@ -145,7 +154,9 @@ class Memory:
         )
         await asyncio.sleep(sleep_time)
 
-    def _build_failure_observation(self, event: RecallAction) -> RecallFailureObservation:
+    def _build_failure_observation(
+        self, event: RecallAction
+    ) -> RecallFailureObservation:
         return RecallFailureObservation(
             recall_type=event.recall_type,
             error_message="Recall failed after retries",
@@ -223,7 +234,8 @@ class Memory:
             ),
             "repo_directory": (
                 self.repository_info.repo_directory
-                if self.repository_info and self.repository_info.repo_directory is not None
+                if self.repository_info
+                and self.repository_info.repo_directory is not None
                 else ""
             ),
             "repo_branch": (
@@ -258,9 +270,15 @@ class Memory:
 
     def _get_conversation_instructions(self) -> str:
         """Get conversation instructions content."""
-        return self.conversation_instructions.content if self.conversation_instructions is not None else ""
+        return (
+            self.conversation_instructions.content
+            if self.conversation_instructions is not None
+            else ""
+        )
 
-    def _on_workspace_context_recall(self, event: RecallAction) -> RecallObservation | None:
+    def _on_workspace_context_recall(
+        self, event: RecallAction
+    ) -> RecallObservation | None:
         """Add repository and runtime information to the stream as a RecallObservation.
 
         This method collects information from all available repo playbooks and concatenates their contents.
@@ -273,7 +291,9 @@ class Memory:
         playbook_knowledge = self._find_playbook_knowledge(event.query)
 
         # Check if we should create a recall observation
-        if not self._should_create_recall_observation(repo_instructions, playbook_knowledge):
+        if not self._should_create_recall_observation(
+            repo_instructions, playbook_knowledge
+        ):
             return None
 
         # Get all required fields
@@ -375,7 +395,9 @@ class Memory:
         """
         from backend.instruction import KnowledgePlaybook, RepoPlaybook
 
-        logger.info("Loading user workspace playbooks: %s", [m.name for m in user_playbooks])
+        logger.info(
+            "Loading user workspace playbooks: %s", [m.name for m in user_playbooks]
+        )
         for user_playbook in user_playbooks:
             if isinstance(user_playbook, KnowledgePlaybook):
                 self.knowledge_playbooks[user_playbook.name] = user_playbook
@@ -431,10 +453,14 @@ class Memory:
                 )
         return mcp_configs
 
-    def set_repository_info(self, repo_name: str, repo_directory: str, branch_name: str | None = None) -> None:
+    def set_repository_info(
+        self, repo_name: str, repo_directory: str, branch_name: str | None = None
+    ) -> None:
         """Store repository info so we can reference it in an observation."""
         if repo_name or repo_directory:
-            self.repository_info = RepositoryInfo(repo_name, repo_directory, branch_name)
+            self.repository_info = RepositoryInfo(
+                repo_name, repo_directory, branch_name
+            )
         else:
             self.repository_info = None
 
@@ -457,7 +483,9 @@ class Memory:
                 if isinstance(host, (str, int)) and isinstance(port, int)
             }
 
-        additional_instructions_attr = getattr(runtime, "additional_agent_instructions", None)
+        additional_instructions_attr = getattr(
+            runtime, "additional_agent_instructions", None
+        )
         additional_instructions_result: Any
         if callable(additional_instructions_attr):
             additional_instructions_result = additional_instructions_attr()
@@ -486,12 +514,16 @@ class Memory:
                 working_dir=working_dir,
             )
 
-    def set_conversation_instructions(self, conversation_instructions: str | None) -> None:
+    def set_conversation_instructions(
+        self, conversation_instructions: str | None
+    ) -> None:
         """Set contextual information for conversation.
 
         This is information the agent may require.
         """
-        self.conversation_instructions = ConversationInstructions(content=conversation_instructions or "")
+        self.conversation_instructions = ConversationInstructions(
+            content=conversation_instructions or ""
+        )
 
     def set_runtime_status(self, status: RuntimeStatus, message: str) -> None:
         """Sends an error message if the callback function was provided."""
@@ -505,12 +537,18 @@ class Memory:
                 if self.loop is None:
                     self.loop = asyncio.get_running_loop()
                 try:
-                    asyncio.run_coroutine_threadsafe(self._set_runtime_status("error", status, message), self.loop)
+                    asyncio.run_coroutine_threadsafe(
+                        self._set_runtime_status("error", status, message), self.loop
+                    )
                 except RuntimeError:
                     try:
-                        logger.info("MEMORY.set_runtime_status: calling status_callback synchronously")
+                        logger.info(
+                            "MEMORY.set_runtime_status: calling status_callback synchronously"
+                        )
                         self.status_callback("error", status, message)
-                        logger.info("MEMORY.set_runtime_status: status_callback returned")
+                        logger.info(
+                            "MEMORY.set_runtime_status: status_callback returned"
+                        )
                     except Exception:
                         from backend.utils.async_utils import create_tracked_task
 
@@ -525,7 +563,9 @@ class Memory:
                     stack_info=False,
                 )
 
-    async def _set_runtime_status(self, msg_type: str, runtime_status: RuntimeStatus, message: str) -> None:
+    async def _set_runtime_status(
+        self, msg_type: str, runtime_status: RuntimeStatus, message: str
+    ) -> None:
         """Sends a status message to the client."""
         if self.status_callback:
             logger.info(

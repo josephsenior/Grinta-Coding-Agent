@@ -72,7 +72,9 @@ class LLMRegistry:
         llm_config = self.config.get_llm_config_from_agent(agent_name)
         self.active_agent_llm: LLM = self.get_llm("agent", llm_config)
 
-    def _create_new_llm(self, service_id: str, config: LLMConfig, with_listener: bool = True) -> LLM:
+    def _create_new_llm(
+        self, service_id: str, config: LLMConfig, with_listener: bool = True
+    ) -> LLM:
         """Create and register a new LLM instance.
 
         Args:
@@ -85,7 +87,9 @@ class LLMRegistry:
 
         """
         if with_listener:
-            llm = LLM(service_id=service_id, config=config, retry_listener=self.retry_listner)
+            llm = LLM(
+                service_id=service_id, config=config, retry_listener=self.retry_listner
+            )
         else:
             llm = LLM(service_id=service_id, config=config)
         self.service_to_llm[service_id] = llm
@@ -114,7 +118,9 @@ class LLMRegistry:
         """
         logger.info("extraneous completion: %s", service_id)
         if service_id not in self.service_to_llm:
-            self._create_new_llm(config=llm_config, service_id=service_id, with_listener=False)
+            self._create_new_llm(
+                config=llm_config, service_id=service_id, with_listener=False
+            )
         llm = self.service_to_llm[service_id]
         response = llm.completion(messages=messages)
         return response.choices[0].message.content.strip()
@@ -155,7 +161,10 @@ class LLMRegistry:
             self.registry_id,
             service_id,
         )
-        if service_id in self.service_to_llm and self.service_to_llm[service_id].config != config:
+        if (
+            service_id in self.service_to_llm
+            and self.service_to_llm[service_id].config != config
+        ):
             msg = f"Requesting same service ID {service_id} with different config, use a new service ID"
             raise ValueError(msg)
         if service_id in self.service_to_llm:
@@ -199,7 +208,11 @@ class LLMRegistry:
 
         """
         self.subscriber = callback
-        self.notify(RegistryEvent(llm=self.active_agent_llm, service_id=self.active_agent_llm.service_id))
+        self.notify(
+            RegistryEvent(
+                llm=self.active_agent_llm, service_id=self.active_agent_llm.service_id
+            )
+        )
 
     def notify(self, event: RegistryEvent) -> None:
         """Notify subscriber of registry event.

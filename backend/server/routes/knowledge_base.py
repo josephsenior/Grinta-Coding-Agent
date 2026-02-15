@@ -27,7 +27,7 @@ from backend.storage.data_models.knowledge_base import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/knowledge-base", tags=["knowledge-base"])
+router = APIRouter(prefix="/api/v1/knowledge-base", tags=["knowledge-base"])
 
 
 # Request/Response models
@@ -68,7 +68,9 @@ class SearchRequest(BaseModel):
     """Request to search the knowledge base."""
 
     query: str = Field(..., min_length=1, description="Search query string")
-    collection_ids: list[str] | None = Field(None, description="Collection IDs to search in (None = all)")
+    collection_ids: list[str] | None = Field(
+        None, description="Collection IDs to search in (None = all)"
+    )
     top_k: int = Field(
         default=KNOWLEDGE_BASE_SEARCH_TOP_K_DEFAULT,
         ge=1,
@@ -140,7 +142,9 @@ class BulkDocumentInput(BaseModel):
 
     filename: str = Field(..., min_length=1, description="Document filename")
     content: str = Field(..., min_length=1, description="Document content")
-    mime_type: str = Field(default="text/plain", description="MIME type of the document")
+    mime_type: str = Field(
+        default="text/plain", description="MIME type of the document"
+    )
 
     @field_validator("filename", "content")
     @classmethod
@@ -460,7 +464,9 @@ async def upload_document(
                 detail=f"Collection {collection_id} not found",
             )
 
-        logger.info("Uploaded document: %s to collection %s", document.filename, collection_id)
+        logger.info(
+            "Uploaded document: %s to collection %s", document.filename, collection_id
+        )
         return _document_to_response(document)
 
     except HTTPException:
@@ -473,7 +479,9 @@ async def upload_document(
         )
 
 
-@router.get("/collections/{collection_id}/documents", response_model=list[DocumentResponse])
+@router.get(
+    "/collections/{collection_id}/documents", response_model=list[DocumentResponse]
+)
 async def list_documents(
     collection_id: str,
     user_id: str = "default",
@@ -587,7 +595,9 @@ async def get_stats(user_id: str = "default") -> dict[str, Any]:
 # Bulk upload endpoint
 
 
-@router.post("/collections/{collection_id}/documents/bulk", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/collections/{collection_id}/documents/bulk", status_code=status.HTTP_201_CREATED
+)
 async def bulk_upload_documents(
     collection_id: str,
     files: list[UploadFile] = File(...),
@@ -704,7 +714,13 @@ async def bulk_upload_documents(
     successful = sum(1 for r in results if r.success)
     failed = len(results) - successful
 
-    logger.info("Bulk upload to collection %s: %s/%s successful, %s failed", collection_id, successful, len(files), failed)
+    logger.info(
+        "Bulk upload to collection %s: %s/%s successful, %s failed",
+        collection_id,
+        successful,
+        len(files),
+        failed,
+    )
 
     return success(
         data={

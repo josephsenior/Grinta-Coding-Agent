@@ -86,9 +86,13 @@ class PromptManager:
         self.env = Environment(loader=FileSystemLoader(prompt_dir), autoescape=True)
         self.system_template: Template = self._load_template(system_prompt_filename)
         self.user_template: Template = self._load_template("user_prompt.j2")
-        self.additional_info_template: Template = self._load_template("additional_info.j2")
+        self.additional_info_template: Template = self._load_template(
+            "additional_info.j2"
+        )
         self.playbook_info_template: Template = self._load_template("playbook_info.j2")
-        self.knowledge_base_info_template: Template = self._load_template("knowledge_base_info.j2")
+        self.knowledge_base_info_template: Template = self._load_template(
+            "knowledge_base_info.j2"
+        )
 
     def _load_template(self, template_name: str) -> Template:
         """Load a template from the prompt directory.
@@ -153,9 +157,13 @@ class PromptManager:
                               about triggered playbooks.
 
         """
-        return self.playbook_info_template.render(triggered_agents=triggered_agents).strip()
+        return self.playbook_info_template.render(
+            triggered_agents=triggered_agents
+        ).strip()
 
-    def build_knowledge_base_info(self, kb_results: list[KnowledgeBaseSearchResult]) -> str:
+    def build_knowledge_base_info(
+        self, kb_results: list[KnowledgeBaseSearchResult]
+    ) -> str:
         """Renders the knowledge base info template with the search results.
 
         Args:
@@ -171,7 +179,8 @@ class PromptManager:
                 (
                     m
                     for m in reversed(messages)
-                    if m.role == "user" and any((isinstance(c, TextContent) for c in m.content))
+                    if m.role == "user"
+                    and any((isinstance(c, TextContent) for c in m.content))
                 ),
                 1,
             ),

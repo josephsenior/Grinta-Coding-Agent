@@ -39,7 +39,9 @@ class KnowledgeBaseStore:
         self._lock = Lock()
         self._collections: dict[str, KnowledgeBaseCollection] = {}
         self._documents: dict[str, KnowledgeBaseDocument] = {}
-        self._collection_documents: dict[str, list[str]] = {}  # collection_id -> [doc_ids]
+        self._collection_documents: dict[
+            str, list[str]
+        ] = {}  # collection_id -> [doc_ids]
 
         # Setup storage directory
         if storage_dir is None:
@@ -60,7 +62,8 @@ class KnowledgeBaseStore:
                 with open(self.collections_file, encoding="utf-8") as f:
                     data = json.load(f)
                     self._collections = {
-                        k: KnowledgeBaseCollection.model_validate(v) for k, v in data.get("collections", {}).items()
+                        k: KnowledgeBaseCollection.model_validate(v)
+                        for k, v in data.get("collections", {}).items()
                     }
                     self._collection_documents = data.get("collection_documents", {})
                 logger.info("Loaded %d collections from disk", len(self._collections))
@@ -69,7 +72,8 @@ class KnowledgeBaseStore:
                 with open(self.documents_file, encoding="utf-8") as f:
                     data = json.load(f)
                     self._documents = {
-                        k: KnowledgeBaseDocument.model_validate(v) for k, v in data.get("documents", {}).items()
+                        k: KnowledgeBaseDocument.model_validate(v)
+                        for k, v in data.get("documents", {}).items()
                     }
                 logger.info("Loaded %d documents from disk", len(self._documents))
 
@@ -82,14 +86,21 @@ class KnowledgeBaseStore:
             # Save collections
             with open(self.collections_file, "w", encoding="utf-8") as f:
                 data = {
-                    "collections": {k: v.model_dump(mode="json") for k, v in self._collections.items()},
+                    "collections": {
+                        k: v.model_dump(mode="json")
+                        for k, v in self._collections.items()
+                    },
                     "collection_documents": self._collection_documents,
                 }
                 json.dump(data, f, indent=2, default=str)
 
             # Save documents
             with open(self.documents_file, "w", encoding="utf-8") as f:
-                data = {"documents": {k: v.model_dump(mode="json") for k, v in self._documents.items()}}
+                data = {
+                    "documents": {
+                        k: v.model_dump(mode="json") for k, v in self._documents.items()
+                    }
+                }
                 json.dump(data, f, indent=2, default=str)
 
             logger.debug("Saved knowledge base data to disk")
@@ -99,7 +110,9 @@ class KnowledgeBaseStore:
 
     # Collection operations
 
-    def create_collection(self, user_id: str, name: str, description: str | None = None) -> KnowledgeBaseCollection:
+    def create_collection(
+        self, user_id: str, name: str, description: str | None = None
+    ) -> KnowledgeBaseCollection:
         """Create a new collection."""
         with self._lock:
             collection = KnowledgeBaseCollection(
@@ -112,7 +125,9 @@ class KnowledgeBaseStore:
             self._collections[collection.id] = collection
             self._collection_documents[collection.id] = []
             self._save_to_disk()
-            logger.info("Created collection: %s (ID: %s)", collection.name, collection.id)
+            logger.info(
+                "Created collection: %s (ID: %s)", collection.name, collection.id
+            )
             return collection
 
     def get_collection(self, collection_id: str) -> KnowledgeBaseCollection | None:
@@ -200,7 +215,11 @@ class KnowledgeBaseStore:
         """List all documents in a collection."""
         with self._lock:
             doc_ids = self._collection_documents.get(collection_id, [])
-            return [self._documents[doc_id] for doc_id in doc_ids if doc_id in self._documents]
+            return [
+                self._documents[doc_id]
+                for doc_id in doc_ids
+                if doc_id in self._documents
+            ]
 
     def delete_document(self, document_id: str) -> bool:
         """Delete a document."""

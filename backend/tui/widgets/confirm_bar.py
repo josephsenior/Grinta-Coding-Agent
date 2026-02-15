@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import Button, Label, Static
+from textual.widgets import Button, Label
 
 
 class ConfirmBar(Widget):
@@ -47,8 +47,12 @@ class ConfirmBar(Widget):
     def compose(self) -> ComposeResult:
         with Horizontal():
             yield Label("Action requires confirmation", id="confirm-label")
-            yield Button("✓ Approve", variant="success", id="btn-approve", classes="confirm-btn")
-            yield Button("✗ Reject", variant="error", id="btn-reject", classes="confirm-btn")
+            yield Button(
+                "✓ Approve", variant="success", id="btn-approve", classes="confirm-btn"
+            )
+            yield Button(
+                "✗ Reject", variant="error", id="btn-reject", classes="confirm-btn"
+            )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-approve":

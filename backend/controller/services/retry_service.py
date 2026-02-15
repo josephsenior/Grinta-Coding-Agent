@@ -46,7 +46,9 @@ class RetryService:
         async def _worker_wrapper() -> None:
             try:
                 await self._retry_worker()
-            except asyncio.CancelledError:  # pragma: no cover - expected cancellation path
+            except (
+                asyncio.CancelledError
+            ):  # pragma: no cover - expected cancellation path
                 raise
             except Exception as exc:  # pragma: no cover - logged for diagnostics
                 logger.exception(
@@ -55,7 +57,9 @@ class RetryService:
                     exc,
                 )
 
-        self._retry_worker_task = loop.create_task(_worker_wrapper(), name=f"forge-retry-worker-{self.controller.id}")
+        self._retry_worker_task = loop.create_task(
+            _worker_wrapper(), name=f"forge-retry-worker-{self.controller.id}"
+        )
         self._task_loop = loop
         logger.debug("Retry worker started for controller %s", self.controller.id)
 
@@ -124,7 +128,9 @@ class RetryService:
         initial_delay = queue.base_delay
         if isinstance(exc, RateLimitError):
             initial_delay = max(initial_delay, queue.base_delay * 2)
-        circuit_breaker = getattr(controller.circuit_breaker_service, "circuit_breaker", None)
+        circuit_breaker = getattr(
+            controller.circuit_breaker_service, "circuit_breaker", None
+        )
         if circuit_breaker:
             consecutive = max(1, getattr(circuit_breaker, "consecutive_errors", 1))
             initial_delay = min(queue.max_delay, initial_delay * consecutive)
@@ -143,7 +149,9 @@ class RetryService:
             f"⚠️ Encountered {type(exc).__name__}. Automatic retry scheduled in "
             f"{int(initial_delay)}s (max {task.max_attempts} attempts)."
         )
-        controller.state.set_last_error(f"{type(exc).__name__}: retry scheduled", source="RetryService")
+        controller.state.set_last_error(
+            f"{type(exc).__name__}: retry scheduled", source="RetryService"
+        )
         controller.event_stream.add_event(
             AgentThinkObservation(content=human_message),
             EventSource.ENVIRONMENT,
@@ -214,7 +222,9 @@ class RetryService:
             logger.debug("Retry worker cancelled for controller %s", controller.id)
             raise
 
-    async def _fetch_ready_tasks(self, controller, poll_interval: float) -> list[RetryTask]:
+    async def _fetch_ready_tasks(
+        self, controller, poll_interval: float
+    ) -> list[RetryTask]:
         queue = self._retry_queue
         if queue is None:
             await asyncio.sleep(poll_interval)
@@ -239,7 +249,9 @@ class RetryService:
         try:
             import redis.exceptions
 
-            return isinstance(exc, (redis.exceptions.ConnectionError, ConnectionError, OSError))
+            return isinstance(
+                exc, (redis.exceptions.ConnectionError, ConnectionError, OSError)
+            )
         except ImportError:
             return isinstance(exc, (ConnectionError, OSError))
 
@@ -269,7 +281,9 @@ class RetryService:
     async def _handle_task_failure(self, task: RetryTask, exc: Exception) -> None:
         queue = self._retry_queue
         if queue is None:
-            logger.debug("Retry queue missing; cannot handle failure for task %s", task.id)
+            logger.debug(
+                "Retry queue missing; cannot handle failure for task %s", task.id
+            )
             self._retry_pending = False
             return
         try:
@@ -285,7 +299,9 @@ class RetryService:
         """Process an individual retry queue task."""
         controller = self.controller
         if controller._closed:
-            logger.debug("Controller %s closed; ignoring retry task %s", controller.id, task.id)
+            logger.debug(
+                "Controller %s closed; ignoring retry task %s", controller.id, task.id
+            )
             return
 
         operation = task.payload.get("operation", "agent_step")
@@ -296,7 +312,9 @@ class RetryService:
         if operation == "action":
             action_dict = task.payload.get("action")
             if not action_dict:
-                logger.warning("Retry task %s missing action payload; skipping", task.id)
+                logger.warning(
+                    "Retry task %s missing action payload; skipping", task.id
+                )
                 return
             from backend.events.serialization.action import action_from_dict
 

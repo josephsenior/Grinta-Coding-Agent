@@ -27,7 +27,9 @@ class SecretMasker:
     PLACEHOLDER = "<secret_hidden>"
     # Top-level event fields that must never be masked so the event
     # structure (type, id, source, etc.) stays intact.
-    TOP_LEVEL_PROTECTED_FIELDS = frozenset({"timestamp", "id", "source", "cause", "action", "observation", "message"})
+    TOP_LEVEL_PROTECTED_FIELDS = frozenset(
+        {"timestamp", "id", "source", "cause", "action", "observation", "message"}
+    )
 
     def __init__(self) -> None:
         self.secrets: dict[str, str] = {}
@@ -47,7 +49,9 @@ class SecretMasker:
         self.secrets.update(secrets)
         self._rebuild_cache()
 
-    def replace_secrets(self, data: dict[str, Any], *, is_top_level: bool = True) -> dict[str, Any]:
+    def replace_secrets(
+        self, data: dict[str, Any], *, is_top_level: bool = True
+    ) -> dict[str, Any]:
         """Recursively replace secret values with a masked placeholder.
 
         Top-level event fields are protected so event structure is preserved.
@@ -66,7 +70,9 @@ class SecretMasker:
         tokens = [str(s) for s in self.secrets.values() if isinstance(s, str) and s]
         unique = sorted(set(tokens), key=len, reverse=True)
         if unique:
-            self._secret_pattern = re.compile("|".join(re.escape(t) for t in unique), flags=re.IGNORECASE)
+            self._secret_pattern = re.compile(
+                "|".join(re.escape(t) for t in unique), flags=re.IGNORECASE
+            )
             self._secret_bytes = [t.encode("utf-8") for t in unique]
         else:
             self._secret_pattern = None

@@ -83,7 +83,9 @@ class ConfigLoadSummary:
         detail_str = (detail or "").strip()
         if len(detail_str) > 240:
             detail_str = f"{detail_str[:237]}..."
-        self._issues.append(_ConfigIssue(section=section, reason=reason, detail=detail_str))
+        self._issues.append(
+            _ConfigIssue(section=section, reason=reason, detail=detail_str)
+        )
 
     def has_fatal_issues(self) -> bool:
         return any(issue.reason in {"invalid", "error"} for issue in self._issues)
@@ -107,7 +109,8 @@ class ConfigLoadSummary:
         lines: list[str] = []
         for section in sorted(grouped.keys()):
             reasons = "; ".join(
-                f"{issue.reason}: {issue.detail}" if issue.detail else issue.reason for issue in grouped[section]
+                f"{issue.reason}: {issue.detail}" if issue.detail else issue.reason
+                for issue in grouped[section]
             )
             lines.append(f"[{section}] {reasons}")
         logger.FORGE_logger.warning(
@@ -230,7 +233,11 @@ def _ensure_cache_directory(cfg: ForgeConfig) -> None:
 
 def _configure_jwt_secret(cfg: ForgeConfig) -> None:
     if not cfg.jwt_secret:
-        cfg.jwt_secret = SecretStr(get_or_create_jwt_secret(get_file_store(cfg.file_store, cfg.file_store_path)))
+        cfg.jwt_secret = SecretStr(
+            get_or_create_jwt_secret(
+                get_file_store(cfg.file_store, cfg.file_store_path)
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +245,9 @@ def _configure_jwt_secret(cfg: ForgeConfig) -> None:
 # ---------------------------------------------------------------------------
 
 
-def get_agent_config_arg(agent_config_arg: str, toml_file: str = "config.toml") -> AgentConfig | None:
+def get_agent_config_arg(
+    agent_config_arg: str, toml_file: str = "config.toml"
+) -> AgentConfig | None:
     """Get a group of agent settings from the config file."""
     agent_config_arg = agent_config_arg.strip("[]").removeprefix("agent.")
     logger.FORGE_logger.debug("Loading agent config from %s", agent_config_arg)
@@ -256,8 +265,13 @@ def get_agent_config_arg(agent_config_arg: str, toml_file: str = "config.toml") 
 # ---------------------------------------------------------------------------
 
 
-def _validate_condenser_section(toml_config: dict, condenser_config_arg: str, toml_file: str) -> dict | None:
-    if "condenser" not in toml_config or condenser_config_arg not in toml_config["condenser"]:
+def _validate_condenser_section(
+    toml_config: dict, condenser_config_arg: str, toml_file: str
+) -> dict | None:
+    if (
+        "condenser" not in toml_config
+        or condenser_config_arg not in toml_config["condenser"]
+    ):
         logger.FORGE_logger.error(
             "Condenser config section [condenser.%s] not found in %s",
             condenser_config_arg,
@@ -267,14 +281,18 @@ def _validate_condenser_section(toml_config: dict, condenser_config_arg: str, to
     return toml_config["condenser"][condenser_config_arg].copy()
 
 
-def _process_llm_condenser(condenser_data: dict, condenser_config_arg: str, toml_file: str) -> dict | None:
+def _process_llm_condenser(
+    condenser_data: dict, condenser_config_arg: str, toml_file: str
+) -> dict | None:
     llm_config_name = condenser_data["llm_config"]
     logger.FORGE_logger.debug(
         "Condenser [%s] requires LLM config [%s]. Loading it...",
         condenser_config_arg,
         llm_config_name,
     )
-    if referenced_llm_config := get_llm_config_arg(llm_config_name, toml_file=toml_file):
+    if referenced_llm_config := get_llm_config_arg(
+        llm_config_name, toml_file=toml_file
+    ):
         condenser_data["llm_config"] = referenced_llm_config
         return condenser_data
     logger.FORGE_logger.error(
@@ -285,7 +303,9 @@ def _process_llm_condenser(condenser_data: dict, condenser_config_arg: str, toml
     return None
 
 
-def _process_condenser_data(condenser_data: dict, condenser_config_arg: str, toml_file: str) -> dict | None:
+def _process_condenser_data(
+    condenser_data: dict, condenser_config_arg: str, toml_file: str
+) -> dict | None:
     condenser_type = condenser_data.get("type")
     if (
         condenser_type in ("llm", "llm_attention", "structured")
@@ -296,16 +316,22 @@ def _process_condenser_data(condenser_data: dict, condenser_config_arg: str, tom
     return condenser_data
 
 
-def get_condenser_config_arg(condenser_config_arg: str, toml_file: str = "config.toml") -> CondenserConfig | None:
+def get_condenser_config_arg(
+    condenser_config_arg: str, toml_file: str = "config.toml"
+) -> CondenserConfig | None:
     """Get a group of condenser settings from the config file by name."""
     condenser_config_arg = condenser_config_arg.strip("[]").removeprefix("condenser.")
-    logger.FORGE_logger.debug("Loading condenser config [%s] from %s", condenser_config_arg, toml_file)
+    logger.FORGE_logger.debug(
+        "Loading condenser config [%s] from %s", condenser_config_arg, toml_file
+    )
 
     toml_config = _load_toml_config(toml_file)
     if toml_config is None:
         return None
 
-    condenser_data = _validate_condenser_section(toml_config, condenser_config_arg, toml_file)
+    condenser_data = _validate_condenser_section(
+        toml_config, condenser_config_arg, toml_file
+    )
     if condenser_data is None:
         return None
 
@@ -318,7 +344,9 @@ def get_condenser_config_arg(condenser_config_arg: str, toml_file: str = "config
         )
         return None
 
-    condenser_data = _process_condenser_data(condenser_data, condenser_config_arg, toml_file)
+    condenser_data = _process_condenser_data(
+        condenser_data, condenser_config_arg, toml_file
+    )
     if condenser_data is None:
         return None
 
@@ -333,7 +361,9 @@ def get_condenser_config_arg(condenser_config_arg: str, toml_file: str = "config
         )
         return config
     except (ValidationError, ValueError) as e:
-        logger.FORGE_logger.error("Invalid condenser configuration for [%s]: %s.", condenser_config_arg, e)
+        logger.FORGE_logger.error(
+            "Invalid condenser configuration for [%s]: %s.", condenser_config_arg, e
+        )
         return None
 
 
@@ -352,9 +382,13 @@ def register_custom_agents(config: ForgeConfig) -> None:
             try:
                 agent_cls = get_impl(Agent, classpath)
                 Agent.register(agent_name, agent_cls)
-                logger.FORGE_logger.info("Registered custom agent '%s' from %s", agent_name, classpath)
+                logger.FORGE_logger.info(
+                    "Registered custom agent '%s' from %s", agent_name, classpath
+                )
             except Exception as e:
-                logger.FORGE_logger.error("Failed to register agent '%s': %s", agent_name, e)
+                logger.FORGE_logger.error(
+                    "Failed to register agent '%s': %s", agent_name, e
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +412,9 @@ def parse_arguments() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 
 
-def load_FORGE_config(set_logging_levels: bool = True, config_file: str = "config.toml") -> ForgeConfig:
+def load_FORGE_config(
+    set_logging_levels: bool = True, config_file: str = "config.toml"
+) -> ForgeConfig:
     """Load the configuration from the specified config file and environment variables."""
     rebuild_config_models()
 

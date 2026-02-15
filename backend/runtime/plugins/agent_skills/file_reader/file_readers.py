@@ -133,7 +133,11 @@ def parse_audio(file_path: str, model: str = "whisper-1") -> None:
             _get_openai_client().audio.translations.create(model=model, file=audio_file)
     except Exception:
         pass
-def parse_image(file_path: str, task: str = "Describe this image as detail as possible.") -> None:
+
+
+def parse_image(
+    file_path: str, task: str = "Describe this image as detail as possible."
+) -> None:
     """Parses the content of an image file and prints the description.
 
     Args:
@@ -151,6 +155,7 @@ def parse_image(file_path: str, task: str = "Describe this image as detail as po
         _ = response.choices[0].message.content
     except Exception:
         pass
+
 
 def parse_video(
     file_path: str,
@@ -203,5 +208,3 @@ def parse_pptx(file_path: str) -> None:
         print(f"{output}\n")
     except Exception:
         pass
-
-

@@ -80,7 +80,9 @@ class AsyncSmartCache:
         self._user_settings_cache: dict[str, tuple[Settings, float]] = {}
 
         if not self.redis_available:
-            logger.info("🚀 AsyncSmartCache: Using in-memory cache (Redis not available)")
+            logger.info(
+                "🚀 AsyncSmartCache: Using in-memory cache (Redis not available)"
+            )
 
     async def _ensure_connection(self) -> bool:
         """Ensure Redis connection is established."""
@@ -109,7 +111,9 @@ class AsyncSmartCache:
                 self.redis_client = await aioredis.from_url(
                     f"redis://{self._redis_host}:{self._redis_port}",
                     password=self._redis_password if self._redis_password else None,
-                    **get_redis_connection_params(self._redis_host, self._redis_port, self._redis_password),
+                    **get_redis_connection_params(
+                        self._redis_host, self._redis_port, self._redis_password
+                    ),
                 )
                 await self.redis_client.ping()
                 logger.info("🚀 AsyncSmartCache: Redis connected successfully")
@@ -150,7 +154,9 @@ class AsyncSmartCache:
             config = load_FORGE_config()
 
             # Cache for 5 minutes (global config rarely changes)
-            await client.setex("smart_cache:global_config", 300, serialize_model(config))
+            await client.setex(
+                "smart_cache:global_config", 300, serialize_model(config)
+            )
             logger.debug("🚀 Global config cache MISS - loaded and cached (Redis)")
             return config
 
@@ -164,7 +170,10 @@ class AsyncSmartCache:
         current_time = time.time()
 
         # Check cache (5min TTL)
-        if self._global_config_cache is not None and current_time - self._global_config_time < 300:
+        if (
+            self._global_config_cache is not None
+            and current_time - self._global_config_time < 300
+        ):
             logger.debug("🚀 Global config cache HIT (memory)")
             return self._global_config_cache
 
@@ -179,7 +188,9 @@ class AsyncSmartCache:
         logger.debug("🚀 Global config cache MISS - loaded and cached (memory)")
         return config
 
-    async def get_user_settings(self, user_id: str, settings_store: SettingsStore) -> Settings | None:
+    async def get_user_settings(
+        self, user_id: str, settings_store: SettingsStore
+    ) -> Settings | None:
         """Get user settings with hybrid caching.
 
         This is the main entry point that handles:
@@ -200,7 +211,9 @@ class AsyncSmartCache:
             return await self._get_user_settings_redis(user_id, settings_store)
         return await self._get_user_settings_memory(user_id, settings_store)
 
-    async def _get_user_settings_redis(self, user_id: str, settings_store: SettingsStore) -> Settings | None:
+    async def _get_user_settings_redis(
+        self, user_id: str, settings_store: SettingsStore
+    ) -> Settings | None:
         """Get user settings from Redis cache."""
         client = self.redis_client
         if client is None:
@@ -219,7 +232,9 @@ class AsyncSmartCache:
                 return settings
 
             # Cache miss - load from database and merge
-            logger.debug("🚀 User settings cache MISS for '%s' - loading from DB", user_id)
+            logger.debug(
+                "🚀 User settings cache MISS for '%s' - loading from DB", user_id
+            )
             loaded_settings = await settings_store.load()
             if not loaded_settings:
                 return None
@@ -233,15 +248,23 @@ class AsyncSmartCache:
 
             # Cache for 1 minute (user settings change more frequently)
             await client.setex(user_key, 60, serialize_model(merged_settings))
-            logger.debug("🚀 Cached merged settings for '%s' (Redis, TTL: 60s)", user_id)
+            logger.debug(
+                "🚀 Cached merged settings for '%s' (Redis, TTL: 60s)", user_id
+            )
             return merged_settings
 
         except Exception as e:
-            logger.error("Redis user settings error for %s: %s, falling back to memory", user_id, e)
+            logger.error(
+                "Redis user settings error for %s: %s, falling back to memory",
+                user_id,
+                e,
+            )
             # Fallback to memory cache
             return await self._get_user_settings_memory(user_id, settings_store)
 
-    async def _get_user_settings_memory(self, user_id: str, settings_store: SettingsStore) -> Settings | None:
+    async def _get_user_settings_memory(
+        self, user_id: str, settings_store: SettingsStore
+    ) -> Settings | None:
         """Get user settings from memory cache."""
         current_time = time.time()
 
@@ -282,7 +305,9 @@ class AsyncSmartCache:
                     await client.delete(user_key)
                     logger.debug("🚀 Invalidated Redis cache for user '%s'", user_id)
                 except Exception as e:
-                    logger.error("Redis cache invalidation error for %s: %s", user_id, e)
+                    logger.error(
+                        "Redis cache invalidation error for %s: %s", user_id, e
+                    )
 
         # Also invalidate memory cache
         if user_id in self._user_settings_cache:
