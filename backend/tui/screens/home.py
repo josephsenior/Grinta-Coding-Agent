@@ -49,6 +49,8 @@ class HomeScreen(Screen[str]):
         Binding("ctrl+q", "quit_app", "Quit", show=True),
         Binding("r", "refresh_list", "Refresh", show=True),
         Binding("d", "delete_selected", "Delete", show=True),
+        Binding("ctrl+f", "focus_search", "Search", show=True),
+        Binding("/", "focus_search", "Search", show=False),
     ]
 
     CSS = """
@@ -65,6 +67,13 @@ class HomeScreen(Screen[str]):
     #home-hint {
         text-align: center;
         color: $text-muted;
+    }
+    #search-bar {
+        height: 3;
+        padding: 0 2;
+    }
+    #search-input {
+        width: 1fr;
     }
     #conversation-list-view {
         height: 1fr;
@@ -91,6 +100,7 @@ class HomeScreen(Screen[str]):
         super().__init__()
         self.client = client
         self._conversations: list[ConversationInfo] = []
+        self._search_query = ""
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -99,6 +109,11 @@ class HomeScreen(Screen[str]):
                 yield Static("⚒  FORGE", id="home-header-text")
                 yield Static(
                     "AI-Powered Development — Terminal Edition", id="home-hint"
+                )
+            with Horizontal(id="search-bar"):
+                yield Input(
+                    placeholder="Search conversations (Ctrl+F or /)...",
+                    id="search-input",
                 )
             yield ListView(id="conversation-list-view")
             with Horizontal(id="new-bar"):
@@ -125,7 +140,34 @@ class HomeScreen(Screen[str]):
             )
             return
 
-        if not self._conversations:
+        self._apply_filter()
+
+    def _apply_filter(self) -> None:
+        """Filter and display conversations based on current search query."""
+        list_view = self.query_one("#conversation-list-view", ListView)
+        list_view.clear()
+
+        # Filter conversations by search query
+        filtered = self._conversations
+        if self._search_query:
+            query_lower = self._search_query.lower()
+            filtered = [
+                conv for conv in self._conversations
+                if query_lower in (conv.title or "").lower()
+                or query_lower in conv.status.lower()
+                or query_lower in conv.conversation_id.lower()
+            ]
+
+        if not filtered and self._conversations:
+            list_view.mount(
+                Static(
+                    f'No conversations match "{self._search_query}"',
+                    classes="empty-hint",
+                )
+            )
+            return
+
+        if not filtered:
             list_view.mount(
                 Static(
                     "No conversations yet — type below to start one.",
@@ -134,10 +176,16 @@ class HomeScreen(Screen[str]):
             )
             return
 
-        for info in self._conversations:
+        for info in filtered:
             list_view.append(ConversationListItem(info))
 
     # ── input handling ────────────────────────────────────────────
+
+    @on(Input.Changed, "#search-input")
+    def _on_search_changed(self, event: Input.Changed) -> None:
+        """Filter conversations as user types in search box."""
+        self._search_query = event.value.strip()
+        self._apply_filter()
 
     @on(Input.Submitted, "#new-input")
     async def _on_new_conversation(self, event: Input.Submitted) -> None:
@@ -172,6 +220,9 @@ class HomeScreen(Screen[str]):
 
     def action_focus_input(self) -> None:
         self.query_one("#new-input", Input).focus()
+
+    def action_focus_search(self) -> None:
+        self.query_one("#search-input", Input).focus()
 
     def action_open_settings(self) -> None:
         from backend.tui.screens.settings import SettingsScreen

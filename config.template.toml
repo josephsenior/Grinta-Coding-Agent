@@ -219,6 +219,70 @@ correct_num = 5
 api_key = ""
 model = "gpt-4o-mini"
 
+################################ Ollama Local Models ##########################
+# Example configuration for running Forge with Ollama local models
+# https://ollama.ai
+##############################################################################
+
+# Step 1: Install Ollama from https://ollama.ai
+# Step 2: Start Ollama: `ollama serve` (runs on http://localhost:11434 by default)
+# Step 3: Pull a model: `ollama pull llama3.2` or `ollama pull deepseek-coder`
+# Step 4: Uncomment and configure the [llm.ollama] section below
+# Step 5: Set the default model or use in agent config: llm_config = "ollama"
+
+# Recommended models for coding:
+# - llama3.2: Good balance of speed and quality
+# - deepseek-coder: Excellent for coding tasks
+# - qwen2.5-coder: Strong code completion
+# - codellama: Specialized for code generation
+
+# Example Ollama configuration:
+#[llm.ollama]
+#model = "ollama/llama3.2"
+#base_url = "http://localhost:11434"
+#api_key = "not-needed"  # Ollama doesn't require API keys
+#temperature = 0.1       # Lower temp for more deterministic code
+#max_output_tokens = 4000
+#timeout = 120           # Increase for slower hardware
+
+# For better code quality, use deepseek-coder:
+#[llm.ollama-coder]
+#model = "ollama/deepseek-coder"
+#base_url = "http://localhost:11434"
+#api_key = "not-needed"
+#temperature = 0.0       # Very low for consistent coding
+#max_output_tokens = 8000
+
+# For faster responses on lower-end hardware:
+#[llm.ollama-fast]
+#model = "ollama/llama3.2:latest"
+#base_url = "http://localhost:11434"
+#api_key = "not-needed"
+#temperature = 0.1
+#max_output_tokens = 2048  # Smaller context for speed
+
+# Usage examples:
+# 1. Set as default model in [llm] section:
+#    model = "ollama/llama3.2"
+#    base_url = "http://localhost:11434"
+#
+# 2. Use specific model for specific agent:
+#    [agent.CodeReviewAgent]
+#    llm_config = "ollama-coder"
+#
+# 3. Use cheaper model for condensing:
+#    [condenser]
+#    type = "llm"
+#    llm_config = "ollama-fast"
+
+# Performance tips for Ollama:
+# - GPU: Install NVIDIA/AMD drivers for 10-100x speedup
+# - RAM: Minimum 8GB, 16GB+ recommended for larger models
+# - Context: Larger max_output_tokens = slower but better quality
+# - Temperature: 0.0-0.2 for code, 0.5-0.8 for creative tasks
+
+##############################################################################
+
 
 #################################### Agent ###################################
 # Configuration for agents (group name starts with 'agent')

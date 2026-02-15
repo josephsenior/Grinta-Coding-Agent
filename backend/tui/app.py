@@ -6,9 +6,11 @@ import logging
 from pathlib import Path
 
 from textual.app import App
+from textual.binding import Binding
 
 from backend.tui.client import ForgeClient
 from backend.tui.screens.chat import ChatScreen
+from backend.tui.screens.help import HelpScreen
 from backend.tui.screens.home import HomeScreen
 
 logger = logging.getLogger("forge.tui")
@@ -29,6 +31,11 @@ class ForgeApp(App[None]):
     TITLE = "Forge"
     SUB_TITLE = "AI-Powered Development"
     CSS_PATH = str(_STYLES_DIR / "forge.tcss")
+
+    BINDINGS = [
+        Binding("?", "show_help", "Help", show=False),
+        Binding("h", "show_help", "Help", show=False),
+    ]
 
     def __init__(self, client: ForgeClient) -> None:
         super().__init__()
@@ -60,3 +67,7 @@ class ForgeApp(App[None]):
         """Gracefully close the client then exit."""
         await self.client.close()
         self.exit()
+
+    def action_show_help(self) -> None:
+        """Show the help screen."""
+        self.push_screen(HelpScreen())

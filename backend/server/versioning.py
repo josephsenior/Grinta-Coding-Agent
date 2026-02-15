@@ -48,6 +48,8 @@ def add_version_headers(response: Response, version: str) -> None:
 
 # Paths that skip versioning entirely
 _EXCLUDED_PATHS = (
+    "/api/health/live",
+    "/api/health/ready",
     "/api/monitoring/health",
     "/docs",
     "/openapi.json",
