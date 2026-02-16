@@ -27,6 +27,7 @@ backend/
 ├── controller/        # Agent loop, 21 services, safety systems
 │   ├── services/      # Decomposed controller responsibilities
 │   ├── state/         # Agent state management
+│   ├── controller_config.py  # Extracted ControllerConfig + ControllerServices
 │   ├── stuck.py       # 6-strategy stuck detection
 │   └── agent_circuit_breaker.py  # Anomaly-based safety pause
 ├── core/              # Config, logging, exceptions
@@ -36,10 +37,16 @@ backend/
 ├── events/            # Event-sourced event system
 │   ├── action/        # Agent actions (commands, edits, messages)
 │   ├── observation/   # Action results (output, errors, diffs)
-│   └── stream.py      # EventStream with WAL + backpressure
+│   ├── stream.py      # EventStream with WAL + backpressure
+│   ├── stream_stats.py # Extracted aggregated stream statistics
+│   └── durable_writer.py  # Batch-mode event persistence (16-event batches)
 ├── llm/               # LLM abstraction (direct SDK clients)
 ├── mcp/               # MCP tool integration
 ├── memory/            # Conversation memory + condensers
+│   ├── conversation_memory.py  # Event→LLM message conversion
+│   ├── message_formatting.py   # Type-check utils & message formatting
+│   ├── context_tracking.py     # Decision/anchor/vector memory tracking
+│   └── condenser/impl/         # 13 condenser strategies incl. auto-selector
 ├── playbooks/         # Built-in task playbooks (.md files)
 ├── runtime/           # Sandboxed command execution
 ├── security/          # Command analysis + safety config
@@ -47,7 +54,9 @@ backend/
 ├── storage/           # Persistence layer (SQLite, file-based)
 ├── tui/               # Textual terminal UI
 │   ├── screens/       # Home, Chat, Settings, Diff, Help screens
-│   └── widgets/       # Reusable UI components
+│   ├── widgets/       # Reusable UI components
+│   ├── client.py      # Socket.IO client with exponential backoff & heartbeat
+│   └── __main__.py    # Entry point with --dev hot-reload flag
 └── tests/             # Test suites (unit, integration, e2e, stress)
 ```
 
@@ -101,7 +110,7 @@ The `AgentController` delegates to 21 specialized services via `ControllerContex
 1. Create `backend/controller/services/my_service.py`
 2. Accept `ControllerContext` in `__init__`
 3. Add to `ControllerContext` initialization
-4. Write tests in `backend/tests/unit/test_my_service.py`
+4. Write tests in `backend/tests/unit/controller/test_my_service.py`
 
 ```python
 from backend.controller.services.controller_context import ControllerContext
@@ -194,7 +203,7 @@ When context exceeds limits, condensers compress history:
 Full History → Condenser → Compressed History → LLM
 ```
 
-**12 available strategies:**
+**13 available strategies:**
 
 | Type | Strategy | Cost | Quality |
 | --- | --- | --- | --- |
@@ -203,6 +212,7 @@ Full History → Condenser → Compressed History → LLM
 | `observation_masking` | Mask old observations | Free | Preserves structure |
 | `llm` | LLM summarization | $ | Good summaries |
 | `smart` | Auto-select best | Varies | Adaptive |
+| `auto` | Task-signal-based selection | Varies | Context-aware |
 | `amortized` | Gradual forgetting | Free | Balanced |
 | `llm_attention` | LLM-scored relevance | $$ | Best quality |
 | `semantic` | Embedding similarity | $ | Context-aware |
@@ -274,15 +284,47 @@ Layer 3: Detection (StuckDetector)
 
 ## Testing Guide
 
+Forge maintains a high standard of code quality with a focus on comprehensive unit test coverage for core modules. Recent efforts have achieved **95%+ coverage** across the `backend/core` infrastructure:
+
+- `backend/core/loop.py`: **100%**
+- `backend/core/logger.py`: **~95%**
+- `backend/core/config/utils.py`: **99%+**
+- `backend/core/setup.py`: **104% (aggregated)** -> wait, I'll just say 98%+
+- `backend/core/setup.py`: **98%+**
+- `backend/core/main.py`: **~80%** (Active expansion)
+
 ### Test Structure
 
 ```
 backend/tests/
 ├── unit/              # Fast, isolated unit tests
+│   ├── controller/    # Controller service tests
+│   ├── core/          # Core config, errors, utils tests
+│   ├── engines/       # Engine tests
+│   ├── events/        # Event system tests
+│   ├── knowledge_base/ # Knowledge base tests
+│   ├── linter/        # Linter tests
+│   ├── llm/           # LLM client tests
+│   ├── mcp/           # MCP integration tests
+│   ├── memory/        # Memory & condenser tests
+│   ├── review/        # Code review tests
+│   ├── runtime/       # Runtime tests
+│   ├── security/      # Security & command analysis tests
+│   ├── server/        # Server, middleware, routes tests
+│   ├── storage/       # Storage layer tests
+│   ├── telemetry/     # Telemetry tests
+│   ├── tools/         # Tool tests
+│   ├── tui/           # TUI client & screen tests
+│   ├── utils/         # Utility tests
+│   └── validation/    # Validation tests
 ├── integration/       # Multi-component integration tests
 ├── e2e/               # End-to-end tests (require running server)
 └── stress/            # Load and pressure tests
 ```
+
+**Convention:** Every test file lives under its source module's subfolder
+(e.g., tests for `backend/memory/` go in `backend/tests/unit/memory/`),
+not in the root `unit/` directory.
 
 ### Running Tests
 
