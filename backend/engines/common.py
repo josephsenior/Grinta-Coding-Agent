@@ -4,12 +4,12 @@ import json
 from typing import TYPE_CHECKING, Any, Callable
 
 from backend.core.logger import FORGE_logger as logger
-from backend.engines.orchestrator.contracts import ChatCompletionToolParam
 from backend.events.action import Action
-from backend.llm.model_response import ModelResponse
 from backend.llm.tool_types import make_function_chunk, make_tool_param
 
 if TYPE_CHECKING:
+    from backend.engines.orchestrator.contracts import ChatCompletionToolParam
+    from backend.engines.orchestrator.executor import ModelResponse
     from backend.events.serialization.event import ToolCallMetadata
 
 

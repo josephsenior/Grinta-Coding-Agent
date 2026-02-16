@@ -141,6 +141,7 @@ class InternalTaskTracker:
             "in_progress": 0,
             "pending": 0,
             "current": None,
+            "completion_percentage": 0,
         }
 
     def _count_task_statuses(self) -> dict[str, int]:

@@ -271,7 +271,9 @@ class GraphCache:
             cache_file = self._get_cache_file_path(repo_path)
 
             metadata_candidate = self.graph_metadata.get(repo_path, {})
-            metadata = (
+            # Copy so we don't mutate the in-memory metadata (cached_at
+            # must stay a datetime for _validate_cache_entry arithmetic).
+            metadata = dict(
                 metadata_candidate if isinstance(metadata_candidate, dict) else {}
             )
 

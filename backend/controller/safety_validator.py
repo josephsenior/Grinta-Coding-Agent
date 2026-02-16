@@ -108,10 +108,10 @@ class SafetyValidator:
         # Analyze the action
         # CommandAnalyzer.analyze takes a command string, not an action
         command = action.command if hasattr(action, "command") else str(action)
-        assessment = self.analyzer.analyze(command)
+        raw_assessment = self.analyzer.analyze(command)
 
-        # assessment is a tuple: (RiskCategory, str, list[str])
-        risk_category, reason, matched_patterns = assessment
+        # raw_assessment is a tuple: (RiskCategory, str, list[str])
+        risk_category, reason, matched_patterns = raw_assessment
         # Convert RiskCategory to ActionSecurityRisk
 
         risk_level_map = {
@@ -123,6 +123,16 @@ class SafetyValidator:
         }
         risk_level = risk_level_map.get(
             risk_category.value.lower(), ActionSecurityRisk.UNKNOWN
+        )
+
+        # Build a structured assessment for downstream helpers
+        from types import SimpleNamespace
+
+        assessment = SimpleNamespace(
+            risk_category=risk_category,
+            reason=reason,
+            matched_patterns=matched_patterns,
+            risk_level=risk_level,
         )
 
         # Determine if action should be blocked

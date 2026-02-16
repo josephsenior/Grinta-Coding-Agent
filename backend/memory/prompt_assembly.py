@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING, cast
 
 from backend.core.logger import FORGE_logger as logger
 from backend.core.message import ImageContent, Message, TextContent
-from backend.events.event import Event, RecallType
+from backend.core.enums import RecallType
+from backend.events.event import Event
 from backend.events.observation.agent import PlaybookKnowledge, RecallObservation
 from backend.utils.prompt import (
     ConversationInstructions,

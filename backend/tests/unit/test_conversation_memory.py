@@ -1,0 +1,351 @@
+"""Unit tests for backend.memory.conversation_memory — event→message conversion."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from backend.core.message import Message, TextContent
+from backend.memory.conversation_memory import ConversationMemory
+from backend.memory.memory_types import DecisionType
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_config(**overrides):
+    """Create a minimal AgentConfig-like object."""
+    cfg = MagicMock()
+    cfg.enable_vector_memory = False
+    cfg.enable_prompt_caching = True
+    cfg.enable_som_visual_browsing = False
+    cfg.cli_mode = False
+    cfg.enable_hybrid_retrieval = False
+    for k, v in overrides.items():
+        setattr(cfg, k, v)
+    return cfg
+
+
+def _make_prompt_manager():
+    pm = MagicMock()
+    pm.get_system_message.return_value = "You are Forge agent."
+    return pm
+
+
+def _make_memory(**config_overrides) -> ConversationMemory:
+    return ConversationMemory(
+        config=_make_config(**config_overrides),
+        prompt_manager=_make_prompt_manager(),
+    )
+
+
+def _text_msg(role: str, text: str) -> Message:
+    return Message(role=role, content=[TextContent(text=text)])
+
+
+# ---------------------------------------------------------------------------
+# Static helpers
+# ---------------------------------------------------------------------------
+
+
+class TestStaticHelpers:
+    def test_message_with_text(self):
+        msg = ConversationMemory._message_with_text("user", "hello")
+        assert msg.role == "user"
+        assert len(msg.content) == 1
+        assert msg.content[0].text == "hello"
+
+    def test_is_valid_image_url_valid(self):
+        assert ConversationMemory._is_valid_image_url("https://example.com/img.png") is True
+
+    def test_is_valid_image_url_none(self):
+        assert ConversationMemory._is_valid_image_url(None) is False
+
+    def test_is_valid_image_url_empty(self):
+        assert ConversationMemory._is_valid_image_url("") is False
+
+    def test_is_valid_image_url_whitespace(self):
+        assert ConversationMemory._is_valid_image_url("   ") is False
+
+    def test_is_text_content_true(self):
+        tc = TextContent(text="hi")
+        assert ConversationMemory._is_text_content(tc) is True
+
+    def test_is_text_content_duck_typed(self):
+        obj = MagicMock()
+        obj.type = "text"
+        obj.text = "hi"
+        assert ConversationMemory._is_text_content(obj) is True
+
+    def test_is_text_content_false(self):
+        obj = MagicMock()
+        obj.type = "image"
+        assert ConversationMemory._is_text_content(obj) is False
+
+    def test_class_name_in_mro(self):
+        assert ConversationMemory._class_name_in_mro("hello", "str") is True
+        assert ConversationMemory._class_name_in_mro("hello", "int") is False
+
+    def test_class_name_in_mro_none(self):
+        assert ConversationMemory._class_name_in_mro(None, "str") is False
+        assert ConversationMemory._class_name_in_mro("hi", None) is False
+
+
+# ---------------------------------------------------------------------------
+# Decision & Anchor tracking
+# ---------------------------------------------------------------------------
+
+
+class TestDecisionTracking:
+    def test_track_decision(self):
+        mem = _make_memory()
+        d = mem.track_decision(
+            description="Use Python",
+            rationale="Best fit",
+            decision_type=DecisionType.ARCHITECTURAL,
+            context="task analysis",
+            confidence=0.9,
+        )
+        assert d.description == "Use Python"
+        assert d.confidence == 0.9
+        assert d.decision_id in mem.decisions
+
+    def test_multiple_decisions(self):
+        mem = _make_memory()
+        mem.track_decision("d1", "r1", DecisionType.ARCHITECTURAL, "ctx")
+        mem.track_decision("d2", "r2", DecisionType.TECHNICAL, "ctx")
+        assert len(mem.decisions) == 2
+
+
+class TestAnchorTracking:
+    def test_add_anchor(self):
+        mem = _make_memory()
+        a = mem.add_anchor(content="critical info", category="requirement", importance=0.95)
+        assert a.content == "critical info"
+        assert a.anchor_id in mem.anchors
+
+    def test_anchor_importance(self):
+        mem = _make_memory()
+        a1 = mem.add_anchor("low", "misc", importance=0.3)
+        a2 = mem.add_anchor("high", "critical", importance=0.99)
+        assert a2.importance > a1.importance
+
+
+class TestContextSummary:
+    def test_empty_summary(self):
+        mem = _make_memory()
+        assert mem.get_context_summary() == ""
+
+    def test_summary_with_anchors(self):
+        mem = _make_memory()
+        mem.add_anchor("important", "requirement", 0.9)
+        summary = mem.get_context_summary()
+        assert "Anchors" in summary
+        assert "important" in summary
+
+    def test_summary_with_decisions(self):
+        mem = _make_memory()
+        mem.track_decision("use Python", "fast", DecisionType.ARCHITECTURAL, "ctx")
+        summary = mem.get_context_summary()
+        assert "Decisions" in summary
+        assert "use Python" in summary
+
+
+# ---------------------------------------------------------------------------
+# Prompt caching
+# ---------------------------------------------------------------------------
+
+
+class TestPromptCaching:
+    def test_apply_prompt_caching_sets_flags(self):
+        mem = _make_memory()
+        msgs = [
+            _text_msg("system", "system prompt"),
+            _text_msg("user", "question"),
+        ]
+        mem.apply_prompt_caching(msgs)
+        # First system message should have cache_prompt=True
+        assert msgs[0].content[0].cache_prompt is True
+        # Last user message should have cache_prompt=True
+        assert msgs[1].content[0].cache_prompt is True
+
+    def test_caching_disabled(self):
+        mem = _make_memory(enable_prompt_caching=False)
+        msgs = [_text_msg("system", "prompt")]
+        mem.apply_prompt_caching(msgs)
+        # Should not modify when disabled
+        # (the method returns early)
+
+    def test_caching_empty_messages(self):
+        mem = _make_memory()
+        mem.apply_prompt_caching([])  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# _apply_user_message_formatting
+# ---------------------------------------------------------------------------
+
+
+class TestUserMessageFormatting:
+    def test_consecutive_user_messages_separated(self):
+        mem = _make_memory()
+        msgs = [
+            _text_msg("user", "first"),
+            _text_msg("user", "second"),
+        ]
+        result = mem._apply_user_message_formatting(msgs)
+        # Second user message should have \n\n prefix
+        assert result[1].content[0].text.startswith("\n\n")
+
+    def test_non_consecutive_not_modified(self):
+        mem = _make_memory()
+        msgs = [
+            _text_msg("user", "question"),
+            _text_msg("assistant", "answer"),
+            _text_msg("user", "follow-up"),
+        ]
+        result = mem._apply_user_message_formatting(msgs)
+        assert not result[2].content[0].text.startswith("\n\n")
+
+    def test_formatting_idempotent(self):
+        mem = _make_memory()
+        msgs = [
+            _text_msg("user", "first"),
+            _text_msg("user", "\n\nsecond"),
+        ]
+        result = mem._apply_user_message_formatting(msgs)
+        # Already has \n\n prefix; should not double it
+        assert result[1].content[0].text == "\n\nsecond"
+
+    def test_original_not_mutated(self):
+        mem = _make_memory()
+        msg = _text_msg("user", "text")
+        msgs = [_text_msg("user", "prev"), msg]
+        result = mem._apply_user_message_formatting(msgs)
+        # Original message should be unchanged (deep copy)
+        assert msg.content[0].text == "text"
+
+
+# ---------------------------------------------------------------------------
+# _normalize_system_messages
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeSystemMessages:
+    def test_adds_system_if_missing(self):
+        mem = _make_memory()
+        msgs = [_text_msg("user", "hi")]
+        result = mem._normalize_system_messages(msgs)
+        assert result[0].role == "system"
+
+    def test_moves_system_to_front(self):
+        mem = _make_memory()
+        msgs = [
+            _text_msg("user", "hi"),
+            _text_msg("system", "you are helpful"),
+        ]
+        result = mem._normalize_system_messages(msgs)
+        assert result[0].role == "system"
+
+    def test_deduplicates_system_messages(self):
+        mem = _make_memory()
+        msgs = [
+            _text_msg("system", "prompt"),
+            _text_msg("system", "duplicate"),
+            _text_msg("user", "hi"),
+        ]
+        result = mem._normalize_system_messages(msgs)
+        system_count = sum(1 for m in result if m.role == "system")
+        assert system_count == 1
+
+    def test_empty_messages(self):
+        mem = _make_memory()
+        result = mem._normalize_system_messages([])
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# _remove_duplicate_system_prompt_user
+# ---------------------------------------------------------------------------
+
+
+class TestRemoveDuplicateSystemPromptUser:
+    def test_duplicate_removed(self):
+        mem = _make_memory()
+        msgs = [
+            _text_msg("system", "You are helpful"),
+            _text_msg("user", "You are helpful"),
+            _text_msg("user", "actual question"),
+        ]
+        result = mem._remove_duplicate_system_prompt_user(msgs)
+        assert len(result) == 2
+        assert result[1].content[0].text == "actual question"
+
+    def test_different_content_preserved(self):
+        mem = _make_memory()
+        msgs = [
+            _text_msg("system", "system prompt"),
+            _text_msg("user", "different question"),
+        ]
+        result = mem._remove_duplicate_system_prompt_user(msgs)
+        assert len(result) == 2
+
+    def test_single_message(self):
+        mem = _make_memory()
+        msgs = [_text_msg("system", "prompt")]
+        result = mem._remove_duplicate_system_prompt_user(msgs)
+        assert len(result) == 1
+
+
+# ---------------------------------------------------------------------------
+# _extract_first_text
+# ---------------------------------------------------------------------------
+
+
+class TestExtractFirstText:
+    def test_text_content(self):
+        msg = _text_msg("user", "hello")
+        assert ConversationMemory._extract_first_text(msg) == "hello"
+
+    def test_none_message(self):
+        assert ConversationMemory._extract_first_text(None) is None
+
+    def test_no_content(self):
+        msg = Message(role="user", content=[])
+        assert ConversationMemory._extract_first_text(msg) is None
+
+
+# ---------------------------------------------------------------------------
+# Memory store/recall (vector store disabled)
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryStoreRecall:
+    def test_store_no_vector_store(self):
+        mem = _make_memory()
+        # Should be a no-op, not raise
+        mem.store_in_memory("ev1", "user", "test content")
+
+    def test_recall_no_vector_store(self):
+        mem = _make_memory()
+        result = mem.recall_from_memory("query")
+        assert result == []
+
+    def test_store_with_mock_vector_store(self):
+        mem = _make_memory()
+        mem.vector_store = MagicMock()
+        mem.store_in_memory("ev1", "user", "content", {"key": "val"})
+        mem.vector_store.add.assert_called_once()
+
+    def test_recall_with_mock_vector_store(self):
+        mem = _make_memory()
+        mem.vector_store = MagicMock()
+        mem.vector_store.search.return_value = [{"content": "result"}]
+        result = mem.recall_from_memory("query", k=3)
+        assert len(result) == 1
+        mem.vector_store.search.assert_called_once_with("query", k=3)

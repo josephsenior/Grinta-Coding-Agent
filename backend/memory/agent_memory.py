@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING, Any, cast
 import backend
 from backend.core.logger import FORGE_logger as logger
 from backend.events.action.agent import RecallAction
-from backend.events.event import Event, EventSource, RecallType
+from backend.core.enums import RecallType
+from backend.events.event import Event, EventSource
 from backend.events.observation.agent import (
     PlaybookKnowledge,
     RecallFailureObservation,

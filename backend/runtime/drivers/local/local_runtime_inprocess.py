@@ -51,7 +51,7 @@ def get_user_info() -> tuple[int, str | None]:
     username = os.getenv("USER") or os.getenv("USERNAME")
     uid_getter = getattr(os, "getuid", None)
     if uid_getter and callable(uid_getter):
-        return (uid_getter(), username)
+        return (uid_getter(), username)  # pylint: disable=not-callable
     return (0, username)
 
 
@@ -380,10 +380,8 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """Copy file from runtime to host."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
-        from pathlib import Path
-
         # For in-process, file is already accessible
-        return Path(path)
+        return Path(path)  # pylint: disable=redefined-outer-name,reimported
 
     def get_mcp_config(self, extra_stdio_servers: list[Any] | None = None) -> Any:
         """Get MCP configuration."""
@@ -442,9 +440,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
     @property
     def workspace_root(self) -> Path:
         """Return the workspace root path."""
-        from pathlib import Path
-
-        return Path(self._temp_workspace) if self._temp_workspace else Path(".")
+        return Path(self._temp_workspace) if self._temp_workspace else Path(".")  # pylint: disable=redefined-outer-name,reimported
 
     @workspace_root.setter
     def workspace_root(self, value: Path) -> None:

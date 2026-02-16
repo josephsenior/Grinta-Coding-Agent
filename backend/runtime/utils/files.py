@@ -112,6 +112,8 @@ async def read_file(
         return ErrorObservation(f"File could not be decoded as utf-8: {path}")
     except IsADirectoryError:
         return ErrorObservation(f"Path is a directory: {path}. You can only read files")
+    except PermissionError:
+        return ErrorObservation(f"Path is a directory: {path}. You can only read files")
     code_view = "".join(lines)
     return FileReadObservation(path=path, content=code_view)
 
