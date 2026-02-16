@@ -9,13 +9,12 @@ from __future__ import annotations
 
 import os
 
-from backend.core.enums import QuotaPlan
 from backend.core.logger import FORGE_logger as logger
 from backend.server.middleware.cost_quota import CostQuotaMiddleware
 
 # Redis availability detection (matches redis_cost_quota.py)
 try:
-    import redis.asyncio as _redis  # noqa: F401
+    import redis.asyncio as _redis
 
     REDIS_AVAILABLE = True
 except ImportError:
@@ -31,25 +30,21 @@ def get_cost_quota_middleware() -> CostQuotaMiddleware:
     Auto-detects Redis and uses ``RedisCostQuotaMiddleware`` if available,
     otherwise falls back to in-memory ``CostQuotaMiddleware``.
     """
-    global _GLOBAL_QUOTA_MIDDLEWARE  # noqa: PLW0603
+    global _GLOBAL_QUOTA_MIDDLEWARE
     if _GLOBAL_QUOTA_MIDDLEWARE is not None:
         return _GLOBAL_QUOTA_MIDDLEWARE
 
-    default_plan = QuotaPlan(os.getenv("DEFAULT_QUOTA_PLAN", "free"))
-
     if REDIS_AVAILABLE:
-        _GLOBAL_QUOTA_MIDDLEWARE = _try_redis_middleware(default_plan)
+        _GLOBAL_QUOTA_MIDDLEWARE = _try_redis_middleware()
 
     if _GLOBAL_QUOTA_MIDDLEWARE is None:
-        _GLOBAL_QUOTA_MIDDLEWARE = CostQuotaMiddleware(
-            enabled=True, default_plan=default_plan
-        )
+        _GLOBAL_QUOTA_MIDDLEWARE = CostQuotaMiddleware(enabled=True)
         logger.info("Using in-memory cost quota middleware (Redis not available)")
 
     return _GLOBAL_QUOTA_MIDDLEWARE
 
 
-def _try_redis_middleware(default_plan: QuotaPlan) -> CostQuotaMiddleware | None:
+def _try_redis_middleware() -> CostQuotaMiddleware | None:
     """Attempt to create a Redis-backed middleware, returning *None* on failure."""
     from backend.server.middleware.redis_cost_quota import RedisCostQuotaMiddleware
 
@@ -58,7 +53,6 @@ def _try_redis_middleware(default_plan: QuotaPlan) -> CostQuotaMiddleware | None
         middleware = RedisCostQuotaMiddleware(
             redis_url=redis_url,
             enabled=True,
-            default_plan=default_plan,
             connection_pool_size=int(os.getenv("REDIS_POOL_SIZE", "10")),
             connection_timeout=float(os.getenv("REDIS_TIMEOUT", "5.0")),
             fallback_enabled=os.getenv("REDIS_QUOTA_FALLBACK", "true").lower()

@@ -31,4 +31,3 @@ class BaseCritic(abc.ABC):
         self, events: list[Event], diff_patch: str | None = None
     ) -> CriticResult:
         """Assess events (and optional patch) and return qualitative CriticResult."""
-        pass

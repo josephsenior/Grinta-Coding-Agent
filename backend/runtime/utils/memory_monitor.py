@@ -22,7 +22,6 @@ class LogStream:
 
     def flush(self) -> None:
         """Flush log stream (no-op for logger redirect)."""
-        pass
 
 
 class MemoryMonitor:

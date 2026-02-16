@@ -137,7 +137,7 @@ def default_if_missing(value: T | Sentinel, default: T) -> T:
     return default if is_missing(value) else value  # type: ignore[return-value]
 
 
-def coalesce(*values: T | Sentinel | None) -> T | None:
+def coalesce[T](*values: T | Sentinel | None) -> T | None:
     """Return first non-sentinel, non-None value.
 
     Args:

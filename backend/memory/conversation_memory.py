@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import copy
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Literal, TypeGuard, cast
+from typing import Any, cast
 
 from backend.core.config.agent_config import AgentConfig
 from backend.core.logger import FORGE_logger as logger
-from backend.core.message import (
-    ImageContent,
-    Message,
-    TextContent,
-)
+from backend.core.message import Message
 from backend.core.schemas import ActionType
 from backend.events.action import (
     Action,
@@ -24,10 +18,20 @@ from backend.events.event import Event, EventSource
 from backend.events.observation.agent import RecallObservation
 from backend.events.observation.observation import Observation
 from backend.memory.action_processors import convert_action_to_messages
+from backend.memory.context_tracking import ContextTracker
 from backend.memory.memory_types import (
     ContextAnchor,
     Decision,
     DecisionType,
+)
+from backend.memory.message_formatting import (
+    apply_user_message_formatting,
+    is_action_event,
+    is_instance_of,
+    is_observation_event,
+    is_text_content,
+    message_with_text,
+    remove_duplicate_system_prompt_user,
 )
 from backend.memory.observation_processors import convert_observation_to_message
 from backend.memory.prompt_assembly import process_recall_observation
@@ -54,13 +58,25 @@ class ConversationMemory:
         self.prompt_manager = prompt_manager
 
         # Initialize vector memory if enabled
-        self.vector_store: EnhancedVectorStore | None = None
+        vector_store: EnhancedVectorStore | None = None
         if bool(getattr(config, "enable_vector_memory", False)):
-            self._initialize_vector_memory()
+            vector_store = self._initialize_vector_memory()
 
-        # Decision & Anchor State (Ported from ContextManager)
-        self.decisions: dict[str, Decision] = {}
-        self.anchors: dict[str, ContextAnchor] = {}
+        # Context tracking (decisions, anchors, vector memory)
+        self._ctx = ContextTracker(vector_store=vector_store)
+
+    # Delegate context-tracking API to ContextTracker
+    @property
+    def decisions(self) -> dict[str, Decision]:
+        return self._ctx.decisions
+
+    @property
+    def anchors(self) -> dict[str, ContextAnchor]:
+        return self._ctx.anchors
+
+    @property
+    def vector_store(self) -> EnhancedVectorStore | None:
+        return self._ctx.vector_store
 
     def track_decision(
         self,
@@ -71,64 +87,33 @@ class ConversationMemory:
         confidence: float = 1.0,
     ) -> Decision:
         """Track a decision made during conversation."""
-        decision_id = f"decision_{len(self.decisions) + 1}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        decision = Decision(
-            decision_id=decision_id,
-            type=decision_type,
-            description=description,
-            rationale=rationale,
-            timestamp=datetime.now(),
-            context=context,
-            confidence=confidence,
+        return self._ctx.track_decision(
+            description, rationale, decision_type, context, confidence,
         )
-        self.decisions[decision_id] = decision
-        logger.info("✓ Tracked decision: %s...", description[:50])
-        return decision
 
     def add_anchor(
         self, content: str, category: str, importance: float = 0.9
     ) -> ContextAnchor:
         """Create a context anchor for critical information."""
-        anchor_id = (
-            f"anchor_{len(self.anchors) + 1}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        )
-        anchor = ContextAnchor(
-            anchor_id=anchor_id,
-            content=content,
-            category=category,
-            importance=importance,
-            timestamp=datetime.now(),
-            last_accessed=datetime.now(),
-        )
-        self.anchors[anchor_id] = anchor
-        logger.info("📌 Anchored %s: %s...", category, content[:50])
-        return anchor
+        return self._ctx.add_anchor(content, category, importance)
 
     def get_context_summary(self) -> str:
         """Get a summary of active anchors and recent decisions for the prompt."""
-        if not self.anchors and not self.decisions:
-            return ""
+        return self._ctx.get_context_summary()
 
-        summary_parts = []
+    def store_in_memory(
+        self,
+        event_id: str,
+        role: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Store an event in persistent vector memory."""
+        self._ctx.store_in_memory(event_id, role, content, metadata)
 
-        # Add Anchors (High Priority)
-        if self.anchors:
-            summary_parts.append("## Critical Context (Anchors)")
-            for anchor in sorted(
-                self.anchors.values(), key=lambda x: x.importance, reverse=True
-            ):
-                summary_parts.append(f"- [{anchor.category.upper()}] {anchor.content}")
-
-        # Add Recent Decisions (Last 5)
-        if self.decisions:
-            summary_parts.append("## Recent Decisions")
-            recent = sorted(
-                self.decisions.values(), key=lambda x: x.timestamp, reverse=True
-            )[:5]
-            for d in recent:
-                summary_parts.append(f"- {d.description} (Rationale: {d.rationale})")
-
-        return "\n".join(summary_parts)
+    def recall_from_memory(self, query: str, k: int = 5) -> list[dict[str, Any]]:
+        """Retrieve relevant context from persistent vector memory."""
+        return self._ctx.recall_from_memory(query, k)
 
     def _initialize_vector_memory(self) -> None:
         """Initialize vector memory store for persistent context."""
@@ -136,7 +121,7 @@ class ConversationMemory:
             hybrid_enabled = bool(
                 getattr(self.agent_config, "enable_hybrid_retrieval", False)
             )
-            self.vector_store = EnhancedVectorStore(
+            self._ctx.vector_store = EnhancedVectorStore(
                 collection_name="conversation_memory",
                 enable_cache=True,
                 enable_reranking=hybrid_enabled,
@@ -152,7 +137,7 @@ class ConversationMemory:
                 "  pip install chromadb sentence-transformers",
                 e,
             )
-            self.vector_store = None
+            self._ctx.vector_store = None
 
     def apply_prompt_caching(self, messages: list[Message]) -> None:
         """Set prompt caching hints for the first system message and the latest user message."""
@@ -170,13 +155,13 @@ class ConversationMemory:
     def _reset_cache_flags(self, messages: list[Message]) -> None:
         for message in messages:
             for content in getattr(message, "content", []) or []:
-                if self._is_text_content(content):
+                if is_text_content(content):
                     content.cache_prompt = False
 
     def _cache_first_system_message(self, messages: list[Message]) -> None:
         first_message = messages[0]
         for content in getattr(first_message, "content", []) or []:
-            if self._is_text_content(content):
+            if is_text_content(content):
                 content.cache_prompt = True
 
     def _cache_latest_user_message(self, messages: list[Message]) -> None:
@@ -184,17 +169,9 @@ class ConversationMemory:
             if message.role != "user":
                 continue
             for content in getattr(message, "content", []) or []:
-                if self._is_text_content(content):
+                if is_text_content(content):
                     content.cache_prompt = True
             break
-
-    @staticmethod
-    def _message_with_text(
-        role: Literal["user", "system", "assistant", "tool"], text: str
-    ) -> Message:
-        """Build a Message with a single TextContent entry."""
-        content_items: list[TextContent | ImageContent] = [TextContent(text=text)]
-        return Message(role=role, content=content_items)
 
     @staticmethod
     def _is_valid_image_url(url: str | None) -> bool:
@@ -259,8 +236,8 @@ class ConversationMemory:
             messages += messages_to_add
         messages = list(filter_unmatched_tool_calls(messages))
         messages = self._normalize_system_messages(messages)
-        messages = self._remove_duplicate_system_prompt_user(messages)
-        return self._apply_user_message_formatting(messages)
+        messages = remove_duplicate_system_prompt_user(messages)
+        return apply_user_message_formatting(messages)
 
     def _prepare_event_history(
         self,
@@ -284,13 +261,13 @@ class ConversationMemory:
         vision_is_active: bool,
     ) -> list[Message]:
         """Dispatch an event to the appropriate transformation helper."""
-        if self._is_action_event(event):
+        if is_action_event(event):
             return self._process_action(
                 action=cast(Action, event),
                 pending_tool_call_action_messages=tool_state.pending_action_messages,
                 vision_is_active=vision_is_active,
             )
-        if self._is_observation_event(event):
+        if is_observation_event(event):
             return self._process_observation(
                 obs=cast(Observation, event),
                 tool_call_id_to_message=tool_state.tool_call_messages,
@@ -314,7 +291,7 @@ class ConversationMemory:
                 "[ConversationMemory] Handling generic event type %s via fallback.",
                 type(event).__name__,
             )
-            return [ConversationMemory._message_with_text("user", fallback_content)]
+            return [message_with_text("user", fallback_content)]
         raise ValueError(
             f"Unknown event type without text content: {type(event).__name__}"
         )
@@ -342,7 +319,7 @@ class ConversationMemory:
             except Exception:
                 system_prompt = "You are Forge agent."
             messages.insert(
-                0, ConversationMemory._message_with_text("system", system_prompt)
+                0, message_with_text("system", system_prompt)
             )
             first_system_index = 0
         elif first_system_index != 0:
@@ -357,144 +334,13 @@ class ConversationMemory:
             if sys_msg.role == "system":
                 # Iterate to find text content
                 for content in sys_msg.content:
-                    if self._is_text_content(content):
+                    if is_text_content(content):
                         content.text += f"\n\n{context_summary}"
                         break
 
         deduped: list[Message] = [messages[0]]
         deduped.extend(message for message in messages[1:] if message.role != "system")
         return deduped
-
-    def _remove_duplicate_system_prompt_user(
-        self, messages: list[Message]
-    ) -> list[Message]:
-        """Drop leading user messages that accidentally duplicate the system prompt.
-
-        Pytest can reload action modules when different suites run together, which
-        occasionally causes a `SystemMessageAction` instance to be deserialized
-        through the generic fallback path (treated as a user message). When this
-        happens we end up with a user role entry that contains the exact same text
-        as the preceding system prompt, shifting the rest of the history and
-        breaking caching-related expectations. This normalization makes the pipeline
-        idempotent by removing that redundant user entry while preserving the rest
-        of the conversation.
-        """
-        if len(messages) < 2:
-            return messages
-        system_text = self._extract_first_text(messages[0])
-        first_user_text = self._extract_first_text(messages[1])
-        if (
-            messages[0].role == "system"
-            and messages[1].role == "user"
-            and system_text
-            and first_user_text
-            and first_user_text.strip() == system_text.strip()
-        ):
-            return [messages[0]] + messages[2:]
-        return messages
-
-    @staticmethod
-    def _extract_first_text(message: Message | None) -> str | None:
-        """Helper to extract the first textual content from a message."""
-        if not message or not getattr(message, "content", None):
-            return None
-        for item in message.content:
-            if ConversationMemory._is_text_content(item):
-                return getattr(item, "text", None)
-        return None
-
-    def _apply_user_message_formatting(self, messages: list[Message]) -> list[Message]:
-        r"""Apply formatting rules to message sequence, such as separating consecutive user messages.
-
-        Ensures proper readability when multiple user messages appear consecutively
-        by adding newline separators. This prevents user messages from being visually
-        connected when they should be distinct.
-
-        Args:
-            messages: List of Message objects to format
-
-        Returns:
-            list[Message]: Formatted message list with newline separators added where needed
-
-        Example:
-            >>> msg1 = Message(role="user", content=[TextContent(text="First")])
-            >>> msg2 = Message(role="user", content=[TextContent(text="Second")])
-            >>> formatted = memory._apply_user_message_formatting([msg1, msg2])
-            >>> formatted[1].content[0].text
-            "\\n\\nSecond"
-
-        """
-        formatted_messages: list[Message] = []
-        prev_role = None
-        for msg in messages:
-            current_role = getattr(msg, "role", None)
-            # Deep copy to avoid mutating original test fixtures / history lists.
-            new_msg = (
-                msg.model_copy(deep=True)
-                if hasattr(msg, "model_copy")
-                else copy.deepcopy(msg)
-            )
-            if (
-                current_role == "user"
-                and prev_role == "user"
-                and (len(new_msg.content) > 0)
-            ):
-                for content_item in new_msg.content:
-                    if self._is_text_content(content_item):
-                        # Add separator only if not already present to remain idempotent.
-                        if not getattr(content_item, "text", "").startswith("\n\n"):
-                            content_item.text = "\n\n" + getattr(
-                                content_item, "text", ""
-                            )
-                        break
-            formatted_messages.append(new_msg)
-            prev_role = current_role
-        return formatted_messages
-
-    @staticmethod
-    def _is_text_content(content_item: Any) -> TypeGuard[TextContent]:
-        """Duck-typed check for text content objects across module reloads."""
-        if isinstance(content_item, TextContent):
-            return True
-        return bool(
-            getattr(content_item, "type", None) == "text"
-            and hasattr(content_item, "text")
-        )
-
-    @staticmethod
-    def _class_name_in_mro(obj: Any, target_name: str | None) -> bool:
-        """Check whether an object's class hierarchy contains the given name."""
-        if not target_name or obj is None:
-            return False
-        cls = obj if isinstance(obj, type) else type(obj)
-        for base in getattr(cls, "__mro__", ()):
-            if base.__name__ == target_name:
-                return True
-        return False
-
-    @staticmethod
-    def _is_instance_of(obj: Any, cls: type[Any]) -> bool:
-        """Safely evaluate isinstance across duplicated module loads."""
-        if isinstance(obj, cls):
-            return True
-        return ConversationMemory._class_name_in_mro(
-            obj, getattr(cls, "__name__", None)
-        )
-
-    @staticmethod
-    def _is_action_event(event: Any) -> bool:
-        """Duck-typed action detection resilient to module reloads."""
-        return ConversationMemory._is_instance_of(event, Action)
-
-    @staticmethod
-    def _is_observation_event(event: Any) -> bool:
-        """Duck-typed observation detection resilient to module reloads."""
-        return ConversationMemory._is_instance_of(event, Observation)
-
-    @staticmethod
-    def _is_message_action(event: Any) -> bool:
-        """Helper for duck-typed MessageAction detection."""
-        return ConversationMemory._is_instance_of(event, MessageAction)
 
     def _process_action(
         self,
@@ -563,7 +409,7 @@ class ConversationMemory:
 
         """
         # Handle special cases first
-        if self._is_instance_of(obs, RecallObservation):
+        if is_instance_of(obs, RecallObservation):
             return self._process_recall_observation(
                 cast(RecallObservation, obs), current_index, events or []
             )
@@ -612,7 +458,7 @@ class ConversationMemory:
         has_system_message = False
         for event in events:
             # Primary fast-path: direct isinstance or duck-typed equivalent
-            if self._is_instance_of(event, SystemMessageAction):
+            if is_instance_of(event, SystemMessageAction):
                 has_system_message = True
                 break
             # Class name match fallback (handles duplicate class loading / re-import edge cases)
@@ -711,65 +557,11 @@ class ConversationMemory:
         logger.info("Inserted initial user action at index %s", insert_pos)
 
     def _is_user_message(self, event: Event) -> bool:
-        if not self._is_instance_of(event, MessageAction):
+        if not is_instance_of(event, MessageAction):
             return False
         source = getattr(event, "source", getattr(event, "_source", None))
         if isinstance(source, EventSource):
             return source == EventSource.USER
         return source == "user"
 
-    def store_in_memory(
-        self,
-        event_id: str,
-        role: str,
-        content: str,
-        metadata: dict[str, Any] | None = None,
-    ) -> None:
-        """Store an event in persistent vector memory.
 
-        Args:
-            event_id: Unique event identifier
-            role: Role (user/agent/system)
-            content: Event content to store
-            metadata: Optional metadata dict
-
-        """
-        if not self.vector_store:
-            return
-
-        try:
-            self.vector_store.add(
-                step_id=event_id,
-                role=role,
-                artifact_hash=None,
-                rationale=None,
-                content_text=content,
-                metadata=metadata or {},
-            )
-            logger.debug("Stored event %s in vector memory", event_id)
-        except Exception as e:
-            logger.warning("Failed to store event in memory: %s", e)
-
-    def recall_from_memory(self, query: str, k: int = 5) -> list[dict[str, Any]]:
-        """Retrieve relevant context from persistent vector memory.
-
-        Args:
-            query: Search query
-            k: Number of results to return
-
-        Returns:
-            List of relevant memory records
-
-        """
-        if not self.vector_store:
-            return []
-
-        try:
-            results = self.vector_store.search(query, k=k)
-            logger.debug(
-                "Retrieved %d relevant memories for query: %s", len(results), query[:50]
-            )
-            return results
-        except Exception as e:
-            logger.warning("Failed to retrieve from memory: %s", e)
-            return []

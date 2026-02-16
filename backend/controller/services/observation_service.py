@@ -65,7 +65,7 @@ class ObservationService:
             observation = await get_plugin_registry().dispatch_action_post(
                 pending_action, observation
             )
-        except Exception:  # noqa: BLE001 — plugins must not break the pipeline
+        except Exception:
             pass
 
         controller = self._context.get_controller()

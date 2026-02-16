@@ -105,7 +105,7 @@ def check_route_file_imports(file_path: Path) -> tuple[bool, list[str]]:
                     if isinstance(target, ast.Name):
                         if "router" in target.id.lower() or "app" in target.id.lower():
                             has_router = True
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 # Check for route decorators
                 for decorator in node.decorator_list:
                     if isinstance(decorator, ast.Attribute):
@@ -217,7 +217,7 @@ def verify_app_registration() -> tuple[bool, list[str]]:
             source = f.read()
 
         # Check for all expected router includes
-        for router_name in EXPECTED_ROUTERS.keys():
+        for router_name in EXPECTED_ROUTERS:
             if (
                 f"include_router({router_name}" not in source
                 and f"include_router({router_name.replace('_router', '')}" not in source
@@ -345,10 +345,9 @@ def main():
         print("✅ ALL CHECKS PASSED - API routes are healthy!")
         print("=" * 80)
         return 0
-    else:
-        print("❌ SOME CHECKS FAILED - Please review the issues above")
-        print("=" * 80)
-        return 1
+    print("❌ SOME CHECKS FAILED - Please review the issues above")
+    print("=" * 80)
+    return 1
 
 
 if __name__ == "__main__":

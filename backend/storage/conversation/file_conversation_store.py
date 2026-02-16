@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from pydantic import TypeAdapter
 
@@ -35,8 +35,8 @@ class FileConversationStore(ConversationStore):
 
     def __init__(
         self,
-        file_store: "FileStore",
-        config: Optional["ForgeConfig | None"] = None,
+        file_store: FileStore,
+        config: ForgeConfig | None | None = None,
         user_id: str | None = None,
     ) -> None:
         """Capture configuration, file store, and ensure local directories exist."""

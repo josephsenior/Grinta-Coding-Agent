@@ -46,7 +46,7 @@ def model_matches(model: str, patterns: list[str]) -> bool:
     return False
 
 
-from backend.llm.capabilities import ModelCapabilities  # noqa: E402
+from backend.llm.capabilities import ModelCapabilities
 
 
 @dataclass(frozen=True)

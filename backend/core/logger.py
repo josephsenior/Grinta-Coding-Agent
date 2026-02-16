@@ -15,7 +15,6 @@ from pythonjsonlogger.json import JsonFormatter
 from backend.core.constants import (
     DEBUG,
     DEBUG_LLM,
-    DISABLE_COLOR_PRINTING,  # noqa: F401  # re-exported for config.utils
     LOG_JSON,
     LOG_JSON_LEVEL_KEY,
     LOG_LEVEL,
@@ -24,7 +23,7 @@ from backend.core.constants import (
 )
 
 # Re-export formatter/filter classes from dedicated module for backward compat.
-from backend.core.log_formatters import (  # noqa: F401
+from backend.core.log_formatters import (
     _TRACE_LOCAL,
     ColoredFormatter,
     ColorType,

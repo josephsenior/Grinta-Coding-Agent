@@ -250,10 +250,10 @@ class RetryService:
             import redis.exceptions
 
             return isinstance(
-                exc, (redis.exceptions.ConnectionError, ConnectionError, OSError)
+                exc, redis.exceptions.ConnectionError | ConnectionError | OSError
             )
         except ImportError:
-            return isinstance(exc, (ConnectionError, OSError))
+            return isinstance(exc, ConnectionError | OSError)
 
     async def _process_tasks(self, tasks: list[RetryTask]) -> None:
         queue = self._retry_queue

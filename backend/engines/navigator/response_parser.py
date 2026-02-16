@@ -86,7 +86,6 @@ class BrowsingActionParserMessage(ActionParser):
 
     def __init__(self) -> None:
         """Initialize message parser."""
-        pass
 
     def check_condition(self, action_str: str) -> bool:
         """Check whether the action string is a plain message (no code blocks).
@@ -127,7 +126,6 @@ class BrowsingActionParserBrowseInteractive(ActionParser):
 
     def __init__(self) -> None:
         """Initialize browse interactive parser."""
-        pass
 
     def check_condition(self, action_str: str) -> bool:
         """Return True because this is the fallback parser."""

@@ -20,7 +20,7 @@ class Session(Protocol):
 
 
 if TYPE_CHECKING:  # Prefer real type for static checkers when available
-    from backend.server.session.session import Session as _RealSession  # noqa: F401
+    pass
 
 
 class SessionManager:

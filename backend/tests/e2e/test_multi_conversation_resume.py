@@ -113,8 +113,7 @@ def _extract_project_name_from_response(content: str) -> str | None:
             r'name.*?["\']([^"\']+)["\']', content, re.IGNORECASE
         ):
             return name_match[1]
-        else:
-            return "Forge-ai" if "Forge-ai" in content_lower else "forge"
+        return "Forge-ai" if "Forge-ai" in content_lower else "forge"
     return None
 
 
@@ -208,7 +207,7 @@ def _find_and_click_conversation(page: Page, conversation_id: str) -> None:
                         conversation_link_found = True
                         page.wait_for_timeout(2000)
                         break
-                    elif (
+                    if (
                         selector == 'a[href*="/conversations/"]'
                         and not conversation_link_found
                     ):

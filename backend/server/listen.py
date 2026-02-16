@@ -8,7 +8,7 @@ from backend.server.shared import sio
 
 # Import Socket.IO handlers to register them - this MUST be after sio is imported
 try:
-    import backend.server.listen_socket  # noqa: F401 # pylint: disable=unused-import
+    pass  # pylint: disable=unused-import
 except Exception as e:
     logger.error("Failed to import Socket.IO handlers: %s", e, exc_info=True)
 else:

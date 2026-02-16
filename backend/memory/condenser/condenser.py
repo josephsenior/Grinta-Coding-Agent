@@ -262,7 +262,6 @@ class BaseLLMCondenser(RollingCondenser, ABC):
 
     def _validate_llm(self) -> None:
         """Hook for subclasses to validate LLM capabilities during initialization."""
-        pass
 
     @classmethod
     def from_config(

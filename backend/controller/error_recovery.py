@@ -146,7 +146,7 @@ class ErrorRecoveryStrategy:
             ErrorType if matched, None otherwise
 
         """
-        if isinstance(error, (ImportError, ModuleNotFoundError)):
+        if isinstance(error, ImportError | ModuleNotFoundError):
             return ErrorType.MODULE_NOT_FOUND
         if isinstance(error, SyntaxError):
             return ErrorType.SYNTAX_ERROR
@@ -155,10 +155,10 @@ class ErrorRecoveryStrategy:
         if isinstance(error, TimeoutError):
             return ErrorType.TIMEOUT_ERROR
         if isinstance(
-            error, (FileNotFoundError, IsADirectoryError, NotADirectoryError)
+            error, FileNotFoundError | IsADirectoryError | NotADirectoryError
         ):
             return ErrorType.FILESYSTEM_ERROR
-        if isinstance(error, (FunctionCallValidationError, FunctionCallNotExistsError)):
+        if isinstance(error, FunctionCallValidationError | FunctionCallNotExistsError):
             return ErrorType.TOOL_CALL_ERROR
         return None
 

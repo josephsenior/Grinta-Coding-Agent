@@ -58,9 +58,8 @@ def main():
     if all_found:
         print("\n[SUCCESS] All new endpoints are properly registered with versioning!")
         return 0
-    else:
-        print("\n[ERROR] Some endpoints need to be registered")
-        return 1
+    print("\n[ERROR] Some endpoints need to be registered")
+    return 1
 
 
 if __name__ == "__main__":

@@ -93,11 +93,9 @@ class FileEditRuntimeInterface(Protocol):
 
     async def read(self, path: str) -> str:
         """Read file contents from runtime."""
-        pass
 
     async def write(self, action: FileWriteAction) -> Observation:
         """Write file (must be implemented by subclass)."""
-        pass
 
 
 class FileEditRuntimeMixin(ABC):

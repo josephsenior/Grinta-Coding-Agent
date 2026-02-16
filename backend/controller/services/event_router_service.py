@@ -53,7 +53,7 @@ class EventRouterService:
             from backend.core.plugin import get_plugin_registry
 
             await get_plugin_registry().dispatch_event(event)
-        except Exception:  # noqa: BLE001 — plugins must not break the pipeline
+        except Exception:
             pass
 
         self._ctrl.state_tracker.add_history(event)

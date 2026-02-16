@@ -123,7 +123,7 @@ class AutonomyController:
 
         # File operations are generally safe in isolated environments
         # but we could add checks for sensitive paths
-        if isinstance(action, (FileWriteAction, FileEditAction)):
+        if isinstance(action, FileWriteAction | FileEditAction):
             # Could add checks for sensitive files like /etc/passwd
             pass
 
@@ -153,7 +153,7 @@ class AutonomyController:
             return False
 
         # Only retry ImportError (for auto pip install)
-        is_import_error = isinstance(error, (ImportError, ModuleNotFoundError))
+        is_import_error = isinstance(error, ImportError | ModuleNotFoundError)
 
         if is_import_error:
             logger.info(

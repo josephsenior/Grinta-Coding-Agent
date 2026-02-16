@@ -33,11 +33,11 @@ def classify_error(exc: Exception) -> type[ForgeError]:
     """
     if isinstance(exc, ForgeError):
         return type(exc)
-    if isinstance(exc, (ValueError, TypeError, KeyError)):
+    if isinstance(exc, ValueError | TypeError | KeyError):
         return UserActionRequiredError
-    if isinstance(exc, (TimeoutError, ConnectionError, OSError)):
+    if isinstance(exc, TimeoutError | ConnectionError | OSError):
         return RetryableError
-    if isinstance(exc, (AssertionError, RuntimeError)):
+    if isinstance(exc, AssertionError | RuntimeError):
         return InvariantBrokenError
     return ForgeError
 

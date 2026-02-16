@@ -167,7 +167,6 @@ class EventCoalescer:
 
     def _merge_streaming_chunks(self, batch: CoalescedBatch) -> Event:
         """Merge streaming chunk events into a single representative event."""
-        last = batch.events[-1]
+        return batch.events[-1]
         # StreamingChunkAction has 'accumulated' field — the last event
         # already contains all accumulated content. Return it directly.
-        return last

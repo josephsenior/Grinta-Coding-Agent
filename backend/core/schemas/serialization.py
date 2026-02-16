@@ -74,10 +74,9 @@ def deserialize_event(
         if "action_type" in data_dict:
             return _deserialize_action(data_dict)
         # Try observation schemas
-        elif "observation_type" in data_dict:
+        if "observation_type" in data_dict:
             return _deserialize_observation(data_dict)
-        else:
-            raise ValueError("Event must have either action_type or observation_type")
+        raise ValueError("Event must have either action_type or observation_type")
     except ValidationError as e:
         raise ValueError(f"Failed to validate event schema: {e}") from e
 
@@ -214,9 +213,8 @@ def migrate_schema_version(
     # V2 to V1 migration (downgrade)
     if from_version == EventVersion.V2 and to_version == EventVersion.V1:
         # Remove V2-specific fields
-        migrated = data.copy()
+        return data.copy()
         # Add downgrade logic here when V2 is introduced
-        return migrated
 
     raise ValueError(f"Migration from {from_version} to {to_version} is not supported")
 

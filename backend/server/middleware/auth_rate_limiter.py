@@ -169,12 +169,11 @@ class AuthRateLimiter:
         """
         if "/login" in path:
             return "login"
-        elif "/register" in path or "/signup" in path:
+        if "/register" in path or "/signup" in path:
             return "register"
-        elif "/password-reset" in path or "/forgot-password" in path:
+        if "/password-reset" in path or "/forgot-password" in path:
             return "password_reset"
-        else:
-            return "other"
+        return "other"
 
     async def _check_rate_limit(self, key: str, endpoint_type: str) -> bool:
         """Check if rate limit is exceeded for an endpoint type.
@@ -200,7 +199,7 @@ class AuthRateLimiter:
 
             return len(attempts) < limit
 
-        elif endpoint_type == "register":
+        if endpoint_type == "register":
             attempts = store["register_attempts"]
             window = self.register_window
             limit = self.register_attempts_per_hour
@@ -209,7 +208,7 @@ class AuthRateLimiter:
 
             return len(attempts) < limit
 
-        elif endpoint_type == "password_reset":
+        if endpoint_type == "password_reset":
             attempts = store["password_reset_attempts"]
             window = self.password_reset_window
             limit = self.password_reset_per_hour
@@ -276,12 +275,11 @@ class AuthRateLimiter:
         # Progressive delay
         if failed_count < 3:
             return 60  # 1 minute
-        elif failed_count < 5:
+        if failed_count < 5:
             return 300  # 5 minutes
-        elif failed_count < 10:
+        if failed_count < 10:
             return 900  # 15 minutes
-        else:
-            return 3600  # 1 hour
+        return 3600  # 1 hour
 
 
 # Redis-backed auth rate limiter (for production)

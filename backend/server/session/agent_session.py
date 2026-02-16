@@ -317,11 +317,7 @@ class AgentSession:
             # Extract provider name from model if possible
             if "/" in model_name:
                 model_name.split("/")[0].title()
-            elif "claude" in model_name.lower():
-                pass
-            elif "gpt" in model_name.lower() or "openai" in model_name.lower():
-                pass
-            elif "gemini" in model_name.lower():
+            elif "claude" in model_name.lower() or "gpt" in model_name.lower() or "openai" in model_name.lower() or "gemini" in model_name.lower():
                 pass
 
             raise LLMAuthenticationError(
@@ -368,7 +364,7 @@ class AgentSession:
             await get_plugin_registry().dispatch_session_start(
                 self.sid, {"user_id": self.user_id}
             )
-        except Exception as plugin_err:  # noqa: BLE001 — plugins must not break startup
+        except Exception as plugin_err:
             self.logger.warning("Plugin session_start hook failed: %s", plugin_err)
 
     def _initialize_session_startup(self) -> StartupContext:
@@ -648,7 +644,7 @@ class AgentSession:
             await get_plugin_registry().dispatch_session_end(
                 self.sid, {"user_id": self.user_id}
             )
-        except Exception as plugin_err:  # noqa: BLE001 — plugins must not break shutdown
+        except Exception as plugin_err:
             self.logger.warning("Plugin session_end hook failed: %s", plugin_err)
 
     async def _wait_for_startup_completion(self) -> None:

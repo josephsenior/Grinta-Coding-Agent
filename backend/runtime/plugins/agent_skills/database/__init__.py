@@ -354,7 +354,7 @@ async def _execute_postgresql_query(conn, query: str, limit: int) -> dict[str, A
         for row in data:
             for key, value in row.items():
                 if value is not None and not isinstance(
-                    value, (str, int, float, bool, type(None))
+                    value, str | int | float | bool | type(None)
                 ):
                     row[key] = str(value)
 
@@ -490,7 +490,7 @@ async def _execute_redis_command(client, command: str) -> dict[str, Any]:
     # Format result
     if result is None:
         data = [{"result": "nil"}]
-    elif isinstance(result, (list, tuple)):
+    elif isinstance(result, list | tuple):
         data = [{"index": str(i), "value": str(v)} for i, v in enumerate(result)]
     elif isinstance(result, dict):
         data = [{"key": k, "value": str(v)} for k, v in result.items()]

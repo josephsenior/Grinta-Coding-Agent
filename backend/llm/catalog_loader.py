@@ -12,7 +12,7 @@ from __future__ import annotations
 import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from collections.abc import Sequence
 
 try:
     import tomllib  # Python 3.11+
@@ -79,7 +79,7 @@ def get_catalog() -> tuple[ModelEntry, ...]:
 
 
 @functools.lru_cache(maxsize=1)
-def _name_index() -> Dict[str, ModelEntry]:
+def _name_index() -> dict[str, ModelEntry]:
     """Build a lookup dict: canonical name and all aliases → ModelEntry."""
     idx: dict[str, ModelEntry] = {}
     for entry in get_catalog():
@@ -106,7 +106,7 @@ def lookup(model: str) -> ModelEntry | None:
     return None
 
 
-def get_pricing(model: str) -> Optional[Dict[str, float]]:
+def get_pricing(model: str) -> dict[str, float] | None:
     """Get pricing for a model, with tier fallback.
 
     Returns ``{"input": <per_1M>, "output": <per_1M>}`` or ``None``.
@@ -136,12 +136,12 @@ def get_token_limits(model: str) -> tuple[int | None, int | None]:
     return None, None
 
 
-def get_featured_models() -> List[str]:
+def get_featured_models() -> list[str]:
     """Return ``provider/name`` strings for models marked ``featured = true``."""
     return [f"{e.provider}/{e.name}" for e in get_catalog() if e.featured]
 
 
-def get_verified_models(provider: str | None = None) -> List[str]:
+def get_verified_models(provider: str | None = None) -> list[str]:
     """Return canonical names for models marked ``verified = true``.
 
     If *provider* is given, filter to that provider only.

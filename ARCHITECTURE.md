@@ -92,8 +92,9 @@ graph TB
 
 | Module | Purpose |
 |---|---|
-| `client.py` | Async HTTP (httpx) + WebSocket (Socket.IO) client facade |
+| `client.py` | Async HTTP (httpx) + WebSocket (Socket.IO) client facade with exponential backoff, auto-rejoin, heartbeat monitoring, and offline message queue |
 | `app.py` | Main Textual App — screen routing (Home → Chat → Home) |
+| `__main__.py` | Entry point with `--dev` flag for hot-reload via `watchfiles` |
 | `screens/home.py` | Conversation list, new conversation creation |
 | `screens/chat.py` | Streaming chat with full event dispatch |
 | `screens/settings.py` | LLM config, agent behaviour, secret management |
@@ -127,8 +128,10 @@ Request → Compression → Security Headers → CSP → Resource Quota
 
 ### 3. Controller Layer (`backend/controller/`)
 
-The `AgentController` (~870 LOC) is the central orchestrator. It delegates to
-21 focused services via a shared `ControllerContext`:
+The `AgentController` (~720 LOC) is the central orchestrator. It delegates to
+21 focused services via a shared `ControllerContext`. Core configuration and
+service containers are extracted into `controller_config.py` (111 LOC) for
+cleaner separation:
 
 ```
 AgentController
@@ -197,16 +200,21 @@ engines/
 The event system is the backbone of session resilience:
 
 ```
-EventStream (stream.py, 1180 LOC)
+EventStream (stream.py, ~615 LOC)
 ├── Pub/Sub with subscriber management
 ├── Thread-safe bounded queue with backpressure
 │   ├── Configurable high-water-mark (HWM)
 │   ├── Drop or slow-path policy
 │   └── ThreadPoolExecutor for async delivery
+├── Batch-mode durable writer
+│   ├── Drains up to 16 events per batch (20ms window)
+│   ├── Per-item retry with exponential backoff
+│   └── Reduces I/O syscalls vs. single-event writes
 ├── Write-Ahead Log (WAL) crash recovery
 │   ├── .pending marker files written BEFORE event
 │   ├── On startup: replay any pending → actual
 │   └── Guarantees no event loss on process crash
+├── Aggregated stream stats (extracted to stream_stats.py, 82 LOC)
 ├── Event serialization & caching
 └── Global stream registry for monitoring
 ```
@@ -220,7 +228,9 @@ EventStream (stream.py, 1180 LOC)
 
 ```
 memory/
-├── conversation_memory.py   # Event→LLM message conversion (1709 LOC)
+├── conversation_memory.py   # Event→LLM message conversion (~569 LOC)
+├── message_formatting.py    # Extracted type-check utils & formatting (155 LOC)
+├── context_tracking.py      # Extracted decision/anchor/vector tracking (132 LOC)
 ├── memory.py                # Memory manager interface
 ├── view.py                  # Memory view helpers
 ├── enhanced_context_manager.py   # Advanced context selection
@@ -231,6 +241,7 @@ memory/
 └── condenser/
     ├── condenser.py          # Base condenser ABC
     └── impl/
+        ├── auto_selector.py                # Task-aware auto-selection
         ├── smart_condenser.py              # Adaptive strategy (default)
         ├── llm_summarizing_condenser.py     # LLM-powered summarization
         ├── llm_attention_condenser.py       # LLM relevance scoring
@@ -405,12 +416,16 @@ or event-driven patterns instead of direct imports.
 |---|---|
 | Event sourcing over CRUD | Session resilience: replay any session from events |
 | 21 controller services | Single-responsibility: each service is <200 LOC |
-| 12 condensers | Long sessions need different strategies for different contexts |
+| 13 condensers | Long sessions need different strategies for different contexts |
+| Auto condenser selector | Picks optimal condenser based on task signals (error ratio, browse weight, history length) |
 | WAL for events | Zero event loss guarantee, even on process crash |
+| Batch-mode durable writer | Reduces I/O syscalls: drains up to 16 events per batch with 20ms window |
 | Bounded event queue | Prevent OOM under load; configurable drop policy |
+| Socket.IO resilience | Exponential backoff, auto-rejoin, heartbeat monitoring, offline queue |
 | Tree-sitter parsing | Structure-aware edits across 45+ languages |
 | Socket.IO over WebSocket | Built-in reconnection, room management, event namespacing |
 | TOML config | Human-readable, comment-friendly, hierarchical |
+| Module splitting | Keep modules under 600 LOC; extracted config, stats, formatting, tracking |
 
 ## Contributing Context
 
@@ -437,6 +452,9 @@ python start_server.py        # Starts on :3000
 
 # TUI (separate terminal)
 python -m backend.tui          # or: forge-tui
+
+# TUI with hot reload (dev mode)
+python -m backend.tui --dev    # Auto-restarts on code changes
 ```
 
 ### File Size Guidelines

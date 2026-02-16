@@ -318,9 +318,8 @@ async def list_files(
     if path is not None:
         # Type narrowing: path is str here
         file_list = [os.path.join(str(path), f) for f in file_list]
-    file_list = [f for f in file_list if f not in FILES_TO_IGNORE]
+    return [f for f in file_list if f not in FILES_TO_IGNORE]
 
-    return file_list
 
 
 @sub_router.get(
@@ -542,8 +541,7 @@ async def git_changes(
                 )
                 await manager.detach_from_conversation(conversation)
                 return JSONResponse(status_code=200, content=[])
-            else:
-                raise
+            raise
     except AgentRuntimeUnavailableError as e:
         logger.error("Runtime unavailable: %s", e)
         return JSONResponse(

@@ -114,7 +114,7 @@ class HallucinationDetector:
             "confidence": max(h["confidence"] for h in hallucinations),
             "claimed_operations": [h["claim"] for h in hallucinations],
             "missing_tools": list(
-                set(tool for h in hallucinations for tool in h["missing_tools"])
+                {tool for h in hallucinations for tool in h["missing_tools"]}
             ),
             "severity": severity,
             "details": hallucinations,
@@ -217,12 +217,11 @@ class HallucinationDetector:
 
         if has_file_hallucination and max_confidence > 0.85:
             return "critical"
-        elif has_file_hallucination or (count > 2):
+        if has_file_hallucination or (count > 2):
             return "high"
-        elif max_confidence > 0.7:
+        if max_confidence > 0.7:
             return "medium"
-        else:
-            return "low"
+        return "low"
 
     def generate_correction_prompt(
         self, detection_result: dict, original_request: str
@@ -243,7 +242,7 @@ class HallucinationDetector:
         claimed_ops = detection_result["claimed_operations"]
         missing_tools = detection_result["missing_tools"]
 
-        correction = f"""⚠️ HALLUCINATION DETECTED - AUTO-CORRECTION REQUIRED
+        return f"""⚠️ HALLUCINATION DETECTED - AUTO-CORRECTION REQUIRED
 
 You claimed the following operations:
 {chr(10).join(f"  - {op}" for op in claimed_ops)}
@@ -263,4 +262,3 @@ Please RETRY with ACTUAL tool execution:
 
 Do this NOW."""
 
-        return correction

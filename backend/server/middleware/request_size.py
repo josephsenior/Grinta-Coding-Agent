@@ -53,7 +53,7 @@ class RequestSizeLoggingMiddleware:
             if "content-length" in response.headers:
                 return int(response.headers.get("content-length", "0"))
             body = getattr(response, "body", None)
-            if isinstance(body, (bytes, bytearray)):
+            if isinstance(body, bytes | bytearray):
                 return len(body)
         except Exception:
             return None
@@ -80,7 +80,7 @@ class RequestSizeLoggingMiddleware:
         async def counting_aiter(aiter):
             total = 0
             async for chunk in aiter:
-                if isinstance(chunk, (bytes, bytearray)):
+                if isinstance(chunk, bytes | bytearray):
                     total += len(chunk)
                 yield chunk
             self._log_request_size(

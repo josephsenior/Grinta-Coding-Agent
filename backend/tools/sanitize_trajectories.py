@@ -95,7 +95,7 @@ def _should_drop_cleaned_value(cleaned: object, original: object, key: str) -> b
     """Determine if a cleaned value should be dropped."""
     if cleaned is None:
         # Drop if it's a container type or a special key
-        return isinstance(original, (dict, list)) or key in {"observation", "action"}
+        return isinstance(original, dict | list) or key in {"observation", "action"}
     return False
 
 

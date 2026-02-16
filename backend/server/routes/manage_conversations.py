@@ -295,7 +295,7 @@ async def new_conversation(
             message=None,
             conversation_status=agent_loop_info.status,
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.exception("Failed to initialize conversation: %s", e)
         return handle_conversation_errors(e)
 

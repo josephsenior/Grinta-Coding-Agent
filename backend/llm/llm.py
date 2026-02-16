@@ -458,7 +458,7 @@ class LLM(RetryMixin, DebugMixin):
             from backend.core.plugin import get_plugin_registry
 
             messages = await get_plugin_registry().dispatch_llm_pre(messages)
-        except Exception:  # noqa: BLE001 — plugins must not break LLM calls
+        except Exception:
             pass
 
         # Merge default kwargs
@@ -488,7 +488,7 @@ class LLM(RetryMixin, DebugMixin):
                 from backend.core.plugin import get_plugin_registry
 
                 response = await get_plugin_registry().dispatch_llm_post(response)
-            except Exception:  # noqa: BLE001 — plugins must not break LLM calls
+            except Exception:
                 pass
 
             return response

@@ -13,17 +13,17 @@ class CanonicalModelMetaclass(ModelMetaclass):
     isinstance() and issubclass() checks across reloaded versions of the same class.
     """
 
-    def __instancecheck__(cls, instance):
+    def __instancecheck__(self, instance):
         if super().__instancecheck__(instance):
             return True
         # Check if the class names match. This allows isinstance(reloaded_obj, original_class) to be True.
-        return type(instance).__name__ == cls.__name__
+        return type(instance).__name__ == self.__name__
 
-    def __subclasscheck__(cls, subclass):
+    def __subclasscheck__(self, subclass):
         if super().__subclasscheck__(subclass):
             return True
         # Check if the class names match. This allows issubclass(reloaded_class, original_class) to be True.
-        return getattr(subclass, "__name__", None) == cls.__name__
+        return getattr(subclass, "__name__", None) == self.__name__
 
 
 class CanonicalMeta(type):

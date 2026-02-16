@@ -23,7 +23,7 @@ def _json_fallback(obj: Any) -> Any:
         return obj.get_secret_value()
     if isinstance(obj, Enum):
         return obj.value
-    if isinstance(obj, (Path, PurePosixPath, PureWindowsPath)):
+    if isinstance(obj, Path | PurePosixPath | PureWindowsPath):
         return str(obj)
     if isinstance(obj, bytes):
         return obj.decode("utf-8", errors="replace")
@@ -45,7 +45,7 @@ def serialize_model(model: BaseModel) -> bytes:
     )
 
 
-def deserialize_model(raw: bytes, model_class: type[T]) -> T:
+def deserialize_model[T: BaseModel](raw: bytes, model_class: type[T]) -> T:
     """Deserialize JSON bytes back to a Pydantic model instance."""
     try:
         data = json.loads(raw)

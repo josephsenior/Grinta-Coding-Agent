@@ -49,7 +49,7 @@ class ToolCall(BaseModel):
     function: ToolCallFunction
 
 
-from backend.core.enums import ContentType  # noqa: E402
+from backend.core.enums import ContentType
 
 
 class Content(BaseModel):

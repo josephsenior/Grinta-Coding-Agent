@@ -163,7 +163,7 @@ async def create_backup():
         ]
 
         print(f"Running pg_dump ({pg_dump_exe})...")
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=False, env=env, capture_output=True, text=True)
 
         if result.returncode != 0:
             print("ERROR: Backup failed")
@@ -188,7 +188,7 @@ async def create_backup():
             str(sql_backup_file),
         ]
 
-        result_sql = subprocess.run(cmd_sql, env=env, capture_output=True, text=True)
+        result_sql = subprocess.run(cmd_sql, check=False, env=env, capture_output=True, text=True)
 
         if result_sql.returncode != 0:
             print("WARNING: SQL backup failed (custom format backup succeeded)")
@@ -296,7 +296,7 @@ async def restore_backup(backup_file: str):
             ]
 
         print("Restoring backup...")
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=False, env=env, capture_output=True, text=True)
 
         if result.returncode != 0:
             print("ERROR: Restore failed")

@@ -118,7 +118,7 @@ def _normalize_whitespace(line: str) -> str:
     Preserves leading/trailing structure but normalizes internal whitespace.
     """
     # Preserve line ending
-    has_newline = line.endswith("\n") or line.endswith("\r\n")
+    has_newline = line.endswith(("\n", "\r\n"))
     line_content = line.rstrip("\n\r")
 
     # Normalize tabs to spaces and collapse multiple spaces
@@ -158,9 +158,7 @@ def get_diff_stats(diff_text: str) -> dict[str, int]:
     for line in lines:
         if line.startswith("@@"):
             hunks += 1
-        elif line.startswith("+++"):
-            changed_files.add(line)
-        elif line.startswith("---"):
+        elif line.startswith(("+++", "---")):
             changed_files.add(line)
         elif line.startswith("+"):
             lines_added += 1

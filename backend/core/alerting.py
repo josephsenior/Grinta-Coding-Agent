@@ -205,7 +205,7 @@ class SLOTracker:
         self._window_start_time = time.time()
 
 
-from backend.core.external_service import ExternalServiceBase  # noqa: E402
+from backend.core.external_service import ExternalServiceBase
 
 
 class AlertManager(ExternalServiceBase):

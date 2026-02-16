@@ -313,7 +313,6 @@ class TestGracefulShutdown:
         """Test that graceful shutdown gives agent one final turn."""
         # This would require full AgentController setup
         # Placeholder for integration test
-        pass
 
 
 class TestSemanticStuckDetection:
@@ -419,7 +418,6 @@ class TestPendingActionTimeout:
         """Test that pending actions auto-clear after timeout."""
         # This requires full controller setup
         # Placeholder for future implementation
-        pass
 
 
 def test_error_type_classification():

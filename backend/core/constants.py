@@ -170,8 +170,7 @@ ROOM_KEY_TEMPLATE = "room_{sid}"
 DEFAULT_SESSION_WAIT_TIME_BEFORE_CLOSE = 90
 DEFAULT_SESSION_WAIT_TIME_BEFORE_CLOSE_INTERVAL = 5
 
-# ── Quota & Plan Limits ─────────────────────────────────────────────
-# QuotaPlan enum lives in backend.core.enums
+# ── Quota ────────────────────────────────────────────────────────────
 DEFAULT_QUOTA_HOUR_WINDOW = 3600
 DEFAULT_QUOTA_DAY_WINDOW = 86400
 DEFAULT_QUOTA_MONTH_WINDOW = 2592000
@@ -179,18 +178,7 @@ QUOTA_EXEMPT_PATHS = {"/", "/api/monitoring/health"}
 QUOTA_EXEMPT_PATH_PREFIXES = ["/assets"]
 
 
-# Quota limits per plan (in USD)
-FREE_PLAN_DAILY_LIMIT = 1.0
-FREE_PLAN_MONTHLY_LIMIT = 20.0
-FREE_PLAN_BURST_LIMIT = 0.5
-
-PRO_PLAN_DAILY_LIMIT = 10.0
-PRO_PLAN_MONTHLY_LIMIT = 200.0
-PRO_PLAN_BURST_LIMIT = 5.0
-
-ENTERPRISE_PLAN_DAILY_LIMIT = 100.0
-ENTERPRISE_PLAN_MONTHLY_LIMIT = 2000.0
-ENTERPRISE_PLAN_BURST_LIMIT = 50.0
+# Quota limits (Forge is local-first / single-user — unlimited by default)
 
 # ── Circuit Breaker ─────────────────────────────────────────────────
 # CircuitState enum lives in backend.core.enums
@@ -239,7 +227,11 @@ LLM_BASED_EDIT_TOOL_NAME = "edit_file"
 TASK_TRACKER_TOOL_NAME = "task_tracker"
 
 # ── Security Risk ───────────────────────────────────────────────────
-SECURITY_RISK_DESC = "The LLM's assessment of the safety risk of this action. See the SECURITY_RISK_ASSESSMENT section in the system prompt for risk level definitions."
+SECURITY_RISK_DESC = (
+    "The LLM's assessment of the safety risk of this action. "
+    "See the SECURITY_RISK_ASSESSMENT section in the system prompt for "
+    "risk level definitions."
+)
 RISK_LEVELS = ["LOW", "MEDIUM", "HIGH"]
 
 # ── UX / Error Presentation ─────────────────────────────────────────
@@ -258,7 +250,13 @@ DEFAULT_CMD_PID = -1
 
 # ── Runtime Messages ────────────────────────────────────────────────
 # Runtime constants
-BASH_TIMEOUT_MESSAGE_TEMPLATE = 'You may wait longer to see additional output by sending empty command \'\', send other commands to interact with the current process, send keys ("C-c", "C-z", "C-d") to interrupt/kill the previous command before sending your new command, or use the timeout parameter in execute_bash for future commands.'
+BASH_TIMEOUT_MESSAGE_TEMPLATE = (
+    "You may wait longer to see additional output by sending empty command '', "
+    "send other commands to interact with the current process, "
+    'send keys ("C-c", "C-z", "C-d") to interrupt/kill the previous command '
+    "before sending your new command, or use the timeout parameter in execute_bash "
+    "for future commands."
+)
 
 # ── Condenser Defaults ──────────────────────────────────────────────
 DEFAULT_CONDENSER_ATTENTION_WINDOW = 100

@@ -209,7 +209,7 @@ async def handle_regular_conversation(
     Returns:
         ConversationResponse-compatible data (status, conversation_id, conversation_status).
     """
-    agent_loop_info = await create_new_conversation(
+    return await create_new_conversation(
         user_id=user_id,
         vcs_provider_tokens=provider_tokens,
         custom_secrets=user_secrets.custom_secrets if user_secrets else None,
@@ -224,7 +224,6 @@ async def handle_regular_conversation(
         conversation_id=conversation_id,
         mcp_config=mcp_config,
     )
-    return agent_loop_info
 
 
 def handle_conversation_errors(e: Exception) -> JSONResponse:

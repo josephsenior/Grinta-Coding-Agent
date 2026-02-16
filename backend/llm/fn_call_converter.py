@@ -327,7 +327,7 @@ def _format_parameter(param_name: str, param_value: Any) -> str:
     if is_multiline:
         ret += "\n"
 
-    if isinstance(param_value, (list, dict)):
+    if isinstance(param_value, list | dict):
         ret += json.dumps(param_value)
     else:
         ret += f"{param_value}"

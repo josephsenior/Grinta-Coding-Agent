@@ -82,9 +82,8 @@ def get(key: str, default: Any = None, ttl: int | None = None) -> Any:
         value, expiry = _l1_cache[key]
         if expiry == 0 or time.time() < expiry:
             return value
-        else:
-            # Expired, remove from L1
-            del _l1_cache[key]
+        # Expired, remove from L1
+        del _l1_cache[key]
 
     # Try L2 cache (Redis)
     redis_client = get_redis_client()
@@ -259,7 +258,6 @@ def cached(
 
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore[return-value]
-        else:
-            return sync_wrapper  # type: ignore[return-value]
+        return sync_wrapper  # type: ignore[return-value]
 
     return decorator

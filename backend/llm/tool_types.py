@@ -27,7 +27,7 @@ def make_function_chunk(**chunk_kwargs: Any) -> Any:
         def __setattr__(self, key, value):
             self[key] = value
 
-    return _Chunk({k: v for k, v in chunk_kwargs.items()})
+    return _Chunk(dict(chunk_kwargs.items()))
 
 
 def make_tool_param(function: Any, type: str = "function", **extras: Any) -> Any:

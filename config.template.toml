@@ -372,6 +372,7 @@ classpath = "my_package.my_module.MyCustomAgent"
 [condenser]
 # The type of condenser to use. Available options:
 # - "smart": Adaptive condensing that preserves important context (default)
+# - "auto": Task-signal-based selection (picks optimal strategy per session)
 # - "noop": No condensing, keeps full history (use for debugging)
 # - "observation_masking": Keeps full event structure but masks older observations
 # - "recent": Keeps only recent events and discards older ones
@@ -422,12 +423,39 @@ type = "smart"
 # Maximum size of history before triggering attention mechanism
 #max_size = 100
 
+# 7. Auto Condenser - Task-signal-based auto-selection
+#type = "auto"
+# Automatically analyses task signals (history length, error rate, browse
+# frequency) and picks the best condenser strategy for the current session.
+# No additional settings needed; thresholds are built-in.
+
 # Example of a custom LLM configuration for condensers that require an LLM
 # If not provided, it falls back to the default LLM
 #[llm.condenser]
 #model = "gpt-4o"
 #temperature = 0.1
 #max_input_tokens = 1024
+
+################################## Graph RAG #################################
+# Graph-based Retrieval Augmented Generation.
+# Combines vector (semantic) search with structural graph traversal for
+# richer, context-aware code retrieval.
+##############################################################################
+[graph_rag]
+# Enable/disable Graph RAG.  When disabled, retrieval falls back to pure
+# vector search.
+#enabled = true
+
+# Path to persist the knowledge graph between sessions.  The graph is stored
+# as a JSON file containing nodes and edges.
+#persistence_path = ".forge/graph.json"
+
+# Default number of hops when expanding from seed nodes.
+# 1 = direct neighbours only; 2 = neighbours-of-neighbours, etc.
+#graph_depth = 1
+
+# Maximum number of semantic (vector) hits to seed graph expansion with.
+#max_seed_results = 5
 
 #################################### Eval ####################################
 # Configuration for the evaluation, please refer to the specific evaluation

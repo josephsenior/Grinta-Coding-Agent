@@ -22,7 +22,7 @@ from backend.server.middleware import (
     RequestTimeoutMiddleware,
 )
 from backend.server.middleware.compression import CompressionMiddleware
-from backend.server.middleware.cost_quota import CostQuotaMiddleware, QuotaPlan
+from backend.server.middleware.cost_quota import CostQuotaMiddleware
 from backend.server.middleware.redis_cost_quota import RedisCostQuotaMiddleware
 from backend.server.middleware.observability import RequestObservabilityMiddleware
 from backend.server.middleware.rate_limiter import (
@@ -524,7 +524,6 @@ if REDIS_AVAILABLE and redis_url:
     # Add Redis-backed cost quota middleware with connection pooling and health checks
     if cost_quota_enabled:
         logger.info("Using Redis cost quota middleware with connection pooling")
-        default_plan = QuotaPlan(os.getenv("DEFAULT_QUOTA_PLAN", "free"))
         connection_pool_size = int(os.getenv("REDIS_POOL_SIZE", "10"))
         connection_timeout = float(os.getenv("REDIS_TIMEOUT", "5.0"))
         fallback_enabled = os.getenv("REDIS_QUOTA_FALLBACK", "true").lower() == "true"
@@ -533,7 +532,6 @@ if REDIS_AVAILABLE and redis_url:
             dispatch=RedisCostQuotaMiddleware(
                 redis_url=redis_url,
                 enabled=True,
-                default_plan=default_plan,
                 connection_pool_size=connection_pool_size,
                 connection_timeout=connection_timeout,
                 fallback_enabled=fallback_enabled,
@@ -550,12 +548,10 @@ else:
             "Using in-memory cost quota middleware (Redis not available). "
             "Set REDIS_URL to enable distributed quota tracking."
         )
-        default_plan = QuotaPlan(os.getenv("DEFAULT_QUOTA_PLAN", "free"))
         app.add_middleware(
             BaseHTTPMiddleware,
             dispatch=CostQuotaMiddleware(
                 enabled=True,
-                default_plan=default_plan,
             ),
         )
 

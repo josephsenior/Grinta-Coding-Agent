@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T", int, float)
 
 
 @dataclass
-class ControlFlag(Generic[T]):
+class ControlFlag[T: (int, float)]:
     """Base class for control flags that manage limits and state transitions."""
 
     limit_increase_amount: T

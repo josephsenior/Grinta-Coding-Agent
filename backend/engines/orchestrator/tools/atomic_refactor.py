@@ -268,6 +268,8 @@ class AtomicRefactor:
         with open(edit.file_path, "w", encoding="utf-8") as f:
             f.write(edit.new_content or "")
 
+        # Validation is now done separately in _apply_all_edits
+        # This allows proper rollback if validation fails
         if validate and validator:
             if not validator(edit.file_path, edit.new_content or ""):
                 raise ValueError(f"Validation failed for {edit.file_path}")
@@ -340,8 +342,28 @@ class AtomicRefactor:
         logger.info("✏️  Applying %s edits...", len(transaction.edits))
         for i, edit in enumerate(transaction.edits):
             try:
-                self._apply_single_edit(edit, validate, validator)
+                # Apply the edit first (write/delete/rename)
+                # Don't validate yet - validation happens after adding to applied_edits
+                if edit.operation in ("modify", "create"):
+                    os.makedirs(os.path.dirname(edit.file_path), exist_ok=True)
+                    with open(edit.file_path, "w", encoding="utf-8") as f:
+                        f.write(edit.new_content or "")
+                elif edit.operation == "delete":
+                    if os.path.exists(edit.file_path):
+                        os.remove(edit.file_path)
+                elif edit.operation == "rename":
+                    if os.path.exists(edit.file_path) and edit.new_path:
+                        os.makedirs(os.path.dirname(edit.new_path), exist_ok=True)
+                        shutil.move(edit.file_path, edit.new_path)
+
+                # Add to applied_edits immediately after write (before validation)
+                # This ensures rollback works if validation fails
                 applied_edits.append(edit)
+
+                # Now validate if needed
+                if validate and validator and edit.operation in ("modify", "create"):
+                    if not validator(edit.file_path, edit.new_content or ""):
+                        raise ValueError(f"Validation failed for {edit.file_path}")
 
             except Exception as e:
                 error_msg = f"Failed to apply edit {i + 1}/{len(transaction.edits)} ({edit.operation} {edit.file_path}): {e}"

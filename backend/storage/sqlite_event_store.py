@@ -111,7 +111,7 @@ class SQLiteEventStore:
         payload = json.dumps(event_dict, ensure_ascii=False)
         timestamp = event_dict.get("timestamp", _time.time())
         event_type = event_dict.get("action", event_dict.get("observation", "unknown"))
-        source = event_dict.get("source", None)
+        source = event_dict.get("source")
 
         with self._lock:
             conn = self._get_conn()

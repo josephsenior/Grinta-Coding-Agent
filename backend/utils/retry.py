@@ -27,7 +27,6 @@ T = TypeVar("T")
 class RetryError(Exception):
     """Exception raised when all retry attempts have been exhausted."""
 
-    pass
 
 
 class RetryExhaustedError(RetryError):
@@ -103,7 +102,7 @@ def calculate_backoff(attempt: int, config: RetryConfig) -> float:
     """
     if config.strategy == RetryStrategy.IMMEDIATE:
         return 0.0
-    elif config.strategy == RetryStrategy.FIXED:
+    if config.strategy == RetryStrategy.FIXED:
         delay = config.initial_delay
     elif config.strategy == RetryStrategy.LINEAR:
         delay = config.initial_delay * (attempt + 1)
@@ -131,7 +130,7 @@ def _validated_retryable_exceptions(config: RetryConfig) -> tuple[type[Exception
     return valid or (Exception,)
 
 
-def retry(
+def retry[T](
     func: Callable[..., T] | None = None,
     *,
     config: RetryConfig | None = None,
@@ -217,50 +216,49 @@ def retry(
                 raise RetryExhaustedError(config.max_attempts, last_error)
 
             return async_wrapper
-        else:
-            retryable_exceptions = _validated_retryable_exceptions(config)
+        retryable_exceptions = _validated_retryable_exceptions(config)
 
-            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                last_error: Exception | None = None
-                for attempt in range(config.max_attempts):
-                    _record_attempt_metrics(op_name, attempt + 1, config.max_attempts)
-                    try:
-                        result = f(*args, **kwargs)
-                        if attempt > 0:
-                            logger.info("Retry succeeded on attempt %d", attempt + 1)
-                        _record_success_metrics(
-                            op_name, attempt + 1, config.max_attempts
-                        )
-                        return result
-                    except retryable_exceptions as e:
-                        last_error = e
-                        _record_error_metrics(
-                            op_name, attempt + 1, config.max_attempts, e
-                        )
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            last_error: Exception | None = None
+            for attempt in range(config.max_attempts):
+                _record_attempt_metrics(op_name, attempt + 1, config.max_attempts)
+                try:
+                    result = f(*args, **kwargs)
+                    if attempt > 0:
+                        logger.info("Retry succeeded on attempt %d", attempt + 1)
+                    _record_success_metrics(
+                        op_name, attempt + 1, config.max_attempts
+                    )
+                    return result
+                except retryable_exceptions as e:
+                    last_error = e
+                    _record_error_metrics(
+                        op_name, attempt + 1, config.max_attempts, e
+                    )
 
-                        if attempt == config.max_attempts - 1:
-                            break
+                    if attempt == config.max_attempts - 1:
+                        break
 
-                        delay = calculate_backoff(attempt, config)
-                        if config.on_retry:
-                            with contextlib.suppress(Exception):
-                                config.on_retry(attempt + 1, e)
+                    delay = calculate_backoff(attempt, config)
+                    if config.on_retry:
+                        with contextlib.suppress(Exception):
+                            config.on_retry(attempt + 1, e)
 
-                        logger.warning(
-                            "Retry attempt %d/%d after %.2fs. Error: %s",
-                            attempt + 1,
-                            config.max_attempts,
-                            delay,
-                            e,
-                        )
-                        time.sleep(delay)
-                    except Exception as e:
-                        logger.error("Non-retryable exception in %s: %s", op_name, e)
-                        raise
+                    logger.warning(
+                        "Retry attempt %d/%d after %.2fs. Error: %s",
+                        attempt + 1,
+                        config.max_attempts,
+                        delay,
+                        e,
+                    )
+                    time.sleep(delay)
+                except Exception as e:
+                    logger.error("Non-retryable exception in %s: %s", op_name, e)
+                    raise
 
-                raise RetryExhaustedError(config.max_attempts, last_error)
+            raise RetryExhaustedError(config.max_attempts, last_error)
 
-            return sync_wrapper
+        return sync_wrapper
 
     if func is None:
         return decorator

@@ -74,7 +74,7 @@ class GraphMemoryStore:
             edge_data = self.graph.get_edge_data(node_id, neighbor_id)
 
             # Handle MultiDiGraph edge data structure (dict of edges)
-            for key, data in edge_data.items():
+            for data in edge_data.values():
                 if edge_type and data.get("type") != edge_type.value:
                     continue
 

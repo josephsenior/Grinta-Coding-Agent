@@ -118,10 +118,9 @@ def _wait_for_agent_response(page: Page, expected_line_count: int) -> None:
                 "✅ Test completed successfully - agent provided correct README line count"
             )
             return
-        else:
-            print(
-                f"Found response but it didn't match expected line count: {content[:100]}..."
-            )
+        print(
+            f"Found response but it didn't match expected line count: {content[:100]}..."
+        )
 
     print("❌ Did not find agent response with README line count within time limit")
     page.screenshot(path="test-results/conv_09_agent_response.png")

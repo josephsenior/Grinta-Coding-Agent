@@ -1,7 +1,9 @@
 """Cost-based quota system for LLM API usage.
 
 Tracks actual $ spent instead of just request counts.
-Supports per-user and per-plan quotas (free, pro, enterprise).
+Forge is a local-first, single-user application so the only plan is
+UNLIMITED (infinite limits).  Cost tracking is still useful for budget
+awareness and telemetry.
 
 The Redis-backed variant lives in ``redis_cost_quota.py``; the global
 factory and ``record_llm_cost`` helper are in ``cost_recording.py``.
@@ -21,19 +23,9 @@ from backend.core.constants import (
     DEFAULT_QUOTA_DAY_WINDOW,
     DEFAULT_QUOTA_HOUR_WINDOW,
     DEFAULT_QUOTA_MONTH_WINDOW,
-    ENTERPRISE_PLAN_BURST_LIMIT,
-    ENTERPRISE_PLAN_DAILY_LIMIT,
-    ENTERPRISE_PLAN_MONTHLY_LIMIT,
-    FREE_PLAN_BURST_LIMIT,
-    FREE_PLAN_DAILY_LIMIT,
-    FREE_PLAN_MONTHLY_LIMIT,
-    PRO_PLAN_BURST_LIMIT,
-    PRO_PLAN_DAILY_LIMIT,
-    PRO_PLAN_MONTHLY_LIMIT,
     QUOTA_EXEMPT_PATH_PREFIXES,
     QUOTA_EXEMPT_PATHS,
 )
-from backend.core.enums import QuotaPlan
 from backend.core.logger import FORGE_logger as logger
 
 if TYPE_CHECKING:
@@ -47,9 +39,8 @@ if TYPE_CHECKING:
 
 @dataclass
 class QuotaConfig:
-    """Quota configuration for a plan."""
+    """Quota configuration."""
 
-    plan: QuotaPlan
     daily_limit: float  # $ per day
     monthly_limit: float  # $ per month
     burst_limit: float  # $ per hour
@@ -66,7 +57,7 @@ class RedisQuotaKeys:
 
 
 # ---------------------------------------------------------------------------
-# In-memory cost store & plan configs
+# In-memory cost store
 # ---------------------------------------------------------------------------
 
 _cost_store: dict[str, dict[str, float]] = defaultdict(
@@ -78,32 +69,12 @@ _cost_store: dict[str, dict[str, float]] = defaultdict(
     }
 )
 
-QUOTA_CONFIGS = {
-    QuotaPlan.FREE: QuotaConfig(
-        plan=QuotaPlan.FREE,
-        daily_limit=FREE_PLAN_DAILY_LIMIT,
-        monthly_limit=FREE_PLAN_MONTHLY_LIMIT,
-        burst_limit=FREE_PLAN_BURST_LIMIT,
-    ),
-    QuotaPlan.PRO: QuotaConfig(
-        plan=QuotaPlan.PRO,
-        daily_limit=PRO_PLAN_DAILY_LIMIT,
-        monthly_limit=PRO_PLAN_MONTHLY_LIMIT,
-        burst_limit=PRO_PLAN_BURST_LIMIT,
-    ),
-    QuotaPlan.ENTERPRISE: QuotaConfig(
-        plan=QuotaPlan.ENTERPRISE,
-        daily_limit=ENTERPRISE_PLAN_DAILY_LIMIT,
-        monthly_limit=ENTERPRISE_PLAN_MONTHLY_LIMIT,
-        burst_limit=ENTERPRISE_PLAN_BURST_LIMIT,
-    ),
-    QuotaPlan.UNLIMITED: QuotaConfig(
-        plan=QuotaPlan.UNLIMITED,
-        daily_limit=float("inf"),
-        monthly_limit=float("inf"),
-        burst_limit=float("inf"),
-    ),
-}
+# Single unlimited config — Forge is local-first / single-user
+DEFAULT_QUOTA_CONFIG = QuotaConfig(
+    daily_limit=float("inf"),
+    monthly_limit=float("inf"),
+    burst_limit=float("inf"),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -112,34 +83,31 @@ QUOTA_CONFIGS = {
 
 
 class CostQuotaMiddleware:
-    """Middleware for enforcing cost-based quotas.
+    """Middleware for tracking LLM costs.
 
-    Tracks actual $ spent on LLM API calls and enforces per-plan limits.
-    More accurate than request-based rate limiting for LLM usage.
+    Tracks actual $ spent on LLM API calls.  Forge is a local-first
+    single-user application so the default quota is UNLIMITED.
+    Cost tracking is still useful for budget awareness and telemetry.
     """
 
     def __init__(
         self,
         enabled: bool = True,
-        default_plan: QuotaPlan = QuotaPlan.FREE,
     ) -> None:
         """Initialize cost quota middleware.
 
         Args:
-            enabled: Whether cost quota enforcement is enabled
-            default_plan: Default plan for users without a plan
+            enabled: Whether cost tracking is enabled
 
         """
         self.enabled = enabled
-        self.default_plan = default_plan
         self.hour_window = DEFAULT_QUOTA_HOUR_WINDOW
         self.day_window = DEFAULT_QUOTA_DAY_WINDOW
         self.month_window = DEFAULT_QUOTA_MONTH_WINDOW
+        self.config = DEFAULT_QUOTA_CONFIG
 
         if enabled:
-            logger.info(
-                "CostQuotaMiddleware initialized with default plan: %s", default_plan
-            )
+            logger.info("CostQuotaMiddleware initialized (unlimited local quota)")
             from backend.telemetry.cost_recording import register_cost_recorder
 
             register_cost_recorder(self.record_cost)
@@ -153,21 +121,18 @@ class CostQuotaMiddleware:
         request: Request,
         call_next: Callable,
     ) -> Response:
-        """Process request with cost quota enforcement."""
+        """Process request with cost tracking."""
         if not self._should_enforce_quota(request):
             return await call_next(request)
 
         quota_key = await self._get_quota_key(request)
-        user_plan = await self._get_user_plan(request)
 
-        if not await self._check_quota(quota_key, user_plan):
-            logger.warning(
-                "Cost quota exceeded for %s (plan: %s)", quota_key, user_plan
-            )
-            return await self._quota_exceeded_response(quota_key, user_plan)
+        if not await self._check_quota(quota_key):
+            logger.warning("Cost quota exceeded for %s", quota_key)
+            return await self._quota_exceeded_response(quota_key)
 
         response = await call_next(request)
-        await self._annotate_response_with_quota(response, quota_key, user_plan)
+        await self._annotate_response_with_quota(response, quota_key)
         return response
 
     # ------------------------------------------------------------------
@@ -190,11 +155,9 @@ class CostQuotaMiddleware:
         self,
         response: Response,
         quota_key: str,
-        plan: QuotaPlan,
     ) -> None:
-        remaining = await self._get_remaining_quota(quota_key, plan)
-        config = QUOTA_CONFIGS[plan]
-        response.headers["X-Cost-Quota-Plan"] = plan.value
+        remaining = await self._get_remaining_quota(quota_key)
+        config = self.config
         response.headers["X-Cost-Quota-Daily-Limit"] = str(config.daily_limit)
         response.headers["X-Cost-Quota-Daily-Remaining"] = str(remaining["daily"])
         response.headers["X-Cost-Quota-Monthly-Limit"] = str(config.monthly_limit)
@@ -219,24 +182,14 @@ class CostQuotaMiddleware:
         except Exception:
             return "ip:unknown"
 
-    async def _get_user_plan(self, request: Request) -> QuotaPlan:
-        """Get user's quota plan from request state or default."""
-        plan = getattr(request.state, "quota_plan", None)
-        if plan:
-            try:
-                return QuotaPlan(plan)
-            except ValueError:
-                pass
-        return self.default_plan
-
     # ------------------------------------------------------------------
     # Quota logic
     # ------------------------------------------------------------------
 
-    async def _check_quota(self, key: str, plan: QuotaPlan) -> bool:
+    async def _check_quota(self, key: str) -> bool:
         """Check if user is within cost quota."""
         current_time = time.time()
-        config = QUOTA_CONFIGS[plan]
+        config = self.config
         cost_data = _cost_store[key]
 
         self._reset_cost_windows(cost_data, current_time)
@@ -271,9 +224,9 @@ class CostQuotaMiddleware:
             return False
         return True
 
-    async def _get_remaining_quota(self, key: str, plan: QuotaPlan) -> dict[str, float]:
+    async def _get_remaining_quota(self, key: str) -> dict[str, float]:
         """Get remaining quota for user."""
-        config = QUOTA_CONFIGS[plan]
+        config = self.config
         cost_data = _cost_store[key]
 
         return {
@@ -281,11 +234,11 @@ class CostQuotaMiddleware:
             "monthly": max(0.0, config.monthly_limit - cost_data["monthly_cost"]),
         }
 
-    async def _quota_exceeded_response(self, key: str, plan: QuotaPlan) -> JSONResponse:
+    async def _quota_exceeded_response(self, key: str) -> JSONResponse:
         """Generate 429 quota exceeded response."""
         from backend.server.utils.error_formatter import format_quota_exceeded_error
 
-        config = QUOTA_CONFIGS[plan]
+        config = self.config
         cost_data = _cost_store[key]
 
         if cost_data["daily_cost"] >= config.daily_limit:
@@ -300,7 +253,6 @@ class CostQuotaMiddleware:
             reset_time = int(cost_data["last_reset_month"] + self.month_window)
 
         quota_info = {
-            "quota_plan": plan.value,
             "limit_type": limit_type,
             "limit": limit,
             "spent": spent,
@@ -311,7 +263,6 @@ class CostQuotaMiddleware:
 
         resp = JSONResponse(status_code=429, content=payload)
         resp.headers["Retry-After"] = str(reset_time - int(time.time()))
-        resp.headers["X-Cost-Quota-Plan"] = plan.value
         return resp
 
     # ------------------------------------------------------------------

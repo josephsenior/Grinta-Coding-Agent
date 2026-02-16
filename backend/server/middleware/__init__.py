@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from backend.server.middleware.cost_quota import CostQuotaMiddleware, QuotaPlan
+from backend.server.middleware.cost_quota import CostQuotaMiddleware
 from backend.server.middleware.cost_recording import record_llm_cost
 from backend.server.middleware.redis_cost_quota import RedisCostQuotaMiddleware
 from backend.server.middleware.rate_limiter import (
@@ -46,7 +46,6 @@ __all__ = [
     "EndpointRateLimiter",
     "InMemoryRateLimiter",
     "LocalhostCORSMiddleware",
-    "QuotaPlan",
     "RequestMetricsMiddleware",
     "RequestSizeLoggingMiddleware",
     "RequestSizeLimiter",

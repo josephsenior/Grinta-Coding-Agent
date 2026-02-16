@@ -3,7 +3,7 @@
 # Lazy imports to avoid heavy dependencies at package-level import.
 
 
-def __getattr__(name: str):  # noqa: N807
+def __getattr__(name: str):
     if name == "Memory":
         from backend.memory.agent_memory import Memory
 

@@ -481,7 +481,7 @@ class Memory:
             web_hosts = {
                 str(host): int(port)
                 for host, port in web_hosts_attr.items()
-                if isinstance(host, (str, int)) and isinstance(port, int)
+                if isinstance(host, str | int) and isinstance(port, int)
             }
 
         additional_instructions_attr = getattr(

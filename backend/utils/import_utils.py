@@ -35,7 +35,7 @@ def import_from(qual_name: str) -> Any:
 
 
 @lru_cache
-def get_impl(cls: type[T], impl_name: str | None) -> type[T]:
+def get_impl[T](cls: type[T], impl_name: str | None) -> type[T]:
     """Import and validate a named implementation of a base class.
 
     This function is an extensibility mechanism in Forge that allows runtime substitution
@@ -78,6 +78,7 @@ def get_impl(cls: type[T], impl_name: str | None) -> type[T]:
         return impl_class
 
     _raise_invalid_impl(cls, impl_class)
+    return None
 
 
 def _impl_matches_base(cls: type[T], impl_class: type[T]) -> bool:

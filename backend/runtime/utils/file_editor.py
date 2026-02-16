@@ -221,7 +221,7 @@ class FileEditor:
             numbered_lines.append(f"{i}\t{line_content}")
 
         formatted_output = "\n".join(numbered_lines)
-        if lines and any(line.endswith("\n") or line.endswith("\r") for line in lines):
+        if lines and any(line.endswith(("\n", "\r")) for line in lines):
             formatted_output += "\n"
         return formatted_output
 
@@ -241,7 +241,7 @@ class FileEditor:
 
         selected_output = "\n".join(selected_lines)
         if lines and any(
-            line.endswith("\n") or line.endswith("\r")
+            line.endswith(("\n", "\r"))
             for line in lines[start_idx:end_idx]
         ):
             selected_output += "\n"

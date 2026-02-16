@@ -6,7 +6,7 @@ without raising `AttributeError`.
 """
 
 import re
-import sys  # noqa: F401 - imported for monkeypatch compatibility
+import sys
 
 
 def refine_prompt(prompt: str):

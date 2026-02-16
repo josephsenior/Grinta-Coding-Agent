@@ -148,7 +148,6 @@ class DirectLLMClient(ABC):
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
         """Stream responses asynchronously. Returns an async iterator."""
-        pass
 
     def __init_subclass__(cls, **kwargs):
         """Ensure subclasses define model_name attribute."""
@@ -552,13 +551,13 @@ def get_direct_client(
 
     if "anthropic" in model_lower or "claude" in model_lower:
         return AnthropicClient(model_name=model, api_key=api_key)
-    elif "google" in model_lower or "gemini" in model_lower:
+    if "google" in model_lower or "gemini" in model_lower:
         return GeminiClient(model_name=model, api_key=api_key)
-    elif "xai" in model_lower or "grok" in model_lower:
+    if "xai" in model_lower or "grok" in model_lower:
         return OpenAIClient(
             model_name=model, api_key=api_key, base_url="https://api.x.ai/v1"
         )
-    elif "ollama" in model_lower:
+    if "ollama" in model_lower:
         # Ollama exposes an OpenAI-compatible API at /v1.
         # Strip the "ollama/" prefix so the actual model name is sent.
         stripped = model.split("/", 1)[1] if "/" in model else model
@@ -568,6 +567,5 @@ def get_direct_client(
             api_key=api_key or "ollama",  # Ollama ignores auth
             base_url=ollama_base,
         )
-    else:
-        # Default to OpenAI (also covers LM Studio, vLLM, etc.)
-        return OpenAIClient(model_name=model, api_key=api_key, base_url=base_url)
+    # Default to OpenAI (also covers LM Studio, vLLM, etc.)
+    return OpenAIClient(model_name=model, api_key=api_key, base_url=base_url)

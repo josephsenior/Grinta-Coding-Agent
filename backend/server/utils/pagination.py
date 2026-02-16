@@ -6,7 +6,7 @@ Provides standardized pagination using cursor-based and offset-based approaches.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -37,7 +37,7 @@ class PaginationParams:
         return (self.page - 1) * self.limit
 
 
-class PaginatedResponse(BaseModel, Generic[T]):
+class PaginatedResponse[T](BaseModel):
     """Standardized paginated response model."""
 
     data: list[T] = Field(..., description="List of items")

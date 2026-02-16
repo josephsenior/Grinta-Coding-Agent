@@ -112,14 +112,7 @@ class RateLimiter:
 
         # Check other excluded paths (public endpoints that are called frequently)
         if (
-            normalized_path
-            in [
-                "/health",
-                "/api/monitoring/health",
-                "/",
-            ]
-            or path.startswith("/assets")
-            or path.startswith("/api/options")
+            normalized_path in ["/health", "/api/monitoring/health", "/"] or path.startswith(("/assets", "/api/options"))
         ):
             return await call_next(request)
 

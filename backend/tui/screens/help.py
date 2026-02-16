@@ -58,17 +58,17 @@ class HelpScreen(Screen[None]):
         with Vertical(id="help-outer"):
             yield Static("⚒  Forge Help", classes="help-title")
             yield Static("Keyboard shortcuts and navigation guide", classes="help-description")
-            
+
             with TabbedContent(initial="shortcuts"):
                 with TabPane("Keyboard Shortcuts", id="shortcuts"):
                     yield self._create_shortcuts_content()
-                
+
                 with TabPane("Navigation", id="navigation"):
                     yield self._create_navigation_content()
-                
+
                 with TabPane("Model & Config", id="config"):
                     yield self._create_config_content()
-        
+
         yield Footer()
 
     def _create_shortcuts_content(self) -> ComposeResult:
@@ -170,7 +170,7 @@ Settings ─────────┘
 ## Quick Tips
 
 - **Scroll**: Use arrow keys or mouse wheel in list views
-- **Multi-select**: Not yet supported, use one action at a time  
+- **Multi-select**: Not yet supported, use one action at a time
 - **Long output**: Agent outputs auto-scroll to show latest
 - **Status**: Top bar shows current model, cost, and agent status
 - **Help**: Press `?` or `H` from any screen to return here
@@ -199,7 +199,7 @@ You can switch models in Settings or by editing `config.toml`:
 Control how much the agent can do automatically:
 
 - **Supervised**: Ask permission for every action (safest)
-- **Balanced**: Ask for high-risk actions only (recommended)  
+- **Balanced**: Ask for high-risk actions only (recommended)
 - **Full**: Run completely automatically (fastest)
 
 ## Memory Management
@@ -223,7 +223,7 @@ Set budgets to prevent runaway charges:
 
 For offline usage:
 
-1. Install Ollama: https://ollama.ai  
+1. Install Ollama: https://ollama.ai
 2. Pull a model: `ollama pull llama3.2`
 3. Start Ollama: `ollama serve`
 4. Configure Forge: Set model to `ollama/llama3.2` in Settings

@@ -200,7 +200,7 @@ class RequestMetricsMiddleware:
             pass
 
         body = getattr(response, "body", None)
-        if isinstance(body, (bytes, bytearray)):
+        if isinstance(body, bytes | bytearray):
             _request_metrics_registry.add_response_bytes(len(body))
 
     def _increment_method_status(

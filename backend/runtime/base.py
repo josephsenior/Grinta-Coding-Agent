@@ -373,7 +373,6 @@ class Runtime(
             conversation_id: ID of conversation to clean up
 
         """
-        pass
 
     def log(self, level: str, message: str) -> None:
         """Log message with runtime context.
@@ -457,8 +456,7 @@ class Runtime(
                     )
                 )
             return await self.call_tool_mcp(event)
-        else:
-            return await call_sync_from_async(self.run_action, event)
+        return await call_sync_from_async(self.run_action, event)
 
     def _handle_runtime_error(
         self, event: Action, error: Exception, is_network_error: bool = False
@@ -692,34 +690,28 @@ Please retry the file creation."""
         Must be implemented by subclasses to establish connection to
         the execution environment (local process, subprocess, etc.).
         """
-        pass
 
     @abstractmethod
     def get_mcp_config(
         self, extra_stdio_servers: list[MCPStdioServerConfig] | None = None
     ) -> MCPConfig:
         """Get MCP configuration for this runtime."""
-        pass
 
     @abstractmethod
     def run(self, action: CmdRunAction) -> Observation:
         """Execute a bash/shell command in the runtime environment."""
-        pass
 
     @abstractmethod
     def read(self, action: FileReadAction) -> Observation:
         """Read file contents from the runtime filesystem."""
-        pass
 
     @abstractmethod
     def write(self, action: FileWriteAction) -> Observation:
         """Write content to a file in the runtime filesystem."""
-        pass
 
     @abstractmethod
     def edit(self, action: FileEditAction) -> Observation:
         """Edit file using search/replace or other edit operations."""
-        pass
 
     @abstractmethod
     def copy_to(
@@ -749,7 +741,6 @@ Please retry the file creation."""
             Observation with page content
 
         """
-        pass
 
     @abstractmethod
     def browse_interactive(self, action: BrowseInteractiveAction) -> Observation:
@@ -762,7 +753,6 @@ Please retry the file creation."""
             Observation with browser interaction results
 
         """
-        pass
 
     @abstractmethod
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
@@ -775,7 +765,6 @@ Please retry the file creation."""
             Observation with tool execution results
 
         """
-        pass
 
     def get_git_diff(self, file_path: str, cwd: str) -> dict[str, str]:
         """Get git diff for a specific file.

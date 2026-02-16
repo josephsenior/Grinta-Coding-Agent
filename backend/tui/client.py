@@ -17,14 +17,25 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Coroutine
+from datetime import datetime, UTC
+from typing import Any
+from collections.abc import Callable, Coroutine
 
 import httpx
 import socketio  # type: ignore[import-untyped]
 
 logger = logging.getLogger("forge.tui.client")
+
+# ---------------------------------------------------------------------------
+# Resilience configuration
+# ---------------------------------------------------------------------------
+_RECONNECT_ATTEMPTS = 0  # 0 = unlimited
+_RECONNECT_DELAY_MIN = 1.0  # seconds — initial backoff
+_RECONNECT_DELAY_MAX = 30.0  # seconds — ceiling
+_HEARTBEAT_INTERVAL = 25  # seconds between client-side pings
+_OFFLINE_QUEUE_MAX = 200  # max buffered actions while disconnected
 
 # ---------------------------------------------------------------------------
 # Type aliases
@@ -108,15 +119,24 @@ class ForgeClient:
             logger=False,
             engineio_logger=False,
             reconnection=True,
-            reconnection_attempts=5,
-            reconnection_delay=1,
+            reconnection_attempts=_RECONNECT_ATTEMPTS,
+            reconnection_delay=_RECONNECT_DELAY_MIN,
+            reconnection_delay_max=_RECONNECT_DELAY_MAX,
         )
+        # Offline message queue — actions buffered while disconnected
+        self._offline_queue: deque[tuple[str, dict[str, Any]]] = deque(
+            maxlen=_OFFLINE_QUEUE_MAX,
+        )
+        self._heartbeat_task: asyncio.Task[None] | None = None
         self._register_sio_handlers()
 
     # ── lifecycle ─────────────────────────────────────────────────
 
     async def close(self) -> None:
         """Tear down HTTP + WS connections."""
+        if self._heartbeat_task and not self._heartbeat_task.done():
+            self._heartbeat_task.cancel()
+            self._heartbeat_task = None
         if self._sio.connected:
             await self._sio.disconnect()
         await self._http.aclose()
@@ -268,11 +288,29 @@ class ForgeClient:
         async def connect() -> None:
             logger.info("Socket.IO connected")
             self._connect_event.set()
+            # Auto-rejoin the conversation we were in before disconnect
+            cid = self._connected_conversation_id
+            if cid:
+                logger.info("Reconnected — auto-rejoining conversation %s", cid)
+                try:
+                    await self._sio.emit(
+                        "rejoin",
+                        {"conversation_id": cid},
+                    )
+                except Exception:
+                    logger.warning(
+                        "Auto-rejoin emit failed for %s", cid, exc_info=True,
+                    )
+            # Flush offline queue
+            await self._flush_offline_queue()
+            # Start heartbeat monitor
+            self._start_heartbeat()
 
         @self._sio.event
         async def disconnect() -> None:
             logger.info("Socket.IO disconnected")
             self._connect_event.clear()
+            self._stop_heartbeat()
 
         @self._sio.on("forge_event")
         async def on_forge_event(data: dict[str, Any]) -> None:
@@ -281,6 +319,64 @@ class ForgeClient:
                     await self._event_callback(data)
                 except Exception:
                     logger.exception("Error in TUI event callback")
+
+    # ── heartbeat ─────────────────────────────────────────────────
+
+    def _start_heartbeat(self) -> None:
+        """Start a periodic heartbeat ping to detect stale connections early."""
+        self._stop_heartbeat()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self._heartbeat_task = loop.create_task(
+            self._heartbeat_loop(), name="forge-ws-heartbeat",
+        )
+
+    def _stop_heartbeat(self) -> None:
+        if self._heartbeat_task and not self._heartbeat_task.done():
+            self._heartbeat_task.cancel()
+        self._heartbeat_task = None
+
+    async def _heartbeat_loop(self) -> None:
+        """Send a lightweight ping at ``_HEARTBEAT_INTERVAL``."""
+        try:
+            while True:
+                await asyncio.sleep(_HEARTBEAT_INTERVAL)
+                if self._sio.connected:
+                    try:
+                        await self._sio.emit("ping", {})
+                    except Exception:
+                        logger.debug("Heartbeat ping failed", exc_info=True)
+        except asyncio.CancelledError:
+            pass
+
+    # ── offline queue ─────────────────────────────────────────────
+
+    def _buffer_action(self, event: str, payload: dict[str, Any]) -> None:
+        """Buffer an action for later delivery when reconnected."""
+        self._offline_queue.append((event, payload))
+        logger.debug(
+            "Buffered offline action (queue depth: %d)", len(self._offline_queue),
+        )
+
+    async def _flush_offline_queue(self) -> None:
+        """Drain and deliver any buffered offline actions."""
+        if not self._offline_queue:
+            return
+        flushed = 0
+        while self._offline_queue and self._sio.connected:
+            event, payload = self._offline_queue.popleft()
+            try:
+                await self._sio.emit(event, payload)
+                flushed += 1
+            except Exception:
+                # Re-queue at the front for next reconnect
+                self._offline_queue.appendleft((event, payload))
+                logger.warning("Failed to flush offline action; re-queued")
+                break
+        if flushed:
+            logger.info("Flushed %d buffered offline actions", flushed)
 
     async def join_conversation(
         self,
@@ -347,12 +443,11 @@ class ForgeClient:
 
         This emits ``forge_user_action`` with the ``MessageAction`` payload,
         matching the same wire format the original web client sends.
-        """
-        if not self._sio.connected:
-            msg = "Not connected to a conversation"
-            raise RuntimeError(msg)
 
-        timestamp = datetime.now(tz=timezone.utc).isoformat()
+        If the Socket.IO transport is down the action is buffered and will be
+        delivered automatically when the connection is restored.
+        """
+        timestamp = datetime.now(tz=UTC).isoformat()
         payload = {
             "action": "message",
             "args": {
@@ -362,7 +457,10 @@ class ForgeClient:
                 "timestamp": timestamp,
             },
         }
-        await self._sio.emit("forge_user_action", payload)
+        if self._sio.connected:
+            await self._sio.emit("forge_user_action", payload)
+        else:
+            self._buffer_action("forge_user_action", payload)
 
     async def send_confirmation(self, *, confirm: bool) -> None:
         """Send user confirmation (approve or reject) for a pending action.
@@ -370,16 +468,15 @@ class ForgeClient:
         Args:
             confirm: ``True`` to approve, ``False`` to reject.
         """
-        if not self._sio.connected:
-            msg = "Not connected to a conversation"
-            raise RuntimeError(msg)
-
         action = "user_confirmed" if confirm else "user_rejected"
         payload = {
             "action": action,
             "args": {},
         }
-        await self._sio.emit("forge_user_action", payload)
+        if self._sio.connected:
+            await self._sio.emit("forge_user_action", payload)
+        else:
+            self._buffer_action("forge_user_action", payload)
 
     async def send_stop(self) -> None:
         """Request the agent to stop."""

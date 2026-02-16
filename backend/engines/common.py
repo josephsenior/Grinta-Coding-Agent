@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
 
 from backend.core.logger import FORGE_logger as logger
 from backend.events.action import Action

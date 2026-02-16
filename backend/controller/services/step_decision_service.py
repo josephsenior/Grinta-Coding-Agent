@@ -70,4 +70,4 @@ class StepDecisionService:
     def _for_observation(self, event: Observation) -> bool:
         if isinstance(event, NullObservation):
             return bool(event.cause)
-        return not isinstance(event, (AgentStateChangedObservation, RecallObservation))
+        return not isinstance(event, AgentStateChangedObservation | RecallObservation)

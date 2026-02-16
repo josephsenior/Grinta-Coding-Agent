@@ -125,9 +125,8 @@ async def verify_setup():
         if table_exists:
             print("[OK] Users table exists")
             return True
-        else:
-            print("[ERROR] Users table not found")
-            return False
+        print("[ERROR] Users table not found")
+        return False
     except Exception as e:
         print(f"[ERROR] Error verifying setup: {e}")
         return False

@@ -94,7 +94,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             if self._is_correct_provider_key(provided_key, provider):
                 logger.debug("Using provided API key for %s", provider)
                 return provided_key
-            elif (
+            if (
                 key_value and len(key_value) > 10
             ):  # Fallback: if it's a substantial key, use it
                 logger.info(
@@ -103,11 +103,10 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
                     len(key_value),
                 )
                 return provided_key
-            else:
-                logger.warning(
-                    "Provided API key appears to be for wrong provider. Expected %s",
-                    provider,
-                )
+            logger.warning(
+                "Provided API key appears to be for wrong provider. Expected %s",
+                provider,
+            )
 
         # Try to get key from environment variables
         env_key = self._get_provider_key_from_env(provider)

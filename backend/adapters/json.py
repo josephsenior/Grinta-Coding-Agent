@@ -26,7 +26,7 @@ class ForgeJSONEncoder(json.JSONEncoder):
             return event_to_dict(obj)
         if isinstance(obj, Metrics):
             return obj.get()
-        if isinstance(obj, (BaseModel, CmdOutputMetadata)):
+        if isinstance(obj, BaseModel | CmdOutputMetadata):
             return model_dump_with_options(obj)
         # Handle dict-like objects that might have been ModelResponse or similar
         if hasattr(obj, "model_dump"):

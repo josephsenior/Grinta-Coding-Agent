@@ -67,7 +67,7 @@ class StuckDetector:
             for event in history
             if not (
                 (isinstance(event, MessageAction) and event.source == EventSource.USER)
-                or isinstance(event, (NullAction, NullObservation))
+                or isinstance(event, NullAction | NullObservation)
             )
         ]
 
@@ -426,7 +426,7 @@ class StuckDetector:
 
         for event in events:
             if isinstance(event, Action) and not isinstance(
-                event, (NullAction, MessageAction)
+                event, NullAction | MessageAction
             ):
                 intent = self._extract_action_intent(event)
                 if intent:

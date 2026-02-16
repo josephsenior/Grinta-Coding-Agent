@@ -2,7 +2,7 @@
 
 import os
 import re
-from typing import Pattern
+from re import Pattern
 
 from backend.core.logger import FORGE_logger as logger
 

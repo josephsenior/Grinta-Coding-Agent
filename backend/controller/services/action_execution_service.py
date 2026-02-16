@@ -79,7 +79,7 @@ class ActionExecutionService:
             from backend.core.plugin import get_plugin_registry
 
             action = await get_plugin_registry().dispatch_action_pre(action)
-        except Exception:  # noqa: BLE001 — plugins must not break the pipeline
+        except Exception:
             pass
 
         ctx: ToolInvocationContext | None = None

@@ -21,7 +21,7 @@ def _sanitize_sys_path():
 
 def _preload_pydantic_root_model() -> None:
     try:
-        import pydantic.root_model  # type: ignore  # noqa: F401  # pylint: disable=unused-import
+        pass  # type: ignore  # pylint: disable=unused-import
     except Exception:
         pass
 
@@ -46,12 +46,12 @@ def _restrict_mcp_path(module: object) -> None:
 _sanitize_sys_path()
 
 
-import asyncio  # noqa: E402
-import inspect  # noqa: E402
-import pathlib  # noqa: E402
-from collections.abc import Iterator  # noqa: E402
+import asyncio
+import inspect
+import pathlib
+from collections.abc import Iterator
 
-import pytest  # noqa: E402
+import pytest
 
 
 @pytest.fixture

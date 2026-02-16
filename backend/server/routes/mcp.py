@@ -167,7 +167,7 @@ def _mcp_span(tool_name: str, resource: str, conversation_id: str | None):
             raise
 
 
-async def _execute_with_tracing(
+async def _execute_with_tracing[ReturnT](
     tool_name: str,
     resource: str,
     conversation_id: str | None,

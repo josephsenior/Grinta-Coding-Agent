@@ -94,7 +94,7 @@ class GraphRAG:
 
         # Simple heuristic: Find imports (very basic python example)
         for line in content.splitlines():
-            if line.startswith("import ") or line.startswith("from "):
+            if line.startswith(("import ", "from ")):
                 # This is a very naive parser, just for demonstration
                 parts = line.split()
                 if len(parts) > 1:

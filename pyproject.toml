@@ -116,6 +116,7 @@ pytest = "^8.4.0"
 flake8 = ">=7.3.0,<8.0.0"
 grpcio = "^1.70.0"
 grpcio-tools = "^1.70.0"
+bandit = "^1.9.3"
 
 [tool.poetry.group.test]
 optional = true
@@ -211,3 +212,13 @@ precision = 2
 show_missing = true
 skip_covered = false
 fail_under = 95
+
+[tool.bandit]
+# Security scanning configuration
+# B101: assert used — acceptable in tests and internal assertions
+# B110: try/except/pass — used intentionally for graceful degradation
+# B404: import subprocess — needed for runtime command execution
+# B603: subprocess call — controlled by SecurityAnalyzer
+# B607: partial path — acceptable for tool invocations
+skips = ["B101", "B110", "B404", "B603", "B607"]
+exclude_dirs = ["backend/tests", "tests"]

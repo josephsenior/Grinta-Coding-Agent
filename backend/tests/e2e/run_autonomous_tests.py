@@ -52,7 +52,7 @@ def run_quick_tests():
         "--maxfail=3",
     ]
 
-    return subprocess.run(cmd, cwd=Path(__file__).parent).returncode
+    return subprocess.run(cmd, check=False, cwd=Path(__file__).parent).returncode
 
 
 def run_specific_test(test_name):
@@ -72,7 +72,7 @@ def run_specific_test(test_name):
         test_name,
     ]
 
-    return subprocess.run(cmd, cwd=Path(__file__).parent).returncode
+    return subprocess.run(cmd, check=False, cwd=Path(__file__).parent).returncode
 
 
 def run_full_tests():
@@ -94,7 +94,7 @@ def run_full_tests():
         "e2e",
     ]
 
-    return subprocess.run(cmd, cwd=Path(__file__).parent).returncode
+    return subprocess.run(cmd, check=False, cwd=Path(__file__).parent).returncode
 
 
 def list_scenarios():
@@ -139,10 +139,10 @@ def main():
 
     if args.scenario:
         return run_specific_test(args.scenario)
-    elif args.full:
+    if args.full:
         return run_full_tests()
-    else:  # Default to quick tests
-        return run_quick_tests()
+    # Default to quick tests
+    return run_quick_tests()
 
 
 if __name__ == "__main__":

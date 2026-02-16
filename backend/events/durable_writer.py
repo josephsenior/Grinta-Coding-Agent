@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import queue
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -11,6 +12,10 @@ from backend.core.logger import FORGE_logger as logger
 # Retry parameters for transient flush failures
 _MAX_FLUSH_RETRIES = 3
 _RETRY_BASE_DELAY = 0.1  # 100ms, doubles each retry
+
+# Batch flush settings
+_DEFAULT_BATCH_SIZE = 16  # max events per flush cycle
+_BATCH_DRAIN_TIMEOUT = 0.02  # 20ms window to accumulate a batch
 
 
 class FileStore(Protocol):
@@ -111,18 +116,61 @@ class DurableEventWriter:
 
     def _run(self) -> None:
         while not self._stop_flag.is_set():
-            try:
-                item = self._queue.get(timeout=0.1)
-            except queue.Empty:
+            batch = self._drain_batch()
+            if batch is None:
+                # Sentinel received – shut down
+                break
+            if not batch:
                 continue
-            if item is None:
-                self._queue.task_done()
+            self._flush_batch(batch)
+
+    # ------------------------------------------------------------------
+    # Batch helpers
+    # ------------------------------------------------------------------
+
+    def _drain_batch(self) -> list[PersistedEvent] | None:
+        """Drain up to ``_DEFAULT_BATCH_SIZE`` events from the queue.
+
+        Returns ``None`` when the sentinel (stop) value is received, an empty
+        list when the queue was idle, or a non-empty list of events to flush.
+        """
+        batch: list[PersistedEvent] = []
+
+        # Block on the first item so we don't spin-wait
+        try:
+            first = self._queue.get(timeout=0.1)
+        except queue.Empty:
+            return batch  # empty – caller will loop
+        if first is None:
+            self._queue.task_done()
+            return None  # sentinel
+        batch.append(first)
+
+        # Opportunistically drain more items within a short window
+        deadline = time.monotonic() + _BATCH_DRAIN_TIMEOUT
+        while len(batch) < _DEFAULT_BATCH_SIZE:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 break
             try:
+                item = self._queue.get(timeout=remaining)
+            except queue.Empty:
+                break
+            if item is None:
+                self._queue.task_done()
+                # Flush what we have, then tell caller to stop
+                self._flush_batch(batch)
+                return None
+            batch.append(item)
+
+        return batch
+
+    def _flush_batch(self, batch: list[PersistedEvent]) -> None:
+        """Flush all events in *batch*, retrying each individually on failure."""
+        for item in batch:
+            try:
                 self._flush_with_retry(item)
-            except (
-                Exception
-            ) as exc:  # pragma: no cover - persistence must not crash thread
+            except Exception as exc:  # pragma: no cover - persistence must not crash thread
                 self._errors += 1
                 logger.error(
                     "Permanently failed to persist event id=%s filename=%s after %d retries: %s",

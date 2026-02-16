@@ -97,7 +97,10 @@ class LLMSummarizingCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass
     )
     token_budget: int | None = Field(
         default=None,
-        description="Optional token budget.  When set, condensation also triggers if the estimated token count of the view exceeds this limit.",
+        description=(
+            "Optional token budget. When set, condensation also triggers if "
+            "the estimated token count of the view exceeds this limit."
+        ),
         ge=1,
     )
     model_config = ConfigDict(extra="forbid")
@@ -200,6 +203,21 @@ class ConversationWindowCondenserConfig(BaseModel, metaclass=CanonicalModelMetac
     model_config = ConfigDict(extra="forbid")
 
 
+class AutoCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass):
+    """Configuration for task-aware automatic condenser selection.
+
+    When ``type = "auto"`` the system analyses the current event stream
+    and picks the most appropriate condenser strategy dynamically.
+    """
+
+    type: Literal["auto"] = Field(default="auto")
+    llm_config: LLMConfig | str | None = Field(
+        default=None,
+        description="LLM config name made available to LLM-based strategies when auto-selected.",
+    )
+    model_config = ConfigDict(extra="forbid")
+
+
 class SmartCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for SmartCondenser with LLM-assisted importance scoring."""
 
@@ -249,6 +267,7 @@ CondenserConfig = (
     | CondenserPipelineConfig
     | ConversationWindowCondenserConfig
     | SmartCondenserConfig
+    | AutoCondenserConfig
 )
 
 
@@ -339,6 +358,7 @@ def create_condenser_config(condenser_type: str, data: dict) -> CondenserConfig:
         "conversation_window": ConversationWindowCondenserConfig,
         "browser_output_masking": BrowserOutputCondenserConfig,
         "smart": SmartCondenserConfig,
+        "auto": AutoCondenserConfig,
     }
     if condenser_type not in condenser_classes:
         msg = f"Unknown condenser type: {condenser_type}"
@@ -357,3 +377,4 @@ LLMAttentionCondenserConfig.model_rebuild()
 StructuredSummaryCondenserConfig.model_rebuild()
 CondenserPipelineConfig.model_rebuild()
 SmartCondenserConfig.model_rebuild()
+AutoCondenserConfig.model_rebuild()

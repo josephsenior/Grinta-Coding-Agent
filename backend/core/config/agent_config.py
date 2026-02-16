@@ -295,12 +295,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 CURRENT_AGENT_CONFIG_SCHEMA_VERSION,
             )
 
-        try:
-            base_config = cls._create_base_config(base_data)
-        except ValueError as exc:
-            config_telemetry.record_invalid_base()
-            raise ValueError(f"Invalid base agent configuration: {exc}") from exc
-
+        base_config = cls._create_base_config(base_data)
         agent_mapping["agent"] = base_config
         errors: list[str] = []
 
@@ -358,7 +353,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         """
         valid_fields = set(cls.model_fields.keys())
-        invalid_fields = {k for k in base_data.keys() if k not in valid_fields}
+        invalid_fields = {k for k in base_data if k not in valid_fields}
         if invalid_fields:
             logger.warning(
                 "Ignoring unknown agent config field(s) in base config: %s",
@@ -411,7 +406,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         """
         # Validate that overrides only contain valid fields
         valid_fields = set(cls.model_fields.keys())
-        invalid_fields = {k for k in overrides.keys() if k not in valid_fields}
+        invalid_fields = {k for k in overrides if k not in valid_fields}
 
         if invalid_fields:
             logger.warning(
@@ -441,8 +436,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         try:
             # Create a new config by copying base and applying safe overrides
-            new_config = base_config.model_copy(update=safe_overrides)
-            return new_config
+            return base_config.model_copy(update=safe_overrides)
         except Exception as e:
             logger.warning("Failed to create custom config for agent '%s': %s", name, e)
             return base_config.model_copy(update={"name": name})

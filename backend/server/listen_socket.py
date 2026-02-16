@@ -252,7 +252,7 @@ async def test_event(connection_id: str, data: dict[str, Any]) -> None:
         data: Event data
 
     """
-    return None
+    return
 
 
 # ------------------------------------------------------------------

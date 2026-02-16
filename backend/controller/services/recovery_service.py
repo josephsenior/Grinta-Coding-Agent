@@ -53,14 +53,35 @@ class RecoveryService:
         await self._handle_non_recoverable_error(exc)
 
     _GENERIC_MESSAGES = {
-        ErrorType.MODULE_NOT_FOUND: "A required Python module is missing: {message}",
-        ErrorType.RUNTIME_CRASH: "The runtime appears to have crashed or disconnected. Reinitializing environment.",
-        ErrorType.NETWORK_ERROR: "Network connectivity issue detected. The agent will retry once connectivity is restored.",
-        ErrorType.FILESYSTEM_ERROR: "File system error encountered. Please check paths and permissions.",
-        ErrorType.TOOL_CALL_ERROR: "Tool invocation failed because of invalid arguments. Review the last tool call and retry.",
-        ErrorType.TIMEOUT_ERROR: "A step timed out before completion. Consider splitting the task or increasing the timeout.",
-        ErrorType.PERMISSION_ERROR: "Operation failed due to insufficient permissions.",
-        ErrorType.DISK_FULL_ERROR: "The workspace disk appears full. Free up space and retry.",
+        ErrorType.MODULE_NOT_FOUND: (
+            "A required Python module is missing: {message}"
+        ),
+        ErrorType.RUNTIME_CRASH: (
+            "The runtime appears to have crashed or disconnected. "
+            "Reinitializing environment."
+        ),
+        ErrorType.NETWORK_ERROR: (
+            "Network connectivity issue detected. The agent will retry "
+            "once connectivity is restored."
+        ),
+        ErrorType.FILESYSTEM_ERROR: (
+            "File system error encountered. Please check paths and "
+            "permissions."
+        ),
+        ErrorType.TOOL_CALL_ERROR: (
+            "Tool invocation failed because of invalid arguments. "
+            "Review the last tool call and retry."
+        ),
+        ErrorType.TIMEOUT_ERROR: (
+            "A step timed out before completion. Consider splitting the "
+            "task or increasing the timeout."
+        ),
+        ErrorType.PERMISSION_ERROR: (
+            "Operation failed due to insufficient permissions."
+        ),
+        ErrorType.DISK_FULL_ERROR: (
+            "The workspace disk appears full. Free up space and retry."
+        ),
     }
 
     def _format_user_message(self, exc: Exception, error_type: ErrorType) -> str:
@@ -342,7 +363,7 @@ class RecoveryService:
 
         if isinstance(exc, AuthenticationError):
             return RuntimeStatus.ERROR_LLM_AUTHENTICATION
-        if isinstance(exc, (ServiceUnavailableError, APIConnectionError, APIError)):
+        if isinstance(exc, ServiceUnavailableError | APIConnectionError | APIError):
             return RuntimeStatus.ERROR_LLM_SERVICE_UNAVAILABLE
         if isinstance(exc, InternalServerError):
             return RuntimeStatus.ERROR_LLM_INTERNAL_SERVER_ERROR

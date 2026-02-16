@@ -230,7 +230,8 @@ def _convert_tool_calls(raw_tool_calls: Any) -> list[ToolCall] | None:
             }
 
         _ensure_tool_call_function(call_dict, call, idx)
-        call_dict.setdefault("id", call_dict.get("tool_call_id") or f"tool_call_{idx}")
+        if not call_dict.get("id"):
+            call_dict["id"] = call_dict.get("tool_call_id") or f"tool_call_{idx}"
         call_dict.setdefault("type", getattr(call, "type", "function"))
         normalized.append(ToolCall.model_validate(call_dict))
     return normalized

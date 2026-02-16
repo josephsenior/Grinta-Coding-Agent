@@ -121,8 +121,7 @@ class GraphCache:
                 self.stats["hits"] += 1
                 logger.debug("📊 Graph cache HIT (Redis) for %s", repo_path)
                 return True
-            else:
-                self.stats["distributed_misses"] += 1
+            self.stats["distributed_misses"] += 1
         except Exception as e:
             logger.debug("Distributed cache error: %s", e)
 

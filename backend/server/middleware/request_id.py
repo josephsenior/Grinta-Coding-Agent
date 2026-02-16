@@ -40,4 +40,7 @@ def get_request_id(request: Request) -> str:
     Returns:
         Request ID string
     """
-    return getattr(request.state, "request_id", "unknown")
+    try:
+        return getattr(request.state, "request_id", "unknown")
+    except AttributeError:
+        return "unknown"

@@ -204,7 +204,7 @@ class DatabaseConversationStore(ConversationStore):
             else:
                 pr_number = row["pr_number"]
 
-        metadata = ConversationMetadata(
+        return ConversationMetadata(
             conversation_id=row["conversation_id"],
             title=row["title"],
             selected_repository=row["selected_repository"],
@@ -224,7 +224,6 @@ class DatabaseConversationStore(ConversationStore):
             total_tokens=row["total_tokens"],
             name=row["name"],
         )
-        return metadata
 
     # 🚀 Observability Extension: Log agent success/failure
     async def log_audit(

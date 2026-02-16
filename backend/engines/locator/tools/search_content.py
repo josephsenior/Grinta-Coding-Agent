@@ -2,7 +2,24 @@
 
 from backend.llm.tool_types import make_function_chunk, make_tool_param
 
-_SEARCH_ENTITY_DESCRIPTION = "\nSearches the codebase to retrieve the complete implementations of specified entities based on the provided entity names.\nThe tool can handle specific entity queries such as function names, class names, or file paths.\n\n**Usage Example:**\n# Search for a specific function implementation\nget_entity_contents(['src/my_file.py:MyClass.func_name'])\n\n# Search for a file's complete content\nget_entity_contents(['src/my_file.py'])\n\n**Entity Name Format:**\n- To specify a function or class, use the format: `file_path:QualifiedName`\n  (e.g., 'src/helpers/math_helpers.py:MathUtils.calculate_sum').\n- To search for a file's content, use only the file path (e.g., 'src/my_file.py').\n"
+_SEARCH_ENTITY_DESCRIPTION = """
+Searches the codebase to retrieve the complete implementations of specified
+entities based on the provided entity names.
+The tool can handle specific entity queries such as function names, class names,
+or file paths.
+
+**Usage Example:**
+# Search for a specific function implementation
+get_entity_contents(['src/my_file.py:MyClass.func_name'])
+
+# Search for a file's complete content
+get_entity_contents(['src/my_file.py'])
+
+**Entity Name Format:**
+- To specify a function or class, use the format: `file_path:QualifiedName`
+  (e.g., 'src/helpers/math_helpers.py:MathUtils.calculate_sum').
+- To search for a file's content, use only the file path (e.g., 'src/my_file.py').
+"""
 SearchEntityTool = make_tool_param(
     type="function",
     function=make_function_chunk(
@@ -14,14 +31,39 @@ SearchEntityTool = make_tool_param(
                 "entity_names": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "A list of entity names to query. Each entity name can represent a function, class, or file. For functions or classes, the format should be 'file_path:QualifiedName' (e.g., 'src/helpers/math_helpers.py:MathUtils.calculate_sum'). For files, use just the file path (e.g., 'src/my_file.py').",
+                    "description": (
+                        "A list of entity names to query. Each entity name can "
+                        "represent a function, class, or file. For functions or "
+                        "classes, the format should be 'file_path:QualifiedName' "
+                        "(e.g., 'src/helpers/math_helpers.py:MathUtils.calculate_sum'). "
+                        "For files, use just the file path (e.g., 'src/my_file.py')."
+                    ),
                 },
             },
             "required": ["entity_names"],
         },
     ),
 )
-_SEARCH_REPO_DESCRIPTION = 'Searches the codebase to retrieve relevant code snippets based on given queries(terms or line numbers).\n** Note:\n- Either `search_terms` or `line_nums` must be provided to perform a search.\n- If `search_terms` are provided, it searches for code snippets based on each term:\n- If `line_nums` is provided, it searches for code snippets around the specified lines within the file defined by `file_path_or_pattern`.\n\n** Example Usage:\n# Search for code content contain keyword `order`, `bill`\nsearch_code_snippets(search_terms=["order", "bill"])\n\n# Search for a class\nsearch_code_snippets(search_terms=["MyClass"])\n\n# Search for context around specific lines (10 and 15) within a file\nsearch_code_snippets(line_nums=[10, 15], file_path_or_pattern=\'src/example.py\')\n'
+_SEARCH_REPO_DESCRIPTION = """
+Searches the codebase to retrieve relevant code snippets based on given queries
+(terms or line numbers).
+** Note:
+- Either `search_terms` or `line_nums` must be provided to perform a search.
+- If `search_terms` are provided, it searches for code snippets based on each
+  term:
+- If `line_nums` is provided, it searches for code snippets around the
+  specified lines within the file defined by `file_path_or_pattern`.
+
+** Example Usage:
+# Search for code content contain keyword `order`, `bill`
+search_code_snippets(search_terms=["order", "bill"])
+
+# Search for a class
+search_code_snippets(search_terms=["MyClass"])
+
+# Search for context around specific lines (10 and 15) within a file
+search_code_snippets(line_nums=[10, 15], file_path_or_pattern='src/example.py')
+"""
 SearchRepoTool = make_tool_param(
     type="function",
     function=make_function_chunk(

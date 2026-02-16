@@ -177,7 +177,11 @@ class MCPStdioServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 msg = "Environment variable key cannot be empty"
                 raise ValueError(msg)
             if not re.match("^[a-zA-Z_][a-zA-Z0-9_]*$", key):
-                msg = f"Invalid environment variable name '{key}'. Must start with letter or underscore, contain only alphanumeric characters and underscores"
+                msg = (
+                    f"Invalid environment variable name '{key}'. Must start with "
+                    "letter or underscore, contain only alphanumeric characters "
+                    "and underscores"
+                )
                 raise ValueError(
                     msg,
                 )
@@ -225,7 +229,8 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     Attributes:
         sse_servers: List of MCP SSE server configs
-        stdio_servers: List of MCP stdio server configs. These servers will be added to the MCP Router running inside runtime container.
+        stdio_servers: List of MCP stdio server configs. These servers will be
+            added to the MCP Router running inside runtime container.
         shttp_servers: List of MCP HTTP server configs.
 
     """
@@ -347,7 +352,9 @@ class ForgeMCPConfig:
             config: ForgeConfig
             user_id: Optional user ID for the MCP server
         Returns:
-            tuple[MCPSHTTPServerConfig | None, list[MCPStdioServerConfig]]: A tuple containing the default SHTTP server configuration (or None) and a list of MCP stdio server configurations
+            tuple[MCPSHTTPServerConfig | None, list[MCPStdioServerConfig]]:
+                A tuple containing the default SHTTP server configuration
+                (or None) and a list of MCP stdio server configurations
 
         """
         stdio_servers: list[MCPStdioServerConfig] = []

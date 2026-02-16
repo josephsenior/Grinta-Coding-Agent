@@ -409,10 +409,9 @@ class Navigator(Agent):
                 )
                 self.retry_count = 0
                 return BrowseInteractiveAction(browser_actions="go_back()")
-            else:
-                return MessageAction(
-                    f"❌ Failed action after {self.max_retries} attempts. Cannot proceed."
-                )
+            return MessageAction(
+                f"❌ Failed action after {self.max_retries} attempts. Cannot proceed."
+            )
 
         # Continue with error context (let agent try alternative)
         logger.warning(

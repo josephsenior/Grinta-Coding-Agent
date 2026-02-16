@@ -20,7 +20,6 @@ from backend.core.logger import FORGE_logger as logger
 class ValidationError(Exception):
     """Raised when input validation fails."""
 
-    pass
 
 
 def validate_file_path(path: str, base_dir: str | None = None) -> str:
@@ -255,26 +254,25 @@ def _detect_mime_type(content: bytes, filename: str) -> str:
     # Simple MIME type detection based on file signature
     if content.startswith(b"\x89PNG"):
         return "image/png"
-    elif content.startswith(b"\xff\xd8\xff"):
+    if content.startswith(b"\xff\xd8\xff"):
         return "image/jpeg"
-    elif content.startswith(b"GIF87a") or content.startswith(b"GIF89a"):
+    if content.startswith((b"GIF87a", b"GIF89a")):
         return "image/gif"
-    elif content.startswith(b"%PDF"):
+    if content.startswith(b"%PDF"):
         return "application/pdf"
-    elif content.startswith(b"PK\x03\x04"):
+    if content.startswith(b"PK\x03\x04"):
         return "application/zip"
-    else:
-        # Fallback to extension-based detection
-        ext = Path(filename).suffix.lower()
-        mime_map = {
-            ".txt": "text/plain",
-            ".json": "application/json",
-            ".html": "text/html",
-            ".css": "text/css",
-            ".js": "application/javascript",
-            ".py": "text/x-python",
-        }
-        return mime_map.get(ext, "application/octet-stream")
+    # Fallback to extension-based detection
+    ext = Path(filename).suffix.lower()
+    mime_map = {
+        ".txt": "text/plain",
+        ".json": "application/json",
+        ".html": "text/html",
+        ".css": "text/css",
+        ".js": "application/javascript",
+        ".py": "text/x-python",
+    }
+    return mime_map.get(ext, "application/octet-stream")
 
 
 def sanitize_string(value: str, max_length: int | None = None) -> str:

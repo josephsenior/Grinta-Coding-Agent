@@ -24,7 +24,6 @@ class FileStore:
             contents: Content to write (string or bytes)
 
         """
-        pass
 
     @abstractmethod
     def read(self, path: str) -> str:
@@ -40,7 +39,6 @@ class FileStore:
             FileNotFoundError: If file doesn't exist
 
         """
-        pass
 
     @abstractmethod
     def list(self, path: str) -> list[str]:
@@ -56,7 +54,6 @@ class FileStore:
             FileNotFoundError: If directory doesn't exist
 
         """
-        pass
 
     @abstractmethod
     def delete(self, path: str) -> None:
@@ -66,4 +63,3 @@ class FileStore:
             path: Path to delete (file or directory)
 
         """
-        pass

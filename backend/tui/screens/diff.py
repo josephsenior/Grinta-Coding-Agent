@@ -153,9 +153,7 @@ class DiffScreen(Screen[None]):
 
         container.mount(Static(f"── {filepath} ──", classes="diff-line-hdr"))
         for line in lines:
-            if line.startswith("+++") or line.startswith("---"):
-                container.mount(Static(line, classes="diff-line-hdr"))
-            elif line.startswith("@@"):
+            if line.startswith(("+++", "---", "@@")):
                 container.mount(Static(line, classes="diff-line-hdr"))
             elif line.startswith("+"):
                 container.mount(Static(line, classes="diff-line-add"))

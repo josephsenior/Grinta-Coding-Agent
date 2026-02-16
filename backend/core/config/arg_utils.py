@@ -53,13 +53,21 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> None:
         "--llm-config",
         default=None,
         type=str,
-        help='Replace default LLM ([llm] section in config.toml) config with the specified LLM config, e.g. "llama3" for [llm.llama3] section in config.toml',
+        help=(
+            "Replace default LLM ([llm] section in config.toml) config with "
+            "the specified LLM config, e.g. 'llama3' for [llm.llama3] section "
+            "in config.toml"
+        ),
     )
     parser.add_argument(
         "--agent-config",
         default=None,
         type=str,
-        help='Replace default Agent ([agent] section in config.toml) config with the specified Agent config, e.g. "CodeAct" for [agent.CodeAct] section in config.toml',
+        help=(
+            "Replace default Agent ([agent] section in config.toml) config "
+            "with the specified Agent config, e.g. 'CodeAct' for "
+            "[agent.CodeAct] section in config.toml"
+        ),
     )
     parser.add_argument(
         "-v", "--version", action="store_true", help="Show version information"
@@ -93,7 +101,10 @@ def add_headless_specific_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--no-auto-continue",
-        help="Disable auto-continue responses in headless mode (i.e. headless will read from stdin instead of auto-continuing)",
+        help=(
+            "Disable auto-continue responses in headless mode (i.e. headless "
+            "will read from stdin instead of auto-continuing)"
+        ),
         action="store_true",
         default=False,
     )
@@ -107,7 +118,11 @@ def add_headless_specific_arguments(parser: argparse.ArgumentParser) -> None:
 
 def get_cli_parser() -> argparse.ArgumentParser:
     """Create argument parser for Forge."""
-    description = 'Welcome to Forge: Code Less, Make More\n\nForge is now a GUI-only application. Use "forge serve" to launch the web interface.'
+    description = (
+        "Welcome to Forge: Code Less, Make More\n\n"
+        "Forge is now a GUI-only application. Use 'forge serve' to launch "
+        "the web interface."
+    )
     parser = argparse.ArgumentParser(
         description=description,
         prog="forge",

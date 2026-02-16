@@ -91,7 +91,12 @@ _CRITICAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"\bRemove-Item\b.*-Recurse.*-Force\b", re.I),
         "recursive forced delete (PowerShell)",
     ),
+    (
+        re.compile(r"\bRemove-Item\b.*-Force.*-Recurse\b", re.I),
+        "recursive forced delete (PowerShell)",
+    ),
     (re.compile(r"\bformat\s+[a-zA-Z]:\s*$", re.I), "drive format (Windows)"),
+    (re.compile(r"\bdel\b.*(/s|/q).*(/s|/q)", re.I), "recursive forced delete (cmd.exe)"),
 ]
 
 _HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
@@ -130,6 +135,7 @@ _HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "execution policy bypass",
     ),
     (re.compile(r"\bReg\s+(Add|Delete)\b", re.I), "registry modification"),
+    (re.compile(r"\bdel\b.*(/s|/q)", re.I), "file deletion (cmd.exe)"),
 ]
 
 _MEDIUM_PATTERNS: list[tuple[re.Pattern[str], str]] = [

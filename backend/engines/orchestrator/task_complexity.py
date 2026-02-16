@@ -168,11 +168,10 @@ class TaskComplexityAnalyzer:
                 threshold,
             )
             return True
-        else:
-            logger.debug(
-                "Task complexity %.1f < %s - skipping planning", complexity, threshold
-            )
-            return False
+        logger.debug(
+            "Task complexity %.1f < %s - skipping planning", complexity, threshold
+        )
+        return False
 
     def estimate_iterations(self, complexity: float, state: State) -> int:
         """Estimate required iterations based on complexity.

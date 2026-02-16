@@ -377,7 +377,7 @@ class Session:
             await self.send(event_to_dict(event))
         elif event.source == EventSource.ENVIRONMENT and isinstance(
             event,
-            (CmdOutputObservation, AgentStateChangedObservation, RecallObservation),
+            CmdOutputObservation | AgentStateChangedObservation | RecallObservation,
         ):
             event_dict = event_to_dict(event)
             event_dict["source"] = EventSource.AGENT

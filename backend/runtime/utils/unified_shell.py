@@ -30,28 +30,23 @@ class UnifiedShellSession(ABC):
     @abstractmethod
     def initialize(self) -> None:
         """Initialize the shell session."""
-        pass
 
     @abstractmethod
     def execute(self, action: CmdRunAction) -> Observation:
         """Execute a command in the shell."""
-        pass
 
     @abstractmethod
     def close(self) -> None:
         """Close the shell session and clean up resources."""
-        pass
 
     @property
     @abstractmethod
     def cwd(self) -> str:
         """Get current working directory."""
-        pass
 
     @abstractmethod
     def get_detected_server(self):
         """Get and clear the last detected server."""
-        pass
 
 
 class BaseShellSession(UnifiedShellSession, ABC):
@@ -127,7 +122,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
         Default implementation returns None. Subclasses should override if
         they support server detection.
         """
-        return None
+        return
 
     def close(self) -> None:
         """Close the shell session and clean up resources."""
@@ -231,29 +226,27 @@ def create_shell_session(
         from backend.runtime.utils.windows_bash import WindowsPowershellSession
 
         logger.info("Using WindowsPowershellSession")
-        session = WindowsPowershellSession(
+        return WindowsPowershellSession(
             **session_kwargs,  # type: ignore[arg-type]
             powershell_exe=tools.shell_type if tools.has_powershell else None,
         )
         # Type cast for mypy - WindowsPowershellSession implements UnifiedShellSession interface
-        return session  # type: ignore[return-value]
 
     # Unix with tmux: Use full BashSession
-    elif tools.has_tmux and tools.has_bash:
+    if tools.has_tmux and tools.has_bash:
         from backend.runtime.utils.bash import BashSession
 
         logger.info("Using BashSession with tmux")
         return BashSession(**session_kwargs)
 
     # Unix without tmux: Use simple Bash session
-    elif tools.has_bash:
+    if tools.has_bash:
         from backend.runtime.utils.simple_bash import SimpleBashSession
 
         logger.info("Using SimpleBashSession (no tmux)")
         return SimpleBashSession(**session_kwargs)
 
     # Fallback: Should not happen if tools are detected correctly
-    else:
-        raise RuntimeError(
-            f"No suitable shell found for platform {sys.platform}. Detected shell: {tools.shell_type}"
-        )
+    raise RuntimeError(
+        f"No suitable shell found for platform {sys.platform}. Detected shell: {tools.shell_type}"
+    )

@@ -64,11 +64,10 @@ class MyPlugin(ForgePlugin):
     # ── Validation ──────────────────────────────────────
 
     def validate(self) -> list[str]:
-        warnings = super().validate()
+        return super().validate()
         # Add your own checks here, e.g.:
         # if not os.environ.get("MY_PLUGIN_API_KEY"):
         #     warnings.append("MY_PLUGIN_API_KEY env var not set")
-        return warnings
 
 
 def register(registry: PluginRegistry) -> None:

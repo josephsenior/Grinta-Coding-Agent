@@ -332,8 +332,7 @@ def _handle_edit_function_command(editor, file_path: str, arguments: dict) -> Ac
         return FileReadAction(
             path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
-    else:
-        return MessageAction(content=f"❌ Edit failed: {result.message}")
+    return MessageAction(content=f"❌ Edit failed: {result.message}")
 
 
 def _handle_rename_symbol_command(editor, file_path: str, arguments: dict) -> Action:
@@ -352,8 +351,7 @@ def _handle_rename_symbol_command(editor, file_path: str, arguments: dict) -> Ac
         return FileReadAction(
             path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
-    else:
-        return MessageAction(content=f"❌ Rename failed: {result.message}")
+    return MessageAction(content=f"❌ Rename failed: {result.message}")
 
 
 def _handle_find_symbol_command(editor, file_path: str, arguments: dict) -> Action:
@@ -374,10 +372,9 @@ def _handle_find_symbol_command(editor, file_path: str, arguments: dict) -> Acti
         if result.parent_name:
             message += f"\n  Parent: {result.parent_name}"
         return MessageAction(content=message)
-    else:
-        return MessageAction(
-            content=f"❌ Symbol '{symbol_name}' not found in {file_path}"
-        )
+    return MessageAction(
+        content=f"❌ Symbol '{symbol_name}' not found in {file_path}"
+    )
 
 
 def _handle_replace_range_command(editor, file_path: str, arguments: dict) -> Action:
@@ -397,8 +394,7 @@ def _handle_replace_range_command(editor, file_path: str, arguments: dict) -> Ac
         return FileReadAction(
             path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
-    else:
-        return MessageAction(content=f"❌ Replace failed: {result.message}")
+    return MessageAction(content=f"❌ Replace failed: {result.message}")
 
 
 def _handle_normalize_indent_command(editor, file_path: str, arguments: dict) -> Action:
@@ -411,8 +407,7 @@ def _handle_normalize_indent_command(editor, file_path: str, arguments: dict) ->
         return FileReadAction(
             path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
-    else:
-        return MessageAction(content=f"❌ Normalization failed: {result.message}")
+    return MessageAction(content=f"❌ Normalization failed: {result.message}")
 
 
 def _handle_structure_editor_tool(arguments: dict) -> Action:

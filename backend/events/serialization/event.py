@@ -29,7 +29,7 @@ TOP_KEYS = [
     "tool_call_metadata",
     "llm_metrics",
 ]
-from backend.events.serialization.common import UNDERSCORE_KEYS  # noqa: E402
+from backend.events.serialization.common import UNDERSCORE_KEYS
 
 DELETE_FROM_TRAJECTORY_EXTRAS = {
     "dom_object",
@@ -329,7 +329,7 @@ def _convert_extras_safely(props: dict[str, Any]) -> dict[str, Any]:
     """Convert extras dictionary safely."""
 
     def _safe_convert(v):
-        if v is None or isinstance(v, (str, int, float, bool, dict, list)):
+        if v is None or isinstance(v, str | int | float | bool | dict | list):
             return v
         if isinstance(v, Enum):
             return v.value

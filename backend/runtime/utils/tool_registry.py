@@ -188,7 +188,7 @@ class ToolRegistry:
         try:
             result = subprocess.run(
                 [command, *args],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -204,7 +204,7 @@ class ToolRegistry:
         try:
             result = subprocess.run(
                 [command, *args],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -224,7 +224,7 @@ class ToolRegistry:
                     "-Command",
                     "$PSVersionTable.PSVersion.ToString()",
                 ],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -239,14 +239,13 @@ class ToolRegistry:
         try:
             result = subprocess.run(
                 ["bash", "--version"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
             if result.returncode == 0:
                 # Extract version from first line
-                first_line = result.stdout.split("\n")[0]
-                return first_line
+                return result.stdout.split("\n")[0]
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
         return None

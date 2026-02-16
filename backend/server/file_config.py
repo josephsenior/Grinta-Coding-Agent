@@ -47,7 +47,7 @@ def load_file_upload_config(
             "Invalid max_file_size_mb: %s. Setting to 0 (no limit).", max_file_size_mb
         )
         max_file_size_mb = 0
-    if not isinstance(allowed_extensions, (list, set)) or not allowed_extensions:
+    if not isinstance(allowed_extensions, list | set) or not allowed_extensions:
         logger.warning(
             'Invalid allowed_extensions: %s. Setting to [".*"].', allowed_extensions
         )

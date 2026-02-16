@@ -322,39 +322,34 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             # SECURE API KEY HANDLING - Use the new API key manager
             key_val = ""
             if self.api_key is not None:
-                try:
-                    key_val = self.api_key.get_secret_value()
-                except AttributeError:
-                    key_val = str(self.api_key)
+                # Pydantic ensures api_key is always SecretStr | None, so get_secret_value always exists
+                key_val = self.api_key.get_secret_value()
 
             has_explicit_key = bool(key_val and key_val.strip())
             object.__setattr__(self, "_has_explicit_api_key", has_explicit_key)
 
             if not has_explicit_key:
-                try:
-                    # Get the correct API key for this model/provider
-                    correct_api_key = api_key_manager.get_api_key_for_model(
-                        self.model, self.api_key
-                    )
+                # Get the correct API key for this model/provider
+                correct_api_key = api_key_manager.get_api_key_for_model(
+                    self.model, self.api_key
+                )
 
-                    if correct_api_key:
-                        self.api_key = correct_api_key
-                        logger.debug("Set correct API key for model: %s", self.model)
+                if correct_api_key:
+                    self.api_key = correct_api_key
+                    logger.debug("Set correct API key for model: %s", self.model)
+                else:
+                    # Try to set from environment as fallback
+                    provider = api_key_manager._extract_provider(self.model)
+                    env_key = api_key_manager._get_provider_key_from_env(provider)
+                    if env_key:
+                        self.api_key = SecretStr(env_key)
+                        logger.debug(
+                            "Loaded API key from environment for %s", provider
+                        )
                     else:
-                        # Try to set from environment as fallback
-                        provider = api_key_manager._extract_provider(self.model)
-                        env_key = api_key_manager._get_provider_key_from_env(provider)
-                        if env_key:
-                            self.api_key = SecretStr(env_key)
-                            logger.debug(
-                                "Loaded API key from environment for %s", provider
-                            )
-                        else:
-                            logger.warning(
-                                "No API key available for model: %s", self.model
-                            )
-                except Exception as e:
-                    logger.error("Error in API key handling: %s", e)
+                        logger.warning(
+                            "No API key available for model: %s", self.model
+                        )
 
             # ALWAYS sync with api_key_manager if we have a key (explicit or loaded)
             if self.api_key:
@@ -364,21 +359,11 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         # CRITICAL: Clean base_url to prevent protocol errors
         self._clean_base_url()
 
-        # Set provider-specific environment variables
-        self._set_provider_environment_variables()
-
         # Configure model-specific settings
         self._configure_model_defaults()
 
-    def _set_provider_environment_variables(self) -> None:
-        """Set provider-specific environment variables."""
-        return None
-
     def _clean_base_url(self) -> None:
         """Clean base_url and other parameters using provider-aware validation."""
-        if not self.model:
-            return
-
         provider = api_key_manager._extract_provider(self.model)
         provider_config = provider_config_manager.get_provider_config(provider)
 

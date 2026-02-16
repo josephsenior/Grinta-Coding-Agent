@@ -20,6 +20,7 @@ Complete guide to using Forge for everyday coding tasks.
 1. **Windows**: Run `.\START_HERE.ps1` in PowerShell (installs everything automatically)
 2. **Manual**: Run `poetry install` then `python start_server.py`
 3. **TUI**: Run `python -m backend.tui` in a separate terminal
+4. **TUI (dev mode)**: Run `python -m backend.tui --dev` for hot-reload on code changes
 
 ### Initial Configuration
 
@@ -338,6 +339,16 @@ type = "noop"
 - **Best for**: Debugging condenser issues, short sessions only
 - **Warning**: Will hit context limits on long sessions
 
+#### 6. Auto Condenser (Task-Aware)
+```toml
+[condenser]
+type = "auto"
+```
+- **What it does**: Analyzes task signals (history length, error rate, browse frequency) and picks the optimal condenser strategy automatically
+- **Best for**: Mixed workloads where different tasks benefit from different strategies
+- **How it works**: Computes signals from the event history, then selects between `recent`, `observation_masking`, `llm`, `smart`, or other strategies based on thresholds
+- **Thresholds**: Short sessions (≤30 events) → `noop`, medium (≤150) → `recent`, browse-heavy → `observation_masking`, high error rate → `llm` summarization, long sessions → `smart`
+
 ### Advanced Memory Settings
 
 #### Multiple LLM Configs
@@ -539,6 +550,7 @@ Check if Forge is running properly:
 2. **Optimize for your workflow**:
    - **Short tasks**: Use `noop` condenser
    - **Long sessions**: Use `smart` or `llm` condenser
+   - **Mixed workloads**: Use `auto` condenser
    - **Cost-conscious**: Use `recent` condenser + local models
 
 3. **Tune safety vs speed**:

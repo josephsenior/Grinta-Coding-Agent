@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
-from pydantic import (  # noqa: E402
+from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
@@ -16,12 +16,12 @@ from pydantic import (  # noqa: E402
     field_validator,
     model_validator,
 )
-from pydantic.json import pydantic_encoder  # noqa: E402
+from pydantic.json import pydantic_encoder
 
-from backend.core.config.mcp_config import MCPConfig  # noqa: E402
-from backend.core.config.utils import load_FORGE_config  # noqa: E402
-from backend.storage.data_models.knowledge_base import KnowledgeBaseSettings  # noqa: E402
-from backend.storage.data_models.user_secrets import UserSecrets  # noqa: E402
+from backend.core.config.mcp_config import MCPConfig
+from backend.core.config.utils import load_FORGE_config
+from backend.storage.data_models.knowledge_base import KnowledgeBaseSettings
+from backend.storage.data_models.user_secrets import UserSecrets
 try:
     from unittest.mock import Mock
 except ImportError:  # pragma: no cover
@@ -235,7 +235,7 @@ class Settings(BaseModel):
         _settings_from_config_cache = None
         _settings_from_config_cache_time = current_time
         _settings_from_config_cache_loader_id = id(load_FORGE_config)
-        return None
+        return
 
     @staticmethod
     def _get_cached_settings(current_time: float) -> Settings | None:

@@ -7,11 +7,13 @@ from enum import Enum
 
 
 class QuotaPlan(str, Enum):
-    """User quota plans."""
+    """User quota plan.
 
-    FREE = "free"
-    PRO = "pro"
-    ENTERPRISE = "enterprise"
+    Forge is a local-first, single-user application so only UNLIMITED
+    is supported.  The enum is kept for backward compatibility with the
+    cost-tracking infrastructure.
+    """
+
     UNLIMITED = "unlimited"
 
 

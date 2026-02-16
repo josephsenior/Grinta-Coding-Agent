@@ -33,7 +33,7 @@ async def replay_events(
         event_count += 1
         logger.debug("forge_event: %s", event.__class__.__name__)
 
-        if isinstance(event, (NullAction, NullObservation, RecallAction)):
+        if isinstance(event, NullAction | NullObservation | RecallAction):
             continue
 
         if isinstance(event, AgentStateChangedObservation):
@@ -94,11 +94,10 @@ async def send_agent_state(
                     "forge_event", event_to_dict(current_state), to=connection_id
                 )
                 return True
-            else:
-                logger.warning(
-                    "No agent state found in agent_loop_info for conversation %s",
-                    conversation_id,
-                )
+            logger.warning(
+                "No agent state found in agent_loop_info for conversation %s",
+                conversation_id,
+            )
     except Exception as e:
         logger.error("Error getting agent state from conversation manager: %s", e)
 

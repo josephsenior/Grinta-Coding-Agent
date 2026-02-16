@@ -172,10 +172,9 @@ class WhitespaceHandler:
         # Validate result (should be 2, 4, or 8)
         if result in {2, 4, 8}:
             return result
-        elif result == 1:
+        if result == 1:
             return 4  # Default
-        else:
-            return result if result < 8 else 4
+        return result if result < 8 else 4
 
     @staticmethod
     def _styles_match(current: IndentConfig, target: IndentConfig) -> bool:
@@ -205,8 +204,7 @@ class WhitespaceHandler:
         """
         if config.style == IndentStyle.TABS:
             return leading_ws  # Each tab = 1 level
-        else:
-            return leading_ws // config.size
+        return leading_ws // config.size
 
     @staticmethod
     def _apply_target_indent(indent_level: int, target_config: IndentConfig) -> str:
@@ -222,8 +220,7 @@ class WhitespaceHandler:
         """
         if target_config.style == IndentStyle.TABS:
             return "\t" * indent_level
-        else:
-            return " " * (indent_level * target_config.size)
+        return " " * (indent_level * target_config.size)
 
     @staticmethod
     def _normalize_line_indent(
@@ -373,8 +370,7 @@ class WhitespaceHandler:
 
         if config.style == IndentStyle.TABS:
             return leading_ws
-        else:
-            return leading_ws // config.size
+        return leading_ws // config.size
 
     @staticmethod
     def _get_min_indent(lines: list[str], config: IndentConfig) -> int:
@@ -505,6 +501,5 @@ class WhitespaceHandler:
         code = WhitespaceHandler.ensure_final_newline(code)
 
         # Remove multiple consecutive blank lines (max 2)
-        code = re.sub(r"\n{4,}", "\n\n\n", code)
+        return re.sub(r"\n{4,}", "\n\n\n", code)
 
-        return code

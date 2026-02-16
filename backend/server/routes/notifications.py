@@ -319,14 +319,13 @@ async def list_notifications(
         all_notifications = await store.get_notifications(user_id, read=read)
         total = len(all_notifications)
 
-        paginated = PaginatedResponse.create(
+        return PaginatedResponse.create(
             items=[n.model_dump() for n in notifications],
             page=params.page,
             limit=params.limit,
             total=total,
         )
         # PaginatedResponse is a Pydantic model, FastAPI can serialize it directly
-        return paginated
 
     except Exception as e:
         logger.error("Error listing notifications: %s", e, exc_info=True)

@@ -5,105 +5,133 @@
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-**Forge** is an open-source AI coding platform built for long-running, autonomous coding sessions.
-It pairs a **Textual TUI** with a **FastAPI + Socket.IO** backend and ships with
-event-sourced session resilience, configurable safety & budget controls, and a 23-tool agent engine.
+**Forge** is a high-performance, open-source AI coding platform built for deep, autonomous coding sessions.
+It pairs a **Textual TUI** with a **FastAPI + Socket.IO** backend, shipping with
+event-sourced session resilience, 12 context condensers, and a 23-tool agent engine.
 
 ---
 
-## Highlights
+## Why Forge?
 
-| | Feature | Details |
-|---|---|---|
-| 🧠 | **Agent Engine** | CodeAct orchestrator with 23 tools, anti-hallucination system, and task planning |
-| 🔁 | **Event-Sourced Sessions** | WAL crash recovery, backpressure-aware streams, full replay |
-| 🛡️ | **Safety & Budget** | Circuit breaker, 6-strategy stuck detector, per-task cost caps ($5 default) |
-| 🧩 | **12 Context Condensers** | Smart, LLM, semantic, amortized, attention, sliding window, and more |
-| 🌐 | **Multi-LLM** | OpenAI, Anthropic, Google Gemini — swap with one config change |
-| 🔌 | **MCP Integration** | Model Context Protocol client for external tool servers |
-| 🎭 | **Playbooks** | 19 built-in playbooks for common workflows |
-| 🌳 | **Structure-Aware Editing** | Tree-sitter parsing across 45+ languages |
-| 📡 | **Real-Time Streaming** | Socket.IO with reconnection, room management, event namespacing |
-| 🖥️ | **Textual TUI** | Native terminal interface — zero Node.js / browser required |
+- **Built for Scale:** Handles thousands of events per session with an event-sourced backbone.
+- **Resilient by Design:** Write-Ahead Logging (WAL) and backpressure-aware streams ensure zero event loss, even on process crashes.
+- **Expert Memory:** 12 distinct [context condenser](docs/CONDENSERS.md) strategies (Smart, Semantic, LLM, etc.) and an auto-selector pick the right memory for every task.
+- **Safety First:** Multi-trip circuit breakers, 6-strategy stuck detection, and per-task cost caps keep your budget and system safe.
+- **Local-First:** Native Ollama and OpenAI-compatible support for zero-cost, private coding.
+- **No-Node TUI:** A full-featured terminal interface built entirely in Python (Textual) — zero JavaScript required.
 
-## Architecture
+---
 
-```
-TUI (Textual)  ←→  Server (FastAPI + Socket.IO)
-                           ↓
-                   AgentController (21 services)
-                           ↓
-                   Orchestrator Engine (23 tools)
-                           ↓
-                   EventStream (WAL + backpressure)
-                           ↓
-                   Memory (12 condensers) + Storage
-```
+## 🏗️ Architecture
 
-For the full walkthrough, see [ARCHITECTURE.md](ARCHITECTURE.md).
+```mermaid
+graph TB
+    subgraph TUI["TUI (Textual)"]
+        Screens[Screens]
+        Client[ForgeClient]
+    end
 
-## Quick Start
+    subgraph Server["Server (FastAPI)"]
+        APP[FastAPI App/Socket.IO]
+        SM[Session Manager]
+    end
 
-> **Windows?** Run `.\START_HERE.ps1` at the repo root — it starts the server and TUI.
+    subgraph Controller["Agent Controller"]
+        AC[AgentController]
+        Services[21 Services]
+        Safety[Circuit Breaker / Stuck Detector]
+    end
 
-### Prerequisites
+    subgraph Engine["Agent Engine"]
+        ORCH[Orchestrator / CodeAct]
+        Tools[23 Tools]
+    end
 
-- Python 3.12+
-- [Poetry](https://python-poetry.org/docs/#installation)
+    subgraph Events["Event System"]
+        ES[EventStream]
+        WAL[WAL / Persistence]
+    end
 
-### Backend
-
-```bash
-poetry install
-python start_server.py        # http://localhost:3000
-```
-
-### TUI (separate terminal)
-
-```bash
-python -m backend.tui          # or: forge-tui
+    UI <-->|Socket.IO| Server
+    Server --> AC
+    AC --> Engine
+    Engine --> Tools
+    AC --> ES
+    ES --> WAL
 ```
 
-See [QUICK_START.md](QUICK_START.md) for a more detailed guide.
+See the [Architecture Deep Dive](ARCHITECTURE.md) for a full walkthrough of the 21 services and 23 tools.
 
-## Configuration
+---
 
-Runtime configuration loads from `config.toml` and environment variables.
-Start from:
+## 🚀 Quick Start
 
-- [config.template.toml](config.template.toml) — copy to `config.toml`
-- [backend/core/config/README.md](backend/core/config/README.md) — full reference
+### 🪟 Windows (Recommended)
+Run the bootstrap script at the repository root. It installs dependencies, sets up the environment, and starts both the server and the TUI:
 
-## Commands
-
-| Command | Purpose |
-|---|---|
-| `poetry run pytest backend/tests` | Backend tests |
-| `python -m backend.tui` | Launch TUI |
-| `forge-tui --port 3000` | Launch TUI (script entry) |
-
-## Project Structure
-
-```
-backend/
-├── controller/     # Agent loop orchestration (21 services)
-├── engines/        # Agent engines (orchestrator, auditor, navigator)
-├── events/         # Event sourcing, WAL, backpressure
-├── memory/         # Context condensers, RAG, vector store
-├── server/         # FastAPI app, routes, middleware, Socket.IO
-├── storage/        # File, PostgreSQL, SQLite storage
-├── tui/            # Textual TUI (screens, widgets, client)
-└── core/           # Config, exceptions, schemas, logging
+```powershell
+.\START_HERE.ps1
 ```
 
-## Authentication
+### 🐧 Linux / macOS / Manual
+1. **Prerequisites:** Python 3.12+ and [Poetry](https://python-poetry.org/docs/#installation).
+2. **Install:** `poetry install`
+3. **Start Backend:** `python start_server.py` (Defaults to http://localhost:3000)
+4. **Start TUI:** `python -m backend.tui` in a new terminal.
 
-HTTP and Socket.IO share the same auth model. See [docs/AUTH.md](docs/AUTH.md).
+---
 
-## Contributing
+## 🤖 LLM Support
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, architecture reference, and contribution workflow.
+Forge works with world-class cloud models and private local models out of the box.
 
-## License
+### Cloud Models
+Configure in `config.toml`:
+- **Anthropic**: `claude-3-5-sonnet-20241022` (Recommended)
+- **OpenAI**: `gpt-4o`, `gpt-4o-mini`
+- **Google**: `gemini-1.5-pro`, `gemini-1.5-flash`
 
-MIT — see [LICENSE](LICENSE).
+### Local Models (Ollama)
+Forge handles Ollama automatically. Just pull a model and set it in your config:
+1. `ollama pull llama3.2`
+2. Set `model = "ollama/llama3.2"` in `config.toml`.
+3. No API key or base URL required — Forge detects the prefix and routes to `localhost:11434`.
+
+---
+
+## 🛠️ Key Concepts
+
+### 12 Context Condensers
+Stop running out of tokens. Forge uses specialized "condensers" to compress conversation history:
+- **Smart/Auto**: Dynamically switches strategies based on task signals.
+- **LLM Summary**: Uses a cheaper model to intelligently summarize history.
+- **Observation Masking**: Keeps the event structure but hides bulky command outputs.
+- **Semantic**: Uses embeddings to find and keep relevant past interactions.
+
+### 23 Specialized Tools
+From `str_replace_editor` (tree-sitter aware) to `browser` automation and `database` access, the agent has everything it needs to build complex apps.
+
+### 6-Strategy Stuck Detection
+Forge detects if the agent is looping by analyzing action patterns, semantic intent, cost acceleration, and token repetition. The circuit breaker then safely pauses the agent for your review.
+
+---
+
+## 📖 Documentation
+
+- [User Guide](USER_GUIDE.md) — LLM setup, autonomy modes, playbooks, and TUI usage.
+- [Architecture](ARCHITECTURE.md) — Deeper dive into the controller, events, and engine layers.
+- [Developer Guide](DEVELOPER.md) — For contributors: project layout, internals, and patterns.
+- [API Reference](openapi.json) — Full OpenAPI 3.1 spec for the backend.
+- [Contributing](CONTRIBUTING.md) — How to add new tools, condensers, or features.
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and our architecture-first development workflow.
+
+---
+
+## ⚖️ License
+
+MIT — See [LICENSE](LICENSE).

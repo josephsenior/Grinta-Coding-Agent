@@ -103,13 +103,12 @@ async def get_runtime_config(
             return JSONResponse(
                 content={"runtime_id": runtime_id, "session_id": session_id}
             )
-        else:
-            return error(
-                message="Conversation not found",
-                status_code=status.HTTP_404_NOT_FOUND,
-                error_code="CONVERSATION_NOT_FOUND",
-                request=request,
-            )
+        return error(
+            message="Conversation not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+            error_code="CONVERSATION_NOT_FOUND",
+            request=request,
+        )
     except Exception as e:
         logger.error("Error getting runtime config: %s", e, exc_info=True)
         return error(

@@ -143,7 +143,7 @@ class SafePath:
         """Compare paths."""
         if isinstance(other, SafePath):
             return self._path == other._path
-        if isinstance(other, (str, Path)):
+        if isinstance(other, str | Path):
             return self._path == Path(other)
         return False
 

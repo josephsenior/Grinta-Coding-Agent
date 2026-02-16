@@ -12,11 +12,9 @@ import random
 import time
 from typing import TYPE_CHECKING
 
-from backend.core.enums import QuotaPlan
 from backend.core.logger import FORGE_logger as logger
 from backend.core.logger import get_trace_context
 from backend.server.middleware.cost_quota import (
-    QUOTA_CONFIGS,
     CostQuotaMiddleware,
     QuotaConfig,
     RedisQuotaKeys,
@@ -53,7 +51,6 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
         self,
         redis_url: str | None = None,
         enabled: bool = True,
-        default_plan: QuotaPlan = QuotaPlan.FREE,
         connection_pool_size: int = 10,
         connection_timeout: float = 5.0,
         fallback_enabled: bool = True,
@@ -62,14 +59,13 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
 
         Args:
             redis_url: Redis connection URL (defaults to REDIS_URL env var)
-            enabled: Whether cost quota enforcement is enabled
-            default_plan: Default plan for users
+            enabled: Whether cost tracking is enabled
             connection_pool_size: Redis connection pool size
             connection_timeout: Redis connection timeout in seconds
             fallback_enabled: Fall back to in-memory if Redis unavailable
 
         """
-        super().__init__(enabled, default_plan)
+        super().__init__(enabled)
         env_url = os.getenv("REDIS_URL")
         self.redis_url: str = redis_url or env_url or "redis://localhost:6379"
         self.connection_pool_size = connection_pool_size
@@ -83,9 +79,8 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
 
         if enabled:
             logger.info(
-                "RedisCostQuotaMiddleware initialized with default plan: %s, "
+                "RedisCostQuotaMiddleware initialized, "
                 "redis_url: %s, pool_size: %s",
-                default_plan,
                 self.redis_url,
                 connection_pool_size,
             )
@@ -255,16 +250,16 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             )
         return allowed
 
-    async def _check_quota(self, key: str, plan: QuotaPlan) -> bool:
+    async def _check_quota(self, key: str) -> bool:
         """Check quota using Redis."""
         redis_client = await self._get_redis_client()
 
         if redis_client is None:
-            return await super()._check_quota(key, plan)
+            return await super()._check_quota(key)
 
         try:
             current_time = time.time()
-            config = QUOTA_CONFIGS[plan]
+            config = self.config
             redis_keys = self._redis_keys(key)
 
             daily_cost = await self._window_cost(
@@ -286,24 +281,24 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
 
             if self._should_instrument_redis():
                 self._record_quota_span(
-                    key, plan, config, daily_cost, monthly_cost, allowed
+                    key, config, daily_cost, monthly_cost, allowed
                 )
 
             return allowed
 
         except Exception as exc:
-            return await self._handle_redis_check_failure(exc, key, plan)
+            return await self._handle_redis_check_failure(exc, key)
 
-    async def _get_remaining_quota(self, key: str, plan: QuotaPlan) -> dict[str, float]:
+    async def _get_remaining_quota(self, key: str) -> dict[str, float]:
         """Get remaining quota using Redis."""
         redis_client = await self._get_redis_client()
 
         if redis_client is None:
-            return await super()._get_remaining_quota(key, plan)
+            return await super()._get_remaining_quota(key)
 
         try:
             current_time = time.time()
-            config = QUOTA_CONFIGS[plan]
+            config = self.config
             redis_keys = self._redis_keys(key)
 
             daily_cost = await self._window_cost(
@@ -330,7 +325,7 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             logger.error(
                 "Redis remaining quota check failed: %s. Falling back to in-memory.", e
             )
-            return await super()._get_remaining_quota(key, plan)
+            return await super()._get_remaining_quota(key)
 
     # ------------------------------------------------------------------
     # Cost recording
@@ -437,12 +432,11 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             sample_rate = max(0.0, min(1.0, float(sample_str)))
         except Exception:
             sample_rate = 1.0
-        return random.random() < sample_rate  # noqa: S311
+        return random.random() < sample_rate
 
     def _record_quota_span(
         self,
         key: str,
-        plan: QuotaPlan,
         config: QuotaConfig,
         daily_cost: float,
         monthly_cost: float,
@@ -458,7 +452,6 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
         with tracer.start_as_current_span("quota.check", kind=_SpanKind.CLIENT) as span:
             span.set_attribute("db.system", "redis")
             span.set_attribute("quota.key", key)
-            span.set_attribute("quota.plan", plan.value)
             span.set_attribute("quota.daily.cost", float(daily_cost))
             span.set_attribute("quota.monthly.cost", float(monthly_cost))
             span.set_attribute("quota.daily.limit", float(config.daily_limit))
@@ -472,7 +465,6 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
         self,
         exc: Exception,
         key: str,
-        plan: QuotaPlan,
     ) -> bool:
         logger.error(
             "Redis quota check failed: %s. %s",
@@ -482,7 +474,7 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             else "Blocking request (fail-closed).",
         )
         if self.fallback_enabled:
-            return await super()._check_quota(key, plan)
+            return await super()._check_quota(key)
         return False
 
     def _maybe_instrument_cost_record(self, key: str, cost: float) -> None:

@@ -4,11 +4,11 @@
 from backend.controller.agent import Agent
 
 from . import (
-    auditor,  # noqa: F401
-    echo,  # noqa: F401
-    locator,  # noqa: F401
-    navigator,  # noqa: F401
-    orchestrator,  # noqa: F401
+    auditor,
+    echo,
+    locator,
+    navigator,
+    orchestrator,
 )
 
 __all__ = [

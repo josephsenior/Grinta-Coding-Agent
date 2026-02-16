@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Coroutine
+from typing import Any
+from collections.abc import Callable, Coroutine
 from urllib.parse import ParseResult, urlparse
 
 import aiohttp

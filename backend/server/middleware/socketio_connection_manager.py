@@ -1,10 +1,11 @@
 """Socket.IO connection management and message queuing.
 
 Provides:
-- Connection health monitoring
+- Connection health monitoring with heartbeat tracking
 - Message queuing for disconnected clients
 - Presence awareness
 - Connection limits per user/IP
+- Stale connection detection and cleanup
 """
 
 from __future__ import annotations
@@ -19,6 +20,11 @@ from backend.core.logger import FORGE_logger as logger
 if TYPE_CHECKING:
     import socketio  # type: ignore[import-untyped]
 
+# ---------------------------------------------------------------------------
+# Heartbeat configuration
+# ---------------------------------------------------------------------------
+_HEARTBEAT_STALE_THRESHOLD = 90  # seconds — consider stale if no ping received
+
 
 @dataclass
 class ConnectionInfo:
@@ -29,6 +35,7 @@ class ConnectionInfo:
     conversation_id: str | None = None
     connected_at: float = field(default_factory=time.time)
     last_activity: float = field(default_factory=time.time)
+    last_heartbeat: float = field(default_factory=time.time)
     message_queue: deque = field(default_factory=deque)
     max_queue_size: int = 100
 
@@ -268,6 +275,54 @@ class SocketIOConnectionManager:
             logger.info("Cleaned up %s idle connections", len(to_remove))
 
         return len(to_remove)
+
+    # ── heartbeat tracking ────────────────────────────────────────
+
+    def record_heartbeat(self, sid: str) -> None:
+        """Record a heartbeat ping from a client.
+
+        Args:
+            sid: Socket session ID
+        """
+        conn_info = self._connections.get(sid)
+        if conn_info:
+            conn_info.last_heartbeat = time.time()
+            conn_info.last_activity = time.time()
+
+    def get_stale_connections(
+        self,
+        stale_threshold: float = _HEARTBEAT_STALE_THRESHOLD,
+    ) -> list[str]:
+        """Return SIDs that have not sent a heartbeat within *stale_threshold*.
+
+        Args:
+            stale_threshold: Seconds since last heartbeat to consider stale.
+
+        Returns:
+            List of stale socket session IDs.
+        """
+        now = time.time()
+        return [
+            sid
+            for sid, info in self._connections.items()
+            if now - info.last_heartbeat > stale_threshold
+        ]
+
+    def cleanup_stale_connections(
+        self,
+        stale_threshold: float = _HEARTBEAT_STALE_THRESHOLD,
+    ) -> int:
+        """Unregister connections that have not sent a heartbeat recently.
+
+        Returns:
+            Number of connections removed.
+        """
+        stale = self.get_stale_connections(stale_threshold)
+        for sid in stale:
+            self.unregister_connection(sid)
+        if stale:
+            logger.info("Cleaned up %d stale (no heartbeat) connections", len(stale))
+        return len(stale)
 
 
 # Global connection manager instance

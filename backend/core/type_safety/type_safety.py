@@ -6,7 +6,7 @@ common bugs and security issues.
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -75,7 +75,7 @@ class PositiveInt(int):
         return cls(value)
 
 
-class SafeList(list[T], Generic[T]):
+class SafeList[T](list[T]):
     """List wrapper with bounds checking and safety features.
 
     Provides safe list operations that prevent index errors and
@@ -120,7 +120,7 @@ class SafeList(list[T], Generic[T]):
         return SafeList(self[start:end])
 
 
-class SafeDict(dict[str, T], Generic[T]):
+class SafeDict[T](dict[str, T]):
     """Dictionary wrapper with type safety and safe access.
 
     Provides safe dictionary operations with better error handling.

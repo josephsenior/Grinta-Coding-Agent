@@ -132,9 +132,8 @@ def main():
         print("  Update routes to use create_versioned_router() or /api/v1/ prefix")
         print("  Add explicit redirects during beta")
         return 1
-    else:
-        print(f"\n{GREEN}✅ All routes support versioning!{RESET}")
-        return 0
+    print(f"\n{GREEN}✅ All routes support versioning!{RESET}")
+    return 0
 
 
 if __name__ == "__main__":
