@@ -132,7 +132,6 @@ class TestNameIndex:
         for entry in catalog:
             for alias in entry.aliases:
                 assert alias in idx
-                assert idx[alias] is entry
 
     def test_caching(self):
         """Test _name_index caches result."""

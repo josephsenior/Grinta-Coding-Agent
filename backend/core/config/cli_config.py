@@ -9,7 +9,10 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-import toml
+try:
+    import tomllib  # Python 3.11+
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]
 
 from backend.core import logger
 from backend.core.config.forge_config import ForgeConfig
@@ -22,12 +25,12 @@ if TYPE_CHECKING:
 def _load_toml_config(toml_file: str) -> dict | None:
     """Load and parse TOML configuration file."""
     try:
-        with open(toml_file, encoding="utf-8") as toml_contents:
-            return toml.load(toml_contents)
+        with open(toml_file, "rb") as toml_contents:
+            return tomllib.load(toml_contents)
     except FileNotFoundError as e:
         logger.FORGE_logger.error("Config file not found: %s. Error: %s", toml_file, e)
         return None
-    except toml.TomlDecodeError as e:
+    except Exception as e:
         logger.FORGE_logger.error(
             "Cannot parse config file %s. Exception: %s", toml_file, e
         )

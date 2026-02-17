@@ -59,7 +59,7 @@ class TestExtractProvider:
         assert self.mgr._extract_provider("my-gpt-variant") == "openai"
 
     def test_truly_unknown(self):
-        assert self.mgr._extract_provider("mistral-large-2") == "unknown"
+        assert self.mgr._extract_provider("mistral-large-2") == "mistral"
 
 
 # ===================================================================

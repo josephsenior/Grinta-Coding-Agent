@@ -374,7 +374,7 @@ async def load_settings(
     settings: Annotated[Settings, Depends(get_user_settings)],
     secrets_store: Annotated[Any, Depends(get_secrets_store)],
     user_id: Annotated[str | None, Depends(get_user_id)] = None,
-) -> GETSettingsModel | JSONResponse:
+) -> Any:
     """Load user settings with token status information.
 
     🚀 PERFORMANCE OPTIMIZED: 60s cache with proper per-user key for 2-3x improvement.
@@ -545,6 +545,14 @@ async def store_llm_settings(
     return settings
 
 
+@router.patch(
+    "/settings",
+    response_model=None,
+    responses={
+        200: {"description": "Settings patched successfully", "model": dict},
+        500: {"description": "Error patching settings", "model": dict},
+    },
+)
 @router.post(
     "/settings",
     response_model=None,

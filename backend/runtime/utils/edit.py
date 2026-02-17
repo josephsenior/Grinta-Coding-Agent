@@ -22,7 +22,7 @@ from backend.events.observation import (
     FileWriteObservation,
     Observation,
 )
-from backend.linter import DefaultLinter
+from backend.code_quality import DefaultLinter
 from backend.runtime.utils.diff import get_diff
 from backend.utils.chunk_localizer import Chunk, get_top_k_chunk_matches
 

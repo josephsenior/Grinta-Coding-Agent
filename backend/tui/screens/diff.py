@@ -7,7 +7,7 @@ from typing import Any
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import VerticalScroll
+from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
     Footer,
@@ -40,7 +40,7 @@ class DiffFileItem(ListItem):
 
 
 class DiffScreen(Screen[None]):
-    """Two-panel diff viewer: file list on the left, diff content on the right.
+    """Two-panel diff viewer: file list on left, diff content on right.
 
     Fetches workspace changes from ``GET /api/git/changes`` and individual
     diffs from ``GET /api/git/diff``.
@@ -92,8 +92,6 @@ class DiffScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        from textual.containers import Horizontal
-
         with Horizontal(id="diff-outer"):
             yield ListView(id="file-list")
             yield VerticalScroll(
@@ -117,7 +115,9 @@ class DiffScreen(Screen[None]):
             return
 
         if not self._changes:
-            file_list.mount(Static("No workspace changes", classes="empty-diff"))
+            await file_list.mount(
+                Static("No workspace changes", classes="empty-diff")
+            )
             return
 
         for change in self._changes:
@@ -134,33 +134,33 @@ class DiffScreen(Screen[None]):
 
     async def _show_diff(self, filepath: str) -> None:
         container = self.query_one("#diff-content", VerticalScroll)
-        # Clear existing content
         await container.remove_children()
 
         try:
             diff_data = await self.client.get_file_diff(self.conversation_id, filepath)
         except Exception as e:
-            container.mount(Static(f"Error: {e}", classes="empty-diff"))
+            await container.mount(Static(f"Error: {e}", classes="empty-diff"))
             return
 
         diff_text: str = str(diff_data.get("diff", diff_data.get("content", "")))
         if not diff_text:
-            container.mount(Static("No diff content available", classes="empty-diff"))
+            await container.mount(
+                Static("No diff content available", classes="empty-diff")
+            )
             return
 
         # Render as coloured diff lines
         lines = diff_text.splitlines()
-
-        container.mount(Static(f"── {filepath} ──", classes="diff-line-hdr"))
+        await container.mount(Static(f"── {filepath} ──", classes="diff-line-hdr"))
         for line in lines:
             if line.startswith(("+++", "---", "@@")):
-                container.mount(Static(line, classes="diff-line-hdr"))
+                await container.mount(Static(line, classes="diff-line-hdr"))
             elif line.startswith("+"):
-                container.mount(Static(line, classes="diff-line-add"))
+                await container.mount(Static(line, classes="diff-line-add"))
             elif line.startswith("-"):
-                container.mount(Static(line, classes="diff-line-del"))
+                await container.mount(Static(line, classes="diff-line-del"))
             else:
-                container.mount(Static(line, classes="diff-line-ctx"))
+                await container.mount(Static(line, classes="diff-line-ctx"))
 
     # ── actions ───────────────────────────────────────────────────
 

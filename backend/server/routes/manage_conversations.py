@@ -205,7 +205,7 @@ async def new_conversation(
     user_secrets: Annotated[UserSecrets | None, Depends(get_user_secrets)] = None,
     auth_type: Annotated[AuthType | None, Depends(get_auth_type)] = None,
     settings: Annotated[Settings | None, Depends(get_user_settings)] = None,
-) -> ConversationResponse | JSONResponse:
+) -> Any:
     """Initialize a new session or join an existing one."""
     logger.info("initializing_new_conversation - parsed data: %s", data)
 
@@ -326,7 +326,7 @@ async def search_conversations_route(
     conversation_trigger: ConversationTrigger | None = Query(
         None, description="Filter by conversation trigger type"
     ),
-) -> ConversationInfoResultSet | JSONResponse:
+) -> Any:
     """HTTP endpoint to paginate conversation metadata with optional filters."""
     try:
         user_id = get_user_id(request)
@@ -374,7 +374,7 @@ search_conversations = _search_conversations_impl
 async def _get_conversation_route(
     request: Request,
     conversation_id: str = Depends(validate_conversation_id),
-) -> ConversationInfo | JSONResponse:
+) -> Any:
     user_id = get_user_id(request)
     conversation_store = await get_conversation_store(request)
     result = await get_conversation_details(
@@ -425,7 +425,7 @@ async def start_conversation(
     ] = None,
     settings: Settings = Depends(get_user_settings),
     conversation_store: Annotated[Any | None, Depends(get_conversation_store)] = None,
-) -> ConversationResponse | JSONResponse:
+) -> Any:
     """Start an agent loop for a conversation."""
     logger.info("=== START CONVERSATION ENDPOINT CALLED ===")
     logger.info("conversation_id: %s", conversation_id)
@@ -471,7 +471,7 @@ async def start_conversation(
 async def stop_conversation(
     conversation_id: Annotated[str, Depends(validate_conversation_id)],
     user_id: Annotated[str, Depends(get_user_id)],
-) -> ConversationResponse | JSONResponse:
+) -> Any:
     """Stop an agent loop for a conversation."""
     logger.info("Stopping conversation: %s", conversation_id)
     try:
@@ -503,7 +503,7 @@ async def update_conversation(
     conversation_id: Annotated[str, Depends(validate_conversation_id)],
     user_id: Annotated[str | None, Depends(get_user_id)],
     conversation_store: Annotated[Any | None, Depends(get_conversation_store)] = None,
-) -> bool | JSONResponse:
+) -> Any:
     """Update conversation metadata (title)."""
     logger.info(
         "Updating conversation %s with title: %s",
@@ -553,7 +553,7 @@ async def get_playbook_management_conversations(
     provider_tokens: Annotated[
         PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
     ] = None,
-) -> ConversationInfoResultSet | JSONResponse:
+) -> Any:
     """Get conversations for the playbook management page with pagination."""
     return await search_playbook_conversations(
         selected_repository=selected_repository,

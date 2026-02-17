@@ -24,11 +24,17 @@ def check_session_api_key(
 
     Having this as a dependency means it appears in OpenAPI Docs.
     """
+    # 0) Bypass if local runtime
+    import os
+    if os.environ.get("FORGE_RUNTIME") == "local":
+        return
+
     # Resolve expected key from the live server config (not an import-time env snapshot)
     from backend.server.middleware.token_auth import get_session_api_key
 
     expected_key = get_session_api_key()
     if not expected_key:
+        # Session API Key is explicitly disabled (empty string)
         return
 
     # 1) Header (preferred)

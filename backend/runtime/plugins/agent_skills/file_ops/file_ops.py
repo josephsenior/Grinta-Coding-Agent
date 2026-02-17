@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 
-from backend.linter import DefaultLinter, LintResult
+from backend.code_quality import DefaultLinter, LintResult
 
 CURRENT_FILE: str | None = None
 CURRENT_LINE = 1

@@ -226,6 +226,8 @@ def check_unknown_sections(toml_config: dict, toml_file: str) -> None:
         "runtime",
         "condenser",
         "mcp",
+        "model_aliases",
+        "api_keys",
     }
     for key in toml_config:
         if key.lower() not in known_sections:

@@ -12,6 +12,7 @@ from backend.llm.exceptions import (
     InternalServerError,
     RateLimitError,
     ServiceUnavailableError,
+    Timeout,
 )
 from backend.llm.llm import (
     _map_anthropic_exception,
@@ -83,8 +84,8 @@ class TestMapOpenAIException:
             exc = openai.APITimeoutError(request=mock_request)
             result = _map_openai_exception(exc, model="gpt-4")
 
-            # APITimeoutError maps to APIConnectionError in the actual code
-            assert isinstance(result, APIConnectionError)
+            # APITimeoutError maps to Timeout
+            assert isinstance(result, Timeout)
             assert result.model == "gpt-4"
             assert result.llm_provider == "openai"
         except ImportError:
@@ -281,8 +282,8 @@ class TestMapAnthropicException:
             exc = anthropic.APITimeoutError(request=mock_request)
             result = _map_anthropic_exception(exc, model="claude-3")
 
-            # APITimeoutError maps to APIConnectionError in the actual code
-            assert isinstance(result, APIConnectionError)
+            # APITimeoutError maps to Timeout
+            assert isinstance(result, Timeout)
             assert result.model == "claude-3"
             assert result.llm_provider == "anthropic"
         except ImportError:

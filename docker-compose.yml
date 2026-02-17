@@ -14,11 +14,16 @@ services:
       - "${FORGE_PORT:-3000}:3000"
     volumes:
       - ./workspace:/app/workspace          # Persist agent workspace
-      - ./config.toml:/app/config.toml:ro   # Mount your config (optional)
+      - ./config.toml:/app/config.toml      # Mount your host config
+      - forge_data:/home/forge/.Forge       # Persist KB and Memory
     environment:
-      - SESSION_API_KEY=${SESSION_API_KEY:-}
-      - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL=${LLM_MODEL:-gpt-4o}
+      - FORGE_HOST=0.0.0.0
+      - FORGE_PORT=3000
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Access host providers (Ollama, etc.)
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health/live"]
@@ -26,13 +31,6 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "2.0"
-    security_opt:
-      - no-new-privileges:true
 
   # Optional: PostgreSQL for conversation/KB storage
   # Activate with: docker compose --profile database up
@@ -61,5 +59,16 @@ services:
           memory: 1G
           cpus: "1.0"
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:
+  forge_data:

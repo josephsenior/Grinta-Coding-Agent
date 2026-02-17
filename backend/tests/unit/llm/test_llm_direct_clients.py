@@ -257,7 +257,7 @@ class TestGeminiClientHelpers:
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there"},
         ]
-        system, gemini = client._convert_messages(messages)
+        system, gemini, caching = client._convert_messages(messages)
         assert system == "System prompt"
         assert len(gemini) == 2
         assert gemini[0]["role"] == "user"

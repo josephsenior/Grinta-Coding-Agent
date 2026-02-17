@@ -65,9 +65,9 @@ class TestNormalizeArguments:
         """Test that non-serve commands get 'serve' prefix."""
         original = sys.argv
         try:
-            sys.argv = ["prog", "init"]
+            sys.argv = ["prog", "unknowncmd"]
             _normalize_arguments()
-            assert sys.argv == ["prog", "serve", "init"]
+            assert sys.argv == ["prog", "serve", "unknowncmd"]
         finally:
             sys.argv = original
 
@@ -75,9 +75,9 @@ class TestNormalizeArguments:
         """Test multiple arguments where first is not 'serve'."""
         original = sys.argv
         try:
-            sys.argv = ["prog", "init", "myproject"]
+            sys.argv = ["prog", "unknowncmd", "myproject"]
             _normalize_arguments()
-            assert sys.argv == ["prog", "serve", "init", "myproject"]
+            assert sys.argv == ["prog", "serve", "unknowncmd", "myproject"]
         finally:
             sys.argv = original
 

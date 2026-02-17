@@ -191,16 +191,14 @@ class TestLocalConfigFunctions:
 
     def test_get_local_config_trusted_dirs_with_dirs(self):
         """Test get_local_config_trusted_dirs with existing dirs."""
-        config_content = """
-[runtime]
-trusted_dirs = ["/path/to/dir1", "/path/to/dir2"]
-"""
+        config_data = {"runtime": {"trusted_dirs": ["/path/to/dir1", "/path/to/dir2"]}}
         with patch("backend.interface.utils._LOCAL_CONFIG_FILE_PATH") as mock_path:
             mock_path.exists.return_value = True
-            with patch("builtins.open", mock_open(read_data=config_content)):
-                dirs = get_local_config_trusted_dirs()
-                assert len(dirs) == 2
-                assert "/path/to/dir1" in dirs
+            with patch("builtins.open", mock_open(read_data=b"")):
+                with patch("backend.interface.utils.tomllib.load", return_value=config_data):
+                    dirs = get_local_config_trusted_dirs()
+                    assert len(dirs) == 2
+                    assert "/path/to/dir1" in dirs
 
     def test_add_local_config_trusted_dir_new_dir(self):
         """Test add_local_config_trusted_dir adds new directory."""

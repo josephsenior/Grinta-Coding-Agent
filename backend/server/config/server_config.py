@@ -15,15 +15,23 @@ def _resolve_session_api_key() -> str:
     """Return the session API key, auto-generating one if not configured.
 
     Priority:
-      1. SESSION_API_KEY environment variable (explicit override)
-      2. Existing key persisted in .env.local
-      3. Auto-generate a new random key, persist to .env.local, and return it
-
-    The static default "forge_dev_key" is never used in production.
+      1. FORGE_RUNTIME="local" → Explicitly return "" for zero-config.
+      2. SESSION_API_KEY environment variable (explicit override)
+      3. Existing key persisted in .env.local
+      4. Auto-generate a new random key (unless in local dev mode)
     """
-    env_key = os.environ.get("SESSION_API_KEY", "").strip()
-    if env_key and env_key != _DEFAULT_INSECURE_KEY:
-        return env_key
+    # For local/OSS mode, if no key is set, we default to disabled (empty string)
+    # to ensure a "One-Click" zero-config experience.
+    if os.environ.get("FORGE_RUNTIME") == "local":
+        logger.info("FORGE_RUNTIME=local detected: disabling session API key for zero-config.")
+        return ""
+
+    env_key = os.environ.get("SESSION_API_KEY")
+    if env_key is not None:
+        # If explicitly set (even to empty string), respect it
+        val = env_key.strip()
+        if val != _DEFAULT_INSECURE_KEY:
+            return val
 
     # Try to read from .env.local (persisted from a previous run)
     env_local = Path(".env.local")
@@ -55,17 +63,16 @@ def _resolve_session_api_key() -> str:
 class ServerConfig(ServerConfigInterface):
     """Default OSS server configuration with environment-driven overrides."""
 
-    config_cls = os.environ.get("FORGE_CONFIG_CLS", None)
-    app_mode = AppMode.OSS
-    session_api_key = _resolve_session_api_key()
-    posthog_client_key = "phc_3ESMmY9SgqEAGBB6sMGK5ayYHkeUuknH2vP6FmWH9RA"
-    github_client_id = os.environ.get("GITHUB_APP_CLIENT_ID", "")
-    enable_billing = os.environ.get("ENABLE_BILLING", "false") == "true"
-    hide_llm_settings = os.environ.get("HIDE_LLM_SETTINGS", "false") == "true"
+    config_cls: str | None = os.environ.get("FORGE_CONFIG_CLS", None)
+    app_mode: AppMode = AppMode.OSS
+    posthog_client_key: str = "phc_3ESMmY9SgqEAGBB6sMGK5ayYHkeUuknH2vP6FmWH9RA"
+    github_client_id: str = os.environ.get("GITHUB_APP_CLIENT_ID", "")
+    enable_billing: bool = os.environ.get("ENABLE_BILLING", "false") == "true"
+    hide_llm_settings: bool = os.environ.get("HIDE_LLM_SETTINGS", "false") == "true"
     # Project management integrations
-    enable_jira = os.environ.get("ENABLE_JIRA", "true") == "true"
-    enable_jira_dc = os.environ.get("ENABLE_JIRA_DC", "true") == "true"
-    enable_linear = os.environ.get("ENABLE_LINEAR", "true") == "true"
+    enable_jira: bool = os.environ.get("ENABLE_JIRA", "true") == "true"
+    enable_jira_dc: bool = os.environ.get("ENABLE_JIRA_DC", "true") == "true"
+    enable_linear: bool = os.environ.get("ENABLE_LINEAR", "true") == "true"
     settings_store_class: str = (
         "backend.storage.settings.file_settings_store.FileSettingsStore"
     )
@@ -81,6 +88,10 @@ class ServerConfig(ServerConfigInterface):
         "backend.server.conversation_manager.local_conversation_manager.LocalConversationManager",
     )
     monitoring_listener_class: str = "backend.server.monitoring.MonitoringListener"
+
+    def __init__(self) -> None:
+        """Initialize server configuration and resolve session API key."""
+        self.session_api_key = _resolve_session_api_key()
 
     def verify_config(self) -> None:
         """Validate that no unsupported config class overrides are provided."""

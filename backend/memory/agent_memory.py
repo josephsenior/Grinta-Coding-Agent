@@ -21,7 +21,7 @@ from backend.events.observation.agent import (
     RecallObservation,
 )
 from backend.events.stream import EventStream, EventStreamSubscriber
-from backend.knowledge_base import KnowledgeBaseManager
+from backend.knowledge import KnowledgeBaseManager
 from backend.core.enums import RuntimeStatus
 from backend.utils.async_utils import run_or_schedule
 from backend.utils.prompt import ConversationInstructions, RepositoryInfo, RuntimeInfo

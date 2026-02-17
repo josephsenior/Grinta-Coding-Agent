@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
     Button,
@@ -21,6 +22,8 @@ from textual.widgets import (
 )
 
 from backend.tui.client import ForgeClient
+
+logger = logging.getLogger("forge.tui.settings")
 
 
 class SettingsScreen(Screen[None]):
@@ -38,7 +41,9 @@ class SettingsScreen(Screen[None]):
     #settings-outer {
         height: 100%;
         padding: 1 2;
-        overflow-y: auto;
+    }
+    #settings-scroll {
+        height: 1fr;
     }
     .section {
         margin: 1 0;
@@ -66,7 +71,7 @@ class SettingsScreen(Screen[None]):
     #btn-row {
         height: 3;
         margin: 1 0;
-        content-align: center middle;
+        align: center middle;
     }
     """
 
@@ -75,83 +80,71 @@ class SettingsScreen(Screen[None]):
         self.client = client
         self._settings: dict[str, Any] = {}
         self._models: list[dict[str, Any]] = []
+        self._models_ready: bool = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Vertical(id="settings-outer"):
             yield Static("⚙  Settings", classes="section-title")
+            with VerticalScroll(id="settings-scroll"):
+                # LLM Configuration
+                with Vertical(classes="section"):
+                    yield Static("LLM Configuration", classes="section-title")
+                    with Horizontal(classes="field-row"):
+                        yield Label("Model", classes="field-label")
+                        yield Select[str](
+                            [("Loading…", "__loading__")],
+                            id="model-select",
+                            prompt="Select a model…",
+                            allow_blank=True,
+                            classes="field-input",
+                        )
+                    with Horizontal(classes="field-row"):
+                        yield Label("API Key", classes="field-label")
+                        yield Input(
+                            placeholder="sk-…",
+                            id="api-key-input",
+                            password=True,
+                            classes="field-input",
+                        )
 
-            # LLM Configuration
-            with Vertical(classes="section"):
-                yield Static("LLM Configuration", classes="section-title")
-                with Horizontal(classes="field-row"):
-                    yield Label("Model", classes="field-label")
-                    yield Select(
-                        [],
-                        id="model-select",
-                        prompt="Select a model…",
-                        classes="field-input",
-                    )
-                with Horizontal(classes="field-row"):
-                    yield Label("Custom Model", classes="field-label")
-                    yield Input(
-                        placeholder="e.g. gpt-4o, claude-sonnet-4-20250514",
-                        id="custom-model-input",
-                        classes="field-input",
-                    )
-                with Horizontal(classes="field-row"):
-                    yield Label("Base URL", classes="field-label")
-                    yield Input(
-                        placeholder="https://api.openai.com/v1 (leave blank for default)",
-                        id="base-url-input",
-                        classes="field-input",
-                    )
-                with Horizontal(classes="field-row"):
-                    yield Label("API Key", classes="field-label")
-                    yield Input(
-                        placeholder="sk-…",
-                        id="api-key-input",
-                        password=True,
-                        classes="field-input",
-                    )
+                # Agent Behaviour
+                with Vertical(classes="section"):
+                    yield Static("Agent Behaviour", classes="section-title")
+                    with Horizontal(classes="field-row"):
+                        yield Label("Confirmation Mode", classes="field-label")
+                        yield Switch(id="confirmation-switch")
+                    with Horizontal(classes="field-row"):
+                        yield Label("Max Iterations", classes="field-label")
+                        yield Input(
+                            placeholder="100",
+                            id="max-iterations-input",
+                            classes="field-input",
+                        )
 
-            # Agent Behaviour
-            with Vertical(classes="section"):
-                yield Static("Agent Behaviour", classes="section-title")
-                with Horizontal(classes="field-row"):
-                    yield Label("Confirmation Mode", classes="field-label")
-                    yield Switch(id="confirmation-switch")
-                with Horizontal(classes="field-row"):
-                    yield Label("Max Iterations", classes="field-label")
-                    yield Input(
-                        placeholder="100",
-                        id="max-iterations-input",
-                        classes="field-input",
-                    )
+                # Secret Management
+                with Vertical(classes="section"):
+                    yield Static("Secrets", classes="section-title")
+                    with Horizontal(classes="field-row"):
+                        yield Label("Provider", classes="field-label")
+                        yield Input(
+                            placeholder="e.g. github, custom",
+                            id="secret-provider-input",
+                            classes="field-input",
+                        )
+                    with Horizontal(classes="field-row"):
+                        yield Label("Token", classes="field-label")
+                        yield Input(
+                            placeholder="token value",
+                            id="secret-token-input",
+                            password=True,
+                            classes="field-input",
+                        )
+                    yield Button("Set Secret", id="btn-set-secret", variant="primary")
 
-            # Secret Management
-            with Vertical(classes="section"):
-                yield Static("Secrets", classes="section-title")
-                with Horizontal(classes="field-row"):
-                    yield Label("Provider", classes="field-label")
-                    yield Input(
-                        placeholder="e.g. github, custom",
-                        id="secret-provider-input",
-                        classes="field-input",
-                    )
-                with Horizontal(classes="field-row"):
-                    yield Label("Token", classes="field-label")
-                    yield Input(
-                        placeholder="token value",
-                        id="secret-token-input",
-                        password=True,
-                        classes="field-input",
-                    )
-                yield Button("Set Secret", id="btn-set-secret", variant="primary")
-
-            with Horizontal(id="btn-row"):
-                yield Button("Save Settings", id="btn-save", variant="success")
-                yield Button("Cancel", id="btn-cancel", variant="default")
+                with Horizontal(id="btn-row"):
+                    yield Button("Save Settings", id="btn-save", variant="success")
+                    yield Button("Cancel", id="btn-cancel", variant="default")
 
         yield Footer()
 
@@ -167,23 +160,27 @@ class SettingsScreen(Screen[None]):
             self.notify(f"Failed to load settings: {e}", severity="error")
             return
 
-        # Populate fields
-        llm = self._settings.get("llm", self._settings)
-        model = llm.get("model", "")
-        base_url = llm.get("base_url", llm.get("api_base", ""))
-        api_key = llm.get("api_key", "")
-        confirmation = self._settings.get("security", {}).get(
-            "confirmation_mode", False
+        llm_data = self._settings.get("llm", {})
+        api_key = str(
+            self._settings.get("llm_api_key")
+            or llm_data.get("api_key")
+            or self._settings.get("api_key")
+            or ""
         )
-        max_iter = str(self._settings.get("agent", {}).get("max_iterations", 100))
+        confirmation = bool(
+            self._settings.get("confirmation_mode")
+            or self._settings.get("security", {}).get("confirmation_mode")
+            or False
+        )
+        max_iter = str(
+            self._settings.get("max_iterations")
+            or self._settings.get("agent", {}).get("max_iterations")
+            or 100
+        )
 
-        if model:
-            self.query_one("#custom-model-input", Input).value = model
-        if base_url:
-            self.query_one("#base-url-input", Input).value = str(base_url)
         if api_key:
-            self.query_one("#api-key-input", Input).value = str(api_key)
-        self.query_one("#confirmation-switch", Switch).value = bool(confirmation)
+            self.query_one("#api-key-input", Input).value = api_key
+        self.query_one("#confirmation-switch", Switch).value = confirmation
         self.query_one("#max-iterations-input", Input).value = max_iter
 
     async def _load_models(self) -> None:
@@ -195,38 +192,50 @@ class SettingsScreen(Screen[None]):
         select = self.query_one("#model-select", Select)
         options: list[tuple[str, str]] = []
         for m in self._models:
-            name = str(m.get("model", m.get("name", str(m))))
-            options.append((name, name))
-        if options:
-            select.set_options(options)
+            model_id = str(m.get("id", m.get("model", str(m))))
+            name = str(m.get("name", model_id))
+            options.append((name, model_id))
+
+        if not options:
+            return
+
+        select.set_options(options)
+        self._models_ready = True
+
+        # Determine current model
+        llm_data = self._settings.get("llm", {})
+        current_model = (
+            self._settings.get("llm_model")
+            or llm_data.get("model")
+            or self._settings.get("model")
+        )
+        if current_model:
+            valid_ids = {opt[1] for opt in options}
+            if current_model in valid_ids:
+                select.value = current_model
 
     # ── button handlers ───────────────────────────────────────────
 
     @on(Button.Pressed, "#btn-save")
     async def _save_settings(self) -> None:
-        model = self.query_one("#custom-model-input", Input).value.strip()
-        base_url = self.query_one("#base-url-input", Input).value.strip()
+        select = self.query_one("#model-select", Select)
+        model_val = select.value
         api_key = self.query_one("#api-key-input", Input).value.strip()
         confirmation = self.query_one("#confirmation-switch", Switch).value
         max_iter = self.query_one("#max-iterations-input", Input).value.strip()
 
-        payload: dict[str, Any] = {}
+        payload: dict[str, Any] = {
+            "confirmation_mode": confirmation,
+        }
 
-        if model or base_url or api_key:
-            llm: dict[str, Any] = {}
-            if model:
-                llm["model"] = model
-            if base_url:
-                llm["base_url"] = base_url
-            if api_key:
-                llm["api_key"] = api_key
-            payload["llm"] = llm
-
-        payload["security"] = {"confirmation_mode": confirmation}
-
+        # Only send model if user actually selected one
+        if model_val and model_val != Select.BLANK and model_val != "__loading__":
+            payload["llm_model"] = str(model_val)
+        if api_key:
+            payload["llm_api_key"] = api_key
         if max_iter:
             try:
-                payload.setdefault("agent", {})["max_iterations"] = int(max_iter)
+                payload["max_iterations"] = int(max_iter)
             except ValueError:
                 pass
 
@@ -253,11 +262,6 @@ class SettingsScreen(Screen[None]):
             self.query_one("#secret-token-input", Input).value = ""
         except Exception as e:
             self.notify(f"Failed: {e}", severity="error")
-
-    @on(Select.Changed, "#model-select")
-    def _on_model_selected(self, event: Select.Changed) -> None:
-        if event.value and event.value != Select.BLANK:
-            self.query_one("#custom-model-input", Input).value = str(event.value)
 
     # ── key bindings ──────────────────────────────────────────────
 

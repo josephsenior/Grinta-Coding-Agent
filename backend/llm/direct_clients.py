@@ -417,21 +417,38 @@ class GeminiClient(DirectLLMClient):
 
     def _convert_messages(
         self, messages: list[dict[str, Any]]
-    ) -> tuple[str | None, list[dict[str, Any]]]:
+    ) -> tuple[str | None, list[dict[str, Any]], bool]:
         """Convert messages to Gemini format, extracting system instruction.
 
         Returns:
-            (system_instruction_or_None, gemini_history_messages)
+            (system_instruction_or_None, gemini_history_messages, caching_requested)
         """
         system_instruction: str | None = None
         gemini_messages: list[dict[str, Any]] = []
+        caching_requested = False
+
         for m in messages:
+            content = m.get("content", "")
+            
+            # Handle list-style content (from Forge's message serialization)
+            text_parts = []
+            if isinstance(content, list):
+                for item in content:
+                    if item.get("type") == "text":
+                        text_parts.append(item.get("text", ""))
+                        if item.get("cache_prompt"):
+                            caching_requested = True
+                    # Image support for Gemini could be added here
+                content = "\n".join(text_parts)
+            
             if m["role"] == "system":
-                system_instruction = m["content"]
+                system_instruction = content
                 continue
+            
             role = "user" if m["role"] == "user" else "model"
-            gemini_messages.append({"role": role, "parts": [m["content"]]})
-        return system_instruction, gemini_messages
+            gemini_messages.append({"role": role, "parts": [content]})
+        
+        return system_instruction, gemini_messages, caching_requested
 
     @staticmethod
     def _extract_gemini_generation_config(
@@ -484,6 +501,9 @@ class GeminiClient(DirectLLMClient):
             if meta
             else 0,
             "total_tokens": getattr(meta, "total_token_count", 0) if meta else 0,
+            "cache_read_tokens": getattr(meta, "cached_content_token_count", 0)
+            if meta
+            else 0,
         }
 
     def _build_gemini_chat(
@@ -494,14 +514,45 @@ class GeminiClient(DirectLLMClient):
         model_name = model_name or self.model_name
         if "/" in model_name:
             model_name = model_name.split("/")[-1]
-        system_instruction, gemini_messages = self._convert_messages(messages)
+        
+        system_instruction, gemini_messages, caching_requested = self._convert_messages(messages)
+        
+        # Handle Context Caching if supported and requested
+        from backend.llm.gemini_cache import gemini_cache_manager
+        
+        cache_name = None
+        if caching_requested:
+            # We cache everything up to the penultimate message (the history)
+            # if history is substantial. For now, let's cache the whole history.
+            history_to_cache = gemini_messages[:-1] if len(gemini_messages) > 1 else []
+            if history_to_cache or system_instruction:
+                cache_name = gemini_cache_manager.get_or_create_cache(
+                    model=model_name,
+                    system_instruction=system_instruction,
+                    messages=history_to_cache
+                )
+
         model_kwargs: dict[str, Any] = {"generation_config": gen_cfg} if gen_cfg else {}
-        if system_instruction:
-            model_kwargs["system_instruction"] = system_instruction
-        model = genai.GenerativeModel(model_name, **model_kwargs)  # type: ignore[arg-type]
-        prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
-        history = gemini_messages[:-1] if gemini_messages else []
-        chat = model.start_chat(history=history)  # type: ignore[arg-type]
+        
+        if cache_name:
+            # When using a cache, the model is initialized with the cache name
+            # and we ONLY send the remaining messages.
+            model = genai.GenerativeModel(model_name, **model_kwargs)
+            # Note: The SDK's start_chat doesn't directly take cache_name yet in all versions
+            # so we use history for the non-cached part.
+            prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
+            # If we cached the history, the history for start_chat is empty.
+            chat = model.start_chat(history=[])
+            # Inject cached_content into kwargs for the final send_message call
+            kwargs["cached_content"] = cache_name
+        else:
+            if system_instruction:
+                model_kwargs["system_instruction"] = system_instruction
+            model = genai.GenerativeModel(model_name, **model_kwargs)
+            prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
+            history = gemini_messages[:-1] if gemini_messages else []
+            chat = model.start_chat(history=history)
+            
         return model_name, chat, prompt
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
@@ -546,26 +597,51 @@ class GeminiClient(DirectLLMClient):
 def get_direct_client(
     model: str, api_key: str, base_url: str | None = None
 ) -> DirectLLMClient:
-    """Factory function to get the correct direct client."""
-    model_lower = model.lower()
+    """Factory function to get the correct direct client using catalog-driven routing.
 
-    if "anthropic" in model_lower or "claude" in model_lower:
-        return AnthropicClient(model_name=model, api_key=api_key)
-    if "google" in model_lower or "gemini" in model_lower:
-        return GeminiClient(model_name=model, api_key=api_key)
-    if "xai" in model_lower or "grok" in model_lower:
-        return OpenAIClient(
-            model_name=model, api_key=api_key, base_url="https://api.x.ai/v1"
-        )
-    if "ollama" in model_lower:
-        # Ollama exposes an OpenAI-compatible API at /v1.
-        # Strip the "ollama/" prefix so the actual model name is sent.
-        stripped = model.split("/", 1)[1] if "/" in model else model
-        ollama_base = base_url or "http://localhost:11434/v1"
-        return OpenAIClient(
-            model_name=stripped,
-            api_key=api_key or "ollama",  # Ollama ignores auth
-            base_url=ollama_base,
-        )
-    # Default to OpenAI (also covers LM Studio, vLLM, etc.)
-    return OpenAIClient(model_name=model, api_key=api_key, base_url=base_url)
+    This function automatically resolves the provider and base URL based on:
+    1. The model catalog (catalog.toml)
+    2. Local endpoint discovery (Ollama, LM Studio, vLLM)
+    3. Provider heuristics for unknown models
+
+    Args:
+        model: Model name (e.g., "gpt-4o", "claude-opus-4", "ollama/llama3")
+        api_key: API key for the provider
+        base_url: Optional explicit base URL (overrides auto-resolution)
+
+    Returns:
+        Appropriate DirectLLMClient instance
+    """
+    from backend.llm.provider_resolver import get_resolver
+
+    resolver = get_resolver()
+
+    # Strip provider prefix if present (e.g., "ollama/llama3" → "llama3")
+    stripped_model = resolver.strip_provider_prefix(model)
+
+    # Resolve provider from catalog or heuristics
+    provider = resolver.resolve_provider(model)
+
+    # Resolve base URL (handles local discovery and environment variables)
+    resolved_base_url = resolver.resolve_base_url(model, base_url)
+
+    logger.debug(
+        "Resolved model=%s → provider=%s, base_url=%s, stripped=%s",
+        model,
+        provider,
+        resolved_base_url or "default",
+        stripped_model,
+    )
+
+    # Route to appropriate client based on provider
+    if provider == "anthropic":
+        return AnthropicClient(model_name=stripped_model, api_key=api_key)
+
+    if provider == "google":
+        return GeminiClient(model_name=stripped_model, api_key=api_key)
+
+    # All OpenAI-compatible providers use OpenAI client
+    # (OpenAI, xAI, DeepSeek, Mistral, Ollama, LM Studio, vLLM, etc.)
+    return OpenAIClient(
+        model_name=stripped_model, api_key=api_key, base_url=resolved_base_url
+    )

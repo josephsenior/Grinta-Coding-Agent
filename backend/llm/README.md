@@ -16,19 +16,43 @@ Forge's LLM system provides a robust, provider-agnostic abstraction layer using 
 
 ## Architecture
 
+### Provider Auto-Resolver Pattern
+
+Forge uses an intelligent routing system that automatically detects providers, discovers local endpoints, and resolves model aliases:
+
 ```
-User selects model: "gpt-4o"
+User specifies model: "coding-model" (alias)
    ↓
-APIKeyManager extracts provider: "openai"
+ModelAliasManager resolves: "ollama/qwen2.5-coder"
    ↓
-ProviderConfigManager validates parameters
+ProviderResolver detects provider: "ollama"
    ↓
-DirectLLMClient (OpenAIClient) initialized
+ProviderResolver discovers local endpoint: "http://localhost:11434"
    ↓
-SDK.completion(model="gpt-4o", ...)
+DirectLLMClient (OpenAI-compatible) initialized
+   ↓
+SDK.completion(model="qwen2.5-coder", ...)  # Prefix stripped
    ↓
 Response + cost tracking + metrics
 ```
+
+### New Components (Provider Auto-Resolver)
+
+1. **ProviderResolver** (`provider_resolver.py`)
+   - Auto-detects provider from model names
+   - Discovers local endpoints (Ollama, LM Studio, vLLM)
+   - Resolves base URLs with intelligent priority
+   - Strips provider prefixes for API calls
+
+2. **ModelAliasManager** (`model_aliases.py`)
+   - Define semantic aliases in `config.toml`
+   - Switch between cloud/local models seamlessly
+   - Store user preferences persistently
+
+3. **Local Endpoint Discovery**
+   - Auto-probes Ollama (`:11434`), LM Studio (`:1234`), vLLM (`:8000`)
+   - Environment variable override support
+   - No manual configuration needed for standard setups
 
 ## Core Components
 
@@ -63,6 +87,74 @@ response = llm.completion(
 - Function calling (when supported)
 - Vision support (when supported)
 - Prompt caching (when supported)
+- **Model alias resolution** (NEW)
+- **Auto-discovery of local endpoints** (NEW)
+
+### 1.5 Working with Local Models
+
+**Auto-Discovery:**
+```python
+from backend.llm import LLM
+
+# No base_url needed - auto-discovers Ollama
+llm = LLM(model="ollama/llama3.2")
+
+# Or LM Studio
+llm = LLM(model="lmstudio/qwen2.5-coder")
+
+# Or vLLM
+llm = LLM(model="vllm/mistral-7b")
+```
+
+**Discover Available Models:**
+```bash
+# Find all local models
+python -m backend.llm.discover_models
+
+# Output:
+# 📦 OLLAMA
+#    - llama3.2
+#    - qwen2.5-coder
+#    - mistral
+```
+
+**Check Provider Status:**
+```bash
+python -m backend.llm.discover_models status
+
+# Output:
+# ✓ OLLAMA          RUNNING
+# ✗ LM STUDIO       NOT FOUND
+# ✗ VLLM            NOT FOUND
+```
+
+**Model Aliases:**
+```toml
+# config.toml
+[model_aliases]
+coding-model = "claude-sonnet-4-5-20250929"
+fast-chat = "ollama/llama3.2"
+experiments = "ollama/qwen2.5-coder"
+```
+
+```python
+# Use aliases in code
+llm = LLM(model="coding-model")  # → claude-sonnet-4-5-20250929
+
+# Switch to local without code changes
+# Just edit config.toml:
+# coding-model = "ollama/qwen2.5-coder"
+```
+
+**List Aliases:**
+```bash
+python -m backend.llm.discover_models aliases
+
+# Output:
+# coding-model     → claude-sonnet-4-5-20250929
+# fast-chat        → ollama/llama3.2
+# experiments      → ollama/qwen2.5-coder
+```
 
 ### 2. API Key Manager (`api_key_manager.py`)
 
@@ -163,13 +255,64 @@ if features.supports_reasoning_effort:
 | Azure OpenAI | Enterprise, compliance | Azure subscription |
 | Google Vertex AI | Enterprise, GCP | GCP credentials |
 
-### Self-Hosted
+### Self-Hosted / Local (Auto-Discovery)
 
-| Provider | Use Case | Setup |
-|----------|----------|-------|
-| Ollama | Local, privacy | Local Ollama server |
+| Provider | Default Port | Auto-Discovery | Use Case |
+|----------|-------------|----------------|----------|
+| Ollama | 11434 | ✓ | Local inference, privacy |
+| LM Studio | 1234 | ✓ | GUI-based local models |
+| vLLM | 8000 | ✓ | Production local deployment |
+
+**No configuration needed** - Forge automatically discovers running local providers:
+
+```python
+# Just specify the model
+llm = LLM(model="ollama/llama3.2")
+# Forge automatically:
+# 1. Detects provider is "ollama"
+# 2. Probes localhost:11434
+# 3. Verifies it's a valid LLM endpoint
+# 4. Uses it automatically
+```
+
+**Override auto-discovery:**
+```bash
+# Custom Ollama location
+export OLLAMA_HOST="http://192.168.1.100:11434"
+
+# Custom LM Studio
+export LM_STUDIO_BASE_URL="http://localhost:1234/v1"
+
+# Custom vLLM
+export VLLM_BASE_URL="http://localhost:8000/v1"
+```
 
 ## Configuration
+
+### Base URL Resolution Priority
+
+When determining where to send API requests, Forge uses this priority order:
+
+1. **Explicit** - Passed directly in code: `LLM(base_url="http://custom:9000")`
+2. **Environment** - Provider-specific env vars (e.g., `OLLAMA_HOST`)
+3. **Auto-Discovery** - Probes common local ports (`:11434`, `:1234`, `:8000`)
+4. **Defaults** - Cloud provider defaults (e.g., `https://api.openai.com/v1`)
+
+```python
+# Priority 1: Explicit (highest)
+llm = LLM(model="ollama/llama3.2", base_url="http://gpu-server:11434")
+
+# Priority 2: Environment variable
+os.environ["OLLAMA_HOST"] = "http://192.168.1.100:11434"
+llm = LLM(model="ollama/llama3.2")
+
+# Priority 3: Auto-discovery
+# (Forge automatically probes localhost:11434)
+llm = LLM(model="ollama/llama3.2")
+
+# Priority 4: Default (for cloud providers)
+llm = LLM(model="gpt-4")  # → https://api.openai.com/v1
+```
 
 ### Via config.toml
 
@@ -193,6 +336,14 @@ native_tool_calling = true # Use native function calling
 
 # Cost control
 max_message_chars = 30000  # Truncate long messages
+
+# Model Aliases (NEW)
+[model_aliases]
+main-model = "claude-sonnet-4-5-20250929"
+fallback = "gpt-4o-mini"
+local-coding = "ollama/qwen2.5-coder"
+local-chat = "ollama/llama3.2"
+experiments = "lmstudio/mistral-7b"
 ```
 
 ### Via Environment Variables
@@ -201,12 +352,20 @@ max_message_chars = 30000  # Truncate long messages
 # Model selection
 LLM_MODEL=claude-sonnet-4-20250514
 
-# API keys
+# Or use alias
+LLM_MODEL=main-model
+
+# API keys (cloud providers)
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 OPENROUTER_API_KEY=sk-or-...
 XAI_API_KEY=...
 GEMINI_API_KEY=AIza...
+
+# Local provider endpoints (NEW)
+OLLAMA_HOST=http://localhost:11434
+LM_STUDIO_BASE_URL=http://localhost:1234/v1
+VLLM_BASE_URL=http://localhost:8000/v1
 
 # Advanced
 LLM_BASE_URL=http://custom-llm-proxy:8000
@@ -421,6 +580,36 @@ print(f"Avg latency: {metrics.avg_response_latency}s")
 
 ## Troubleshooting
 
+### "Ollama not detected" / "Local provider not found"
+
+```bash
+# Check if Ollama is running
+curl http://localhost:11434/api/tags
+
+# If not, start it
+ollama serve
+
+# Or explicitly set the endpoint
+export OLLAMA_HOST="http://localhost:11434"
+
+# Check provider status
+python -m backend.llm.discover_models status
+```
+
+### "Model alias not found"
+
+```bash
+# List all defined aliases
+python -m backend.llm.discover_models aliases
+
+# Add alias to config.toml
+[model_aliases]
+your-alias = "target-model"
+
+# Or check what's resolving
+python -c "from backend.llm.model_aliases import get_alias_manager; print(get_alias_manager().resolve_alias('your-alias'))"
+```
+
 ### "No API key found"
 
 ```bash
@@ -468,6 +657,59 @@ print(f"Function calling: {features.supports_function_calling}")
 ```
 
 ## Best Practices
+
+### 0. Use Model Aliases for Flexibility
+
+**Problem:** Hardcoding model names makes switching between providers difficult.
+
+**Solution:** Use semantic aliases in `config.toml`:
+
+```toml
+[model_aliases]
+# Define by use case, not provider
+coding-model = "claude-sonnet-4-5-20250929"
+review-model = "gpt-4o"
+fast-model = "claude-haiku-4-5-20251001"
+
+# Easy switch to local for development
+local-coding = "ollama/qwen2.5-coder"
+local-chat = "ollama/llama3.2"
+```
+
+```python
+# Code uses semantic names
+llm = LLM(model="coding-model")
+
+# Switch providers by editing config, not code
+# coding-model = "ollama/qwen2.5-coder"  # Now local!
+```
+
+### 0.5 Leverage Local Models for Development
+
+**Use local models to:**
+- Reduce API costs during development
+- Work offline
+- Increase iteration speed
+
+```bash
+# Start Ollama
+ollama serve
+
+# Pull coding-optimized model
+ollama pull qwen2.5-coder
+
+# Configure as default for dev
+[model_aliases]
+dev-model = "ollama/qwen2.5-coder"
+```
+
+```python
+# Use in development
+if os.getenv("ENV") == "development":
+    llm = LLM(model="dev-model")  # Local
+else:
+    llm = LLM(model="coding-model")  # Cloud
+```
 
 ### 1. Choose the Right Model
 
@@ -601,6 +843,10 @@ OLLAMA_BASE_URL=http://localhost:11434
 | `bedrock.py` | AWS Bedrock support |
 | `llm_utils.py` | Utility functions |
 | `llm_registry.py` | Model registry |
+| **`provider_resolver.py`** | **Provider detection & local discovery (NEW)** |
+| **`model_aliases.py`** | **Model alias management (NEW)** |
+| **`catalog_loader.py`** | **Model catalog & metadata (NEW)** |
+| **`discover_models.py`** | **CLI tool for local model discovery (NEW)** |
 
 ## Examples
 

@@ -19,7 +19,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-import toml
+try:
+    import tomllib  # Python 3.11+
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]
+
 from pydantic import SecretStr, ValidationError
 
 from backend.core import logger
@@ -154,11 +158,11 @@ def load_from_toml(cfg: ForgeConfig, toml_file: str = "config.toml") -> None:
     summary = ConfigLoadSummary(toml_file)
     try:
         try:
-            with open(toml_file, encoding="utf-8") as toml_contents:
-                toml_config = toml.load(toml_contents)
+            with open(toml_file, "rb") as toml_contents:
+                toml_config = tomllib.load(toml_contents)
         except FileNotFoundError:
             return
-        except toml.TomlDecodeError as e:
+        except Exception as e:
             logger.FORGE_logger.warning(
                 "Cannot parse config from toml, toml values have not been applied.\nError: %s",
                 e,

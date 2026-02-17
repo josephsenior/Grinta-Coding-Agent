@@ -301,7 +301,9 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         return "unknown"
 
     def _extract_provider(self, model: str) -> str:
-        """Extract provider from model identifier.
+        """Extract provider from model identifier using resolver.
+
+        Uses the catalog-based resolver for accurate provider detection.
 
         Args:
             model: Model identifier string
@@ -313,18 +315,28 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if not model:
             return "unknown"
 
-        model_lower = model.lower()
+        try:
+            from backend.llm.provider_resolver import get_resolver
 
-        # Check prefix matches first (most specific)
-        if provider := self._check_prefix_match(model, model_lower):
+            resolver = get_resolver()
+            provider = resolver.resolve_provider(model)
+            logger.debug("Resolved model=%s to provider=%s", model, provider)
             return provider
+        except Exception as e:
+            logger.warning("Failed to use resolver for provider detection: %s", e)
+            # Fallback to legacy logic
+            model_lower = model.lower()
 
-        # Check keyword matches (moderately specific)
-        if provider := self._check_keyword_match(model_lower):
-            return provider
+            # Check prefix matches first (most specific)
+            if provider := self._check_prefix_match(model, model_lower):
+                return provider
 
-        # Check fallback patterns (least specific)
-        return self._check_fallback_patterns(model_lower)
+            # Check keyword matches (moderately specific)
+            if provider := self._check_keyword_match(model_lower):
+                return provider
+
+            # Check fallback patterns (least specific)
+            return self._check_fallback_patterns(model_lower)
 
     def _is_correct_provider_key(
         self, api_key: SecretStr, expected_provider: str

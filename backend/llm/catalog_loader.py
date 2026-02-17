@@ -156,3 +156,50 @@ def get_verified_models(provider: str | None = None) -> list[str]:
 def get_all_model_names() -> Sequence[str]:
     """Return all known canonical model names."""
     return [e.name for e in get_catalog()]
+
+
+def is_openai_compatible(model: str) -> bool:
+    """Check if a model uses OpenAI-compatible API.
+
+    Returns:
+        True if model should use OpenAI client
+    """
+    entry = lookup(model)
+    if entry:
+        # These providers are OpenAI-compatible
+        return entry.provider in ["openai", "deepseek", "mistral", "xai"]
+
+    # Heuristic fallback
+    model_lower = model.lower()
+    return any(
+        x in model_lower
+        for x in ["gpt-", "o1-", "o3-", "o4-", "codex", "deepseek", "grok", "mistral"]
+    )
+
+
+def get_provider_info(model: str) -> dict[str, Any]:
+    """Get provider information for a model.
+
+    Returns:
+        Dictionary with provider metadata
+    """
+    entry = lookup(model)
+    if entry:
+        return {
+            "provider": entry.provider,
+            "supports_function_calling": entry.supports_function_calling,
+            "supports_vision": entry.supports_vision,
+            "supports_prompt_cache": entry.supports_prompt_cache,
+            "max_input_tokens": entry.max_input_tokens,
+            "max_output_tokens": entry.max_output_tokens,
+        }
+
+    # Return defaults for unknown models
+    return {
+        "provider": "openai",
+        "supports_function_calling": False,
+        "supports_vision": False,
+        "supports_prompt_cache": False,
+        "max_input_tokens": None,
+        "max_output_tokens": None,
+    }

@@ -63,7 +63,8 @@ FUNCTION_CALLING_PATTERNS: list[str] = [
     "claude-3-5-sonnet*",
     "claude-3.5-haiku*",
     "claude-sonnet-4*",
-    "claude-opus-4-1*",
+    "claude-opus-4*",
+    "claude-4*",
     "gpt-4o*",
     "gpt-4.1*",
     "gpt-5*",
@@ -73,6 +74,7 @@ FUNCTION_CALLING_PATTERNS: list[str] = [
     "gemini/gemini-1.5-*",
     "gemini/gemini-2.0-*",
     "gemini-2.5-*",
+    "gemini-3*",
     "grok-*",
     "kimi-k2*",
     "qwen3*",
@@ -83,6 +85,7 @@ REASONING_EFFORT_PATTERNS: list[str] = [
     "o4-*",
     "gemini-2.0-flash-thinking*",
     "gemini-2.5-*",
+    "gemini-3-deep-think*",
     "gpt-5*",
     "deepseek*",
 ]
@@ -93,6 +96,9 @@ PROMPT_CACHE_PATTERNS: list[str] = [
     "claude-3-haiku*",
     "claude-3-opus*",
     "claude-sonnet-4*",
+    "claude-opus-4*",
+    "claude-4*",
+    "deepseek*",
 ]
 SUPPORTS_STOP_WORDS_FALSE_PATTERNS: list[str] = [
     "o1*",
@@ -104,13 +110,17 @@ SUPPORTS_STOP_WORDS_FALSE_PATTERNS: list[str] = [
 RESPONSE_SCHEMA_PATTERNS: list[str] = [
     "gpt-4o*",
     "gpt-4-turbo*",
+    "gpt-5*",
     "o1-*",
     "o3-*",
+    "o4-*",
     "gemini/gemini-1.5-*",
     "gemini/gemini-2.0-*",
+    "gemini-3*",
     "claude-3-7-sonnet*",
     "claude-3.5-sonnet*",
     "claude-3.5-haiku*",
+    "claude-4*",
 ]
 
 

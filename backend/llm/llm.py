@@ -54,10 +54,11 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
             return AuthenticationError(str(exc), model=model, llm_provider="openai")
         if isinstance(exc, _oai.RateLimitError):
             return RateLimitError(str(exc), model=model, llm_provider="openai")
-        if isinstance(exc, _oai.APIConnectionError):
-            return APIConnectionError(str(exc), model=model, llm_provider="openai")
+        # Check APITimeoutError before APIConnectionError (subclass relationship)
         if isinstance(exc, _oai.APITimeoutError):
             return Timeout(str(exc), model=model, llm_provider="openai")
+        if isinstance(exc, _oai.APIConnectionError):
+            return APIConnectionError(str(exc), model=model, llm_provider="openai")
         if isinstance(exc, _oai.BadRequestError):
             if is_context_window_error(str(exc).lower(), exc):
                 return ContextWindowExceededError(
@@ -89,10 +90,11 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
             return AuthenticationError(str(exc), model=model, llm_provider="anthropic")
         if isinstance(exc, _anth.RateLimitError):
             return RateLimitError(str(exc), model=model, llm_provider="anthropic")
-        if isinstance(exc, _anth.APIConnectionError):
-            return APIConnectionError(str(exc), model=model, llm_provider="anthropic")
+        # Check APITimeoutError before APIConnectionError (subclass relationship)
         if isinstance(exc, _anth.APITimeoutError):
             return Timeout(str(exc), model=model, llm_provider="anthropic")
+        if isinstance(exc, _anth.APIConnectionError):
+            return APIConnectionError(str(exc), model=model, llm_provider="anthropic")
         if isinstance(exc, _anth.BadRequestError):
             if is_context_window_error(str(exc).lower(), exc):
                 return ContextWindowExceededError(
@@ -193,11 +195,38 @@ class LLM(RetryMixin, DebugMixin):
         self.retry_listener = retry_listener
         self._function_calling_active: bool = False
 
+        # Resolve model aliases before processing
+        from backend.llm.model_aliases import get_alias_manager
+
+        alias_manager = get_alias_manager()
+        original_model = self.config.model
+        resolved_model = alias_manager.resolve_alias(original_model)
+
+        if resolved_model != original_model:
+            logger.info("Model alias resolved: %s -> %s", original_model, resolved_model)
+            self.config.model = resolved_model
+
+        # Use resolver for local endpoint discovery and provider detection
+        from backend.llm.provider_resolver import get_resolver
+
+        resolver = get_resolver()
+
+        # Resolve base_url using the resolver (handles local discovery)
+        if not self.config.base_url:
+            discovered_url = resolver.resolve_base_url(self.config.model)
+            if discovered_url:
+                logger.info(
+                    "Auto-discovered base_url for %s: %s",
+                    self.config.model,
+                    discovered_url,
+                )
+                self.config.base_url = discovered_url
+
         # Initialize client
         api_key_value = self._extract_api_key()
 
-        # Local models (Ollama, LM Studio, vLLM) don't require real API keys.
-        _is_local = "ollama" in self.config.model.lower() or (
+        # Check if this is a local model
+        _is_local = resolver.is_local_model(self.config.model) or (
             self.config.base_url
             and any(
                 h in self.config.base_url

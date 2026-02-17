@@ -1,0 +1,249 @@
+"""Tests for PendingActionService."""
+
+import time
+import unittest
+from unittest.mock import MagicMock, patch
+
+from backend.controller.services.pending_action_service import PendingActionService
+
+
+class TestPendingActionService(unittest.TestCase):
+    """Test PendingActionService pending action tracking."""
+
+    def setUp(self):
+        """Create mock context for testing."""
+        self.mock_controller = MagicMock()
+        self.mock_controller.log = MagicMock()
+        self.mock_controller.event_stream = MagicMock()
+        
+        self.mock_context = MagicMock()
+        self.mock_context.get_controller.return_value = self.mock_controller
+        
+        self.service = PendingActionService(self.mock_context, timeout=120.0)
+
+    def test_initialization(self):
+        """Test service initializes with None pending action."""
+        self.assertEqual(self.service._context, self.mock_context)
+        self.assertEqual(self.service._timeout, 120.0)
+        self.assertIsNone(self.service._pending)
+
+    def test_set_action(self):
+        """Test set() stores action with timestamp."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+        
+        self.service.set(mock_action)
+        
+        self.assertIsNotNone(self.service._pending)
+        action, timestamp = self.service._pending
+        self.assertEqual(action, mock_action)
+        self.assertIsInstance(timestamp, float)
+        self.mock_controller.log.assert_called_once()
+
+    def test_set_none_clears_pending(self):
+        """Test set(None) clears pending action."""
+        # First set an action
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+        self.service.set(mock_action)
+        
+        # Then clear it
+        self.service.set(None)
+        
+        self.assertIsNone(self.service._pending)
+        # Should have logged clearing
+        self.assertEqual(self.mock_controller.log.call_count, 2)  # Set + clear
+
+    def test_set_none_when_no_pending(self):
+        """Test set(None) when no pending action does nothing."""
+        self.service.set(None)
+        
+        self.assertIsNone(self.service._pending)
+        self.mock_controller.log.assert_not_called()
+
+    def test_get_returns_action_when_not_timed_out(self):
+        """Test get() returns action when within timeout."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+        
+        self.service.set(mock_action)
+        action = self.service.get()
+        
+        self.assertEqual(action, mock_action)
+
+    def test_get_returns_none_when_no_pending(self):
+        """Test get() returns None when no pending action."""
+        action = self.service.get()
+        
+        self.assertIsNone(action)
+
+    @patch('time.time')
+    def test_get_returns_none_when_timed_out(self, mock_time):
+        """Test get() returns None and handles timeout when exceeded."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+        
+        # Set action at t=0
+        mock_time.return_value = 100.0
+        self.service.set(mock_action)
+        
+        # Get at t=125 (timeout=120)
+        mock_time.return_value = 225.1
+        action = self.service.get()
+        
+        self.assertIsNone(action)
+        self.assertIsNone(self.service._pending)
+        
+        # Should have logged timeout
+        self.mock_controller.event_stream.add_event.assert_called_once()
+
+    @patch('time.time')
+    def test_get_logs_periodic_updates(self, mock_time):
+        """Test get() logs periodic updates for long-running actions."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+        
+        # Set action at t=0
+        mock_time.return_value = 100.0
+        self.service.set(mock_action)
+        
+        # Get at t=90 (should log update)
+        mock_time.return_value = 190.0
+        action = self.service.get()
+        
+        self.assertEqual(action, mock_action)
+        # Should have logged both set and periodic update
+        log_calls = [call[0][1] for call in self.mock_controller.log.call_args_list]
+        self.assertTrue(any("Pending action active" in msg for msg in log_calls))
+
+    def test_info_returns_pending_tuple(self):
+        """Test info() returns (action, timestamp) tuple."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+        
+        self.service.set(mock_action)
+        result = self.service.info()
+        
+        self.assertIsNotNone(result)
+        action, timestamp = result
+        self.assertEqual(action, mock_action)
+        self.assertIsInstance(timestamp, float)
+
+    def test_info_returns_none_when_no_pending(self):
+        """Test info() returns None when no pending action."""
+        result = self.service.info()
+        
+        self.assertIsNone(result)
+
+    def test_log_clear(self):
+        """Test _log_clear logs action clearing."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+        timestamp = time.time() - 5.0
+        
+        self.service._log_clear(self.mock_controller, mock_action, timestamp)
+        
+        self.mock_controller.log.assert_called_once()
+        log_args = self.mock_controller.log.call_args[0]
+        self.assertIn("Cleared pending action", log_args[1])
+
+    @patch('backend.controller.services.pending_action_service.ErrorObservation')
+    def test_handle_timeout(self, mock_error_obs):
+        """Test _handle_timeout logs and emits timeout error."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = 456
+        
+        mock_obs = MagicMock()
+        mock_error_obs.return_value = mock_obs
+        
+        self.service._handle_timeout(self.mock_controller, mock_action, 125.5)
+        
+        # Should log warning
+        self.mock_controller.log.assert_called_once()
+        log_args = self.mock_controller.log.call_args[0]
+        self.assertEqual(log_args[0], "warning")
+        self.assertIn("timed out", log_args[1])
+        
+        # Should create ErrorObservation
+        mock_error_obs.assert_called_once()
+        call_kwargs = mock_error_obs.call_args[1]
+        self.assertIn("timed out", call_kwargs['content'])
+        self.assertEqual(call_kwargs['error_id'], "PENDING_ACTION_TIMEOUT")
+        
+        # Should set cause to action ID
+        self.assertEqual(mock_obs.cause, 456)
+        
+        # Should emit event
+        self.mock_controller.event_stream.add_event.assert_called_once()
+
+    @patch('backend.controller.services.pending_action_service.ErrorObservation')
+    def test_handle_timeout_unknown_action_id(self, mock_error_obs):
+        """Test _handle_timeout handles unknown action ID."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "unknown"
+        
+        mock_obs = MagicMock()
+        mock_error_obs.return_value = mock_obs
+        
+        self.service._handle_timeout(self.mock_controller, mock_action, 125.5)
+        
+        # Cause should remain None for invalid IDs
+        self.assertIsNone(mock_obs.cause)
+
+    @patch('backend.controller.services.pending_action_service.ErrorObservation')
+    def test_handle_timeout_non_integer_action_id(self, mock_error_obs):
+        """Test _handle_timeout handles non-integer action ID."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "not-an-int"
+        
+        mock_obs = MagicMock()
+        mock_error_obs.return_value = mock_obs
+        
+        # Should not raise exception
+        self.service._handle_timeout(self.mock_controller, mock_action, 125.5)
+        
+        self.assertIsNone(mock_obs.cause)
+
+    @patch('time.time')
+    def test_set_action_replaces_previous(self, mock_time):
+        """Test set() replaces previous pending action."""
+        mock_action1 = MagicMock()
+        mock_action1.__class__.__name__ = "Action1"
+        mock_action1.id = "action-1"
+        
+        mock_action2 = MagicMock()
+        mock_action2.__class__.__name__ = "Action2"
+        mock_action2.id = "action-2"
+        
+        mock_time.return_value = 100.0
+        self.service.set(mock_action1)
+        
+        mock_time.return_value = 110.0
+        self.service.set(mock_action2)
+        
+        # Should log setting each action (source doesn't auto-clear on replace)
+        self.assertEqual(self.mock_controller.log.call_count, 2)  # set1 + set2
+        
+        # Current pending should be action2
+        action, timestamp = self.service._pending
+        self.assertEqual(action, mock_action2)
+
+    def test_custom_timeout(self):
+        """Test service with custom timeout value."""
+        service = PendingActionService(self.mock_context, timeout=60.0)
+        
+        self.assertEqual(service._timeout, 60.0)
+
+
+if __name__ == '__main__':
+    unittest.main()

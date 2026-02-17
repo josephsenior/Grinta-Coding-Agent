@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.core.logger import FORGE_logger as logger
+from backend.events.observation.status import StatusObservation
 
 if TYPE_CHECKING:
     from backend.controller.services.controller_context import ControllerContext
@@ -48,9 +49,13 @@ class BudgetGuardService:
         if budget_flag is None:
             return
 
-        current = getattr(budget_flag, "current_value", None)
-        max_value = getattr(budget_flag, "max_value", None)
-        if current is None or max_value is None or max_value <= 0:
+        try:
+            current = float(budget_flag.current_value)
+            max_value = float(budget_flag.max_value)
+        except (AttributeError, TypeError, ValueError):
+            return
+
+        if max_value <= 0:
             return
 
         pct = current / max_value
@@ -88,8 +93,6 @@ class BudgetGuardService:
         # Use a lightweight status observation so the WebSocket pushes this
         # to all connected clients automatically via the event stream.
         try:
-            from backend.events.observation.status import StatusObservation
-
             obs = StatusObservation(
                 content=content,
                 status_type="budget_alert",

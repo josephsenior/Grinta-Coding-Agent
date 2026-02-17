@@ -10,6 +10,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+import chromadb
+from chromadb.config import Settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,14 +65,6 @@ class ChromaDBBackend(VectorBackend):
             persist_directory: Directory for persistent storage
 
         """
-        try:
-            import chromadb
-            from chromadb.config import Settings
-            from sentence_transformers import SentenceTransformer
-        except ImportError as e:
-            msg = f"ChromaDB backend requires: pip install chromadb sentence-transformers\nOriginal error: {e}"
-            raise ImportError(msg) from e
-
         if persist_directory is None:
             persist_directory = Path.home() / ".Forge" / "memory" / "chroma"
         persist_directory.mkdir(parents=True, exist_ok=True)
@@ -82,6 +77,8 @@ class ChromaDBBackend(VectorBackend):
         # Use lightweight model for local development
         model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
         logger.info("Loading local embedding model: %s", model_name)
+        from sentence_transformers import SentenceTransformer
+
         self.model = SentenceTransformer(model_name)
 
         try:

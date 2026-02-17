@@ -60,7 +60,7 @@ graph TB
     ES --> WAL
 ```
 
-See the [Architecture Deep Dive](ARCHITECTURE.md) for a full walkthrough of the 21 services and 23 tools.
+See the [Architecture Deep Dive](docs/ARCHITECTURE.md) for a full walkthrough of the 21 services and 23 tools.
 
 ---
 
@@ -83,19 +83,29 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 
 ## 🤖 LLM Support
 
-Forge works with world-class cloud models and private local models out of the box.
+Forge features an **Intelligent Provider Resolver** that handles routing, local discovery, and model aliases automatically.
 
 ### Cloud Models
-Configure in `config.toml`:
-- **Anthropic**: `claude-3-5-sonnet-20241022` (Recommended)
+Configure in `config.toml`. Forge auto-resolves providers (OpenAI, Anthropic, Gemini, etc.):
+- **Anthropic**: `claude-3-7-sonnet` (Native SDK, no prefix needed)
 - **OpenAI**: `gpt-4o`, `gpt-4o-mini`
-- **Google**: `gemini-1.5-pro`, `gemini-1.5-flash`
+- **Google**: `gemini-2.0-pro-exp`
 
-### Local Models (Ollama)
-Forge handles Ollama automatically. Just pull a model and set it in your config:
-1. `ollama pull llama3.2`
-2. Set `model = "ollama/llama3.2"` in `config.toml`.
-3. No API key or base URL required — Forge detects the prefix and routes to `localhost:11434`.
+### Local Models & Auto-Discovery
+Forge automatically discovers running local providers (Ollama, LM Studio, vLLM):
+1. Start your local provider (e.g., `ollama serve`).
+2. Set `model = "ollama/llama3.2"` (or `lmstudio/...`) in `config.toml`.
+3. Forge probes localhost ports (:11434, :1234, :8000) and routes locally with ZERO manual configuration.
+
+### Model Aliases
+Define semantic aliases in `config.toml` to swap models without changing code:
+```toml
+[model_aliases]
+coding = "claude-3-7-sonnet"
+fast = "gpt-4o-mini"
+local = "ollama/qwen2.5-coder"
+```
+Then use `model = "coding"` in your config or agent settings.
 
 ---
 
@@ -118,9 +128,9 @@ Forge detects if the agent is looping by analyzing action patterns, semantic int
 
 ## 📖 Documentation
 
-- [User Guide](USER_GUIDE.md) — LLM setup, autonomy modes, playbooks, and TUI usage.
-- [Architecture](ARCHITECTURE.md) — Deeper dive into the controller, events, and engine layers.
-- [Developer Guide](DEVELOPER.md) — For contributors: project layout, internals, and patterns.
+- [User Guide](docs/USER_GUIDE.md) — LLM setup, autonomy modes, playbooks, and TUI usage.
+- [Architecture](docs/ARCHITECTURE.md) — Deeper dive into the controller, events, and engine layers.
+- [Developer Guide](docs/DEVELOPER.md) — For contributors: project layout, internals, and patterns.
 - [API Reference](openapi.json) — Full OpenAPI 3.1 spec for the backend.
 - [Contributing](CONTRIBUTING.md) — How to add new tools, condensers, or features.
 

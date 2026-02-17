@@ -255,7 +255,7 @@ async def unset_provider_tokens(
 @router.get("/secrets", response_model=None)
 async def load_custom_secrets_names(
     user_secrets: Annotated[UserSecrets | None, Depends(get_user_secrets)],
-) -> GETCustomSecrets | JSONResponse:
+) -> Any:
     """Get list of custom secret names and descriptions (without values).
 
     Args:

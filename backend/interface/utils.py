@@ -5,7 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import toml
+try:
+    import tomllib  # Python 3.11+
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]
+
 from pydantic import BaseModel, Field
 
 from backend.core.providers import (
@@ -29,9 +33,9 @@ def get_local_config_trusted_dirs() -> list[str]:
 
     """
     if _LOCAL_CONFIG_FILE_PATH.exists():
-        with open(_LOCAL_CONFIG_FILE_PATH, encoding="utf-8") as f:
+        with open(_LOCAL_CONFIG_FILE_PATH, "rb") as f:
             try:
-                config = toml.load(f)
+                config = tomllib.load(f)
             except Exception:
                 config = _DEFAULT_CONFIG
         if "runtime" in config and "trusted_dirs" in config["runtime"]:
@@ -43,8 +47,8 @@ def _load_local_config() -> dict:
     """Load local config file or return default config."""
     if _LOCAL_CONFIG_FILE_PATH.exists():
         try:
-            with open(_LOCAL_CONFIG_FILE_PATH, encoding="utf-8") as f:
-                return toml.load(f)
+            with open(_LOCAL_CONFIG_FILE_PATH, "rb") as f:
+                return tomllib.load(f)
         except Exception:
             return _DEFAULT_CONFIG
     else:
@@ -68,8 +72,20 @@ def _add_trusted_dir(config: dict, folder_path: str) -> None:
 
 def _save_local_config(config: dict) -> None:
     """Save config to local config file."""
-    with open(_LOCAL_CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
-        toml.dump(config, f)
+    try:
+        import toml
+
+        with open(_LOCAL_CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+            toml.dump(config, f)
+    except ImportError:
+        # Fallback to a very simple manual dump if only runtime dirs are involved
+        # or just log a warning. For now, we prefer keeping toml as an optional
+        # for these rare write operations.
+        from backend.core import logger
+
+        logger.FORGE_logger.warning(
+            "The 'toml' package is required to save configuration changes. Please install it with 'pip install toml'."
+        )
 
 
 def add_local_config_trusted_dir(folder_path: str) -> None:

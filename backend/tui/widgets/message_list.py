@@ -67,26 +67,35 @@ class MessageList(Widget):
     # ── public API ────────────────────────────────────────────────
 
     def add_user_message(self, content: str) -> None:
-        container = Vertical(classes="user-msg")
-        container.mount(Static("You", classes="user-msg-label"))
-        container.mount(Static(content))
+        """Append a user message bubble."""
+        container = Vertical(
+            Static("You", classes="user-msg-label"),
+            Static(content),
+            classes="user-msg",
+        )
         self.mount(container)
 
     def add_assistant_message(self, content: str) -> None:
-        container = Vertical(classes="assistant-msg")
-        container.mount(Static("Forge", classes="assistant-msg-label"))
-        container.mount(Static(content))
+        """Append an assistant message bubble."""
+        container = Vertical(
+            Static("Forge", classes="assistant-msg-label"),
+            Static(content),
+            classes="assistant-msg",
+        )
         self.mount(container)
 
     def add_system_message(self, content: str) -> None:
+        """Append a centred system/info message."""
         self.mount(Static(content, classes="system-msg"))
 
     def add_action(self, title: str, body: str, thought: str = "") -> None:
+        """Append an action card requiring user approval."""
         self.mount(ActionCard(title, body, thought))
 
     def add_observation(self, title: str, content: str) -> None:
-        container = Vertical(classes="obs-card")
-        container.mount(Static(f"◀ {title}", classes="obs-title"))
+        """Append a tool-observation card."""
+        children: list[Static] = [Static(f"◀ {title}", classes="obs-title")]
         if content:
-            container.mount(Static(content))
+            children.append(Static(content))
+        container = Vertical(*children, classes="obs-card")
         self.mount(container)

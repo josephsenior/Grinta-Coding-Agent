@@ -23,9 +23,12 @@ class StuckDetectionService:
     def is_stuck(self) -> bool:
         """Return True if the controller (or any delegate) appears stuck."""
         delegate = getattr(self._controller, "delegate", None)
-        if delegate and hasattr(delegate, "stuck_service"):
-            if delegate.stuck_service.is_stuck():
-                return True
+        if delegate is not None:
+            stuck_service = getattr(delegate, "stuck_service", None)
+            if stuck_service is not None:
+                result = stuck_service.is_stuck()
+                if result is True:
+                    return True
 
         if not self._detector:
             return False

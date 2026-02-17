@@ -19,6 +19,8 @@ import time
 from collections import OrderedDict
 from typing import Any
 
+from .local_vector_store import ChromaDBBackend
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,15 +95,10 @@ class ReRanker:
         """Lazy load the model."""
         if self._model is None:
             try:
+                logger.info("Loading re-ranker model: %s", self.model_name)
                 from sentence_transformers import CrossEncoder
 
-                logger.info("Loading re-ranker model: %s", self.model_name)
                 self._model = CrossEncoder(self.model_name)
-            except ImportError:
-                logger.warning(
-                    "sentence-transformers not available, re-ranking disabled"
-                )
-                self.enabled = False
             except Exception as e:
                 logger.warning("Failed to load re-ranker: %s", e)
                 self.enabled = False
@@ -186,9 +183,6 @@ class EnhancedVectorStore:
             cache_ttl: Cache TTL in seconds
 
         """
-        # Import the local store
-        from .local_vector_store import ChromaDBBackend
-
         self.backend: ChromaDBBackend = ChromaDBBackend(collection_name)
 
         # Initialize cache
