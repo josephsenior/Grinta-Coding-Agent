@@ -186,8 +186,24 @@ class ForgeClient:
     ) -> dict[str, Any]:
         """POST /api/conversations → create & start a new session.
 
+        Automatically prepends the content of ``.forge/context.md`` (if it
+        exists) to ``conversation_instructions`` so the agent always has the
+        project context without the user having to paste it.
+
         Returns the raw response dict (contains ``conversation_id``).
         """
+        # Inject local project memory if available
+        try:
+            from backend.core.workspace_context import read_project_memory
+            memory = read_project_memory()
+            if memory:
+                if conversation_instructions:
+                    conversation_instructions = memory + "\n\n---\n\n" + conversation_instructions
+                else:
+                    conversation_instructions = memory
+        except Exception:
+            pass  # Never fail conversation creation over a missing context file
+
         payload: dict[str, Any] = {}
         if initial_message:
             payload["initial_user_msg"] = initial_message

@@ -1,7 +1,17 @@
-"""Chat screen — main conversation workspace with streaming messages."""
+"""Chat screen — main conversation workspace with streaming messages.
+
+Improvements:
+- Right sidebar (ActivityPanel) tracks files, thoughts, cost, steps.
+- Inline diff hints on file edits.
+- Agent changelog written to .forge/changelog.jsonl.
+- Terminal bell fires on task completion.
+- Playbook detection from observation events.
+"""
 
 from __future__ import annotations
 
+import logging
+import sys
 from typing import Any
 
 from textual import on
@@ -13,12 +23,18 @@ from textual.widgets import (
     Footer,
     Header,
     Input,
+    Select,
+    Static,
 )
 
 from backend.tui.client import ForgeClient
+from backend.tui.widgets.activity_panel import ActivityPanel
 from backend.tui.widgets.confirm_bar import ConfirmBar
 from backend.tui.widgets.message_list import MessageList
 from backend.tui.widgets.status_bar import AgentStatusBar
+from backend.core.workspace_context import append_changelog
+
+logger = logging.getLogger("forge.tui.chat")
 
 # Agent states that mean "waiting for user"
 _AWAITING_STATES = frozenset({"awaiting_user_confirmation", "awaiting_user_input"})
@@ -36,11 +52,16 @@ class ChatScreen(Screen[None]):
         Binding("ctrl+q", "go_home", "Back to Home", show=True),
         Binding("ctrl+d", "view_diff", "View Diff", show=True),
         Binding("ctrl+x", "stop_agent", "Stop Agent", show=True),
+        Binding("ctrl+p", "toggle_panel", "Panel", show=True),
         Binding("escape", "dismiss_confirm", "Cancel", show=False),
     ]
 
     CSS = """
     #chat-outer {
+        height: 100%;
+    }
+    #chat-main {
+        width: 1fr;
         height: 100%;
     }
     #message-scroll {
@@ -53,10 +74,29 @@ class ChatScreen(Screen[None]):
         padding: 0 1;
         border-top: hkey $primary;
     }
+    #model-selector {
+        width: 24;
+        margin-right: 1;
+    }
     #chat-input {
         width: 1fr;
     }
+    .diff-hint {
+        margin: 0 0 0 4;
+        padding: 0 1;
+        border-left: outer $primary;
+        color: $text-muted;
+    }
+    .diff-add {
+        color: $success;
+    }
+    .diff-del {
+        color: $error;
+    }
     """
+
+    # Characters to show from old/new content in inline diff hints
+    _DIFF_PREVIEW_CHARS = 100
 
     def __init__(self, client: ForgeClient, conversation_id: str) -> None:
         super().__init__()
@@ -64,14 +104,25 @@ class ChatScreen(Screen[None]):
         self.conversation_id = conversation_id
         self._agent_state: str = "loading"
         self._pending_action: dict[str, Any] | None = None
+        self._models_loaded: bool = False
+        self._step_count: int = 0
+        self._panel_visible: bool = True
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        with Vertical(id="chat-outer"):
-            yield VerticalScroll(MessageList(id="message-list"), id="message-scroll")
-            yield ConfirmBar(id="confirm-bar")
-            with Horizontal(id="input-row"):
-                yield Input(placeholder="Type a message…", id="chat-input")
+        with Horizontal(id="chat-outer"):
+            with Vertical(id="chat-main"):
+                yield VerticalScroll(MessageList(id="message-list"), id="message-scroll")
+                yield ConfirmBar(id="confirm-bar")
+                with Horizontal(id="input-row"):
+                    yield Select[str](
+                        [("Loading…", "__loading__")],
+                        id="model-selector",
+                        prompt="Model",
+                        allow_blank=True,
+                    )
+                    yield Input(placeholder="Type a message…", id="chat-input")
+            yield ActivityPanel(id="activity-panel")
         yield AgentStatusBar(id="agent-status-bar")
         yield Footer()
 
@@ -81,6 +132,7 @@ class ChatScreen(Screen[None]):
             f"Connecting to conversation {self.conversation_id[:8]}…"
         )
         try:
+            await self._load_models()
             await self.client.join_conversation(
                 self.conversation_id,
                 on_event=self._handle_event,
@@ -89,11 +141,67 @@ class ChatScreen(Screen[None]):
         except Exception as e:
             self._add_system_message(f"Connection error: {e}")
 
+    async def _load_models(self) -> None:
+        """Populate the model selector from the backend."""
+        try:
+            models = await self.client.get_models()
+            settings = await self.client.get_settings()
+        except Exception as exc:
+            logger.debug("Failed to load models/settings: %s", exc)
+            return
+
+        select = self.query_one("#model-selector", Select)
+        options: list[tuple[str, str]] = []
+        for m in models:
+            model_id = str(m.get("id", m.get("model", str(m))))
+            name = str(m.get("name", model_id))
+            options.append((name, model_id))
+
+        if not options:
+            return
+
+        select.set_options(options)
+
+        # Determine the currently active model
+        current_model = (
+            settings.get("llm_model")
+            or settings.get("llm", {}).get("model")
+            or settings.get("model")
+        )
+
+        # Try to set it; fall back to first option
+        self._models_loaded = True
+        if current_model:
+            valid_ids = {opt[1] for opt in options}
+            if current_model in valid_ids:
+                select.value = current_model
+            else:
+                select.value = options[0][1]
+        else:
+            select.value = options[0][1]
+
     async def on_unmount(self) -> None:
         """Clean up Socket.IO connection when leaving the screen."""
-        await self.client.leave_conversation()
+        try:
+            await self.client.leave_conversation()
+        except Exception:
+            pass
 
     # ── input handling ────────────────────────────────────────────
+
+    @on(Select.Changed, "#model-selector")
+    async def _on_model_change(self, event: Select.Changed) -> None:
+        # Skip programmatic changes and the loading placeholder
+        if not self._models_loaded:
+            return
+        val = event.value
+        if not val or val == Select.BLANK or val == "__loading__":
+            return
+        try:
+            await self.client.save_settings({"llm_model": str(val)})
+            self.notify(f"Switched to {val}")
+        except Exception as e:
+            self.notify(f"Failed to switch model: {e}", severity="error")
 
     @on(Input.Submitted, "#chat-input")
     async def _on_submit(self, event: Input.Submitted) -> None:
@@ -122,35 +230,48 @@ class ChatScreen(Screen[None]):
     # ── event stream handler ──────────────────────────────────────
 
     async def _handle_event(self, data: dict[str, Any]) -> None:
-        """Process a single ``forge_event`` from the Socket.IO stream.
+        """Process a ``forge_event`` from the Socket.IO stream.
 
-        This is called from the Socket.IO reader task inside python-socketio,
-        so we need to use ``call_from_thread`` / ``post_message`` to update
-        the Textual widget tree safely.
+        python-socketio's async client runs callbacks *inside* the asyncio
+        event loop but outside Textual's message pump.  We use
+        ``call_from_thread`` which safely schedules processing on the
+        Textual event loop regardless of the calling context.
         """
-        # Delegate to the UI thread
-        self.app.call_from_thread(self._process_event, data)
+        try:
+            self.app.call_from_thread(self._process_event, data)
+        except Exception:
+            # App might be shutting down; log and move on
+            logger.debug("Event dispatch failed (app shutting down?)", exc_info=True)
 
     def _process_event(self, data: dict[str, Any]) -> None:
         """Dispatch event data to the appropriate widget update."""
-        if "action" in data:
-            self._handle_action(data)
-        elif "observation" in data:
-            self._handle_observation(data)
-        elif "extras" in data and "agent_state" in data.get("extras", {}):
-            new_state = data["extras"]["agent_state"]
-            self._update_agent_state(new_state, data)
+        try:
+            if "action" in data:
+                self._handle_action(data)
+            elif "observation" in data:
+                self._handle_observation(data)
+            elif "extras" in data and "agent_state" in data.get("extras", {}):
+                new_state = data["extras"]["agent_state"]
+                self._update_agent_state(new_state, data)
 
-        # Update metrics if present
-        llm_metrics = data.get("llm_metrics")
-        if llm_metrics:
-            status_bar = self.query_one("#agent-status-bar", AgentStatusBar)
-            cost = llm_metrics.get("accumulated_cost")
-            model = llm_metrics.get("model")
-            if cost is not None:
-                status_bar.update_cost(cost)
-            if model:
-                status_bar.update_model(model)
+            llm_metrics = data.get("llm_metrics")
+            if llm_metrics:
+                status_bar = self.query_one("#agent-status-bar", AgentStatusBar)
+                panel = self.query_one("#activity-panel", ActivityPanel)
+                cost = llm_metrics.get("accumulated_cost")
+                model = llm_metrics.get("model")
+                if cost is not None:
+                    status_bar.update_cost(cost)
+                    panel.update_cost(float(cost))
+                    append_changelog(
+                        "cost_update",
+                        {"cost": cost, "model": model or ""},
+                        conversation_id=self.conversation_id,
+                    )
+                if model:
+                    status_bar.update_model(model)
+        except Exception:
+            logger.debug("Error processing event", exc_info=True)
 
     # ── action events ─────────────────────────────────────────────
 
@@ -158,64 +279,117 @@ class ChatScreen(Screen[None]):
         action_type = data.get("action", "")
         args = data.get("args", {})
 
-        # Hidden actions are internal — skip
         if args.get("hidden"):
             return
 
+        panel = self.query_one("#activity-panel", ActivityPanel)
+
         if action_type == "message":
-            # Agent message (not user — user messages come via our input)
             source = data.get("source", "")
             content = args.get("content", "")
             if source == "user":
-                # Already shown via _add_user_message, skip duplicate
                 return
             self._add_assistant_message(content)
-
         elif action_type == "run":
-            # Command execution
             cmd = args.get("command", "")
             thought = args.get("thought", "")
             self._add_action_card("Run Command", cmd, thought)
-
+            append_changelog(
+                "command_run",
+                {"command": cmd[:200]},
+                conversation_id=self.conversation_id,
+            )
         elif action_type == "read":
             path = args.get("path", "")
             self._add_action_card("Read File", path)
-
+            panel.track_file(path, "read")
         elif action_type == "write":
             path = args.get("path", "")
+            content = args.get("content", "")
             self._add_action_card("Write File", path)
-
+            if content:
+                first_line = next(
+                    (ln for ln in content.splitlines() if ln.strip()), ""
+                )
+                if first_line:
+                    self._add_diff_hint(
+                        f"+ {first_line[:self._DIFF_PREVIEW_CHARS]}",
+                        css_class="diff-add",
+                    )
+            panel.track_file(path, "write")
+            append_changelog(
+                "file_write",
+                {"path": path},
+                conversation_id=self.conversation_id,
+            )
         elif action_type == "edit":
             path = args.get("path", "")
+            old_str = args.get("old_str", "")
+            new_str = args.get("new_str", "")
             self._add_action_card("Edit File", path)
-
+            self._show_inline_diff(old_str, new_str)
+            panel.track_file(path, "edit")
+            append_changelog(
+                "file_edit",
+                {"path": path},
+                conversation_id=self.conversation_id,
+            )
         elif action_type == "browse":
             url = args.get("url", "")
             self._add_action_card("Browse", url)
-
+            panel.track_file(url, "browse")
+            append_changelog(
+                "browse",
+                {"url": url[:300]},
+                conversation_id=self.conversation_id,
+            )
         elif action_type == "mcp":
             tool = args.get("tool_name", args.get("name", "mcp"))
             self._add_action_card(f"MCP: {tool}", str(args.get("arguments", "")))
-
         elif action_type == "think":
             thought = args.get("content", args.get("thought", ""))
             if thought:
                 self._add_action_card("Thinking", thought)
-
+                panel.add_thought(thought)
         elif action_type in ("finish", "reject"):
             content = args.get("content", args.get("outputs", {}).get("content", ""))
             self._add_system_message(
                 f"Agent {action_type}: {content}" if content else f"Agent {action_type}"
             )
-
+            append_changelog(
+                "task_finished" if action_type == "finish" else "task_rejected",
+                {"message": content[:300] if content else ""},
+                conversation_id=self.conversation_id,
+            )
         else:
-            # Generic action
             self._add_action_card(action_type, str(args)[:200])
 
-        # If the action has security_risk, show confirmation
+        # Increment step counter
+        self._step_count += 1
+        panel.update_steps(self._step_count)
+
         if "security_risk" in args:
             self._pending_action = data
             self._show_confirm_bar(action_type, args)
+
+    def _show_inline_diff(self, old_str: str, new_str: str) -> None:
+        """Show a compact before/after hint for file edits."""
+        if not old_str and not new_str:
+            return
+        old_first = next(
+            (ln for ln in old_str.splitlines() if ln.strip()), ""
+        )
+        new_first = next(
+            (ln for ln in new_str.splitlines() if ln.strip()), ""
+        )
+        if old_first:
+            self._add_diff_hint(
+                f"- {old_first[:self._DIFF_PREVIEW_CHARS]}", css_class="diff-del"
+            )
+        if new_first:
+            self._add_diff_hint(
+                f"+ {new_first[:self._DIFF_PREVIEW_CHARS]}", css_class="diff-add"
+            )
 
     # ── observation events ────────────────────────────────────────
 
@@ -225,43 +399,42 @@ class ChatScreen(Screen[None]):
         extras = data.get("extras", {})
 
         if obs_type == "agent_state_changed":
-            new_state = extras.get("agent_state", "")
-            self._update_agent_state(new_state, data)
+            self._update_agent_state(extras.get("agent_state", ""), data)
             return
-
         if obs_type == "error":
             self._add_system_message(f"Error: {content}")
-            return
-
-        if obs_type == "run":
-            # Truncate long command output for display
-            display_content = content[:500] + "…" if len(content) > 500 else content
-            msg_list = self.query_one("#message-list", MessageList)
-            msg_list.add_observation("Command Output", display_content)
-            return
-
-        if obs_type in ("read", "write", "edit"):
-            msg = f"[{obs_type}] {content[:200]}" if content else f"[{obs_type}] done"
-            msg_list = self.query_one("#message-list", MessageList)
-            msg_list.add_observation(obs_type.title(), msg)
-            return
-
-        if obs_type == "mcp":
-            tool = extras.get("tool_name", "mcp")
-            msg_list = self.query_one("#message-list", MessageList)
-            msg_list.add_observation(
-                f"MCP: {tool}", content[:300] if content else "done"
+            append_changelog(
+                "task_error",
+                {"message": content[:300]},
+                conversation_id=self.conversation_id,
             )
             return
 
-        if obs_type in ("chat", "message"):
-            self._add_assistant_message(content)
+        # Playbook knowledge — update activity panel
+        if obs_type in ("playbook", "playbook_knowledge"):
+            playbooks = extras.get("playbooks", [])
+            if isinstance(playbooks, list) and playbooks:
+                panel = self.query_one("#activity-panel", ActivityPanel)
+                panel.set_playbooks([str(p) for p in playbooks])
             return
 
-        # Generic observation
-        if content:
-            msg_list = self.query_one("#message-list", MessageList)
+        msg_list = self.query_one("#message-list", MessageList)
+
+        if obs_type == "run":
+            display = content[:500] + "…" if len(content) > 500 else content
+            msg_list.add_observation("Command Output", display)
+        elif obs_type in ("read", "write", "edit"):
+            msg = f"[{obs_type}] {content[:200]}" if content else f"[{obs_type}] done"
+            msg_list.add_observation(obs_type.title(), msg)
+        elif obs_type == "mcp":
+            tool = extras.get("tool_name", "mcp")
+            msg_list.add_observation(f"MCP: {tool}", content[:300] if content else "done")
+        elif obs_type in ("chat", "message"):
+            self._add_assistant_message(content)
+        elif content:
             msg_list.add_observation(obs_type or "observation", content[:300])
+
+        self._scroll_to_bottom()
 
     # ── agent state ───────────────────────────────────────────────
 
@@ -271,7 +444,6 @@ class ChatScreen(Screen[None]):
         status_bar.update_state(new_state)
 
         if new_state == "awaiting_user_confirmation":
-            # Show the confirmation bar
             extras = data.get("extras", {})
             action_type = extras.get("confirmation_action_type", "action")
             self._show_confirm_bar(action_type, extras)
@@ -280,27 +452,31 @@ class ChatScreen(Screen[None]):
 
         if new_state in _TERMINAL_STATES:
             self._add_system_message(f"Agent state: {new_state}")
+            self._ring_bell()
 
     # ── widget helpers ────────────────────────────────────────────
 
     def _add_user_message(self, content: str) -> None:
-        msg_list = self.query_one("#message-list", MessageList)
-        msg_list.add_user_message(content)
+        self.query_one("#message-list", MessageList).add_user_message(content)
         self._scroll_to_bottom()
 
     def _add_assistant_message(self, content: str) -> None:
-        msg_list = self.query_one("#message-list", MessageList)
-        msg_list.add_assistant_message(content)
+        self.query_one("#message-list", MessageList).add_assistant_message(content)
         self._scroll_to_bottom()
 
     def _add_system_message(self, content: str) -> None:
-        msg_list = self.query_one("#message-list", MessageList)
-        msg_list.add_system_message(content)
+        self.query_one("#message-list", MessageList).add_system_message(content)
         self._scroll_to_bottom()
 
     def _add_action_card(self, title: str, body: str, thought: str = "") -> None:
+        self.query_one("#message-list", MessageList).add_action(title, body, thought)
+        self._scroll_to_bottom()
+
+    def _add_diff_hint(self, line: str, css_class: str = "") -> None:
+        """Mount a compact inline diff hint below the last action card."""
         msg_list = self.query_one("#message-list", MessageList)
-        msg_list.add_action(title, body, thought)
+        classes = f"diff-hint {css_class}".strip()
+        msg_list.mount(Static(line, classes=classes))
         self._scroll_to_bottom()
 
     def _scroll_to_bottom(self) -> None:
@@ -313,8 +489,15 @@ class ChatScreen(Screen[None]):
         bar.show_confirmation(action_type, risk)
 
     def _hide_confirm_bar(self) -> None:
-        bar = self.query_one("#confirm-bar", ConfirmBar)
-        bar.hide_confirmation()
+        self.query_one("#confirm-bar", ConfirmBar).hide_confirmation()
+
+    def _ring_bell(self) -> None:
+        """Emit a terminal bell to notify the user the task is done."""
+        try:
+            sys.stdout.write("\a")
+            sys.stdout.flush()
+        except Exception:
+            pass
 
     # ── actions ───────────────────────────────────────────────────
 
@@ -335,3 +518,9 @@ class ChatScreen(Screen[None]):
 
     def action_dismiss_confirm(self) -> None:
         self._hide_confirm_bar()
+
+    def action_toggle_panel(self) -> None:
+        """Show/hide the activity sidebar (Ctrl+P)."""
+        panel = self.query_one("#activity-panel", ActivityPanel)
+        self._panel_visible = not self._panel_visible
+        panel.display = self._panel_visible

@@ -1,6 +1,11 @@
 """Main entry point for Forge CLI with subcommand support."""
 
 import sys
+import os
+import subprocess
+import time
+import signal
+from pathlib import Path
 
 from backend.core.config import get_cli_parser
 from backend.interface.gui_launcher import launch_gui_server
@@ -14,7 +19,7 @@ def _handle_help_request(parser) -> None:
 
 def _normalize_arguments() -> None:
     """Normalize command line arguments."""
-    if len(sys.argv) == 1 or (len(sys.argv) > 1 and sys.argv[1] not in ["serve"]):
+    if len(sys.argv) == 1 or (len(sys.argv) > 1 and sys.argv[1] not in ["serve", "all", "start", "init"]):
         sys.argv.insert(1, "serve")
 
 
@@ -24,10 +29,109 @@ def _handle_version_request(args) -> None:
         sys.exit(0)
 
 
+def _launch_all_in_one() -> None:
+    """Launch both backend server and TUI in the same terminal session."""
+    import httpx
+    from backend.tui.app import ForgeApp
+    from backend.tui.client import ForgeClient
+    from backend import __version__
+
+    # 0. Check for Redis (Mandatory dependency)
+    try:
+        import redis
+        r = redis.Redis(host='localhost', port=6379, socket_connect_timeout=1)
+        r.ping()
+        print("✅ Redis connection verified.")
+    except Exception as e:
+        print("⚠️  Warning: Redis connection failed. Some features may be limited.")
+        print("   If you are running locally, please ensure redis-server is running.")
+        print(f"   Error: {e}")
+
+    # 1. Start backend server in background
+    env = os.environ.copy()
+    env["FORGE_RUNTIME"] = "local"
+    # Ensure zero-config for local sessions by disabling the mandatory API key requirement
+    # Users can still enable it by setting SESSION_API_KEY explicitly in their terminal shell.
+    if not os.environ.get("SESSION_API_KEY"):
+        env["SESSION_API_KEY"] = ""
+    
+    server_cmd = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "backend.server.listen:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "3000",
+        "--log-level", "warning"  # Keep logs quiet so they don't corrupt TUI
+    ]
+    
+    server_proc = subprocess.Popen(
+        server_cmd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
+
+    def cleanup(sig=None, frame=None):
+        print("\nCleanup: Stopping server...")
+        server_proc.terminate()
+        server_proc.wait()
+        sys.exit(0)
+
+    # Register cleanup handlers
+    signal.signal(signal.SIGINT, cleanup)
+    signal.signal(signal.SIGTERM, cleanup)
+
+    # 2. Wait for server to be ready
+    print("⏳ Waiting for backend to initialize...")
+    max_retries = 30
+    ready = False
+    for i in range(max_retries):
+        if server_proc.poll() is not None:
+            print("❌ Backend process exited prematurely.")
+            output, _ = server_proc.communicate()
+            print("\nBackend output:")
+            print("-" * 40)
+            print(output)
+            print("-" * 40)
+            sys.exit(1)
+            
+        try:
+            with httpx.Client() as client:
+                response = client.get("http://localhost:3000/api/health/live")
+                if response.status_code == 200:
+                    ready = True
+                    break
+        except Exception:
+            pass
+        time.sleep(0.5)
+        if i % 5 == 0 and i > 0:
+            print(f"   Still waiting ({i/2}s elapsed)...")
+
+    if not ready:
+        print("❌ Backend failed to start. Aborting.")
+        server_proc.terminate()
+        sys.exit(1)
+
+    # 3. Launch TUI in foreground
+    print("✅ Backend ready! Launching TUI...")
+    try:
+        client = ForgeClient(base_url="http://localhost:3000")
+        app = ForgeApp(client)
+        app.run()
+    finally:
+        cleanup()
+
+
 def _execute_command(args, parser) -> None:
     """Execute the appropriate command based on parsed arguments."""
     if args.command == "serve":
         launch_gui_server()
+    elif args.command in ("all", "start"):
+        _launch_all_in_one()
     elif args.command == "init":
         from backend.interface.cli.init_project import init_project
 

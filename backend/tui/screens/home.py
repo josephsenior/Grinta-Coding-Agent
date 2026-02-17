@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -19,6 +18,7 @@ from textual.widgets import (
 )
 
 from backend.tui.client import ConversationInfo, ForgeClient
+from backend.core.workspace_context import detect_project_type, today_stats
 
 
 def _fuzzy_subsequence_score(query: str, target: str) -> float:
@@ -58,70 +58,91 @@ class ConversationListItem(ListItem):
         self.info = info
 
     def compose(self) -> ComposeResult:
-        with Horizontal():
+        with Horizontal(classes="conversation-item"):
             yield Label(self.info.title or "Untitled", classes="conversation-title")
-            yield Label(
-                self.info.status,
-                classes="conversation-meta",
-            )
+            yield Label(self.info.status, classes="conversation-meta")
 
 
-class HomeScreen(Screen[str]):
+class HomeScreen(Screen[None]):
     """Landing screen — lists conversations and lets the user create new ones.
 
-    Returns the chosen ``conversation_id`` when the user selects or creates one.
+    Navigation:
+    - Selecting a conversation pushes ChatScreen via ``app.open_chat()``.
+    - Creating a new conversation does the same.
+    - This screen stays on the stack so returning from ChatScreen is instant.
     """
 
     BINDINGS = [
-        Binding("ctrl+n", "focus_input", "New conversation", show=True),
+        Binding("ctrl+n", "focus_new", "New", show=True),
         Binding("ctrl+s", "open_settings", "Settings", show=True),
+        Binding("ctrl+y", "open_summary", "Summary", show=True),
         Binding("ctrl+q", "quit_app", "Quit", show=True),
-        Binding("r", "refresh_list", "Refresh", show=True),
-        Binding("d", "delete_selected", "Delete", show=True),
         Binding("ctrl+f", "focus_search", "Search", show=True),
+        # Single-char bindings only fire when a non-Input widget has focus
+        Binding("r", "refresh_list", "Refresh", show=False),
+        Binding("d", "delete_selected", "Delete", show=False),
         Binding("/", "focus_search", "Search", show=False),
     ]
 
     CSS = """
+    #home-outer {
+        height: 100%;
+        padding: 1 2;
+    }
     #home-header {
         height: 5;
         content-align: center middle;
-        padding: 1;
     }
-    #home-header-text {
+    #home-title {
         text-align: center;
         text-style: bold;
         color: $accent;
     }
-    #home-hint {
+    #home-subtitle {
         text-align: center;
         color: $text-muted;
     }
     #search-bar {
         height: 3;
-        padding: 0 2;
+        padding: 0 0;
     }
     #search-input {
         width: 1fr;
     }
+    #list-area {
+        height: 1fr;
+    }
     #conversation-list-view {
         height: 1fr;
         border: round $primary;
-        margin: 0 2;
+    }
+    #empty-state {
+        height: 1fr;
+        content-align: center middle;
+        color: $text-muted;
+        text-style: italic;
+        border: round $primary;
     }
     #new-bar {
         height: 3;
         dock: bottom;
-        padding: 0 2;
+        padding: 0 0;
     }
     #new-input {
         width: 1fr;
     }
-    .empty-hint {
-        height: 100%;
-        content-align: center middle;
+    .conversation-item {
+        height: 3;
+        padding: 0 1;
+    }
+    .conversation-title {
+        width: 1fr;
+        text-style: bold;
+    }
+    .conversation-meta {
         color: $text-muted;
-        text-style: italic;
+        text-align: right;
+        width: auto;
     }
     """
 
@@ -133,18 +154,25 @@ class HomeScreen(Screen[str]):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        with Vertical(id="home-container"):
+        with Vertical(id="home-outer"):
             with Vertical(id="home-header"):
-                yield Static("⚒  FORGE", id="home-header-text")
+                yield Static("⚒  FORGE", id="home-title")
                 yield Static(
-                    "AI-Powered Development — Terminal Edition", id="home-hint"
+                    "AI-Powered Development — Terminal Edition", id="home-subtitle"
                 )
+                yield Static("", id="home-fingerprint")
+                yield Static("", id="home-stats")
             with Horizontal(id="search-bar"):
                 yield Input(
-                    placeholder="Search conversations (Ctrl+F or /)...",
+                    placeholder="Search conversations (Ctrl+F or /)…",
                     id="search-input",
                 )
-            yield ListView(id="conversation-list-view")
+            with Vertical(id="list-area"):
+                yield ListView(id="conversation-list-view")
+                yield Static(
+                    "No conversations yet — type below to start one.",
+                    id="empty-state",
+                )
             with Horizontal(id="new-bar"):
                 yield Input(
                     placeholder="Describe a task to start a new conversation…",
@@ -154,21 +182,43 @@ class HomeScreen(Screen[str]):
 
     async def on_mount(self) -> None:
         """Load conversations when the screen mounts."""
+        self._refresh_workspace_info()
         await self._load_conversations()
+
+    async def on_screen_resume(self) -> None:
+        """Refresh the list when returning from ChatScreen."""
+        self._refresh_workspace_info()
+        await self._load_conversations()
+
+    def _refresh_workspace_info(self) -> None:
+        """Update the fingerprint and today's stats labels."""
+        try:
+            fingerprint = detect_project_type()
+            fp_widget = self.query_one("#home-fingerprint", Static)
+            fp_widget.update(fingerprint)
+        except Exception:
+            pass
+        try:
+            stats = today_stats()
+            sessions = stats.get("sessions", 0)
+            cost = stats.get("total_cost", 0.0)
+            tasks = stats.get("tasks_done", 0)
+            stats_widget = self.query_one("#home-stats", Static)
+            stats_widget.update(
+                f"Today: {sessions} session{'s' if sessions != 1 else ''}"
+                f" · ${cost:.4f} · {tasks} task{'s' if tasks != 1 else ''} done"
+            )
+        except Exception:
+            pass
 
     # ── data loading ──────────────────────────────────────────────
 
     async def _load_conversations(self) -> None:
-        list_view = self.query_one("#conversation-list-view", ListView)
-        list_view.clear()
         try:
             self._conversations = await self.client.list_conversations(limit=50)
         except Exception as e:
-            list_view.mount(
-                Static(f"Error loading conversations: {e}", classes="empty-hint")
-            )
+            self._show_empty(f"Error loading conversations: {e}")
             return
-
         self._apply_filter()
 
     def _apply_filter(self) -> None:
@@ -176,7 +226,6 @@ class HomeScreen(Screen[str]):
         list_view = self.query_one("#conversation-list-view", ListView)
         list_view.clear()
 
-        # Filter conversations by search query (fuzzy matching)
         filtered = self._conversations
         if self._search_query:
             scored = []
@@ -188,39 +237,34 @@ class HomeScreen(Screen[str]):
             filtered = [conv for _, conv in scored]
 
         if not filtered and self._conversations:
-            list_view.mount(
-                Static(
-                    f'No conversations match "{self._search_query}"',
-                    classes="empty-hint",
-                )
-            )
+            self._show_empty(f'No conversations match "{self._search_query}"')
             return
 
         if not filtered:
-            list_view.mount(
-                Static(
-                    "No conversations yet — type below to start one.",
-                    classes="empty-hint",
-                )
-            )
+            self._show_empty("No conversations yet — type below to start one.")
             return
 
+        # Hide empty state, show list
+        self.query_one("#empty-state", Static).display = False
+        list_view.display = True
         for info in filtered:
             list_view.append(ConversationListItem(info))
 
+    def _show_empty(self, message: str) -> None:
+        """Show the empty-state label and hide the list."""
+        self.query_one("#conversation-list-view", ListView).display = False
+        empty = self.query_one("#empty-state", Static)
+        empty.update(message)
+        empty.display = True
+
     @staticmethod
     def _fuzzy_match_score(query: str, conv: ConversationInfo) -> float:
-        """Score a conversation against a search query using fuzzy matching.
-
-        Returns a score > 0 if the conversation matches, 0 otherwise.
-        Higher scores indicate better matches.
-        """
+        """Score a conversation against a search query using fuzzy matching."""
         query_lower = query.lower()
         title = (conv.title or "").lower()
         status = conv.status.lower()
         cid = conv.conversation_id.lower()
 
-        # Exact substring match (highest priority)
         if query_lower in title:
             return 100.0
         if query_lower in status:
@@ -228,12 +272,10 @@ class HomeScreen(Screen[str]):
         if query_lower in cid:
             return 70.0
 
-        # Fuzzy: all query characters appear in order in the target
         score = _fuzzy_subsequence_score(query_lower, title)
         if score > 0:
             return score
 
-        # Word-level matching: each query word found somewhere
         words = query_lower.split()
         if words:
             matched = sum(
@@ -257,44 +299,41 @@ class HomeScreen(Screen[str]):
     @on(Input.Submitted, "#new-input")
     async def _on_new_conversation(self, event: Input.Submitted) -> None:
         msg = event.value.strip()
-        if not msg:
-            # Create a blank conversation
-            pass
         await self._create_and_open(msg or None)
 
     @on(ListView.Selected, "#conversation-list-view")
     def _on_conversation_selected(self, event: ListView.Selected) -> None:
         item = event.item
         if isinstance(item, ConversationListItem):
-            self.dismiss(item.info.conversation_id)
+            self.app.open_chat(item.info.conversation_id)  # type: ignore[attr-defined]
 
     # ── actions ───────────────────────────────────────────────────
 
     async def _create_and_open(self, initial_message: str | None) -> None:
-        """Create a conversation then switch to the chat screen."""
+        """Create a conversation then push the chat screen."""
         self.notify("Creating conversation…", severity="information")
         try:
             result = await self.client.create_conversation(initial_message)
             cid = result.get("conversation_id", "")
             if cid:
-                self.dismiss(cid)
+                self.query_one("#new-input", Input).value = ""
+                self.app.open_chat(cid)  # type: ignore[attr-defined]
             else:
-                self.notify(
-                    "Failed to get conversation_id from server", severity="error"
-                )
+                self.notify("Failed to get conversation_id", severity="error")
         except Exception as e:
             self.notify(f"Error: {e}", severity="error")
 
-    def action_focus_input(self) -> None:
+    def action_focus_new(self) -> None:
         self.query_one("#new-input", Input).focus()
 
     def action_focus_search(self) -> None:
         self.query_one("#search-input", Input).focus()
 
     def action_open_settings(self) -> None:
-        from backend.tui.screens.settings import SettingsScreen
+        self.app.open_settings()  # type: ignore[attr-defined]
 
-        self.app.push_screen(SettingsScreen(self.client))
+    def action_open_summary(self) -> None:
+        self.app.open_summary()  # type: ignore[attr-defined]
 
     def action_quit_app(self) -> None:
         self.app.exit()
