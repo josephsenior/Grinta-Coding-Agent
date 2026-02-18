@@ -18,12 +18,16 @@ class TelemetryService:
 
     def initialize_tool_pipeline(self) -> None:
         """Create the default tool invocation pipeline for the controller."""
+        from backend.controller.file_state_tracker import FileStateMiddleware
         from backend.controller.idempotency import IdempotencyMiddleware
         from backend.controller.pre_exec_diff import PreExecDiffMiddleware
         from backend.controller.rollback_middleware import RollbackMiddleware
         from backend.controller.tool_pipeline import (
             CircuitBreakerMiddleware,
+            ConflictDetectionMiddleware,
             CostQuotaMiddleware,
+            EditVerifyMiddleware,
+            ErrorPatternMiddleware,
             LoggingMiddleware,
             PlanningMiddleware,
             ReflectionMiddleware,
@@ -49,6 +53,17 @@ class TelemetryService:
         middlewares.append(RollbackMiddleware())
         # Pre-execution diff preview (before logging/telemetry)
         middlewares.append(PreExecDiffMiddleware())
+        # Auto-verify hint after file edits
+        middlewares.append(EditVerifyMiddleware())
+        # Warn when re-editing a file without verifying in between
+        middlewares.append(ConflictDetectionMiddleware())
+        # Auto-query error_patterns DB when errors arrive
+        middlewares.append(ErrorPatternMiddleware())
+        # File state tracking (records files read/modified/created)
+        file_state_mw = FileStateMiddleware()
+        middlewares.append(file_state_mw)
+        # Store tracker on controller for context injection by planner
+        controller._file_state_tracker = file_state_mw.tracker
         middlewares.extend(
             [LoggingMiddleware(controller), TelemetryMiddleware(controller)]
         )

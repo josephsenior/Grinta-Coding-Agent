@@ -9,6 +9,12 @@ from backend.core.message import Message, TextContent
 from backend.events.action import MessageAction
 from backend.memory.condenser import Condenser
 from backend.memory.conversation_memory import ConversationMemory
+from backend.memory.pre_condensation_snapshot import (
+    extract_snapshot,
+    format_snapshot_for_injection,
+    load_snapshot,
+    save_snapshot,
+)
 from backend.memory.view import View
 
 if TYPE_CHECKING:
@@ -70,6 +76,9 @@ class ConversationMemoryManager:
         if not self.condenser:
             return CondensedHistory(list(history), None)
 
+        # Auto-extract critical context before condensation may discard events
+        self._extract_pre_condensation_snapshot(list(history))
+
         condensation_result = self.condenser.condensed_history(state)
 
         # If memory pressure is active and the condenser chose NOT to
@@ -94,7 +103,33 @@ class ConversationMemoryManager:
 
         if isinstance(condensation_result, View):
             return CondensedHistory(condensation_result.events, None)
+
+        # Condensation occurred — attach the snapshot for post-recovery injection
         return CondensedHistory([], condensation_result.action)
+
+    def _extract_pre_condensation_snapshot(self, history: list[Event]) -> None:
+        """Extract and persist a snapshot of critical context from current history.
+
+        This runs *before* the condenser, so the full event stream is still
+        available.  The snapshot is read back during post-condensation recovery.
+        """
+        try:
+            snapshot = extract_snapshot(history)
+            if snapshot.get("files_touched") or snapshot.get("recent_errors") or snapshot.get("decisions"):
+                save_snapshot(snapshot)
+        except Exception:
+            logger.debug("Pre-condensation snapshot extraction failed", exc_info=True)
+
+    @staticmethod
+    def get_restored_context() -> str:
+        """Load and format the pre-condensation snapshot for injection into recovery.
+
+        Returns an empty string if no snapshot is available.
+        """
+        snapshot = load_snapshot()
+        if not snapshot:
+            return ""
+        return format_snapshot_for_injection(snapshot)
 
     def get_initial_user_message(self, events: Iterable[Event]) -> MessageAction:
         from backend.core.schemas import ActionType

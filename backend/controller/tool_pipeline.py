@@ -303,10 +303,15 @@ class PlanningMiddleware(ToolInvocationMiddleware):
 
     def __init__(self, controller: AgentController) -> None:
         self.controller = controller
+        self._planning_injected = False
 
     async def plan(self, ctx: ToolInvocationContext) -> None:
         """Analyze task complexity and trigger planning if needed."""
         if not ctx.action.runnable:
+            return
+
+        # Only inject planning once per session
+        if self._planning_injected:
             return
 
         agent = getattr(self.controller, "agent", None)
@@ -328,11 +333,31 @@ class PlanningMiddleware(ToolInvocationMiddleware):
             complexity = analyzer.analyze_complexity(initial_message, state)
             ctx.metadata["task_complexity"] = complexity
             ctx.metadata["should_plan"] = True
+            self._planning_injected = True
 
             logger.info(
                 "📋 Planning middleware: Task complexity %.1f - "
-                "agent should use task tracker for decomposition",
+                "injecting planning directive",
                 complexity,
+            )
+
+            # Adapt circuit breaker thresholds for complex tasks
+            cb_service = getattr(self.controller, "circuit_breaker_service", None)
+            max_iter = getattr(state.iteration_flag, "max_value", 500) or 500
+            if cb_service:
+                cb_service.adapt(complexity, max_iter)
+
+            # Inject a planning directive into state extra_data so the
+            # orchestrator's next turn sees an instruction to plan first
+            state.set_extra(
+                "planning_directive",
+                (
+                    f"[AUTO-PLAN] Task complexity={complexity:.1f}. "
+                    "Before executing any tool calls, use think() to create "
+                    "a step-by-step plan, then use task_tracker(command='plan') "
+                    "to register your plan. Only then begin execution."
+                ),
+                source="PlanningMiddleware",
             )
 
     def _get_initial_user_message(self, state: State) -> str:
@@ -368,12 +393,14 @@ class ReflectionMiddleware(ToolInvocationMiddleware):
         if not config or not getattr(config, "enable_reflection", True):
             return
 
+        from backend.events.action import FileEditAction, FileWriteAction, CmdRunAction
+
         # For file edits, verify syntax and logic
-        if hasattr(ctx.action, "action") and ctx.action.action in ("edit", "write"):
+        if isinstance(ctx.action, (FileEditAction, FileWriteAction)):
             await self._verify_file_action(ctx, agent)
 
         # For commands, verify safety
-        if hasattr(ctx.action, "action") and ctx.action.action == "run":
+        if isinstance(ctx.action, CmdRunAction):
             await self._verify_command_action(ctx, agent)
 
     async def _verify_file_action(self, ctx: ToolInvocationContext, agent) -> None:
@@ -455,3 +482,153 @@ class TelemetryMiddleware(ToolInvocationMiddleware):
         self, ctx: ToolInvocationContext, observation: Observation | None
     ) -> None:
         self.telemetry.on_observe(ctx, observation)
+
+
+class ErrorPatternMiddleware(ToolInvocationMiddleware):
+    """Auto-queries the error_patterns DB when an ErrorObservation arrives.
+
+    Eliminates the need for the LLM to remember to call error_patterns(query)
+    every time it hits an error.  If a known fix exists, it is appended
+    directly to the observation so the LLM sees it on the next turn.
+    """
+
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
+        if observation is None:
+            return
+        from backend.events.observation import ErrorObservation
+
+        if not isinstance(observation, ErrorObservation):
+            return
+
+        content = getattr(observation, "content", "") or ""
+        if not content:
+            return
+
+        try:
+            from backend.engines.orchestrator.tools.error_patterns import _query_patterns
+
+            result_action = _query_patterns(content)
+            result_text = getattr(result_action, "thought", "")
+            # Only append if a known pattern was found
+            if "No known patterns" not in result_text and result_text:
+                observation.content = (
+                    content
+                    + "\n\n<KNOWN_FIX>"
+                    + "\n" + result_text
+                    + "\n</KNOWN_FIX>"
+                )
+        except Exception:
+            pass  # Non-critical — never let this break error handling
+
+
+class ConflictDetectionMiddleware(ToolInvocationMiddleware):
+    """Warns when the agent re-edits a file without verifying it first.
+
+    Tracks which files have been edited and read in the current session.
+    When the agent edits a file that was already edited without a subsequent
+    read/view, a warning is prepended to the observation reminding the LLM
+    to verify its mental model before making further edits.
+    """
+
+    def __init__(self) -> None:
+        # {path: edit_count_since_last_view}
+        self._unverified_edits: dict[str, int] = {}
+
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
+        from backend.events.action import FileEditAction, FileReadAction, FileWriteAction
+        from backend.events.observation import ErrorObservation
+
+        action = ctx.action
+
+        # Track reads — reset unverified count for the file
+        if isinstance(action, FileReadAction):
+            path = getattr(action, "path", None)
+            if path:
+                self._unverified_edits.pop(path, None)
+            return
+
+        if not isinstance(action, (FileEditAction, FileWriteAction)):
+            return
+
+        # Skip view commands (they don't modify files)
+        command = getattr(action, "command", None)
+        if command == "view":
+            return
+
+        path = getattr(action, "path", None)
+        if not path:
+            return
+
+        prev_count = self._unverified_edits.get(path, 0)
+        self._unverified_edits[path] = prev_count + 1
+
+        if observation is None:
+            return
+
+        # Only warn after first repeat edit without a verified read in between
+        if prev_count >= 1 and not isinstance(observation, ErrorObservation):
+            content = getattr(observation, "content", "") or ""
+            observation.content = (
+                f"<CONFLICT_WARNING>\n"
+                f"You have edited '{path}' {prev_count + 1} times without reading it back.\n"
+                "Use verify_state or str_replace_editor(view) to confirm the current "
+                "file state before making further edits.\n"
+                "</CONFLICT_WARNING>\n\n"
+                + content
+            )
+
+
+class EditVerifyMiddleware(ToolInvocationMiddleware):
+    """Appends a verify-after-edit hint to file edit observations.
+
+    After a FileEditAction or FileWriteAction completes, this middleware
+    appends a short reminder telling the LLM to read the affected lines
+    to confirm the edit was applied correctly.  This prevents silent
+    drift where the agent assumes an edit succeeded without checking.
+
+    Selective: ``str_replace`` and ``insert`` commands already include a
+    diff-style snippet in their observation, so the hint is skipped for
+    those — requesting a redundant ``cat`` wastes a turn.
+    """
+
+    # Commands whose observations already contain enough verification context.
+    _SELF_VERIFYING_COMMANDS = frozenset({"str_replace", "insert", "undo_edit"})
+
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
+        if observation is None:
+            return
+        from backend.events.action import FileEditAction, FileWriteAction
+
+        action = ctx.action
+        if not isinstance(action, (FileEditAction, FileWriteAction)):
+            return
+
+        content = getattr(observation, "content", None)
+        if content is None or not isinstance(content, str):
+            return
+
+        # Only add hint for successful edits (no error markers)
+        from backend.events.observation import ErrorObservation
+        if isinstance(observation, ErrorObservation):
+            return
+
+        # Skip hint for commands that already show diff/context in output.
+        command = getattr(action, "command", None)
+        if command in self._SELF_VERIFYING_COMMANDS:
+            return
+
+        path = getattr(action, "path", "unknown")
+        observation.content = (
+            content
+            + "\n\n<VERIFY_HINT>"
+            + f"\nFile {path} was modified. Consider reading the affected "
+            + "lines to confirm the edit was applied correctly before "
+            + "moving on."
+            + "\n</VERIFY_HINT>"
+        )

@@ -225,8 +225,16 @@ class MCPClient(BaseModel):
     # Public API — call tool
     # ------------------------------------------------------------------
 
+    # Per-call timeout (seconds).  Override via subclass or instance attribute.
+    CALL_TIMEOUT: float = 60.0
+
     async def call_tool(self, tool_name: str, args: dict) -> CallToolResult:
-        """Call a tool on the MCP server, reconnecting if the session dropped."""
+        """Call a tool on the MCP server, reconnecting if the session dropped.
+
+        Each call is wrapped in an ``asyncio.wait_for`` with ``CALL_TIMEOUT``
+        seconds to prevent hanging on unresponsive servers.  After a timeout
+        or connection error, the client reconnects and retries once.
+        """
         if tool_name not in self.tool_map:
             msg = f"Tool {tool_name} not found."
             raise ValueError(msg)
@@ -235,14 +243,28 @@ class MCPClient(BaseModel):
             raise RuntimeError(msg)
 
         try:
-            return await self.client.call_tool_mcp(name=tool_name, arguments=args)
+            return await asyncio.wait_for(
+                self.client.call_tool_mcp(name=tool_name, arguments=args),
+                timeout=self.CALL_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "MCP call_tool(%s) timed out after %.1fs — attempting reconnect",
+                tool_name,
+                self.CALL_TIMEOUT,
+            )
+            await self._reconnect()
         except Exception as exc:
             logger.warning(
                 "MCP call_tool(%s) failed: %s — attempting reconnect", tool_name, exc
             )
             await self._reconnect()
-            # Retry once after reconnect
-            return await self.client.call_tool_mcp(name=tool_name, arguments=args)
+
+        # Retry once after reconnect (with timeout)
+        return await asyncio.wait_for(
+            self.client.call_tool_mcp(name=tool_name, arguments=args),
+            timeout=self.CALL_TIMEOUT,
+        )
 
     # ------------------------------------------------------------------
     # Public API — disconnect

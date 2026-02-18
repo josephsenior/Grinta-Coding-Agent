@@ -28,6 +28,7 @@ from backend.core.errors import (
 from backend.core.logger import FORGE_logger as logger
 from backend.core.message import Message
 from backend.events.action import AgentThinkAction, MessageAction, PlaybookFinishAction
+from backend.events.action.files import FileReadAction
 from backend.events.event import EventSource
 from backend.llm.llm_registry import LLMRegistry
 from backend.runtime.plugins import (
@@ -96,6 +97,11 @@ class Orchestrator(Agent):
         # Protocol-typed reference for step() logic
         self.memory_manager: MemoryManagerProtocol = self._memory_manager_impl
 
+        # Register vector-memory callback for the semantic_recall tool
+        codeact_function_calling.register_semantic_recall(
+            self.conversation_memory.recall_from_memory
+        )
+
         # Planner/executor wiring
         self.planner: PlannerProtocol = OrchestratorPlanner(
             config=self.config,
@@ -116,6 +122,10 @@ class Orchestrator(Agent):
             and getattr(self.config, "health_check_prompts", None)
         )
         self._last_llm_latency: float = 0.0
+        self._reflection_interval: int = int(
+            getattr(self.config, "reflection_interval", 10)
+        )
+        self._steps_since_reflection: int = 0
         self._run_production_health_check()
 
     # ------------------------------------------------------------------ #
@@ -163,9 +173,16 @@ class Orchestrator(Agent):
 
             pending = self._consume_pending_action()
             if pending:
+                self._steps_since_reflection += 1
                 return pending
 
+            # Periodic self-reflection checkpoint
+            reflection = self._maybe_inject_reflection()
+            if reflection:
+                return reflection
+
             condensed = self.memory_manager.condense_history(state)
+            self._steps_since_reflection += 1
             return self._execute_llm_step(state, condensed)
 
         except ContextLimitError:
@@ -198,6 +215,13 @@ class Orchestrator(Agent):
     def _execute_llm_step(self, state: State, condensed: Any) -> Action:
         """Core logic to prepare messages, call LLM, and return the first action."""
         if condensed.pending_action:
+            # Extract initial task text for semantic recall during recovery
+            try:
+                initial_msg = self.memory_manager.get_initial_user_message(state.history)
+                task_text = getattr(initial_msg, "content", "")[:200] if initial_msg else ""
+            except Exception:
+                task_text = ""
+            self._queue_post_condensation_recovery(task_text=task_text)
             return condensed.pending_action
 
         initial_user_message = self.memory_manager.get_initial_user_message(
@@ -248,9 +272,13 @@ class Orchestrator(Agent):
                 pass
 
     def _consume_pending_action(self) -> Action | None:
-        if self.pending_actions:
-            return self.pending_actions.popleft()
-        return None
+        if not self.pending_actions:
+            return None
+        # Try to batch consecutive read-only file reads into one action
+        batched = self._try_batch_file_reads()
+        if batched:
+            return batched
+        return self.pending_actions.popleft()
 
     def _serialize_messages(self, messages: list[Message]) -> list[dict]:
         serialized: list[dict] = []
@@ -340,6 +368,111 @@ class Orchestrator(Agent):
         for pending in actions:
             self.pending_actions.append(pending)
 
+    def _try_batch_file_reads(self) -> Action | None:
+        """Batch consecutive FileReadAction items into a single CmdRunAction.
+
+        When the LLM emits multiple file reads in one response, executing them
+        one-per-step is wasteful.  This collapses them into a single bash
+        command that cats all requested files, cutting round-trips.
+        """
+        if len(self.pending_actions) < 2:
+            return None
+
+        # Collect the leading run of FileReadAction entries
+        batch: list[FileReadAction] = []
+        for action in self.pending_actions:
+            if isinstance(action, FileReadAction) and action.start == 0 and action.end == -1:
+                batch.append(action)
+            else:
+                break
+
+        if len(batch) < 2:
+            return None
+
+        # Pop them from the queue
+        for _ in batch:
+            self.pending_actions.popleft()
+
+        from backend.events.action.commands import CmdRunAction
+
+        # Build a single command that prints each file with a clear header
+        parts: list[str] = []
+        for fr in batch:
+            parts.append(f'echo "=== FILE: {fr.path} ===" && cat "{fr.path}"')
+        combined_cmd = " && ".join(parts)
+        return CmdRunAction(command=combined_cmd, thought="Batched parallel file reads")
+
+    def _queue_post_condensation_recovery(self, task_text: str = "") -> None:
+        """Inject recovery actions after condensation so the agent re-orients.
+
+        This enforces the recovery sequence described in SELF_REGULATION:
+        1. Inject restored context from pre-condensation snapshot
+        2. Inject working memory (structured cognitive workspace)
+        3. Auto semantic recall against the task description
+        4. Recall all scratchpad notes
+        5. Review the task tracker
+        """
+        from backend.engines.orchestrator.tools.note import build_recall_action
+        from backend.engines.orchestrator.tools.working_memory import get_full_working_memory
+
+        # Load the auto-extracted context snapshot
+        restored = self._memory_manager_impl.get_restored_context()
+        restored_block = f"\n\n{restored}" if restored else ""
+
+        # Load structured working memory
+        wm = get_full_working_memory()
+        wm_block = f"\n\n{wm}" if wm else ""
+
+        # Auto semantic recall — query vector memory with the task description
+        semantic_block = ""
+        if task_text:
+            recall_fn = codeact_function_calling.get_semantic_recall_fn()
+            if recall_fn:
+                try:
+                    results = recall_fn(task_text, 3)
+                    if results:
+                        parts = ["\n\n<SEMANTIC_RECALL_RECOVERY>"]
+                        for i, item in enumerate(results, 1):
+                            content = item.get("content_text", item.get("content", ""))
+                            parts.append(f"  [{i}] {content[:300]}")
+                        parts.append("</SEMANTIC_RECALL_RECOVERY>")
+                        semantic_block = "\n".join(parts)
+                except Exception:
+                    pass  # Non-critical — don't block recovery on recall failure
+
+        recovery_think = AgentThinkAction(
+            thought=(
+                "⚡ CONTEXT CONDENSED — executing mandatory recovery sequence: "
+                "restoring scratchpad notes and reviewing task tracker."
+                f"{restored_block}"
+                f"{wm_block}"
+                f"{semantic_block}"
+            )
+        )
+        recall_action = build_recall_action({"key": "all"})
+        self.pending_actions.append(recovery_think)
+        self.pending_actions.append(recall_action)
+
+    def _maybe_inject_reflection(self) -> Action | None:
+        """Inject a self-reflection think action every N steps.
+
+        Returns an AgentThinkAction if the interval has elapsed, else None.
+        The counter resets after each reflection.
+        """
+        if self._reflection_interval <= 0:
+            return None
+        if self._steps_since_reflection < self._reflection_interval:
+            return None
+
+        self._steps_since_reflection = 0
+        return AgentThinkAction(
+            thought=(
+                "🔍 SELF-REFLECTION CHECKPOINT — "
+                "Pausing to assess progress. Am I advancing the goal? "
+                "Should I update the task tracker? Is there a simpler path?"
+            )
+        )
+
     # ------------------------------------------------------------------ #
     # Convenience helpers
     # ------------------------------------------------------------------ #
@@ -354,3 +487,11 @@ class Orchestrator(Agent):
         return codeact_function_calling.response_to_actions(
             response, mcp_tool_names=list(self.mcp_tools.keys())
         )
+
+    def set_mcp_tools(self, mcp_tools: list[dict]) -> None:
+        """Set MCP tools and sync names to prompt manager for dynamic discovery."""
+        super().set_mcp_tools(mcp_tools)
+        # Sync connected tool names so the system prompt reflects reality
+        pm = getattr(self, "_prompt_manager", None)
+        if pm and hasattr(pm, "mcp_tool_names"):
+            pm.mcp_tool_names = list(self.mcp_tools.keys())

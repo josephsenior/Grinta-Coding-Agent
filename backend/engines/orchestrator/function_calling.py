@@ -14,15 +14,32 @@ from backend.core.exceptions import (
 )
 from backend.core.logger import FORGE_logger as logger
 from backend.engines.orchestrator.tools import (
+    create_apply_patch_tool,
     create_browser_tool,
     create_cmd_run_tool,
     create_condensation_request_tool,
     create_finish_tool,
     create_llm_based_edit_tool,
+    create_note_tool,
+    create_recall_tool,
+    create_run_tests_tool,
+    create_semantic_recall_tool,
     create_str_replace_editor_tool,
     create_structure_editor_tool,
     create_think_tool,
 )
+from backend.engines.orchestrator.tools.apply_patch import build_apply_patch_action
+from backend.engines.orchestrator.tools.note import build_note_action, build_recall_action
+from backend.engines.orchestrator.tools.run_tests import build_run_tests_action
+from backend.engines.orchestrator.tools.search_code import build_search_code_action, SEARCH_CODE_TOOL_NAME
+from backend.engines.orchestrator.tools.web_search import build_web_search_action, WEB_SEARCH_TOOL_NAME
+from backend.engines.orchestrator.tools.workspace_status import build_workspace_status_action, WORKSPACE_STATUS_TOOL_NAME
+from backend.engines.orchestrator.tools.error_patterns import build_error_patterns_action, ERROR_PATTERNS_TOOL_NAME
+from backend.engines.orchestrator.tools.checkpoint import build_checkpoint_action, CHECKPOINT_TOOL_NAME
+from backend.engines.orchestrator.tools.project_map import build_project_map_action, PROJECT_MAP_TOOL_NAME
+from backend.engines.orchestrator.tools.session_diff import build_session_diff_action, SESSION_DIFF_TOOL_NAME
+from backend.engines.orchestrator.tools.verify_state import build_verify_state_action, VERIFY_STATE_TOOL_NAME
+from backend.engines.orchestrator.tools.working_memory import build_working_memory_action, WORKING_MEMORY_TOOL_NAME
 from backend.engines.common import (
     common_response_to_actions,
 )
@@ -46,6 +63,20 @@ from backend.events.tool import build_tool_call_metadata
 from backend.llm.tool_names import TASK_TRACKER_TOOL_NAME
 
 ToolHandler = Callable[[dict[str, Any]], Action]
+
+# Callback for semantic recall — set by the orchestrator at init time.
+# Signature: (query: str, k: int) -> list[dict[str, Any]]
+_semantic_recall_registry: dict[str, Callable[[str, int], list[dict[str, Any]]]] = {}
+
+
+def register_semantic_recall(fn: Callable[[str, int], list[dict[str, Any]]]) -> None:
+    """Register the vector-memory recall callback (called by orchestrator)."""
+    _semantic_recall_registry["fn"] = fn
+
+
+def get_semantic_recall_fn() -> Callable[[str, int], list[dict[str, Any]]] | None:
+    """Return the registered semantic recall callback, or None."""
+    return _semantic_recall_registry.get("fn")
 
 if TYPE_CHECKING:
     ModelResponse = Any
@@ -90,7 +121,8 @@ def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
         raise FunctionCallValidationError(
             msg,
         )
-    is_input = arguments.get("is_input", "false") == "true"
+    raw_is_input = arguments.get("is_input", False)
+    is_input = raw_is_input is True or (isinstance(raw_is_input, str) and raw_is_input.lower() == "true")
     action = CmdRunAction(command=arguments["command"], is_input=is_input)
     if "timeout" in arguments:
         try:
@@ -111,7 +143,136 @@ def _handle_finish_tool(arguments: dict) -> PlaybookFinishAction:
         raise FunctionCallValidationError(
             msg,
         )
-    return PlaybookFinishAction(final_thought=arguments["message"])
+    outputs: dict = {}
+    if "completed" in arguments:
+        outputs["completed"] = arguments["completed"]
+    if "blocked_by" in arguments:
+        outputs["blocked_by"] = arguments["blocked_by"]
+    if "next_steps" in arguments:
+        outputs["next_steps"] = arguments["next_steps"]
+    return PlaybookFinishAction(final_thought=arguments["message"], outputs=outputs)
+
+
+def _handle_note_tool(arguments: dict) -> AgentThinkAction:
+    """Handle NOTE_TOOL: store key→value in .forge/agent_notes.json (native)."""
+    key = arguments.get("key", "")
+    value = arguments.get("value", "")
+    if not key:
+        from backend.core.exceptions import FunctionCallValidationError as _E
+        raise _E('Missing required argument "key" in tool call note')
+    return build_note_action(key, value)
+
+
+def _handle_recall_tool(arguments: dict) -> AgentThinkAction:
+    """Handle RECALL_TOOL: retrieve key from .forge/agent_notes.json (native)."""
+    key = arguments.get("key", "all")
+    return build_recall_action(key)
+
+
+def _handle_semantic_recall_tool(arguments: dict) -> AgentThinkAction:
+    """Handle SEMANTIC_RECALL_TOOL: query vector memory for related context.
+
+    Returns results tagged as [SEMANTIC_RECALL_RESULT] so the LLM can
+    distinguish retrieved data from its own reasoning.
+    """
+    query = arguments.get("query", "")
+    if not query:
+        raise FunctionCallValidationError(
+            'Missing required argument "query" in tool call semantic_recall'
+        )
+    k = min(int(arguments.get("k", 5)), 10)
+    recall_fn = _semantic_recall_registry.get("fn")
+    if recall_fn is None:
+        return AgentThinkAction(
+            thought="[SEMANTIC_RECALL_RESULT] Vector memory is not available in this session."
+        )
+    results = recall_fn(query, k)
+    if not results:
+        return AgentThinkAction(
+            thought=f"[SEMANTIC_RECALL_RESULT] No results found for query: {query!r}"
+        )
+    parts = [f"[SEMANTIC_RECALL_RESULT] {len(results)} results for query: {query!r}\n"]
+    for i, item in enumerate(results, 1):
+        content = item.get("content_text", item.get("content", ""))
+        role = item.get("role", "unknown")
+        score = item.get("score", "")
+        score_str = f" (score={score:.3f})" if isinstance(score, float) else ""
+        parts.append(f"  [{i}] ({role}{score_str}) {content[:500]}")
+    return AgentThinkAction(thought="\n".join(parts))
+
+
+def _handle_run_tests_tool(arguments: dict) -> CmdRunAction:
+    """Handle RUN_TESTS_TOOL: run pytest and return structured JSON results."""
+    filter_str = arguments.get("filter", "")
+    extra_flags = arguments.get("extra_flags", "")
+    return build_run_tests_action(filter_str=filter_str, extra_flags=extra_flags)
+
+
+def _handle_apply_patch_tool(arguments: dict) -> CmdRunAction:
+    """Handle APPLY_PATCH_TOOL: apply a unified diff to the workspace."""
+    if "patch" not in arguments:
+        from backend.core.exceptions import FunctionCallValidationError as _E
+        raise _E('Missing required argument "patch" in tool call apply_patch')
+    check_only = arguments.get("check_only", "false") == "true"
+    return build_apply_patch_action(patch=arguments["patch"], check_only=check_only)
+
+
+def _handle_search_code_tool(arguments: dict) -> CmdRunAction:
+    """Handle SEARCH_CODE_TOOL: fast code search via ripgrep/grep."""
+    return build_search_code_action(
+        pattern=arguments.get("pattern", ""),
+        path=arguments.get("path", "."),
+        file_pattern=arguments.get("file_pattern", ""),
+        context_lines=arguments.get("context_lines", 2),
+        case_sensitive=arguments.get("case_sensitive", "false"),
+        max_results=arguments.get("max_results", 50),
+    )
+
+
+def _handle_web_search_tool(arguments: dict) -> CmdRunAction:
+    """Handle WEB_SEARCH_TOOL: search the web for information."""
+    query = arguments.get("query", "")
+    if not query:
+        raise FunctionCallValidationError(
+            'Missing required argument "query" in tool call web_search'
+        )
+    num_results = int(arguments.get("num_results", 5))
+    return build_web_search_action(query=query, num_results=num_results)
+
+
+def _handle_workspace_status_tool(arguments: dict) -> CmdRunAction:
+    """Handle workspace_status tool: gather project state snapshot."""
+    return build_workspace_status_action(arguments)
+
+
+def _handle_error_patterns_tool(arguments: dict) -> AgentThinkAction:
+    """Handle error_patterns tool: store/query error→solution patterns."""
+    return build_error_patterns_action(arguments)
+
+
+def _handle_checkpoint_tool(arguments: dict) -> AgentThinkAction:
+    """Handle checkpoint tool: save/view progress checkpoints."""
+    return build_checkpoint_action(arguments)
+
+
+def _handle_project_map_tool(arguments: dict) -> CmdRunAction | AgentThinkAction:
+    """Handle project_map tool: structural overview of the workspace."""
+    return build_project_map_action(arguments)
+
+
+def _handle_session_diff_tool(arguments: dict) -> CmdRunAction:
+    """Handle session_diff tool: show cumulative changes in the session."""
+    return build_session_diff_action(arguments)
+
+
+def _handle_verify_state_tool(arguments: dict) -> AgentThinkAction:
+    """Handle verify_state tool: validate file assertions before editing."""
+    return build_verify_state_action(arguments)
+
+
+def _handle_working_memory_tool(arguments: dict) -> AgentThinkAction:
+    """Handle working_memory tool: structured cognitive workspace."""
+    return build_working_memory_action(arguments)
 
 
 def _handle_llm_based_file_edit_tool(arguments: dict) -> FileEditAction:
@@ -170,10 +331,62 @@ def _filter_valid_editor_kwargs(other_kwargs: dict) -> dict:
     return valid_kwargs_for_editor
 
 
+def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThinkAction:
+    """Generate a unified diff preview of what a str_replace or insert would produce."""
+    import difflib
+    import os
+
+    if not os.path.isfile(path):
+        return AgentThinkAction(thought=f"[PREVIEW] File not found: {path}")
+
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            original_lines = f.readlines()
+    except OSError as exc:
+        return AgentThinkAction(thought=f"[PREVIEW] Cannot read {path}: {exc}")
+
+    new_lines = list(original_lines)
+
+    if command == "str_replace":
+        old_str = kwargs.get("old_str", "")
+        new_str = kwargs.get("new_str", "")
+        if not old_str:
+            return AgentThinkAction(thought="[PREVIEW] old_str is required for str_replace preview")
+        original_text = "".join(original_lines)
+        count = original_text.count(old_str)
+        if count == 0:
+            return AgentThinkAction(thought=f"[PREVIEW] old_str not found in {path}")
+        if count > 1:
+            return AgentThinkAction(thought=f"[PREVIEW] old_str matches {count} locations — must be unique")
+        new_text = original_text.replace(old_str, new_str, 1)
+        new_lines = new_text.splitlines(keepends=True)
+    elif command == "insert":
+        insert_line = int(kwargs.get("insert_line", 0))
+        new_str = kwargs.get("new_str", "")
+        insert_text = new_str if new_str.endswith("\n") else new_str + "\n"
+        new_lines[insert_line:insert_line] = [insert_text]
+
+    diff = difflib.unified_diff(
+        original_lines, new_lines,
+        fromfile=f"a/{path}", tofile=f"b/{path}",
+        lineterm="",
+    )
+    diff_text = "\n".join(diff)
+    if not diff_text:
+        return AgentThinkAction(thought=f"[PREVIEW] No changes detected for {path}")
+    return AgentThinkAction(thought=f"[PREVIEW] Dry-run diff for {path}:\n{diff_text}")
+
+
 def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     """Handle str_replace_editor tool call."""
     path, command = _validate_str_replace_editor_args(arguments)
     other_kwargs = {k: v for k, v in arguments.items() if k not in ["command", "path"]}
+
+    # Handle preview/dry-run mode — show what the edit would produce
+    raw_preview = other_kwargs.pop("preview", False)
+    preview = raw_preview is True or (isinstance(raw_preview, str) and raw_preview.lower() == "true")
+    if preview and command in ("str_replace", "insert"):
+        return _preview_str_replace_edit(path, command, other_kwargs)
 
     # Handle view command separately
     if command == "view":
@@ -372,9 +585,7 @@ def _handle_find_symbol_command(editor, file_path: str, arguments: dict) -> Acti
         if result.parent_name:
             message += f"\n  Parent: {result.parent_name}"
         return MessageAction(content=message)
-    return MessageAction(
-        content=f"❌ Symbol '{symbol_name}' not found in {file_path}"
-    )
+    return MessageAction(content=f"❌ Symbol '{symbol_name}' not found in {file_path}")
 
 
 def _handle_replace_range_command(editor, file_path: str, arguments: dict) -> Action:
@@ -410,6 +621,48 @@ def _handle_normalize_indent_command(editor, file_path: str, arguments: dict) ->
     return MessageAction(content=f"❌ Normalization failed: {result.message}")
 
 
+def _handle_create_file_command(file_path: str, arguments: dict) -> Action:
+    """Handle create_file command — delegates to str_replace_editor create."""
+    content = arguments.get("content", "")
+    return FileEditAction(
+        path=file_path,
+        command="create",
+        file_text=content,
+        impl_source=FileEditSource.FILE_EDITOR,
+    )
+
+
+def _handle_view_file_command(file_path: str) -> Action:
+    """Handle view_file command — reads file contents."""
+    return FileReadAction(path=file_path, impl_source=FileReadSource.FILE_EDITOR)
+
+
+def _handle_insert_code_command(file_path: str, arguments: dict) -> Action:
+    """Handle insert_code command — inserts code after a line number."""
+    new_code = arguments.get("new_code")
+    insert_line = arguments.get("insert_line")
+    if new_code is None or insert_line is None:
+        raise FunctionCallValidationError(
+            "insert_code requires 'new_code' and 'insert_line' arguments"
+        )
+    return FileEditAction(
+        path=file_path,
+        command="insert",
+        insert_line=int(insert_line),
+        new_str=new_code,
+        impl_source=FileEditSource.FILE_EDITOR,
+    )
+
+
+def _handle_undo_last_edit_command(file_path: str) -> Action:
+    """Handle undo_last_edit command — reverts last edit to file."""
+    return FileEditAction(
+        path=file_path,
+        command="undo_edit",
+        impl_source=FileEditSource.FILE_EDITOR,
+    )
+
+
 def _handle_structure_editor_tool(arguments: dict) -> Action:
     """Handle StructureEditor tool call."""
     tool_name = create_structure_editor_tool()["function"]["name"]
@@ -427,24 +680,36 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
             f"Failed to initialize Structure Editor: {e}"
         ) from e
 
-    # Command dispatch map
-    command_handlers = {
+    # Command dispatch map — editor-powered commands use the StructureEditor instance
+    editor_command_handlers = {
         "edit_function": _handle_edit_function_command,
         "rename_symbol": _handle_rename_symbol_command,
         "find_symbol": _handle_find_symbol_command,
         "replace_range": _handle_replace_range_command,
         "normalize_indent": _handle_normalize_indent_command,
     }
+    # File I/O commands delegate directly to runtime actions (no StructureEditor needed)
+    simple_command_handlers = {
+        "create_file": lambda fp, args: _handle_create_file_command(fp, args),
+        "view_file": lambda fp, _args: _handle_view_file_command(fp),
+        "insert_code": lambda fp, args: _handle_insert_code_command(fp, args),
+        "undo_last_edit": lambda fp, _args: _handle_undo_last_edit_command(fp),
+    }
 
     # Execute command
     try:
-        if command not in command_handlers:
+        if command in editor_command_handlers:
+            handler = editor_command_handlers[command]
+            return handler(editor, file_path, arguments)
+        elif command in simple_command_handlers:
+            handler = simple_command_handlers[command]
+            return handler(file_path, arguments)
+        else:
+            all_cmds = list(editor_command_handlers) + list(simple_command_handlers)
             raise FunctionCallValidationError(
-                f"Unknown command '{command}' for structure_editor tool"
+                f"Unknown command '{command}' for structure_editor tool. "
+                f"Valid commands: {all_cmds}"
             )
-
-        handler = command_handlers[command]
-        return handler(editor, file_path, arguments)
 
     except Exception as e:
         return MessageAction(content=f"❌ Structure Editor error: {str(e)}")
@@ -470,6 +735,20 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         ]: _handle_condensation_request_tool,
         create_browser_tool()["function"]["name"]: _handle_browser_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
+        create_note_tool()["function"]["name"]: _handle_note_tool,
+        create_recall_tool()["function"]["name"]: _handle_recall_tool,
+        create_semantic_recall_tool()["function"]["name"]: _handle_semantic_recall_tool,
+        create_run_tests_tool()["function"]["name"]: _handle_run_tests_tool,
+        create_apply_patch_tool()["function"]["name"]: _handle_apply_patch_tool,
+        SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
+        WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,
+        WORKSPACE_STATUS_TOOL_NAME: _handle_workspace_status_tool,
+        ERROR_PATTERNS_TOOL_NAME: _handle_error_patterns_tool,
+        CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
+        PROJECT_MAP_TOOL_NAME: _handle_project_map_tool,
+        SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,
+        VERIFY_STATE_TOOL_NAME: _handle_verify_state_tool,
+        WORKING_MEMORY_TOOL_NAME: _handle_working_memory_tool,
     }
 
 
