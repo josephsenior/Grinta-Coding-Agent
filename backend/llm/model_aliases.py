@@ -171,7 +171,7 @@ class ModelAliasManager:
             config["model_aliases"] = self._aliases
 
             # Write back
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 toml.dump(config, f)
 
             logger.info("Saved %d aliases to %s", len(self._aliases), path)

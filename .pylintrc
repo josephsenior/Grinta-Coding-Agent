@@ -16,7 +16,8 @@ disable=C0114,  # missing-module-docstring
         R0903,  # too-few-public-methods (data classes are fine)
         W0201,  # attribute-defined-outside-init (intentional in some cases)
         C0413,  # wrong-import-position (sometimes necessary)
-        W0613   # unused-argument (required by interface/protocol)
+        W0613,  # unused-argument (required by interface/protocol)
+        W0237   # arguments-renamed (common when overriding with better names)
 
 [DESIGN]
 # Relaxed thresholds for large orchestration/service modules
@@ -32,7 +33,7 @@ max-line-length=120
 
 [BASIC]
 # Good variable names (allow single-letter variables in specific contexts)
-good-names=i,j,k,ex,Run,_,f,e,x,y,id,pk,db,ok
+good-names=i,j,k,ex,Run,_,f,e,x,y,id,pk,db,ok,TREE_SITTER_AVAILABLE,GENERIC_READ,FILE_SHARE_READ,FILE_SHARE_WRITE,FILE_SHARE_DELETE,OPEN_EXISTING,EXCLUDE_PREFIXES,TARGET_PACKAGES,FORGE_version,_RuntimeLanguage,_RuntimeParser,_RuntimeNode,_RuntimeTree,FILE_ATTRIBUTE_NORMAL
 
 # Allow uppercase constants and class attributes
 const-rgx=(([A-Z_][A-Z0-9_]*)|(__.*__)|([a-z_][a-z0-9_]*))$

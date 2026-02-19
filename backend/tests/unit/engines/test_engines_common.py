@@ -93,9 +93,7 @@ class TestParseToolCallArguments:
         assert parse_tool_call_arguments(tc) == {"key": "val"}
 
     def test_json_string(self):
-        tc = SimpleNamespace(
-            function=SimpleNamespace(arguments='{"a": 1, "b": "two"}')
-        )
+        tc = SimpleNamespace(function=SimpleNamespace(arguments='{"a": 1, "b": "two"}'))
         result = parse_tool_call_arguments(tc)
         assert result == {"a": 1, "b": "two"}
 

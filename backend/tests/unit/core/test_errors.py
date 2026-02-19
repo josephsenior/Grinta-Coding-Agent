@@ -171,7 +171,7 @@ class TestAgentRuntimeError:
         """Test context defaults to empty dict."""
         error = AgentRuntimeError("Error")
         assert isinstance(error.context, dict)
-        assert len(error.context) == 0
+        assert not error.context
 
     def test_context_is_mutable(self):
         """Test error context can be modified after creation."""

@@ -19,6 +19,7 @@ from backend.events.tool import ToolCallMetadata, build_tool_call_metadata
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _fake_sdk_response(
     resp_id: str = "resp-1",
     model: str = "gpt-4",
@@ -39,8 +40,8 @@ def _fake_sdk_response(
 # ModelResponseLite
 # ===================================================================
 
-class TestModelResponseLite:
 
+class TestModelResponseLite:
     def test_from_sdk_with_namespace(self):
         resp = _fake_sdk_response(resp_id="r1", model="gpt-4", content="hi")
         lite = ModelResponseLite.from_sdk(resp)
@@ -55,7 +56,13 @@ class TestModelResponseLite:
             "id": "d1",
             "model": "claude",
             "choices": [
-                {"message": {"role": "assistant", "content": "text", "tool_calls": None}}
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "text",
+                        "tool_calls": None,
+                    }
+                }
             ],
         }
         lite = ModelResponseLite.from_sdk(resp)
@@ -111,8 +118,8 @@ class TestModelResponseLite:
 # AssistantToolCallLite / AssistantMessageLite / ChoiceLite
 # ===================================================================
 
-class TestLiteModels:
 
+class TestLiteModels:
     def test_tool_call_lite_defaults(self):
         tc = AssistantToolCallLite()
         assert tc.id is None
@@ -137,8 +144,8 @@ class TestLiteModels:
 # ToolCallMetadata
 # ===================================================================
 
-class TestToolCallMetadata:
 
+class TestToolCallMetadata:
     def test_from_sdk_basic(self):
         resp = _fake_sdk_response()
         md = ToolCallMetadata.from_sdk(
@@ -206,8 +213,8 @@ class TestToolCallMetadata:
 # build_tool_call_metadata
 # ===================================================================
 
-class TestBuildToolCallMetadata:
 
+class TestBuildToolCallMetadata:
     def test_returns_tool_call_metadata(self):
         resp = _fake_sdk_response()
         md = build_tool_call_metadata(

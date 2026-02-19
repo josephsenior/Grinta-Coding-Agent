@@ -11,6 +11,7 @@ from backend.events.event_store_abc import EventStoreABC
 
 # ── Concrete stub ─────────────────────────────────────────────────────
 
+
 class _StubStore(EventStoreABC):
     """Minimal concrete implementation for testing base-class helpers."""
 
@@ -19,8 +20,9 @@ class _StubStore(EventStoreABC):
         self.user_id = None
         self._events = events or []
 
-    def search_events(self, start_id=0, end_id=None, reverse=False,
-                      filter=None, limit=None):
+    def search_events(
+        self, start_id=0, end_id=None, reverse=False, filter=None, limit=None
+    ):
         sliced = self._events[start_id:end_id]
         if reverse:
             sliced = list(reversed(sliced))
@@ -43,6 +45,7 @@ class _StubStore(EventStoreABC):
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
+
 def _make_event(source="agent", hidden=False, timestamp=None):
     ev = MagicMock()
     ev.source = MagicMock()
@@ -53,6 +56,7 @@ def _make_event(source="agent", hidden=False, timestamp=None):
 
 
 # ── get_events ────────────────────────────────────────────────────────
+
 
 class TestGetEvents:
     def test_returns_all_events(self):
@@ -98,6 +102,7 @@ class TestGetEvents:
 
 # ── filtered_events_by_source ─────────────────────────────────────────
 
+
 class TestFilteredEventsBySource:
     def test_filters_by_source(self):
         e1 = _make_event(source="agent")
@@ -110,6 +115,7 @@ class TestFilteredEventsBySource:
 
 
 # ── get_matching_events ───────────────────────────────────────────────
+
 
 class TestGetMatchingEvents:
     def test_default_parameters(self):

@@ -26,7 +26,10 @@ class TestMilestone:
 
     def test_with_description(self):
         m = Milestone(
-            name="commit", iteration=10, timestamp=datetime.now(), description="First commit"
+            name="commit",
+            iteration=10,
+            timestamp=datetime.now(),
+            description="First commit",
         )
         assert m.description == "First commit"
 
@@ -226,7 +229,9 @@ class TestDetectMilestones:
         from backend.events.observation import CmdOutputObservation
 
         tracker = ProgressTracker(max_iterations=100)
-        obs = CmdOutputObservation(content="passed", command="pytest tests/", exit_code=0)
+        obs = CmdOutputObservation(
+            content="passed", command="pytest tests/", exit_code=0
+        )
         state = MagicMock()
         state.history = [obs]
         tracker._detect_milestones(state, current_iteration=5)
@@ -237,7 +242,9 @@ class TestDetectMilestones:
         from backend.events.observation import CmdOutputObservation
 
         tracker = ProgressTracker(max_iterations=100)
-        obs = CmdOutputObservation(content="passed", command="pytest tests/", exit_code=0)
+        obs = CmdOutputObservation(
+            content="passed", command="pytest tests/", exit_code=0
+        )
         state = MagicMock()
         state.history = [obs]
         tracker._detect_milestones(state, 5)

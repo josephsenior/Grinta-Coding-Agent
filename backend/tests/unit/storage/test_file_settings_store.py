@@ -27,6 +27,7 @@ def _clear_cache():
 
 # ── __init__ ──────────────────────────────────────────────────────────
 
+
 class TestFileSettingsStoreInit:
     def test_default_path(self):
         fs = MagicMock()
@@ -41,6 +42,7 @@ class TestFileSettingsStoreInit:
 
 
 # ── load ──────────────────────────────────────────────────────────────
+
 
 class TestFileSettingsStoreLoad:
     async def test_load_returns_none_when_file_not_found(self):
@@ -125,6 +127,7 @@ class TestFileSettingsStoreLoad:
 
 # ── store ─────────────────────────────────────────────────────────────
 
+
 class TestFileSettingsStoreStore:
     async def test_store_writes_and_invalidates_cache(self):
         fs = MagicMock()
@@ -152,6 +155,7 @@ class TestFileSettingsStoreStore:
 
 
 # ── get_instance ──────────────────────────────────────────────────────
+
 
 class TestFileSettingsStoreGetInstance:
     async def test_creates_instance(self):

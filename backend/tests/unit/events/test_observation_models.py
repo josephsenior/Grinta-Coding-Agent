@@ -1,7 +1,6 @@
 """Tests for event observation model types."""
 
 import unittest
-from dataclasses import fields as dc_fields
 
 from backend.core.enums import RecallType
 from backend.core.schemas import AgentState, ObservationType
@@ -70,9 +69,7 @@ class TestAgentStateChangedObservation(unittest.TestCase):
     """Test AgentStateChangedObservation."""
 
     def test_construction_with_agent_state(self):
-        obs = AgentStateChangedObservation(
-            content="", agent_state=AgentState.RUNNING
-        )
+        obs = AgentStateChangedObservation(content="", agent_state=AgentState.RUNNING)
         self.assertEqual(obs.agent_state, AgentState.RUNNING)
 
     def test_construction_with_string(self):
@@ -80,9 +77,7 @@ class TestAgentStateChangedObservation(unittest.TestCase):
         self.assertEqual(obs.agent_state, "custom_state")
 
     def test_reason_default(self):
-        obs = AgentStateChangedObservation(
-            content="", agent_state=AgentState.STOPPED
-        )
+        obs = AgentStateChangedObservation(content="", agent_state=AgentState.STOPPED)
         self.assertEqual(obs.reason, "")
 
     def test_reason_set(self):
@@ -132,9 +127,7 @@ class TestPlaybookKnowledge(unittest.TestCase):
     """Test PlaybookKnowledge dataclass."""
 
     def test_construction(self):
-        pk = PlaybookKnowledge(
-            name="py_best", trigger="python", content="Use venv"
-        )
+        pk = PlaybookKnowledge(name="py_best", trigger="python", content="Use venv")
         self.assertEqual(pk.name, "py_best")
         self.assertEqual(pk.trigger, "python")
         self.assertEqual(pk.content, "Use venv")
@@ -144,21 +137,15 @@ class TestRecallObservation(unittest.TestCase):
     """Test RecallObservation."""
 
     def test_workspace_context_message(self):
-        obs = RecallObservation(
-            content="", recall_type=RecallType.WORKSPACE_CONTEXT
-        )
+        obs = RecallObservation(content="", recall_type=RecallType.WORKSPACE_CONTEXT)
         self.assertEqual(obs.message, "Added workspace context")
 
     def test_knowledge_message(self):
-        obs = RecallObservation(
-            content="", recall_type=RecallType.KNOWLEDGE
-        )
+        obs = RecallObservation(content="", recall_type=RecallType.KNOWLEDGE)
         self.assertEqual(obs.message, "Added playbook knowledge")
 
     def test_default_fields(self):
-        obs = RecallObservation(
-            content="", recall_type=RecallType.WORKSPACE_CONTEXT
-        )
+        obs = RecallObservation(content="", recall_type=RecallType.WORKSPACE_CONTEXT)
         self.assertEqual(obs.repo_name, "")
         self.assertEqual(obs.repo_directory, "")
         self.assertEqual(obs.runtime_hosts, {})
@@ -193,9 +180,7 @@ class TestRecallFailureObservation(unittest.TestCase):
     """Test RecallFailureObservation."""
 
     def test_message_from_error(self):
-        obs = RecallFailureObservation(
-            content="", error_message="Connection failed"
-        )
+        obs = RecallFailureObservation(content="", error_message="Connection failed")
         self.assertEqual(obs.message, "Connection failed")
 
     def test_message_falls_back_to_content(self):

@@ -22,17 +22,19 @@ class TestStepDecisionService(unittest.TestCase):
     def setUp(self):
         """Create mock controller for testing."""
         self.mock_controller = MagicMock()
-        self.mock_controller.get_agent_state = MagicMock(return_value=AgentState.RUNNING)
-        
+        self.mock_controller.get_agent_state = MagicMock(
+            return_value=AgentState.RUNNING
+        )
+
         self.service = StepDecisionService(self.mock_controller)
 
     def test_should_step_message_from_user(self):
         """Test should_step returns True for user messages."""
         action = MessageAction(content="Hello")
         action.source = EventSource.USER
-        
+
         result = self.service.should_step(action)
-        
+
         self.assertTrue(result)
 
     def test_should_step_message_from_agent_running(self):
@@ -40,19 +42,21 @@ class TestStepDecisionService(unittest.TestCase):
         action = MessageAction(content="Response")
         action.source = EventSource.AGENT
         self.mock_controller.get_agent_state.return_value = AgentState.RUNNING
-        
+
         result = self.service.should_step(action)
-        
+
         self.assertTrue(result)
 
     def test_should_step_message_from_agent_awaiting_input(self):
         """Test should_step returns False for agent message when awaiting input."""
         action = MessageAction(content="Question")
         action.source = EventSource.AGENT
-        self.mock_controller.get_agent_state.return_value = AgentState.AWAITING_USER_INPUT
-        
+        self.mock_controller.get_agent_state.return_value = (
+            AgentState.AWAITING_USER_INPUT
+        )
+
         result = self.service.should_step(action)
-        
+
         self.assertFalse(result)
 
     def test_should_step_message_from_agent_paused(self):
@@ -60,107 +64,105 @@ class TestStepDecisionService(unittest.TestCase):
         action = MessageAction(content="Info")
         action.source = EventSource.AGENT
         self.mock_controller.get_agent_state.return_value = AgentState.PAUSED
-        
+
         result = self.service.should_step(action)
-        
+
         self.assertTrue(result)
 
     def test_should_step_condensation_action(self):
         """Test should_step returns True for CondensationAction."""
         action = MagicMock(spec=CondensationAction)
-        
+
         result = self.service.should_step(action)
-        
+
         self.assertTrue(result)
 
     def test_should_step_condensation_request_action(self):
         """Test should_step returns True for CondensationRequestAction."""
         action = MagicMock(spec=CondensationRequestAction)
-        
+
         result = self.service.should_step(action)
-        
+
         self.assertTrue(result)
 
     def test_should_step_other_action(self):
         """Test should_step returns False for other actions."""
         action = MagicMock(spec=Action)
-        
+
         result = self.service.should_step(action)
-        
+
         self.assertFalse(result)
 
     def test_should_step_null_observation_with_cause(self):
         """Test should_step returns True for NullObservation with cause."""
         observation = NullObservation(content="")
         observation.cause = 123
-        
+
         result = self.service.should_step(observation)
-        
+
         self.assertTrue(result)
 
     def test_should_step_null_observation_without_cause(self):
         """Test should_step returns False for NullObservation without cause."""
         observation = NullObservation(content="")
         observation.cause = None
-        
+
         result = self.service.should_step(observation)
-        
+
         self.assertFalse(result)
 
     def test_should_step_null_observation_empty_cause(self):
         """Test should_step returns False for NullObservation with empty cause."""
         observation = NullObservation(content="")
         observation.cause = 0
-        
+
         result = self.service.should_step(observation)
-        
+
         self.assertFalse(result)
 
     def test_should_step_agent_state_changed_observation(self):
         """Test should_step returns False for AgentStateChangedObservation."""
         observation = AgentStateChangedObservation(
-            content="State changed",
-            agent_state=AgentState.RUNNING,
-            reason=""
+            content="State changed", agent_state=AgentState.RUNNING, reason=""
         )
-        
+
         result = self.service.should_step(observation)
-        
+
         self.assertFalse(result)
 
     def test_should_step_recall_observation(self):
         """Test should_step returns False for RecallObservation."""
         observation = MagicMock(spec=RecallObservation)
-        
+
         result = self.service.should_step(observation)
-        
+
         self.assertFalse(result)
 
     def test_should_step_regular_observation(self):
         """Test should_step returns True for regular observations."""
         observation = MagicMock(spec=Observation)
-        
+
         result = self.service.should_step(observation)
-        
+
         self.assertTrue(result)
 
     def test_should_step_non_event(self):
         """Test should_step returns False for non-event objects."""
         result = self.service.should_step("not an event")
-        
+
         self.assertFalse(result)
 
     def test_should_step_none(self):
         """Test should_step returns False for None."""
         result = self.service.should_step(None)
-        
+
         self.assertFalse(result)
 
     def test_for_action_delegation(self):
         """Test _for_action delegates to specific handlers."""
         action = MessageAction(content="Test")
         action.source = EventSource.USER
-        
+
         # Should delegate to message handler
         result = self.service._for_action(action)
         self.assertTrue(result)
@@ -169,12 +171,14 @@ class TestStepDecisionService(unittest.TestCase):
         """Test _for_message_action always steps for user messages."""
         action = MessageAction(content="Test")
         action.source = EventSource.USER
-        
+
         # Should always return True regardless of state
-        self.mock_controller.get_agent_state.return_value = AgentState.AWAITING_USER_INPUT
+        self.mock_controller.get_agent_state.return_value = (
+            AgentState.AWAITING_USER_INPUT
+        )
         result = self.service._for_message_action(action)
         self.assertTrue(result)
-        
+
         self.mock_controller.get_agent_state.return_value = AgentState.RUNNING
         result = self.service._for_message_action(action)
         self.assertTrue(result)
@@ -184,15 +188,13 @@ class TestStepDecisionService(unittest.TestCase):
         # Regular observation
         obs = MagicMock(spec=Observation)
         self.assertTrue(self.service._for_observation(obs))
-        
+
         # StateChanged observation
         state_obs = AgentStateChangedObservation(
-            content="",
-            agent_state=AgentState.RUNNING,
-            reason=""
+            content="", agent_state=AgentState.RUNNING, reason=""
         )
         self.assertFalse(self.service._for_observation(state_obs))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

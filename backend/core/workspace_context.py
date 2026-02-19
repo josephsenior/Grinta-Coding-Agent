@@ -17,8 +17,6 @@ A ``.gitignore`` inside it excludes ``changelog.jsonl`` by default
 from __future__ import annotations
 
 import json
-import os
-from collections import defaultdict
 from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
@@ -81,6 +79,7 @@ _CONTEXT_TEMPLATE = """\
 
 # ── Directory helpers ────────────────────────────────────────────────
 
+
 def get_forge_dir(cwd: Path | None = None) -> Path:
     """Return the path to the ``.forge/`` directory for *cwd* (or CWD)."""
     return (cwd or Path.cwd()) / _FORGE_DIR
@@ -98,6 +97,7 @@ def ensure_forge_dir(cwd: Path | None = None) -> Path:
 
 
 # ── Project memory ───────────────────────────────────────────────────
+
 
 def read_project_memory(cwd: Path | None = None) -> str | None:
     """Return the contents of ``.forge/context.md``, or *None* if absent/empty."""
@@ -128,6 +128,7 @@ def write_context_template(cwd: Path | None = None) -> Path:
 
 
 # ── Workspace fingerprinting ─────────────────────────────────────────
+
 
 def detect_project_type(cwd: Path | None = None) -> str:
     """Return a human-readable description of the project type.
@@ -161,6 +162,7 @@ def detect_test_runner(cwd: Path | None = None) -> str | None:
 
 
 # ── Agent changelog ──────────────────────────────────────────────────
+
 
 def append_changelog(
     event_type: str,
@@ -197,6 +199,26 @@ def read_today_changelog(cwd: Path | None = None) -> list[dict[str, Any]]:
     )
 
 
+def read_week_changelog(cwd: Path | None = None) -> list[dict[str, Any]]:
+    """Return all changelog entries from the past 7 days (UTC)."""
+    from datetime import timedelta
+
+    cutoff = (datetime.now(UTC) - timedelta(days=6)).strftime("%Y-%m-%d")
+    return _read_changelog_filtered(
+        lambda e: e.get("date", "") >= cutoff,
+        cwd=cwd,
+    )
+
+
+def read_month_changelog(cwd: Path | None = None) -> list[dict[str, Any]]:
+    """Return all changelog entries from the current calendar month (UTC)."""
+    prefix = datetime.now(UTC).strftime("%Y-%m")
+    return _read_changelog_filtered(
+        lambda e: e.get("date", "").startswith(prefix),
+        cwd=cwd,
+    )
+
+
 def read_all_changelog(cwd: Path | None = None) -> list[dict[str, Any]]:
     """Return all changelog entries."""
     return _read_changelog_filtered(lambda _: True, cwd=cwd)
@@ -227,6 +249,7 @@ def _read_changelog_filtered(
 
 
 # ── Today's summary stats ────────────────────────────────────────────
+
 
 def today_stats(cwd: Path | None = None) -> dict[str, Any]:
     """Aggregate today's changelog into a stats dict for the home-screen banner."""
@@ -271,3 +294,89 @@ def today_stats(cwd: Path | None = None) -> dict[str, Any]:
         "tasks_done": tasks_done,
         "tasks_error": tasks_error,
     }
+
+
+def today_total_cost(cwd: Path | None = None) -> float:
+    """Return the total LLM cost accumulated today (UTC) across all sessions.
+
+    Reads the changelog and computes the max per-session cost then sums them.
+    """
+    entries = read_today_changelog(cwd)
+    session_max: dict[str, float] = {}
+    for e in entries:
+        if e.get("event") == "cost_update":
+            cid = e.get("conversation_id", "__anon__")
+            cost = float(e.get("cost", 0.0))
+            if cost > session_max.get(cid, 0.0):
+                session_max[cid] = cost
+    return sum(session_max.values(), 0.0)
+
+
+# ── Session tags & project labels ────────────────────────────────────
+
+_TAGS_FILE = "tags.json"
+
+
+def _load_tags_store(cwd: Path | None = None) -> dict[str, dict[str, Any]]:
+    """Load the tags store from ``.forge/tags.json``.
+
+    Returns a dict mapping conversation_id → {"tags": [...], "project": str}.
+    """
+    path = get_forge_dir(cwd) / _TAGS_FILE
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_tags_store(store: dict[str, dict[str, Any]], cwd: Path | None = None) -> None:
+    """Persist the tags store to ``.forge/tags.json``."""
+    try:
+        forge_dir = ensure_forge_dir(cwd)
+        path = forge_dir / _TAGS_FILE
+        path.write_text(json.dumps(store, indent=2, default=str), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def get_conversation_meta(
+    conversation_id: str, cwd: Path | None = None
+) -> dict[str, Any]:
+    """Return the stored metadata (tags, project) for a conversation."""
+    store = _load_tags_store(cwd)
+    return store.get(conversation_id, {"tags": [], "project": ""})
+
+
+def set_conversation_tags(
+    conversation_id: str,
+    tags: list[str],
+    *,
+    project: str | None = None,
+    cwd: Path | None = None,
+) -> None:
+    """Set tags (and optionally project) for a conversation in the local store."""
+    store = _load_tags_store(cwd)
+    existing = store.get(conversation_id, {"tags": [], "project": ""})
+    existing["tags"] = sorted(set(t.strip().lstrip("#").lower() for t in tags if t.strip()))
+    if project is not None:
+        existing["project"] = project.strip()
+    store[conversation_id] = existing
+    _save_tags_store(store, cwd)
+
+
+def list_projects(cwd: Path | None = None) -> list[str]:
+    """Return a sorted list of all distinct project labels in the tags store."""
+    store = _load_tags_store(cwd)
+    projects = {v.get("project", "") for v in store.values()}
+    return sorted(p for p in projects if p)
+
+
+def list_all_tags(cwd: Path | None = None) -> list[str]:
+    """Return a sorted list of all distinct tags in the tags store."""
+    store = _load_tags_store(cwd)
+    tags: set[str] = set()
+    for v in store.values():
+        tags.update(v.get("tags", []))
+    return sorted(tags)

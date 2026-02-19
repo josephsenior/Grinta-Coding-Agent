@@ -1,6 +1,5 @@
 """Tests for backend.storage.locations — conversation path helpers."""
 
-
 from backend.storage.locations import (
     get_conversation_dir,
     get_conversation_events_dir,

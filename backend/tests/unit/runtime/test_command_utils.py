@@ -19,6 +19,7 @@ from backend.runtime.utils.command import (
 # _build_plugin_args
 # ---------------------------------------------------------------------------
 
+
 class TestBuildPluginArgs:
     """Tests for _build_plugin_args."""
 
@@ -40,6 +41,7 @@ class TestBuildPluginArgs:
 # ---------------------------------------------------------------------------
 # _validate_env_part
 # ---------------------------------------------------------------------------
+
 
 class TestValidateEnvPart:
     """Tests for _validate_env_part."""
@@ -77,6 +79,7 @@ class TestValidateEnvPart:
 # _build_browsergym_args
 # ---------------------------------------------------------------------------
 
+
 class TestBuildBrowsergymArgs:
     """Tests for _build_browsergym_args."""
 
@@ -108,6 +111,7 @@ class TestBuildBrowsergymArgs:
 # _validate_and_get_username
 # ---------------------------------------------------------------------------
 
+
 class TestValidateAndGetUsername:
     """Tests for _validate_and_get_username."""
 
@@ -137,11 +141,18 @@ class TestValidateAndGetUsername:
 # get_action_execution_server_startup_command
 # ---------------------------------------------------------------------------
 
+
 class TestGetStartupCommand:
     """Tests for get_action_execution_server_startup_command."""
 
-    def _make_config(self, *, run_as_forge=True, enable_browser=True,
-                     workspace_mount="/workspace", browsergym_env=None):
+    def _make_config(
+        self,
+        *,
+        run_as_forge=True,
+        enable_browser=True,
+        workspace_mount="/workspace",
+        browsergym_env=None,
+    ):
         cfg = MagicMock()
         cfg.run_as_Forge = run_as_forge
         cfg.enable_browser = enable_browser

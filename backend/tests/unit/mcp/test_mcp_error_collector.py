@@ -13,6 +13,7 @@ from backend.mcp.error_collector import MCPError, MCPErrorCollector
 # MCPError dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestMCPError:
     """Tests for the MCPError dataclass."""
 
@@ -43,6 +44,7 @@ class TestMCPError:
 # ---------------------------------------------------------------------------
 # MCPErrorCollector
 # ---------------------------------------------------------------------------
+
 
 class TestMCPErrorCollector:
     """Tests for the MCPErrorCollector class."""
@@ -110,8 +112,7 @@ class TestMCPErrorCollector:
                 c.add_error(f"srv_{thread_id}", "stdio", f"err_{i}")
 
         threads = [
-            threading.Thread(target=add_errors, args=(t,))
-            for t in range(num_threads)
+            threading.Thread(target=add_errors, args=(t,)) for t in range(num_threads)
         ]
         for t in threads:
             t.start()

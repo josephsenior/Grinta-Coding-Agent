@@ -122,16 +122,54 @@ async def search_components(mcps, args: dict[str, Any], call_tool_func) -> dict:
     }
 
 
+async def mcp_capabilities_status(mcps, args: dict[str, Any], call_tool_func) -> dict:
+    return {
+        "content": [
+            {
+                "type": "text",
+                "text": json.dumps(
+                    {
+                        "connected_servers": len(mcps or []),
+                        "connected_tools": sorted(
+                            {
+                                tool.name
+                                for client in (mcps or [])
+                                for tool in getattr(client, "tools", [])
+                            }
+                        ),
+                        "mcp_available": bool(mcps),
+                    },
+                    ensure_ascii=False,
+                ),
+            }
+        ]
+    }
+
+
 WRAPPER_TOOL_REGISTRY: dict[str, Callable] = {
     "search_components": search_components,
     "get_component_cached": _wrap_simple_passthrough("get_component"),
     "get_block_cached": _wrap_simple_passthrough("get_block"),
+    "mcp_capabilities_status": mcp_capabilities_status,
 }
 
 
 def wrapper_tool_params(available_server_tools: list[str]) -> list[dict]:
     """Describe wrapper tool signatures for MCP discovery based on available underlying tools."""
-    params = []
+    params = [
+        {
+            "type": "function",
+            "function": {
+                "name": "mcp_capabilities_status",
+                "description": "Report MCP connectivity and currently available MCP tool names for degraded-mode diagnostics.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
+            },
+        }
+    ]
     names = set(available_server_tools)
     if "list_components" in names:
         params.append(

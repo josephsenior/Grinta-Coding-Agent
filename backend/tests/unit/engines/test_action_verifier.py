@@ -21,6 +21,7 @@ def verifier():
 
 # ── should_verify ────────────────────────────────────────────────────
 
+
 class TestShouldVerify:
     def test_file_edit(self, verifier):
         action = MagicMock(spec=FileEditAction)
@@ -36,6 +37,7 @@ class TestShouldVerify:
 
 
 # ── verify_action ────────────────────────────────────────────────────
+
 
 class TestVerifyAction:
     @pytest.mark.asyncio

@@ -39,8 +39,8 @@ def _make_store(
 # Initialization
 # ===================================================================
 
-class TestBatchedWebHookInit:
 
+class TestBatchedWebHookInit:
     def test_defaults(self):
         inner = MagicMock()
         store = BatchedWebHookFileStore(
@@ -66,8 +66,8 @@ class TestBatchedWebHookInit:
 # Delegation to inner file store
 # ===================================================================
 
-class TestDelegation:
 
+class TestDelegation:
     def test_write_delegates(self):
         store, inner, _ = _make_store()
         store.write("path/to/file", "hello")
@@ -95,8 +95,8 @@ class TestDelegation:
 # Batching behavior
 # ===================================================================
 
-class TestBatching:
 
+class TestBatching:
     def test_write_queues_update(self):
         store, _, _ = _make_store()
         store.write("a.txt", "data")
@@ -131,8 +131,8 @@ class TestBatching:
 # Flush
 # ===================================================================
 
-class TestFlush:
 
+class TestFlush:
     def test_flush_sends_batch(self):
         store, _, mock_client = _make_store()
         store.write("a.txt", "hello")
@@ -170,8 +170,8 @@ class TestFlush:
 # Size-triggered flush
 # ===================================================================
 
-class TestSizeTriggeredFlush:
 
+class TestSizeTriggeredFlush:
     @patch("backend.storage.batched_web_hook.EXECUTOR")
     def test_exceeds_size_limit_triggers_send(self, mock_executor):
         store, _, _ = _make_store(batch_size_limit=10)
@@ -185,8 +185,8 @@ class TestSizeTriggeredFlush:
 # Timer management
 # ===================================================================
 
-class TestTimerManagement:
 
+class TestTimerManagement:
     def test_timer_created_on_write(self):
         store, _, _ = _make_store(batch_timeout=100)
         store.write("a.txt", "data")
@@ -211,8 +211,8 @@ class TestTimerManagement:
 # Bytes handling in payload
 # ===================================================================
 
-class TestBytesHandling:
 
+class TestBytesHandling:
     def test_bytes_content_utf8(self):
         store, inner, mock_client = _make_store()
         store.write("file.txt", b"hello bytes")

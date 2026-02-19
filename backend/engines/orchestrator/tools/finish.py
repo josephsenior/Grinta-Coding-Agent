@@ -13,6 +13,7 @@ _FINISH_DESCRIPTION = (
     "- Any next steps for the user\n"
     "- Explanation if you're unable to complete the task\n"
     "- Any follow-up questions if more information is needed\n"
+    "\nOptionally provide structured completion metadata via the other fields."
 )
 
 
@@ -25,7 +26,24 @@ def create_finish_tool() -> ChatCompletionToolParam:
             "message": {
                 "type": "string",
                 "description": "Final message to send to the user",
-            }
+            },
+            "completed": {
+                "type": "array",
+                "description": "List of tasks or steps that were completed during this session",
+                "items": {"type": "string"},
+            },
+            "blocked_by": {
+                "type": "string",
+                "description": (
+                    "If you were unable to fully complete the task, describe what is "
+                    "blocking progress (missing info, permissions, external dependency, etc.)"
+                ),
+            },
+            "next_steps": {
+                "type": "array",
+                "description": "Concrete next steps the user should take to continue",
+                "items": {"type": "string"},
+            },
         },
         required=["message"],
     )

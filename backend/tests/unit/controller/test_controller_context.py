@@ -10,6 +10,7 @@ from backend.controller.services.controller_context import ControllerContext
 
 # ── helpers ──────────────────────────────────────────────────────────
 
+
 def _make_ctx(**ctrl_attrs) -> ControllerContext:
     controller = MagicMock()
     for k, v in ctrl_attrs.items():
@@ -18,6 +19,7 @@ def _make_ctx(**ctrl_attrs) -> ControllerContext:
 
 
 # ── property proxies ─────────────────────────────────────────────────
+
 
 class TestControllerContextProperties:
     def test_id(self):
@@ -77,6 +79,7 @@ class TestControllerContextProperties:
 
 # ── pending_action ───────────────────────────────────────────────────
 
+
 class TestPendingAction:
     def test_from_pending_action_service(self):
         svc = MagicMock()
@@ -95,6 +98,7 @@ class TestPendingAction:
 
 # ── set_pending_action / clear ───────────────────────────────────────
 
+
 class TestSetPendingAction:
     def test_set_via_action_service(self):
         action_svc = MagicMock()
@@ -111,6 +115,7 @@ class TestSetPendingAction:
 
 # ── emit_event ───────────────────────────────────────────────────────
 
+
 class TestEmitEvent:
     def test_emit(self):
         es = MagicMock()
@@ -120,6 +125,7 @@ class TestEmitEvent:
 
 
 # ── pop_action_context ───────────────────────────────────────────────
+
 
 class TestPopActionContext:
     def test_found(self):
@@ -139,6 +145,7 @@ class TestPopActionContext:
 
 
 # ── get_controller ───────────────────────────────────────────────────
+
 
 class TestGetController:
     def test_returns_controller(self):

@@ -28,11 +28,10 @@ from textual.widgets import (
 )
 
 from backend.tui.client import ForgeClient
-from backend.tui.widgets.activity_panel import ActivityPanel
 from backend.tui.widgets.confirm_bar import ConfirmBar
 from backend.tui.widgets.message_list import MessageList
 from backend.tui.widgets.status_bar import AgentStatusBar
-from backend.core.workspace_context import append_changelog
+from backend.core.workspace_context import append_changelog, today_total_cost
 
 logger = logging.getLogger("forge.tui.chat")
 
@@ -52,7 +51,6 @@ class ChatScreen(Screen[None]):
         Binding("ctrl+q", "go_home", "Back to Home", show=True),
         Binding("ctrl+d", "view_diff", "View Diff", show=True),
         Binding("ctrl+x", "stop_agent", "Stop Agent", show=True),
-        Binding("ctrl+p", "toggle_panel", "Panel", show=True),
         Binding("escape", "dismiss_confirm", "Cancel", show=False),
     ]
 
@@ -106,13 +104,14 @@ class ChatScreen(Screen[None]):
         self._pending_action: dict[str, Any] | None = None
         self._models_loaded: bool = False
         self._step_count: int = 0
-        self._panel_visible: bool = True
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal(id="chat-outer"):
             with Vertical(id="chat-main"):
-                yield VerticalScroll(MessageList(id="message-list"), id="message-scroll")
+                yield VerticalScroll(
+                    MessageList(id="message-list"), id="message-scroll"
+                )
                 yield ConfirmBar(id="confirm-bar")
                 with Horizontal(id="input-row"):
                     yield Select[str](
@@ -122,7 +121,6 @@ class ChatScreen(Screen[None]):
                         allow_blank=True,
                     )
                     yield Input(placeholder="Type a message…", id="chat-input")
-            yield ActivityPanel(id="activity-panel")
         yield AgentStatusBar(id="agent-status-bar")
         yield Footer()
 
@@ -133,6 +131,7 @@ class ChatScreen(Screen[None]):
         )
         try:
             await self._load_models()
+            await self._apply_budget_limits()
             await self.client.join_conversation(
                 self.conversation_id,
                 on_event=self._handle_event,
@@ -140,6 +139,19 @@ class ChatScreen(Screen[None]):
             self._add_system_message("Connected — streaming events")
         except Exception as e:
             self._add_system_message(f"Connection error: {e}")
+
+    async def _apply_budget_limits(self) -> None:
+        """Fetch budget limits from server and configure the status bar."""
+        try:
+            limits = await self.client.get_budget_limits()
+            session_limit = limits.get("session_limit")
+            daily_limit = limits.get("daily_limit")
+            # Compute today's spend *before* this session from changelog
+            daily_base = today_total_cost()
+            status_bar = self.query_one("#agent-status-bar", AgentStatusBar)
+            status_bar.set_limits(session_limit, daily_limit, daily_base)
+        except Exception:
+            pass  # Never block startup over budget config
 
     async def _load_models(self) -> None:
         """Populate the model selector from the backend."""
@@ -257,12 +269,10 @@ class ChatScreen(Screen[None]):
             llm_metrics = data.get("llm_metrics")
             if llm_metrics:
                 status_bar = self.query_one("#agent-status-bar", AgentStatusBar)
-                panel = self.query_one("#activity-panel", ActivityPanel)
                 cost = llm_metrics.get("accumulated_cost")
                 model = llm_metrics.get("model")
                 if cost is not None:
                     status_bar.update_cost(cost)
-                    panel.update_cost(float(cost))
                     append_changelog(
                         "cost_update",
                         {"cost": cost, "model": model or ""},
@@ -282,8 +292,6 @@ class ChatScreen(Screen[None]):
         if args.get("hidden"):
             return
 
-        panel = self.query_one("#activity-panel", ActivityPanel)
-
         if action_type == "message":
             source = data.get("source", "")
             content = args.get("content", "")
@@ -302,21 +310,17 @@ class ChatScreen(Screen[None]):
         elif action_type == "read":
             path = args.get("path", "")
             self._add_action_card("Read File", path)
-            panel.track_file(path, "read")
         elif action_type == "write":
             path = args.get("path", "")
             content = args.get("content", "")
             self._add_action_card("Write File", path)
             if content:
-                first_line = next(
-                    (ln for ln in content.splitlines() if ln.strip()), ""
-                )
+                first_line = next((ln for ln in content.splitlines() if ln.strip()), "")
                 if first_line:
                     self._add_diff_hint(
-                        f"+ {first_line[:self._DIFF_PREVIEW_CHARS]}",
+                        f"+ {first_line[: self._DIFF_PREVIEW_CHARS]}",
                         css_class="diff-add",
                     )
-            panel.track_file(path, "write")
             append_changelog(
                 "file_write",
                 {"path": path},
@@ -328,7 +332,6 @@ class ChatScreen(Screen[None]):
             new_str = args.get("new_str", "")
             self._add_action_card("Edit File", path)
             self._show_inline_diff(old_str, new_str)
-            panel.track_file(path, "edit")
             append_changelog(
                 "file_edit",
                 {"path": path},
@@ -337,7 +340,6 @@ class ChatScreen(Screen[None]):
         elif action_type == "browse":
             url = args.get("url", "")
             self._add_action_card("Browse", url)
-            panel.track_file(url, "browse")
             append_changelog(
                 "browse",
                 {"url": url[:300]},
@@ -350,7 +352,6 @@ class ChatScreen(Screen[None]):
             thought = args.get("content", args.get("thought", ""))
             if thought:
                 self._add_action_card("Thinking", thought)
-                panel.add_thought(thought)
         elif action_type in ("finish", "reject"):
             content = args.get("content", args.get("outputs", {}).get("content", ""))
             self._add_system_message(
@@ -366,7 +367,6 @@ class ChatScreen(Screen[None]):
 
         # Increment step counter
         self._step_count += 1
-        panel.update_steps(self._step_count)
 
         if "security_risk" in args:
             self._pending_action = data
@@ -376,19 +376,15 @@ class ChatScreen(Screen[None]):
         """Show a compact before/after hint for file edits."""
         if not old_str and not new_str:
             return
-        old_first = next(
-            (ln for ln in old_str.splitlines() if ln.strip()), ""
-        )
-        new_first = next(
-            (ln for ln in new_str.splitlines() if ln.strip()), ""
-        )
+        old_first = next((ln for ln in old_str.splitlines() if ln.strip()), "")
+        new_first = next((ln for ln in new_str.splitlines() if ln.strip()), "")
         if old_first:
             self._add_diff_hint(
-                f"- {old_first[:self._DIFF_PREVIEW_CHARS]}", css_class="diff-del"
+                f"- {old_first[: self._DIFF_PREVIEW_CHARS]}", css_class="diff-del"
             )
         if new_first:
             self._add_diff_hint(
-                f"+ {new_first[:self._DIFF_PREVIEW_CHARS]}", css_class="diff-add"
+                f"+ {new_first[: self._DIFF_PREVIEW_CHARS]}", css_class="diff-add"
             )
 
     # ── observation events ────────────────────────────────────────
@@ -410,12 +406,12 @@ class ChatScreen(Screen[None]):
             )
             return
 
-        # Playbook knowledge — update activity panel
+        # Playbook knowledge — handled silently now or via messages
         if obs_type in ("playbook", "playbook_knowledge"):
             playbooks = extras.get("playbooks", [])
             if isinstance(playbooks, list) and playbooks:
-                panel = self.query_one("#activity-panel", ActivityPanel)
-                panel.set_playbooks([str(p) for p in playbooks])
+                # Optionally notify user in chat
+                self._add_system_message(f"Loaded playbooks: {', '.join(str(p) for p in playbooks)}")
             return
 
         msg_list = self.query_one("#message-list", MessageList)
@@ -428,7 +424,9 @@ class ChatScreen(Screen[None]):
             msg_list.add_observation(obs_type.title(), msg)
         elif obs_type == "mcp":
             tool = extras.get("tool_name", "mcp")
-            msg_list.add_observation(f"MCP: {tool}", content[:300] if content else "done")
+            msg_list.add_observation(
+                f"MCP: {tool}", content[:300] if content else "done"
+            )
         elif obs_type in ("chat", "message"):
             self._add_assistant_message(content)
         elif content:
@@ -518,9 +516,3 @@ class ChatScreen(Screen[None]):
 
     def action_dismiss_confirm(self) -> None:
         self._hide_confirm_bar()
-
-    def action_toggle_panel(self) -> None:
-        """Show/hide the activity sidebar (Ctrl+P)."""
-        panel = self.query_one("#activity-panel", ActivityPanel)
-        self._panel_visible = not self._panel_visible
-        panel.display = self._panel_visible

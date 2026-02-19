@@ -170,7 +170,9 @@ class DurableEventWriter:
         for item in batch:
             try:
                 self._flush_with_retry(item)
-            except Exception as exc:  # pragma: no cover - persistence must not crash thread
+            except (
+                Exception
+            ) as exc:  # pragma: no cover - persistence must not crash thread
                 self._errors += 1
                 logger.error(
                     "Permanently failed to persist event id=%s filename=%s after %d retries: %s",

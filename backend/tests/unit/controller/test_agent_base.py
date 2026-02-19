@@ -16,6 +16,7 @@ from backend.core.exceptions import (
 
 # ── helpers ──────────────────────────────────────────────────────────
 
+
 def _make_concrete_agent(name: str = "TestAgent"):
     """Create a concrete Agent subclass for testing."""
     return type(name, (Agent,), {"step": lambda self, state: None})
@@ -28,6 +29,7 @@ def _llm_registry():
 
 
 # ── registration ─────────────────────────────────────────────────────
+
 
 class TestAgentRegistry:
     def setup_method(self):
@@ -61,6 +63,7 @@ class TestAgentRegistry:
 
 # ── init and properties ──────────────────────────────────────────────
 
+
 class TestAgentInit:
     def test_init_basic(self):
         cls = _make_concrete_agent("BasicInitAgent")
@@ -86,6 +89,7 @@ class TestAgentInit:
 
 # ── set_mcp_tools ────────────────────────────────────────────────────
 
+
 class TestSetMcpTools:
     def test_adds_tools(self):
         cls = _make_concrete_agent()
@@ -109,10 +113,11 @@ class TestSetMcpTools:
         agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
         with patch("backend.controller.agent.build_tool", return_value=None):
             agent.set_mcp_tools([{"function": {"name": "x"}}])
-        assert len(agent.tools) == 0
+        assert not agent.tools
 
 
 # ── get_system_message ───────────────────────────────────────────────
+
 
 class TestGetSystemMessage:
     def test_with_prompt_manager(self):

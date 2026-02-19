@@ -33,6 +33,7 @@ class TestShouldExit:
         """Test initially returns False."""
         # Reset module state
         import backend.utils.shutdown_listener as mod
+
         mod._should_exit = None
 
         result = should_exit()
@@ -54,6 +55,7 @@ class TestShouldContinue:
         """Test initially returns True."""
         # Reset module state
         import backend.utils.shutdown_listener as mod
+
         mod._should_exit = None
 
         result = should_continue()
@@ -62,6 +64,7 @@ class TestShouldContinue:
     def test_opposite_of_should_exit(self):
         """Test returns opposite of should_exit."""
         import backend.utils.shutdown_listener as mod
+
         mod._should_exit = False
 
         assert should_continue() is True
@@ -86,9 +89,11 @@ class TestSleepIfShouldContinue:
     def test_sleeps_long_duration_in_chunks(self):
         """Test sleeps for long duration in chunks."""
         import backend.utils.shutdown_listener as mod
+
         mod._should_exit = False
 
         import time
+
         start = time.time()
         sleep_if_should_continue(0.5)
         elapsed = time.time() - start

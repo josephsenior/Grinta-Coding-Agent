@@ -105,7 +105,10 @@ class TestPromptManager:
         assert pm.system_template is not None
         assert pm.user_template is not None
 
-    @patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x)
+    @patch(
+        "backend.engines.orchestrator.tools.prompt.refine_prompt",
+        side_effect=lambda x: x,
+    )
     def test_get_system_message(self, mock_refine, tmp_path):
         from backend.utils.prompt import PromptManager
 
@@ -171,7 +174,10 @@ class TestPromptManager:
 
 
 class TestOrchestratorPromptManager:
-    @patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x)
+    @patch(
+        "backend.engines.orchestrator.tools.prompt.refine_prompt",
+        side_effect=lambda x: x,
+    )
     def test_identity_prefix_added(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
@@ -188,7 +194,10 @@ class TestOrchestratorPromptManager:
         result = opm.get_system_message()
         assert result.startswith("You are Forge agent.")
 
-    @patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x)
+    @patch(
+        "backend.engines.orchestrator.tools.prompt.refine_prompt",
+        side_effect=lambda x: x,
+    )
     def test_identity_prefix_not_duplicated(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
@@ -207,7 +216,10 @@ class TestOrchestratorPromptManager:
         result = opm.get_system_message()
         assert result.count("You are Forge agent.") == 1
 
-    @patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x)
+    @patch(
+        "backend.engines.orchestrator.tools.prompt.refine_prompt",
+        side_effect=lambda x: x,
+    )
     def test_config_injected(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
@@ -218,9 +230,7 @@ class TestOrchestratorPromptManager:
             "playbook_info.j2",
             "knowledge_base_info.j2",
         ]:
-            (tmp_path / name).write_text(
-                "cli={{ cli_mode }}", encoding="utf-8"
-            )
+            (tmp_path / name).write_text("cli={{ cli_mode }}", encoding="utf-8")
 
         mock_config = MagicMock()
         mock_config.cli_mode = True

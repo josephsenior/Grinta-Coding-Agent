@@ -42,6 +42,9 @@ def _snapshot_path() -> Path:
     return Path(_WORKSPACE_ROOT) / _SNAPSHOT_FILE
 
 
+_MAX_ATTEMPTED_APPROACHES = 20
+
+
 def extract_snapshot(events: list[Event]) -> dict[str, Any]:
     """Extract critical context from events that are about to be condensed.
 
@@ -58,6 +61,7 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         "recent_errors": [],
         "decisions": [],
         "recent_commands": [],
+        "attempted_approaches": [],
     }
 
     for event in events:
@@ -65,6 +69,8 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
         _extract_errors(event, snapshot)
         _extract_decisions(event, snapshot)
         _extract_commands(event, snapshot)
+
+    _extract_attempted_approaches(events, snapshot)
 
     return snapshot
 
@@ -157,6 +163,63 @@ def _extract_commands(event: Event, snapshot: dict) -> None:
             commands[-1]["output"] = "\n".join(truncated)[:_MAX_CONTENT_LENGTH]
 
 
+def _extract_attempted_approaches(events: list[Event], snapshot: dict) -> None:
+    """Extract action→outcome pairs to build a structured 'attempted approaches' record.
+
+    This captures WHAT was tried and WHETHER it worked, so the LLM can avoid
+    retrying failed strategies after condensation.
+    """
+    approaches = snapshot["attempted_approaches"]
+    if len(approaches) >= _MAX_ATTEMPTED_APPROACHES:
+        return
+
+    pending_action: dict[str, Any] | None = None
+
+    for event in events:
+        cls_name = type(event).__name__
+
+        if cls_name == "FileEditAction":
+            path = getattr(event, "path", "")
+            command = getattr(event, "command", "edit")
+            old_str = str(getattr(event, "old_str", ""))[:80] if hasattr(event, "old_str") else ""
+            pending_action = {
+                "type": "file_edit",
+                "detail": f"{command} on {path}" + (f" (old_str: {old_str!r}...)" if old_str else ""),
+            }
+        elif cls_name == "CmdRunAction":
+            cmd = str(getattr(event, "command", ""))[:150]
+            pending_action = {"type": "command", "detail": cmd}
+        elif cls_name in ("ErrorObservation",) and pending_action:
+            content = str(getattr(event, "content", ""))[:150]
+            pending_action["outcome"] = f"FAILED: {content}"
+            if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
+                approaches.append(pending_action)
+            pending_action = None
+        elif cls_name == "CmdOutputObservation" and pending_action:
+            exit_code = getattr(event, "exit_code", 0)
+            if exit_code != 0:
+                content = str(getattr(event, "content", ""))
+                lines = content.strip().split("\n")
+                tail = lines[-1][:150] if lines else ""
+                pending_action["outcome"] = f"FAILED (exit={exit_code}): {tail}"
+                if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
+                    approaches.append(pending_action)
+            else:
+                pending_action["outcome"] = "SUCCESS"
+                if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
+                    approaches.append(pending_action)
+            pending_action = None
+        elif cls_name == "FileEditObservation" and pending_action:
+            content = str(getattr(event, "content", ""))
+            if "error" in content.lower() or "failed" in content.lower():
+                pending_action["outcome"] = f"FAILED: {content[:150]}"
+            else:
+                pending_action["outcome"] = "SUCCESS"
+            if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
+                approaches.append(pending_action)
+            pending_action = None
+
+
 def save_snapshot(snapshot: dict[str, Any]) -> None:
     """Persist the snapshot to disk."""
     p = _snapshot_path()
@@ -218,6 +281,21 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
             parts.append(f"  $ {cmd}")
             if "output" in cmd_info:
                 parts.append(f"    → {cmd_info['output'][:150]}")
+
+    # Attempted approaches — what was tried and whether it worked
+    approaches = snapshot.get("attempted_approaches", [])
+    if approaches:
+        failed = [a for a in approaches if "FAILED" in a.get("outcome", "")]
+        succeeded = [a for a in approaches if a.get("outcome") == "SUCCESS"]
+        parts.append(f"\nAttempted approaches ({len(approaches)} total, {len(failed)} failed, {len(succeeded)} succeeded):")
+        parts.append("FAILED approaches (DO NOT retry these):")
+        for a in failed[-10:]:
+            parts.append(f"  ✗ [{a.get('type', '?')}] {a.get('detail', '')[:200]}")
+            parts.append(f"    → {a.get('outcome', '')[:200]}")
+        if succeeded:
+            parts.append("Succeeded approaches:")
+            for a in succeeded[-5:]:
+                parts.append(f"  ✓ [{a.get('type', '?')}] {a.get('detail', '')[:200]}")
 
     parts.append("</RESTORED_CONTEXT>")
     return "\n".join(parts)

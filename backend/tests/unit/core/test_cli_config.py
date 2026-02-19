@@ -80,19 +80,25 @@ class TestGetLlmConfigArg:
 class TestApplyAdditionalOverrides:
     def test_agent_cls_override(self):
         config = ForgeConfig()
-        args = SimpleNamespace(agent_cls="CustomAgent", max_iterations=None, max_budget_per_task=None)
+        args = SimpleNamespace(
+            agent_cls="CustomAgent", max_iterations=None, max_budget_per_task=None
+        )
         apply_additional_overrides(config, args)
         assert config.default_agent == "CustomAgent"
 
     def test_max_iterations_override(self):
         config = ForgeConfig()
-        args = SimpleNamespace(agent_cls=None, max_iterations=50, max_budget_per_task=None)
+        args = SimpleNamespace(
+            agent_cls=None, max_iterations=50, max_budget_per_task=None
+        )
         apply_additional_overrides(config, args)
         assert config.max_iterations == 50
 
     def test_max_budget_override(self):
         config = ForgeConfig()
-        args = SimpleNamespace(agent_cls=None, max_iterations=None, max_budget_per_task=10.0)
+        args = SimpleNamespace(
+            agent_cls=None, max_iterations=None, max_budget_per_task=10.0
+        )
         apply_additional_overrides(config, args)
         assert config.max_budget_per_task == 10.0
 
@@ -108,7 +114,9 @@ class TestApplyAdditionalOverrides:
     def test_none_values_not_applied(self):
         config = ForgeConfig()
         original_iter = config.max_iterations
-        args = SimpleNamespace(agent_cls=None, max_iterations=None, max_budget_per_task=None)
+        args = SimpleNamespace(
+            agent_cls=None, max_iterations=None, max_budget_per_task=None
+        )
         apply_additional_overrides(config, args)
         assert config.max_iterations == original_iter
 

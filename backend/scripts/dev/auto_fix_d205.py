@@ -23,7 +23,12 @@ BATCH_SIZE = 5
 
 def run_cmd(cmd: list[str], cwd: Path = ROOT) -> subprocess.CompletedProcess:
     return subprocess.run(
-        cmd, check=False, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        cmd,
+        check=False,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
     )
 
 

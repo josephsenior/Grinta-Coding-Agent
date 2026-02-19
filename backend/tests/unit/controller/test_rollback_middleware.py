@@ -80,7 +80,12 @@ class TestRiskyActionTypes:
 
     @pytest.mark.parametrize(
         "action_type",
-        ["MessageAction", "BrowseURLAction", "AgentFinishAction", "IPythonRunCellAction"],
+        [
+            "MessageAction",
+            "BrowseURLAction",
+            "AgentFinishAction",
+            "IPythonRunCellAction",
+        ],
     )
     def test_not_risky(self, action_type):
         assert action_type not in _RISKY_ACTION_TYPES
@@ -170,9 +175,7 @@ class TestLazyManagerInit:
         mw = RollbackMiddleware(workspace_path=None)
         ctx = _make_ctx(workspace_path=str(tmp_path))
         # RollbackManager is imported inside _get_manager — patch at source
-        with patch(
-            "backend.core.rollback.rollback_manager.RollbackManager"
-        ) as MockRM:
+        with patch("backend.core.rollback.rollback_manager.RollbackManager") as MockRM:
             MockRM.return_value = MagicMock()
             result = mw._get_manager(ctx)
         assert result is not None

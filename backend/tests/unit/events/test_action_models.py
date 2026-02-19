@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
 
 from backend.core.enums import (
     ActionConfirmationStatus,
@@ -194,7 +193,9 @@ class TestCmdRunAction(unittest.TestCase):
         self.assertEqual(CmdRunAction().security_risk, ActionSecurityRisk.UNKNOWN)
 
     def test_confirmation_state(self):
-        self.assertEqual(CmdRunAction().confirmation_state, ActionConfirmationStatus.CONFIRMED)
+        self.assertEqual(
+            CmdRunAction().confirmation_state, ActionConfirmationStatus.CONFIRMED
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -518,7 +519,9 @@ class TestCondensationAction(unittest.TestCase):
 # ---------------------------------------------------------------------------
 class TestCondensationRequestAction(unittest.TestCase):
     def test_action_type(self):
-        self.assertEqual(CondensationRequestAction.action, ActionType.CONDENSATION_REQUEST)
+        self.assertEqual(
+            CondensationRequestAction.action, ActionType.CONDENSATION_REQUEST
+        )
 
     def test_message(self):
         self.assertIn("condensation", CondensationRequestAction().message)

@@ -8,6 +8,7 @@ from backend.core.exceptions import AgentStuckInLoopError
 from backend.core.logger import FORGE_logger as logger
 from backend.core.schemas import AgentState
 from backend.events import EventSource
+from backend.events.action import AgentThinkAction
 from backend.events.observation import ErrorObservation
 
 if TYPE_CHECKING:
@@ -17,8 +18,12 @@ if TYPE_CHECKING:
 class StepGuardService:
     """Ensures controller steps are safe w.r.t. circuit breaker and stuck detection."""
 
+    _replan_attempts: int = 0
+    _MAX_REPLAN_ATTEMPTS: int = 2
+
     def __init__(self, context: ControllerContext) -> None:
         self._context = context
+        self._replan_attempts = 0
 
     async def ensure_can_step(self) -> bool:
         """Return False if circuit breaker/stuck detection block execution."""
@@ -60,14 +65,60 @@ class StepGuardService:
         if not stuck_service:
             return True
 
+        # Always compute and expose the repetition score for proactive self-correction
+        rep_score = stuck_service.compute_repetition_score()
+        state = getattr(controller, "state", None)
+        if state and hasattr(state, "turn_signals"):
+            state.turn_signals.repetition_score = rep_score
+
         if not stuck_service.is_stuck():
+            self._replan_attempts = 0
             return True
 
         cb_service = getattr(controller, "circuit_breaker_service", None)
         if cb_service:
             cb_service.record_stuck_detection()
 
+        # Try replanning before escalating to error recovery.
+        if self._replan_attempts < self._MAX_REPLAN_ATTEMPTS:
+            self._replan_attempts += 1
+            logger.warning(
+                "Stuck detected — injecting replan directive (attempt %d/%d)",
+                self._replan_attempts,
+                self._MAX_REPLAN_ATTEMPTS,
+            )
+            self._inject_replan_directive(controller)
+        else:
+            # Replanning exhausted — fall back to original error recovery
+            self._replan_attempts = 0
+
         await controller._react_to_exception(
             AgentStuckInLoopError("Agent got stuck in a loop")
         )
         return False
+
+    def _inject_replan_directive(self, controller) -> None:
+        """Inject a think action that forces the LLM to reassess its approach."""
+        replan_think = AgentThinkAction(
+            thought=(
+                "🚨 STUCK LOOP DETECTED — Your last several actions achieved no progress. "
+                "MANDATORY RECOVERY PROTOCOL:\n"
+                "1. STOP repeating the same approach\n"
+                "2. Analyze what went wrong — what error or non-progress pattern do you see?\n"
+                "3. List 2-3 ALTERNATIVE strategies you haven't tried\n"
+                "4. Pick the most promising one and execute it\n"
+                "5. If the file you're editing has changed, use view to see current content first\n\n"
+                "DO NOT repeat any action you've already tried. Change your strategy completely."
+            )
+        )
+        controller.event_stream.add_event(replan_think, EventSource.AGENT)
+
+        # Set a planning directive so the planner also nudges the LLM
+        state = getattr(controller, "state", None)
+        if state and hasattr(state, "set_planning_directive"):
+            state.set_planning_directive(
+                "STUCK RECOVERY: Your previous approach failed repeatedly. "
+                "You MUST change strategy. Review errors with error_patterns() "
+                "and update your plan with task_tracker(command='plan').",
+                source="StepGuardService",
+            )

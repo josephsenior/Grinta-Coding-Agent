@@ -164,9 +164,7 @@ class SmartConfigCache:
         """
         if self.redis_available:
             return self._get_user_settings_redis(user_id, settings_store, secrets_store)
-        return self._get_user_settings_memory(
-            user_id, settings_store, secrets_store
-        )
+        return self._get_user_settings_memory(user_id, settings_store, secrets_store)
 
     def _get_user_settings_redis(
         self, user_id: str, settings_store, secrets_store

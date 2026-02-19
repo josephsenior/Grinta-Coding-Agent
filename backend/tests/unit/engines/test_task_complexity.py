@@ -10,6 +10,7 @@ from backend.engines.orchestrator.task_complexity import TaskComplexityAnalyzer
 
 # ── helpers ──────────────────────────────────────────────────────────
 
+
 def _config(**overrides):
     defaults = {
         "planning_complexity_threshold": 3,
@@ -28,6 +29,7 @@ def _state(history=None):
 
 
 # ── analyze_complexity ───────────────────────────────────────────────
+
 
 class TestAnalyzeComplexity:
     def test_empty_message(self):
@@ -75,6 +77,7 @@ class TestAnalyzeComplexity:
 
 # ── _is_simple_task ──────────────────────────────────────────────────
 
+
 class TestIsSimpleTask:
     def test_simple_patterns(self):
         analyzer = TaskComplexityAnalyzer(_config())
@@ -88,6 +91,7 @@ class TestIsSimpleTask:
 
 
 # ── should_plan ──────────────────────────────────────────────────────
+
 
 class TestShouldPlan:
     def test_disabled(self):
@@ -106,6 +110,7 @@ class TestShouldPlan:
 
 
 # ── estimate_iterations ──────────────────────────────────────────────
+
 
 class TestEstimateIterations:
     def test_dynamic_disabled_fallback(self):

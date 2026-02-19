@@ -23,11 +23,14 @@ from backend.events.action import MessageAction
 # Helpers
 # ===================================================================
 
+
 def _make_state(extra_data: dict | None = None):
     """Create a fake State with extra_data dict."""
     state = MagicMock()
     state.extra_data = extra_data or {}
-    state.set_extra = MagicMock(side_effect=lambda k, v, **kw: state.extra_data.__setitem__(k, v))
+    state.set_extra = MagicMock(
+        side_effect=lambda k, v, **kw: state.extra_data.__setitem__(k, v)
+    )
     return state
 
 
@@ -45,8 +48,8 @@ def _make_events(n: int) -> list:
 # get_condensation_metadata
 # ===================================================================
 
-class TestGetCondensationMetadata:
 
+class TestGetCondensationMetadata:
     def test_empty_state(self):
         state = _make_state()
         assert get_condensation_metadata(state) == []
@@ -60,14 +63,15 @@ class TestGetCondensationMetadata:
 # Condenser.add_metadata / write_metadata
 # ===================================================================
 
+
 class ConcreteCondenser(Condenser):
     """Non-abstract condenser for testing."""
+
     def condense(self, view):
         return view
 
 
 class TestCondenserMetadata:
-
     def test_add_and_write(self):
         c = ConcreteCondenser()
         state = _make_state()
@@ -90,7 +94,13 @@ class TestCondenserMetadata:
 
     def test_eviction_on_max_batches(self):
         c = ConcreteCondenser()
-        state = _make_state({CONDENSER_METADATA_KEY: [{"i": i} for i in range(MAX_CONDENSER_META_BATCHES)]})
+        state = _make_state(
+            {
+                CONDENSER_METADATA_KEY: [
+                    {"i": i} for i in range(MAX_CONDENSER_META_BATCHES)
+                ]
+            }
+        )
         c.add_metadata("new", True)
         c.write_metadata(state)
         meta = state.extra_data[CONDENSER_METADATA_KEY]
@@ -111,8 +121,8 @@ class TestCondenserMetadata:
 # Condenser.register_config / from_config
 # ===================================================================
 
-class TestCondenserRegistry:
 
+class TestCondenserRegistry:
     def test_register_and_from_config(self):
         # Create a dummy config type
         class DummyConfig:
@@ -160,8 +170,10 @@ class TestCondenserRegistry:
 # BaseLLMCondenser
 # ===================================================================
 
+
 class ConcreteLLMCondenser(BaseLLMCondenser):
     """Non-abstract LLM condenser for testing."""
+
     def get_condensation(self, view):
         return Condensation(
             action=MagicMock(
@@ -174,7 +186,6 @@ class ConcreteLLMCondenser(BaseLLMCondenser):
 
 
 class TestBaseLLMCondenser:
-
     def test_init_basic(self):
         c = ConcreteLLMCondenser(llm=None, max_size=50, keep_first=2)
         assert c.max_size == 50
@@ -238,8 +249,8 @@ class TestBaseLLMCondenser:
 # Condensation model
 # ===================================================================
 
-class TestCondensation:
 
+class TestCondensation:
     def test_condensation_creation(self):
         from backend.events.action.agent import CondensationAction
 

@@ -39,15 +39,29 @@ class TelemetryService:
         context = self._context
         controller = context.get_controller()
         config = context.agent_config
+        planning_enabled = bool(
+            config
+            and (
+                getattr(config, "enable_planning_middleware", False)
+                or getattr(config, "enable_auto_planning", False)
+            )
+        )
+        reflection_enabled = bool(
+            config
+            and getattr(config, "enable_reflection", True)
+            and getattr(config, "enable_reflection_middleware", False)
+        )
+        controller._planning_middleware_enabled = planning_enabled
+        controller._reflection_middleware_enabled = reflection_enabled
         middlewares = [
             SafetyValidatorMiddleware(controller),
             IdempotencyMiddleware(),
             CircuitBreakerMiddleware(controller),
             CostQuotaMiddleware(controller),
         ]
-        if config and getattr(config, "enable_planning_middleware", False):
+        if planning_enabled:
             middlewares.append(PlanningMiddleware(controller))
-        if config and getattr(config, "enable_reflection_middleware", False):
+        if reflection_enabled:
             middlewares.append(ReflectionMiddleware(controller))
         # Rollback checkpoint before risky actions
         middlewares.append(RollbackMiddleware())

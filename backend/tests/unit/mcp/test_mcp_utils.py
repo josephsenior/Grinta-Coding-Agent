@@ -28,14 +28,16 @@ class TestIsWindowsMcpDisabled:
             assert _is_windows_mcp_disabled() is False
 
     def test_windows_no_env(self):
-        with patch.object(sys, "platform", "win32"), patch.dict(
-            "os.environ", {}, clear=True
+        with (
+            patch.object(sys, "platform", "win32"),
+            patch.dict("os.environ", {}, clear=True),
         ):
             assert _is_windows_mcp_disabled() is True
 
     def test_windows_with_env(self):
-        with patch.object(sys, "platform", "win32"), patch.dict(
-            "os.environ", {"FORGE_ENABLE_WINDOWS_MCP": "1"}
+        with (
+            patch.object(sys, "platform", "win32"),
+            patch.dict("os.environ", {"FORGE_ENABLE_WINDOWS_MCP": "1"}),
         ):
             assert _is_windows_mcp_disabled() is False
 
@@ -87,7 +89,12 @@ class TestConvertMcpsToTools:
         assert convert_mcps_to_tools(None) == []
 
     def test_empty_list(self):
-        assert convert_mcps_to_tools([]) == []
+        result = convert_mcps_to_tools([])
+        assert isinstance(result, list)
+        assert any(
+            tool.get("function", {}).get("name") == "mcp_capabilities_status"
+            for tool in result
+        )
 
     def test_basic_conversion(self):
         tool_mock = MagicMock()
@@ -109,7 +116,11 @@ class TestConvertMcpsToTools:
         client.tools = MagicMock(side_effect=Exception("boom"))
         # The iteration over client.tools will fail
         result = convert_mcps_to_tools([client])
-        assert result == []
+        assert isinstance(result, list)
+        assert any(
+            tool.get("function", {}).get("name") == "mcp_capabilities_status"
+            for tool in result
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -201,10 +212,14 @@ class TestAsyncHelpers:
         client = AsyncMock()
         response = MagicMock()
 
-        with patch("backend.mcp.utils.get_cached", return_value=None), patch(
-            "backend.mcp.utils.model_dump_with_options",
-            return_value={"result": "data"},
-        ), patch("backend.mcp.utils.set_cache"):
+        with (
+            patch("backend.mcp.utils.get_cached", return_value=None),
+            patch(
+                "backend.mcp.utils.model_dump_with_options",
+                return_value={"result": "data"},
+            ),
+            patch("backend.mcp.utils.set_cache"),
+        ):
             client.call_tool = AsyncMock(return_value=response)
             obs = await _execute_direct_tool(action, client)
             data = json.loads(obs.content)
@@ -217,7 +232,10 @@ class TestAsyncHelpers:
         action = SimpleNamespace(name="tool1", arguments={})
         with patch("backend.mcp.utils._is_windows_mcp_disabled", return_value=True):
             obs = await call_tool_mcp([], action)
-            assert "not available" in obs.content.lower() or "disabled" in obs.content.lower()
+            assert (
+                "not available" in obs.content.lower()
+                or "disabled" in obs.content.lower()
+            )
 
     @pytest.mark.asyncio
     async def test_call_tool_mcp_no_clients(self):
@@ -225,8 +243,10 @@ class TestAsyncHelpers:
 
         action = SimpleNamespace(name="tool1", arguments={})
         with patch("backend.mcp.utils._is_windows_mcp_disabled", return_value=False):
-            with pytest.raises(ValueError, match="No MCP clients"):
-                await call_tool_mcp([], action)
+            obs = await call_tool_mcp([], action)
+            assert "no mcp clients" in obs.content.lower() or "no mcp clients" in str(
+                obs
+            ).lower() or "no mcp" in obs.content.lower()
 
     @pytest.mark.asyncio
     async def test_call_tool_mcp_wrapper_dispatch(self):
@@ -240,9 +260,12 @@ class TestAsyncHelpers:
         mock_client = MagicMock()
         mock_client.tools = []
 
-        with patch("backend.mcp.utils._is_windows_mcp_disabled", return_value=False), patch.dict(
-            "backend.mcp.utils.WRAPPER_TOOL_REGISTRY",
-            {"wrap_tool": fake_wrapper},
+        with (
+            patch("backend.mcp.utils._is_windows_mcp_disabled", return_value=False),
+            patch.dict(
+                "backend.mcp.utils.WRAPPER_TOOL_REGISTRY",
+                {"wrap_tool": fake_wrapper},
+            ),
         ):
             obs = await call_tool_mcp([mock_client], action)
             data = json.loads(obs.content)
@@ -271,7 +294,11 @@ class TestAsyncHelpers:
         config = MagicMock()
         with patch("backend.mcp.utils._is_windows_mcp_disabled", return_value=True):
             result = await fetch_mcp_tools_from_config(config)
-            assert result == []
+            assert isinstance(result, list)
+            assert any(
+                t.get("function", {}).get("name") == "mcp_capabilities_status"
+                for t in result
+            )
 
     @pytest.mark.asyncio
     async def test_call_mcp_raw_cache_hit(self):

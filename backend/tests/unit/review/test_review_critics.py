@@ -90,7 +90,10 @@ class TestAgentFinishedCritic:
         non_action = MagicMock()
         result = critic.evaluate([non_action])
         assert result.score == 0
-        assert "not finish" in result.message.lower() or "did not" in result.message.lower()
+        assert (
+            "not finish" in result.message.lower()
+            or "did not" in result.message.lower()
+        )
 
     def test_empty_events(self, critic):
         result = critic.evaluate([])

@@ -27,15 +27,21 @@ def _make_middleware():
 class TestMatchesPattern:
     def test_exact_match(self):
         m = _make_middleware()
-        assert m._matches_pattern("POST /api/v1/settings", "POST /api/v1/settings") is True
+        assert (
+            m._matches_pattern("POST /api/v1/settings", "POST /api/v1/settings") is True
+        )
 
     def test_method_mismatch(self):
         m = _make_middleware()
-        assert m._matches_pattern("GET /api/v1/settings", "POST /api/v1/settings") is False
+        assert (
+            m._matches_pattern("GET /api/v1/settings", "POST /api/v1/settings") is False
+        )
 
     def test_path_mismatch(self):
         m = _make_middleware()
-        assert m._matches_pattern("POST /api/v1/other", "POST /api/v1/settings") is False
+        assert (
+            m._matches_pattern("POST /api/v1/other", "POST /api/v1/settings") is False
+        )
 
     def test_incomplete_operation(self):
         m = _make_middleware()
@@ -56,7 +62,12 @@ class TestPathMatches:
 
     def test_param_placeholder_matches(self):
         m = _make_middleware()
-        assert m._path_matches("/api/v1/conversations/abc123", "/api/v1/conversations/{id}") is True
+        assert (
+            m._path_matches(
+                "/api/v1/conversations/abc123", "/api/v1/conversations/{id}"
+            )
+            is True
+        )
 
     def test_different_lengths(self):
         m = _make_middleware()
@@ -86,8 +97,7 @@ class TestGetClientIP:
         req = MagicMock()
         req.headers = MagicMock()
         req.headers.get.side_effect = lambda k, d=None: (
-            None if k == "X-Forwarded-For" else
-            "10.0.0.1" if k == "X-Real-IP" else d
+            None if k == "X-Forwarded-For" else "10.0.0.1" if k == "X-Real-IP" else d
         )
         assert m._get_client_ip(req) == "10.0.0.1"
 

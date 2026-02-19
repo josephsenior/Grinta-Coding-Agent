@@ -31,10 +31,26 @@ def page_id_to_offset(page_id: str | None) -> int:
         page_id: Base64 encoded page ID, or None for first page.
 
     Returns:
-        int: The decoded offset value, or 0 if page_id is None.
+        int: The decoded offset value, or 0 if page_id is None, empty, or invalid.
 
     """
-    return int(base64.b64decode(page_id).decode()) if page_id else 0
+    if not page_id:
+        return 0
+
+    try:
+        # If it's a numeric string, treat it as direct offset (fallback)
+        if page_id.isdigit():
+            return int(page_id)
+
+        # Otherwise expect base64
+        decoded_bytes = base64.b64decode(page_id, validate=False)
+        decoded_str = decoded_bytes.decode()
+        if not decoded_str:
+            return 0
+        return int(decoded_str)
+    except Exception:
+        # Gracefully handle invalid pagination cursors by resetting to page 0
+        return 0
 
 
 async def iterate(fn: Callable, **kwargs) -> AsyncIterator:

@@ -34,7 +34,8 @@ def get_contextual_events_text(
 
     try:
         context_before = event_store.search_events(
-            start_id=event_id,
+            start_id=max(0, event_id - context_size),
+            end_id=event_id - 1,
             filter=event_filter,
             reverse=True,
             limit=context_size,

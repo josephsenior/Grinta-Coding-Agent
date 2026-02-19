@@ -5,7 +5,7 @@ TUI component talks through :class:`ForgeClient`.
 
 Usage::
 
-    client = ForgeClient("http://localhost:3000")
+    client = ForgeClient("http://localhost:3001")
     await client.connect()
     convos = await client.list_conversations()
     c = await client.create_conversation("Fix the login bug")
@@ -18,10 +18,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import deque
-from dataclasses import dataclass, field
-from datetime import datetime, UTC
-from typing import Any
 from collections.abc import Callable, Coroutine
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 import socketio  # type: ignore[import-untyped]
@@ -57,6 +57,8 @@ class ConversationInfo:
     status: str = "unknown"
     created_at: str = ""
     last_updated_at: str = ""
+    tags: tuple[str, ...] = ()
+    project: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ConversationInfo:
@@ -66,6 +68,8 @@ class ConversationInfo:
             status=data.get("status", data.get("conversation_status", "unknown")),
             created_at=data.get("created_at", ""),
             last_updated_at=data.get("last_updated_at", data.get("updated_at", "")),
+            tags=tuple(data.get("tags", [])),
+            project=data.get("project", ""),
         )
 
 
@@ -97,7 +101,7 @@ class ServerConfig:
 class ForgeClient:
     """Async HTTP + Socket.IO client facade for the Forge API."""
 
-    base_url: str = "http://localhost:3000"
+    base_url: str = "http://localhost:3001"
 
     # ── internal state ────────────────────────────────────────────
     _http: httpx.AsyncClient = field(init=False, repr=False)
@@ -145,12 +149,12 @@ class ForgeClient:
 
     async def _get(self, path: str, **kwargs: Any) -> Any:
         resp = await self._http.get(path, **kwargs)
-        resp.raise_for_status()
+        self._raise_for_status(resp)
         return resp.json()
 
     async def _post(self, path: str, **kwargs: Any) -> Any:
         resp = await self._http.post(path, **kwargs)
-        resp.raise_for_status()
+        self._raise_for_status(resp)
         return resp.json()
 
     async def _delete(self, path: str) -> bool:
@@ -159,20 +163,48 @@ class ForgeClient:
 
     async def _patch(self, path: str, **kwargs: Any) -> Any:
         resp = await self._http.patch(path, **kwargs)
-        resp.raise_for_status()
+        self._raise_for_status(resp)
         return resp.json()
+
+    @staticmethod
+    def _raise_for_status(resp: httpx.Response) -> None:
+        """Raise an error with the server's own detail message when possible."""
+        if resp.is_success:
+            return
+        detail: str = ""
+        try:
+            body = resp.json()
+            detail = (
+                body.get("detail") or body.get("message") or body.get("error") or ""
+            )
+            if isinstance(detail, list):  # FastAPI validation errors
+                detail = "; ".join(str(e.get("msg", e)) for e in detail)
+        except Exception:
+            detail = resp.text or resp.reason_phrase or ""
+        code = resp.status_code
+        prefix = {
+            400: "Bad request",
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not found",
+            422: "Validation error",
+            500: "Server error",
+            503: "Service unavailable",
+        }.get(code, f"HTTP {code}")
+        msg = f"{prefix}: {detail}" if detail else f"HTTP {code} {resp.reason_phrase}"
+        raise httpx.HTTPStatusError(msg, request=resp.request, response=resp)
 
     # ── conversations ─────────────────────────────────────────────
 
     async def list_conversations(
         self,
-        page: int = 1,
+        page_id: str | None = None,
         limit: int = 20,
     ) -> list[ConversationInfo]:
         """GET /api/conversations → list of conversations."""
         data = await self._get(
             "/conversations",
-            params={"page_id": page, "limit": limit},
+            params={"page_id": page_id, "limit": limit},
         )
         results = data.get("results", data) if isinstance(data, dict) else data
         if not isinstance(results, list):
@@ -195,10 +227,13 @@ class ForgeClient:
         # Inject local project memory if available
         try:
             from backend.core.workspace_context import read_project_memory
+
             memory = read_project_memory()
             if memory:
                 if conversation_instructions:
-                    conversation_instructions = memory + "\n\n---\n\n" + conversation_instructions
+                    conversation_instructions = (
+                        memory + "\n\n---\n\n" + conversation_instructions
+                    )
                 else:
                     conversation_instructions = memory
         except Exception:
@@ -231,8 +266,12 @@ class ForgeClient:
         return ServerConfig.from_dict(data)
 
     async def get_models(self) -> list[dict[str, Any]]:
-        """GET /api/models."""
-        return await self._get("/models")
+        """GET /api/v1/options/models."""
+        models = await self._get("/options/models")
+        return [
+            {"id": m, "name": m, "model": m} if isinstance(m, str) else m
+            for m in (models or [])
+        ]
 
     # ── settings ──────────────────────────────────────────────────
 
@@ -243,6 +282,38 @@ class ForgeClient:
     async def save_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         """POST /api/settings."""
         return await self._post("/settings", json=settings)
+
+    async def get_budget_limits(self) -> dict[str, float | None]:
+        """Return session and daily budget limits from server config.
+
+        Returns a dict with keys ``session_limit`` and ``daily_limit``
+        (both may be None if not configured).
+        """
+        try:
+            data = await self._get("/options/config")
+            return {
+                "session_limit": data.get("max_budget_per_session") or None,
+                "daily_limit": data.get("max_budget_per_day") or None,
+            }
+        except Exception:
+            # Fall back to reading config file directly when server is unavailable
+            try:
+                import tomllib
+                from pathlib import Path
+
+                cfg_path = Path.cwd() / "config.toml"
+                if cfg_path.exists():
+                    with cfg_path.open("rb") as fh:
+                        cfg = tomllib.load(fh)
+                    core = cfg.get("core", {})
+                    return {
+                        "session_limit": core.get("max_budget_per_session") or None,
+                        "daily_limit": core.get("max_budget_per_day") or None,
+                    }
+            except Exception:
+                pass
+            return {"session_limit": None, "daily_limit": None}
+
 
     # ── secrets ───────────────────────────────────────────────────
 
@@ -315,7 +386,9 @@ class ForgeClient:
                     )
                 except Exception:
                     logger.warning(
-                        "Auto-rejoin emit failed for %s", cid, exc_info=True,
+                        "Auto-rejoin emit failed for %s",
+                        cid,
+                        exc_info=True,
                     )
             # Flush offline queue
             await self._flush_offline_queue()
@@ -346,7 +419,8 @@ class ForgeClient:
         except RuntimeError:
             return
         self._heartbeat_task = loop.create_task(
-            self._heartbeat_loop(), name="forge-ws-heartbeat",
+            self._heartbeat_loop(),
+            name="forge-ws-heartbeat",
         )
 
     def _stop_heartbeat(self) -> None:
@@ -373,7 +447,8 @@ class ForgeClient:
         """Buffer an action for later delivery when reconnected."""
         self._offline_queue.append((event, payload))
         logger.debug(
-            "Buffered offline action (queue depth: %d)", len(self._offline_queue),
+            "Buffered offline action (queue depth: %d)",
+            len(self._offline_queue),
         )
 
     async def _flush_offline_queue(self) -> None:
@@ -418,24 +493,29 @@ class ForgeClient:
             self._connect_event.clear()
 
         query = f"conversation_id={conversation_id}&latest_event_id={latest_event_id}"
-        await self._sio.connect(
-            self.base_url,
-            socketio_path="/socket.io",
-            transports=["websocket", "polling"],
-            wait_timeout=15,
-            headers={"Connection": "Upgrade"},
-            auth={},
-            namespaces=["/"],
-        )
         # Socket.IO python client doesn't support query params in connect() directly —
-        # we set them via the URL
-        if not self._sio.connected:
+        # we set them via the URL. We include common headers for robustness.
+        url = f"{self.base_url}?{query}"
+        logger.info("Connecting to Socket.IO at %s", url)
+
+        try:
             await self._sio.connect(
-                f"{self.base_url}?{query}",
+                url,
                 socketio_path="/socket.io",
                 transports=["websocket", "polling"],
                 wait_timeout=15,
+                namespaces=["/"],
             )
+        except Exception as e:
+            logger.error("Failed to connect to Socket.IO: %s", e)
+            # Fallback to polling if websocket fails and we haven't tried yet
+            if not self._sio.connected:
+                await self._sio.connect(
+                    url,
+                    socketio_path="/socket.io",
+                    transports=["polling"],
+                    wait_timeout=15,
+                )
 
         self._connected_conversation_id = conversation_id
         logger.info("Joined conversation %s via Socket.IO", conversation_id)

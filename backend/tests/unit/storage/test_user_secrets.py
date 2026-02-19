@@ -16,13 +16,13 @@ class TestUserSecretsDefaults:
     def test_empty_dict(self):
         s = UserSecrets()
         assert isinstance(s.provider_tokens, MappingProxyType)
-        assert len(s.provider_tokens) == 0
+        assert not s.provider_tokens
         assert isinstance(s.custom_secrets, MappingProxyType)
-        assert len(s.custom_secrets) == 0
+        assert not s.custom_secrets
 
     def test_none_input(self):
         s = UserSecrets.model_validate(None)
-        assert len(s.provider_tokens) == 0
+        assert not s.provider_tokens
 
     def test_not_a_dict_rejected(self):
         with pytest.raises(ValueError, match="dictionary"):
@@ -33,7 +33,7 @@ class TestConvertProviderTokens:
     def test_empty(self):
         result = UserSecrets._convert_provider_tokens({})
         assert isinstance(result, MappingProxyType)
-        assert len(result) == 0
+        assert not result
 
     def test_already_mappingproxy(self):
         token = ProviderToken(token=SecretStr("tok"), host="h")
@@ -43,21 +43,19 @@ class TestConvertProviderTokens:
 
     def test_string_keys_converted(self):
         token = ProviderToken(token=SecretStr("tok123"), host="gh.com")
-        result = UserSecrets._convert_provider_tokens(
-            {"enterprise_sso": token}
-        )
+        result = UserSecrets._convert_provider_tokens({"enterprise_sso": token})
         assert ProviderType.ENTERPRISE_SSO in result
 
     def test_invalid_provider_skipped(self):
         token = ProviderToken(token=SecretStr("tok"), host="h")
         result = UserSecrets._convert_provider_tokens({"invalid_provider": token})
-        assert len(result) == 0
+        assert not result
 
 
 class TestConvertCustomSecrets:
     def test_empty(self):
         result = UserSecrets._convert_custom_secrets({})
-        assert len(result) == 0
+        assert not result
 
     def test_already_mappingproxy(self):
         sec = CustomSecret(secret=SecretStr("v"), description="d")
@@ -74,9 +72,7 @@ class TestConvertCustomSecrets:
 class TestUserSecretsSerialization:
     def test_provider_tokens_hidden_by_default(self):
         token = ProviderToken(token=SecretStr("secret123"), host="gh.com")
-        s = UserSecrets(
-            provider_tokens={ProviderType.ENTERPRISE_SSO: token}
-        )
+        s = UserSecrets(provider_tokens={ProviderType.ENTERPRISE_SSO: token})
         data = model_dump_with_options(s)
         # Token should NOT be exposed
         for v in data.get("provider_tokens", {}).values():
@@ -84,9 +80,7 @@ class TestUserSecretsSerialization:
 
     def test_provider_tokens_exposed_with_context(self):
         token = ProviderToken(token=SecretStr("secret123"), host="gh.com")
-        s = UserSecrets(
-            provider_tokens={ProviderType.ENTERPRISE_SSO: token}
-        )
+        s = UserSecrets(provider_tokens={ProviderType.ENTERPRISE_SSO: token})
         data = model_dump_with_options(s, context={"expose_secrets": True})
         found = False
         for v in data.get("provider_tokens", {}).values():

@@ -11,6 +11,7 @@ from backend.storage.secrets.file_secrets_store import FileSecretsStore
 
 # ── __init__ ──────────────────────────────────────────────────────────
 
+
 class TestFileSecretsStoreInit:
     def test_default_path(self):
         fs = MagicMock()
@@ -38,6 +39,7 @@ class TestFileSecretsStoreInit:
 
 # ── load ──────────────────────────────────────────────────────────────
 
+
 class TestFileSecretsStoreLoad:
     async def test_load_returns_none_when_not_found(self):
         fs = MagicMock()
@@ -57,7 +59,9 @@ class TestFileSecretsStoreLoad:
 
         # UserSecrets uses provider_tokens and custom_secrets
         # ProviderType only has "enterprise_sso" as a valid enum value
-        data = json.dumps({"provider_tokens": {"enterprise_sso": {"token": "tok_test"}}})
+        data = json.dumps(
+            {"provider_tokens": {"enterprise_sso": {"token": "tok_test"}}}
+        )
 
         with patch(
             "backend.storage.secrets.file_secrets_store.call_sync_from_async",
@@ -67,7 +71,7 @@ class TestFileSecretsStoreLoad:
             result = await store.load()
             assert result is not None
             # provider_tokens should have the converted entry
-            assert len(result.provider_tokens) > 0
+            assert result.provider_tokens
 
     async def test_load_normalizes_string_provider_tokens(self):
         """String token values get normalized to {"token": value} dicts
@@ -77,11 +81,13 @@ class TestFileSecretsStoreLoad:
 
         # The load() method normalizes string tokens to {"token": ...}
         # Then UserSecrets._convert_provider_tokens converts to ProviderToken objects
-        data = json.dumps({
-            "provider_tokens": {
-                "enterprise_sso": "tok_abc123",
+        data = json.dumps(
+            {
+                "provider_tokens": {
+                    "enterprise_sso": "tok_abc123",
+                }
             }
-        })
+        )
 
         with patch(
             "backend.storage.secrets.file_secrets_store.call_sync_from_async",
@@ -91,7 +97,7 @@ class TestFileSecretsStoreLoad:
             result = await store.load()
             assert result is not None
             # The tokens end up as MappingProxyType with ProviderType keys
-            assert len(result.provider_tokens) >= 1
+            assert result.provider_tokens
 
     async def test_load_skips_empty_token_values(self):
         """Empty strings and empty dicts are excluded by the normalization logic."""
@@ -101,11 +107,13 @@ class TestFileSecretsStoreLoad:
         # empty_str -> normalized away (not truthy)
         # empty_dict -> no 'token' key so normalized away
         # valid -> kept
-        data = json.dumps({
-            "provider_tokens": {
-                "enterprise_sso": {"token": "tok-1"},
+        data = json.dumps(
+            {
+                "provider_tokens": {
+                    "enterprise_sso": {"token": "tok-1"},
+                }
             }
-        })
+        )
 
         with patch(
             "backend.storage.secrets.file_secrets_store.call_sync_from_async",
@@ -114,19 +122,21 @@ class TestFileSecretsStoreLoad:
         ):
             result = await store.load()
             assert result is not None
-            assert len(result.provider_tokens) >= 1
+            assert result.provider_tokens
 
     async def test_load_empty_tokens_filtered(self):
         """Verify that empty strings and empty dicts get filtered out."""
         fs = MagicMock()
         store = FileSecretsStore(fs)
 
-        data = json.dumps({
-            "provider_tokens": {
-                "empty_str": "",
-                "empty_dict": {},
+        data = json.dumps(
+            {
+                "provider_tokens": {
+                    "empty_str": "",
+                    "empty_dict": {},
+                }
             }
-        })
+        )
 
         with patch(
             "backend.storage.secrets.file_secrets_store.call_sync_from_async",
@@ -138,7 +148,7 @@ class TestFileSecretsStoreLoad:
             # Both empty tokens should be filtered in normalization,
             # resulting in provider_tokens=None (no valid tokens)
             tokens = result.provider_tokens
-            assert len(tokens) == 0
+            assert not tokens
 
     async def test_load_handles_non_dict_json(self):
         fs = MagicMock()
@@ -154,6 +164,7 @@ class TestFileSecretsStoreLoad:
 
 
 # ── store ─────────────────────────────────────────────────────────────
+
 
 class TestFileSecretsStoreStore:
     async def test_store_writes_json(self):
@@ -181,6 +192,7 @@ class TestFileSecretsStoreStore:
 
 
 # ── get_instance ──────────────────────────────────────────────────────
+
 
 class TestFileSecretsStoreGetInstance:
     async def test_creates_instance_with_file_store(self):

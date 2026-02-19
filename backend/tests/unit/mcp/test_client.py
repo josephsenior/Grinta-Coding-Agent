@@ -3,7 +3,6 @@
 Tests MCPClient session management, connection, reconnection, and tool calls.
 """
 
-import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -69,7 +68,9 @@ class TestMCPClientSessionManagement(unittest.IsolatedAsyncioTestCase):
         """Test closing session gracefully handles connection errors."""
         mcp_client = MCPClient()
         mock_fastmcp_client = AsyncMock(spec=Client)
-        mock_fastmcp_client.__aexit__ = AsyncMock(side_effect=Exception("Connection lost"))
+        mock_fastmcp_client.__aexit__ = AsyncMock(
+            side_effect=Exception("Connection lost")
+        )
         mcp_client.client = mock_fastmcp_client
         mcp_client._session_active = True
 
@@ -82,7 +83,7 @@ class TestMCPClientSessionManagement(unittest.IsolatedAsyncioTestCase):
         """Test populate_tools fetches and maps server tools."""
         mcp_client = MCPClient()
         mock_fastmcp_client = AsyncMock(spec=Client)
-        
+
         server_tools = [
             Tool(
                 name="search_files",
@@ -165,7 +166,7 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
 
     async def test_connect_http_without_url_raises(self) -> None:
         """Test connecting without empty URL raises ValidationError."""
-        mcp_client = MCPClient()
+        MCPClient()
 
         with self.assertRaises(ValidationError):
             MCPSSEServerConfig(url="")
@@ -286,9 +287,7 @@ class TestMCPClientToolCalls(unittest.IsolatedAsyncioTestCase):
     async def test_call_tool_success(self) -> None:
         """Test successful tool call."""
         mock_client = AsyncMock(spec=Client)
-        mock_result = CallToolResult(
-            content=[{"type": "text", "text": "File found"}]
-        )
+        mock_result = CallToolResult(content=[{"type": "text", "text": "File found"}])
         mock_client.call_tool_mcp = AsyncMock(return_value=mock_result)
 
         mcp_client = MCPClient(client=mock_client, _session_active=True)
@@ -331,10 +330,10 @@ class TestMCPClientToolCalls(unittest.IsolatedAsyncioTestCase):
         """Test tool call reconnects and retries on failure."""
         mock_client = AsyncMock(spec=Client)
         mock_client.__aenter__ = AsyncMock()
-        mock_client.list_tools = AsyncMock(return_value=[
-            Tool(name="test_tool", description="Test", inputSchema={})
-        ])
-        
+        mock_client.list_tools = AsyncMock(
+            return_value=[Tool(name="test_tool", description="Test", inputSchema={})]
+        )
+
         # First call fails, second succeeds
         success_result = CallToolResult(content=[{"type": "text", "text": "OK"}])
         mock_client.call_tool_mcp = AsyncMock(
@@ -391,9 +390,7 @@ class TestMCPClientReconnection(unittest.IsolatedAsyncioTestCase):
     async def test_reconnect_fails_after_max_attempts(self) -> None:
         """Test reconnection raises after max attempts."""
         mock_client = AsyncMock(spec=Client)
-        mock_client.__aenter__ = AsyncMock(
-            side_effect=ConnectionError("Server down")
-        )
+        mock_client.__aenter__ = AsyncMock(side_effect=ConnectionError("Server down"))
 
         mcp_client = MCPClient(client=mock_client)
 

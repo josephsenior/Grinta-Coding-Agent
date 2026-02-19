@@ -141,7 +141,7 @@ class TestLogAction:
         )
 
         assert isinstance(audit_id, str)
-        assert len(audit_id) > 0
+        assert audit_id
 
         # Verify file was written
         log_file = al._get_session_log_file("s1")
@@ -239,7 +239,9 @@ class TestFilteredQueries:
             session_id="filter-test",
             iteration=1,
             action=_make_cmd_action("rm -rf /"),
-            validation_result=_make_validation_result(allowed=False, blocked_reason="danger"),
+            validation_result=_make_validation_result(
+                allowed=False, blocked_reason="danger"
+            ),
             timestamp=datetime(2025, 1, 1),
         )
 
@@ -254,14 +256,18 @@ class TestFilteredQueries:
             session_id="risk-test",
             iteration=0,
             action=_make_cmd_action("safe"),
-            validation_result=_make_validation_result(risk_level=ActionSecurityRisk.LOW),
+            validation_result=_make_validation_result(
+                risk_level=ActionSecurityRisk.LOW
+            ),
             timestamp=datetime(2025, 1, 1),
         )
         await al.log_action(
             session_id="risk-test",
             iteration=1,
             action=_make_cmd_action("risky"),
-            validation_result=_make_validation_result(risk_level=ActionSecurityRisk.HIGH),
+            validation_result=_make_validation_result(
+                risk_level=ActionSecurityRisk.HIGH
+            ),
             timestamp=datetime(2025, 1, 1),
         )
 
@@ -352,7 +358,7 @@ class TestExportAuditTrail:
         out_path = str(tmp_path / "export.json")
         al.export_audit_trail("export-test", out_path)
 
-        with open(out_path) as f:
+        with open(out_path, encoding="utf-8") as f:
             data = json.load(f)
         assert isinstance(data, list)
         assert len(data) == 1

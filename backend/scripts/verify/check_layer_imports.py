@@ -76,7 +76,12 @@ def _extract_imports(filepath: Path) -> list[tuple[int, str, bool]]:
             test = node.test
             # if TYPE_CHECKING:  or  if typing.TYPE_CHECKING:
             is_tc = False
-            if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING" or isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
+            if (
+                isinstance(test, ast.Name)
+                and test.id == "TYPE_CHECKING"
+                or isinstance(test, ast.Attribute)
+                and test.attr == "TYPE_CHECKING"
+            ):
                 is_tc = True
             if is_tc:
                 start = node.lineno

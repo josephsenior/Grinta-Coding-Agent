@@ -137,8 +137,14 @@ class TestProtocolCompliance:
     async def test_can_call_action_methods(self):
         """Test action dispatch methods can be called on compliant object."""
         executor = MagicMock(spec=ActionExecutorProtocol)
-        executor.run_action = AsyncMock(return_value=CmdOutputObservation(content="ok", command="test", exit_code=0))
-        executor.run = AsyncMock(return_value=CmdOutputObservation(content="run_ok", command="echo test", exit_code=0))
+        executor.run_action = AsyncMock(
+            return_value=CmdOutputObservation(content="ok", command="test", exit_code=0)
+        )
+        executor.run = AsyncMock(
+            return_value=CmdOutputObservation(
+                content="run_ok", command="echo test", exit_code=0
+            )
+        )
         executor.read = AsyncMock()
         executor.write = AsyncMock()
         executor.edit = AsyncMock()

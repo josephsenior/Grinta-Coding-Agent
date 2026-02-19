@@ -13,6 +13,7 @@ from backend.code_quality.impl import DefaultLinter, LintError, LintResult
 
 # ── LintError ─────────────────────────────────────────────────────────
 
+
 class TestLintError:
     def test_visualize_line_only(self):
         err = LintError(line=10, column=None, message="bad thing")
@@ -32,6 +33,7 @@ class TestLintError:
 
 
 # ── LintResult ────────────────────────────────────────────────────────
+
 
 class TestLintResult:
     def test_separates_errors_and_warnings(self):
@@ -58,18 +60,23 @@ class TestLintResult:
 
 # ── DefaultLinter initialization ──────────────────────────────────────
 
+
 class TestDefaultLinterInit:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=False)
     def test_no_backend_available(self, mock_check):
         linter = DefaultLinter(backend="auto")
         assert linter._detected_backend is None
 
-    @patch.object(DefaultLinter, "_check_backend_available", side_effect=lambda b: b == "ruff")
+    @patch.object(
+        DefaultLinter, "_check_backend_available", side_effect=lambda b: b == "ruff"
+    )
     def test_auto_detects_ruff(self, mock_check):
         linter = DefaultLinter(backend="auto")
         assert linter._detected_backend == "ruff"
 
-    @patch.object(DefaultLinter, "_check_backend_available", side_effect=lambda b: b == "pylint")
+    @patch.object(
+        DefaultLinter, "_check_backend_available", side_effect=lambda b: b == "pylint"
+    )
     def test_auto_detects_pylint(self, mock_check):
         linter = DefaultLinter(backend="auto")
         assert linter._detected_backend == "pylint"
@@ -86,6 +93,7 @@ class TestDefaultLinterInit:
 
 
 # ── Cache logic ───────────────────────────────────────────────────────
+
 
 class TestDefaultLinterCache:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=False)
@@ -114,8 +122,9 @@ class TestDefaultLinterCache:
         expected = LintResult(errors=[LintError(1, None, "x")], warnings=[])
         key = "lint:content:hit:cfg"
 
-        with patch.object(linter, "_get_cache_key", return_value=key), patch.object(
-            linter, "_get_from_cache", return_value=expected
+        with (
+            patch.object(linter, "_get_cache_key", return_value=key),
+            patch.object(linter, "_get_from_cache", return_value=expected),
         ):
             result = linter.lint(content="x = 1")
 
@@ -154,7 +163,7 @@ class TestDefaultLinterCache:
         linter._cache_hits = 5
         linter._cache_misses = 3
         linter.clear_cache()
-        assert len(linter._cache) == 0
+        assert not linter._cache
         assert linter._cache_hits == 0
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
@@ -169,6 +178,7 @@ class TestDefaultLinterCache:
 
 
 # ── _get_cache_key ────────────────────────────────────────────────────
+
 
 class TestGetCacheKey:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
@@ -212,6 +222,7 @@ class TestGetCacheKey:
 
 # ── _hash_config ──────────────────────────────────────────────────────
 
+
 class TestHashConfig:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_deterministic(self, _):
@@ -227,13 +238,16 @@ class TestHashConfig:
 
 # ── lint_file_diff ────────────────────────────────────────────────────
 
+
 class TestLintFileDiff:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_delegates_to_lint(self, _):
         linter = DefaultLinter(backend="ruff")
         expected = LintResult(
             errors=[LintError(line=1, column=None, message="err")],
-            warnings=[LintError(line=2, column=None, message="warn", severity="warning")],
+            warnings=[
+                LintError(line=2, column=None, message="warn", severity="warning")
+            ],
         )
         with patch.object(linter, "lint", return_value=expected):
             issues = linter.lint_file_diff("orig.py", "updated.py")
@@ -241,6 +255,7 @@ class TestLintFileDiff:
 
 
 # ── _lint_with_ruff (subprocess mock) ─────────────────────────────────
+
 
 class TestLintWithRuff:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
@@ -263,7 +278,9 @@ class TestLintWithRuff:
         mock_result.stdout = json.dumps(ruff_output)
         mock_result.stderr = ""
 
-        with patch("backend.code_quality.impl.subprocess.run", return_value=mock_result):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", return_value=mock_result
+        ):
             result = linter._lint_with_ruff("test.py")
         assert len(result.errors) == 1
         assert len(result.warnings) == 1
@@ -273,14 +290,20 @@ class TestLintWithRuff:
     def test_ruff_timeout(self, _):
         linter = DefaultLinter(backend="ruff")
         import subprocess
-        with patch("backend.code_quality.impl.subprocess.run", side_effect=subprocess.TimeoutExpired("ruff", 30)):
+
+        with patch(
+            "backend.code_quality.impl.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("ruff", 30),
+        ):
             result = linter._lint_with_ruff("test.py")
         assert result.errors == []
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_ruff_not_found(self, _):
         linter = DefaultLinter(backend="ruff")
-        with patch("backend.code_quality.impl.subprocess.run", side_effect=FileNotFoundError):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", side_effect=FileNotFoundError
+        ):
             result = linter._lint_with_ruff("test.py")
         assert result.errors == []
 
@@ -290,7 +313,9 @@ class TestLintWithRuff:
         mock_result = MagicMock()
         mock_result.returncode = 2
         mock_result.stderr = "crash"
-        with patch("backend.code_quality.impl.subprocess.run", return_value=mock_result):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", return_value=mock_result
+        ):
             result = linter._lint_with_ruff("test.py")
         assert result.errors == []
 
@@ -300,7 +325,9 @@ class TestLintWithRuff:
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stdout = "not json"
-        with patch("backend.code_quality.impl.subprocess.run", return_value=mock_result):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", return_value=mock_result
+        ):
             result = linter._lint_with_ruff("test.py")
         assert result.errors == []
 
@@ -327,12 +354,15 @@ class TestLintWithRuff:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_ruff_generic_exception(self, _):
         linter = DefaultLinter(backend="ruff")
-        with patch("backend.code_quality.impl.subprocess.run", side_effect=RuntimeError("boom")):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", side_effect=RuntimeError("boom")
+        ):
             result = linter._lint_with_ruff("test.py")
         assert result.errors == []
 
 
 # ── _lint_with_pylint (subprocess mock) ───────────────────────────────
+
 
 class TestLintWithPylint:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
@@ -360,7 +390,9 @@ class TestLintWithPylint:
         mock_result.stdout = json.dumps(pylint_output)
         mock_result.stderr = ""
 
-        with patch("backend.code_quality.impl.subprocess.run", return_value=mock_result):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", return_value=mock_result
+        ):
             result = linter._lint_with_pylint("test.py")
         assert len(result.errors) == 1
         assert len(result.warnings) == 1
@@ -370,7 +402,11 @@ class TestLintWithPylint:
         linter = DefaultLinter(backend="pylint")
         linter._detected_backend = "pylint"
         import subprocess
-        with patch("backend.code_quality.impl.subprocess.run", side_effect=subprocess.TimeoutExpired("pylint", 60)):
+
+        with patch(
+            "backend.code_quality.impl.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("pylint", 60),
+        ):
             result = linter._lint_with_pylint("test.py")
         assert result.errors == []
 
@@ -382,7 +418,9 @@ class TestLintWithPylint:
         mock_result.returncode = 2
         mock_result.stdout = "not json"
         mock_result.stderr = ""
-        with patch("backend.code_quality.impl.subprocess.run", return_value=mock_result):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", return_value=mock_result
+        ):
             result = linter._lint_with_pylint("test.py")
         assert result.errors == []
 
@@ -390,7 +428,9 @@ class TestLintWithPylint:
     def test_pylint_not_found(self, _):
         linter = DefaultLinter(backend="pylint")
         linter._detected_backend = "pylint"
-        with patch("backend.code_quality.impl.subprocess.run", side_effect=FileNotFoundError):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", side_effect=FileNotFoundError
+        ):
             result = linter._lint_with_pylint("test.py")
         assert result.errors == []
 
@@ -398,7 +438,9 @@ class TestLintWithPylint:
     def test_pylint_generic_exception(self, _):
         linter = DefaultLinter(backend="pylint")
         linter._detected_backend = "pylint"
-        with patch("backend.code_quality.impl.subprocess.run", side_effect=RuntimeError("boom")):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", side_effect=RuntimeError("boom")
+        ):
             result = linter._lint_with_pylint("test.py")
         assert result.errors == []
 
@@ -436,7 +478,9 @@ class TestLintContent:
             return LintResult(errors=[], warnings=[])
 
         with patch.object(linter, "_lint_with_ruff", side_effect=fake_lint):
-            result = linter._lint_content("print('x')", file_path=str(tmp_path / "file.txt"))
+            result = linter._lint_content(
+                "print('x')", file_path=str(tmp_path / "file.txt")
+            )
 
         assert result.errors == []
         assert captured["path"].endswith(".txt")
@@ -478,16 +522,21 @@ class TestLintContent:
 
 # ── _check_backend_available ──────────────────────────────────────────
 
+
 class TestCheckBackendAvailable:
     def test_ruff_available(self):
         mock_result = MagicMock()
         mock_result.returncode = 0
-        with patch("backend.code_quality.impl.subprocess.run", return_value=mock_result):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", return_value=mock_result
+        ):
             linter = DefaultLinter.__new__(DefaultLinter)
             assert linter._check_backend_available("ruff") is True
 
     def test_ruff_not_found(self):
-        with patch("backend.code_quality.impl.subprocess.run", side_effect=FileNotFoundError):
+        with patch(
+            "backend.code_quality.impl.subprocess.run", side_effect=FileNotFoundError
+        ):
             linter = DefaultLinter.__new__(DefaultLinter)
             assert linter._check_backend_available("ruff") is False
 

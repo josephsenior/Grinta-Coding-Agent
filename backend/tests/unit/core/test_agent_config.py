@@ -146,7 +146,7 @@ class TestSeparateBaseAndCustomSections:
         data = {"llm_config": {"model": "gpt-4"}}
         base, custom = AgentConfig._separate_base_and_custom_sections(data)
         assert "llm_config" in base
-        assert len(custom) == 0
+        assert not custom
 
 
 class TestCreateBaseConfig:
@@ -165,20 +165,24 @@ class TestCreateBaseConfig:
     def test_invalid_field_value_recovery(self):
         """Test that invalid field values trigger recovery logic."""
         # Pass invalid value for memory_max_threads (must be >= 1)
-        cfg = AgentConfig._create_base_config({
-            "name": "test",
-            "memory_max_threads": -5,  # Invalid: must be >= 1
-        })
+        cfg = AgentConfig._create_base_config(
+            {
+                "name": "test",
+                "memory_max_threads": -5,  # Invalid: must be >= 1
+            }
+        )
         # Should fall back to default
         assert cfg.name == "test"
         assert cfg.memory_max_threads >= 1
 
     def test_multiple_invalid_fields_recovery(self):
         """Test recovery with multiple invalid field values."""
-        cfg = AgentConfig._create_base_config({
-            "name": "",  # Invalid: non-empty string required
-            "memory_max_threads": 0,  # Invalid: must be >= 1
-        })
+        cfg = AgentConfig._create_base_config(
+            {
+                "name": "",  # Invalid: non-empty string required
+                "memory_max_threads": 0,  # Invalid: must be >= 1
+            }
+        )
         # Should use defaults for invalid fields
         assert cfg.name == FORGE_DEFAULT_AGENT
         assert cfg.memory_max_threads >= 1
@@ -187,7 +191,9 @@ class TestCreateBaseConfig:
 class TestCreateCustomConfig:
     def test_override_fields(self):
         base = AgentConfig()
-        custom = AgentConfig._create_custom_config("MyAgent", base, {"enable_cmd": False})
+        custom = AgentConfig._create_custom_config(
+            "MyAgent", base, {"enable_cmd": False}
+        )
         assert custom.name == "MyAgent"
         assert custom.enable_cmd is False
 
@@ -202,7 +208,7 @@ class TestCreateCustomConfig:
         custom = AgentConfig._create_custom_config(
             "MyAgent",
             base,
-            {"memory_max_threads": -10}  # Invalid value
+            {"memory_max_threads": -10},  # Invalid value
         )
         assert custom.name == "MyAgent"
         # Should use base value, not invalid override
@@ -235,17 +241,17 @@ class TestFromTomlSection:
     def test_invalid_custom_agent_raises_error(self):
         """Test that invalid custom agent configurations raise ValueError."""
         from unittest.mock import patch
-        
+
         data = {
             "name": "base",
             "BadAgent": {"enable_browsing": True},
         }
-        
+
         # Mock _create_custom_config to raise an exception
         with patch.object(
             AgentConfig,
-            '_create_custom_config',
-            side_effect=ValidationError.from_exception_data("test", [])
+            "_create_custom_config",
+            side_effect=ValidationError.from_exception_data("test", []),
         ):
             with pytest.raises(ValueError, match="Invalid custom agent configuration"):
                 AgentConfig.from_toml_section(data)
@@ -253,18 +259,16 @@ class TestFromTomlSection:
     def test_multiple_invalid_custom_agents_combined_error(self):
         """Test that multiple invalid custom agents create combined error message."""
         from unittest.mock import patch
-        
+
         data = {
             "name": "base",
             "BadAgent1": {"enable_browsing": True},
             "BadAgent2": {"enable_cmd": False},
         }
-        
+
         # Mock to raise for both custom agents
         with patch.object(
-            AgentConfig,
-            '_create_custom_config',
-            side_effect=ValueError("Config error")
+            AgentConfig, "_create_custom_config", side_effect=ValueError("Config error")
         ):
             with pytest.raises(ValueError, match="Invalid custom agent configuration"):
                 AgentConfig.from_toml_section(data)

@@ -137,8 +137,8 @@ DEFAULT_AGENT_MCP_ENABLED = True
 DEFAULT_AGENT_AUTO_PLANNING_ENABLED = True
 DEFAULT_AGENT_PLANNING_COMPLEXITY_THRESHOLD = 3
 DEFAULT_AGENT_REFLECTION_ENABLED = True
-DEFAULT_AGENT_PLANNING_MIDDLEWARE_ENABLED = False
-DEFAULT_AGENT_REFLECTION_MIDDLEWARE_ENABLED = False
+DEFAULT_AGENT_PLANNING_MIDDLEWARE_ENABLED = True
+DEFAULT_AGENT_REFLECTION_MIDDLEWARE_ENABLED = True
 DEFAULT_AGENT_REFLECTION_MAX_ATTEMPTS = 2
 DEFAULT_AGENT_DYNAMIC_ITERATIONS_ENABLED = True
 DEFAULT_AGENT_MIN_ITERATIONS = 20
@@ -151,6 +151,11 @@ DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = False
 DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME = "system_prompt.j2"
 DEFAULT_AGENT_CLI_MODE = False
 DEFAULT_FORGE_MCP_CONFIG_CLS = "backend.core.config.mcp_config.ForgeMCPConfig"
+DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS = 5
+DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS = 10
+DEFAULT_AGENT_MAX_STUCK_DETECTIONS = 3
+DEFAULT_AGENT_MAX_ERROR_RATE = 0.5
+DEFAULT_AGENT_ERROR_RATE_WINDOW = 10
 
 # ── API & Server ────────────────────────────────────────────────────
 API_VERSION_V1 = "v1"
@@ -225,12 +230,16 @@ BROWSER_TOOL_NAME = "browser"
 FINISH_TOOL_NAME = "finish"
 LLM_BASED_EDIT_TOOL_NAME = "edit_file"
 TASK_TRACKER_TOOL_NAME = "task_tracker"
-
+NOTE_TOOL_NAME = "note"
+RECALL_TOOL_NAME = "recall"
+SEMANTIC_RECALL_TOOL_NAME = "semantic_recall"
+RUN_TESTS_TOOL_NAME = "run_tests"
+APPLY_PATCH_TOOL_NAME = "apply_patch"
 # ── Security Risk ───────────────────────────────────────────────────
 SECURITY_RISK_DESC = (
-    "The LLM's assessment of the safety risk of this action. "
-    "See the SECURITY_RISK_ASSESSMENT section in the system prompt for "
-    "risk level definitions."
+    "Optional. Your assessment of this action's safety risk (LOW/MEDIUM/HIGH). "
+    "If omitted, risk is classified automatically server-side. "
+    "See the SECURITY_RISK_ASSESSMENT section in the system prompt for definitions."
 )
 RISK_LEVELS = ["LOW", "MEDIUM", "HIGH"]
 

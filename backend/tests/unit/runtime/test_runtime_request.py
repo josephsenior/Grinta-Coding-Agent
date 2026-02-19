@@ -15,9 +15,7 @@ class TestRequestHTTPError:
     def test_basic_error(self):
         request = httpx.Request("GET", "http://example.com")
         response = httpx.Response(500, request=request)
-        err = RequestHTTPError(
-            "Server Error", request=request, response=response
-        )
+        err = RequestHTTPError("Server Error", request=request, response=response)
         assert "Server Error" in str(err)
 
     def test_error_with_detail(self):
@@ -35,18 +33,14 @@ class TestRequestHTTPError:
     def test_error_without_detail(self):
         request = httpx.Request("GET", "http://example.com")
         response = httpx.Response(500, request=request)
-        err = RequestHTTPError(
-            "Server Error", request=request, response=response
-        )
+        err = RequestHTTPError("Server Error", request=request, response=response)
         assert err.detail is None
         assert "Details:" not in str(err)
 
     def test_is_http_status_error(self):
         request = httpx.Request("GET", "http://example.com")
         response = httpx.Response(500, request=request)
-        err = RequestHTTPError(
-            "Server Error", request=request, response=response
-        )
+        err = RequestHTTPError("Server Error", request=request, response=response)
         assert isinstance(err, httpx.HTTPStatusError)
 
 

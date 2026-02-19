@@ -24,6 +24,7 @@ from backend.llm.exceptions import (
 
 # ── LLMError base ──────────────────────────────────────────────────────
 
+
 class TestLLMError:
     def test_basic_instantiation(self):
         e = LLMError("something broke")
@@ -49,62 +50,73 @@ class TestLLMError:
 
 # ── Subclass hierarchy ─────────────────────────────────────────────────
 
+
 class TestSubclasses:
-    @pytest.mark.parametrize("cls", [
-        APIConnectionError,
-        APIError,
-        AuthenticationError,
-        BadRequestError,
-        ContentPolicyViolationError,
-        ContextWindowExceededError,
-        InternalServerError,
-        NotFoundError,
-        RateLimitError,
-        ServiceUnavailableError,
-        Timeout,
-        OpenAIError,
-    ])
+    @pytest.mark.parametrize(
+        "cls",
+        [
+            APIConnectionError,
+            APIError,
+            AuthenticationError,
+            BadRequestError,
+            ContentPolicyViolationError,
+            ContextWindowExceededError,
+            InternalServerError,
+            NotFoundError,
+            RateLimitError,
+            ServiceUnavailableError,
+            Timeout,
+            OpenAIError,
+        ],
+    )
     def test_inherits_from_llm_error(self, cls):
         assert issubclass(cls, LLMError)
 
-    @pytest.mark.parametrize("cls", [
-        APIConnectionError,
-        APIError,
-        AuthenticationError,
-        BadRequestError,
-        ContentPolicyViolationError,
-        ContextWindowExceededError,
-        InternalServerError,
-        NotFoundError,
-        RateLimitError,
-        ServiceUnavailableError,
-        Timeout,
-        OpenAIError,
-    ])
+    @pytest.mark.parametrize(
+        "cls",
+        [
+            APIConnectionError,
+            APIError,
+            AuthenticationError,
+            BadRequestError,
+            ContentPolicyViolationError,
+            ContextWindowExceededError,
+            InternalServerError,
+            NotFoundError,
+            RateLimitError,
+            ServiceUnavailableError,
+            Timeout,
+            OpenAIError,
+        ],
+    )
     def test_instantiation_with_message(self, cls):
         e = cls("test error")
         assert e.message == "test error"
 
-    @pytest.mark.parametrize("cls", [
-        APIConnectionError,
-        APIError,
-        AuthenticationError,
-        BadRequestError,
-        ContentPolicyViolationError,
-        ContextWindowExceededError,
-        InternalServerError,
-        NotFoundError,
-        RateLimitError,
-        ServiceUnavailableError,
-        Timeout,
-        OpenAIError,
-    ])
+    @pytest.mark.parametrize(
+        "cls",
+        [
+            APIConnectionError,
+            APIError,
+            AuthenticationError,
+            BadRequestError,
+            ContentPolicyViolationError,
+            ContextWindowExceededError,
+            InternalServerError,
+            NotFoundError,
+            RateLimitError,
+            ServiceUnavailableError,
+            Timeout,
+            OpenAIError,
+        ],
+    )
     def test_catches_as_llm_error(self, cls):
         with pytest.raises(LLMError):
             raise cls("boom")
 
 
 # ── is_context_window_error ────────────────────────────────────────────
+
 
 class TestIsContextWindowError:
     def test_context_window_exceeded_error_instance(self):

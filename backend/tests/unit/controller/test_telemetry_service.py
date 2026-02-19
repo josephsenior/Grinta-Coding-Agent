@@ -19,6 +19,7 @@ def _make_context(**overrides) -> MagicMock:
 
 # ── initialize_tool_pipeline ─────────────────────────────────────────
 
+
 class TestInitializeToolPipeline:
     def test_creates_default_pipeline(self):
         ctx = _make_context()
@@ -26,7 +27,9 @@ class TestInitializeToolPipeline:
         svc.initialize_tool_pipeline()
         ctx.initialize_tool_pipeline.assert_called_once()
         middlewares = ctx.initialize_tool_pipeline.call_args[0][0]
-        assert len(middlewares) >= 5  # at least safety, idempotency, cb, cost, rollback, ...
+        assert (
+            len(middlewares) >= 5
+        )  # at least safety, idempotency, cb, cost, rollback, ...
 
     def test_includes_planning_middleware_when_enabled(self):
         config = SimpleNamespace(
@@ -68,6 +71,7 @@ class TestInitializeToolPipeline:
 
 # ── handle_blocked_invocation ────────────────────────────────────────
 
+
 class TestHandleBlockedInvocation:
     def test_emits_error_observation(self):
         ctx = _make_context()
@@ -76,9 +80,7 @@ class TestHandleBlockedInvocation:
         invocation_ctx = MagicMock()
         invocation_ctx.block_reason = "Too dangerous"
         invocation_ctx.metadata = {}
-        with patch(
-            "backend.controller.tool_telemetry.ToolTelemetry"
-        ) as MockTT:
+        with patch("backend.controller.tool_telemetry.ToolTelemetry") as MockTT:
             MockTT.get_instance.return_value = MagicMock()
             svc.handle_blocked_invocation(action, invocation_ctx)
         ctx.emit_event.assert_called_once()
@@ -93,9 +95,7 @@ class TestHandleBlockedInvocation:
         invocation_ctx = MagicMock()
         invocation_ctx.block_reason = "blocked"
         invocation_ctx.metadata = {"handled": True}
-        with patch(
-            "backend.controller.tool_telemetry.ToolTelemetry"
-        ) as MockTT:
+        with patch("backend.controller.tool_telemetry.ToolTelemetry") as MockTT:
             MockTT.get_instance.return_value = MagicMock()
             svc.handle_blocked_invocation(action, invocation_ctx)
         ctx.emit_event.assert_not_called()
@@ -107,10 +107,10 @@ class TestHandleBlockedInvocation:
         invocation_ctx = MagicMock()
         invocation_ctx.block_reason = "boom"
         invocation_ctx.metadata = {}
-        with patch(
-            "backend.controller.tool_telemetry.ToolTelemetry"
-        ) as MockTT:
-            MockTT.get_instance.return_value.on_blocked.side_effect = RuntimeError("telemetry fail")
+        with patch("backend.controller.tool_telemetry.ToolTelemetry") as MockTT:
+            MockTT.get_instance.return_value.on_blocked.side_effect = RuntimeError(
+                "telemetry fail"
+            )
             # Should NOT raise
             svc.handle_blocked_invocation(action, invocation_ctx)
         ctx.emit_event.assert_called_once()

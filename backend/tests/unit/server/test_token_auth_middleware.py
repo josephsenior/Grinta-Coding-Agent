@@ -34,6 +34,7 @@ def _mock_key():
 
 # --------------- Public Paths ---------------
 
+
 class TestPublicPaths:
     @pytest.mark.asyncio
     async def test_options_allowed(self):
@@ -69,6 +70,7 @@ class TestPublicPaths:
 
 
 # --------------- Authentication ---------------
+
 
 class TestAuth:
     @pytest.mark.asyncio

@@ -30,8 +30,8 @@ class TestLLMRateGovernorInit:
         assert governor._max_backoff == 30.0
         assert governor._backoff_multiplier == 1.5
         assert governor._current_backoff == 1.0
-        assert len(governor._history) == 0
-        assert len(governor._latencies) == 0
+        assert not governor._history
+        assert not governor._latencies
         assert governor._consecutive_throttles == 0
 
     def test_init_with_custom_rate(self):
@@ -88,7 +88,7 @@ class TestCheckAndWait:
         # Should not raise or throttle
         await governor.check_and_wait(usage)
 
-        assert len(governor._history) == 0
+        assert not governor._history
 
     @pytest.mark.asyncio
     async def test_first_call_adds_to_history(self):
@@ -184,7 +184,9 @@ class TestCheckAndWait:
         usage1.completion_tokens = 70
         await governor.check_and_wait(usage1)
 
-        assert governor._consecutive_throttles >= 0  # May or may not throttle based on window
+        assert (
+            governor._consecutive_throttles >= 0
+        )  # May or may not throttle based on window
 
         # Wait for history to clear
         await asyncio.sleep(0.1)

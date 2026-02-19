@@ -67,7 +67,10 @@ class TestStringMasking:
         self.m.set_secrets({"API_KEY": "sk-12345", "DB_PASS": "hunter2"})
 
     def test_basic_replacement(self):
-        assert self.m._mask_string("my key: sk-12345") == f"my key: {SecretMasker.PLACEHOLDER}"
+        assert (
+            self.m._mask_string("my key: sk-12345")
+            == f"my key: {SecretMasker.PLACEHOLDER}"
+        )
 
     def test_multiple_occurrences(self):
         result = self.m._mask_string("sk-12345 and sk-12345 again")
@@ -98,7 +101,10 @@ class TestStringMasking:
         """Secrets with regex-special chars must be escaped properly."""
         m = SecretMasker()
         m.set_secrets({"REGEX_KEY": "abc.+*?$[]()"})
-        assert m._mask_string("found abc.+*?$[]() here") == f"found {SecretMasker.PLACEHOLDER} here"
+        assert (
+            m._mask_string("found abc.+*?$[]() here")
+            == f"found {SecretMasker.PLACEHOLDER} here"
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ from backend.llm.tool_types import (
 
 # ── make_function_chunk ────────────────────────────────────────────────
 
+
 class TestMakeFunctionChunk:
     def test_basic(self):
         chunk = make_function_chunk(name="my_func", description="does stuff")
@@ -51,6 +52,7 @@ class TestMakeFunctionChunk:
 
 # ── make_tool_param ────────────────────────────────────────────────────
 
+
 class TestMakeToolParam:
     def test_basic(self):
         fn = make_function_chunk(name="f", description="d")
@@ -87,6 +89,7 @@ class TestMakeToolParam:
 
 
 # ── PromptTokensDetails ───────────────────────────────────────────────
+
 
 class TestPromptTokensDetails:
     def test_default_none(self):

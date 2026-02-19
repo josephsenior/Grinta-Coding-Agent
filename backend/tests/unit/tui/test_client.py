@@ -136,9 +136,7 @@ class TestForgeClient(unittest.IsolatedAsyncioTestCase):
         """Test creating new conversation."""
         mock_post.return_value = MagicMock(
             status_code=200,
-            json=MagicMock(
-                return_value={"conversation_id": "conv_new_123"}
-            ),
+            json=MagicMock(return_value={"conversation_id": "conv_new_123"}),
         )
 
         result = await self.client.create_conversation("Build a web app")
@@ -149,9 +147,7 @@ class TestForgeClient(unittest.IsolatedAsyncioTestCase):
         """Test creating conversation without initial message."""
         mock_post.return_value = MagicMock(
             status_code=200,
-            json=MagicMock(
-                return_value={"conversation_id": "conv_empty"}
-            ),
+            json=MagicMock(return_value={"conversation_id": "conv_empty"}),
         )
 
         result = await self.client.create_conversation(None)
@@ -250,9 +246,7 @@ class TestForgeClient(unittest.IsolatedAsyncioTestCase):
         """Test getting diff for a specific file."""
         mock_get.return_value = MagicMock(
             status_code=200,
-            json=MagicMock(
-                return_value={"diff": "+ new line\n- old line"}
-            ),
+            json=MagicMock(return_value={"diff": "+ new line\n- old line"}),
         )
 
         diff = await self.client.get_file_diff("conv_123", "app.py")

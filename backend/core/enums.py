@@ -82,6 +82,11 @@ class ActionType(str, Enum):
     CONDENSATION_REQUEST = "condensation_request"
     TASK_TRACKING = "task_tracking"
     STREAMING_CHUNK = "streaming_chunk"
+    # New meta-cognition actions for uncertainty handling
+    UNCERTAINTY = "uncertainty"
+    PROPOSAL = "proposal"
+    CLARIFICATION = "clarification"
+    ESCALATE = "escalate"
 
 
 class LifecyclePhase(str, Enum):

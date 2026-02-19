@@ -10,18 +10,20 @@ Usage:
 from __future__ import annotations
 
 import sys
-from typing import Any
 
 from backend.core.logger import FORGE_logger as logger
 from backend.llm.model_aliases import get_alias_manager
-from backend.llm.provider_resolver import check_local_providers, discover_all_local_models
+from backend.llm.provider_resolver import (
+    check_local_providers,
+    discover_all_local_models,
+)
 
 
 def print_section(title: str) -> None:
     """Print a section header."""
     print(f"\n{'=' * 60}")
     print(f"  {title}")
-    print('=' * 60)
+    print("=" * 60)
 
 
 def discover_command() -> None:
@@ -51,8 +53,8 @@ def discover_command() -> None:
     if "ollama" in models and models["ollama"]:
         sample_model = models["ollama"][0]
         print(f'   - Direct: config.model = "ollama/{sample_model}"')
-        print(f'   - Alias:  config.model = "my-local-model"')
-        print(f'             [model_aliases]')
+        print('   - Alias:  config.model = "my-local-model"')
+        print("             [model_aliases]")
         print(f'             my-local-model = "ollama/{sample_model}"')
 
 

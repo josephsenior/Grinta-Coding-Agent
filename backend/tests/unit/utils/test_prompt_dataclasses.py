@@ -111,7 +111,7 @@ class TestPromptManagerInit:
                 "playbook_info.j2",
                 "knowledge_base_info.j2",
             ]:
-                with open(os.path.join(tmpdir, name), "w") as f:
+                with open(os.path.join(tmpdir, name, encoding="utf-8"), "w") as f:
                     f.write("{{ content }}")
 
             pm = PromptManager(prompt_dir=tmpdir)
@@ -129,7 +129,7 @@ class TestPromptManagerInit:
                 "playbook_info.j2",
                 "knowledge_base_info.j2",
             ]:
-                with open(os.path.join(tmpdir, name), "w") as f:
+                with open(os.path.join(tmpdir, name, encoding="utf-8"), "w") as f:
                     f.write("custom")
 
             pm = PromptManager(prompt_dir=tmpdir, system_prompt_filename="custom.j2")
@@ -151,9 +151,7 @@ class TestPromptManagerRendering:
         (tmp_path / "playbook_info.j2").write_text(
             "Agents: {{ triggered_agents|length }}"
         )
-        (tmp_path / "knowledge_base_info.j2").write_text(
-            "KB: {{ kb_results|length }}"
-        )
+        (tmp_path / "knowledge_base_info.j2").write_text("KB: {{ kb_results|length }}")
         return PromptManager(prompt_dir=str(tmp_path))
 
     def test_get_example_user_message(self, pm):

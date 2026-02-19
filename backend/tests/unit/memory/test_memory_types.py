@@ -18,18 +18,21 @@ from backend.memory.memory_types import (
 # Enums
 # ===================================================================
 
-class TestDecisionType:
 
+class TestDecisionType:
     def test_all_values(self):
         expected = {
-            "architectural", "implementation", "technical",
-            "functional", "constraint", "workflow",
+            "architectural",
+            "implementation",
+            "technical",
+            "functional",
+            "constraint",
+            "workflow",
         }
         assert {e.value for e in DecisionType} == expected
 
 
 class TestMemoryTier:
-
     def test_all_values(self):
         assert MemoryTier.SHORT_TERM.value == "short_term"
         assert MemoryTier.WORKING.value == "working"
@@ -40,8 +43,8 @@ class TestMemoryTier:
 # Decision
 # ===================================================================
 
-class TestDecision:
 
+class TestDecision:
     @pytest.fixture()
     def sample_decision(self) -> Decision:
         return Decision(
@@ -111,8 +114,8 @@ class TestDecision:
 # ContextAnchor
 # ===================================================================
 
-class TestContextAnchor:
 
+class TestContextAnchor:
     @pytest.fixture()
     def sample_anchor(self) -> ContextAnchor:
         now = datetime(2025, 3, 20, 8, 0, 0)

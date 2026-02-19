@@ -11,7 +11,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import json
 import sqlite3
 import threading
 import time
@@ -40,7 +39,9 @@ def store(store_path: Path) -> SQLiteEventStore:
 class TestInitialization:
     """Test store initialization and schema creation."""
 
-    def test_creates_database_file(self, store_path: Path, store: SQLiteEventStore) -> None:
+    def test_creates_database_file(
+        self, store_path: Path, store: SQLiteEventStore
+    ) -> None:
         """Test that database file is created."""
         assert store_path.exists()
 
@@ -55,19 +56,19 @@ class TestInitialization:
         """Test that schema is properly created."""
         conn = sqlite3.connect(str(store_path))
         cursor = conn.cursor()
-        
+
         # Check events table exists
         cursor.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='events'"
         )
         assert cursor.fetchone() is not None
-        
+
         # Check metadata table exists
         cursor.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='metadata'"
         )
         assert cursor.fetchone() is not None
-        
+
         conn.close()
 
     def test_repr(self, store_path: Path, store: SQLiteEventStore) -> None:
@@ -85,7 +86,7 @@ class TestWriteOperations:
         """Test writing a single event."""
         event = {"id": 0, "action": "test", "data": "hello"}
         store.write_event(0, event)
-        
+
         result = store.read_event(0)
         assert result is not None
         assert result["action"] == "test"
@@ -96,7 +97,7 @@ class TestWriteOperations:
         now = time.time()
         event = {"id": 0, "action": "test", "timestamp": now}
         store.write_event(0, event)
-        
+
         result = store.read_event(0)
         assert result["timestamp"] == now
 
@@ -104,7 +105,7 @@ class TestWriteOperations:
         """Test writing event with source."""
         event = {"id": 0, "action": "test", "source": "agent"}
         store.write_event(0, event)
-        
+
         result = store.read_event(0)
         assert result["source"] == "agent"
 
@@ -112,46 +113,46 @@ class TestWriteOperations:
         """Test that event_type defaults to 'action' field."""
         event = {"id": 0, "action": "my_action"}
         store.write_event(0, event)
-        
+
         conn = sqlite3.connect(str(store._db_path))
         cursor = conn.cursor()
         cursor.execute("SELECT event_type FROM events WHERE id = 0")
         event_type = cursor.fetchone()[0]
         conn.close()
-        
+
         assert event_type == "my_action"
 
     def test_write_event_defaults_to_observation(self, store: SQLiteEventStore) -> None:
         """Test that event_type defaults to 'observation' if no action."""
         event = {"id": 0, "observation": "test_obs"}
         store.write_event(0, event)
-        
+
         conn = sqlite3.connect(str(store._db_path))
         cursor = conn.cursor()
         cursor.execute("SELECT event_type FROM events WHERE id = 0")
         event_type = cursor.fetchone()[0]
         conn.close()
-        
+
         assert event_type == "test_obs"
 
     def test_write_event_defaults_to_unknown(self, store: SQLiteEventStore) -> None:
         """Test that event_type defaults to 'unknown' if neither action nor observation."""
         event = {"id": 0}
         store.write_event(0, event)
-        
+
         conn = sqlite3.connect(str(store._db_path))
         cursor = conn.cursor()
         cursor.execute("SELECT event_type FROM events WHERE id = 0")
         event_type = cursor.fetchone()[0]
         conn.close()
-        
+
         assert event_type == "unknown"
 
     def test_write_event_overwrites(self, store: SQLiteEventStore) -> None:
         """Test that writing same ID overwrites previous event."""
         store.write_event(0, {"id": 0, "action": "first"})
         store.write_event(0, {"id": 0, "action": "second"})
-        
+
         result = store.read_event(0)
         assert result["action"] == "second"
 
@@ -166,7 +167,7 @@ class TestWriteOperations:
             },
         }
         store.write_event(0, event)
-        
+
         result = store.read_event(0)
         assert result["data"]["nested"]["deep"] == [1, 2, 3]
         assert result["data"]["unicode"] == "🚀 emoji test"
@@ -179,7 +180,7 @@ class TestWriteOperations:
             (2, {"id": 2, "action": "third"}),
         ]
         store.write_events_batch(events)
-        
+
         assert store.read_event(0)["action"] == "first"
         assert store.read_event(1)["action"] == "second"
         assert store.read_event(2)["action"] == "third"
@@ -196,7 +197,7 @@ class TestWriteOperations:
             (1, {"id": 1, "action": "test", "source": "tool"}),
         ]
         store.write_events_batch(events)
-        
+
         assert store.read_event(0)["source"] == "agent"
         assert store.read_event(1)["source"] == "tool"
 
@@ -213,7 +214,7 @@ class TestReadOperations:
         """Test reading event after write."""
         event = {"id": 5, "action": "test", "value": 42}
         store.write_event(5, event)
-        
+
         result = store.read_event(5)
         assert result["action"] == "test"
         assert result["value"] == 42
@@ -228,7 +229,7 @@ class TestReadOperations:
         store.write_event(0, {"id": 0, "action": "a"})
         store.write_event(1, {"id": 1, "action": "b"})
         store.write_event(2, {"id": 2, "action": "c"})
-        
+
         result = store.list_events()
         assert len(result) == 3
         assert result[0]["action"] == "a"
@@ -239,7 +240,7 @@ class TestReadOperations:
         """Test listing events from start_id."""
         for i in range(5):
             store.write_event(i, {"id": i, "action": f"event_{i}"})
-        
+
         result = store.list_events(start_id=2)
         assert len(result) == 3
         assert result[0]["action"] == "event_2"
@@ -250,7 +251,7 @@ class TestReadOperations:
         """Test listing events with end_id (exclusive)."""
         for i in range(5):
             store.write_event(i, {"id": i, "action": f"event_{i}"})
-        
+
         result = store.list_events(end_id=3)
         assert len(result) == 3
         assert result[0]["action"] == "event_0"
@@ -260,7 +261,7 @@ class TestReadOperations:
         """Test listing events with both start_id and end_id."""
         for i in range(10):
             store.write_event(i, {"id": i, "action": f"event_{i}"})
-        
+
         result = store.list_events(start_id=2, end_id=5)
         assert len(result) == 3
         assert [r["action"] for r in result] == ["event_2", "event_3", "event_4"]
@@ -270,7 +271,7 @@ class TestReadOperations:
         store.write_event(0, {"action": "move"})
         store.write_event(1, {"action": "attack"})
         store.write_event(2, {"action": "move"})
-        
+
         result = store.list_events(event_type="move")
         assert len(result) == 2
 
@@ -279,7 +280,7 @@ class TestReadOperations:
         store.write_event(0, {"action": "test", "source": "agent"})
         store.write_event(1, {"action": "test", "source": "tool"})
         store.write_event(2, {"action": "test", "source": "agent"})
-        
+
         result = store.list_events(source="agent")
         assert len(result) == 2
 
@@ -287,7 +288,7 @@ class TestReadOperations:
         """Test limiting results."""
         for i in range(10):
             store.write_event(i, {"action": f"event_{i}"})
-        
+
         result = store.list_events(limit=3)
         assert len(result) == 3
 
@@ -297,7 +298,7 @@ class TestReadOperations:
         store.write_event(1, {"action": "click", "source": "api"})
         store.write_event(2, {"action": "scroll", "source": "ui"})
         store.write_event(3, {"action": "click", "source": "ui"})
-        
+
         result = store.list_events(event_type="click", source="ui")
         assert len(result) == 2
         assert result[0]["action"] == "click"
@@ -309,7 +310,7 @@ class TestReadOperations:
         store.write_event(1, {"action": "one"})
         store.write_event(3, {"action": "three"})
         store.write_event(2, {"action": "two"})
-        
+
         result = store.list_events()
         assert [r["action"] for r in result] == ["one", "two", "three", "five"]
 
@@ -332,14 +333,14 @@ class TestReadOperations:
         store.write_event(3, {"action": "three"})
         store.write_event(1, {"action": "one"})
         store.write_event(5, {"action": "five"})
-        
+
         assert store.max_id() == 5
 
     def test_max_id_with_gap(self, store: SQLiteEventStore) -> None:
         """Test max_id when there's a gap in IDs."""
         store.write_event(0, {"action": "zero"})
         store.write_event(10, {"action": "ten"})
-        
+
         assert store.max_id() == 10
 
 
@@ -350,9 +351,9 @@ class TestDeleteOperations:
         """Test deleting a single event."""
         store.write_event(0, {"action": "test"})
         store.write_event(1, {"action": "test"})
-        
+
         store.delete_event(0)
-        
+
         assert store.read_event(0) is None
         assert store.read_event(1) is not None
         assert store.count() == 1
@@ -366,9 +367,9 @@ class TestDeleteOperations:
         """Test deleting events from start_id onwards."""
         for i in range(10):
             store.write_event(i, {"action": f"event_{i}"})
-        
+
         deleted = store.delete_from(5)
-        
+
         assert deleted == 5
         assert store.count() == 5
         assert store.read_event(4) is not None
@@ -379,7 +380,7 @@ class TestDeleteOperations:
         """Test delete_from returns number of deleted rows."""
         for i in range(3):
             store.write_event(i, {"action": f"event_{i}"})
-        
+
         deleted = store.delete_from(1)
         assert deleted == 2
 
@@ -395,47 +396,50 @@ class TestConcurrency:
 
     def test_concurrent_writes(self, store: SQLiteEventStore) -> None:
         """Test writing from multiple threads."""
+
         def write_events(start_id: int, count: int) -> None:
             for i in range(count):
-                store.write_event(start_id + i, {"id": start_id + i, "thread_id": start_id})
-        
+                store.write_event(
+                    start_id + i, {"id": start_id + i, "thread_id": start_id}
+                )
+
         threads = [
             threading.Thread(target=write_events, args=(0, 50)),
             threading.Thread(target=write_events, args=(50, 50)),
             threading.Thread(target=write_events, args=(100, 50)),
         ]
-        
+
         for t in threads:
             t.start()
         for t in threads:
             t.join()
-        
+
         assert store.count() == 150
 
     def test_concurrent_reads_and_writes(self, store: SQLiteEventStore) -> None:
         """Test reading and writing concurrently."""
         results: list[Any] = []
-        
+
         def writer() -> None:
             for i in range(50):
                 store.write_event(i, {"id": i, "action": f"event_{i}"})
                 time.sleep(0.001)
-        
+
         def reader() -> None:
             for _ in range(100):
                 events = store.list_events()
                 results.append(len(events))
                 time.sleep(0.001)
-        
+
         t1 = threading.Thread(target=writer)
         t2 = threading.Thread(target=reader)
-        
+
         t2.start()  # Start reader first
         t1.start()
-        
+
         t1.join()
         t2.join()
-        
+
         # Reader should see increasing counts (not strict, just sanity check)
         assert store.count() == 50
         assert all(0 <= count <= 50 for count in results)
@@ -444,7 +448,7 @@ class TestConcurrency:
         """Test that batch write is atomic."""
         events = [(i, {"id": i, "action": f"event_{i}"}) for i in range(100)]
         store.write_events_batch(events)
-        
+
         assert store.count() == 100
         assert store.max_id() == 99
 
@@ -456,7 +460,7 @@ class TestDataIntegrity:
         """Test that special characters are preserved."""
         special = "!@#$%^&*(){}[]|\\:;\"'<>?,./\n\t€©®™"
         store.write_event(0, {"text": special})
-        
+
         result = store.read_event(0)
         assert result["text"] == special
 
@@ -464,20 +468,23 @@ class TestDataIntegrity:
         """Test writing and reading very large payloads."""
         large_data = "x" * 10000
         store.write_event(0, {"data": large_data})
-        
+
         result = store.read_event(0)
         assert result["data"] == large_data
         assert len(result["data"]) == 10000
 
     def test_numeric_values_preserved(self, store: SQLiteEventStore) -> None:
         """Test that numeric types are preserved through JSON."""
-        store.write_event(0, {
-            "int": 42,
-            "float": 3.14159,
-            "negative": -100,
-            "zero": 0,
-        })
-        
+        store.write_event(
+            0,
+            {
+                "int": 42,
+                "float": 3.14159,
+                "negative": -100,
+                "zero": 0,
+            },
+        )
+
         result = store.read_event(0)
         assert result["int"] == 42
         assert result["float"] == 3.14159
@@ -487,7 +494,7 @@ class TestDataIntegrity:
     def test_null_values_handled(self, store: SQLiteEventStore) -> None:
         """Test that null values are handled correctly."""
         store.write_event(0, {"nullable": None, "exists": "value"})
-        
+
         result = store.read_event(0)
         assert result["nullable"] is None
         assert result["exists"] == "value"
@@ -495,7 +502,7 @@ class TestDataIntegrity:
     def test_boolean_values_preserved(self, store: SQLiteEventStore) -> None:
         """Test that booleans are preserved."""
         store.write_event(0, {"yes": True, "no": False})
-        
+
         result = store.read_event(0)
         assert result["yes"] is True
         assert result["no"] is False
@@ -503,7 +510,7 @@ class TestDataIntegrity:
     def test_list_values_preserved(self, store: SQLiteEventStore) -> None:
         """Test that lists are preserved."""
         store.write_event(0, {"items": [1, "two", 3.0, None, True]})
-        
+
         result = store.read_event(0)
         assert result["items"] == [1, "two", 3.0, None, True]
 
@@ -516,7 +523,7 @@ class TestLifecycle:
         store = SQLiteEventStore(store_path)
         store.write_event(0, {"action": "test"})
         store.close()
-        
+
         # Connection should be None after close
         assert store._conn is None
 
@@ -525,7 +532,7 @@ class TestLifecycle:
         store1 = SQLiteEventStore(store_path)
         store1.write_event(0, {"action": "first"})
         store1.close()
-        
+
         # Reopen the same database
         store2 = SQLiteEventStore(store_path)
         result = store2.read_event(0)
@@ -538,11 +545,11 @@ class TestLifecycle:
         store = SQLiteEventStore(store_path)
         store.write_event(0, {"action": "first"})
         store.close()
-        
+
         store = SQLiteEventStore(store_path)
         store.write_event(1, {"action": "second"})
         events = store.list_events()
-        
+
         assert len(events) == 2
         store.close()
 
@@ -562,7 +569,9 @@ class TestErrorHandling:
         result = store.list_events(source="nonexistent")
         assert result == []
 
-    def test_list_events_with_nonexistent_event_type(self, store: SQLiteEventStore) -> None:
+    def test_list_events_with_nonexistent_event_type(
+        self, store: SQLiteEventStore
+    ) -> None:
         """Test filtering by event_type that doesn't exist."""
         store.write_event(0, {"action": "real"})
         result = store.list_events(event_type="fake")

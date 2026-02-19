@@ -6,7 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.runtime.factory import _DEFAULT_RUNTIME_IMPORTS, _lazy_import, get_runtime_cls
+from backend.runtime.factory import (
+    _DEFAULT_RUNTIME_IMPORTS,
+    _lazy_import,
+    get_runtime_cls,
+)
 
 
 # ── _lazy_import function ──────────────────────────────────────────────
@@ -61,6 +65,7 @@ class TestGetRuntimeCls:
         assert cls.__name__ == "LocalRuntimeInProcess"
         # Verify it's a runtime class
         from backend.runtime.base import Runtime
+
         assert issubclass(cls, Runtime)
 
     def test_raises_on_unknown_runtime(self):

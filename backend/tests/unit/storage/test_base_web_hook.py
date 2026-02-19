@@ -17,7 +17,9 @@ def inner_store():
 @pytest.fixture()
 def hook_store(inner_store):
     client = MagicMock()
-    return BaseWebHookFileStore(file_store=inner_store, base_url="http://hook.test/", client=client)
+    return BaseWebHookFileStore(
+        file_store=inner_store, base_url="http://hook.test/", client=client
+    )
 
 
 class TestBaseWebHookInit:

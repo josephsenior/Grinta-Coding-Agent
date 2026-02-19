@@ -32,7 +32,7 @@ class TestCreateThinkTool:
         tool = create_think_tool()
         function = tool.get("function", {})
         description = function.get("description", "")
-        assert len(description) > 0
+        assert description
         assert "think" in description.lower()
 
     def test_description_mentions_brainstorming(self):

@@ -28,6 +28,7 @@ class TestCreateTrackedTask:
     @pytest.mark.asyncio
     async def test_creates_task(self):
         """Test creates asyncio task."""
+
         async def sample_coro():
             return 42
 
@@ -39,6 +40,7 @@ class TestCreateTrackedTask:
     @pytest.mark.asyncio
     async def test_task_with_name(self):
         """Test task creation with custom name."""
+
         async def sample_coro():
             return "named"
 
@@ -89,6 +91,7 @@ class TestCallSyncFromAsync:
     @pytest.mark.asyncio
     async def test_calls_sync_function(self):
         """Test calling synchronous function."""
+
         def sync_func(x, y):
             return x + y
 
@@ -98,6 +101,7 @@ class TestCallSyncFromAsync:
     @pytest.mark.asyncio
     async def test_calls_sync_with_kwargs(self):
         """Test calling sync function with kwargs."""
+
         def sync_func(a, b=5):
             return a * b
 
@@ -107,6 +111,7 @@ class TestCallSyncFromAsync:
     @pytest.mark.asyncio
     async def test_exception_propagates(self):
         """Test exception from sync function propagates."""
+
         def failing_func():
             raise ValueError("sync error")
 
@@ -122,6 +127,7 @@ class TestCallAsyncFromSync:
 
     def test_calls_async_function(self):
         """Test calling async function from sync."""
+
         async def async_func(x):
             await asyncio.sleep(0.01)
             return x * 2
@@ -131,6 +137,7 @@ class TestCallAsyncFromSync:
 
     def test_calls_async_with_timeout(self):
         """Test calling async function with custom timeout."""
+
         async def quick_func():
             return "quick"
 
@@ -144,6 +151,7 @@ class TestCallAsyncFromSync:
 
     def test_raises_on_non_coroutine_function(self):
         """Test raises ValueError for non-coroutine function."""
+
         def regular_func():
             return "not a coro"
 
@@ -152,6 +160,7 @@ class TestCallAsyncFromSync:
 
     def test_exception_propagates_from_async(self):
         """Test exception from async function propagates."""
+
         async def failing_async():
             raise RuntimeError("async error")
 
@@ -168,6 +177,7 @@ class TestCallCoroInBgThread:
     @pytest.mark.asyncio
     async def test_calls_coro_in_thread(self):
         """Test calling coroutine in background thread."""
+
         async def bg_coro(value):
             await asyncio.sleep(0.01)
             return value + 100
@@ -178,6 +188,7 @@ class TestCallCoroInBgThread:
     @pytest.mark.asyncio
     async def test_uses_delegate_pattern(self):
         """Test uses dynamic import delegate pattern."""
+
         async def sample():
             return "delegated"
 
@@ -194,6 +205,7 @@ class TestWaitAll:
     @pytest.mark.asyncio
     async def test_waits_for_all_coroutines(self):
         """Test waits for all coroutines to complete."""
+
         async def coro1():
             return 1
 
@@ -215,6 +227,7 @@ class TestWaitAll:
     @pytest.mark.asyncio
     async def test_raises_single_exception(self):
         """Test raises exception from single failing task."""
+
         async def failing():
             raise ValueError("task failed")
 
@@ -227,6 +240,7 @@ class TestWaitAll:
     @pytest.mark.asyncio
     async def test_raises_async_exception_for_multiple_failures(self):
         """Test raises AsyncException for multiple failures."""
+
         async def fail1():
             raise ValueError("error 1")
 
@@ -240,6 +254,7 @@ class TestWaitAll:
     @pytest.mark.asyncio
     async def test_timeout_raises_timeout_error(self):
         """Test timeout raises TimeoutError."""
+
         async def slow_task():
             await asyncio.sleep(10)
             return "never"
@@ -283,6 +298,7 @@ class TestRunInLoop:
     @pytest.mark.asyncio
     async def test_runs_in_same_loop(self):
         """Test runs coroutine in same loop directly."""
+
         async def sample():
             return "same_loop"
 
@@ -293,6 +309,7 @@ class TestRunInLoop:
     @pytest.mark.asyncio
     async def test_runs_in_different_loop(self):
         """Test runs coroutine when on different loop."""
+
         async def sample():
             return "different_loop"
 

@@ -40,6 +40,16 @@ CRITICAL REQUIREMENTS FOR USING THIS TOOL:
 3. REPLACEMENT: The `new_str` parameter should contain the edited lines that replace the `old_str`. Both strings must be different.
 
 Remember: when making multiple file edits in a row to the same file, you should prefer to send all edits in a single message with multiple calls to this tool, rather than multiple messages with a single call each.
+
+COMPOUND COMMAND: `view_and_replace` — combines view + str_replace in ONE call.
+   - Returns the file content (optionally scoped by `view_range`) AND applies the replacement.
+   - When `view_range` is provided, `old_str` only needs to be unique within that range.
+   - Eliminates stale reads: the returned content is always fresh.
+   - Use this when you need to read a file section and edit it in a single step.
+
+WHITESPACE TOLERANCE: Pass `normalize_ws: true` with `str_replace` or `view_and_replace`.
+   - Ignores trailing whitespace and tab-vs-space differences when matching `old_str`.
+   - The replacement uses the file's actual indentation, not your provided whitespace.
 """
 _SHORT_STR_REPLACE_EDITOR_DESCRIPTION = "Custom editing tool for viewing, creating and editing files in plain-text format\n* Editor state is ephemeral to the current agent session and should not be relied upon for cross-run persistence. For step-level caching or long-term persistence, rely on the orchestrator's cache.\n* If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep\n* The `create` command cannot be used if the specified `path` already exists as a file\n* If a `command` generates a long output, it will be truncated and marked with `<response clipped>`\n* The `undo_edit` command will revert the last edit made to the file at `path`\nNotes for using the `str_replace` command:\n* The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces!\n* If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique\n* The `new_str` parameter should contain the edited lines that should replace the `old_str`\n"
 
@@ -66,8 +76,8 @@ def create_str_replace_editor_tool(
         description=description,
         properties={
             "command": get_command_param(
-                "The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`, `undo_edit`.",
-                ["view", "create", "str_replace", "insert", "undo_edit"],
+                "The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`, `undo_edit`, `view_and_replace`.",
+                ["view", "create", "str_replace", "insert", "undo_edit", "view_and_replace"],
             ),
             "path": get_path_param(
                 "Absolute path to file or directory, e.g. `/workspace/file.py` or `/workspace`."
@@ -89,11 +99,22 @@ def create_str_replace_editor_tool(
                 "type": "integer",
             },
             "view_range": {
-                "description": "Optional parameter of `view` command when `path` points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file.",
+                "description": "Optional parameter of `view` and `view_and_replace` commands when `path` points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file. For `view_and_replace`, limits the search scope for `old_str` to within this range.",
                 "items": {"type": "integer"},
                 "type": "array",
             },
+            "normalize_ws": {
+                "description": "Optional boolean for `str_replace` and `view_and_replace` commands. "
+                    "If true, whitespace differences (trailing spaces, tabs vs spaces) are ignored when "
+                    "matching `old_str`. The replacement preserves the file's original indentation style.",
+                "type": "boolean",
+            },
             "security_risk": get_security_risk_param(),
+            "preview": {
+                "description": "If true, show what the edit would produce without modifying the file. "
+                    "Works with str_replace and insert commands. Returns a unified diff preview.",
+                "type": "boolean",
+            },
         },
-        required=["command", "path", "security_risk"],
+        required=["command", "path"],
     )

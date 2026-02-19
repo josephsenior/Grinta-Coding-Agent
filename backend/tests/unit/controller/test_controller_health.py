@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 
-
 class TestCircuitBreakerHealth:
     def test_defaults(self):
         from backend.controller.health import CircuitBreakerHealth

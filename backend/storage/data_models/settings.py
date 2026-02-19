@@ -22,6 +22,7 @@ from backend.core.config.mcp_config import MCPConfig
 from backend.core.config.utils import load_FORGE_config
 from backend.storage.data_models.knowledge_base import KnowledgeBaseSettings
 from backend.storage.data_models.user_secrets import UserSecrets
+
 try:
     from unittest.mock import Mock
 except ImportError:  # pragma: no cover

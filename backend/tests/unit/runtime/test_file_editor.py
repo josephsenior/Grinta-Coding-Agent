@@ -14,6 +14,7 @@ from backend.core.type_safety.sentinels import MISSING
 # ToolResult / ToolError
 # ---------------------------------------------------------------------------
 
+
 class TestToolResult:
     """Tests for the ToolResult dataclass."""
 
@@ -46,6 +47,7 @@ class TestToolError:
 # ---------------------------------------------------------------------------
 # FileEditor — view
 # ---------------------------------------------------------------------------
+
 
 class TestFileEditorView:
     """Tests for the FileEditor view command."""
@@ -83,7 +85,9 @@ class TestFileEditorView:
     def test_view_nonexistent_file(self):
         result = self.editor(command="view", path="nope.txt")
         assert result.error is not None
-        assert "not found" in result.error.lower() or "validation" in result.error.lower()
+        assert (
+            "not found" in result.error.lower() or "validation" in result.error.lower()
+        )
 
     def test_view_directory_is_error(self):
         (Path(self.tmpdir) / "subdir").mkdir()
@@ -94,6 +98,7 @@ class TestFileEditorView:
 # ---------------------------------------------------------------------------
 # FileEditor — write / create
 # ---------------------------------------------------------------------------
+
 
 class TestFileEditorWrite:
     """Tests for the FileEditor write/create commands."""
@@ -120,7 +125,9 @@ class TestFileEditorWrite:
         assert p.read_text() == "new"
 
     def test_write_dry_run(self):
-        result = self.editor(command="write", path="dry.txt", file_text="content", dry_run=True)
+        result = self.editor(
+            command="write", path="dry.txt", file_text="content", dry_run=True
+        )
         assert result.error is None
         assert "preview" in result.output.lower() or "Preview" in result.output
         # File should not actually be created
@@ -130,6 +137,7 @@ class TestFileEditorWrite:
 # ---------------------------------------------------------------------------
 # FileEditor — edit
 # ---------------------------------------------------------------------------
+
 
 class TestFileEditorEdit:
     """Tests for the FileEditor edit command."""
@@ -146,8 +154,10 @@ class TestFileEditorEdit:
     def test_str_replace(self):
         self._write("code.py", "x = 1\ny = 2\nz = 3\n")
         result = self.editor(
-            command="edit", path="code.py",
-            old_str="y = 2", new_str="y = 42",
+            command="edit",
+            path="code.py",
+            old_str="y = 2",
+            new_str="y = 42",
         )
         assert result.error is None
         content = (Path(self.tmpdir) / "code.py").read_text()
@@ -156,8 +166,10 @@ class TestFileEditorEdit:
     def test_edit_dry_run(self):
         self._write("code.py", "x = 1\n")
         result = self.editor(
-            command="edit", path="code.py",
-            old_str="x = 1", new_str="x = 99",
+            command="edit",
+            path="code.py",
+            old_str="x = 1",
+            new_str="x = 99",
             dry_run=True,
         )
         assert result.error is None
@@ -167,8 +179,10 @@ class TestFileEditorEdit:
     def test_insert_at_line(self):
         self._write("insert.py", "line1\nline2\nline3\n")
         result = self.editor(
-            command="edit", path="insert.py",
-            insert_line=2, new_str="inserted",
+            command="edit",
+            path="insert.py",
+            insert_line=2,
+            new_str="inserted",
         )
         assert result.error is None
         content = (Path(self.tmpdir) / "insert.py").read_text()
@@ -178,6 +192,7 @@ class TestFileEditorEdit:
 # ---------------------------------------------------------------------------
 # FileEditor — unknown command
 # ---------------------------------------------------------------------------
+
 
 class TestFileEditorUnknown:
     """Tests for unknown commands."""
@@ -194,6 +209,7 @@ class TestFileEditorUnknown:
 # ---------------------------------------------------------------------------
 # _extract_content
 # ---------------------------------------------------------------------------
+
 
 class TestExtractContent:
     """Tests for _extract_content."""

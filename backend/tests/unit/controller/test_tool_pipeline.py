@@ -7,10 +7,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.controller.tool_pipeline import (
+    ConflictDetectionMiddleware,
+    ReflectionMiddleware,
     ToolInvocationContext,
     ToolInvocationMiddleware,
     ToolInvocationPipeline,
 )
+from backend.events.action import CmdRunAction, FileEditAction
 
 
 # ---------------------------------------------------------------------------
@@ -25,6 +28,8 @@ def _mock_controller():
     ctrl.state.iteration_flag = MagicMock(current_value=1)
     ctrl.state.history = []
     ctrl.log = MagicMock()
+    ctrl.event_stream = MagicMock()
+    ctrl._pending_action = None
     return ctrl
 
 
@@ -328,3 +333,46 @@ class TestCreateContext:
         assert ctx.state is state
         assert ctx.blocked is False
         assert ctx.metadata == {}
+
+
+class TestNewPolicyMiddlewares:
+    @pytest.mark.asyncio
+    async def test_reflection_blocks_destructive_command(self):
+        ctrl = _mock_controller()
+        ctrl.agent = MagicMock()
+        ctrl.agent.config = MagicMock()
+        ctrl.agent.config.enable_reflection = True
+        ctrl.agent.config.enable_reflection_middleware = True
+
+        mw = ReflectionMiddleware(ctrl)
+        ctx = ToolInvocationContext(
+            controller=ctrl,
+            action=CmdRunAction(command="rm -rf /"),
+            state=_mock_state(),
+        )
+
+        await mw.verify(ctx)
+
+        assert ctx.blocked is True
+        assert "destructive" in (ctx.block_reason or "")
+        ctrl.event_stream.add_event.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_conflict_detection_blocks_repeated_unverified_edits(self):
+        ctrl = _mock_controller()
+        mw = ConflictDetectionMiddleware()
+
+        # Simulate repeated prior unverified edits.
+        mw._unverified_edits["src/main.py"] = 2
+
+        ctx = ToolInvocationContext(
+            controller=ctrl,
+            action=FileEditAction(path="src/main.py", command="str_replace"),
+            state=_mock_state(),
+        )
+
+        await mw.verify(ctx)
+
+        assert ctx.blocked is True
+        assert "conflict_detection" in (ctx.block_reason or "")
+        ctrl.event_stream.add_event.assert_called_once()

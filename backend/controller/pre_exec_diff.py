@@ -25,6 +25,9 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
     downstream consumers (audit logger, debug endpoint, UI) can inspect
     the planned change without re-computing it.
 
+    In the observe stage, the diff is appended to the observation content
+    so the LLM can verify what actually changed.
+
     Only activates for ``FileEditAction`` and ``FileWriteAction``.
     """
 
@@ -43,6 +46,25 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
             await self._diff_for_edit(ctx, action)
         elif isinstance(action, FileWriteAction):
             await self._diff_for_write(ctx, action)
+
+    # -----------------------------------------------------------------
+    # observe stage — append diff summary to observation content
+    # -----------------------------------------------------------------
+    async def observe(self, ctx: ToolInvocationContext, observation=None) -> None:
+        diff = ctx.metadata.get("pre_exec_diff")
+        if not diff or observation is None:
+            return
+
+        # Append a concise diff to the observation so the LLM sees what changed
+        content = getattr(observation, "content", None)
+        if content is None or not isinstance(content, str):
+            return
+
+        # Limit diff size to avoid bloating context
+        diff_preview = diff if len(diff) <= 2000 else diff[:2000] + "\n... (diff truncated)"
+        observation.content = (
+            content + "\n\n<DIFF_PREVIEW>\n" + diff_preview + "\n</DIFF_PREVIEW>"
+        )
 
     # -----------------------------------------------------------------
     # internals

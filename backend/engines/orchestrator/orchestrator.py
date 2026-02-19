@@ -12,6 +12,7 @@ Architecture notes (preserve these strengths):
 
 from __future__ import annotations
 
+import contextlib
 import os
 from collections import deque
 from typing import TYPE_CHECKING, Any
@@ -177,7 +178,7 @@ class Orchestrator(Agent):
                 return pending
 
             # Periodic self-reflection checkpoint
-            reflection = self._maybe_inject_reflection()
+            reflection = self._maybe_inject_reflection(state)
             if reflection:
                 return reflection
 
@@ -217,8 +218,12 @@ class Orchestrator(Agent):
         if condensed.pending_action:
             # Extract initial task text for semantic recall during recovery
             try:
-                initial_msg = self.memory_manager.get_initial_user_message(state.history)
-                task_text = getattr(initial_msg, "content", "")[:200] if initial_msg else ""
+                initial_msg = self.memory_manager.get_initial_user_message(
+                    state.history
+                )
+                task_text = (
+                    getattr(initial_msg, "content", "")[:200] if initial_msg else ""
+                )
             except Exception:
                 task_text = ""
             self._queue_post_condensation_recovery(task_text=task_text)
@@ -237,6 +242,20 @@ class Orchestrator(Agent):
         self._sync_executor_llm()
 
         result = self.executor.execute(params, self.event_stream)
+
+        # Ack turn-scoped directives only after a successful LLM call.
+        # This makes retries (context-limit, transient tool errors, etc.)
+        # deterministic: signals persist until an actual successful model response.
+        try:
+            if hasattr(state, "ack_planning_directive"):
+                state.ack_planning_directive(source="Orchestrator")
+            if hasattr(state, "ack_memory_pressure"):
+                state.ack_memory_pressure(source="Orchestrator")
+        finally:
+            # Backward-compatible cleanup
+            with contextlib.suppress(Exception):
+                state.extra_data.pop("planning_directive", None)
+                state.extra_data.pop("memory_pressure", None)
 
         # Track LLM latency for adaptive rate governing
         self._last_llm_latency = result.execution_time
@@ -381,7 +400,11 @@ class Orchestrator(Agent):
         # Collect the leading run of FileReadAction entries
         batch: list[FileReadAction] = []
         for action in self.pending_actions:
-            if isinstance(action, FileReadAction) and action.start == 0 and action.end == -1:
+            if (
+                isinstance(action, FileReadAction)
+                and action.start == 0
+                and action.end == -1
+            ):
                 batch.append(action)
             else:
                 break
@@ -413,7 +436,9 @@ class Orchestrator(Agent):
         5. Review the task tracker
         """
         from backend.engines.orchestrator.tools.note import build_recall_action
-        from backend.engines.orchestrator.tools.working_memory import get_full_working_memory
+        from backend.engines.orchestrator.tools.working_memory import (
+            get_full_working_memory,
+        )
 
         # Load the auto-extracted context snapshot
         restored = self._memory_manager_impl.get_restored_context()
@@ -453,8 +478,16 @@ class Orchestrator(Agent):
         self.pending_actions.append(recovery_think)
         self.pending_actions.append(recall_action)
 
-    def _maybe_inject_reflection(self) -> Action | None:
-        """Inject a self-reflection think action every N steps.
+    def _maybe_inject_reflection(self, state: State | None = None) -> Action | None:
+        """Inject a structured self-reflection think action every N steps.
+
+        Unlike the previous version which asked vague questions, this version
+        provides concrete session metrics for the LLM to reflect on:
+        - Turn count and remaining budget
+        - Files modified this session
+        - Error count from recent history
+        - Token usage percentage
+        - The original user request (re-injected for goal alignment)
 
         Returns an AgentThinkAction if the interval has elapsed, else None.
         The counter resets after each reflection.
@@ -465,11 +498,81 @@ class Orchestrator(Agent):
             return None
 
         self._steps_since_reflection = 0
+
+        # Build structured reflection data
+        data_parts: list[str] = []
+
+        if state is not None:
+            # Turn progress
+            iter_flag = getattr(state, "iteration_flag", None)
+            current = getattr(iter_flag, "current_value", 0) if iter_flag else 0
+            max_val = getattr(iter_flag, "max_value", 0) if iter_flag else 0
+            if current:
+                progress = f"Turn {current}"
+                if max_val:
+                    progress += (
+                        f"/{max_val} ({int(current / max_val * 100)}% of budget)"
+                    )
+                data_parts.append(f"  • Progress: {progress}")
+
+            # Token usage
+            metrics = getattr(state, "metrics", None)
+            if metrics:
+                atu = getattr(metrics, "accumulated_token_usage", None)
+                if atu:
+                    prompt_tok = getattr(atu, "prompt_tokens", 0)
+                    ctx_window = getattr(atu, "context_window", 0)
+                    if prompt_tok and ctx_window:
+                        pct = int(prompt_tok / ctx_window * 100)
+                        data_parts.append(
+                            f"  • Context usage: {pct}% ({prompt_tok}/{ctx_window} tokens)"
+                        )
+
+                cost = getattr(metrics, "accumulated_cost", 0.0)
+                if cost > 0:
+                    data_parts.append(f"  • Cost so far: ${cost:.4f}")
+
+            # Files modified (from file verification guard)
+            modified_files = list(self.anti_hallucination._file_modified_turns.keys())
+            if modified_files:
+                files_str = ", ".join(modified_files[-5:])  # last 5
+                if len(modified_files) > 5:
+                    files_str += f" (+{len(modified_files) - 5} more)"
+                data_parts.append(f"  • Files modified: {files_str}")
+
+            # Error count
+            error_count = 0
+            for event in reversed(list(getattr(state, "history", []))):
+                cls_name = type(event).__name__
+                if cls_name == "ErrorObservation":
+                    error_count += 1
+                if error_count >= 20:
+                    break
+            if error_count:
+                data_parts.append(f"  • Errors encountered: {error_count}")
+
+            # Original user request
+            try:
+                initial_msg = self.memory_manager.get_initial_user_message(
+                    state.history
+                )
+                task_text = getattr(initial_msg, "content", "")[:200]
+                if task_text:
+                    data_parts.append(f'  • Original request: "{task_text}"')
+            except Exception:
+                pass
+
+        data_block = "\n".join(data_parts) if data_parts else "  (no metrics available)"
+
         return AgentThinkAction(
             thought=(
-                "🔍 SELF-REFLECTION CHECKPOINT — "
-                "Pausing to assess progress. Am I advancing the goal? "
-                "Should I update the task tracker? Is there a simpler path?"
+                "🔍 SELF-REFLECTION CHECKPOINT — Session metrics:\n"
+                f"{data_block}\n\n"
+                "Based on these metrics, assess:\n"
+                "1. Am I making progress toward the original goal?\n"
+                "2. Should I change strategy (too many errors, repeated edits)?\n"
+                "3. Should I update the task tracker with current progress?\n"
+                "4. Is there a simpler path I'm overlooking?"
             )
         )
 
@@ -491,7 +594,16 @@ class Orchestrator(Agent):
     def set_mcp_tools(self, mcp_tools: list[dict]) -> None:
         """Set MCP tools and sync names to prompt manager for dynamic discovery."""
         super().set_mcp_tools(mcp_tools)
-        # Sync connected tool names so the system prompt reflects reality
+        # Sync connected tool names and descriptions so the system prompt reflects reality
         pm = getattr(self, "_prompt_manager", None)
         if pm and hasattr(pm, "mcp_tool_names"):
             pm.mcp_tool_names = list(self.mcp_tools.keys())
+            descriptions: dict[str, str] = {}
+            for tool_dict in mcp_tools:
+                name = tool_dict.get("name", "")
+                desc = tool_dict.get("description", "")
+                if name and desc:
+                    first_line = desc.split("\n")[0][:120]
+                    descriptions[name] = first_line
+            if hasattr(pm, "mcp_tool_descriptions"):
+                pm.mcp_tool_descriptions = descriptions

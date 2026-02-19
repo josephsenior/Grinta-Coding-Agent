@@ -18,6 +18,7 @@ def ckpt(tmp_path):
 
 # ── begin / commit lifecycle ─────────────────────────────────────────
 
+
 class TestStreamingCheckpointLifecycle:
     def test_begin_creates_wal(self, ckpt: StreamingCheckpoint, tmp_path):
         token = ckpt.begin({"model": "gpt-4", "messages": [1, 2]})
@@ -44,6 +45,7 @@ class TestStreamingCheckpointLifecycle:
 
 # ── active_token ─────────────────────────────────────────────────────
 
+
 class TestActiveToken:
     def test_none_initially(self, ckpt):
         assert ckpt.active_token is None
@@ -59,6 +61,7 @@ class TestActiveToken:
 
 
 # ── recover ──────────────────────────────────────────────────────────
+
 
 class TestRecover:
     def test_no_wal(self, ckpt):
@@ -84,6 +87,7 @@ class TestRecover:
 
 # ── _summarise_params ────────────────────────────────────────────────
 
+
 class TestSummariseParams:
     def test_extracts_model_and_counts(self, ckpt):
         summary = ckpt._summarise_params(
@@ -99,6 +103,7 @@ class TestSummariseParams:
 
 
 # ── attempt tracking ─────────────────────────────────────────────────
+
 
 class TestAttemptTracking:
     def test_default_attempt(self, ckpt, tmp_path):

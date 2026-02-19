@@ -48,9 +48,13 @@ class TestCheckpoint:
 
     def test_roundtrip(self):
         cp = Checkpoint(
-            id="cp2", timestamp=2000.0, description="round",
-            checkpoint_type="before_risky", workspace_path="/ws",
-            metadata={"x": 1}, git_commit_sha="sha1",
+            id="cp2",
+            timestamp=2000.0,
+            description="round",
+            checkpoint_type="before_risky",
+            workspace_path="/ws",
+            metadata={"x": 1},
+            git_commit_sha="sha1",
             file_snapshots={"b.py": "saved"},
         )
         d = cp.to_dict()
@@ -130,7 +134,7 @@ class TestRollbackManager:
         rm = RollbackManager(str(workspace))
         cp_id = rm.create_checkpoint("to delete")
         assert rm.delete_checkpoint(cp_id) is True
-        assert len(rm.checkpoints) == 0
+        assert not rm.checkpoints
 
     def test_delete_checkpoint_not_found(self, workspace):
         rm = RollbackManager(str(workspace))
@@ -198,15 +202,17 @@ class TestRollbackManager:
         # Create new manager — should handle corrupted manifest gracefully
         rm2 = RollbackManager(str(workspace))
         # Should have empty checkpoints list due to graceful error handling
-        assert len(rm2.checkpoints) == 0
+        assert not rm2.checkpoints
 
     def test_git_available_check_failure(self, workspace, monkeypatch):
         """Test when git command fails."""
+
         def mock_subprocess_run(*args, **kwargs):
             class Result:
                 returncode = 1
                 stderr = "not a git repo"
                 stdout = ""
+
             return Result()
 
         monkeypatch.setattr("subprocess.run", mock_subprocess_run)
@@ -215,6 +221,7 @@ class TestRollbackManager:
 
     def test_git_available_check_exception(self, workspace, monkeypatch):
         """Test when git command raises exception."""
+
         def mock_subprocess_run(*args, **kwargs):
             raise RuntimeError("git not found")
 
@@ -224,6 +231,7 @@ class TestRollbackManager:
 
     def test_create_checkpoint_with_git_snapshot(self, workspace, monkeypatch):
         """Test checkpoint creation when git is available."""
+
         def mock_subprocess_run(cmd, *args, **kwargs):
             class Result:
                 returncode = 0
@@ -261,11 +269,13 @@ class TestRollbackManager:
 
     def test_create_checkpoint_git_disabled(self, workspace, monkeypatch):
         """Test checkpoint creation with use_git=False."""
+
         def mock_subprocess_run(cmd, *args, **kwargs):
             class Result:
                 returncode = 0
                 stdout = "abc123\n"
                 stderr = ""
+
             if "rev-parse" in cmd and "--git-dir" in cmd:
                 return Result()
             return Result()
@@ -311,6 +321,7 @@ class TestRollbackManager:
 
     def test_create_git_snapshot_sha_read_fails(self, workspace, monkeypatch):
         """Test when git commit succeeds but reading SHA fails."""
+
         def mock_subprocess_run(cmd, *args, **kwargs):
             class Result:
                 returncode = 0
@@ -344,10 +355,13 @@ class TestRollbackManager:
 
     def test_create_git_snapshot_exception(self, workspace, monkeypatch):
         """Test git snapshot exception handling."""
+
         def mock_subprocess_run(cmd, *args, **kwargs):
             if "rev-parse" in cmd and "--git-dir" in cmd:
+
                 class Result:
                     returncode = 0
+
                 return Result()
             raise RuntimeError("git subprocess error")
 
@@ -376,6 +390,7 @@ class TestRollbackManager:
 
         # Make checkpoints_dir read-only to trigger write error
         import stat
+
         original_mode = rm.checkpoints_dir.stat().st_mode
 
         try:
@@ -419,6 +434,7 @@ class TestRollbackManager:
 
     def test_git_rollback_success(self, workspace, monkeypatch):
         """Test successful git-based rollback."""
+
         def mock_subprocess_run(cmd, *args, **kwargs):
             class Result:
                 returncode = 0
@@ -465,6 +481,7 @@ class TestRollbackManager:
 
     def test_git_rollback_without_sha(self, workspace, monkeypatch):
         """Test git rollback when commit sha is None."""
+
         def mock_subprocess_run(cmd, *args, **kwargs):
             class Result:
                 returncode = 0
@@ -495,9 +512,11 @@ class TestRollbackManager:
 
     def test_rollback_git_not_available(self, workspace, monkeypatch):
         """Test rollback when vcs_available is False."""
+
         def mock_subprocess_run(cmd, *args, **kwargs):
             class Result:
                 returncode = 1
+
             if "rev-parse" in cmd and "--git-dir" in cmd:
                 return Result()
             return Result()
@@ -519,6 +538,7 @@ class TestRollbackManager:
 
         # Manually create a fake checkpoint without creating snapshot
         from backend.core.rollback.rollback_manager import Checkpoint
+
         fake_cp = Checkpoint(
             id="fake_cp",
             timestamp=1000.0,
@@ -526,7 +546,7 @@ class TestRollbackManager:
             checkpoint_type="manual",
             workspace_path=str(workspace),
             file_snapshots={},
-            git_commit_sha=None
+            git_commit_sha=None,
         )
         rm.checkpoints.append(fake_cp)
 

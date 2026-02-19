@@ -7,10 +7,9 @@ coherence logic without requiring LLM or external services.
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock
 
 from backend.events.action import Action, MessageAction
-from backend.events.action.agent import CondensationAction
 from backend.events.observation import Observation
 from backend.memory.condenser.condenser import Condensation
 from backend.memory.condenser.impl.semantic_condenser import (
@@ -33,6 +32,7 @@ class _TestableCondenser(SemanticCondenser):
 def _make_event(event_id: int, cls=None):
     if cls is None:
         from backend.events.event import Event
+
         cls = Event
     mock = MagicMock(spec=cls)
     mock.id = event_id
@@ -158,7 +158,9 @@ class TestSemanticCondenserScoring(unittest.TestCase):
         self.assertIn("question", reasons)
 
     def test_calculate_importance_normalizes(self):
-        action = _make_action(30, action="finish file delegate", command="build install")
+        action = _make_action(
+            30, action="finish file delegate", command="build install"
+        )
         score, reasons = self.condenser._calculate_importance(action)
         self.assertLessEqual(score, 1.0)
 

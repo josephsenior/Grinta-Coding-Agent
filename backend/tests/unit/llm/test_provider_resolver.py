@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import socket
-from pathlib import Path
 from unittest import TestCase
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import httpx
 
@@ -77,9 +76,7 @@ class TestProviderResolver(TestCase):
             self.assertEqual(
                 self.resolver.resolve_provider("ollama/llama3.2"), "ollama"
             )
-            self.assertEqual(
-                self.resolver.resolve_provider("ollama-model"), "ollama"
-            )
+            self.assertEqual(self.resolver.resolve_provider("ollama-model"), "ollama")
 
     def test_resolve_provider_deepseek(self):
         """Test resolve_provider identifies DeepSeek models."""
@@ -94,9 +91,7 @@ class TestProviderResolver(TestCase):
     def test_resolve_provider_mistral(self):
         """Test resolve_provider identifies Mistral models."""
         with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            self.assertEqual(
-                self.resolver.resolve_provider("mistral-large"), "mistral"
-            )
+            self.assertEqual(self.resolver.resolve_provider("mistral-large"), "mistral")
             self.assertEqual(
                 self.resolver.resolve_provider("codestral-latest"), "mistral"
             )
@@ -104,9 +99,7 @@ class TestProviderResolver(TestCase):
     def test_resolve_provider_default_openai(self):
         """Test resolve_provider defaults to openai for unknown models."""
         with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            self.assertEqual(
-                self.resolver.resolve_provider("unknown-model"), "openai"
-            )
+            self.assertEqual(self.resolver.resolve_provider("unknown-model"), "openai")
 
     def test_is_local_model_true(self):
         """Test is_local_model identifies local models."""
@@ -158,9 +151,7 @@ class TestProviderResolver(TestCase):
     def test_resolve_base_url_ollama_env_with_v1(self):
         """Test resolve_base_url preserves /v1 if already in env var."""
         with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            with patch.dict(
-                "os.environ", {"OLLAMA_HOST": "http://custom:11434/v1"}
-            ):
+            with patch.dict("os.environ", {"OLLAMA_HOST": "http://custom:11434/v1"}):
                 result = self.resolver.resolve_base_url("ollama/llama3.2")
                 self.assertEqual(result, "http://custom:11434/v1")
 
@@ -168,7 +159,9 @@ class TestProviderResolver(TestCase):
         """Test resolve_base_url auto-discovers Ollama endpoint."""
         with patch("backend.llm.provider_resolver.lookup", return_value=None):
             with patch.object(
-                self.resolver, "discover_local_endpoint", return_value="http://localhost:11434/v1"
+                self.resolver,
+                "discover_local_endpoint",
+                return_value="http://localhost:11434/v1",
             ) as mock_discover:
                 result = self.resolver.resolve_base_url("ollama/llama3.2")
                 mock_discover.assert_called_once_with("ollama")
@@ -315,9 +308,7 @@ class TestProviderResolver(TestCase):
         """Test get_available_local_models for OpenAI-compatible endpoints."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [{"id": "model1"}, {"id": "model2"}]
-        }
+        mock_response.json.return_value = {"data": [{"id": "model1"}, {"id": "model2"}]}
 
         with patch.object(
             self.resolver,
@@ -364,9 +355,7 @@ class TestProviderResolver(TestCase):
             self.resolver.strip_provider_prefix("anthropic/claude-opus-4"),
             "claude-opus-4",
         )
-        self.assertEqual(
-            self.resolver.strip_provider_prefix("openai/gpt-4o"), "gpt-4o"
-        )
+        self.assertEqual(self.resolver.strip_provider_prefix("openai/gpt-4o"), "gpt-4o")
         self.assertEqual(
             self.resolver.strip_provider_prefix("google/gemini-2.0-flash"),
             "gemini-2.0-flash",
@@ -380,9 +369,7 @@ class TestProviderResolver(TestCase):
 
     def test_strip_provider_prefix_no_prefix(self):
         """Test strip_provider_prefix returns original when no prefix."""
-        self.assertEqual(
-            self.resolver.strip_provider_prefix("llama3.2"), "llama3.2"
-        )
+        self.assertEqual(self.resolver.strip_provider_prefix("llama3.2"), "llama3.2")
         self.assertEqual(self.resolver.strip_provider_prefix("gpt-4o"), "gpt-4o")
 
     def test_strip_provider_prefix_case_insensitive(self):
@@ -436,13 +423,11 @@ class TestDiscoverAllLocalModels(TestCase):
         """Test discover_all_local_models returns models from all providers."""
         with patch("backend.llm.provider_resolver.get_resolver") as mock_get_resolver:
             mock_resolver = MagicMock()
-            mock_resolver.get_available_local_models.side_effect = (
-                lambda provider: {
-                    "ollama": ["llama3.2", "codellama"],
-                    "lm_studio": ["qwen"],
-                    "vllm": [],
-                }.get(provider, [])
-            )
+            mock_resolver.get_available_local_models.side_effect = lambda provider: {
+                "ollama": ["llama3.2", "codellama"],
+                "lm_studio": ["qwen"],
+                "vllm": [],
+            }.get(provider, [])
             mock_get_resolver.return_value = mock_resolver
 
             result = discover_all_local_models()

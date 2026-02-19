@@ -391,7 +391,7 @@ class TestDecomposeTask:
         # Should not raise (parameter currently unused but accepted)
         subtask_ids = tracker.decompose_task("Task", max_subtasks=10)
 
-        assert len(subtask_ids) >= 1
+        assert subtask_ids
 
 
 class TestReset:
@@ -421,7 +421,7 @@ class TestReset:
         tracker.reset()
 
         # Should be like new
-        assert len(tracker.tasks) == 0
+        assert not tracker.tasks
         progress = tracker.get_progress()
         assert progress["total"] == 0
 

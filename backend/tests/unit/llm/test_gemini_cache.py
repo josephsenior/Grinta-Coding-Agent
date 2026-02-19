@@ -48,7 +48,7 @@ class TestGeminiCacheManager(unittest.TestCase):
     def test_hash_none_system(self):
         h = self.manager._get_hash(None, [])
         self.assertIsInstance(h, str)
-        self.assertTrue(len(h) > 0)
+        self.assertTrue(h)
 
     # -- get_or_create_cache (cache hit) ------------------------------------
 
@@ -192,7 +192,6 @@ class TestGeminiCacheManager(unittest.TestCase):
             messages=[],
         )
         # default ttl_minutes=60
-        call_kwargs = mock_caching.CachedContent.create.call_args
         # ttl should be set via time.timedelta
         self.assertTrue(mock_caching.CachedContent.create.called)
 

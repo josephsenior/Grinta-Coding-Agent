@@ -17,6 +17,7 @@ from backend.controller.tool_pipeline import (
 
 # ── ToolInvocationContext ─────────────────────────────────────────────
 
+
 class TestToolInvocationContextPipeline:
     def test_defaults(self):
         ctx = ToolInvocationContext(
@@ -48,6 +49,7 @@ class TestToolInvocationContextPipeline:
 
 # ── ToolInvocationMiddleware base ─────────────────────────────────────
 
+
 class TestToolInvocationMiddlewareBase:
     @pytest.mark.asyncio
     async def test_default_plan_is_noop(self):
@@ -75,6 +77,7 @@ class TestToolInvocationMiddlewareBase:
 
 
 # ── ToolInvocationPipeline ────────────────────────────────────────────
+
 
 class TestToolInvocationPipelineCore:
     def test_create_context(self):
@@ -139,8 +142,10 @@ class TestToolInvocationPipelineCore:
     @pytest.mark.asyncio
     async def test_middleware_blocking_stops_chain(self):
         mw1 = MagicMock(spec=ToolInvocationMiddleware)
+
         async def block(ctx):
             ctx.block("mw1 blocked")
+
         mw1.plan = block
 
         mw2 = MagicMock(spec=ToolInvocationMiddleware)
@@ -159,13 +164,17 @@ class TestToolInvocationPipelineCore:
         order = []
 
         mw1 = MagicMock(spec=ToolInvocationMiddleware)
+
         async def plan1(ctx):
             order.append(1)
+
         mw1.plan = plan1
 
         mw2 = MagicMock(spec=ToolInvocationMiddleware)
+
         async def plan2(ctx):
             order.append(2)
+
         mw2.plan = plan2
 
         pipeline = ToolInvocationPipeline(MagicMock(), [mw1, mw2])
@@ -177,6 +186,7 @@ class TestToolInvocationPipelineCore:
 
 
 # ── CircuitBreakerMiddleware ──────────────────────────────────────────
+
 
 class TestCircuitBreakerMiddlewarePipeline:
     @pytest.mark.asyncio
@@ -208,6 +218,7 @@ class TestCircuitBreakerMiddlewarePipeline:
     @pytest.mark.asyncio
     async def test_observe_records_error_for_error_obs(self):
         from backend.events.observation import ErrorObservation
+
         controller = MagicMock()
         service = MagicMock()
         controller.circuit_breaker_service = service
@@ -234,6 +245,7 @@ class TestCircuitBreakerMiddlewarePipeline:
 
 
 # ── LoggingMiddleware ─────────────────────────────────────────────────
+
 
 class TestLoggingMiddlewarePipeline:
     @pytest.mark.asyncio

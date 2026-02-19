@@ -12,6 +12,7 @@ from backend.controller.services.iteration_service import IterationService
 
 # ── helpers ──────────────────────────────────────────────────────────
 
+
 def _make_service(**ctx_overrides):
     ctx = MagicMock()
     agent = MagicMock()
@@ -38,6 +39,7 @@ def _make_service(**ctx_overrides):
 
 # ── _should_apply_iterations ─────────────────────────────────────────
 
+
 class TestShouldApply:
     def test_enabled(self):
         svc, ctx, *_ = _make_service()
@@ -55,6 +57,7 @@ class TestShouldApply:
 
 # ── _fallback_iteration_target ───────────────────────────────────────
 
+
 class TestFallbackTarget:
     def test_basic(self):
         svc, _, config, *_ = _make_service()
@@ -65,11 +68,14 @@ class TestFallbackTarget:
 
 # ── _apply_iteration_flag ────────────────────────────────────────────
 
+
 class TestApplyIterationFlag:
     def test_sets_max_via_state(self):
         svc, ctx, config, state, iflag = _make_service()
         svc._apply_iteration_flag(iflag, config, 5.0, 270)
-        state.adjust_iteration_limit.assert_called_once_with(270, source="IterationService")
+        state.adjust_iteration_limit.assert_called_once_with(
+            270, source="IterationService"
+        )
 
     def test_respects_max_override(self):
         svc, ctx, config, state, iflag = _make_service()
@@ -82,6 +88,7 @@ class TestApplyIterationFlag:
 
 
 # ── apply_dynamic_iterations ─────────────────────────────────────────
+
 
 class TestApplyDynamic:
     @pytest.mark.asyncio

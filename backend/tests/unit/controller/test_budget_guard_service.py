@@ -29,7 +29,7 @@ class TestBudgetGuardService:
         ctx = _FakeContext(current=0.10, max_value=1.00)  # 10%
         svc = BudgetGuardService(ctx)
         svc._check_budget_thresholds()
-        assert len(svc._alerted_thresholds) == 0
+        assert not svc._alerted_thresholds
 
     def test_alert_at_50_percent(self):
         ctx = _FakeContext(current=0.55, max_value=1.00)
@@ -72,7 +72,7 @@ class TestBudgetGuardService:
         )
         svc = BudgetGuardService(ctx)
         svc._check_budget_thresholds()  # no div-by-zero
-        assert len(svc._alerted_thresholds) == 0
+        assert not svc._alerted_thresholds
 
     def test_sync_with_metrics_calls_state_tracker(self):
         ctx = _FakeContext(current=0.1, max_value=1.0)

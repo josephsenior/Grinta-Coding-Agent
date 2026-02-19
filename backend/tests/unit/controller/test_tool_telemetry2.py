@@ -124,7 +124,9 @@ class TestOnObserve:
         tt = ToolTelemetry()
         ctx = MagicMock()
         ctx.metadata = {}
-        obs = CmdOutputObservation(command="ls", command_id=1, exit_code=0, content="output")
+        obs = CmdOutputObservation(
+            command="ls", command_id=1, exit_code=0, content="output"
+        )
 
         # Should not crash
         tt.on_observe(ctx, obs)
@@ -132,10 +134,17 @@ class TestOnObserve:
     def test_determines_outcome_and_duration(self):
         tt = ToolTelemetry()
         ctx = MagicMock()
-        ctx.metadata = {"telemetry": {"start_time": time.monotonic() - 1.0, "tool_name": "test_tool"}}
+        ctx.metadata = {
+            "telemetry": {
+                "start_time": time.monotonic() - 1.0,
+                "tool_name": "test_tool",
+            }
+        }
         ctx.action = MagicMock()
         ctx.action.action = "test_action"
-        obs = CmdOutputObservation(command="ls", command_id=1, exit_code=0, content="output")
+        obs = CmdOutputObservation(
+            command="ls", command_id=1, exit_code=0, content="output"
+        )
 
         with patch.object(tt, "_determine_outcome", return_value="success"):
             with patch.object(tt, "_elapsed_since", return_value=1.5):
@@ -157,7 +166,9 @@ class TestDetermineOutcome:
 
     def test_success_observation_returns_success(self):
         tt = ToolTelemetry()
-        obs = CmdOutputObservation(command="ls", command_id=1, exit_code=0, content="output")
+        obs = CmdOutputObservation(
+            command="ls", command_id=1, exit_code=0, content="output"
+        )
         result = tt._determine_outcome(obs)
         assert result == "success"
 

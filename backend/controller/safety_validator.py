@@ -64,8 +64,8 @@ class SafetyValidator:
         self.config = config
         self.analyzer = CommandAnalyzer(
             {
-                "blocked_patterns": config.blocked_patterns,
-                "allowed_exceptions": config.allowed_exceptions,
+                "blocked_commands": config.blocked_patterns,
+                "allowed_commands": config.allowed_exceptions,
                 "risk_threshold": config.risk_threshold,
             },
         )

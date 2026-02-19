@@ -11,6 +11,7 @@ from backend.review.finish_critic import AgentFinishedCritic
 
 # ── CriticResult ───────────────────────────────────────────────────────
 
+
 class TestCriticResult:
     def test_success_above_threshold(self):
         r = CriticResult(score=0.8, message="ok")
@@ -34,6 +35,7 @@ class TestCriticResult:
 
 
 # ── AgentFinishedCritic ────────────────────────────────────────────────
+
 
 class TestAgentFinishedCritic:
     def test_empty_patch_returns_zero(self):

@@ -29,7 +29,7 @@ class TestConnectionInfo:
         assert ci.conversation_id is None
         assert ci.connected_at > 0
         assert ci.last_activity > 0
-        assert len(ci.message_queue) == 0
+        assert not ci.message_queue
         assert ci.max_queue_size == 100
 
 
@@ -112,7 +112,7 @@ class TestMessageQueuing:
         assert delivered == 1
         sio.emit.assert_called_once_with("event", {"x": 1}, room="s1")
         ci = mgr.get_connection("s1")
-        assert len(ci.message_queue) == 0
+        assert not ci.message_queue
 
     @pytest.mark.asyncio
     async def test_deliver_expired(self, mgr):

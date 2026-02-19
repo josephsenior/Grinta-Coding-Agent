@@ -173,5 +173,5 @@ def create_browser_tool() -> ChatCompletionToolParam:
             },
             "security_risk": get_security_risk_param(),
         },
-        required=["code", "security_risk"],
+        required=["code"],
     )

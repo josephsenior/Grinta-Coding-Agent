@@ -12,6 +12,7 @@ from backend.runtime.utils.memory_monitor import LogStream, MemoryMonitor
 # LogStream
 # ---------------------------------------------------------------------------
 
+
 class TestLogStream:
     def test_write_logs_message(self):
         stream = LogStream()
@@ -39,6 +40,7 @@ class TestLogStream:
 # ---------------------------------------------------------------------------
 # MemoryMonitor
 # ---------------------------------------------------------------------------
+
 
 class TestMemoryMonitor:
     def test_disabled_by_default(self):

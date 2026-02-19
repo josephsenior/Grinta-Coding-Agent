@@ -186,9 +186,6 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
         raise
 
 
-# Removed duplicate connect handler - using the one above that properly creates sessions
-
-
 @sio.event
 async def forge_user_action(connection_id: str, data: dict[str, Any]) -> None:
     """Handle user action from Socket.IO client.

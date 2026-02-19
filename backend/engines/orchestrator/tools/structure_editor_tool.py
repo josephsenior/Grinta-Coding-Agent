@@ -43,6 +43,22 @@ COMMANDS:
    Optional: style ("spaces" or "tabs"), size (2, 4, 8)
    Automatically detects and normalizes to project standards
 
+6. `create_file` - Create a new file with content
+   Required: file_path, content
+   Creates parent directories if needed
+
+7. `view_file` - View a file's contents
+   Required: file_path
+   Returns the file's full content
+
+8. `insert_code` - Insert code after a specific line
+   Required: file_path, new_code, insert_line
+   insert_line=0 inserts at the beginning of the file
+
+9. `undo_last_edit` - Undo the most recent edit to a file
+   Required: file_path
+   Reverts the last change made by the editor
+
 FEATURES:
 - Language-agnostic: Works with ALL languages via Tree-sitter
 - Auto-indentation: New code automatically matches file style
@@ -59,7 +75,8 @@ BEST PRACTICES:
 
 _SHORT_ULTIMATE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
 
-Commands: edit_function, rename_symbol, find_symbol, replace_range, normalize_indent
+Commands: edit_function, rename_symbol, find_symbol, replace_range, normalize_indent,
+          create_file, view_file, insert_code, undo_last_edit
 - Edits by symbol name (function/class), not line numbers
 - Auto-indents code to match file style
 - Validates syntax before saving
@@ -160,5 +177,5 @@ def create_structure_editor_tool(
             },
             "security_risk": get_security_risk_param(),
         },
-        required=["command", "file_path", "security_risk"],
+        required=["command", "file_path"],
     )

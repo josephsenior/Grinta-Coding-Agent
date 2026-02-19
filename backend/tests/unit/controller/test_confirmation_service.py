@@ -36,6 +36,7 @@ def _make_safety_service() -> MagicMock:
 
 # ── get_next_action ──────────────────────────────────────────────────
 
+
 class TestGetNextAction:
     def test_live_action(self):
         ctx = _make_context()
@@ -73,6 +74,7 @@ class TestGetNextAction:
 
 # ── is_replay_mode / replay_progress ─────────────────────────────────
 
+
 class TestReplayProperties:
     def test_not_in_replay(self):
         ctx = _make_context()
@@ -93,6 +95,7 @@ class TestReplayProperties:
 
 
 # ── evaluate_action ──────────────────────────────────────────────────
+
 
 class TestEvaluateAction:
     @pytest.mark.asyncio
@@ -127,6 +130,7 @@ class TestEvaluateAction:
 
 # ── handle_pending_confirmation ──────────────────────────────────────
 
+
 class TestHandlePendingConfirmation:
     @pytest.mark.asyncio
     async def test_returns_false_for_no_confirmation_attr(self):
@@ -157,6 +161,7 @@ class TestHandlePendingConfirmation:
 
 
 # ── action_counts ────────────────────────────────────────────────────
+
 
 class TestActionCounts:
     def test_initial_counts(self):

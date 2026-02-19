@@ -18,8 +18,16 @@ from backend.storage.data_models.conversation_template import (
 class TestTemplateCategory:
     def test_all_values(self):
         expected = {
-            "debug", "refactor", "document", "test", "review",
-            "explain", "optimize", "fix_bug", "add_feature", "custom",
+            "debug",
+            "refactor",
+            "document",
+            "test",
+            "review",
+            "explain",
+            "optimize",
+            "fix_bug",
+            "add_feature",
+            "custom",
         }
         actual = {c.value for c in TemplateCategory}
         assert actual == expected

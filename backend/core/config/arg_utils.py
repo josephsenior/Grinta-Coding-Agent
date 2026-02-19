@@ -134,7 +134,12 @@ def get_cli_parser() -> argparse.ArgumentParser:
         metavar="COMMAND",
     )
     subparsers.add_parser("serve", help="Launch the Forge GUI server (web interface)")
-    subparsers.add_parser("all", help="Launch both backend server and TUI in one terminal")
+    subparsers.add_parser(
+        "all", help="Launch both backend server and TUI in one terminal"
+    )
+    subparsers.add_parser(
+        "start", help="Launch both backend server and TUI (alias for 'all')"
+    )
 
     subparsers.add_parser(
         "health", help="Run production health checks for critical dependencies"

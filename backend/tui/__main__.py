@@ -1,4 +1,4 @@
-"""Entry point: ``python -m backend.tui [--port PORT] [--host HOST] [--dev]``."""
+"""Entry point: ``python -m backend.tui [--port PORT] [--host HOST] [--dev] [--embedded]``."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--port",
         type=int,
-        default=3000,
+        default=3001,
         help="Forge backend port (default: 3000)",
     )
     parser.add_argument(
@@ -34,6 +34,14 @@ def _parse_args() -> argparse.Namespace:
         "--dev",
         action="store_true",
         help="Enable dev mode: auto-reload on source changes under backend/tui/",
+    )
+    parser.add_argument(
+        "--embedded",
+        action="store_true",
+        help=(
+            "Single-process embedded mode: start the backend server automatically "
+            "in the same process, then launch the TUI.  No second terminal needed."
+        ),
     )
     return parser.parse_args()
 
@@ -95,7 +103,11 @@ def main() -> None:
     """Parse CLI args and either run directly or in dev-reload mode."""
     args = _parse_args()
 
-    if args.dev:
+    if args.embedded:
+        from backend.embedded import run_embedded
+
+        run_embedded(host=args.host, port=args.port, verbose=args.verbose)
+    elif args.dev:
         _run_dev_mode(args.host, args.port, args.verbose)
     else:
         _run_app(args.host, args.port, args.verbose)

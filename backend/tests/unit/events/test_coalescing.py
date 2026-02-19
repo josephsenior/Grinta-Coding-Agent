@@ -121,7 +121,7 @@ class TestFlush:
         c.absorb(_event("NullObservation"))
         results = c.flush_all()
         assert len(results) == 2
-        assert len(c._pending) == 0
+        assert not c._pending
 
     def test_flush_all_empty(self):
         c = EventCoalescer()

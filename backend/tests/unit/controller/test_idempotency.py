@@ -41,7 +41,9 @@ class TestComputeIdempotencyKey:
     def test_different_action_type_different_key(self):
         cmd_action = CmdRunAction(command="echo test")
         think_action = AgentThinkAction(thought="echo test")
-        assert compute_idempotency_key(cmd_action) != compute_idempotency_key(think_action)
+        assert compute_idempotency_key(cmd_action) != compute_idempotency_key(
+            think_action
+        )
 
     def test_file_write_same_content_same_key(self):
         action1 = FileWriteAction(path="test.py", content="print('hello')")
@@ -297,4 +299,3 @@ class TestTTLEviction:
         # Only the new action's key should be in cache
         new_key = compute_idempotency_key(new_action)
         assert new_key in middleware._cache
-

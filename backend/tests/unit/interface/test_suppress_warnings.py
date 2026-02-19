@@ -26,7 +26,7 @@ class TestSuppressCliWarnings(unittest.TestCase):
 
     def test_suppresses_pydantic_serializer_warnings(self) -> None:
         """Test Pydantic serializer warnings are suppressed."""
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
 
             # This import triggers filter setup
@@ -40,7 +40,7 @@ class TestSuppressCliWarnings(unittest.TestCase):
 
     def test_suppresses_deprecation_warnings(self) -> None:
         """Test deprecation warnings are suppressed."""
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
 
             from backend.interface import suppress_warnings  # noqa: F401
@@ -52,7 +52,7 @@ class TestSuppressCliWarnings(unittest.TestCase):
 
     def test_suppresses_syntax_warnings_from_pydub(self) -> None:
         """Test pydub SyntaxWarnings are suppressed."""
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
 
             from backend.interface import suppress_warnings  # noqa: F401
@@ -86,12 +86,15 @@ class TestSuppressCliWarnings(unittest.TestCase):
 
         suppress_cli_warnings()
 
-        with warnings.catch_warnings(record=True) as caught_warnings:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
 
             # These specific patterns should be suppressed
             test_warnings = [
-                ("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning),
+                (
+                    "Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work",
+                    RuntimeWarning,
+                ),
                 ("Pydantic serializer warnings: model='User'", UserWarning),
                 ("PydanticSerializationUnexpectedValue: value", UserWarning),
                 ("Call to deprecated method get_config", DeprecationWarning),
@@ -115,7 +118,7 @@ class TestWarningFiltersIntegration(unittest.TestCase):
 
         suppress_cli_warnings()
 
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
 
             # This warning should NOT be suppressed

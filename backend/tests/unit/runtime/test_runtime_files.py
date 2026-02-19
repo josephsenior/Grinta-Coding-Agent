@@ -164,7 +164,7 @@ class TestReadFile:
         obs = await read_file(str(tmp_path), str(tmp_path), str(tmp_path))
         from backend.events.observation import ErrorObservation
 
-        # On Windows, open(directory) raises PermissionError which is caught
+        # On Windows, open(directory, encoding="utf-8") raises PermissionError which is caught
         # and turned into an ErrorObservation; on Linux it's IsADirectoryError.
         assert isinstance(obs, ErrorObservation)
 
@@ -173,9 +173,7 @@ class TestWriteFile:
     async def test_write_new_file(self, tmp_path):
         from backend.runtime.utils.files import write_file
 
-        obs = await write_file(
-            "new.txt", str(tmp_path), str(tmp_path), "hello world"
-        )
+        obs = await write_file("new.txt", str(tmp_path), str(tmp_path), "hello world")
         from backend.events.observation import FileWriteObservation
 
         assert isinstance(obs, FileWriteObservation)
@@ -197,9 +195,7 @@ class TestWriteFile:
 
         workspace = tmp_path / "ws"
         workspace.mkdir()
-        obs = await write_file(
-            "../../bad.txt", str(workspace), str(workspace), "bad"
-        )
+        obs = await write_file("../../bad.txt", str(workspace), str(workspace), "bad")
         from backend.events.observation import ErrorObservation
 
         assert isinstance(obs, ErrorObservation)

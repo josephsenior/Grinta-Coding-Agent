@@ -18,6 +18,7 @@ from backend.engines.navigator.utils import (
 
 # ── ErrorResponse dataclass ────────────────────────────────────────────
 
+
 class TestErrorResponse:
     def test_basic(self):
         r = ErrorResponse(message="fail", reason="timeout")
@@ -26,6 +27,7 @@ class TestErrorResponse:
 
 
 # ── NavigatorMetadata dataclass ────────────────────────────────────────
+
 
 class TestNavigatorMetadata:
     def test_required_only(self):
@@ -38,14 +40,18 @@ class TestNavigatorMetadata:
 
     def test_all_fields(self):
         m = NavigatorMetadata(
-            goal="g", url="u", action_space="a",
-            additional_context="extra", include_error_prefix=True,
+            goal="g",
+            url="u",
+            action_space="a",
+            additional_context="extra",
+            include_error_prefix=True,
         )
         assert m.additional_context == "extra"
         assert m.include_error_prefix is True
 
 
 # ── BrowsingPromptFragment ─────────────────────────────────────────────
+
 
 class TestBrowsingPromptFragment:
     def test_defaults(self):
@@ -57,7 +63,10 @@ class TestBrowsingPromptFragment:
 
     def test_with_metadata(self):
         f = BrowsingPromptFragment(
-            name="n", content="c", fallback="fb", metadata={"k": "v"},
+            name="n",
+            content="c",
+            fallback="fb",
+            metadata={"k": "v"},
         )
         assert f.fallback == "fb"
         assert f.metadata == {"k": "v"}
@@ -71,6 +80,7 @@ class TestBrowsingPromptFragment:
 
 
 # ── PageParser ─────────────────────────────────────────────────────────
+
 
 class TestPageParser:
     def test_extract_text(self):
@@ -91,7 +101,9 @@ class TestPageParser:
         assert parser.extract_title() == ""
 
     def test_to_dict(self):
-        html = "<html><head><title>Test</title></head><body><p>Content</p></body></html>"
+        html = (
+            "<html><head><title>Test</title></head><body><p>Content</p></body></html>"
+        )
         parser = PageParser(html)
         d = parser.to_dict()
         assert d["title"] == "Test"
@@ -106,6 +118,7 @@ class TestPageParser:
 
 
 # ── PromptBuilder ──────────────────────────────────────────────────────
+
 
 class TestPromptBuilder:
     def test_empty_build(self):
@@ -128,6 +141,7 @@ class TestPromptBuilder:
 
 
 # ── parse_error_response ───────────────────────────────────────────────
+
 
 class TestParseErrorResponse:
     def test_basic(self):

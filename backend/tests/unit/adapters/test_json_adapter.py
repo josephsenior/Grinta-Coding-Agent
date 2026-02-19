@@ -16,6 +16,7 @@ from backend.core.exceptions import LLMResponseError
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class _SamplePydantic(BaseModel):
     name: str = "test"
     value: int = 42
@@ -25,8 +26,8 @@ class _SamplePydantic(BaseModel):
 # ForgeJSONEncoder
 # ===================================================================
 
-class TestForgeJSONEncoder:
 
+class TestForgeJSONEncoder:
     def test_datetime_encoding(self):
         dt = datetime(2025, 6, 15, 12, 30, 0)
         result = json.dumps({"ts": dt}, cls=ForgeJSONEncoder)
@@ -41,6 +42,7 @@ class TestForgeJSONEncoder:
 
     def test_model_with_model_dump(self):
         """Objects with model_dump() should be serialized via that method."""
+
         class FakeDumpable:
             def model_dump(self):
                 return {"key": "dumped"}
@@ -58,8 +60,8 @@ class TestForgeJSONEncoder:
 # dumps
 # ===================================================================
 
-class TestDumps:
 
+class TestDumps:
     def test_simple_dict(self):
         result = dumps({"a": 1, "b": "two"})
         parsed = json.loads(result)
@@ -83,8 +85,8 @@ class TestDumps:
 # loads
 # ===================================================================
 
-class TestLoads:
 
+class TestLoads:
     def test_valid_json(self):
         result = loads('{"key": "value"}')
         assert result == {"key": "value"}
@@ -106,7 +108,7 @@ class TestLoads:
     def test_badly_malformed_embedded_json(self):
         """Truly unrecoverable JSON should raise LLMResponseError."""
         # Brace-balanced but not valid JSON at all
-        raw = '{this is not: valid json at all }'
+        raw = "{this is not: valid json at all }"
         # json_repair may be able to fix simpler cases, but truly broken
         # content should raise
         try:

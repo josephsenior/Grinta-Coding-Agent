@@ -5,8 +5,6 @@ Targets 0% coverage (65 statements).
 
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -39,10 +37,11 @@ def tmp_tree(tmp_path: Path) -> Path:
 # search_files
 # -----------------------------------------------------------
 
+
 class TestSearchFiles:
     def test_basic_search(self, searcher: PythonSearcher, tmp_tree: Path):
         results = searcher.search_files("hello", str(tmp_tree))
-        assert len(results) >= 1
+        assert results
         assert any("hello" in line for _, _, line in results)
 
     def test_no_match(self, searcher: PythonSearcher, tmp_tree: Path):
@@ -69,21 +68,24 @@ class TestSearchFiles:
 
     def test_case_sensitive(self, searcher: PythonSearcher, tmp_tree: Path):
         results = searcher.search_files("FOO", str(tmp_tree))
-        assert len(results) >= 1
+        assert results
         # Should NOT match "foo" in lowercase
-        lower_results = searcher.search_files("foo", str(tmp_tree))
+        searcher.search_files("foo", str(tmp_tree))
         # FOO only exists once — case-sensitive should differ from "foo"
         foobar_results = searcher.search_files("foobar", str(tmp_tree))
         assert foobar_results == []
 
-    def test_case_insensitive(self, case_insensitive_searcher: PythonSearcher, tmp_tree: Path):
+    def test_case_insensitive(
+        self, case_insensitive_searcher: PythonSearcher, tmp_tree: Path
+    ):
         results = case_insensitive_searcher.search_files("foo", str(tmp_tree))
-        assert len(results) >= 1  # Should match FOO
+        assert results  # Should match FOO
 
 
 # -----------------------------------------------------------
 # search_content
 # -----------------------------------------------------------
+
 
 class TestSearchContent:
     def test_basic_content_search(self, searcher: PythonSearcher):
@@ -114,6 +116,7 @@ class TestSearchContent:
 # _iter_files
 # -----------------------------------------------------------
 
+
 class TestIterFiles:
     def test_yields_all_files(self, searcher: PythonSearcher, tmp_tree: Path):
         files = list(searcher._iter_files(tmp_tree))
@@ -130,13 +133,14 @@ class TestIterFiles:
 # _search_file
 # -----------------------------------------------------------
 
+
 class TestSearchFile:
     def test_single_file(self, searcher: PythonSearcher, tmp_tree: Path):
         import re
 
         regex = re.compile("hello")
         results = searcher._search_file(tmp_tree / "hello.py", regex, 100)
-        assert len(results) >= 1
+        assert results
 
     def test_max_results_per_file(self, searcher: PythonSearcher, tmp_tree: Path):
         import re

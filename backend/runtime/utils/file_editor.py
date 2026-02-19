@@ -241,8 +241,7 @@ class FileEditor:
 
         selected_output = "\n".join(selected_lines)
         if lines and any(
-            line.endswith(("\n", "\r"))
-            for line in lines[start_idx:end_idx]
+            line.endswith(("\n", "\r")) for line in lines[start_idx:end_idx]
         ):
             selected_output += "\n"
 
@@ -333,7 +332,9 @@ class FileEditor:
             return self._insert_at_line(old_content_str, content_to_insert, insert_line)
 
         if old_str_val and new_str_val:
-            return old_content_str.replace(old_str_val, new_str_val)
+            if old_str_val in old_content_str:
+                return old_content_str.replace(old_str_val, new_str_val)
+            return self._fuzzy_match_error(old_content_str, old_str_val)
 
         if file_text_val:
             return file_text_val
@@ -345,6 +346,48 @@ class FileEditor:
             output="",
             error="No content provided for edit operation",
             new_content=old_content_str,
+        )
+
+    def _fuzzy_match_error(self, content: str, old_str: str) -> ToolResult:
+        """Return an error with the closest matching block from the file."""
+        import difflib
+
+        lines = content.splitlines(keepends=True)
+        old_lines = old_str.splitlines(keepends=True)
+        window = len(old_lines)
+
+        best_ratio = 0.0
+        best_block = ""
+
+        for i in range(max(1, len(lines) - window + 1)):
+            candidate = "".join(lines[i : i + window])
+            ratio = difflib.SequenceMatcher(None, old_str, candidate).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_block = candidate
+
+        if best_ratio > 0.6:
+            return ToolResult(
+                output="",
+                error=(
+                    f"ERROR: No exact match for old_str was found in the file. "
+                    f"Did you mean this block (similarity {best_ratio:.0%})?\n\n"
+                    f"<<<\n{best_block.rstrip()}\n>>>\n\n"
+                    f"Please provide the exact text to replace, "
+                    f"including whitespace and indentation."
+                ),
+                new_content=content,
+            )
+
+        return ToolResult(
+            output="",
+            error=(
+                "ERROR: No match for old_str was found in the file. "
+                "The content you're trying to replace does not exist. "
+                "Use the view command to see the current file content, "
+                "then retry with the exact text."
+            ),
+            new_content=content,
         )
 
     def _write_edit_result(

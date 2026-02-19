@@ -10,7 +10,7 @@ import json
 import pytest
 
 from backend.core.enums import EventVersion
-from backend.core.schemas.base import BaseEventSchema, EventMetadata, EventSchemaV1
+from backend.core.schemas.base import BaseEventSchema
 from backend.core.schemas.serialization import (
     _deserialize_action,
     _deserialize_observation,
@@ -29,7 +29,12 @@ def _action_dict(action_type: str, **extra) -> dict:
 
 
 def _obs_dict(obs_type: str, **extra) -> dict:
-    return {"observation_type": obs_type, "content": "ok", "schema_version": "1.0.0", **extra}
+    return {
+        "observation_type": obs_type,
+        "content": "ok",
+        "schema_version": "1.0.0",
+        **extra,
+    }
 
 
 # ==================================================================
@@ -38,6 +43,7 @@ def _obs_dict(obs_type: str, **extra) -> dict:
 class TestSerializeEvent:
     def test_round_trip_action(self):
         from backend.core.schemas.actions import NullActionSchema
+
         ev = NullActionSchema()
         s = serialize_event(ev)
         assert isinstance(s, str)
@@ -46,6 +52,7 @@ class TestSerializeEvent:
 
     def test_round_trip_message(self):
         from backend.core.schemas.actions import MessageActionSchema
+
         ev = MessageActionSchema(content="hello")
         s = serialize_event(ev)
         d = json.loads(s)
@@ -235,13 +242,16 @@ class TestMigrateSchemaVersion:
 class TestValidateEventSchema:
     def test_valid_schema(self):
         from backend.core.schemas.actions import NullActionSchema
+
         assert validate_event_schema(NullActionSchema()) is True
 
     def test_valid_message(self):
         from backend.core.schemas.actions import MessageActionSchema
+
         assert validate_event_schema(MessageActionSchema(content="hi")) is True
 
     def test_valid_observation(self):
         from backend.core.schemas.observations import ErrorObservationSchema
+
         ev = ErrorObservationSchema(content="err")
         assert validate_event_schema(ev) is True

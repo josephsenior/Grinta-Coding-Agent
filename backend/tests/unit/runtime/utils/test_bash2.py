@@ -27,28 +27,28 @@ class TestSplitBashCommands:
     def test_multiple_commands_semicolon(self):
         result = split_bash_commands("echo a; echo b")
         # split_bash_commands preserves structure — returns nodes not individual commands
-        assert len(result) >= 1
+        assert result
         assert "echo" in result[0]
 
     def test_multiple_commands_newline(self):
         result = split_bash_commands("echo a\necho b")
-        assert len(result) >= 1
+        assert result
 
     def test_multiple_commands_and(self):
         result = split_bash_commands("mkdir test && cd test")
-        assert len(result) >= 1
+        assert result
 
     def test_multiple_commands_or(self):
         result = split_bash_commands("ls /nonexistent || echo failed")
-        assert len(result) >= 1
+        assert result
 
     def test_multiple_commands_pipe(self):
         result = split_bash_commands("cat file.txt | grep pattern")
-        assert len(result) >= 1
+        assert result
 
     def test_complex_command(self):
         result = split_bash_commands("cd /tmp && ls -la | grep test")
-        assert len(result) >= 1
+        assert result
 
     def test_command_with_quotes(self):
         result = split_bash_commands('echo "hello world"')
@@ -63,7 +63,9 @@ class TestSplitBashCommands:
     def test_parsing_not_implemented_returns_original(self):
         # Mock bashlex.parse to raise NotImplementedError
         cmd = "some command"
-        with patch("backend.runtime.utils.bash.bashlex.parse", side_effect=NotImplementedError):
+        with patch(
+            "backend.runtime.utils.bash.bashlex.parse", side_effect=NotImplementedError
+        ):
             result = split_bash_commands(cmd)
             assert result == [cmd]
 
@@ -75,7 +77,9 @@ class TestSplitBashCommands:
 
     def test_parsing_attribute_error_returns_original(self):
         cmd = "some command"
-        with patch("backend.runtime.utils.bash.bashlex.parse", side_effect=AttributeError):
+        with patch(
+            "backend.runtime.utils.bash.bashlex.parse", side_effect=AttributeError
+        ):
             result = split_bash_commands(cmd)
             assert result == [cmd]
 
@@ -87,7 +91,7 @@ class TestSplitBashCommands:
     def test_handles_remaining_content_after_last_command(self):
         # Commands with trailing characters
         result = split_bash_commands("echo a ; echo b ; ")
-        assert len(result) >= 1
+        assert result
 
     def test_command_without_trailing_pipe(self):
         result = split_bash_commands("ls")
@@ -146,7 +150,7 @@ class TestBashUtilsIntegration:
         # Ensure split_bash_commands can handle commands with special chars
         cmd = "echo hello; ls -la"
         split_result = split_bash_commands(cmd)
-        assert len(split_result) >= 1
+        assert split_result
 
         # Escape each command
         for sub_cmd in split_result:

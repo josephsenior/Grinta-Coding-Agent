@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 from backend.runtime.security_enforcement import SecurityEnforcementMixin
 
@@ -116,7 +115,9 @@ class TestEnforceSecurity:
                 result = rt._enforce_security(action)
         assert result is not None
         assert result.__class__.__name__ == "NullObservation"
-        assert action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
+        assert (
+            action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
+        )
 
     def test_medium_risk_allowed(self):
         from backend.core.enums import ActionSecurityRisk

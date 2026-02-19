@@ -6,7 +6,6 @@ import json
 import unittest
 from datetime import datetime, timezone
 
-from pydantic import ValidationError
 
 from backend.core.enums import (
     EventSource,
@@ -134,7 +133,9 @@ class TestDeserializeEvent(unittest.TestCase):
         self.assertIsNotNone(event)
 
     def test_missing_type_raises(self):
-        with self.assertRaises(ValueError, msg="must have either action_type or observation_type"):
+        with self.assertRaises(
+            ValueError, msg="must have either action_type or observation_type"
+        ):
             deserialize_event({"foo": "bar"})
 
     def test_invalid_json_raises(self):

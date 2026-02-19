@@ -32,9 +32,7 @@ class TestToolFunctionName:
         assert OrchestratorSafetyManager._tool_function_name(action) == "fallback"
 
     def test_metadata_without_function_name(self):
-        action = SimpleNamespace(
-            tool_call_metadata=SimpleNamespace(), action="act"
-        )
+        action = SimpleNamespace(tool_call_metadata=SimpleNamespace(), action="act")
         assert OrchestratorSafetyManager._tool_function_name(action) == "act"
 
 
@@ -47,9 +45,7 @@ class TestShouldWarnOnDetection:
 
     def test_not_hallucinated(self):
         assert (
-            OrchestratorSafetyManager._should_warn_on_detection(
-                {"hallucinated": False}
-            )
+            OrchestratorSafetyManager._should_warn_on_detection({"hallucinated": False})
             is False
         )
 

@@ -68,8 +68,13 @@ class TestErrorSeverity:
 class TestErrorCategory:
     def test_values(self):
         expected = {
-            "user_input", "system", "rate_limit", "authentication",
-            "network", "ai_model", "configuration",
+            "user_input",
+            "system",
+            "rate_limit",
+            "authentication",
+            "network",
+            "ai_model",
+            "configuration",
         }
         actual = {c.value for c in ErrorCategory}
         assert actual == expected
@@ -87,9 +92,23 @@ class TestContentType:
 class TestActionType:
     def test_has_all_core_actions(self):
         for name in (
-            "MESSAGE", "SYSTEM", "START", "READ", "WRITE", "EDIT",
-            "RUN", "BROWSE", "THINK", "FINISH", "REJECT", "NULL",
-            "PAUSE", "RESUME", "STOP", "PUSH", "RECALL",
+            "MESSAGE",
+            "SYSTEM",
+            "START",
+            "READ",
+            "WRITE",
+            "EDIT",
+            "RUN",
+            "BROWSE",
+            "THINK",
+            "FINISH",
+            "REJECT",
+            "NULL",
+            "PAUSE",
+            "RESUME",
+            "STOP",
+            "PUSH",
+            "RECALL",
         ):
             assert hasattr(ActionType, name)
 
@@ -158,7 +177,10 @@ class TestActionConfirmationStatus:
     def test_values(self):
         assert ActionConfirmationStatus.CONFIRMED.value == "confirmed"
         assert ActionConfirmationStatus.REJECTED.value == "rejected"
-        assert ActionConfirmationStatus.AWAITING_CONFIRMATION.value == "awaiting_confirmation"
+        assert (
+            ActionConfirmationStatus.AWAITING_CONFIRMATION.value
+            == "awaiting_confirmation"
+        )
 
 
 class TestActionSecurityRisk:
@@ -172,7 +194,9 @@ class TestActionSecurityRisk:
         assert ActionSecurityRisk.HIGH.value == 2
 
     def test_ordering(self):
-        assert ActionSecurityRisk.LOW < ActionSecurityRisk.MEDIUM < ActionSecurityRisk.HIGH
+        assert (
+            ActionSecurityRisk.LOW < ActionSecurityRisk.MEDIUM < ActionSecurityRisk.HIGH
+        )
 
     def test_dynamic_access(self):
         first = list(ActionSecurityRisk)[0]

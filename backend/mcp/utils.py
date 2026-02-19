@@ -32,8 +32,11 @@ from backend.mcp.wrappers import WRAPPER_TOOL_REGISTRY, wrapper_tool_params
 from backend.runtime import LocalRuntimeInProcess
 
 
-def _is_windows_mcp_disabled() -> bool:
-    """Return True when MCP support should be bypassed on Windows."""
+def _is_windows_stdio_mcp_disabled() -> bool:
+    """Return True when stdio MCP should be bypassed on Windows.
+
+    HTTP/SSE MCP remains enabled by default on Windows.
+    """
     return sys.platform == "win32" and not os.getenv("FORGE_ENABLE_WINDOWS_MCP")
 
 
@@ -84,16 +87,19 @@ async def create_mcps(
 
     Reduced complexity: 13 → 5 by extracting connection logic to separate handlers.
     """
-    # Early returns for unsupported platforms or no servers
-    if _is_windows_mcp_disabled():
-        logger.info(
-            "MCP functionality is disabled on Windows, skipping client creation"
-        )
-        return []
-
     servers = _collect_all_servers(sse_servers, shttp_servers, stdio_servers)
     if not servers:
         return []
+
+    if _is_windows_stdio_mcp_disabled():
+        original_count = len(servers)
+        servers = [s for s in servers if not isinstance(s, MCPStdioServerConfig)]
+        skipped = original_count - len(servers)
+        if skipped > 0:
+            logger.info(
+                "Windows stdio MCP disabled by default: skipped %s stdio server(s); HTTP/SSE MCP remains enabled.",
+                skipped,
+            )
 
     # Connect to each server using appropriate handler
     mcps = []
@@ -209,9 +215,6 @@ async def fetch_mcp_tools_from_config(
         A list of tool dictionaries. Returns an empty list if no connections could be established.
 
     """
-    if _is_windows_mcp_disabled():
-        logger.info("MCP functionality is disabled on Windows, skipping tool fetching")
-        return []
     mcps = []
     mcp_tools = []
     try:
@@ -223,8 +226,10 @@ async def fetch_mcp_tools_from_config(
             mcp_config.stdio_servers if use_stdio else [],
         )
         if not mcps:
-            logger.debug("No MCP clients were successfully connected")
-            return []
+            logger.warning(
+                "No MCP clients were successfully connected; exposing degraded capability status tool only"
+            )
+            return wrapper_tool_params([])
         mcp_tools = convert_mcps_to_tools(mcps)
     except Exception as e:
         error_msg = f"Error fetching MCP tools: {e!s}"
@@ -321,7 +326,29 @@ async def _execute_direct_tool(
         )
     except McpError as e:
         logger.error("MCP error when calling tool %s: %s", action.name, e)
-        error_content = json.dumps({"isError": True, "error": str(e), "content": []})
+        error_content = (
+            f"MCP tool '{action.name}' returned an error: {e}\n"
+            "You can try:\n"
+            "  1. Re-call the tool with corrected arguments\n"
+            "  2. Use bash (execute_bash) as a fallback to accomplish the same task\n"
+            "  3. Use mcp_capabilities_status to check current MCP server health"
+        )
+        return MCPObservation(
+            content=error_content, name=action.name, arguments=action.arguments
+        )
+    except Exception as e:
+        # Catch-all for connection failures, timeouts, and unexpected errors
+        logger.error(
+            "MCP tool '%s' failed unexpectedly: %s", action.name, e, exc_info=True
+        )
+        error_content = (
+            f"MCP server for tool '{action.name}' is unavailable (reason: {type(e).__name__}: {e}).\n"
+            "The MCP server may be disconnected or experiencing issues.\n"
+            "Fallback options:\n"
+            "  1. Use bash (execute_bash) to accomplish the same task\n"
+            "  2. Use mcp_capabilities_status to inspect current MCP availability\n"
+            "  3. Continue with non-MCP tools"
+        )
         return MCPObservation(
             content=error_content, name=action.name, arguments=action.arguments
         )
@@ -340,22 +367,28 @@ async def call_tool_mcp(mcps: list[MCPClient], action: MCPAction) -> Observation
     """
     from backend.events.observation import ErrorObservation
 
-    if _is_windows_mcp_disabled():
-        logger.info("MCP functionality is disabled on Windows")
-        return ErrorObservation("MCP functionality is not available on Windows")
-
-    if not mcps:
-        msg = "No MCP clients found"
-        raise ValueError(msg)
-
     logger.debug("MCP action received: %s", action)
 
     # Handle wrapper tools
     if action.name in WRAPPER_TOOL_REGISTRY:
         return await _execute_wrapper_tool(action, mcps)
 
-    # Handle direct tools
-    matching_client = _find_matching_mcp(mcps, action.name)
+    if not mcps:
+        return ErrorObservation(
+            "No MCP clients are currently connected. "
+            "Use mcp_capabilities_status to inspect availability and continue with non-MCP tools."
+        )
+
+    # Handle direct tools with graceful fallback on client lookup failure
+    try:
+        matching_client = _find_matching_mcp(mcps, action.name)
+    except ValueError:
+        return ErrorObservation(
+            f"MCP tool '{action.name}' is not available on any connected MCP server.\n"
+            "This may mean the server that provides this tool is disconnected.\n"
+            "Use mcp_capabilities_status to check which tools are currently available, "
+            "or use bash (execute_bash) as a fallback."
+        )
     return await _execute_direct_tool(action, matching_client)
 
 
@@ -383,10 +416,6 @@ async def add_mcp_tools_to_agent(
     agent: Agent, runtime: Runtime, memory: Memory
 ) -> MCPConfig | None:
     """Add MCP tools to an agent."""
-    if _is_windows_mcp_disabled():
-        logger.info("MCP functionality is disabled on Windows, skipping MCP tools")
-        agent.set_mcp_tools([])
-        return None
     assert runtime.runtime_initialized, (
         "Runtime must be initialized before adding MCP tools"
     )

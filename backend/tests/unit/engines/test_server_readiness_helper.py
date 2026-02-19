@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from backend.engines.orchestrator.tools.server_readiness_helper import (
     check_server_ready,
@@ -21,6 +20,7 @@ from backend.engines.orchestrator.tools.server_readiness_helper import (
 # -----------------------------------------------------------
 # wait_for_server_ready
 # -----------------------------------------------------------
+
 
 class TestWaitForServerReady:
     @patch("backend.engines.orchestrator.tools.server_readiness_helper.time")
@@ -71,6 +71,7 @@ class TestWaitForServerReady:
 # check_server_ready
 # -----------------------------------------------------------
 
+
 class TestCheckServerReady:
     @patch("backend.engines.orchestrator.tools.server_readiness_helper.requests")
     def test_returns_true_when_healthy(self, mock_requests):
@@ -96,6 +97,7 @@ class TestCheckServerReady:
 # -----------------------------------------------------------
 # safe_goto_localhost
 # -----------------------------------------------------------
+
 
 class TestSafeGotoLocalhost:
     def test_non_localhost_returns_plain_goto(self):
@@ -124,6 +126,7 @@ class TestSafeGotoLocalhost:
 # safe_navigate_to_url
 # -----------------------------------------------------------
 
+
 class TestSafeNavigateToUrl:
     def test_non_http_returns_original(self):
         result = safe_navigate_to_url("code", "file:///tmp/foo")
@@ -142,6 +145,7 @@ class TestSafeNavigateToUrl:
 # -----------------------------------------------------------
 # create_safe_navigation_browser_code
 # -----------------------------------------------------------
+
 
 class TestCreateSafeNavigationBrowserCode:
     def test_basic_url(self):

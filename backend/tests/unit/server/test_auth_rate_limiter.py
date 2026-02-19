@@ -23,6 +23,7 @@ def _clear_store():
 
 # ── Constructor & config ──────────────────────────────────────────────
 
+
 class TestAuthRateLimiterInit:
     def test_defaults(self):
         limiter = AuthRateLimiter()
@@ -44,6 +45,7 @@ class TestAuthRateLimiterInit:
 
 # ── _get_endpoint_type ────────────────────────────────────────────────
 
+
 class TestGetEndpointType:
     def test_login(self):
         limiter = AuthRateLimiter()
@@ -59,11 +61,15 @@ class TestGetEndpointType:
 
     def test_password_reset(self):
         limiter = AuthRateLimiter()
-        assert limiter._get_endpoint_type("/api/auth/password-reset") == "password_reset"
+        assert (
+            limiter._get_endpoint_type("/api/auth/password-reset") == "password_reset"
+        )
 
     def test_forgot_password(self):
         limiter = AuthRateLimiter()
-        assert limiter._get_endpoint_type("/api/auth/forgot-password") == "password_reset"
+        assert (
+            limiter._get_endpoint_type("/api/auth/forgot-password") == "password_reset"
+        )
 
     def test_other(self):
         limiter = AuthRateLimiter()
@@ -71,6 +77,7 @@ class TestGetEndpointType:
 
 
 # ── _get_rate_limit_key ──────────────────────────────────────────────
+
 
 class TestGetRateLimitKey:
     def test_uses_forwarded_for(self):
@@ -99,6 +106,7 @@ class TestGetRateLimitKey:
 
 # ── _check_rate_limit ────────────────────────────────────────────────
 
+
 class TestCheckRateLimit:
     @pytest.mark.asyncio
     async def test_login_within_limit(self):
@@ -108,9 +116,7 @@ class TestCheckRateLimit:
     @pytest.mark.asyncio
     async def test_login_exceeds_limit(self):
         limiter = AuthRateLimiter(login_attempts_per_15min=2)
-        _auth_rate_limit_store["key"]["login_attempts"] = [
-            time.time(), time.time()
-        ]
+        _auth_rate_limit_store["key"]["login_attempts"] = [time.time(), time.time()]
         assert await limiter._check_rate_limit("key", "login") is False
 
     @pytest.mark.asyncio
@@ -151,6 +157,7 @@ class TestCheckRateLimit:
 
 # ── _record_attempt ───────────────────────────────────────────────────
 
+
 class TestRecordAttempt:
     @pytest.mark.asyncio
     async def test_records_login_attempt(self):
@@ -173,6 +180,7 @@ class TestRecordAttempt:
 
 # ── _record_failed_attempt ────────────────────────────────────────────
 
+
 class TestRecordFailedAttempt:
     @pytest.mark.asyncio
     async def test_records_failed(self):
@@ -191,6 +199,7 @@ class TestRecordFailedAttempt:
 
 
 # ── _get_retry_after ──────────────────────────────────────────────────
+
 
 class TestGetRetryAfter:
     def test_few_failures(self):
@@ -221,6 +230,7 @@ class TestGetRetryAfter:
 
 
 # ── __call__ middleware ───────────────────────────────────────────────
+
 
 class TestAuthRateLimiterMiddleware:
     @pytest.mark.asyncio

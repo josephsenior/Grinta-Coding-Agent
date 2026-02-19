@@ -41,12 +41,22 @@ class CircuitBreakerService:
         if not getattr(agent_config, "enable_circuit_breaker", True):
             return
 
-        cb_config = CircuitBreakerConfig(
-            enabled=True,
-            max_consecutive_errors=getattr(agent_config, "max_consecutive_errors", 5),
-            max_high_risk_actions=getattr(agent_config, "max_high_risk_actions", 10),
-            max_stuck_detections=getattr(agent_config, "max_stuck_detections", 3),
-        )
+        config_kwargs = {
+            "enabled": True,
+            "max_consecutive_errors": getattr(agent_config, "max_consecutive_errors", 5),
+            "max_high_risk_actions": getattr(agent_config, "max_high_risk_actions", 10),
+            "max_stuck_detections": getattr(agent_config, "max_stuck_detections", 3),
+        }
+
+        max_error_rate = getattr(agent_config, "max_error_rate", None)
+        if isinstance(max_error_rate, int | float):
+            config_kwargs["max_error_rate"] = float(max_error_rate)
+
+        error_rate_window = getattr(agent_config, "error_rate_window", None)
+        if isinstance(error_rate_window, int):
+            config_kwargs["error_rate_window"] = error_rate_window
+
+        cb_config = CircuitBreakerConfig(**config_kwargs)
 
         self._circuit_breaker = CircuitBreaker(cb_config)
         setattr(self.controller, "circuit_breaker", self._circuit_breaker)
@@ -85,3 +95,8 @@ class CircuitBreakerService:
         """Record a stuck detection event."""
         if self._circuit_breaker:
             self._circuit_breaker.record_stuck_detection()
+
+    def adapt(self, complexity: float, max_iterations: int) -> None:
+        """Adapt thresholds to task complexity and iteration budget."""
+        if self._circuit_breaker:
+            self._circuit_breaker.adapt(complexity, max_iterations)

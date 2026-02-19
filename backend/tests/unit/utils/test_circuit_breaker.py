@@ -46,7 +46,9 @@ class TestBreakerState:
 class TestCircuitBreakerTransitions:
     """Verify closed → open → half_open → closed lifecycle."""
 
-    def _make_breaker(self, threshold: int = 3, base_seconds: float = 0.01) -> CircuitBreaker:
+    def _make_breaker(
+        self, threshold: int = 3, base_seconds: float = 0.01
+    ) -> CircuitBreaker:
         """Create a breaker with predictable config."""
         with patch.dict(
             "os.environ",

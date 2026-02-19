@@ -10,6 +10,7 @@ from backend.runtime.utils.edit import _extract_code
 
 # --------------- _extract_code ---------------
 
+
 class TestExtractCode:
     def test_extracts_code(self):
         text = "<updated_code>print('hello')</updated_code>"
@@ -43,6 +44,7 @@ class TestExtractCode:
 
 # --------------- _validate_range (via FileEditRuntimeMixin) ---------------
 # _validate_range is an instance method, so we test it via a minimal subclass
+
 
 class TestValidateRange:
     """Test _validate_range logic through the mixin."""

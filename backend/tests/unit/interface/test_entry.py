@@ -232,7 +232,9 @@ class TestMainFunction:
     @patch("backend.interface.entry._execute_command")
     @patch("backend.interface.entry.get_cli_parser")
     @patch("backend.interface.entry._normalize_arguments")
-    def test_main_normalizes_arguments(self, mock_normalize, mock_get_parser, mock_execute_cmd):
+    def test_main_normalizes_arguments(
+        self, mock_normalize, mock_get_parser, mock_execute_cmd
+    ):
         """Test main calls _normalize_arguments."""
         mock_parser = MagicMock()
         mock_args = MagicMock()

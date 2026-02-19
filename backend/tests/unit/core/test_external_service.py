@@ -66,6 +66,7 @@ class TestGetAuthHeaders:
     def test_no_api_key(self):
         svc = self._make_svc(api_key=None)
         from urllib.parse import urlparse
+
         parsed = urlparse("https://api.example.com/events")
         headers = svc._get_auth_headers(parsed)
         assert headers == {"Content-Type": "application/json"}
@@ -74,6 +75,7 @@ class TestGetAuthHeaders:
     def test_pagerduty_token(self):
         svc = self._make_svc(api_key="my_pd_key")
         from urllib.parse import urlparse
+
         parsed = urlparse("https://events.pagerduty.com/v2/enqueue")
         headers = svc._get_auth_headers(parsed)
         assert headers["Authorization"] == "Token token=my_pd_key"
@@ -81,6 +83,7 @@ class TestGetAuthHeaders:
     def test_datadog_header(self):
         svc = self._make_svc(api_key="dd_key")
         from urllib.parse import urlparse
+
         parsed = urlparse("https://http-intake.logs.datadog.com/api/v2")
         headers = svc._get_auth_headers(parsed)
         assert headers["DD-API-KEY"] == "dd_key"
@@ -88,6 +91,7 @@ class TestGetAuthHeaders:
     def test_logzio_header(self):
         svc = self._make_svc(api_key="logz_key")
         from urllib.parse import urlparse
+
         parsed = urlparse("https://listener.logzio.io")
         headers = svc._get_auth_headers(parsed)
         assert headers["X-API-KEY"] == "logz_key"
@@ -95,6 +99,7 @@ class TestGetAuthHeaders:
     def test_generic_bearer(self):
         svc = self._make_svc(api_key="generic_key")
         from urllib.parse import urlparse
+
         parsed = urlparse("https://custom-service.example.com/events")
         headers = svc._get_auth_headers(parsed)
         assert headers["Authorization"] == "Bearer generic_key"
@@ -105,7 +110,9 @@ class TestGetSession:
     async def test_creates_session(self):
         svc = ExternalServiceBase(endpoint="http://x.com", enabled=True)
         assert svc._session is None
-        with patch("backend.core.external_service.aiohttp.ClientSession") as MockSession:
+        with patch(
+            "backend.core.external_service.aiohttp.ClientSession"
+        ) as MockSession:
             mock_instance = MagicMock()
             mock_instance.closed = False
             MockSession.return_value = mock_instance
@@ -129,7 +136,9 @@ class TestGetSession:
         old_session.closed = True
         svc._session = old_session
 
-        with patch("backend.core.external_service.aiohttp.ClientSession") as MockSession:
+        with patch(
+            "backend.core.external_service.aiohttp.ClientSession"
+        ) as MockSession:
             new_session = MagicMock()
             new_session.closed = False
             MockSession.return_value = new_session
@@ -146,8 +155,12 @@ class TestPrepareRequest:
 
     @pytest.mark.asyncio
     async def test_returns_tuple_when_ready(self):
-        svc = ExternalServiceBase(endpoint="https://api.example.com", api_key="key", enabled=True)
-        with patch("backend.core.external_service.aiohttp.ClientSession") as MockSession:
+        svc = ExternalServiceBase(
+            endpoint="https://api.example.com", api_key="key", enabled=True
+        )
+        with patch(
+            "backend.core.external_service.aiohttp.ClientSession"
+        ) as MockSession:
             mock_instance = MagicMock()
             mock_instance.closed = False
             MockSession.return_value = mock_instance
@@ -171,10 +184,14 @@ class TestSendRequest:
 
     @pytest.mark.asyncio
     async def test_executes_request_and_returns_result(self):
-        svc = ExternalServiceBase(endpoint="https://api.example.com", api_key="k", enabled=True)
+        svc = ExternalServiceBase(
+            endpoint="https://api.example.com", api_key="k", enabled=True
+        )
         execute = AsyncMock(return_value=True)
 
-        with patch("backend.core.external_service.aiohttp.ClientSession") as MockSession:
+        with patch(
+            "backend.core.external_service.aiohttp.ClientSession"
+        ) as MockSession:
             mock_instance = MagicMock()
             mock_instance.closed = False
             MockSession.return_value = mock_instance
@@ -187,10 +204,14 @@ class TestSendRequest:
 
     @pytest.mark.asyncio
     async def test_returns_false_on_exception(self):
-        svc = ExternalServiceBase(endpoint="https://api.example.com", api_key="k", enabled=True)
+        svc = ExternalServiceBase(
+            endpoint="https://api.example.com", api_key="k", enabled=True
+        )
         execute = AsyncMock(side_effect=RuntimeError("network error"))
 
-        with patch("backend.core.external_service.aiohttp.ClientSession") as MockSession:
+        with patch(
+            "backend.core.external_service.aiohttp.ClientSession"
+        ) as MockSession:
             mock_instance = MagicMock()
             mock_instance.closed = False
             MockSession.return_value = mock_instance

@@ -34,7 +34,9 @@ class TestQuotaConfig:
 
 class TestRedisQuotaKeys:
     def test_frozen_dataclass(self):
-        keys = RedisQuotaKeys(daily="d", monthly="m", daily_reset="dr", monthly_reset="mr")
+        keys = RedisQuotaKeys(
+            daily="d", monthly="m", daily_reset="dr", monthly_reset="mr"
+        )
         assert keys.daily == "d"
         assert keys.monthly == "m"
         with pytest.raises(AttributeError):
@@ -319,7 +321,9 @@ class TestGetQuotaKey:
         req.client.host = "192.168.1.1"
         headers_mock = MagicMock()
         headers_mock.get = MagicMock(
-            side_effect=lambda k, d=None: {"X-Forwarded-For": "10.0.0.1, 192.168.1.1"}.get(k, d)
+            side_effect=lambda k, d=None: {
+                "X-Forwarded-For": "10.0.0.1, 192.168.1.1"
+            }.get(k, d)
         )
         req.headers = headers_mock
         key = await mw._get_quota_key(req)

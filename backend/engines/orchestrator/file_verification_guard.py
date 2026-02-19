@@ -5,6 +5,7 @@ This module:
 2. Injects verification commands after file operations
 3. Validates that LLM responses actually call tools when claiming file changes
 4. Tracks pending file operations across turns
+5. Detects stale reads — forces re-reads when editing files not recently read
 """
 
 from __future__ import annotations
@@ -47,7 +48,12 @@ class FileVerificationGuard:
             "verifications_injected": 0,
             "hallucinations_prevented": 0,
             "strict_mode_activations": 0,
+            "stale_reads_prevented": 0,
         }
+        # Stale-read prevention: track when files were last read and modified
+        self._file_read_turns: dict[str, int] = {}
+        self._file_modified_turns: dict[str, int] = {}
+        self._stale_threshold = 5  # turns before a read is considered stale
 
     def reset(self) -> None:
         """Reset internal state.
@@ -61,7 +67,10 @@ class FileVerificationGuard:
             "verifications_injected": 0,
             "hallucinations_prevented": 0,
             "strict_mode_activations": 0,
+            "stale_reads_prevented": 0,
         }
+        self._file_read_turns.clear()
+        self._file_modified_turns.clear()
 
     def should_enforce_tools(
         self, last_user_message: str, state: State, strict_mode: bool = True
@@ -148,6 +157,10 @@ class FileVerificationGuard:
     ) -> list[Action]:
         """Automatically inject verification commands after file operations.
 
+        Also detects stale reads and prepends a re-read before edits on
+        files that haven't been read recently or that were modified since
+        the last read.
+
         Args:
             actions: List of actions from LLM
             turn: Current turn number
@@ -159,12 +172,87 @@ class FileVerificationGuard:
         enhanced_actions = []
 
         for action in actions:
+            # Stale-read prevention: if this is a file edit and the file
+            # hasn't been read recently, inject a read before the edit
+            if self._is_file_operation(action):
+                file_path = self._safe_file_path(action)
+                if file_path and self.is_stale_read(file_path, turn):
+                    read_action = self._create_stale_read_action(file_path)
+                    if read_action:
+                        enhanced_actions.append(read_action)
+                        self.record_file_read(file_path, turn)
+                        self.stats["stale_reads_prevented"] += 1
+                        logger.info(
+                            "🔄 Stale-read prevention: forced re-read of %s",
+                            file_path,
+                        )
+
             enhanced_actions.append(action)
             if not self._is_file_operation(action):
                 continue
             self._append_verification_action(enhanced_actions, action, turn)
 
         return enhanced_actions
+
+    # ------------------------------------------------------------------ #
+    # Stale-read prevention
+    # ------------------------------------------------------------------ #
+
+    def record_file_read(self, file_path: str, turn: int) -> None:
+        """Record that a file was read at the given turn."""
+        self._file_read_turns[file_path] = turn
+
+    def record_file_modification(self, file_path: str, turn: int) -> None:
+        """Record that a file was modified at the given turn."""
+        self._file_modified_turns[file_path] = turn
+
+    def is_stale_read(self, file_path: str, current_turn: int) -> bool:
+        """Check whether the LLM's knowledge of a file is stale.
+
+        A file is considered stale if:
+        - It has never been read, OR
+        - It was modified after the last read, OR
+        - It was last read more than `_stale_threshold` turns ago
+
+        Args:
+            file_path: The file path to check
+            current_turn: The current turn number
+
+        Returns:
+            True if the file content is likely stale in the LLM's context
+        """
+        last_read = self._file_read_turns.get(file_path)
+        last_modified = self._file_modified_turns.get(file_path)
+
+        # Never been read
+        if last_read is None:
+            return True
+
+        # Modified after last read
+        if last_modified is not None and last_modified > last_read:
+            return True
+
+        # Read too long ago
+        if current_turn - last_read > self._stale_threshold:
+            return True
+
+        return False
+
+    def _create_stale_read_action(self, file_path: str) -> Action | None:
+        """Create a command to re-read a stale file before editing."""
+        from backend.events.action import CmdRunAction
+
+        try:
+            cmd = f"cat -n {file_path} | head -100"
+            return CmdRunAction(
+                command=cmd,
+                thought=(
+                    f"[STALE-READ PREVENTION] Re-reading {file_path} before edit — "
+                    f"file content may have changed since last read."
+                ),
+            )
+        except Exception:  # pragma: no cover - defensive
+            return None
 
     def _is_file_operation(self, action: Action) -> bool:
         from backend.core.schemas import ActionType
@@ -217,8 +305,18 @@ class FileVerificationGuard:
         from backend.events.action import CmdRunAction
 
         try:
+            if file_path.endswith(".py"):
+                # Syntax-check Python files immediately so errors are caught,
+                # then show the tail (where edits landed) rather than the head.
+                cmd = (
+                    f"python -m py_compile {file_path} && "
+                    f"echo '[{file_path}: syntax OK]' && "
+                    f"tail -40 {file_path}"
+                )
+            else:
+                cmd = f"ls -lah {file_path} && echo '---' && tail -40 {file_path}"
             return CmdRunAction(
-                command=f"ls -lah {file_path} && echo '---' && head -20 {file_path}",
+                command=cmd,
                 thought=f"[AUTO-VERIFY] Verifying file operation on {file_path}",
             )
         except Exception:  # pragma: no cover - defensive
@@ -327,4 +425,6 @@ class FileVerificationGuard:
             **self.stats,
             "pending_operations": len(self.pending_file_operations),
             "unverified_operations": len(self.get_unverified_operations()),
+            "tracked_reads": len(self._file_read_turns),
+            "tracked_modifications": len(self._file_modified_turns),
         }

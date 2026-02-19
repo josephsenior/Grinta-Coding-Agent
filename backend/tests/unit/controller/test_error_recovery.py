@@ -151,9 +151,12 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         # Should include pip install
-        assert any(isinstance(action, CmdRunAction) and "pip install" in action.command for action in actions)
+        assert any(
+            isinstance(action, CmdRunAction) and "pip install" in action.command
+            for action in actions
+        )
 
     def test_runtime_crash_recovery(self):
         """Test recovery actions for runtime crash."""
@@ -162,7 +165,7 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, AgentThinkAction) for action in actions)
 
     def test_network_error_recovery(self):
@@ -172,7 +175,7 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, MessageAction) for action in actions)
 
     def test_network_error_git_specific(self):
@@ -182,9 +185,12 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         # Should include git config commands
-        assert any(isinstance(action, CmdRunAction) and "git config" in action.command for action in actions)
+        assert any(
+            isinstance(action, CmdRunAction) and "git config" in action.command
+            for action in actions
+        )
 
     def test_filesystem_error_recovery(self):
         """Test recovery actions for filesystem error."""
@@ -193,18 +199,19 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, CmdRunAction) for action in actions)
 
-    def test_tool_call_error_recovery_empty(self):
-        """Test tool call error returns empty to prevent loops."""
+    def test_tool_call_error_recovery(self):
+        """Test tool call error returns feedback to LLM for self-correction."""
         error = FunctionCallValidationError("Invalid parameter")
         error_type = ErrorType.TOOL_CALL_ERROR
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        # Should return empty to prevent infinite loop
-        assert len(actions) == 0
+        # High-quality recovery provides structured feedback
+        assert actions
+        assert any("tool call error" in (a.thought or "").lower() for a in actions if hasattr(a, "thought"))
 
     def test_tool_call_error_auth_empty(self):
         """Test tool call error with auth indicator returns empty."""
@@ -213,7 +220,7 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) == 0
+        assert not actions
 
     def test_timeout_error_recovery(self):
         """Test recovery actions for timeout error."""
@@ -222,7 +229,7 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, AgentThinkAction) for action in actions)
 
     def test_permission_error_recovery(self):
@@ -232,7 +239,7 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, MessageAction) for action in actions)
 
     def test_disk_full_error_recovery(self):
@@ -242,10 +249,16 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         # Should include df and cleanup commands
-        assert any(isinstance(action, CmdRunAction) and "df" in action.command for action in actions)
-        assert any(isinstance(action, CmdRunAction) and "rm" in action.command for action in actions)
+        assert any(
+            isinstance(action, CmdRunAction) and "df" in action.command
+            for action in actions
+        )
+        assert any(
+            isinstance(action, CmdRunAction) and "rm" in action.command
+            for action in actions
+        )
 
     def test_syntax_error_recovery(self):
         """Test recovery actions for syntax error."""
@@ -254,7 +267,7 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, AgentThinkAction) for action in actions)
 
     def test_unknown_error_recovery(self):
@@ -264,7 +277,7 @@ class TestGetRecoveryActions:
 
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, AgentThinkAction) for action in actions)
 
     def test_authentication_error_returns_empty(self):
@@ -275,7 +288,7 @@ class TestGetRecoveryActions:
         actions = ErrorRecoveryStrategy.get_recovery_actions(error_type, error)
 
         # Should return empty for auth errors
-        assert len(actions) == 0
+        assert not actions
 
 
 class TestRecoverModuleNotFound:
@@ -286,7 +299,7 @@ class TestRecoverModuleNotFound:
         error_str = "No module named 'requests'"
         actions = ErrorRecoveryStrategy._recover_module_not_found(error_str)
 
-        assert len(actions) > 0
+        assert actions
         # Should install 'requests'
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
         assert any("requests" in action.command for action in cmd_actions)
@@ -296,7 +309,7 @@ class TestRecoverModuleNotFound:
         error_str = "No module named 'requests.auth'"
         actions = ErrorRecoveryStrategy._recover_module_not_found(error_str)
 
-        assert len(actions) > 0
+        assert actions
         # Should install 'requests', not 'requests.auth'
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
         assert any("pip install requests" in action.command for action in cmd_actions)
@@ -306,7 +319,7 @@ class TestRecoverModuleNotFound:
         error_str = "Some other import error"
         actions = ErrorRecoveryStrategy._recover_module_not_found(error_str)
 
-        assert len(actions) > 0
+        assert actions
         # Should still return some action
         assert any(isinstance(action, AgentThinkAction) for action in actions)
 
@@ -319,7 +332,7 @@ class TestRecoverRuntimeCrash:
         error_str = "runtime terminated"
         actions = ErrorRecoveryStrategy._recover_runtime_crash(error_str)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, AgentThinkAction) for action in actions)
         assert any(isinstance(action, CmdRunAction) for action in actions)
         assert any(isinstance(action, MessageAction) for action in actions)
@@ -341,7 +354,7 @@ class TestRecoverNetworkError:
         error_str = "git clone failed: timeout"
         actions = ErrorRecoveryStrategy._recover_network_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
         # Should configure git
         assert any("git config" in action.command for action in cmd_actions)
@@ -351,7 +364,7 @@ class TestRecoverNetworkError:
         error_str = "connection refused"
         actions = ErrorRecoveryStrategy._recover_network_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, AgentThinkAction) for action in actions)
         # Should include sleep command
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
@@ -366,7 +379,7 @@ class TestRecoverFilesystemError:
         error_str = "'test.py' not found"
         actions = ErrorRecoveryStrategy._recover_filesystem_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         # Should include pwd and ls commands
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
         assert any("pwd" in action.command for action in cmd_actions)
@@ -386,7 +399,7 @@ class TestRecoverFilesystemError:
         error_str = "filesystem error"
         actions = ErrorRecoveryStrategy._recover_filesystem_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
         assert any("pwd" in action.command for action in cmd_actions)
 
@@ -399,7 +412,7 @@ class TestRecoverTimeoutError:
         error_str = "timeout"
         actions = ErrorRecoveryStrategy._recover_timeout_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, AgentThinkAction) for action in actions)
         assert any(isinstance(action, MessageAction) for action in actions)
 
@@ -412,7 +425,7 @@ class TestRecoverPermissionError:
         error_str = "Permission denied: '/etc/config.txt'"
         actions = ErrorRecoveryStrategy._recover_permission_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         # Should include ls command with the file path
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
         assert any("config.txt" in action.command for action in cmd_actions)
@@ -422,10 +435,10 @@ class TestRecoverPermissionError:
         error_str = "Permission denied"
         actions = ErrorRecoveryStrategy._recover_permission_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         # Should still return actions with "the file"
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
-        assert len(cmd_actions) > 0
+        assert cmd_actions
 
 
 class TestRecoverDiskFullError:
@@ -436,7 +449,7 @@ class TestRecoverDiskFullError:
         error_str = "no space left on device"
         actions = ErrorRecoveryStrategy._recover_disk_full_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
         assert any("df" in action.command for action in cmd_actions)
 
@@ -459,17 +472,20 @@ class TestRecoverSyntaxError:
         error_str = 'File "test.py", line 42, syntax error'
         actions = ErrorRecoveryStrategy._recover_syntax_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
         # Should include sed/cat command to show file context
-        assert any(("sed" in action.command or "cat" in action.command) for action in cmd_actions)
+        assert any(
+            ("sed" in action.command or "cat" in action.command)
+            for action in cmd_actions
+        )
 
     def test_no_file_info_returns_generic(self):
         """Test returns generic actions when can't extract file info."""
         error_str = "syntax error somewhere"
         actions = ErrorRecoveryStrategy._recover_syntax_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, AgentThinkAction) for action in actions)
 
 
@@ -481,7 +497,7 @@ class TestRecoverUnknownError:
         error_str = "unexpected error"
         actions = ErrorRecoveryStrategy._recover_unknown_error(error_str)
 
-        assert len(actions) > 0
+        assert actions
         assert any(isinstance(action, AgentThinkAction) for action in actions)
         assert any(isinstance(action, MessageAction) for action in actions)
 

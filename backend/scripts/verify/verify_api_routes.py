@@ -139,7 +139,7 @@ def check_route_file_imports(file_path: Path) -> tuple[bool, list[str]]:
     except Exception as e:
         issues.append(f"AST parsing error: {str(e)}")
 
-    return len(issues) == 0, issues
+    return not issues, issues
 
 
 def verify_router_imports() -> dict[str, tuple[bool, str]]:
@@ -235,7 +235,7 @@ def verify_app_registration() -> tuple[bool, list[str]]:
     except Exception as e:
         issues.append(f"Error checking app.py: {str(e)}")
 
-    return len(issues) == 0, issues
+    return not issues, issues
 
 
 def main():

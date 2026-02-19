@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 
-
 from backend.events.action.action import Action
 from backend.events.action.empty import NullAction
-from backend.events.observation import CmdOutputObservation, NullObservation, Observation
+from backend.events.observation import (
+    CmdOutputObservation,
+    NullObservation,
+    Observation,
+)
 from backend.events.utils import (
     _add_action_observation_pairs,
     _add_orphaned_observations,
@@ -109,7 +112,7 @@ class TestOrphaned:
         o_map = {1: _obs(1)}
         pairs: list = []
         _add_orphaned_observations(pairs, a_map, o_map)
-        assert len(pairs) == 0  # 1 is in action_map
+        assert not pairs  # 1 is in action_map
 
     def test_orphan_cmd_obs_added(self):
         a_map: dict = {}
@@ -126,7 +129,7 @@ class TestOrphaned:
         o_map[99]._cause = 99
         pairs: list = []
         _add_orphaned_observations(pairs, a_map, o_map)
-        assert len(pairs) == 0
+        assert not pairs
 
 
 # ---------------------------------------------------------------------------

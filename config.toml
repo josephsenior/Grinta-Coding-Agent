@@ -62,6 +62,17 @@
 # Set to 0 for no limit (not recommended for unattended sessions).
 max_budget_per_task = 5.0
 
+# Maximum LLM cost (USD) per session (single conversation).
+# When set, this cap is shown live in the TUI status bar.
+# Overrides max_budget_per_task for per-session enforcement.
+# Example: max_budget_per_session = 2.0
+#max_budget_per_session = 0.0
+
+# Maximum total LLM cost (USD) across ALL sessions in a single calendar day.
+# When set, the TUI status bar shows today's running total vs this limit.
+# Example: max_budget_per_day = 20.0
+#max_budget_per_day = 0.0
+
 # Maximum number of iterations
 #max_iterations = 500
 
@@ -72,7 +83,7 @@ max_budget_per_task = 5.0
 #runtime = "local"
 
 # Name of the default agent
-#default_agent = "Orchestrator"
+default_agent = "Orchestrator"
 
 # JWT secret for authentication
 #jwt_secret = ""

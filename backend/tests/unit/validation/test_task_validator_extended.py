@@ -22,6 +22,7 @@ from backend.events.observation import CmdOutputObservation
 # Task & ValidationResult dataclasses
 # ---------------------------------------------------------------------------
 
+
 class TestTaskDataclass:
     def test_defaults(self):
         t = Task(description="Build feature X")
@@ -36,6 +37,7 @@ class TestTaskDataclass:
             acceptance_criteria=["no regression"],
         )
         assert len(t.requirements) == 1
+
 
 class TestValidationResult:
     def test_passed(self):
@@ -61,6 +63,7 @@ class TestValidationResult:
 # TestPassingValidator
 # ---------------------------------------------------------------------------
 
+
 class TestTestPassingValidator:
     def _make_state(self, events):
         state = MagicMock()
@@ -77,7 +80,9 @@ class TestTestPassingValidator:
     async def test_failing_tests(self):
         v = TestPassingValidator()
         cmd = CmdRunAction(command="pytest tests/")
-        obs = CmdOutputObservation(content="FAILED", command_id=1, command="pytest tests/", exit_code=1)
+        obs = CmdOutputObservation(
+            content="FAILED", command_id=1, command="pytest tests/", exit_code=1
+        )
         state = self._make_state([cmd, obs])
         result = await v.validate_completion(Task(description="x"), state)
         assert result.passed is False
@@ -86,7 +91,9 @@ class TestTestPassingValidator:
     async def test_passing_tests(self):
         v = TestPassingValidator()
         cmd = CmdRunAction(command="pytest tests/")
-        obs = CmdOutputObservation(content="3 passed", command_id=1, command="pytest tests/", exit_code=0)
+        obs = CmdOutputObservation(
+            content="3 passed", command_id=1, command="pytest tests/", exit_code=0
+        )
         state = self._make_state([cmd, obs])
         result = await v.validate_completion(Task(description="x"), state)
         assert result.passed is True
@@ -95,6 +102,7 @@ class TestTestPassingValidator:
 # ---------------------------------------------------------------------------
 # DiffValidator
 # ---------------------------------------------------------------------------
+
 
 class TestDiffValidator:
     def _make_state(self, events):
@@ -114,7 +122,9 @@ class TestDiffValidator:
         cmd = CmdRunAction(command="git diff")
         # Only 2 meaningful lines
         diff_text = "+line1\n+line2\n"
-        obs = CmdOutputObservation(content=diff_text, command_id=1, command="git diff", exit_code=0)
+        obs = CmdOutputObservation(
+            content=diff_text, command_id=1, command="git diff", exit_code=0
+        )
         state = self._make_state([cmd, obs])
         result = await v.validate_completion(Task(description="x"), state)
         assert result.passed is False
@@ -123,7 +133,9 @@ class TestDiffValidator:
         v = DiffValidator()
         cmd = CmdRunAction(command="git diff")
         diff_text = "\n".join([f"+code_line_{i}" for i in range(10)])
-        obs = CmdOutputObservation(content=diff_text, command_id=1, command="git diff", exit_code=0)
+        obs = CmdOutputObservation(
+            content=diff_text, command_id=1, command="git diff", exit_code=0
+        )
         state = self._make_state([cmd, obs])
         result = await v.validate_completion(Task(description="x"), state)
         assert result.passed is True
@@ -144,6 +156,7 @@ class TestDiffValidator:
 # ---------------------------------------------------------------------------
 # FileExistsValidator
 # ---------------------------------------------------------------------------
+
 
 class TestFileExistsValidator:
     def _make_state(self, events):
@@ -175,13 +188,16 @@ class TestFileExistsValidator:
 
     def test_extract_expected_files(self):
         v = FileExistsValidator()
-        files = v._extract_expected_files("Create a file 'main.py' and save to 'output.txt'")
+        files = v._extract_expected_files(
+            "Create a file 'main.py' and save to 'output.txt'"
+        )
         assert "main.py" in files or "output.txt" in files
 
 
 # ---------------------------------------------------------------------------
 # LLMTaskEvaluator
 # ---------------------------------------------------------------------------
+
 
 class TestLLMTaskEvaluator:
     async def test_no_llm_passes(self):
@@ -194,14 +210,17 @@ class TestLLMTaskEvaluator:
 
     async def test_llm_evaluation_success(self):
         import json
+
         llm = MagicMock()
         choice = MagicMock()
-        choice.message.content = json.dumps({
-            "completed": True,
-            "reason": "All done",
-            "confidence": 0.9,
-            "missing_items": [],
-        })
+        choice.message.content = json.dumps(
+            {
+                "completed": True,
+                "reason": "All done",
+                "confidence": 0.9,
+                "missing_items": [],
+            }
+        )
         resp = MagicMock()
         resp.choices = [choice]
         llm.completion = AsyncMock(return_value=resp)
@@ -253,6 +272,7 @@ class TestLLMTaskEvaluator:
 # ---------------------------------------------------------------------------
 # CompositeValidator
 # ---------------------------------------------------------------------------
+
 
 class TestCompositeValidator:
     def _make_validator(self, passed: bool, confidence: float = 1.0):

@@ -183,7 +183,7 @@ class TestErrorRecovery:
             ErrorType.MODULE_NOT_FOUND, error
         )
 
-        assert len(actions) > 0
+        assert actions
         assert any("pip install" in str(action) for action in actions)
 
     def test_recovery_actions_for_network_error(self):
@@ -193,7 +193,7 @@ class TestErrorRecovery:
             ErrorType.NETWORK_ERROR, error
         )
 
-        assert len(actions) > 0
+        assert actions
         # Should configure git for better resilience
         assert any("git config" in str(action) for action in actions)
 

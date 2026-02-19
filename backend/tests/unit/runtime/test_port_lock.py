@@ -24,8 +24,8 @@ def lock_dir(tmp_path):
 # PortLock basics
 # ===================================================================
 
-class TestPortLockInit:
 
+class TestPortLockInit:
     def test_default_lock_dir(self):
         lock = PortLock(8080)
         assert lock.port == 8080
@@ -39,7 +39,6 @@ class TestPortLockInit:
 
 
 class TestPortLockAcquireRelease:
-
     def test_acquire_and_release(self, lock_dir):
         lock = PortLock(12345, lock_dir=lock_dir)
         assert lock.acquire(timeout=2.0) is True
@@ -75,7 +74,6 @@ class TestPortLockAcquireRelease:
 
 
 class TestPortLockContention:
-
     def test_second_lock_contention_windows(self, lock_dir):
         """On Windows (no fcntl), second lock on same port should block/timeout."""
         lock1 = PortLock(55555, lock_dir=lock_dir)
@@ -97,11 +95,12 @@ class TestPortLockContention:
 # _check_port_available
 # ===================================================================
 
-class TestCheckPortAvailable:
 
+class TestCheckPortAvailable:
     def test_available_port(self):
         # Port 0 lets OS choose — we use a high random port that's likely free
         import socket
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
@@ -112,6 +111,7 @@ class TestCheckPortAvailable:
     def test_unavailable_port(self):
         """Bind on 0.0.0.0 and listen to truly occupy the port."""
         import socket
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Do NOT set SO_REUSEADDR — we want the port truly exclusive
         sock.bind(("0.0.0.0", 0))
@@ -132,8 +132,8 @@ class TestCheckPortAvailable:
 # cleanup_stale_locks
 # ===================================================================
 
-class TestCleanupStaleLocks:
 
+class TestCleanupStaleLocks:
     def test_no_lock_dir(self, tmp_path):
         """Returns 0 when directory doesn't exist."""
         with patch("backend.runtime.utils.port_lock.tempfile") as mock_tmp:

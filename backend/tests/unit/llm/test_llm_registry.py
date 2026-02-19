@@ -45,7 +45,7 @@ class TestLLMRegistry(TestCase):
         self.mock_config = MagicMock()
         self.mock_config.default_agent = "test_agent"
         self.mock_config.get_agent_to_llm_config_map.return_value = {}
-        
+
         self.mock_llm_config = MagicMock()
         self.mock_llm_config.model = "gpt-4o"
         self.mock_config.get_llm_config_from_agent.return_value = self.mock_llm_config
@@ -69,7 +69,7 @@ class TestLLMRegistry(TestCase):
         """Test initialization uses default agent when none specified."""
         mock_llm = MagicMock()
         mock_llm_cls.return_value = mock_llm
-        
+
         # Setup the deepcopy to return a mock that we can track
         mock_config_copy = MagicMock()
         mock_config_copy.default_agent = "test_agent"
@@ -77,7 +77,7 @@ class TestLLMRegistry(TestCase):
         mock_config_copy.get_llm_config_from_agent.return_value = self.mock_llm_config
         mock_deepcopy.return_value = mock_config_copy
 
-        registry = LLMRegistry(self.mock_config)
+        LLMRegistry(self.mock_config)
 
         mock_config_copy.get_llm_config_from_agent.assert_called_with("test_agent")
 
@@ -101,7 +101,7 @@ class TestLLMRegistry(TestCase):
         mock_llm_cls.return_value = mock_llm
 
         registry = LLMRegistry(self.mock_config)
-        
+
         new_llm = registry._create_new_llm("test_service", self.mock_llm_config)
 
         self.assertEqual(new_llm, mock_llm)
@@ -115,7 +115,7 @@ class TestLLMRegistry(TestCase):
         mock_llm_cls.return_value = mock_llm
 
         registry = LLMRegistry(self.mock_config)
-        
+
         registry._create_new_llm(
             "no_listener_service", self.mock_llm_config, with_listener=False
         )
@@ -150,7 +150,7 @@ class TestLLMRegistry(TestCase):
         mock_llm_cls.return_value = mock_llm
 
         registry = LLMRegistry(self.mock_config)
-        
+
         result = registry.request_extraneous_completion(
             "extraneous_service",
             self.mock_llm_config,
@@ -360,7 +360,7 @@ class TestLLMRegistry(TestCase):
         mock_llm_cls.return_value = mock_llm
 
         registry = LLMRegistry(self.mock_config)
-        
+
         def failing_callback(event):
             raise RuntimeError("Subscriber error")
 
@@ -375,15 +375,14 @@ class TestLLMRegistry(TestCase):
     @patch("backend.llm.llm_registry.LLM")
     def test_config_deepcopy(self, mock_llm_cls):
         """Test that config is deep copied on initialization."""
-        import copy
 
         mock_llm = MagicMock()
         mock_llm_cls.return_value = mock_llm
 
         with patch("backend.llm.llm_registry.copy.deepcopy") as mock_deepcopy:
             mock_deepcopy.return_value = self.mock_config
-            
-            registry = LLMRegistry(self.mock_config)
+
+            LLMRegistry(self.mock_config)
 
             mock_deepcopy.assert_called_with(self.mock_config)
 
@@ -403,7 +402,7 @@ class TestLLMRegistry(TestCase):
         """Test agent_to_llm_config map is initialized."""
         mock_llm = MagicMock()
         mock_llm_cls.return_value = mock_llm
-        
+
         test_map = {"agent1": MagicMock(), "agent2": MagicMock()}
         self.mock_config.get_agent_to_llm_config_map.return_value = test_map
 

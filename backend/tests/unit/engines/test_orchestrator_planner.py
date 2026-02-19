@@ -114,10 +114,10 @@ class TestGetLastUserMessage:
 
 class TestPatternConstants:
     def test_question_patterns_not_empty(self):
-        assert len(QUESTION_PATTERNS) > 0
+        assert QUESTION_PATTERNS
 
     def test_action_patterns_not_empty(self):
-        assert len(ACTION_PATTERNS) > 0
+        assert ACTION_PATTERNS
 
     def test_question_patterns_are_regex(self):
         import re

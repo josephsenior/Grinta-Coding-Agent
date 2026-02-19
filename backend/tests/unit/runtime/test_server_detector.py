@@ -16,13 +16,16 @@ from backend.runtime.utils.server_detector import (
 # DetectedServer dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestDetectedServer:
     """Tests for the DetectedServer dataclass."""
 
     def test_basic_creation(self):
         ds = DetectedServer(
-            port=3000, url="http://localhost:3000",
-            protocol="http", health_status="healthy",
+            port=3000,
+            url="http://localhost:3000",
+            protocol="http",
+            health_status="healthy",
         )
         assert ds.port == 3000
         assert ds.url == "http://localhost:3000"
@@ -32,8 +35,10 @@ class TestDetectedServer:
 
     def test_with_command_hint(self):
         ds = DetectedServer(
-            port=8080, url="http://localhost:8080",
-            protocol="http", health_status="unknown",
+            port=8080,
+            url="http://localhost:8080",
+            protocol="http",
+            health_status="unknown",
             command_hint="python -m http.server 8080",
         )
         assert ds.command_hint == "python -m http.server 8080"
@@ -43,11 +48,14 @@ class TestDetectedServer:
 # extract_port_from_output
 # ---------------------------------------------------------------------------
 
+
 class TestExtractPortFromOutput:
     """Tests for extract_port_from_output."""
 
     def test_vite_server(self):
-        output = "  VITE v5.0.0  ready in 300ms\n\n  ➜  Local:   http://localhost:5173/\n"
+        output = (
+            "  VITE v5.0.0  ready in 300ms\n\n  ➜  Local:   http://localhost:5173/\n"
+        )
         result = extract_port_from_output(output)
         assert result is not None
         port, protocol, line = result
@@ -121,6 +129,7 @@ class TestExtractPortFromOutput:
 # ---------------------------------------------------------------------------
 # is_port_listening
 # ---------------------------------------------------------------------------
+
 
 class TestIsPortListening:
     """Tests for is_port_listening."""

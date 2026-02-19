@@ -55,9 +55,7 @@ class TestKnowledgeBaseCollection:
 
     def test_description_max_length(self):
         with pytest.raises(ValidationError):
-            KnowledgeBaseCollection(
-                user_id="u1", name="KB", description="X" * 1001
-            )
+            KnowledgeBaseCollection(user_id="u1", name="KB", description="X" * 1001)
 
     def test_document_count_negative(self):
         with pytest.raises(ValidationError):

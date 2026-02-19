@@ -13,7 +13,12 @@ from backend.controller.idempotency import (
     classify_idempotency,
     compute_idempotency_key,
 )
-from backend.events.action import CmdRunAction, FileEditAction, FileReadAction, MessageAction
+from backend.events.action import (
+    CmdRunAction,
+    FileEditAction,
+    FileReadAction,
+    MessageAction,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -61,8 +66,13 @@ class TestClassifyIdempotency:
         assert classify_idempotency(MessageAction(content="hi")) == "idempotent"
 
     def test_non_idempotent_actions(self):
-        assert classify_idempotency(CmdRunAction(command="rm -rf /")) == "non-idempotent"
-        assert classify_idempotency(FileEditAction(path="/x", content="y")) == "non-idempotent"
+        assert (
+            classify_idempotency(CmdRunAction(command="rm -rf /")) == "non-idempotent"
+        )
+        assert (
+            classify_idempotency(FileEditAction(path="/x", content="y"))
+            == "non-idempotent"
+        )
 
     def test_unknown_action(self):
         @dataclass
@@ -144,7 +154,7 @@ class TestIdempotencyMiddleware:
 
         time.sleep(0.02)
         mw._evict_expired(time.monotonic())
-        assert len(mw._cache) == 0
+        assert not mw._cache
 
     @pytest.mark.asyncio
     async def test_metadata_populated(self):

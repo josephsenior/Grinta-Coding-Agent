@@ -104,8 +104,11 @@ class TestStateTrackerAddHistory:
     def test_add_event(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s", state=None, conversation_stats=MagicMock(),
-            max_iterations=100, max_budget_per_task=None,
+            id="s",
+            state=None,
+            conversation_stats=MagicMock(),
+            max_iterations=100,
+            max_budget_per_task=None,
         )
         action = MessageAction(content="hello")
         st.add_history(action)
@@ -114,17 +117,23 @@ class TestStateTrackerAddHistory:
     def test_excluded_events_not_added(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s", state=None, conversation_stats=MagicMock(),
-            max_iterations=100, max_budget_per_task=None,
+            id="s",
+            state=None,
+            conversation_stats=MagicMock(),
+            max_iterations=100,
+            max_budget_per_task=None,
         )
         st.add_history(NullAction())
-        assert len(st.state.history) == 0
+        assert not st.state.history
 
     def test_trim_on_count_overflow(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s", state=None, conversation_stats=MagicMock(),
-            max_iterations=100, max_budget_per_task=None,
+            id="s",
+            state=None,
+            conversation_stats=MagicMock(),
+            max_iterations=100,
+            max_budget_per_task=None,
         )
         # Stuff history just above the cap
         st.state.history = list(range(MAX_HISTORY_EVENTS + 10))
@@ -141,8 +150,11 @@ class TestStateTrackerControlFlags:
     def test_run_control_flags_increments_iteration(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s", state=None, conversation_stats=MagicMock(),
-            max_iterations=100, max_budget_per_task=None,
+            id="s",
+            state=None,
+            conversation_stats=MagicMock(),
+            max_iterations=100,
+            max_budget_per_task=None,
         )
         before = st.state.iteration_flag.current_value
         st.run_control_flags()
@@ -151,8 +163,11 @@ class TestStateTrackerControlFlags:
     def test_maybe_increase_limits(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s", state=None, conversation_stats=MagicMock(),
-            max_iterations=100, max_budget_per_task=None,
+            id="s",
+            state=None,
+            conversation_stats=MagicMock(),
+            max_iterations=100,
+            max_budget_per_task=None,
         )
         # increase_limit only bumps when headless_mode=False AND _hit_limit=True
         st.state.iteration_flag._hit_limit = True
@@ -170,16 +185,22 @@ class TestValidateHistoryRange:
     def test_valid_range(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s", state=None, conversation_stats=MagicMock(),
-            max_iterations=100, max_budget_per_task=None,
+            id="s",
+            state=None,
+            conversation_stats=MagicMock(),
+            max_iterations=100,
+            max_budget_per_task=None,
         )
         assert st._validate_history_range(0, 10) is True
 
     def test_invalid_range(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s", state=None, conversation_stats=MagicMock(),
-            max_iterations=100, max_budget_per_task=None,
+            id="s",
+            state=None,
+            conversation_stats=MagicMock(),
+            max_iterations=100,
+            max_budget_per_task=None,
         )
         assert st._validate_history_range(20, 5) is False
         assert st.state.history == []

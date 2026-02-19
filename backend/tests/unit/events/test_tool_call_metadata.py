@@ -91,9 +91,7 @@ class TestToolCallMetadata:
     def test_from_sdk_with_complex_tool_calls(self):
         tc1 = SimpleNamespace(id="tc_1", function=SimpleNamespace(name="search"))
         tc2 = SimpleNamespace(id="tc_2", function=SimpleNamespace(name="write"))
-        msg = SimpleNamespace(
-            role="assistant", content=None, tool_calls=[tc1, tc2]
-        )
+        msg = SimpleNamespace(role="assistant", content=None, tool_calls=[tc1, tc2])
         choice = SimpleNamespace(message=msg)
         resp = SimpleNamespace(id="r2", model="claude", choices=[choice])
 

@@ -104,7 +104,9 @@ class TestEncodeBinaryFile:
         assert base64.b64decode(encoded_part) == data
 
     def test_none_mime_uses_default(self):
-        result = encode_binary_file("/tmp/test", b"data", None, "application/octet-stream")
+        result = encode_binary_file(
+            "/tmp/test", b"data", None, "application/octet-stream"
+        )
         assert "application/octet-stream" in result
 
 
@@ -115,7 +117,7 @@ class TestResolvePath:
     def test_relative_path(self):
         with tempfile.TemporaryDirectory() as td:
             # Create the file so validation passes
-            open(os.path.join(td, "test.txt"), "w").close()
+            open(os.path.join(td, "test.txt", encoding="utf-8"), "w").close()
             result = resolve_path("test.txt", td)
             assert os.path.isabs(result)
             assert result.endswith("test.txt")
@@ -141,7 +143,9 @@ class TestEnsureDirectoryExists:
 # ---------------------------------------------------------------------------
 class TestReadTextFile:
     def test_full_file(self):
-        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
             f.write("line1\nline2\nline3\n")
             f.flush()
             action = FileReadAction(path=f.name)
@@ -211,7 +215,7 @@ class TestWriteFileContent:
             action = FileWriteAction(path=fp, content="hello world")
             err = write_file_content(fp, action, file_exists=False)
             assert err is None
-            assert open(fp).read() == "hello world"
+            assert open(fp, encoding="utf-8").read() == "hello world"
 
     def test_write_error_returns_observation(self):
         # Try writing to a directory
@@ -276,9 +280,9 @@ class TestDirectoryViewing:
         with tempfile.TemporaryDirectory() as td:
             # Create structure
             os.makedirs(os.path.join(td, "subdir"))
-            open(os.path.join(td, "file1.txt"), "w").close()
-            open(os.path.join(td, "subdir", "file2.txt"), "w").close()
-            open(os.path.join(td, ".hidden"), "w").close()
+            open(os.path.join(td, "file1.txt", encoding="utf-8"), "w").close()
+            open(os.path.join(td, "subdir", "file2.txt", encoding="utf-8"), "w").close()
+            open(os.path.join(td, ".hidden", encoding="utf-8"), "w").close()
 
             entries, hidden = _list_directory_recursive(td, max_depth=2)
             assert any("file1.txt" in e for e in entries)
@@ -293,6 +297,6 @@ class TestDirectoryViewing:
 
     def test_handle_directory_view(self):
         with tempfile.TemporaryDirectory() as td:
-            open(os.path.join(td, "readme.md"), "w").close()
+            open(os.path.join(td, "readme.md", encoding="utf-8"), "w").close()
             obs = handle_directory_view(td, "/workspace")
             assert "readme.md" in obs.content

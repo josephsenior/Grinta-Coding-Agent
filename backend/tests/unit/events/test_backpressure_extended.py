@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from backend.events.backpressure import BackpressureManager
 from backend.events.event import Event
@@ -76,7 +76,9 @@ class TestBackpressureManagerInit(unittest.TestCase):
         self.assertEqual(mgr.queue_size, 0)
 
     def test_custom_critical_event_fn(self):
-        fn = lambda e: True
+        def fn(e):
+            return True
+
         mgr = BackpressureManager(is_critical_event=fn)
         self.assertIs(mgr._is_critical_event, fn)
 
@@ -245,8 +247,8 @@ class TestBackpressureManagerRateWindow(unittest.TestCase):
         now = time.monotonic()
         # Add old and new samples
         mgr._recent_enqueued.append(now - 120)  # Stale
-        mgr._recent_enqueued.append(now - 30)   # Recent
-        mgr._recent_enqueued.append(now)          # Current
+        mgr._recent_enqueued.append(now - 30)  # Recent
+        mgr._recent_enqueued.append(now)  # Current
 
         mgr.trim_recent_window()
 
@@ -267,11 +269,21 @@ class TestBackpressureManagerSnapshot(unittest.TestCase):
         snap = mgr.get_snapshot(started_at)
 
         expected_keys = {
-            "enqueued", "dropped_oldest", "dropped_newest",
-            "high_watermark_hits", "critical_events", "critical_queue_blocked",
-            "queue_size", "max_queue_size", "uptime_seconds",
-            "rate_window_seconds", "events_window_count", "drops_window_count",
-            "events_per_minute", "drops_per_minute", "queue_utilization_pct",
+            "enqueued",
+            "dropped_oldest",
+            "dropped_newest",
+            "high_watermark_hits",
+            "critical_events",
+            "critical_queue_blocked",
+            "queue_size",
+            "max_queue_size",
+            "uptime_seconds",
+            "rate_window_seconds",
+            "events_window_count",
+            "drops_window_count",
+            "events_per_minute",
+            "drops_per_minute",
+            "queue_utilization_pct",
         }
         for key in expected_keys:
             self.assertIn(key, snap)

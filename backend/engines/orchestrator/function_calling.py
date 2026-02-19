@@ -18,21 +18,26 @@ from backend.engines.orchestrator.tools import (
     create_browser_tool,
     create_cmd_run_tool,
     create_condensation_request_tool,
+    create_clarification_tool,
+    create_escalate_tool,
     create_finish_tool,
     create_llm_based_edit_tool,
     create_note_tool,
+    create_proposal_tool,
     create_recall_tool,
     create_run_tests_tool,
     create_semantic_recall_tool,
     create_str_replace_editor_tool,
     create_structure_editor_tool,
     create_think_tool,
+    create_uncertainty_tool,
 )
 from backend.engines.orchestrator.tools.apply_patch import build_apply_patch_action
 from backend.engines.orchestrator.tools.note import build_note_action, build_recall_action
 from backend.engines.orchestrator.tools.run_tests import build_run_tests_action
 from backend.engines.orchestrator.tools.search_code import build_search_code_action, SEARCH_CODE_TOOL_NAME
 from backend.engines.orchestrator.tools.web_search import build_web_search_action, WEB_SEARCH_TOOL_NAME
+from backend.engines.orchestrator.tools.web_reader import build_web_reader_action, WEB_READER_TOOL_NAME
 from backend.engines.orchestrator.tools.workspace_status import build_workspace_status_action, WORKSPACE_STATUS_TOOL_NAME
 from backend.engines.orchestrator.tools.error_patterns import build_error_patterns_action, ERROR_PATTERNS_TOOL_NAME
 from backend.engines.orchestrator.tools.checkpoint import build_checkpoint_action, CHECKPOINT_TOOL_NAME
@@ -48,12 +53,16 @@ from backend.events.action import (
     ActionSecurityRisk,
     AgentThinkAction,
     BrowseInteractiveAction,
+    ClarificationRequestAction,
     CmdRunAction,
+    EscalateToHumanAction,
     FileEditAction,
     FileReadAction,
     MessageAction,
     PlaybookFinishAction,
+    ProposalAction,
     TaskTrackingAction,
+    UncertaintyAction,
 )
 from backend.events.action.agent import CondensationRequestAction
 from backend.events.action.mcp import MCPAction
@@ -240,6 +249,16 @@ def _handle_web_search_tool(arguments: dict) -> CmdRunAction:
     return build_web_search_action(query=query, num_results=num_results)
 
 
+def _handle_web_reader_tool(arguments: dict) -> CmdRunAction:
+    """Handle WEB_READER_TOOL: read webpage content."""
+    url = arguments.get("url", "")
+    if not url:
+        raise FunctionCallValidationError(
+            'Missing required argument "url" in tool call web_reader'
+        )
+    return build_web_reader_action(url=url)
+
+
 def _handle_workspace_status_tool(arguments: dict) -> CmdRunAction:
     """Handle workspace_status tool: gather project state snapshot."""
     return build_workspace_status_action(arguments)
@@ -331,6 +350,130 @@ def _filter_valid_editor_kwargs(other_kwargs: dict) -> dict:
     return valid_kwargs_for_editor
 
 
+def _normalize_whitespace(text: str) -> str:
+    """Normalize whitespace for fuzzy matching: strip trailing spaces and unify indent chars."""
+    lines = text.splitlines(keepends=True)
+    normalized = []
+    for line in lines:
+        stripped = line.rstrip(" \t")
+        stripped = stripped.replace("\t", "    ")
+        normalized.append(stripped)
+    return "".join(normalized)
+
+
+def _ws_tolerant_replace(file_content: str, old_str: str, new_str: str) -> tuple[str | None, str | None]:
+    """Try whitespace-normalized matching to find and replace old_str in file_content.
+
+    Returns (new_content, None) on success, or (None, error_message) on failure.
+    """
+    norm_content = _normalize_whitespace(file_content)
+    norm_old = _normalize_whitespace(old_str)
+
+    count = norm_content.count(norm_old)
+    if count == 0:
+        return None, "No match found even with whitespace normalization."
+    if count > 1:
+        return None, f"Whitespace-normalized old_str matches {count} locations — must be unique."
+
+    norm_start = norm_content.index(norm_old)
+    norm_end = norm_start + len(norm_old)
+
+    orig_start = _map_normalized_offset_to_original(file_content, norm_start)
+    orig_end = _map_normalized_offset_to_original(file_content, norm_end)
+
+    original_matched = file_content[orig_start:orig_end]
+    new_content = file_content[:orig_start] + new_str + file_content[orig_end:]
+    return new_content, None
+
+
+def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
+    """Map a character offset in normalized text back to the original text."""
+    norm_pos = 0
+    orig_pos = 0
+    while norm_pos < norm_offset and orig_pos < len(original):
+        ch = original[orig_pos]
+        if ch == "\t":
+            norm_pos += 4
+        else:
+            norm_pos += 1
+        orig_pos += 1
+        if ch in (" ", "\t"):
+            while orig_pos < len(original) and original[orig_pos] in (" ", "\t") and norm_pos < norm_offset:
+                if original[orig_pos] == "\t":
+                    norm_pos += 4
+                else:
+                    norm_pos += 1
+                orig_pos += 1
+                if norm_pos >= norm_offset:
+                    break
+            continue
+    return orig_pos
+
+
+def _handle_view_and_replace(path: str, kwargs: dict) -> Action:
+    """Handle the compound view_and_replace command.
+
+    Returns a list of actions: first a FileReadAction (view), then a FileEditAction (replace).
+    If old_str/new_str are provided, performs the replacement; otherwise just views.
+    """
+    import os
+
+    old_str = kwargs.get("old_str", "")
+    new_str = kwargs.get("new_str", "")
+    view_range = kwargs.get("view_range")
+    normalize_ws = kwargs.get("normalize_ws", False)
+    if isinstance(normalize_ws, str):
+        normalize_ws = normalize_ws.lower() == "true"
+
+    if not os.path.isfile(path):
+        return AgentThinkAction(thought=f"[VIEW_AND_REPLACE] File not found: {path}")
+
+    if not old_str:
+        return FileReadAction(
+            path=path,
+            impl_source=FileReadSource.FILE_EDITOR,
+            view_range=view_range,
+        )
+
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            content = f.read()
+    except OSError as exc:
+        return AgentThinkAction(thought=f"[VIEW_AND_REPLACE] Cannot read {path}: {exc}")
+
+    search_content = content
+    if view_range and len(view_range) >= 2:
+        lines = content.splitlines(keepends=True)
+        start_idx = max(0, view_range[0] - 1)
+        end_idx = len(lines) if view_range[1] == -1 else min(len(lines), view_range[1])
+        search_content = "".join(lines[start_idx:end_idx])
+
+    if old_str not in search_content:
+        if normalize_ws:
+            new_content, err = _ws_tolerant_replace(search_content, old_str, new_str)
+            if err:
+                return AgentThinkAction(
+                    thought=f"[VIEW_AND_REPLACE] {err} Use view command to check the actual content."
+                )
+        else:
+            return AgentThinkAction(
+                thought=f"[VIEW_AND_REPLACE] old_str not found in {path}"
+                + (f" (within lines {view_range[0]}-{view_range[1]})" if view_range else "")
+                + ". Use view command to check the actual content."
+            )
+
+    edit_kwargs = {"old_str": old_str, "new_str": new_str}
+    if normalize_ws:
+        edit_kwargs["normalize_ws"] = True
+
+    return FileEditAction(
+        path=path,
+        command="str_replace",
+        impl_source=FileEditSource.FILE_EDITOR,
+        **edit_kwargs,
+    )
+
+
 def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThinkAction:
     """Generate a unified diff preview of what a str_replace or insert would produce."""
     import difflib
@@ -377,7 +520,7 @@ def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThi
     return AgentThinkAction(thought=f"[PREVIEW] Dry-run diff for {path}:\n{diff_text}")
 
 
-def _handle_str_replace_editor_tool(arguments: dict) -> Action:
+def _handle_str_replace_editor_tool(arguments: dict) -> Action | list[Action]:
     """Handle str_replace_editor tool call."""
     path, command = _validate_str_replace_editor_args(arguments)
     other_kwargs = {k: v for k, v in arguments.items() if k not in ["command", "path"]}
@@ -388,6 +531,10 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     if preview and command in ("str_replace", "insert"):
         return _preview_str_replace_edit(path, command, other_kwargs)
 
+    # Handle compound view_and_replace command
+    if command == "view_and_replace":
+        return _handle_view_and_replace(path, other_kwargs)
+
     # Handle view command separately
     if command == "view":
         return FileReadAction(
@@ -396,11 +543,15 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
             view_range=other_kwargs.get("view_range"),
         )
 
-    # Remove view_range for edit commands
-    other_kwargs.pop("view_range", None)
+    # Remove view_range for standard edit commands (unless it's str_replace with view_range for scoping)
+    view_range = other_kwargs.pop("view_range", None)
 
     # Filter valid editor kwargs
     valid_kwargs_for_editor = _filter_valid_editor_kwargs(other_kwargs)
+
+    # For str_replace with view_range, pass it along for line-range scoping
+    if command == "str_replace" and view_range is not None:
+        valid_kwargs_for_editor["view_range"] = view_range
 
     # Create and configure action
     action = FileEditAction(
@@ -421,6 +572,95 @@ def _handle_think_tool(arguments: dict) -> AgentThinkAction:
             msg,
         )
     return AgentThinkAction(thought=arguments["thought"])
+
+
+# ============================================================================
+# Meta-cognition tool handlers - enabling the LLM to express uncertainty
+# ============================================================================
+
+
+def _handle_uncertainty_tool(arguments: dict) -> UncertaintyAction:
+    """Handle uncertainty tool: express doubt about current understanding."""
+    uncertainty_level = arguments.get("uncertainty_level", 0.5)
+    # Clamp to valid range
+    uncertainty_level = max(0.0, min(1.0, float(uncertainty_level)))
+    
+    specific_concerns = arguments.get("specific_concerns", [])
+    if isinstance(specific_concerns, str):
+        specific_concerns = [specific_concerns]
+    
+    requested_information = arguments.get("requested_information", "")
+    thought = arguments.get("thought", "")
+    
+    return UncertaintyAction(
+        uncertainty_level=uncertainty_level,
+        specific_concerns=specific_concerns,
+        requested_information=requested_information,
+        thought=thought,
+    )
+
+
+def _handle_proposal_tool(arguments: dict) -> ProposalAction:
+    """Handle proposal tool: propose options before committing to a path."""
+    options = arguments.get("options", [])
+    if isinstance(options, str):
+        # If a single option string is passed, wrap it
+        options = [{"description": options}]
+    
+    recommended = arguments.get("recommended", 0)
+    rationale = arguments.get("rationale", "")
+    thought = arguments.get("thought", "")
+    
+    return ProposalAction(
+        options=options,
+        recommended=recommended,
+        rationale=rationale,
+        thought=thought,
+    )
+
+
+def _handle_clarification_tool(arguments: dict) -> ClarificationRequestAction:
+    """Handle clarification tool: ask for clarification before proceeding."""
+    question = arguments.get("question", "")
+    if not question:
+        from backend.core.exceptions import FunctionCallValidationError as _E
+        raise _E('Missing required argument "question" in tool call clarification')
+    
+    options = arguments.get("options", [])
+    if isinstance(options, str):
+        options = [options]
+    
+    context = arguments.get("context", "")
+    thought = arguments.get("thought", "")
+    
+    return ClarificationRequestAction(
+        question=question,
+        options=options,
+        context=context,
+        thought=thought,
+    )
+
+
+def _handle_escalate_tool(arguments: dict) -> EscalateToHumanAction:
+    """Handle escalate_to_human tool: request human assistance."""
+    reason = arguments.get("reason", "")
+    if not reason:
+        from backend.core.exceptions import FunctionCallValidationError as _E
+        raise _E('Missing required argument "reason" in tool call escalate_to_human')
+    
+    attempts_made = arguments.get("attempts_made", [])
+    if isinstance(attempts_made, str):
+        attempts_made = [attempts_made]
+    
+    specific_help_needed = arguments.get("specific_help_needed", "")
+    thought = arguments.get("thought", "")
+    
+    return EscalateToHumanAction(
+        reason=reason,
+        attempts_made=attempts_made,
+        specific_help_needed=specific_help_needed,
+        thought=thought,
+    )
 
 
 def _handle_condensation_request_tool(arguments: dict) -> CondensationRequestAction:
@@ -447,38 +687,52 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
             f'Missing required argument "command" in tool call {TASK_TRACKER_TOOL_NAME}'
         )
         raise FunctionCallValidationError(msg)
-    if arguments["command"] == "plan" and "task_list" not in arguments:
-        msg = f'Missing required argument "task_list" for "plan" command in tool call {TASK_TRACKER_TOOL_NAME}'
+    if arguments["command"] in {"plan", "update"} and "task_list" not in arguments:
+        msg = f'Missing required argument "task_list" for "{arguments["command"]}" command in tool call {TASK_TRACKER_TOOL_NAME}'
         raise FunctionCallValidationError(
             msg,
         )
+
     raw_task_list = arguments.get("task_list", [])
     if not isinstance(raw_task_list, list):
         msg = f'Invalid format for "task_list". Expected a list but got {type(raw_task_list)}.'
         raise FunctionCallValidationError(
             msg,
         )
+
+    # We do a pass-through validation/normalization, but allow keys for future extensibility
+    # This also handles the recursive nature implicitly by just passing the dicts through
+    # provided they meet the minimum bar of having an id and description/status.
     normalized_task_list = []
-    for i, task in enumerate(raw_task_list):
-        if isinstance(task, dict):
-            normalized_task = {
-                "id": task.get(
-                    "id",
-                    f"task-{i + 1}",
-                ),
-                "title": task.get("title", "Untitled task"),
-                "status": task.get("status", "todo"),
-                "notes": task.get("notes", ""),
-            }
-        else:
-            logger.warning(
-                "Unexpected task format in task_list: %s - %s", type(task), task
-            )
-            msg = f"Unexpected task format in task_list: {type(task)}. Each task shoud be a dictionary."
+
+    def normalize_step(s: dict, idx: int) -> dict:
+        if not isinstance(s, dict):
             raise FunctionCallValidationError(
-                msg,
+                f"Task item must be a dictionary, got {type(s)}"
             )
-        normalized_task_list.append(normalized_task)
+
+        # Support both old and new keys for backward compatibility during migration.
+        return {
+            "id": s.get("id", f"task-{idx}"),
+            "title": s.get("title", s.get("description", "Untitled step")),
+            "status": s.get("status", "todo"),
+            "notes": s.get("notes", s.get("result", "")),
+            "tags": s.get("tags", []),
+            "subtasks": [
+                normalize_step(sub, i + 1)
+                for i, sub in enumerate(s.get("subtasks", []))
+            ],
+        }
+
+    try:
+        for i, task in enumerate(raw_task_list):
+            normalized_task_list.append(normalize_step(task, i + 1))
+    except FunctionCallValidationError as e:
+        raise e
+    except Exception as e:
+        logger.warning("Error normalizing task list: %s", e)
+        raise FunctionCallValidationError(f"Invalid task list structure: {e}") from e
+
     return TaskTrackingAction(
         command=arguments["command"], task_list=normalized_task_list
     )
@@ -742,6 +996,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         create_apply_patch_tool()["function"]["name"]: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,
+        WEB_READER_TOOL_NAME: _handle_web_reader_tool,
         WORKSPACE_STATUS_TOOL_NAME: _handle_workspace_status_tool,
         ERROR_PATTERNS_TOOL_NAME: _handle_error_patterns_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
@@ -749,6 +1004,11 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,
         VERIFY_STATE_TOOL_NAME: _handle_verify_state_tool,
         WORKING_MEMORY_TOOL_NAME: _handle_working_memory_tool,
+        # Meta-cognition tools
+        create_uncertainty_tool()["function"]["name"]: _handle_uncertainty_tool,
+        create_proposal_tool()["function"]["name"]: _handle_proposal_tool,
+        create_clarification_tool()["function"]["name"]: _handle_clarification_tool,
+        create_escalate_tool()["function"]["name"]: _handle_escalate_tool,
     }
 
 

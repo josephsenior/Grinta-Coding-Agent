@@ -13,6 +13,7 @@ from backend.llm.metrics import Cost, Metrics, ResponseLatency, TokenUsage
 
 # ── Cost dataclass ──────────────────────────────────────────────────────
 
+
 class TestCost:
     def test_defaults(self):
         c = Cost()
@@ -31,6 +32,7 @@ class TestCost:
 
 # ── ResponseLatency model ──────────────────────────────────────────────
 
+
 class TestResponseLatency:
     def test_construction(self):
         rl = ResponseLatency(model="gpt-4", latency=1.5, response_id="r1")
@@ -40,6 +42,7 @@ class TestResponseLatency:
 
 
 # ── TokenUsage model ───────────────────────────────────────────────────
+
 
 class TestTokenUsage:
     def test_defaults(self):
@@ -54,13 +57,25 @@ class TestTokenUsage:
         assert tu.response_id == ""
 
     def test_add(self):
-        a = TokenUsage(model="m", prompt_tokens=10, completion_tokens=5, context_window=100, per_turn_token=15)
-        b = TokenUsage(model="m", prompt_tokens=20, completion_tokens=8, context_window=200, per_turn_token=28)
+        a = TokenUsage(
+            model="m",
+            prompt_tokens=10,
+            completion_tokens=5,
+            context_window=100,
+            per_turn_token=15,
+        )
+        b = TokenUsage(
+            model="m",
+            prompt_tokens=20,
+            completion_tokens=8,
+            context_window=200,
+            per_turn_token=28,
+        )
         result = a + b
         assert result.prompt_tokens == 30
         assert result.completion_tokens == 13
         assert result.context_window == 200  # max
-        assert result.per_turn_token == 28   # other's value
+        assert result.per_turn_token == 28  # other's value
         assert result.model == "m"
         assert result.response_id == a.response_id  # from self
 
@@ -73,6 +88,7 @@ class TestTokenUsage:
 
 
 # ── Metrics class ──────────────────────────────────────────────────────
+
 
 class TestMetricsInit:
     def test_defaults(self):
@@ -215,11 +231,14 @@ class TestMetricsDiff:
         current._costs = baseline._costs.copy()
         # Add a new cost after baseline
         import time
+
         time.sleep(0.01)
         current.add_cost(2.0)
 
         diff = current.diff(baseline)
-        assert diff.accumulated_cost == pytest.approx(current.accumulated_cost - baseline.accumulated_cost)
+        assert diff.accumulated_cost == pytest.approx(
+            current.accumulated_cost - baseline.accumulated_cost
+        )
 
     def test_diff_empty_baseline(self):
         baseline = Metrics("m")

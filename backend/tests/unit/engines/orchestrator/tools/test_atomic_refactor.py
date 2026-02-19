@@ -155,7 +155,7 @@ class TestAtomicRefactor:
         """Test adding a modify edit to a transaction."""
         # Create a test file
         test_file = os.path.join(self.temp_dir, "test.txt")
-        with open(test_file, "w") as f:
+        with open(test_file, "w", encoding="utf-8") as f:
             f.write("original content")
 
         txn = self.refactor.begin_transaction()
@@ -192,7 +192,7 @@ class TestAtomicRefactor:
         old_path = os.path.join(self.temp_dir, "old.txt")
         new_path = os.path.join(self.temp_dir, "new.txt")
 
-        with open(old_path, "w") as f:
+        with open(old_path, "w", encoding="utf-8") as f:
             f.write("content")
 
         txn = self.refactor.begin_transaction()
@@ -208,7 +208,7 @@ class TestAtomicRefactor:
     def test_commit_modify_operation(self):
         """Test committing a modify operation."""
         test_file = os.path.join(self.temp_dir, "test.txt")
-        with open(test_file, "w") as f:
+        with open(test_file, "w", encoding="utf-8") as f:
             f.write("original")
 
         txn = self.refactor.begin_transaction()
@@ -219,7 +219,7 @@ class TestAtomicRefactor:
         assert result.files_modified == 1
         assert txn.committed is True
 
-        with open(test_file) as f:
+        with open(test_file, encoding="utf-8") as f:
             assert f.read() == "modified"
 
     def test_commit_create_operation(self):
@@ -231,22 +231,24 @@ class TestAtomicRefactor:
 
         assert result.success is True
         assert os.path.exists(test_file)
-        with open(test_file) as f:
+        with open(test_file, encoding="utf-8") as f:
             assert f.read() == "new file"
 
     def test_commit_delete_operation(self):
         """Test committing a delete operation."""
         test_file = os.path.join(self.temp_dir, "to_delete.txt")
-        with open(test_file, "w") as f:
+        with open(test_file, "w", encoding="utf-8") as f:
             f.write("delete me")
 
         txn = self.refactor.begin_transaction()
         # Manually add delete edit
-        txn.edits.append(FileEdit(
-            file_path=test_file,
-            operation="delete",
-            original_content="delete me",
-        ))
+        txn.edits.append(
+            FileEdit(
+                file_path=test_file,
+                operation="delete",
+                original_content="delete me",
+            )
+        )
         result = self.refactor.commit(txn, validate=False)
 
         assert result.success is True
@@ -257,7 +259,7 @@ class TestAtomicRefactor:
         old_path = os.path.join(self.temp_dir, "old.txt")
         new_path = os.path.join(self.temp_dir, "new.txt")
 
-        with open(old_path, "w") as f:
+        with open(old_path, "w", encoding="utf-8") as f:
             f.write("content")
 
         txn = self.refactor.begin_transaction()
@@ -271,11 +273,11 @@ class TestAtomicRefactor:
     def test_commit_with_validation_success(self):
         """Test commit with validation that passes."""
         test_file = os.path.join(self.temp_dir, "test.txt")
-        with open(test_file, "w") as f:
+        with open(test_file, "w", encoding="utf-8") as f:
             f.write("original")
 
         def validator(filepath, content):
-            return len(content) > 0
+            return content
 
         txn = self.refactor.begin_transaction()
         self.refactor.add_file_edit(txn, test_file, "valid", operation="modify")
@@ -286,7 +288,7 @@ class TestAtomicRefactor:
     def test_commit_with_validation_failure_rolls_back(self):
         """Test that validation failure triggers rollback."""
         test_file = os.path.join(self.temp_dir, "test.txt")
-        with open(test_file, "w") as f:
+        with open(test_file, "w", encoding="utf-8") as f:
             f.write("original")
 
         def failing_validator(filepath, content):
@@ -298,7 +300,7 @@ class TestAtomicRefactor:
 
         assert result.success is False
         # Check that file was rolled back
-        with open(test_file) as f:
+        with open(test_file, encoding="utf-8") as f:
             assert f.read() == "original"
 
     def test_commit_already_committed_transaction(self):
@@ -324,7 +326,7 @@ class TestAtomicRefactor:
     def test_rollback_transaction(self):
         """Test rolling back a transaction."""
         test_file = os.path.join(self.temp_dir, "test.txt")
-        with open(test_file, "w") as f:
+        with open(test_file, "w", encoding="utf-8") as f:
             f.write("original")
 
         txn = self.refactor.begin_transaction()
@@ -337,13 +339,13 @@ class TestAtomicRefactor:
         assert result.success is True
         assert txn.rolled_back is True
         # File should be restored
-        with open(test_file) as f:
+        with open(test_file, encoding="utf-8") as f:
             assert f.read() == "original"
 
     def test_rollback_modify_edit(self):
         """Test rollback restores original content."""
         test_file = os.path.join(self.temp_dir, "test.txt")
-        with open(test_file, "w") as f:
+        with open(test_file, "w", encoding="utf-8") as f:
             f.write("original")
 
         txn = self.refactor.begin_transaction()
@@ -353,7 +355,7 @@ class TestAtomicRefactor:
         # Manually trigger rollback
         self.refactor._rollback_edits(txn.edits, txn)
 
-        with open(test_file) as f:
+        with open(test_file, encoding="utf-8") as f:
             assert f.read() == "original"
 
     def test_rollback_create_edit_removes_file(self):
@@ -373,7 +375,7 @@ class TestAtomicRefactor:
         old_path = os.path.join(self.temp_dir, "old.txt")
         new_path = os.path.join(self.temp_dir, "new.txt")
 
-        with open(old_path, "w") as f:
+        with open(old_path, "w", encoding="utf-8") as f:
             f.write("content")
 
         txn = self.refactor.begin_transaction()
@@ -389,7 +391,7 @@ class TestAtomicRefactor:
     def test_dry_run_success(self):
         """Test dry-run with valid operations."""
         test_file = os.path.join(self.temp_dir, "test.txt")
-        with open(test_file, "w") as f:
+        with open(test_file, "w", encoding="utf-8") as f:
             f.write("original")
 
         txn = self.refactor.begin_transaction()
@@ -399,7 +401,7 @@ class TestAtomicRefactor:
         assert result.success is True
         assert result.files_modified == 1
         # File should not be modified
-        with open(test_file) as f:
+        with open(test_file, encoding="utf-8") as f:
             assert f.read() == "original"
 
     def test_dry_run_detects_missing_file(self):
@@ -414,13 +416,13 @@ class TestAtomicRefactor:
         result = self.refactor.dry_run(txn)
 
         assert result.success is False
-        assert len(result.errors) > 0
+        assert result.errors
         assert "does not exist" in result.errors[0]
 
     def test_dry_run_detects_existing_file_for_create(self):
         """Test dry-run detects existing files for create operation."""
         test_file = os.path.join(self.temp_dir, "exists.txt")
-        with open(test_file, "w") as f:
+        with open(test_file, "w", encoding="utf-8") as f:
             f.write("exists")
 
         txn = self.refactor.begin_transaction()
@@ -456,9 +458,9 @@ class TestAtomicRefactor:
         file1 = os.path.join(self.temp_dir, "file1.txt")
         file2 = os.path.join(self.temp_dir, "file2.txt")
 
-        with open(file1, "w") as f:
+        with open(file1, "w", encoding="utf-8") as f:
             f.write("content1")
-        with open(file2, "w") as f:
+        with open(file2, "w", encoding="utf-8") as f:
             f.write("content2")
 
         txn = self.refactor.begin_transaction()
@@ -469,16 +471,16 @@ class TestAtomicRefactor:
         assert result.success is True
         assert result.files_modified == 2
 
-        with open(file1) as f:
+        with open(file1, encoding="utf-8") as f:
             assert f.read() == "modified1"
-        with open(file2) as f:
+        with open(file2, encoding="utf-8") as f:
             assert f.read() == "modified2"
 
     def test_commit_failure_in_middle_rolls_back_all(self):
         """Test that failure in middle of transaction rolls back all edits."""
         file1 = os.path.join(self.temp_dir, "file1.txt")
 
-        with open(file1, "w") as f:
+        with open(file1, "w", encoding="utf-8") as f:
             f.write("original1")
 
         def failing_validator(filepath, content):
@@ -494,9 +496,9 @@ class TestAtomicRefactor:
         result = self.refactor.commit(txn, validate=True, validator=failing_validator)
 
         assert result.success is False
-        assert len(result.errors) > 0
+        assert result.errors
         # First file should be rolled back
-        with open(file1) as f:
+        with open(file1, encoding="utf-8") as f:
             assert f.read() == "original1"
         # Second file should not exist (was rolled back)
         assert not os.path.exists(file2)

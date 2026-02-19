@@ -202,7 +202,11 @@ def collect_controller_health(controller: Any) -> dict[str, Any]:
     cb_service = getattr(controller, "circuit_breaker_service", None)
     cb_state = getattr(cb_service, "state", None)
     cb_state_name = getattr(cb_state, "name", str(cb_state) if cb_state else None)
-    cb_failures = getattr(cb_service, "failure_count", 0) or 0
+    cb_failures = getattr(cb_service, "failure_count", 0)
+    if not isinstance(cb_failures, (int, float)):
+        cb_failures = getattr(cb_service, "consecutive_errors", 0)
+    if not isinstance(cb_failures, (int, float)):
+        cb_failures = 0
     if cb_state_name == "OPEN" or cb_failures >= 5:
         warnings.append("circuit_breaker_unhealthy")
 

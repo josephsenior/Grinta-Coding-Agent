@@ -98,8 +98,8 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     llms: dict[str, LLMConfig] = Field(default_factory=dict)
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     default_agent: str = Field(default=FORGE_DEFAULT_AGENT)
-    runtime_config: RuntimeConfig = Field(default_factory=lambda: RuntimeConfig())
-    security: SecurityConfig = Field(default_factory=lambda: SecurityConfig())
+    runtime_config: RuntimeConfig = Field(default_factory=RuntimeConfig)
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
     runtime: str = Field(default=DEFAULT_RUNTIME)
     file_store: str = Field(default=DEFAULT_FILE_STORE)
     file_store_path: str = Field(default=DEFAULT_WORKSPACE_BASE)
@@ -112,6 +112,20 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "Maximum LLM cost (USD) allowed per task. Set to 0 or None for no limit (not recommended)."
         ),
     )
+    max_budget_per_session: float | None = Field(
+        default=None,
+        description=(
+            "Maximum LLM cost (USD) for a single conversation session. "
+            "Overrides max_budget_per_task when set. None = use max_budget_per_task."
+        ),
+    )
+    max_budget_per_day: float | None = Field(
+        default=None,
+        description=(
+            "Maximum total LLM cost (USD) across all sessions in a calendar day. "
+            "Set to 0 or None for no daily limit."
+        ),
+    )
     debug: bool = Field(default=False)
     disable_color: bool = Field(default=False)
     conversation_max_age_seconds: int = Field(
@@ -121,11 +135,11 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     max_concurrent_conversations: int = Field(
         default=DEFAULT_MAX_CONCURRENT_CONVERSATIONS
     )
-    mcp: MCPConfig = Field(default_factory=lambda: MCPConfig())
-    git: GitIdentityConfig = Field(default_factory=lambda: GitIdentityConfig())
-    file_uploads: FileUploadsConfig = Field(default_factory=lambda: FileUploadsConfig())
-    trajectory: TrajectoryConfig = Field(default_factory=lambda: TrajectoryConfig())
-    event_stream: EventStreamConfig = Field(default_factory=lambda: EventStreamConfig())
+    mcp: MCPConfig = Field(default_factory=MCPConfig)
+    git: GitIdentityConfig = Field(default_factory=GitIdentityConfig)
+    file_uploads: FileUploadsConfig = Field(default_factory=FileUploadsConfig)
+    trajectory: TrajectoryConfig = Field(default_factory=TrajectoryConfig)
+    event_stream: EventStreamConfig = Field(default_factory=EventStreamConfig)
     vcs_user_name: str = Field(
         default=DEFAULT_VCS_USER_NAME,
         description="Git user name for commits made by the agent",

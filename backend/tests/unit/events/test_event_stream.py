@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 
-from backend.events.stream import EventStreamSubscriber, get_aggregated_event_stream_stats
+from backend.events.stream import (
+    EventStreamSubscriber,
+    get_aggregated_event_stream_stats,
+)
 
 
 # ---------------------------------------------------------------------------

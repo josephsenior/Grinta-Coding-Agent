@@ -35,11 +35,65 @@ RESUMABLE_STATES = [
 ]
 
 # Versioned JSON format — bump when schema changes
-STATE_SCHEMA_VERSION = 1
+STATE_SCHEMA_VERSION = 2
 
 # Number of timestamped state checkpoints to retain for crash recovery.
 # On restore, if the primary file is corrupt we try checkpoints newest-first.
 MAX_STATE_CHECKPOINTS = 3
+
+
+@dataclass
+class TurnSignals:
+    """First-class, turn-scoped control signals for agents.
+
+    These signals are meant to be:
+    - deterministic (typed vs. ad-hoc extra_data)
+    - retry-safe (consumed via explicit acknowledgements)
+    - optionally surfaced to the LLM in a dedicated control message
+    """
+
+    planning_directive: str | None = None
+    memory_pressure: str | None = None
+    repetition_score: float = 0.0
+
+
+@dataclass
+class PlanStep:
+    """A single step in the agent's active plan."""
+
+    id: str
+    description: str
+    status: str = "pending"  # pending, in_progress, completed, failed, skipped
+    result: str | None = None
+    subtasks: list[PlanStep] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ActivePlan:
+    """The agent's current active plan."""
+
+    steps: list[PlanStep] = field(default_factory=list)
+    title: str = "Current Plan"
+
+    def find_step(self, step_id: str) -> PlanStep | None:
+        """Find a step by ID recursively."""
+        for step in self.steps:
+            if step.id == step_id:
+                return step
+            found = self._find_in_subtasks(step, step_id)
+            if found:
+                return found
+        return None
+
+    def _find_in_subtasks(self, parent: PlanStep, step_id: str) -> PlanStep | None:
+        for step in parent.subtasks:
+            if step.id == step_id:
+                return step
+            found = self._find_in_subtasks(step, step_id)
+            if found:
+                return found
+        return None
 
 
 class TrafficControlState:
@@ -106,6 +160,7 @@ class State:
     parent_metrics_snapshot: Metrics | None = None
     parent_iteration: int = 100
     extra_data: dict[str, Any] = field(default_factory=dict)
+    turn_signals: TurnSignals = field(default_factory=TurnSignals)
     last_error: str = ""
     iteration: int | None = None
     local_iteration: int | None = None
@@ -114,6 +169,7 @@ class State:
     local_metrics: Metrics | None = None
     delegates: dict[tuple[int, int], tuple[str, str]] | None = None
     metrics: Metrics = field(default_factory=Metrics)
+    plan: ActivePlan | None = None
 
     # ------------------------------------------------------------------ #
     # Centralized mutation methods
@@ -139,6 +195,34 @@ class State:
         self.extra_data[key] = value
         if source:
             logger.debug("State.extra_data[%s] set by %s", key, source)
+
+    def set_planning_directive(self, directive: str, *, source: str = "") -> None:
+        """Set the current planning directive for the next LLM turn."""
+        self.turn_signals.planning_directive = directive
+        if source:
+            logger.debug("State.turn_signals.planning_directive set by %s", source)
+
+    def ack_planning_directive(self, *, source: str = "") -> None:
+        """Acknowledge/clear the current planning directive after success."""
+        if self.turn_signals.planning_directive is None:
+            return
+        self.turn_signals.planning_directive = None
+        if source:
+            logger.debug("State.turn_signals.planning_directive acked by %s", source)
+
+    def set_memory_pressure(self, level: str, *, source: str = "") -> None:
+        """Set a memory-pressure signal for the next turn."""
+        self.turn_signals.memory_pressure = level
+        if source:
+            logger.debug("State.turn_signals.memory_pressure set by %s", source)
+
+    def ack_memory_pressure(self, *, source: str = "") -> None:
+        """Acknowledge/clear memory pressure after it has been handled."""
+        if self.turn_signals.memory_pressure is None:
+            return
+        self.turn_signals.memory_pressure = None
+        if source:
+            logger.debug("State.turn_signals.memory_pressure acked by %s", source)
 
     def adjust_iteration_limit(self, new_max: int, *, source: str = "") -> None:
         """Safely adjust the iteration flag's max_value."""
@@ -372,6 +456,10 @@ class State:
         for key in ("inputs", "outputs", "extra_data"):
             doc[key] = data.get(key, {})
 
+        # Turn signals (typed)
+        ts = data.get("turn_signals")
+        doc["turn_signals"] = asdict(ts) if ts else None
+
         # ControlFlag dataclasses
         flag = data.get("iteration_flag")
         doc["iteration_flag"] = asdict(flag) if flag else None
@@ -388,6 +476,11 @@ class State:
         pms = data.get("parent_metrics_snapshot")
         doc["parent_metrics_snapshot"] = (
             pms.get() if pms is not None and hasattr(pms, "get") else None
+        )
+
+        plan = data.get("plan")
+        doc["plan"] = (
+            asdict(plan) if plan and hasattr(plan, "steps") else None
         )
 
         return json.dumps(doc, separators=(",", ":"))
@@ -449,6 +542,14 @@ class State:
         state.outputs = doc.get("outputs", {})
         state.extra_data = doc.get("extra_data", {})
 
+        # Turn signals
+        ts = doc.get("turn_signals")
+        if isinstance(ts, dict):
+            state.turn_signals = TurnSignals(
+                planning_directive=ts.get("planning_directive"),
+                memory_pressure=ts.get("memory_pressure"),
+            )
+
         # ControlFlags
         iflag = doc.get("iteration_flag")
         if isinstance(iflag, dict):
@@ -480,6 +581,28 @@ class State:
             pms = Metrics()
             pms.__setstate__(pms_dict)
             state.parent_metrics_snapshot = pms
+
+        plan_dict = doc.get("plan")
+        if isinstance(plan_dict, dict):
+            try:
+                # Helper to recursively rebuild PlanSteps
+                def _build_step(d: dict) -> PlanStep:
+                    return PlanStep(
+                        id=d["id"],
+                        description=d["description"],
+                        status=d.get("status", "pending"),
+                        result=d.get("result"),
+                        subtasks=[_build_step(s) for s in d.get("subtasks", [])],
+                        tags=d.get("tags", []),
+                    )
+                
+                steps = [_build_step(s) for s in plan_dict.get("steps", [])]
+                state.plan = ActivePlan(
+                    steps=steps,
+                    title=plan_dict.get("title", "Current Plan"),
+                )
+            except Exception as e:
+                logger.warning("Failed to restore plan from state: %s", e)
 
         return state
 

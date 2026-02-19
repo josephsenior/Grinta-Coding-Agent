@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from backend.events.action import (
     AgentThinkAction,
     CmdRunAction,
@@ -22,6 +21,7 @@ from backend.memory.action_processors import (
 
 
 # ── _is_tool_based_action ───────────────────────────────────────────
+
 
 class TestIsToolBasedAction:
     def test_agent_think(self):
@@ -45,6 +45,7 @@ class TestIsToolBasedAction:
 
 # ── _role_from_source ────────────────────────────────────────────────
 
+
 class TestRoleFromSource:
     def test_user_source(self):
         assert _role_from_source(EventSource.USER) == "user"
@@ -60,6 +61,7 @@ class TestRoleFromSource:
 
 
 # ── _handle_message_action ──────────────────────────────────────────
+
 
 class TestHandleMessageAction:
     def test_user_message(self):
@@ -86,6 +88,7 @@ class TestHandleMessageAction:
 
 # ── _handle_user_cmd_action ─────────────────────────────────────────
 
+
 class TestHandleUserCmdAction:
     def test_formats_command(self):
         action = CmdRunAction(command="ls -la")
@@ -97,6 +100,7 @@ class TestHandleUserCmdAction:
 
 # ── _handle_system_message_action ───────────────────────────────────
 
+
 class TestHandleSystemMessageAction:
     def test_formats_system(self):
         action = SystemMessageAction(content="You are an agent.")
@@ -107,6 +111,7 @@ class TestHandleSystemMessageAction:
 
 
 # ── convert_action_to_messages ───────────────────────────────────────
+
 
 class TestConvertActionToMessages:
     def test_system_message_action(self):
@@ -124,6 +129,7 @@ class TestConvertActionToMessages:
     def test_unknown_action_returns_empty(self):
         """Unrecognized action types produce empty list."""
         from backend.events.action import NullAction
+
         action = NullAction()
         result = convert_action_to_messages(action, {})
         assert result == []

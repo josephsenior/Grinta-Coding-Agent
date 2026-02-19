@@ -53,9 +53,7 @@ class RecoveryService:
         await self._handle_non_recoverable_error(exc)
 
     _GENERIC_MESSAGES = {
-        ErrorType.MODULE_NOT_FOUND: (
-            "A required Python module is missing: {message}"
-        ),
+        ErrorType.MODULE_NOT_FOUND: ("A required Python module is missing: {message}"),
         ErrorType.RUNTIME_CRASH: (
             "The runtime appears to have crashed or disconnected. "
             "Reinitializing environment."
@@ -65,8 +63,7 @@ class RecoveryService:
             "once connectivity is restored."
         ),
         ErrorType.FILESYSTEM_ERROR: (
-            "File system error encountered. Please check paths and "
-            "permissions."
+            "File system error encountered. Please check paths and permissions."
         ),
         ErrorType.TOOL_CALL_ERROR: (
             "Tool invocation failed because of invalid arguments. "

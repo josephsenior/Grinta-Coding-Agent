@@ -70,7 +70,7 @@ class TestAlertPolicy:
     def test_recovery_resets(self):
         p = AlertPolicy("test", "cpu", 0.9, comparison=">", duration=0.0)
         p.check(0.95)  # start violation
-        p.check(0.5)   # drops below → resets
+        p.check(0.5)  # drops below → resets
         assert p._violation_start_time is None
 
     def test_cooldown(self):
@@ -168,7 +168,9 @@ class TestSLOTracker:
         assert v["latency"] is False
 
     def test_check_slo_violations_all_bad(self):
-        slo = SLOTracker(availability_target=0.99, error_rate_target=0.01, latency_p95_target_ms=10.0)
+        slo = SLOTracker(
+            availability_target=0.99, error_rate_target=0.01, latency_p95_target_ms=10.0
+        )
         for _ in range(50):
             slo.record_request(100.0, is_error=True)
         v = slo.check_slo_violations()
@@ -177,7 +179,9 @@ class TestSLOTracker:
         assert v["latency"] is True
 
     def test_custom_targets(self):
-        slo = SLOTracker(availability_target=0.5, latency_p95_target_ms=500.0, error_rate_target=0.5)
+        slo = SLOTracker(
+            availability_target=0.5, latency_p95_target_ms=500.0, error_rate_target=0.5
+        )
         assert slo.availability_target == 0.5
         assert slo.latency_p95_target_ms == 500.0
         assert slo.error_rate_target == 0.5
@@ -197,7 +201,7 @@ class TestSLOTracker:
 
         assert slo._request_count == 0
         assert slo._error_count == 0
-        assert len(slo._latency_samples) == 0
+        assert not slo._latency_samples
 
 
 class TestAlertManager:
@@ -276,7 +280,9 @@ class TestAlertManager:
     @pytest.mark.asyncio
     async def test_send_alert_calls_send_request(self):
         mgr = AlertManager(endpoint="http://x", enabled=True)
-        with patch.object(mgr, "_send_request", new=AsyncMock(return_value=True)) as send_mock:
+        with patch.object(
+            mgr, "_send_request", new=AsyncMock(return_value=True)
+        ) as send_mock:
             result = await mgr.send_alert("p", "m", 1.0, 2.0, message="hi")
         assert result is True
         assert send_mock.called

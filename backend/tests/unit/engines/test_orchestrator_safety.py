@@ -10,11 +10,13 @@ from backend.engines.orchestrator.safety import OrchestratorSafetyManager
 
 # ── helpers ──────────────────────────────────────────────────────────
 
+
 def _manager(anti_hallucination=None, hallucination_detector=None):
     return OrchestratorSafetyManager(anti_hallucination, hallucination_detector)
 
 
 # ── should_enforce_tools ─────────────────────────────────────────────
+
 
 class TestShouldEnforceTools:
     def test_no_message(self):
@@ -40,6 +42,7 @@ class TestShouldEnforceTools:
 
 
 # ── apply (full pipeline) ───────────────────────────────────────────
+
 
 class TestApply:
     def test_no_modules(self):
@@ -69,6 +72,7 @@ class TestApply:
 
 # ── _tool_function_name ──────────────────────────────────────────────
 
+
 class TestToolFunctionName:
     def test_from_metadata(self):
         action = MagicMock()
@@ -86,6 +90,7 @@ class TestToolFunctionName:
 
 
 # ── _should_warn_on_detection ────────────────────────────────────────
+
 
 class TestShouldWarnOnDetection:
     def test_none(self):
@@ -109,6 +114,7 @@ class TestShouldWarnOnDetection:
 
 # ── _build_warning_content ───────────────────────────────────────────
 
+
 class TestBuildWarningContent:
     def test_basic(self):
         content = OrchestratorSafetyManager._build_warning_content(
@@ -123,6 +129,7 @@ class TestBuildWarningContent:
 
 
 # ── hallucination detection in pipeline ──────────────────────────────
+
 
 class TestDetectAndWarn:
     def test_critical_detection_prepends_warning(self):

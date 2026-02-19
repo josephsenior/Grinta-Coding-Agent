@@ -1,7 +1,6 @@
 """Tests for backend.server.settings Pydantic models."""
 
 
-
 class TestPOSTProviderModel:
     def test_defaults(self):
         from backend.server.settings import POSTProviderModel
@@ -13,9 +12,7 @@ class TestPOSTProviderModel:
     def test_with_tokens(self):
         from backend.server.settings import POSTProviderModel
 
-        model = POSTProviderModel(
-            provider_tokens={"openai": {"token": "sk-123"}}
-        )
+        model = POSTProviderModel(provider_tokens={"openai": {"token": "sk-123"}})
         assert "openai" in model.provider_tokens
 
 
@@ -38,9 +35,7 @@ class TestCustomSecretModels:
     def test_with_description(self):
         from backend.server.settings import CustomSecretWithoutValueModel
 
-        model = CustomSecretWithoutValueModel(
-            name="API_KEY", description="My API key"
-        )
+        model = CustomSecretWithoutValueModel(name="API_KEY", description="My API key")
         assert model.description == "My API key"
 
     def test_with_value(self):

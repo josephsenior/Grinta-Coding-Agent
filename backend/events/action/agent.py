@@ -227,3 +227,133 @@ class TaskTrackingAction(Action):
         if num_tasks == 1:
             return "Managing 1 task item."
         return f"Managing {num_tasks} task items."
+
+
+# ============================================================================
+# Meta-cognition actions - enabling the LLM to express uncertainty and seek guidance
+# ============================================================================
+
+
+@dataclass
+class UncertaintyAction(Action):
+    """An action where the agent expresses uncertainty about its current understanding or observations.
+
+    This enables the LLM to explicitly flag doubt rather than guessing or hallucinating.
+    The system can then provide clarification, additional context, or switch strategy.
+
+    Attributes:
+        uncertainty_level (float): Confidence level 0.0-1.0 (1.0 = fully confident)
+        specific_concerns (list): Specific things the agent is uncertain about
+        requested_information (str): What information would help resolve uncertainty
+        thought (str): The agent's explanation of its concerns
+        action (str): The action type, namely ActionType.UNCERTAINTY
+
+    """
+
+    uncertainty_level: float = 0.5
+    specific_concerns: list[str] = field(default_factory=list)
+    requested_information: str = ""
+    thought: str = ""
+    action: ClassVar[str] = ActionType.UNCERTAINTY
+
+    @property
+    def message(self) -> str:
+        """Get uncertainty expression message."""
+        if self.thought:
+            return f"Expressing uncertainty: {self.thought}"
+        concerns = ", ".join(self.specific_concerns) if self.specific_concerns else "general uncertainty"
+        return f"Uncertainty ({self.uncertainty_level:.0%} confidence): {concerns}"
+
+    __test__ = False
+
+
+@dataclass
+class ProposalAction(Action):
+    """An action where the agent proposes options before committing to a path.
+
+    This enables the LLM to suggest different approaches and get user feedback
+    before executing potentially risky or irreversible actions.
+
+    Attributes:
+        options (list): List of proposed options with pros/cons
+        recommended (int): Index of the recommended option
+        rationale (str): Why these options are being proposed
+        thought (str): The agent's explanation
+        action (str): The action type, namely ActionType.PROPOSAL
+
+    """
+
+    options: list[dict[str, Any]] = field(default_factory=list)
+    recommended: int = 0
+    rationale: str = ""
+    thought: str = ""
+    action: ClassVar[str] = ActionType.PROPOSAL
+
+    @property
+    def message(self) -> str:
+        """Get proposal message."""
+        if self.rationale:
+            return f"Proposing options: {self.rationale}"
+        return f"Proposing {len(self.options)} options for consideration"
+
+    __test__ = False
+
+
+@dataclass
+class ClarificationRequestAction(Action):
+    """An action where the agent asks for clarification before proceeding.
+
+    This enables the LLM to proactively request clarification rather than
+    making assumptions that may lead to errors.
+
+    Attributes:
+        question (str): The clarification question
+        options (list): Optional multiple choice options
+        context (str): Why clarification is needed
+        thought (str): The agent's reasoning
+        action (str): The action type, namely ActionType.CLARIFICATION
+
+    """
+
+    question: str = ""
+    options: list[str] = field(default_factory=list)
+    context: str = ""
+    thought: str = ""
+    action: ClassVar[str] = ActionType.CLARIFICATION
+
+    @property
+    def message(self) -> str:
+        """Get clarification request message."""
+        return f"Requesting clarification: {self.question}"
+
+    __test__ = False
+
+
+@dataclass
+class EscalateToHumanAction(Action):
+    """An action where the agent requests escalation to human assistance.
+
+    This enables the LLM to explicitly request help when it's stuck,
+    has tried multiple approaches without success, or needs human intervention.
+
+    Attributes:
+        reason (str): Why escalation is being requested
+        attempts_made (list): Summary of approaches already tried
+        specific_help_needed (str): What kind of help is needed
+        thought (str): The agent's explanation
+        action (str): The action type, namely ActionType.ESCALATE
+
+    """
+
+    reason: str = ""
+    attempts_made: list[str] = field(default_factory=list)
+    specific_help_needed: str = ""
+    thought: str = ""
+    action: ClassVar[str] = ActionType.ESCALATE
+
+    @property
+    def message(self) -> str:
+        """Get escalation message."""
+        return f"Requesting human assistance: {self.reason}"
+
+    __test__ = False

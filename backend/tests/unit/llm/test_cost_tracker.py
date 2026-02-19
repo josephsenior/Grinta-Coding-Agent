@@ -82,9 +82,14 @@ class TestRecordLLMCostFromMetrics:
     def test_records_accumulated_cost(self):
         metrics = SimpleNamespace(accumulated_cost=1.23)
         mock_record = MagicMock()
-        with patch.dict("sys.modules", {
-            "backend.telemetry.cost_recording": MagicMock(record_llm_cost=mock_record)
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "backend.telemetry.cost_recording": MagicMock(
+                    record_llm_cost=mock_record
+                )
+            },
+        ):
             record_llm_cost_from_metrics("user:42", metrics)
         mock_record.assert_called_once_with("user:42", 1.23)
 
@@ -113,9 +118,7 @@ class TestRecordLLMCostFromResponse:
     @patch("backend.llm.cost_tracker.get_completion_cost", return_value=0.50)
     def test_records_cost_from_usage(self, mock_cost):
         response = {"usage": {"prompt_tokens": 100, "completion_tokens": 50}}
-        with patch(
-            "backend.telemetry.cost_recording.record_llm_cost"
-        ) as mock_record:
+        with patch("backend.telemetry.cost_recording.record_llm_cost") as mock_record:
             record_llm_cost_from_response("ip:127", response, "gpt-4o")
         mock_cost.assert_called_once()
         mock_record.assert_called_once_with("ip:127", 0.50)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from unittest import TestCase
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 
 from backend.events.action import TaskTrackingAction
 from backend.events.observation import (
@@ -248,7 +248,9 @@ class TestTaskTrackingMixin(TestCase):
 
         # Then view them
         view_action = TaskTrackingAction(command="view", task_list=[])
-        self.mixin.event_stream.file_store.read.return_value = "# Task List\n\n1. ⏳ Task 1\n"
+        self.mixin.event_stream.file_store.read.return_value = (
+            "# Task List\n\n1. ⏳ Task 1\n"
+        )
 
         with self.assertPathHandling():
             view_result = self.mixin._handle_task_tracking_action(view_action)

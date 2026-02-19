@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from unittest import TestCase
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-from tenacity import RetryCallState
 
 from backend.core.exceptions import LLMNoResponseError
 from backend.llm.retry_mixin import RetryMixin
@@ -35,9 +34,7 @@ class TestRetryMixin(TestCase):
 
     def test_retry_decorator_custom_retry_exceptions(self):
         """Test retry decorator with custom retry exceptions."""
-        decorator = self.mixin.retry_decorator(
-            retry_exceptions=(ValueError, TypeError)
-        )
+        decorator = self.mixin.retry_decorator(retry_exceptions=(ValueError, TypeError))
 
         self.assertIsNotNone(decorator)
 
@@ -203,9 +200,7 @@ class TestRetryMixin(TestCase):
         )
 
     @patch("backend.llm.retry_mixin.logger")
-    def test_before_sleep_with_llm_no_response_error_non_zero_temp(
-        self, mock_logger
-    ):
+    def test_before_sleep_with_llm_no_response_error_non_zero_temp(self, mock_logger):
         """Test before_sleep handles LLMNoResponseError with non-zero temperature."""
         decorator = self.mixin.retry_decorator(
             num_retries=2, retry_exceptions=(LLMNoResponseError,)

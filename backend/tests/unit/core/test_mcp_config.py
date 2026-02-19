@@ -52,7 +52,11 @@ class TestValidateMcpUrl:
     def test_generic_exception_reraise(self):
         """Test that non-ValueError exceptions are wrapped and raised."""
         from unittest.mock import patch
-        with patch("backend.core.config.mcp_config.urlparse", side_effect=RuntimeError("parse failed")):
+
+        with patch(
+            "backend.core.config.mcp_config.urlparse",
+            side_effect=RuntimeError("parse failed"),
+        ):
             with pytest.raises(ValueError, match="Invalid URL format"):
                 _validate_mcp_url("http://example.com")
 
@@ -103,11 +107,15 @@ class TestMCPStdioServerConfig:
             MCPStdioServerConfig(name="s1", command="")
 
     def test_args_from_string(self):
-        cfg = MCPStdioServerConfig(name="s1", command="npx", args="-y mcp-remote https://example.com")
+        cfg = MCPStdioServerConfig(
+            name="s1", command="npx", args="-y mcp-remote https://example.com"
+        )
         assert cfg.args == ["-y", "mcp-remote", "https://example.com"]
 
     def test_args_from_string_with_quotes(self):
-        cfg = MCPStdioServerConfig(name="s1", command="npx", args='--config "path with spaces"')
+        cfg = MCPStdioServerConfig(
+            name="s1", command="npx", args='--config "path with spaces"'
+        )
         assert "--config" in cfg.args
         assert "path with spaces" in cfg.args
 
@@ -199,9 +207,11 @@ class TestMCPConfig:
         assert normalized == data
 
     def test_string_url_conversion(self):
-        cfg = MCPConfig.model_validate({
-            "sse_servers": ["http://example.com:3000/sse"],
-        })
+        cfg = MCPConfig.model_validate(
+            {
+                "sse_servers": ["http://example.com:3000/sse"],
+            }
+        )
         assert len(cfg.sse_servers) == 1
         assert cfg.sse_servers[0].url == "http://example.com:3000/sse"
 
@@ -227,9 +237,13 @@ class TestMCPConfig:
     def test_validate_servers_invalid_url_format(self):
         """Test validate_servers with malformed URL."""
         from unittest.mock import patch
+
         cfg = MCPConfig(sse_servers=[MCPSSEServerConfig(url="http://test.com")])
         # Patch urlparse to make it fail for testing exception path
-        with patch("backend.core.config.mcp_config.urlparse", side_effect=Exception("parse error")):
+        with patch(
+            "backend.core.config.mcp_config.urlparse",
+            side_effect=Exception("parse error"),
+        ):
             with pytest.raises(ValueError, match="Invalid URL"):
                 cfg.validate_servers()
 
@@ -246,22 +260,28 @@ class TestMCPConfig:
         assert cfg.sse_servers == []
 
     def test_from_toml_section_sse(self):
-        mapping = MCPConfig.from_toml_section({
-            "sse_servers": [{"url": "http://localhost:3000/sse"}],
-        })
+        mapping = MCPConfig.from_toml_section(
+            {
+                "sse_servers": [{"url": "http://localhost:3000/sse"}],
+            }
+        )
         assert len(mapping["mcp"].sse_servers) == 1
 
     def test_from_toml_section_stdio(self):
-        mapping = MCPConfig.from_toml_section({
-            "stdio_servers": [{"name": "s1", "command": "npx"}],
-        })
+        mapping = MCPConfig.from_toml_section(
+            {
+                "stdio_servers": [{"name": "s1", "command": "npx"}],
+            }
+        )
         assert len(mapping["mcp"].stdio_servers) == 1
 
     def test_from_toml_section_shttp(self):
         """Test from_toml_section with shttp_servers."""
-        mapping = MCPConfig.from_toml_section({
-            "shttp_servers": [{"url": "http://localhost:3000/mcp"}],
-        })
+        mapping = MCPConfig.from_toml_section(
+            {
+                "shttp_servers": [{"url": "http://localhost:3000/mcp"}],
+            }
+        )
         assert len(mapping["mcp"].shttp_servers) == 1
         assert mapping["mcp"].shttp_servers[0].url == "http://localhost:3000/mcp"
 
@@ -283,4 +303,4 @@ class TestForgeMCPConfig:
         assert shttp is not None
         assert shttp.url == "http://localhost:3000/mcp/mcp"
         assert isinstance(stdio, list)
-        assert len(stdio) == 0
+        assert not stdio

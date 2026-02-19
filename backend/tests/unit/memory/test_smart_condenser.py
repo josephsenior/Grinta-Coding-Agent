@@ -207,7 +207,10 @@ class TestGetCondensation:
 
     def test_large_history_forgets_some(self):
         sc = SmartCondenser(
-            llm=None, max_size=50, keep_first=2, importance_threshold=0.95,
+            llm=None,
+            max_size=50,
+            keep_first=2,
+            importance_threshold=0.95,
             recency_bonus_window=3,
         )
         events = [_event(i) for i in range(30)]

@@ -18,6 +18,7 @@ from backend.core.type_safety.path_validation import (
 # PathValidationError
 # ---------------------------------------------------------------------------
 
+
 class TestPathValidationError:
     """Tests for PathValidationError."""
 
@@ -34,6 +35,7 @@ class TestPathValidationError:
 # ---------------------------------------------------------------------------
 # SafePath
 # ---------------------------------------------------------------------------
+
 
 class TestSafePath:
     """Tests for SafePath wrapper."""
@@ -63,6 +65,7 @@ class TestSafePath:
     def test_fspath_protocol(self):
         sp = SafePath(Path("/workspace/test.py"))
         import os
+
         assert os.fspath(sp) == str(Path("/workspace/test.py"))
 
     def test_equality(self):
@@ -87,6 +90,7 @@ class TestSafePath:
 # ---------------------------------------------------------------------------
 # validate_and_sanitize_path
 # ---------------------------------------------------------------------------
+
 
 class TestValidateAndSanitizePath:
     """Tests for validate_and_sanitize_path."""
@@ -130,22 +134,30 @@ class TestValidateAndSanitizePath:
 
     def test_must_exist_raises(self):
         with pytest.raises(PathValidationError, match="does not exist"):
-            validate_and_sanitize_path("nonexistent.txt", workspace_root=self.tmpdir, must_exist=True)
+            validate_and_sanitize_path(
+                "nonexistent.txt", workspace_root=self.tmpdir, must_exist=True
+            )
 
     def test_must_exist_passes(self):
         p = Path(self.tmpdir) / "exists.txt"
         p.write_text("data")
-        result = validate_and_sanitize_path("exists.txt", workspace_root=self.tmpdir, must_exist=True)
+        result = validate_and_sanitize_path(
+            "exists.txt", workspace_root=self.tmpdir, must_exist=True
+        )
         assert result == p.resolve()
 
     def test_relative_requires_workspace(self):
         with pytest.raises(PathValidationError, match="workspace_root required"):
-            validate_and_sanitize_path("file.txt", workspace_root=None, must_be_relative=True)
+            validate_and_sanitize_path(
+                "file.txt", workspace_root=None, must_be_relative=True
+            )
 
     def test_absolute_path_allowed(self):
         result = validate_and_sanitize_path(self.tmpdir, must_be_relative=False)
         assert result == Path(self.tmpdir).resolve()
 
     def test_nested_path(self):
-        result = validate_and_sanitize_path("a/b/c/file.txt", workspace_root=self.tmpdir)
+        result = validate_and_sanitize_path(
+            "a/b/c/file.txt", workspace_root=self.tmpdir
+        )
         assert result == Path(self.tmpdir).resolve() / "a" / "b" / "c" / "file.txt"

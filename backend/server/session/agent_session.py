@@ -317,7 +317,12 @@ class AgentSession:
             # Extract provider name from model if possible
             if "/" in model_name:
                 model_name.split("/")[0].title()
-            elif "claude" in model_name.lower() or "gpt" in model_name.lower() or "openai" in model_name.lower() or "gemini" in model_name.lower():
+            elif (
+                "claude" in model_name.lower()
+                or "gpt" in model_name.lower()
+                or "openai" in model_name.lower()
+                or "gemini" in model_name.lower()
+            ):
                 pass
 
             raise LLMAuthenticationError(

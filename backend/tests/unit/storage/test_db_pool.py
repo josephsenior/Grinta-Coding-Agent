@@ -19,6 +19,7 @@ def _reset_pool():
 
 # ── get_db_pool ───────────────────────────────────────────────────────
 
+
 class TestGetDbPool:
     async def test_raises_without_database_url(self, monkeypatch):
         monkeypatch.delenv("DATABASE_URL", raising=False)
@@ -41,7 +42,12 @@ class TestGetDbPool:
         mock_asyncpg = MagicMock()
         mock_asyncpg.create_pool = AsyncMock(return_value=mock_pool)
 
-        with patch("builtins.__import__", side_effect=lambda name, *a, **kw: mock_asyncpg if name == "asyncpg" else __builtins__.__import__(name, *a, **kw)):
+        with patch(
+            "builtins.__import__",
+            side_effect=lambda name, *a, **kw: mock_asyncpg
+            if name == "asyncpg"
+            else __builtins__.__import__(name, *a, **kw),
+        ):
             result = await db_pool_module.get_db_pool()
 
         assert result is mock_pool
@@ -59,7 +65,12 @@ class TestGetDbPool:
         mock_asyncpg = MagicMock()
         mock_asyncpg.create_pool = AsyncMock(return_value=mock_pool)
 
-        with patch("builtins.__import__", side_effect=lambda name, *a, **kw: mock_asyncpg if name == "asyncpg" else __builtins__.__import__(name, *a, **kw)):
+        with patch(
+            "builtins.__import__",
+            side_effect=lambda name, *a, **kw: mock_asyncpg
+            if name == "asyncpg"
+            else __builtins__.__import__(name, *a, **kw),
+        ):
             await db_pool_module.get_db_pool()
 
         call_kwargs = mock_asyncpg.create_pool.call_args[1]
@@ -76,7 +87,12 @@ class TestGetDbPool:
         mock_asyncpg = MagicMock()
         mock_asyncpg.create_pool = AsyncMock(return_value=mock_pool)
 
-        with patch("builtins.__import__", side_effect=lambda name, *a, **kw: mock_asyncpg if name == "asyncpg" else __builtins__.__import__(name, *a, **kw)):
+        with patch(
+            "builtins.__import__",
+            side_effect=lambda name, *a, **kw: mock_asyncpg
+            if name == "asyncpg"
+            else __builtins__.__import__(name, *a, **kw),
+        ):
             await db_pool_module.get_db_pool()
 
         call_kwargs = mock_asyncpg.create_pool.call_args[1]
@@ -85,6 +101,7 @@ class TestGetDbPool:
 
 
 # ── close_db_pool ─────────────────────────────────────────────────────
+
 
 class TestCloseDbPool:
     async def test_noop_when_no_pool(self):

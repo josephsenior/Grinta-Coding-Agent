@@ -463,6 +463,7 @@ class TestSaveScreenshotIfNeeded:
         # Create tiny valid PNG
         img = Image.new("RGB", (1, 1), color=(255, 0, 0))
         import io
+
         buffer = io.BytesIO()
         img.save(buffer, format="PNG")
         valid_png = base64.b64encode(buffer.getvalue()).decode()
@@ -517,12 +518,16 @@ class TestBrowseFunction:
         )
         action = BrowseURLAction(url="https://example.com")
 
-        with patch(
-            "backend.runtime.browser.utils.call_sync_from_async",
-            new_callable=AsyncMock,
-            return_value={"url": "https://example.com", "text_content": "Content"},
-        ), patch(
-            "backend.runtime.browser.utils.get_agent_obs_text", return_value="formatted"
+        with (
+            patch(
+                "backend.runtime.browser.utils.call_sync_from_async",
+                new_callable=AsyncMock,
+                return_value={"url": "https://example.com", "text_content": "Content"},
+            ),
+            patch(
+                "backend.runtime.browser.utils.get_agent_obs_text",
+                return_value="formatted",
+            ),
         ):
             obs = await browse(action, mock_browser)
 
@@ -534,15 +539,18 @@ class TestBrowseFunction:
         mock_browser = MagicMock()
         action = BrowseURLAction(url="https://example.com", return_axtree=False)
 
-        with patch(
-            "backend.runtime.browser.utils.call_sync_from_async",
-            new_callable=AsyncMock,
-            return_value={
-                "axtree_object": {"nodes": [1, 2, 3]},
-                "extra_element_properties": {"key": "val"},
-            },
-        ), patch(
-            "backend.runtime.browser.utils.get_agent_obs_text", return_value="text"
+        with (
+            patch(
+                "backend.runtime.browser.utils.call_sync_from_async",
+                new_callable=AsyncMock,
+                return_value={
+                    "axtree_object": {"nodes": [1, 2, 3]},
+                    "extra_element_properties": {"key": "val"},
+                },
+            ),
+            patch(
+                "backend.runtime.browser.utils.get_agent_obs_text", return_value="text"
+            ),
         ):
             obs = await browse(action, mock_browser)
 
@@ -552,19 +560,20 @@ class TestBrowseFunction:
     async def test_keeps_axtree_when_requested(self):
         """Test keeps DOM data when return_axtree is True."""
         mock_browser = MagicMock()
-        action = BrowseInteractiveAction(
-            browser_actions="click", return_axtree=True
-        )
+        action = BrowseInteractiveAction(browser_actions="click", return_axtree=True)
 
-        with patch(
-            "backend.runtime.browser.utils.call_sync_from_async",
-            new_callable=AsyncMock,
-            return_value={
-                "axtree_object": {"nodes": [1, 2, 3]},
-                "extra_element_properties": {"key": "val"},
-            },
-        ), patch(
-            "backend.runtime.browser.utils.get_agent_obs_text", return_value="text"
+        with (
+            patch(
+                "backend.runtime.browser.utils.call_sync_from_async",
+                new_callable=AsyncMock,
+                return_value={
+                    "axtree_object": {"nodes": [1, 2, 3]},
+                    "extra_element_properties": {"key": "val"},
+                },
+            ),
+            patch(
+                "backend.runtime.browser.utils.get_agent_obs_text", return_value="text"
+            ),
         ):
             obs = await browse(action, mock_browser)
 

@@ -22,7 +22,7 @@ class TestLogShipper:
     def test_disabled_enqueue_is_noop(self):
         shipper = LogShipper(endpoint="http://x", enabled=False)
         shipper.enqueue({"message": "hello"})
-        assert len(shipper._log_queue) == 0
+        assert not shipper._log_queue
 
     def test_enabled_enqueue_adds(self):
         shipper = LogShipper(endpoint="http://x", enabled=True)
@@ -53,7 +53,7 @@ class TestLogShipper:
         batch = shipper._dequeue_batch()
         # batch_size=10 so all 5 should be dequeued
         assert len(batch) == 5
-        assert len(shipper._log_queue) == 0
+        assert not shipper._log_queue
 
     def test_dequeue_batch_empty(self):
         shipper = LogShipper(endpoint="http://x", enabled=True)
@@ -123,9 +123,7 @@ class TestLogShipper:
             def post(self, *args, **kwargs):
                 return FakeContext(FakeResponse())
 
-        result = await shipper._post_payload(
-            FakeSession(), {"logs": []}, {"X": "Y"}, 1
-        )
+        result = await shipper._post_payload(FakeSession(), {"logs": []}, {"X": "Y"}, 1)
         assert result is True
 
     @pytest.mark.asyncio
@@ -152,9 +150,7 @@ class TestLogShipper:
             def post(self, *args, **kwargs):
                 return FakeContext(FakeResponse())
 
-        result = await shipper._post_payload(
-            FakeSession(), {"logs": []}, {"X": "Y"}, 1
-        )
+        result = await shipper._post_payload(FakeSession(), {"logs": []}, {"X": "Y"}, 1)
         assert result is False
 
     @pytest.mark.asyncio
@@ -162,7 +158,9 @@ class TestLogShipper:
         shipper = LogShipper(endpoint="http://x", enabled=True)
         logs = [{"message": "x"}]
 
-        with patch.object(shipper, "_send_request", new=AsyncMock(return_value=True)) as send_mock:
+        with patch.object(
+            shipper, "_send_request", new=AsyncMock(return_value=True)
+        ) as send_mock:
             result = await shipper._ship_logs(logs)
 
         assert result is True
@@ -208,11 +206,15 @@ class TestLogShipper:
 
     @pytest.mark.asyncio
     async def test_attempt_ship_with_retries(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True, max_retries=3, retry_delay=0.01)
+        shipper = LogShipper(
+            endpoint="http://x", enabled=True, max_retries=3, retry_delay=0.01
+        )
         logs = [{"message": "x"}]
 
         shipper._ship_logs = AsyncMock(side_effect=[False, True])
-        with patch("backend.core.log_shipping.asyncio.sleep", new=AsyncMock()) as sleep_mock:
+        with patch(
+            "backend.core.log_shipping.asyncio.sleep", new=AsyncMock()
+        ) as sleep_mock:
             result = await shipper._attempt_ship_with_retries(logs)
 
         assert result is True
@@ -235,7 +237,9 @@ class TestLogShipper:
             coro.close()
             return MagicMock()
 
-        monkeypatch.setattr("backend.core.log_shipping.asyncio.create_task", fake_create_task)
+        monkeypatch.setattr(
+            "backend.core.log_shipping.asyncio.create_task", fake_create_task
+        )
 
         shipper.enqueue({"message": "x"})
         assert shipper._ship_task is not None
@@ -249,7 +253,7 @@ class TestLogShipper:
         await shipper.flush()
 
         shipper._ship_logs.assert_awaited_once()
-        assert len(shipper._log_queue) == 0
+        assert not shipper._log_queue
 
     @pytest.mark.asyncio
     async def test_start_creates_task(self, monkeypatch):
@@ -259,7 +263,9 @@ class TestLogShipper:
             coro.close()
             return MagicMock()
 
-        monkeypatch.setattr("backend.core.log_shipping.asyncio.create_task", fake_create_task)
+        monkeypatch.setattr(
+            "backend.core.log_shipping.asyncio.create_task", fake_create_task
+        )
 
         await shipper.start()
         assert shipper._ship_task is not None
@@ -312,8 +318,13 @@ class TestLogShippingHandler:
     def test_no_shipper(self):
         handler = LogShippingHandler(shipper=None)
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="hello", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=(),
+            exc_info=None,
         )
         handler.emit(record)  # should not raise
 
@@ -321,18 +332,28 @@ class TestLogShippingHandler:
         shipper = LogShipper(enabled=False)
         handler = LogShippingHandler(shipper=shipper)
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="hello", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=(),
+            exc_info=None,
         )
         handler.emit(record)  # should not raise, not enqueued
-        assert len(shipper._log_queue) == 0
+        assert not shipper._log_queue
 
     def test_enabled_shipper_enqueues(self):
         shipper = LogShipper(endpoint="http://x", enabled=True)
         handler = LogShippingHandler(shipper=shipper)
         record = logging.LogRecord(
-            name="test", level=logging.WARNING, pathname="/p", lineno=42,
-            msg="warn msg", args=(), exc_info=None,
+            name="test",
+            level=logging.WARNING,
+            pathname="/p",
+            lineno=42,
+            msg="warn msg",
+            args=(),
+            exc_info=None,
         )
         handler.emit(record)
         assert len(shipper._log_queue) == 1
@@ -348,8 +369,13 @@ class TestLogShippingHandler:
         shipper.enqueue.side_effect = RuntimeError("fail")
         handler = LogShippingHandler(shipper=shipper)
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="x", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="x",
+            args=(),
+            exc_info=None,
         )
         handler.emit(record)  # should not raise
 

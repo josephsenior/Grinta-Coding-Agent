@@ -54,7 +54,12 @@ def cache():
         "backend.engines.auditor.tools.file_cache.create_distributed_cache",
         return_value=None,
     ):
-        return FileCache(max_cache_size=5, ttl_seconds=60, enable_mtime_check=False, use_distributed=False)
+        return FileCache(
+            max_cache_size=5,
+            ttl_seconds=60,
+            enable_mtime_check=False,
+            use_distributed=False,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -98,9 +103,15 @@ class TestContentCache:
             "backend.engines.auditor.tools.file_cache.create_distributed_cache",
             return_value=None,
         ):
-            c = FileCache(ttl_seconds=0, enable_mtime_check=False, use_distributed=False)
+            c = FileCache(
+                ttl_seconds=0, enable_mtime_check=False, use_distributed=False
+            )
         # Manually insert expired entry
-        c.content_cache["/test.py"] = ("content", datetime.now() - timedelta(seconds=10), 0.0)
+        c.content_cache["/test.py"] = (
+            "content",
+            datetime.now() - timedelta(seconds=10),
+            0.0,
+        )
         assert c.get_content("/test.py") is None
 
     def test_mtime_invalidation(self):
@@ -108,14 +119,16 @@ class TestContentCache:
             "backend.engines.auditor.tools.file_cache.create_distributed_cache",
             return_value=None,
         ):
-            c = FileCache(ttl_seconds=300, enable_mtime_check=True, use_distributed=False)
+            c = FileCache(
+                ttl_seconds=300, enable_mtime_check=True, use_distributed=False
+            )
         with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as f:
             f.write(b"v1")
             f.flush()
             c.cache_content(f.name, "v1")
             # Modify file to change mtime
             time.sleep(0.05)
-            with open(f.name, "w") as fh:
+            with open(f.name, "w", encoding="utf-8") as fh:
                 fh.write("v2")
             # Now local check should return None (mtime changed)
             assert c.get_content(f.name) is None
@@ -189,8 +202,8 @@ class TestInvalidation:
         cache.content_cache["/a.py"] = ("c", datetime.now(), 0.0)
         cache.symbol_cache["/a.py"] = {}
         cache.clear()
-        assert len(cache.content_cache) == 0
-        assert len(cache.symbol_cache) == 0
+        assert not cache.content_cache
+        assert not cache.symbol_cache
 
 
 # ---------------------------------------------------------------------------

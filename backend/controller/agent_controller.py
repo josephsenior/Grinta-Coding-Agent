@@ -423,6 +423,9 @@ class AgentController:
         """Execute one agent step.
 
         Detects stuck agents and enforces iteration and task budget limits.
+        When the agent returns a non-blocking action (e.g. AgentThinkAction)
+        and has more queued actions from the same LLM response, those are
+        drained immediately without re-entering the full polling cycle.
         """
         if not self.step_prerequisites.can_step():
             return
@@ -452,6 +455,29 @@ class AgentController:
         await self.action_execution.execute_action(action)
         await self._handle_post_execution()
 
+        # Batch-drain queued non-blocking actions from the same LLM response.
+        # After a non-runnable action (e.g. AgentThinkAction), no pending_action
+        # is set, so we can immediately process the next queued action without
+        # waiting for the full polling cycle.
+        while self._can_drain_pending():
+            action = await self.action_execution.get_next_action()
+            if action is None:
+                break
+            await self.action_execution.execute_action(action)
+            await self._handle_post_execution()
+
+    def _can_drain_pending(self) -> bool:
+        """Check if we can immediately execute the next queued action.
+
+        Returns True when no action is awaiting its observation (i.e. the last
+        action was non-runnable) AND the agent has more queued actions from the
+        same LLM response.
+        """
+        if self._pending_action:
+            return False
+        pending = getattr(self.agent, "pending_actions", None)
+        return bool(pending)
+
     async def _handle_post_execution(self) -> None:
         """Handle post-execution tasks like rate limits and memory pressure."""
         # Check rate limits after action execution (which likely consumed tokens)
@@ -475,8 +501,8 @@ class AgentController:
             )
             self.memory_pressure.record_condensation()
             # Set a metadata flag the orchestrator can check during next step()
-            if hasattr(self.state, "extra_data"):
-                self.state.set_extra("memory_pressure", level, source="AgentController")
+            if hasattr(self.state, "turn_signals"):
+                self.state.set_memory_pressure(level, source="AgentController")
 
     async def _run_control_flags_safely(self) -> bool:
         """Run control flags with exception handling."""

@@ -1,6 +1,5 @@
 """Tests for backend.code_quality.impl — code linting with multiple backends."""
 
-
 from backend.code_quality.impl import DefaultLinter, LintError, LintResult
 
 
@@ -89,14 +88,14 @@ class TestLintResult:
         error2 = LintError(line=2, column=2, message="Error 2", severity="error")
         result = LintResult(errors=[error1, error2], warnings=[])
         assert len(result.errors) == 2
-        assert len(result.warnings) == 0
+        assert not result.warnings
 
     def test_create_with_warnings_only(self):
         """Test creating LintResult with warnings only."""
         warning1 = LintError(line=1, column=1, message="Warning 1", severity="warning")
         warning2 = LintError(line=2, column=2, message="Warning 2", severity="warning")
         result = LintResult(errors=[], warnings=[warning1, warning2])
-        assert len(result.errors) == 0
+        assert not result.errors
         assert len(result.warnings) == 2
 
     def test_create_with_mixed_issues(self):
@@ -178,7 +177,7 @@ class TestDefaultLinter:
     def test_cache_initialized_empty(self):
         """Test cache is initialized empty."""
         linter = DefaultLinter()
-        assert len(linter._cache) == 0
+        assert not linter._cache
         assert linter._cache_hits == 0
         assert linter._cache_misses == 0
 
@@ -199,6 +198,7 @@ class TestDefaultLinter:
         """Test cache uses OrderedDict for LRU behavior."""
         linter = DefaultLinter()
         from collections import OrderedDict
+
         assert isinstance(linter._cache, OrderedDict)
 
     def test_cache_metrics_initialization(self):

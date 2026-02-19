@@ -33,3 +33,16 @@ class StuckDetectionService:
         if not self._detector:
             return False
         return bool(self._detector.is_stuck(self._controller.headless_mode))
+
+    def compute_repetition_score(self) -> float:
+        """Compute a 0.0-1.0 proximity score for stuck detection.
+
+        Exposes how close the agent is to being flagged as stuck,
+        allowing proactive self-correction.
+        """
+        if not self._detector:
+            return 0.0
+        try:
+            return self._detector.compute_repetition_score(self._controller.headless_mode)
+        except Exception:
+            return 0.0

@@ -1,0 +1,29 @@
+[MASTER]
+# Test-specific pylint configuration
+# Tests have different rules from production code
+
+[MESSAGES CONTROL]
+disable=
+    # Tests legitimately access private members for testing
+    W0212,  # protected-access
+    # Pytest fixtures redefine outer names by design
+    W0621,  # redefined-outer-name
+    # Tests often have unused variables in setup
+    W0612,  # unused-variable
+    # Tests duplicate code intentionally for readability
+    R0801,  # duplicate-code
+    # Test classes can have many methods
+    R0904,  # too-many-public-methods
+    # Tests can have many arguments/attributes
+    R0902,  # too-many-instance-attributes
+    R0913,  # too-many-arguments
+    R0917,  # too-many-positional-arguments
+    # Tests can have long methods with many steps
+    R0911,  # too-many-return-statements
+    R1702,  # too-many-nested-blocks
+    # Test constants use UPPER_CASE which isn't snake_case
+    C0103,  # invalid-name
+    # Docstrings not required in tests
+    C0114,  # missing-module-docstring
+    C0115,  # missing-class-docstring
+    C0116   # missing-function-docstring

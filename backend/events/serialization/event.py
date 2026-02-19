@@ -369,12 +369,23 @@ def event_to_trajectory(
 
 
 def truncate_content(content: str, max_chars: int | None = None) -> str:
-    """Truncate the middle of the observation content if it is too long."""
+    """Truncate long content, keeping a small head and large tail.
+
+    Command output typically ends with the most important information (error
+    messages, tracebacks, test results).  Keeping 12 % from the start for
+    context and 88 % from the end ensures errors are never truncated away.
+    """
     if max_chars is None or len(content) <= max_chars or max_chars < 0:
         return content
-    half = max_chars // 2
+    original_len = len(content)
+    # At least 20 % of head context if max_chars is small; the rest goes to the tail.
+    # Otherwise at least 200 chars.
+    head = min(max_chars // 5, 200) if max_chars < 1000 else max(200, max_chars // 8)
+    tail = max(0, max_chars - head)
+    retained = head + tail
+    pct = round(retained / original_len * 100)
     return (
-        content[:half]
-        + "\n[... Observation truncated due to length ...]\n"
-        + content[-half:]
+        content[:head]
+        + f"\n[... Observation truncated: {original_len} chars → {retained} chars ({pct}% retained) ...]\n"
+        + content[-tail:] if tail > 0 else f"\n[... Observation truncated: {original_len} chars → {retained} chars ({pct}% retained) ...]\n"
     )

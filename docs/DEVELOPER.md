@@ -129,6 +129,27 @@ class MyService:
         pass
 ```
 
+## Tool Invocation Pipeline
+
+The `AgentController` executes tools through a middleware pipeline (`backend/controller/tool_pipeline.py`). This allows intercepting tool calls for validation, safety, and telemetry.
+
+### Middleware Chain
+
+The pipeline runs in four stages: `plan` → `verify` → `execute` → `observe`.
+
+| Middleware | Stage | Responsibility |
+| --- | --- | --- |
+| `PlanningMiddleware` | Plan | **Auto-Planning**: Injects a planning directive (`[AUTO-PLAN]`) if task complexity is high. |
+| `SafetyValidatorMiddleware` | Verify | **Safety**: Checks actions against the safety policy (e.g., blocking `rm -rf`). |
+| `ReflectionMiddleware` | Verify | **Sanity Check**: Verifies file edits (syntax) and commands (destructive patterns) before execution. |
+| `ConflictDetectionMiddleware` | Verify | **State Integrity**: Blocks repeated file edits if the file hasn't been read/verified in between. |
+| `CircuitBreakerMiddleware` | Execute/Observe | **Reliability**: Tracks error rates and trips the circuit breaker on failures. |
+| `CostQuotaMiddleware` | Plan/Observe | **Budget**: Tracks token usage and enforces budget limits. |
+| `ErrorPatternMiddleware` | Observe | **Self-Correction**: Auto-queries the `error_patterns` DB for known fixes when an error occurs. |
+| `EditVerifyMiddleware` | Observe | **Verification**: Appends a hint to read file content after edits to ensure changes were applied correctly. |
+| `TelemetryMiddleware` | All | **Observability**: Emits telemetry events for each stage. |
+| `LoggingMiddleware` | All | **Debugging**: detailed logs. |
+
 ## Event System Internals
 
 ### EventStream

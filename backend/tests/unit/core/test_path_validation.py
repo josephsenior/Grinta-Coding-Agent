@@ -47,7 +47,9 @@ class TestValidateAndSanitizePath:
         assert result == workspace / "app.py"
 
     def test_nested_relative(self, workspace: Path):
-        result = validate_and_sanitize_path("src/main.py", workspace_root=str(workspace))
+        result = validate_and_sanitize_path(
+            "src/main.py", workspace_root=str(workspace)
+        )
         assert result == (workspace / "src" / "main.py").resolve()
 
     def test_empty_string(self):
@@ -67,7 +69,9 @@ class TestValidateAndSanitizePath:
         with pytest.raises(PathValidationError, match="dangerous character"):
             validate_and_sanitize_path(f"file{char}name", workspace_root=str(workspace))
 
-    @pytest.mark.parametrize("pattern", ["../etc/passwd", "..\\windows\\system32", "..%2Fetc"])
+    @pytest.mark.parametrize(
+        "pattern", ["../etc/passwd", "..\\windows\\system32", "..%2Fetc"]
+    )
     def test_traversal(self, pattern: str, workspace: Path):
         with pytest.raises(PathValidationError, match="traversal"):
             validate_and_sanitize_path(pattern, workspace_root=str(workspace))
@@ -92,7 +96,9 @@ class TestValidateAndSanitizePath:
 
     def test_relative_needs_workspace(self):
         with pytest.raises(PathValidationError, match="workspace_root required"):
-            validate_and_sanitize_path("file.py", workspace_root=None, must_be_relative=True)
+            validate_and_sanitize_path(
+                "file.py", workspace_root=None, must_be_relative=True
+            )
 
     def test_absolute_mode(self, tmp_path: Path):
         target = tmp_path / "absolute.py"
@@ -101,7 +107,9 @@ class TestValidateAndSanitizePath:
         assert result.exists()
 
     def test_url_decoded(self, workspace: Path):
-        result = validate_and_sanitize_path("my%20file.py", workspace_root=str(workspace))
+        result = validate_and_sanitize_path(
+            "my%20file.py", workspace_root=str(workspace)
+        )
         assert "my file" in str(result)
 
     def test_very_deep_path(self, workspace: Path):
@@ -115,12 +123,14 @@ class TestValidateAndSanitizePath:
         # Use an invalid character for Windows paths (if on Windows)
         # or a path that would cause OSError
         import platform
+
         if platform.system() == "Windows":
             # Windows doesn't allow certain characters in paths
             # This should be caught by dangerous chars, but let's test other edge cases
             pass
         # Alternative approach: mock Path.resolve to raise OSError
         from unittest.mock import patch
+
         with patch("pathlib.Path.resolve", side_effect=OSError("Mock error")):
             with pytest.raises(PathValidationError, match="Invalid path"):
                 validate_and_sanitize_path("test.py", workspace_root=str(workspace))
@@ -214,7 +224,9 @@ class TestSafePath:
         outside_file = outside / "file.py"
         outside_file.touch()
         # Create a SafePath with absolute path outside workspace
-        sp = SafePath.validate(str(outside_file), workspace_root=str(workspace), must_be_relative=False)
+        sp = SafePath.validate(
+            str(outside_file), workspace_root=str(workspace), must_be_relative=False
+        )
         # Set workspace_root after validation to test the ValueError path
         sp._workspace_root = workspace
         result = sp.relative_to_workspace()

@@ -182,7 +182,9 @@ class TestAgentState:
     def test_user_interaction_states(self):
         """Test AgentState user interaction values."""
         assert AgentState.AWAITING_USER_INPUT.value == "awaiting_user_input"
-        assert AgentState.AWAITING_USER_CONFIRMATION.value == "awaiting_user_confirmation"
+        assert (
+            AgentState.AWAITING_USER_CONFIRMATION.value == "awaiting_user_confirmation"
+        )
         assert AgentState.USER_CONFIRMED.value == "user_confirmed"
         assert AgentState.USER_REJECTED.value == "user_rejected"
 
@@ -219,7 +221,10 @@ class TestActionConfirmationStatus:
         """Test ActionConfirmationStatus has expected values."""
         assert ActionConfirmationStatus.CONFIRMED.value == "confirmed"
         assert ActionConfirmationStatus.REJECTED.value == "rejected"
-        assert ActionConfirmationStatus.AWAITING_CONFIRMATION.value == "awaiting_confirmation"
+        assert (
+            ActionConfirmationStatus.AWAITING_CONFIRMATION.value
+            == "awaiting_confirmation"
+        )
 
     def test_enum_count(self):
         """Test ActionConfirmationStatus has exactly 3 values."""
@@ -285,8 +290,14 @@ class TestRuntimeStatus:
 
     def test_error_statuses(self):
         """Test RuntimeStatus has error values."""
-        assert RuntimeStatus.ERROR_RUNTIME_DISCONNECTED.value == "STATUS$ERROR_RUNTIME_DISCONNECTED"
-        assert RuntimeStatus.ERROR_LLM_AUTHENTICATION.value == "STATUS$ERROR_LLM_AUTHENTICATION"
+        assert (
+            RuntimeStatus.ERROR_RUNTIME_DISCONNECTED.value
+            == "STATUS$ERROR_RUNTIME_DISCONNECTED"
+        )
+        assert (
+            RuntimeStatus.ERROR_LLM_AUTHENTICATION.value
+            == "STATUS$ERROR_LLM_AUTHENTICATION"
+        )
 
     def test_enum_minimum_count(self):
         """Test RuntimeStatus has at least 10 values."""

@@ -143,5 +143,5 @@ def create_llm_based_edit_tool() -> ChatCompletionToolParam:
             },
             "security_risk": get_security_risk_param(),
         },
-        required=["path", "content", "security_risk"],
+        required=["path", "content"],
     )

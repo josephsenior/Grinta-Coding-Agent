@@ -47,7 +47,9 @@ class TestParseProvidersSet:
     def test_comma_separated_providers(self):
         from backend.server.socket_auth import parse_providers_set
 
-        result = parse_providers_set({"providers_set": ["enterprise_sso,enterprise_sso"]})
+        result = parse_providers_set(
+            {"providers_set": ["enterprise_sso,enterprise_sso"]}
+        )
         assert len(result) == 2
 
     def test_empty_providers(self):

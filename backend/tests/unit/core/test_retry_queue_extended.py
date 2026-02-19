@@ -6,10 +6,9 @@ and get_retry_queue singleton factory.
 
 from __future__ import annotations
 
-import asyncio
 import time
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 from backend.core.retry_queue import (
     BaseRetryBackend,
@@ -187,17 +186,13 @@ class TestInMemoryRetryBackend(unittest.IsolatedAsyncioTestCase):
         self.backend = InMemoryRetryBackend()
 
     async def test_schedule_stores_task(self):
-        task = RetryTask(
-            id="t1", controller_id="ctrl", payload={"a": 1}, reason="test"
-        )
+        task = RetryTask(id="t1", controller_id="ctrl", payload={"a": 1}, reason="test")
         result = await self.backend.schedule(task)
         self.assertEqual(result.id, "t1")
         self.assertIn("t1", self.backend._tasks)
 
     async def test_schedule_returns_same_task(self):
-        task = RetryTask(
-            id="t2", controller_id="ctrl", payload={}, reason="test"
-        )
+        task = RetryTask(id="t2", controller_id="ctrl", payload={}, reason="test")
         result = await self.backend.schedule(task)
         self.assertIs(result, task)
 
@@ -266,9 +261,7 @@ class TestInMemoryRetryBackend(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ready_a[0].id, "ta")
 
     async def test_mark_success_removes_task(self):
-        task = RetryTask(
-            id="ts", controller_id="ctrl", payload={}, reason="test"
-        )
+        task = RetryTask(id="ts", controller_id="ctrl", payload={}, reason="test")
         await self.backend.schedule(task)
         self.assertIn("ts", self.backend._tasks)
 
@@ -309,9 +302,7 @@ class TestInMemoryRetryBackend(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.backend._dead_letter[0].id, "td")
 
     async def test_dead_letter_moves_task(self):
-        task = RetryTask(
-            id="dl", controller_id="ctrl", payload={}, reason="fatal"
-        )
+        task = RetryTask(id="dl", controller_id="ctrl", payload={}, reason="fatal")
         await self.backend.schedule(task)
         self.assertIn("dl", self.backend._tasks)
 
@@ -332,12 +323,18 @@ class TestInMemoryRetryBackend(unittest.IsolatedAsyncioTestCase):
 
     async def test_multiple_schedule_same_id(self):
         task = RetryTask(
-            id="dup", controller_id="ctrl", payload={"v": 1}, reason="test",
+            id="dup",
+            controller_id="ctrl",
+            payload={"v": 1},
+            reason="test",
             next_attempt_at=time.time() - 10,
         )
         await self.backend.schedule(task)
         task2 = RetryTask(
-            id="dup", controller_id="ctrl", payload={"v": 2}, reason="test2",
+            id="dup",
+            controller_id="ctrl",
+            payload={"v": 2},
+            reason="test2",
             next_attempt_at=time.time() - 10,
         )
         await self.backend.schedule(task2)
@@ -400,7 +397,7 @@ class TestRetryQueue(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(task.next_attempt_at, before + 5.0)
 
     async def test_fetch_ready_delegates(self):
-        task = await self.queue.schedule(
+        await self.queue.schedule(
             controller_id="ctrl-1",
             payload={},
             reason="test",
@@ -412,7 +409,7 @@ class TestRetryQueue(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(ready), 1)
 
     async def test_mark_success_delegates(self):
-        task = await self.queue.schedule(
+        await self.queue.schedule(
             controller_id="ctrl-1",
             payload={},
             reason="test",
@@ -426,7 +423,7 @@ class TestRetryQueue(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(remaining), 0)
 
     async def test_mark_failure_reschedules(self):
-        task = await self.queue.schedule(
+        await self.queue.schedule(
             controller_id="ctrl-1",
             payload={},
             reason="test",
@@ -440,7 +437,7 @@ class TestRetryQueue(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.reason, "connection refused")
 
     async def test_mark_failure_exhausted(self):
-        task = await self.queue.schedule(
+        await self.queue.schedule(
             controller_id="ctrl-1",
             payload={},
             reason="test",
@@ -488,10 +485,12 @@ class TestGetRetryQueue(unittest.TestCase):
     def setUp(self):
         # Reset singleton before each test
         import backend.core.retry_queue as rq_module
+
         rq_module._retry_queue = None
 
     def tearDown(self):
         import backend.core.retry_queue as rq_module
+
         rq_module._retry_queue = None
 
     def test_returns_none_when_disabled(self):
@@ -500,33 +499,45 @@ class TestGetRetryQueue(unittest.TestCase):
             self.assertIsNone(result)
 
     def test_returns_queue_when_enabled(self):
-        with patch.dict("os.environ", {
-            "RETRY_QUEUE_ENABLED": "true",
-            "RETRY_QUEUE_BACKEND": "memory",
-        }, clear=False):
+        with patch.dict(
+            "os.environ",
+            {
+                "RETRY_QUEUE_ENABLED": "true",
+                "RETRY_QUEUE_BACKEND": "memory",
+            },
+            clear=False,
+        ):
             result = get_retry_queue()
             self.assertIsNotNone(result)
             self.assertIsInstance(result, RetryQueue)
             self.assertIsInstance(result.backend, InMemoryRetryBackend)
 
     def test_returns_cached_singleton(self):
-        with patch.dict("os.environ", {
-            "RETRY_QUEUE_ENABLED": "true",
-            "RETRY_QUEUE_BACKEND": "memory",
-        }, clear=False):
+        with patch.dict(
+            "os.environ",
+            {
+                "RETRY_QUEUE_ENABLED": "true",
+                "RETRY_QUEUE_BACKEND": "memory",
+            },
+            clear=False,
+        ):
             q1 = get_retry_queue()
             q2 = get_retry_queue()
             self.assertIs(q1, q2)
 
     def test_custom_config_from_env(self):
-        with patch.dict("os.environ", {
-            "RETRY_QUEUE_ENABLED": "true",
-            "RETRY_QUEUE_BACKEND": "memory",
-            "RETRY_QUEUE_RETRY_DELAY_SECONDS": "30.0",
-            "RETRY_QUEUE_MAX_DELAY_SECONDS": "1800.0",
-            "RETRY_QUEUE_MAX_RETRIES": "5",
-            "RETRY_QUEUE_POLL_INTERVAL": "10.0",
-        }, clear=False):
+        with patch.dict(
+            "os.environ",
+            {
+                "RETRY_QUEUE_ENABLED": "true",
+                "RETRY_QUEUE_BACKEND": "memory",
+                "RETRY_QUEUE_RETRY_DELAY_SECONDS": "30.0",
+                "RETRY_QUEUE_MAX_DELAY_SECONDS": "1800.0",
+                "RETRY_QUEUE_MAX_RETRIES": "5",
+                "RETRY_QUEUE_POLL_INTERVAL": "10.0",
+            },
+            clear=False,
+        ):
             q = get_retry_queue()
             self.assertEqual(q.base_delay, 30.0)
             self.assertEqual(q.max_delay, 1800.0)
@@ -536,6 +547,7 @@ class TestGetRetryQueue(unittest.TestCase):
     def test_disabled_values(self):
         for val in ("false", "0", "no", "anything"):
             import backend.core.retry_queue as rq_module
+
             rq_module._retry_queue = None
             with patch.dict("os.environ", {"RETRY_QUEUE_ENABLED": val}, clear=False):
                 result = get_retry_queue()

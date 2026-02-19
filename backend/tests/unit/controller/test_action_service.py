@@ -27,7 +27,9 @@ def _make_context() -> MagicMock:
     # Mock get_combined_metrics to return a proper metrics-like object
     controller.conversation_stats.get_combined_metrics.return_value = SimpleNamespace(
         accumulated_cost=0.5,
-        accumulated_token_usage=SimpleNamespace(prompt_tokens=100, completion_tokens=50),
+        accumulated_token_usage=SimpleNamespace(
+            prompt_tokens=100, completion_tokens=50
+        ),
         max_budget_per_task=10.0,
     )
     controller._bind_action_context = MagicMock()
@@ -53,22 +55,28 @@ def _make_confirmation_service() -> MagicMock:
 
 # ── run: type check ─────────────────────────────────────────────────
 
+
 class TestRunTypeCheck:
     @pytest.mark.asyncio
     async def test_rejects_non_action(self):
-        svc = ActionService(_make_context(), _make_pending_service(), _make_confirmation_service())
+        svc = ActionService(
+            _make_context(), _make_pending_service(), _make_confirmation_service()
+        )
         with pytest.raises(TypeError, match="requires an Action"):
             await svc.run("not_an_action", None)
 
 
 # ── run: blocked ─────────────────────────────────────────────────────
 
+
 class TestRunBlocked:
     @pytest.mark.asyncio
     async def test_blocked_ctx_calls_handle_blocked(self):
         ctx_mock = _make_context()
         controller = ctx_mock.get_controller()
-        svc = ActionService(ctx_mock, _make_pending_service(), _make_confirmation_service())
+        svc = ActionService(
+            ctx_mock, _make_pending_service(), _make_confirmation_service()
+        )
         action = MagicMock(spec=Action)
         action.runnable = True
         action.source = None
@@ -80,6 +88,7 @@ class TestRunBlocked:
 
 
 # ── set_pending_action / get_pending_action ──────────────────────────
+
 
 class TestPendingActionDelegation:
     def test_set_delegates(self):
@@ -106,10 +115,13 @@ class TestPendingActionDelegation:
 
 # ── _prepare_metrics_for_action ──────────────────────────────────────
 
+
 class TestPrepareMetrics:
     def test_attaches_metrics_to_action(self):
         ctx_mock = _make_context()
-        svc = ActionService(ctx_mock, _make_pending_service(), _make_confirmation_service())
+        svc = ActionService(
+            ctx_mock, _make_pending_service(), _make_confirmation_service()
+        )
         action = MagicMock(spec=Action)
         action.llm_metrics = None
         svc._prepare_metrics_for_action(action)

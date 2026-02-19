@@ -96,7 +96,10 @@ _CRITICAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "recursive forced delete (PowerShell)",
     ),
     (re.compile(r"\bformat\s+[a-zA-Z]:\s*$", re.I), "drive format (Windows)"),
-    (re.compile(r"\bdel\b.*(/s|/q).*(/s|/q)", re.I), "recursive forced delete (cmd.exe)"),
+    (
+        re.compile(r"\bdel\b.*(/s|/q).*(/s|/q)", re.I),
+        "recursive forced delete (cmd.exe)",
+    ),
 ]
 
 _HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
@@ -168,8 +171,8 @@ class CommandAnalyzer:
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self.config: dict[str, Any] = config or {}
-        self._blocked: list[str] = self.config.get("blocked_commands", [])
-        self._allowed: list[str] = self.config.get("allowed_commands", [])
+        self._blocked: list[str] = self.config.get("blocked_commands") or self.config.get("blocked_patterns", [])
+        self._allowed: list[str] = self.config.get("allowed_commands") or self.config.get("allowed_exceptions", [])
 
         # Compile any user-supplied extra patterns
         self._extra_critical: list[tuple[re.Pattern[str], str]] = []

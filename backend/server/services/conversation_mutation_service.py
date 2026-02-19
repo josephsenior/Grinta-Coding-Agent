@@ -11,6 +11,9 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import FORGE_logger as logger
+from backend.server.schemas.conversation_info_result_set import (
+    ConversationInfoResultSet,
+)
 from backend.server.services.conversation_query_service import (
     build_conversation_result_set,
     filter_conversations_by_age,
@@ -26,9 +29,6 @@ from backend.storage.data_models.conversation_status import ConversationStatus
 
 if TYPE_CHECKING:
     from backend.server.schemas.agent_loop_info import AgentLoopInfo
-    from backend.server.schemas.conversation_info_result_set import (
-        ConversationInfoResultSet,
-    )
     from backend.storage.conversation.conversation_store import ConversationStore
 
 

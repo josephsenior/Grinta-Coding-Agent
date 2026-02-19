@@ -9,6 +9,7 @@ from backend.review.base import BaseCritic, CriticResult
 
 # ── CriticResult ──────────────────────────────────────────────────────
 
+
 class TestCriticResult:
     def test_construction(self):
         r = CriticResult(score=0.8, message="good job")
@@ -42,6 +43,7 @@ class TestCriticResult:
 
 
 # ── BaseCritic ────────────────────────────────────────────────────────
+
 
 class TestBaseCritic:
     def test_is_abstract(self):

@@ -33,6 +33,7 @@ def _make_request(method="GET", path="/test", content_length=None):
 
 # --------------- _content_length_from_headers ---------------
 
+
 class TestContentLengthFromHeaders:
     def test_returns_int_when_present(self, mw):
         headers = {"content-length": "1024"}
@@ -46,6 +47,7 @@ class TestContentLengthFromHeaders:
 
 
 # --------------- _response_size ---------------
+
 
 class TestResponseSize:
     def test_from_content_length_header(self, mw):
@@ -66,6 +68,7 @@ class TestResponseSize:
 
 
 # --------------- __call__ ---------------
+
 
 class TestCall:
     @pytest.mark.asyncio
@@ -90,6 +93,7 @@ class TestCall:
 
 # --------------- _wrap_streaming_response ---------------
 
+
 class TestWrapStreamingResponse:
     def test_returns_false_when_no_body_iterator(self, mw):
         resp = MagicMock()
@@ -109,6 +113,7 @@ class TestWrapStreamingResponse:
 
 
 # --------------- _log_request_size ---------------
+
 
 class TestLogRequestSize:
     def test_logs_info(self, mw):

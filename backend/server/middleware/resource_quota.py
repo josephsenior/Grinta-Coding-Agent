@@ -104,7 +104,17 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
         # Check exclusions (must be checked FIRST before any rate limiting)
         # Use both normalized and original path for maximum compatibility
         is_excluded = (
-            normalized_path in {"/health", "/api/monitoring/health", "/alive", "/docs", "/redoc", "/openapi.json"} or normalized_path.startswith(("/api/auth", "/api/options")) or path.startswith(("/api/auth", "/api/options"))
+            normalized_path
+            in {
+                "/health",
+                "/api/monitoring/health",
+                "/alive",
+                "/docs",
+                "/redoc",
+                "/openapi.json",
+            }
+            or normalized_path.startswith(("/api/auth", "/api/options"))
+            or path.startswith(("/api/auth", "/api/options"))
         )
 
         if is_excluded:

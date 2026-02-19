@@ -187,7 +187,7 @@ class FileEditObservation(Observation):
         if change_applied and self.old_content == self.new_content:
             msg = (
                 "(no changes detected. Please make sure your edits change "
-                 "the content of the existing file.)\n"
+                "the content of the existing file.)\n"
             )
             self._diff_cache = msg
             return self._diff_cache

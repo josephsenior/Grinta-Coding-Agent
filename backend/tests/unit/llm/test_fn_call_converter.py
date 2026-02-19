@@ -41,6 +41,7 @@ from backend.llm.fn_call_converter import (
 
 # ── refine_prompt ──────────────────────────────────────────────────────
 
+
 class TestRefinePrompt:
     def test_non_windows(self):
         with patch.object(sys, "platform", "linux"):
@@ -56,6 +57,7 @@ class TestRefinePrompt:
 
 
 # ── _validate_tool_call_structure ──────────────────────────────────────
+
 
 class TestValidateToolCallStructure:
     def test_valid(self):
@@ -81,6 +83,7 @@ class TestValidateToolCallStructure:
 
 # ── _parse_tool_call_arguments ─────────────────────────────────────────
 
+
 class TestParseToolCallArguments:
     def test_valid_json(self):
         tc = {"function": {"arguments": '{"key": "val"}'}}
@@ -93,6 +96,7 @@ class TestParseToolCallArguments:
 
 
 # ── _format_parameter ─────────────────────────────────────────────────
+
 
 class TestFormatParameter:
     def test_simple_string(self):
@@ -118,6 +122,7 @@ class TestFormatParameter:
 
 # ── _format_tool_call_string ──────────────────────────────────────────
 
+
 class TestFormatToolCallString:
     def test_basic(self):
         result = _format_tool_call_string("test_fn", {"x": "1", "y": "2"})
@@ -133,6 +138,7 @@ class TestFormatToolCallString:
 
 
 # ── convert_tool_call_to_string ────────────────────────────────────────
+
 
 class TestConvertToolCallToString:
     def test_basic(self):
@@ -151,6 +157,7 @@ class TestConvertToolCallToString:
 
 
 # ── convert_tools_to_description ───────────────────────────────────────
+
 
 class TestConvertToolsToDescription:
     def test_basic(self):
@@ -230,6 +237,7 @@ class TestConvertToolsToDescription:
 
 # ── _fix_stopword ──────────────────────────────────────────────────────
 
+
 class TestFixStopword:
     def test_adds_closing_when_missing(self):
         s = "<function=foo>\n<parameter=x>1</parameter>"
@@ -252,6 +260,7 @@ class TestFixStopword:
 
 # ── _normalize_parameter_tags ──────────────────────────────────────────
 
+
 class TestNormalizeParameterTags:
     def test_malformed_tag(self):
         body = "<parameter=name=value</parameter>"
@@ -271,6 +280,7 @@ class TestNormalizeParameterTags:
 
 # ── _convert_to_integer / _convert_to_array ────────────────────────────
 
+
 class TestTypeConverters:
     def test_convert_to_integer_valid(self):
         assert _convert_to_integer("count", "42") == 42
@@ -280,7 +290,7 @@ class TestTypeConverters:
             _convert_to_integer("count", "abc")
 
     def test_convert_to_array_valid(self):
-        assert _convert_to_array("items", '[1, 2, 3]') == [1, 2, 3]
+        assert _convert_to_array("items", "[1, 2, 3]") == [1, 2, 3]
 
     def test_convert_to_array_invalid(self):
         with pytest.raises(FunctionCallValidationError, match="array"):
@@ -288,6 +298,7 @@ class TestTypeConverters:
 
 
 # ── _validate_parameter_allowed ────────────────────────────────────────
+
 
 class TestValidateParameterAllowed:
     def test_allowed(self):
@@ -303,6 +314,7 @@ class TestValidateParameterAllowed:
 
 # ── _validate_required_parameters ──────────────────────────────────────
 
+
 class TestValidateRequiredParameters:
     def test_all_present(self):
         _validate_required_parameters({"a", "b"}, {"a", "b"}, "fn")  # no error
@@ -313,6 +325,7 @@ class TestValidateRequiredParameters:
 
 
 # ── _validate_enum_constraint ──────────────────────────────────────────
+
 
 class TestValidateEnumConstraint:
     def test_valid_enum(self):
@@ -333,6 +346,7 @@ class TestValidateEnumConstraint:
 
 
 # ── _extract_parameter_schema ──────────────────────────────────────────
+
 
 class TestExtractParameterSchema:
     def test_full_schema(self):
@@ -358,6 +372,7 @@ class TestExtractParameterSchema:
 
 # ── _convert_parameter_value ───────────────────────────────────────────
 
+
 class TestConvertParameterValue:
     def test_string_passthrough(self):
         assert _convert_parameter_value("x", "hello", {"x": "string"}) == "hello"
@@ -373,6 +388,7 @@ class TestConvertParameterValue:
 
 
 # ── ExampleStepBuilder ─────────────────────────────────────────────────
+
 
 class TestExampleStepBuilder:
     def test_empty_tools(self):
@@ -401,6 +417,7 @@ class TestExampleStepBuilder:
 
 
 # ── convert_fncall_messages_to_non_fncall_messages ─────────────────────
+
 
 class TestConvertFncallToNonFncall:
     def _make_tool(self, name="my_fn"):
@@ -447,13 +464,20 @@ class TestConvertFncallToNonFncall:
 
 # ── convert_from_multiple_tool_calls_to_single_tool_call_messages ──────
 
+
 class TestConvertMultipleToSingle:
     def test_single_tool_call_passthrough(self):
         messages = [
             {
                 "role": "assistant",
                 "content": "thinking",
-                "tool_calls": [{"id": "t1", "type": "function", "function": {"name": "f", "arguments": "{}"}}],
+                "tool_calls": [
+                    {
+                        "id": "t1",
+                        "type": "function",
+                        "function": {"name": "f", "arguments": "{}"},
+                    }
+                ],
             },
             {"role": "tool", "tool_call_id": "t1", "content": "done"},
         ]
@@ -466,8 +490,16 @@ class TestConvertMultipleToSingle:
                 "role": "assistant",
                 "content": "doing both",
                 "tool_calls": [
-                    {"id": "t1", "type": "function", "function": {"name": "f1", "arguments": "{}"}},
-                    {"id": "t2", "type": "function", "function": {"name": "f2", "arguments": "{}"}},
+                    {
+                        "id": "t1",
+                        "type": "function",
+                        "function": {"name": "f1", "arguments": "{}"},
+                    },
+                    {
+                        "id": "t2",
+                        "type": "function",
+                        "function": {"name": "f2", "arguments": "{}"},
+                    },
                 ],
             },
             {"role": "tool", "tool_call_id": "t1", "content": "r1"},
@@ -483,8 +515,16 @@ class TestConvertMultipleToSingle:
                 "role": "assistant",
                 "content": "",
                 "tool_calls": [
-                    {"id": "t1", "type": "function", "function": {"name": "f1", "arguments": "{}"}},
-                    {"id": "t2", "type": "function", "function": {"name": "f2", "arguments": "{}"}},
+                    {
+                        "id": "t1",
+                        "type": "function",
+                        "function": {"name": "f1", "arguments": "{}"},
+                    },
+                    {
+                        "id": "t2",
+                        "type": "function",
+                        "function": {"name": "f2", "arguments": "{}"},
+                    },
                 ],
             },
         ]
@@ -497,8 +537,16 @@ class TestConvertMultipleToSingle:
                 "role": "assistant",
                 "content": "",
                 "tool_calls": [
-                    {"id": "t1", "type": "function", "function": {"name": "f1", "arguments": "{}"}},
-                    {"id": "t2", "type": "function", "function": {"name": "f2", "arguments": "{}"}},
+                    {
+                        "id": "t1",
+                        "type": "function",
+                        "function": {"name": "f1", "arguments": "{}"},
+                    },
+                    {
+                        "id": "t2",
+                        "type": "function",
+                        "function": {"name": "f2", "arguments": "{}"},
+                    },
                 ],
             },
         ]
@@ -510,9 +558,11 @@ class TestConvertMultipleToSingle:
 
 # ── Regex patterns ─────────────────────────────────────────────────────
 
+
 class TestRegexPatterns:
     def test_fn_regex_matches(self):
         import re
+
         text = "<function=my_fn>\n<parameter=x>1</parameter>\n</function>"
         match = re.search(FN_REGEX_PATTERN, text, re.DOTALL)
         assert match is not None
@@ -520,6 +570,7 @@ class TestRegexPatterns:
 
     def test_fn_param_regex(self):
         import re
+
         text = "<parameter=name>value</parameter>"
         match = re.search(FN_PARAM_REGEX_PATTERN, text, re.DOTALL)
         assert match is not None
@@ -528,6 +579,7 @@ class TestRegexPatterns:
 
     def test_tool_result_regex(self):
         import re
+
         text = "EXECUTION RESULT of [my_tool]:\nsome output"
         match = re.search(TOOL_RESULT_REGEX_PATTERN, text, re.DOTALL)
         assert match is not None

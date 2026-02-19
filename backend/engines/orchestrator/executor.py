@@ -177,8 +177,6 @@ class OrchestratorExecutor:
                 accumulated=accumulated_content,
                 is_final=True,
             )
-            from backend.events.event import EventSource
-
             final_chunk.source = EventSource.AGENT
             if event_stream:
                 event_stream.add_event(final_chunk, EventSource.AGENT)
@@ -249,7 +247,9 @@ class OrchestratorExecutor:
 
         response_text = self._extract_response_text(response)
         proceed, validated_actions = self._safety.apply(response_text, actions)
-        return validated_actions if proceed else validated_actions
+        if not proceed:
+            logger.warning("Safety pipeline blocked response (hallucination or validation failure)")
+        return validated_actions
 
     def _extract_response_text(self, response: ModelResponse) -> str:
         if not hasattr(response, "choices") or not response.choices:

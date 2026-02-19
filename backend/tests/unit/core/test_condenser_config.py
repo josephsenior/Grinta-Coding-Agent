@@ -19,6 +19,7 @@ from backend.core.config.condenser_config import (
 
 # ── Config model defaults ─────────────────────────────────────────────
 
+
 class TestNoOpCondenserConfig:
     def test_default(self):
         c = NoOpCondenserConfig()
@@ -115,6 +116,7 @@ class TestSmartCondenserConfig:
 
 # ── create_condenser_config ──────────────────────────────────────────
 
+
 class TestCreateCondenserConfig:
     def test_noop(self):
         cfg = create_condenser_config("noop", {"type": "noop"})
@@ -126,16 +128,22 @@ class TestCreateCondenserConfig:
         assert cfg.max_events == 100
 
     def test_amortized(self):
-        cfg = create_condenser_config("amortized", {"type": "amortized", "max_size": 50})
+        cfg = create_condenser_config(
+            "amortized", {"type": "amortized", "max_size": 50}
+        )
         assert isinstance(cfg, AmortizedForgettingCondenserConfig)
         assert cfg.max_size == 50
 
     def test_observation_masking(self):
-        cfg = create_condenser_config("observation_masking", {"type": "observation_masking"})
+        cfg = create_condenser_config(
+            "observation_masking", {"type": "observation_masking"}
+        )
         assert isinstance(cfg, ObservationMaskingCondenserConfig)
 
     def test_conversation_window(self):
-        cfg = create_condenser_config("conversation_window", {"type": "conversation_window"})
+        cfg = create_condenser_config(
+            "conversation_window", {"type": "conversation_window"}
+        )
         assert isinstance(cfg, ConversationWindowCondenserConfig)
 
     def test_smart(self):
@@ -153,6 +161,7 @@ class TestCreateCondenserConfig:
 
 # ── condenser_config_from_toml_section ───────────────────────────────
 
+
 class TestCondenserConfigFromTomlSection:
     def test_noop_section(self):
         result = condenser_config_from_toml_section({"type": "noop"})
@@ -167,10 +176,12 @@ class TestCondenserConfigFromTomlSection:
 
     def test_invalid_config_falls_back_to_noop(self):
         """Invalid config should produce NoOpCondenserConfig with warning."""
-        result = condenser_config_from_toml_section({
-            "type": "recent",
-            "max_events": -1,  # Invalid
-        })
+        result = condenser_config_from_toml_section(
+            {
+                "type": "recent",
+                "max_events": -1,  # Invalid
+            }
+        )
         assert "condenser" in result
         assert isinstance(result["condenser"], NoOpCondenserConfig)
 
@@ -184,11 +195,13 @@ class TestCondenserConfigFromTomlSection:
         assert isinstance(result["condenser"], NoOpCondenserConfig)
 
     def test_recent_section(self):
-        result = condenser_config_from_toml_section({
-            "type": "recent",
-            "max_events": 200,
-            "keep_first": 3,
-        })
+        result = condenser_config_from_toml_section(
+            {
+                "type": "recent",
+                "max_events": 200,
+                "keep_first": 3,
+            }
+        )
         cfg = result["condenser"]
         assert isinstance(cfg, RecentEventsCondenserConfig)
         assert cfg.max_events == 200

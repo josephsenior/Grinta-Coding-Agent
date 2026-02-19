@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from backend.runtime.utils.bash import (
     BashCommandStatus,
     _remove_command_prefix,
@@ -14,6 +13,7 @@ from backend.runtime.utils.bash import (
 # ---------------------------------------------------------------------------
 # split_bash_commands
 # ---------------------------------------------------------------------------
+
 
 class TestSplitBashCommands:
     """Tests for split_bash_commands."""
@@ -40,7 +40,7 @@ class TestSplitBashCommands:
     def test_semicolon_separated(self):
         result = split_bash_commands("echo a; echo b")
         # bashlex parses this as 2 separate commands
-        assert len(result) >= 1  # may be 1 or 2 depending on parsing
+        assert result  # may be 1 or 2 depending on parsing
 
     def test_piped_command_stays_single(self):
         result = split_bash_commands("cat file | grep pattern")
@@ -65,6 +65,7 @@ class TestSplitBashCommands:
 # ---------------------------------------------------------------------------
 # _remove_command_prefix
 # ---------------------------------------------------------------------------
+
 
 class TestRemoveCommandPrefix:
     """Tests for _remove_command_prefix."""
@@ -92,6 +93,7 @@ class TestRemoveCommandPrefix:
 # ---------------------------------------------------------------------------
 # BashCommandStatus
 # ---------------------------------------------------------------------------
+
 
 class TestBashCommandStatus:
     """Tests for BashCommandStatus enum."""

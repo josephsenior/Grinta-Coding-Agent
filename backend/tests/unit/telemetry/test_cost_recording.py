@@ -17,6 +17,7 @@ class TestRegisterCostRecorder:
     def teardown_method(self):
         """Clear registered recorder after each test."""
         import backend.telemetry.cost_recording as module
+
         module._cost_recorder = None
 
     def test_registers_recorder_callback(self):
@@ -25,6 +26,7 @@ class TestRegisterCostRecorder:
         register_cost_recorder(recorder)
 
         import backend.telemetry.cost_recording as module
+
         assert module._cost_recorder is recorder
 
     def test_registration_completes_without_error(self):
@@ -34,6 +36,7 @@ class TestRegisterCostRecorder:
         register_cost_recorder(recorder)
 
         import backend.telemetry.cost_recording as module
+
         assert module._cost_recorder is recorder
 
     def test_can_register_different_recorder(self):
@@ -45,16 +48,19 @@ class TestRegisterCostRecorder:
         register_cost_recorder(recorder2)
 
         import backend.telemetry.cost_recording as module
+
         assert module._cost_recorder is recorder2
 
     def test_accepts_callable(self):
         """Test accepts any callable as recorder."""
+
         def my_recorder(user_key: str, cost: float) -> None:
             pass
 
         register_cost_recorder(my_recorder)
 
         import backend.telemetry.cost_recording as module
+
         assert module._cost_recorder is my_recorder
 
 
@@ -67,11 +73,13 @@ class TestRecordLLMCost:
     def setup_method(self):
         """Clear recorder before each test."""
         import backend.telemetry.cost_recording as module
+
         module._cost_recorder = None
 
     def teardown_method(self):
         """Clear recorder after each test."""
         import backend.telemetry.cost_recording as module
+
         module._cost_recorder = None
 
     def test_no_op_when_no_recorder_registered(self):
@@ -169,11 +177,13 @@ class TestGlobalState:
     def teardown_method(self):
         """Reset global state after each test."""
         import backend.telemetry.cost_recording as module
+
         module._cost_recorder = None
 
     def test_initial_state_is_none(self):
         """Test _cost_recorder is None initially."""
         import backend.telemetry.cost_recording as module
+
         # Reset to initial state
         module._cost_recorder = None
         assert module._cost_recorder is None
@@ -199,6 +209,7 @@ class TestIntegrationScenarios:
     def teardown_method(self):
         """Clean up after each test."""
         import backend.telemetry.cost_recording as module
+
         module._cost_recorder = None
 
     def test_server_middleware_registration_pattern(self):

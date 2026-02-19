@@ -13,7 +13,10 @@ class TestGetAggregatedEventStreamStats:
 
     def test_no_streams_returns_zero_totals(self):
         """Test returns zero totals when no streams exist."""
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[],
+        ):
             stats = get_aggregated_event_stream_stats()
             assert stats["streams"] == 0
             assert stats["enqueued"] == 0
@@ -45,7 +48,10 @@ class TestGetAggregatedEventStreamStats:
             "queue_size": 150,
         }
 
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[mock_stream]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[mock_stream],
+        ):
             stats = get_aggregated_event_stream_stats()
 
             assert stats["streams"] == 1
@@ -91,7 +97,10 @@ class TestGetAggregatedEventStreamStats:
             "uptime_seconds": 180,
         }
 
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[mock_stream1, mock_stream2]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[mock_stream1, mock_stream2],
+        ):
             stats = get_aggregated_event_stream_stats()
 
             assert stats["streams"] == 2
@@ -120,7 +129,10 @@ class TestGetAggregatedEventStreamStats:
             "queue_utilization_pct": 75,
         }
 
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[mock_stream1, mock_stream2, mock_stream3]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[mock_stream1, mock_stream2, mock_stream3],
+        ):
             stats = get_aggregated_event_stream_stats()
 
             # (60 + 90 + 75) / 3 = 75
@@ -135,7 +147,10 @@ class TestGetAggregatedEventStreamStats:
             # All other keys missing
         }
 
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[mock_stream]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[mock_stream],
+        ):
             stats = get_aggregated_event_stream_stats()
 
             assert stats["enqueued"] == 100
@@ -146,7 +161,9 @@ class TestGetAggregatedEventStreamStats:
     def test_skips_broken_stream_and_continues(self):
         """Test skips stream that raises exception and continues aggregating others."""
         mock_stream1 = MagicMock()
-        mock_stream1.get_backpressure_snapshot.side_effect = RuntimeError("Stream broken")
+        mock_stream1.get_backpressure_snapshot.side_effect = RuntimeError(
+            "Stream broken"
+        )
 
         mock_stream2 = MagicMock()
         mock_stream2.get_backpressure_snapshot.return_value = {
@@ -154,7 +171,10 @@ class TestGetAggregatedEventStreamStats:
             "queue_size": 75,
         }
 
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[mock_stream1, mock_stream2]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[mock_stream1, mock_stream2],
+        ):
             stats = get_aggregated_event_stream_stats()
 
             # Should only count stream2
@@ -167,7 +187,10 @@ class TestGetAggregatedEventStreamStats:
         mock_stream = MagicMock()
         mock_stream.get_backpressure_snapshot.return_value = {}
 
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[mock_stream]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[mock_stream],
+        ):
             stats = get_aggregated_event_stream_stats()
 
             assert stats["streams"] == 1
@@ -191,7 +214,10 @@ class TestGetAggregatedEventStreamStats:
             "critical_sync_persistence": 4,
         }
 
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[mock_stream1, mock_stream2]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[mock_stream1, mock_stream2],
+        ):
             stats = get_aggregated_event_stream_stats()
 
             assert stats["critical_events"] == 12  # 5 + 7
@@ -208,7 +234,10 @@ class TestGetAggregatedEventStreamStats:
             "durable_writer_errors": 1,
         }
 
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[mock_stream]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[mock_stream],
+        ):
             stats = get_aggregated_event_stream_stats()
 
             assert stats["durable_enqueue_failures"] == 2
@@ -232,7 +261,10 @@ class TestGetAggregatedEventStreamStats:
             "persist_failures_per_minute": 1,
         }
 
-        with patch("backend.events.stream_stats.EventStream.iter_global_streams", return_value=[mock_stream1, mock_stream2]):
+        with patch(
+            "backend.events.stream_stats.EventStream.iter_global_streams",
+            return_value=[mock_stream1, mock_stream2],
+        ):
             stats = get_aggregated_event_stream_stats()
 
             assert stats["events_per_minute"] == 300  # 120 + 180

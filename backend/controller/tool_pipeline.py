@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -349,8 +350,7 @@ class PlanningMiddleware(ToolInvocationMiddleware):
 
             # Inject a planning directive into state extra_data so the
             # orchestrator's next turn sees an instruction to plan first
-            state.set_extra(
-                "planning_directive",
+            state.set_planning_directive(
                 (
                     f"[AUTO-PLAN] Task complexity={complexity:.1f}. "
                     "Before executing any tool calls, use think() to create "
@@ -390,7 +390,7 @@ class ReflectionMiddleware(ToolInvocationMiddleware):
             return
 
         config = getattr(agent, "config", None)
-        if not config or not getattr(config, "enable_reflection", True):
+        if not self._is_reflection_enabled(config):
             return
 
         from backend.events.action import FileEditAction, FileWriteAction, CmdRunAction
@@ -454,13 +454,37 @@ class ReflectionMiddleware(ToolInvocationMiddleware):
 
         for pattern in destructive_patterns:
             if re.search(pattern, command):
+                from backend.events.event import EventSource
+                from backend.events.observation import ErrorObservation
+
                 logger.warning(
-                    "⚠️ Reflection: Potentially destructive command detected: %s",
+                    "Reflection blocked destructive command: %s",
                     command,
                 )
-                # Don't block, but log warning (safety validator should handle this)
+                ctx.block("reflection_blocked_destructive_command")
+                ctx.metadata["handled"] = True
+                error_obs = ErrorObservation(
+                    content=(
+                        "ACTION BLOCKED: Reflection middleware detected a potentially destructive command.\n"
+                        f"Command: {command}"
+                    ),
+                    error_id="REFLECTION_BLOCKED_DESTRUCTIVE_COMMAND",
+                )
+                error_obs.cause = getattr(ctx.action, "id", None)
+                self.controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
+                self.controller._pending_action = None
+                return
 
         logger.debug("✅ Reflection: Command action verified: %s", command)
+
+    @staticmethod
+    def _is_reflection_enabled(config: Any) -> bool:
+        if not config:
+            return False
+        return bool(
+            getattr(config, "enable_reflection", True)
+            and getattr(config, "enable_reflection_middleware", False)
+        )
 
 
 class TelemetryMiddleware(ToolInvocationMiddleware):
@@ -535,6 +559,44 @@ class ConflictDetectionMiddleware(ToolInvocationMiddleware):
     def __init__(self) -> None:
         # {path: edit_count_since_last_view}
         self._unverified_edits: dict[str, int] = {}
+
+    async def verify(self, ctx: ToolInvocationContext) -> None:
+        """Block repeated edits without any read/verify in between."""
+        from backend.events.action import FileEditAction, FileWriteAction
+        from backend.events.event import EventSource
+        from backend.events.observation import ErrorObservation
+
+        action = ctx.action
+        if not isinstance(action, (FileEditAction, FileWriteAction)):
+            return
+
+        command = getattr(action, "command", None)
+        if command == "view":
+            return
+
+        path = getattr(action, "path", None)
+        if not path:
+            return
+
+        threshold = int(os.getenv("FORGE_CONFLICT_BLOCK_THRESHOLD", "2"))
+        prev_count = self._unverified_edits.get(path, 0)
+        if prev_count < threshold:
+            return
+
+        ctx.block("conflict_detection_repeated_unverified_edits")
+        ctx.metadata["handled"] = True
+        error_obs = ErrorObservation(
+            content=(
+                "ACTION BLOCKED: Repeated edits without verification were detected.\n"
+                f"File: {path}\n"
+                f"Unverified edit streak: {prev_count}\n"
+                "Read/verify the file state before applying more edits."
+            ),
+            error_id="CONFLICT_DETECTION_BLOCKED",
+        )
+        error_obs.cause = getattr(ctx.action, "id", None)
+        ctx.controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
+        ctx.controller._pending_action = None
 
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None

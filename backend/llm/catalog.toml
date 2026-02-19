@@ -228,6 +228,7 @@ featured = true
 supports_function_calling = true
 supports_prompt_cache = true
 supports_vision = true
+strip_reasoning_effort = true
 
 [models."claude-4.5-sonnet"]
 provider = "anthropic"
@@ -241,6 +242,7 @@ featured = true
 supports_function_calling = true
 supports_prompt_cache = true
 supports_vision = true
+strip_reasoning_effort = true
 
 [models."claude-4-sonnet"]
 provider = "anthropic"
@@ -291,6 +293,9 @@ verified = true
 supports_function_calling = true
 supports_prompt_cache = true
 supports_vision = true
+strip_reasoning_effort = true
+thinking_mode = "disabled"
+strip_top_p = true
 
 [models."claude-2.1"]
 provider = "anthropic"
@@ -347,6 +352,9 @@ featured = true
 supports_function_calling = true
 supports_reasoning_effort = true
 supports_vision = true
+thinking_mode = "budget:128"
+strip_temperature = true
+strip_top_p = true
 
 [models."gemini-2.5-flash"]
 provider = "google"

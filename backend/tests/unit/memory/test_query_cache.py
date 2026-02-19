@@ -9,7 +9,6 @@ from backend.memory.vector_store import QueryCache
 
 
 class TestQueryCacheInit:
-
     def test_defaults(self):
         cache = QueryCache()
         assert cache.max_size == 10000
@@ -24,7 +23,6 @@ class TestQueryCacheInit:
 
 
 class TestQueryCacheGetSet:
-
     def test_set_and_get(self):
         cache = QueryCache()
         cache.set("hello", [{"id": 1}])
@@ -76,7 +74,6 @@ class TestQueryCacheGetSet:
 
 
 class TestQueryCacheStats:
-
     def test_stats_empty(self):
         cache = QueryCache()
         stats = cache.stats()
@@ -97,7 +94,6 @@ class TestQueryCacheStats:
 
 
 class TestQueryCacheHashQuery:
-
     def test_deterministic(self):
         h1 = QueryCache._hash_query("test query")
         h2 = QueryCache._hash_query("test query")

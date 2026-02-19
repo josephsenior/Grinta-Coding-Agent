@@ -52,6 +52,7 @@ class SimpleTokenAuthMiddleware(BaseHTTPMiddleware):
         expected_key = get_session_api_key()
         if (
             os.environ.get("FORGE_RUNTIME") == "local"
+            or os.environ.get("SESSION_API_KEY") == ""
             or not expected_key
         ):
             return await call_next(request)
@@ -65,8 +66,12 @@ class SimpleTokenAuthMiddleware(BaseHTTPMiddleware):
 
         # Verify Key
         is_valid = False
-        if header_key and secrets.compare_digest(header_key, expected_key) or scheme.lower() == "bearer" and bearer_token and secrets.compare_digest(
-            bearer_token, expected_key
+        if (
+            header_key
+            and secrets.compare_digest(header_key, expected_key)
+            or scheme.lower() == "bearer"
+            and bearer_token
+            and secrets.compare_digest(bearer_token, expected_key)
         ):
             is_valid = True
 

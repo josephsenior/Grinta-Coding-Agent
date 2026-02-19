@@ -61,7 +61,7 @@ class TestFuzzyScore(unittest.TestCase):
         """Test empty needle returns division by zero (or infinity)."""
         # This might be a bug, but document current behavior
         try:
-            score = _fuzzy_score("", "button")
+            _fuzzy_score("", "button")
             # If no error, it should return something (likely nan or inf)
             self.assertTrue(True)
         except ZeroDivisionError:
@@ -213,9 +213,7 @@ class TestSearchComponents(unittest.IsolatedAsyncioTestCase):
     """Tests for search_components wrapper tool."""
 
     @patch("backend.mcp.wrappers._get_components_list")
-    async def test_searches_components_by_query(
-        self, mock_get_list: AsyncMock
-    ) -> None:
+    async def test_searches_components_by_query(self, mock_get_list: AsyncMock) -> None:
         """Test searches and ranks components by query."""
         mock_get_list.return_value = ["Button", "Input", "ButtonGroup", "Label"]
         call_tool_func = AsyncMock()
@@ -343,15 +341,17 @@ class TestWrapperToolParams(unittest.TestCase):
         params = wrapper_tool_params(available_tools)
 
         names = [p["function"]["name"] for p in params]
-        self.assertEqual(len(names), 3)
+        self.assertEqual(len(names), 4)
         self.assertIn("search_components", names)
         self.assertIn("get_component_cached", names)
         self.assertIn("get_block_cached", names)
+        self.assertIn("mcp_capabilities_status", names)
 
-    def test_returns_empty_when_no_tools_available(self) -> None:
-        """Test returns empty list when no underlying tools available."""
+    def test_returns_status_tool_when_no_tools_available(self) -> None:
+        """Test returns MCP status tool when no underlying tools are available."""
         params = wrapper_tool_params([])
-        self.assertEqual(params, [])
+        names = [p["function"]["name"] for p in params]
+        self.assertEqual(names, ["mcp_capabilities_status"])
 
     def test_search_components_schema(self) -> None:
         """Test search_components has correct schema."""
@@ -378,6 +378,7 @@ class TestWrapperToolRegistry(unittest.TestCase):
         self.assertIn("search_components", WRAPPER_TOOL_REGISTRY)
         self.assertIn("get_component_cached", WRAPPER_TOOL_REGISTRY)
         self.assertIn("get_block_cached", WRAPPER_TOOL_REGISTRY)
+        self.assertIn("mcp_capabilities_status", WRAPPER_TOOL_REGISTRY)
 
     def test_registry_functions_are_callable(self) -> None:
         """Test all registered functions are callable."""
@@ -390,12 +391,8 @@ class TestRequiredUnderlying(unittest.TestCase):
 
     def test_required_underlying_mapping(self) -> None:
         """Test REQUIRED_UNDERLYING correctly maps dependencies."""
-        self.assertEqual(
-            REQUIRED_UNDERLYING["list_components"], ["search_components"]
-        )
-        self.assertEqual(
-            REQUIRED_UNDERLYING["get_component"], ["get_component_cached"]
-        )
+        self.assertEqual(REQUIRED_UNDERLYING["list_components"], ["search_components"])
+        self.assertEqual(REQUIRED_UNDERLYING["get_component"], ["get_component_cached"])
         self.assertEqual(REQUIRED_UNDERLYING["get_block"], ["get_block_cached"])
 
 

@@ -14,8 +14,8 @@ from backend.core.config.api_key_manager import APIKeyManager
 # _extract_provider
 # ===================================================================
 
-class TestExtractProvider:
 
+class TestExtractProvider:
     def setup_method(self):
         self.mgr = APIKeyManager()
 
@@ -66,8 +66,8 @@ class TestExtractProvider:
 # _is_correct_provider_key
 # ===================================================================
 
-class TestIsCorrectProviderKey:
 
+class TestIsCorrectProviderKey:
     def setup_method(self):
         self.mgr = APIKeyManager()
 
@@ -104,8 +104,8 @@ class TestIsCorrectProviderKey:
 # _check_prefix_match
 # ===================================================================
 
-class TestCheckPrefixMatch:
 
+class TestCheckPrefixMatch:
     def setup_method(self):
         self.mgr = APIKeyManager()
 
@@ -120,8 +120,8 @@ class TestCheckPrefixMatch:
 # _check_keyword_match
 # ===================================================================
 
-class TestCheckKeywordMatch:
 
+class TestCheckKeywordMatch:
     def setup_method(self):
         self.mgr = APIKeyManager()
 
@@ -139,8 +139,8 @@ class TestCheckKeywordMatch:
 # get_api_key_for_model
 # ===================================================================
 
-class TestGetApiKeyForModel:
 
+class TestGetApiKeyForModel:
     def test_returns_correct_provided_key(self):
         mgr = APIKeyManager()
         key = SecretStr("sk-correct123456789")
@@ -157,7 +157,9 @@ class TestGetApiKeyForModel:
 
     def test_env_var_fallback(self):
         mgr = APIKeyManager()
-        with patch.object(mgr, "_get_provider_key_from_env", return_value="env-key-123"):
+        with patch.object(
+            mgr, "_get_provider_key_from_env", return_value="env-key-123"
+        ):
             result = mgr.get_api_key_for_model("gpt-4")
             assert result is not None
             assert result.get_secret_value() == "env-key-123"
@@ -191,8 +193,8 @@ class TestGetApiKeyForModel:
 # set_api_key
 # ===================================================================
 
-class TestSetApiKey:
 
+class TestSetApiKey:
     def test_set_api_key(self):
         mgr = APIKeyManager()
         key = SecretStr("sk-test")
@@ -205,8 +207,8 @@ class TestSetApiKey:
 # set_environment_variables
 # ===================================================================
 
-class TestSetEnvironmentVariables:
 
+class TestSetEnvironmentVariables:
     def test_suppress_env_export(self):
         mgr = APIKeyManager(suppress_env_export=True)
         # Should return early without setting anything
@@ -218,7 +220,9 @@ class TestSetEnvironmentVariables:
     def test_sets_env_vars(self):
         mgr = APIKeyManager()
         key = SecretStr("sk-test-env-var")
-        with patch("backend.core.config.api_key_manager.provider_config_manager") as pcm:
+        with patch(
+            "backend.core.config.api_key_manager.provider_config_manager"
+        ) as pcm:
             pcm.get_provider_config.return_value = MagicMock(
                 required_params=["api_key"],
                 env_var="OPENAI_API_KEY",
@@ -234,7 +238,9 @@ class TestSetEnvironmentVariables:
         """Test that Google provider sets both GOOGLE_API_KEY and provider env var - covers lines 223-228."""
         mgr = APIKeyManager()
         key = SecretStr("AIzaSyTest123")
-        with patch("backend.core.config.api_key_manager.provider_config_manager") as pcm:
+        with patch(
+            "backend.core.config.api_key_manager.provider_config_manager"
+        ) as pcm:
             pcm.get_provider_config.return_value = MagicMock(
                 required_params=["api_key"],
                 env_var="GEMINI_API_KEY",
@@ -251,7 +257,9 @@ class TestSetEnvironmentVariables:
     def test_missing_api_key_with_env_fallback(self):
         """Test behavior when no API key provided but found in environment."""
         mgr = APIKeyManager()
-        with patch("backend.core.config.api_key_manager.provider_config_manager") as pcm:
+        with patch(
+            "backend.core.config.api_key_manager.provider_config_manager"
+        ) as pcm:
             pcm.get_provider_config.return_value = MagicMock(
                 required_params=["api_key"],
                 env_var="OPENAI_API_KEY",
@@ -259,7 +267,9 @@ class TestSetEnvironmentVariables:
             pcm.get_environment_variable.return_value = "OPENAI_API_KEY"
             pcm.validate_api_key_format.return_value = None
             # Set env var so it's found by _get_provider_key_from_env
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "env-fallback-key"}, clear=False):
+            with patch.dict(
+                os.environ, {"OPENAI_API_KEY": "env-fallback-key"}, clear=False
+            ):
                 mgr.set_environment_variables("gpt-4", None)
                 # Should have set env vars with fallback key
                 assert os.environ.get("OPENAI_API_KEY") == "env-fallback-key"
@@ -267,8 +277,10 @@ class TestSetEnvironmentVariables:
 
     def test_missing_api_key_no_fallback(self):
         """Test behavior when no API key found anywhere (returns early)."""
-        mgr = APIKeyManager()
-        with patch("backend.core.config.api_key_manager.provider_config_manager") as pcm:
+        APIKeyManager()
+        with patch(
+            "backend.core.config.api_key_manager.provider_config_manager"
+        ) as pcm:
             pcm.get_provider_config.return_value = MagicMock(
                 required_params=["api_key"],
                 env_var="OPENAI_API_KEY",
@@ -284,7 +296,9 @@ class TestSetEnvironmentVariables:
 
     def test_missing_api_key_critical_path(self):
         """Test the critical error path when API key required but not found anywhere - covers line 198-199."""
-        with patch("backend.core.config.api_key_manager.provider_config_manager") as pcm:
+        with patch(
+            "backend.core.config.api_key_manager.provider_config_manager"
+        ) as pcm:
             # Create provider config that requires API key
             mock_config = MagicMock(
                 required_params=["api_key"],
@@ -293,7 +307,7 @@ class TestSetEnvironmentVariables:
             pcm.get_provider_config.return_value = mock_config
             pcm.get_environment_variable.return_value = None  # No env var mapping
             pcm.validate_api_key_format.return_value = None
-            
+
             # Ensure totally clean environment
             with patch.dict(os.environ, {}, clear=True):
                 # Create completely fresh manager
@@ -301,11 +315,13 @@ class TestSetEnvironmentVariables:
                 # Call should trigger critical error path where env_key is None
                 test_mgr.set_environment_variables("gpt-4", None)
                 # Verify no env vars were set (returned early after FAILED message)
-                assert len(os.environ) == 0
+                assert not os.environ
 
     def test_provider_without_required_api_key(self):
         """Test behavior when provider doesn't require API key - covers lines 223-228."""
-        with patch("backend.core.config.api_key_manager.provider_config_manager") as pcm:
+        with patch(
+            "backend.core.config.api_key_manager.provider_config_manager"
+        ) as pcm:
             # Provider that doesn't require API key
             mock_config = MagicMock(
                 required_params=["base_url"],  # Has other params but NOT api_key
@@ -314,7 +330,7 @@ class TestSetEnvironmentVariables:
             pcm.get_provider_config.return_value = mock_config
             pcm.get_environment_variable.return_value = None
             pcm.validate_api_key_format.return_value = None
-            
+
             with patch.dict(os.environ, {}, clear=True):
                 # Create fresh manager
                 test_mgr = APIKeyManager()
@@ -322,19 +338,21 @@ class TestSetEnvironmentVariables:
                 test_mgr.set_environment_variables("gpt-4", None)
                 # Should return early with debug message "API key not required"
                 # Verify no env vars were set
-                assert len(os.environ) == 0
+                assert not os.environ
 
 
 # ===================================================================
 # validate_and_clean_completion_params
 # ===================================================================
 
-class TestValidateAndClean:
 
+class TestValidateAndClean:
     def test_delegates_to_provider_config_manager(self):
         mgr = APIKeyManager()
         params = {"temperature": 0.7, "bad_param": True}
-        with patch("backend.core.config.api_key_manager.provider_config_manager") as pcm:
+        with patch(
+            "backend.core.config.api_key_manager.provider_config_manager"
+        ) as pcm:
             pcm.validate_and_clean_params.return_value = {"temperature": 0.7}
             result = mgr.validate_and_clean_completion_params("gpt-4", params)
             assert result == {"temperature": 0.7}
@@ -345,21 +363,27 @@ class TestValidateAndClean:
 # _get_provider_key_from_env
 # ===================================================================
 
-class TestGetProviderKeyFromEnv:
 
+class TestGetProviderKeyFromEnv:
     def test_get_key_from_provider_env_var(self):
         """Test getting API key from provider-specific environment variable."""
         mgr = APIKeyManager()
-        with patch("backend.core.config.api_key_manager.provider_config_manager") as pcm:
+        with patch(
+            "backend.core.config.api_key_manager.provider_config_manager"
+        ) as pcm:
             pcm.get_environment_variable.return_value = "OPENAI_API_KEY"
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key-123"}, clear=False):
+            with patch.dict(
+                os.environ, {"OPENAI_API_KEY": "test-key-123"}, clear=False
+            ):
                 result = mgr._get_provider_key_from_env("openai")
                 assert result == "test-key-123"
 
     def test_fallback_to_llm_api_key(self):
         """Test fallback to LLM_API_KEY when provider env var not set."""
         mgr = APIKeyManager()
-        with patch("backend.core.config.api_key_manager.provider_config_manager") as pcm:
+        with patch(
+            "backend.core.config.api_key_manager.provider_config_manager"
+        ) as pcm:
             pcm.get_environment_variable.return_value = None
             with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
                 result = mgr._get_provider_key_from_env("unknown_provider")

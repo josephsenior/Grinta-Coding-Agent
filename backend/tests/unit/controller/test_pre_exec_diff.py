@@ -142,18 +142,24 @@ class TestDiffForEdit:
         ctx.state = state
         ctx.metadata = {}
 
-        with patch.object(
-            middleware, "_resolve_path", return_value="/workspace/test.txt"
-        ), patch("os.path.isfile", return_value=True), patch.object(
-            middleware, "_read_file", return_value="old content here"
-        ), patch(
-            "backend.runtime.utils.diff.get_diff",
-            return_value="- old content\\n+ new content",
+        with (
+            patch.object(
+                middleware, "_resolve_path", return_value="/workspace/test.txt"
+            ),
+            patch("os.path.isfile", return_value=True),
+            patch.object(middleware, "_read_file", return_value="old content here"),
+            patch(
+                "backend.runtime.utils.diff.get_diff",
+                return_value="- old content\\n+ new content",
+            ),
         ):
             await middleware._diff_for_edit(ctx, action)
 
         assert "pre_exec_diff" in ctx.metadata
-        assert "old content" in ctx.metadata["pre_exec_diff"] or "new content" in ctx.metadata["pre_exec_diff"]
+        assert (
+            "old content" in ctx.metadata["pre_exec_diff"]
+            or "new content" in ctx.metadata["pre_exec_diff"]
+        )
 
     @pytest.mark.asyncio
     async def test_diff_for_edit_handles_exceptions(self):
@@ -174,7 +180,9 @@ class TestDiffForEdit:
         ctx.state = state
         ctx.metadata = {}
 
-        with patch.object(middleware, "_resolve_path", side_effect=RuntimeError("Test error")):
+        with patch.object(
+            middleware, "_resolve_path", side_effect=RuntimeError("Test error")
+        ):
             # Should not raise
             await middleware._diff_for_edit(ctx, action)
 
@@ -199,11 +207,15 @@ class TestDiffForWrite:
         ctx.state = state
         ctx.metadata = {}
 
-        with patch.object(
-            middleware, "_resolve_path", return_value="/workspace/newfile.txt"
-        ), patch("os.path.isfile", return_value=False), patch(
-            "backend.runtime.utils.diff.get_diff",
-            return_value="+ new content",
+        with (
+            patch.object(
+                middleware, "_resolve_path", return_value="/workspace/newfile.txt"
+            ),
+            patch("os.path.isfile", return_value=False),
+            patch(
+                "backend.runtime.utils.diff.get_diff",
+                return_value="+ new content",
+            ),
         ):
             await middleware._diff_for_write(ctx, action)
 
@@ -224,13 +236,16 @@ class TestDiffForWrite:
         ctx.state = state
         ctx.metadata = {}
 
-        with patch.object(
-            middleware, "_resolve_path", return_value="/workspace/existing.txt"
-        ), patch("os.path.isfile", return_value=True), patch.object(
-            middleware, "_read_file", return_value="old content"
-        ), patch(
-            "backend.runtime.utils.diff.get_diff",
-            return_value="- old content\\n+ new content",
+        with (
+            patch.object(
+                middleware, "_resolve_path", return_value="/workspace/existing.txt"
+            ),
+            patch("os.path.isfile", return_value=True),
+            patch.object(middleware, "_read_file", return_value="old content"),
+            patch(
+                "backend.runtime.utils.diff.get_diff",
+                return_value="- old content\\n+ new content",
+            ),
         ):
             await middleware._diff_for_write(ctx, action)
 
@@ -250,10 +265,12 @@ class TestDiffForWrite:
         ctx.state = state
         ctx.metadata = {}
 
-        with patch.object(
-            middleware, "_resolve_path", return_value="/workspace/file.txt"
-        ), patch("os.path.isfile", return_value=True), patch.object(
-            middleware, "_read_file", return_value="same content"
+        with (
+            patch.object(
+                middleware, "_resolve_path", return_value="/workspace/file.txt"
+            ),
+            patch("os.path.isfile", return_value=True),
+            patch.object(middleware, "_read_file", return_value="same content"),
         ):
             await middleware._diff_for_write(ctx, action)
 
@@ -274,7 +291,9 @@ class TestDiffForWrite:
         ctx.state = state
         ctx.metadata = {}
 
-        with patch.object(middleware, "_resolve_path", side_effect=RuntimeError("Test error")):
+        with patch.object(
+            middleware, "_resolve_path", side_effect=RuntimeError("Test error")
+        ):
             # Should not raise
             await middleware._diff_for_write(ctx, action)
 
@@ -417,8 +436,9 @@ class TestReadFile:
 
     def test_read_file_success(self):
         """Should read file content successfully."""
-        with patch("builtins.open", mock_open(read_data="file content")), patch(
-            "os.path.getsize", return_value=100
+        with (
+            patch("builtins.open", mock_open(read_data="file content")),
+            patch("os.path.getsize", return_value=100),
         ):
             content = PreExecDiffMiddleware._read_file("/path/to/file.txt")
 
@@ -426,7 +446,7 @@ class TestReadFile:
 
     def test_read_file_too_large_returns_none(self):
         """Should return None if file is too large."""
-        large_size = 10  * 1024 * 1024  # 10 MB > 2 MB limit
+        large_size = 10 * 1024 * 1024  # 10 MB > 2 MB limit
         with patch("os.path.getsize", return_value=large_size):
             content = PreExecDiffMiddleware._read_file("/path/to/large.txt")
 
@@ -435,7 +455,9 @@ class TestReadFile:
     def test_read_file_respects_max_bytes_param(self):
         """Should respect custom max_bytes parameter."""
         with patch("os.path.getsize", return_value=1000):
-            content = PreExecDiffMiddleware._read_file("/path/to/file.txt", max_bytes=500)
+            content = PreExecDiffMiddleware._read_file(
+                "/path/to/file.txt", max_bytes=500
+            )
 
         # File is 1000 bytes but limit is 500, should return None
         assert content is None
@@ -450,8 +472,9 @@ class TestReadFile:
     def test_read_file_handles_decode_errors(self):
         """Should use error replacement for decode errors."""
         # Mock file with binary content that can't be decoded
-        with patch("builtins.open", mock_open(read_data="content")), patch(
-            "os.path.getsize", return_value=100
+        with (
+            patch("builtins.open", mock_open(read_data="content")),
+            patch("os.path.getsize", return_value=100),
         ):
             content = PreExecDiffMiddleware._read_file("/path/to/file.txt")
 

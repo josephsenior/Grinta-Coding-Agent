@@ -15,6 +15,7 @@ from backend.storage.conversation.conversation_validator import (
 
 # ── ConversationAccessDenied ──────────────────────────────────────────
 
+
 class TestConversationAccessDenied:
     def test_is_exception(self):
         exc = ConversationAccessDenied("nope")
@@ -26,6 +27,7 @@ class TestConversationAccessDenied:
 
 
 # ── ConversationValidator.__init__ ────────────────────────────────────
+
 
 class TestConversationValidatorInit:
     def test_explicit_mode_permissive(self):
@@ -69,6 +71,7 @@ class TestConversationValidatorInit:
 
 # ── _extract_user_id ──────────────────────────────────────────────────
 
+
 class TestExtractUserId:
     def test_returns_none_by_default(self):
         v = ConversationValidator(mode="permissive")
@@ -80,6 +83,7 @@ class TestExtractUserId:
 
 
 # ── validate (permissive) ────────────────────────────────────────────
+
 
 class TestValidatePermissive:
     @pytest.fixture
@@ -106,6 +110,7 @@ class TestValidatePermissive:
 
 # ── validate (strict) ────────────────────────────────────────────────
 
+
 class TestValidateStrict:
     @pytest.fixture
     def validator(self):
@@ -124,6 +129,7 @@ class TestValidateStrict:
 
 
 # ── _validate_strict ──────────────────────────────────────────────────
+
 
 class TestValidateStrictInternal:
     async def test_none_user_id_raises(self):
@@ -195,6 +201,7 @@ class TestValidateStrictInternal:
 
 # ── _create_metadata ──────────────────────────────────────────────────
 
+
 class TestCreateMetadata:
     async def test_creates_and_returns_metadata(self):
         mock_store = AsyncMock()
@@ -213,6 +220,7 @@ class TestCreateMetadata:
 
 
 # ── create_conversation_validator factory ─────────────────────────────
+
 
 class TestCreateConversationValidatorFactory:
     def test_returns_validator_instance(self):

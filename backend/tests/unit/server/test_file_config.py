@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from backend.server.file_config import (
     get_unique_filename,
     sanitize_filename,
@@ -13,6 +12,7 @@ from backend.server.file_config import (
 # ---------------------------------------------------------------------------
 # sanitize_filename
 # ---------------------------------------------------------------------------
+
 
 class TestSanitizeFilename:
     def test_normal_filename(self):
@@ -54,6 +54,7 @@ class TestSanitizeFilename:
 # ---------------------------------------------------------------------------
 # get_unique_filename
 # ---------------------------------------------------------------------------
+
 
 class TestGetUniqueFilename:
     def test_no_conflict(self, tmp_path):

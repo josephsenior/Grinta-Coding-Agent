@@ -21,7 +21,6 @@ class ValidationError(Exception):
     """Raised when input validation fails."""
 
 
-
 def validate_file_path(path: str, base_dir: str | None = None) -> str:
     """Validate and sanitize a file path to prevent directory traversal.
 

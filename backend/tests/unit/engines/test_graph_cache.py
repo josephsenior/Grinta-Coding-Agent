@@ -26,8 +26,8 @@ def cache(tmp_path):
 # Initialization
 # ===================================================================
 
-class TestGraphCacheInit:
 
+class TestGraphCacheInit:
     def test_local_mode(self, tmp_path):
         gc = GraphCache(
             cache_dir=str(tmp_path / "gc"),
@@ -48,8 +48,8 @@ class TestGraphCacheInit:
 # get_graph / cache_graph
 # ===================================================================
 
-class TestGraphCacheGetSet:
 
+class TestGraphCacheGetSet:
     def test_miss_returns_none(self, cache):
         assert cache.get_graph("/repo/path") is None
         assert cache.stats["misses"] == 1
@@ -82,8 +82,8 @@ class TestGraphCacheGetSet:
 # TTL expiration
 # ===================================================================
 
-class TestTTLExpiration:
 
+class TestTTLExpiration:
     def test_expired_entry_returns_none(self, cache):
         graph_data = {"x": 1}
         cache.cache_graph("/repo", graph_data)
@@ -98,8 +98,8 @@ class TestTTLExpiration:
 # File modification detection
 # ===================================================================
 
-class TestFileModification:
 
+class TestFileModification:
     def test_unmodified_file(self, cache, tmp_path):
         f = tmp_path / "code.py"
         f.write_text("x = 1")
@@ -130,8 +130,8 @@ class TestFileModification:
 # Disk persistence
 # ===================================================================
 
-class TestDiskPersistence:
 
+class TestDiskPersistence:
     def test_save_and_load(self, cache):
         graph_data = {"nodes": [1, 2]}
         cache.cache_graph("/my/repo", graph_data)
@@ -161,8 +161,8 @@ class TestDiskPersistence:
 # Invalidation & clear
 # ===================================================================
 
-class TestInvalidation:
 
+class TestInvalidation:
     def test_invalidate_repo(self, cache):
         cache.cache_graph("/repo", {"x": 1})
         cache._invalidate_repo("/repo")
@@ -174,16 +174,16 @@ class TestInvalidation:
         cache.cache_graph("/r1", {"a": 1})
         cache.cache_graph("/r2", {"b": 2})
         cache.clear()
-        assert len(cache.graph_cache) == 0
-        assert len(cache.graph_metadata) == 0
+        assert not cache.graph_cache
+        assert not cache.graph_metadata
 
 
 # ===================================================================
 # Stats
 # ===================================================================
 
-class TestGraphCacheStats:
 
+class TestGraphCacheStats:
     def test_stats_initial(self, cache):
         stats = cache.get_stats()
         assert stats["hits"] == 0

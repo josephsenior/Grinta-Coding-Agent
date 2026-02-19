@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import logging
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch
 
 
 from backend.core.logger import (
@@ -24,6 +24,7 @@ from backend.core.logger import (
 
 
 # ── RollingLogger ─────────────────────────────────────────────────────
+
 
 class TestRollingLogger:
     def test_initialization(self):
@@ -71,20 +72,24 @@ class TestRollingLogger:
     def test_rolling_logger_display_logic(self, mock_stdout):
         mock_stdout.isatty.return_value = True
         rl = RollingLogger(max_lines=2, char_limit=10)
-        
+
         # Test start
         rl.start("Starting...")
         assert mock_stdout.write.call_count >= 1
-        
+
         # Test add_line (which calls print_lines, move_back, replace_current_line)
         mock_stdout.write.reset_mock()
         rl.add_line("test")
-        
+
         # Should have called write multiple times for escape codes and content
         # \x1b[F (move back)
         # \x1b[2K (replace line)
-        assert any("\x1b[F" in call.args[0] for call in mock_stdout.write.call_args_list)
-        assert any("\x1b[2K" in call.args[0] for call in mock_stdout.write.call_args_list)
+        assert any(
+            "\x1b[F" in call.args[0] for call in mock_stdout.write.call_args_list
+        )
+        assert any(
+            "\x1b[2K" in call.args[0] for call in mock_stdout.write.call_args_list
+        )
         assert any("test" in call.args[0] for call in mock_stdout.write.call_args_list)
 
     @patch("backend.core.logger.DEBUG", True)
@@ -108,6 +113,7 @@ class TestRollingLogger:
 
 
 # ── Trace context ─────────────────────────────────────────────────────
+
 
 class TestTraceContext:
     def test_set_and_get_context(self):
@@ -137,6 +143,7 @@ class TestTraceContext:
 
 
 # ── ForgeLoggerAdapter ────────────────────────────────────────────────
+
 
 class TestForgeLoggerAdapter:
     def test_default_extra(self):
@@ -173,6 +180,7 @@ class TestForgeLoggerAdapter:
 
 # ── bind_context helper ──────────────────────────────────────────────
 
+
 class TestBindContext:
     def test_with_raw_logger(self):
         logger = logging.getLogger("test_bind")
@@ -188,6 +196,7 @@ class TestBindContext:
 
 # ── Handler factories ────────────────────────────────────────────────
 
+
 class TestHandlerFactories:
     def test_get_console_handler(self):
         handler = get_console_handler(logging.DEBUG)
@@ -202,6 +211,7 @@ class TestHandlerFactories:
     def test_json_formatter_returns_formatter(self):
         fmt = json_formatter()
         from pythonjsonlogger.json import JsonFormatter
+
         assert isinstance(fmt, JsonFormatter)
 
     def test_json_log_handler(self):
@@ -212,6 +222,7 @@ class TestHandlerFactories:
 
 # ── log_uncaught_exceptions ───────────────────────────────────────────
 
+
 class TestLogUncaughtExceptions:
     @patch("backend.core.logger.logging")
     def test_logs_exception(self, mock_logging):
@@ -219,6 +230,7 @@ class TestLogUncaughtExceptions:
             raise ValueError("test error")
         except ValueError:
             import sys
+
             _, exc, tb = sys.exc_info()
             log_uncaught_exceptions(ValueError, exc, tb)
         mock_logging.error.assert_called()
@@ -226,14 +238,20 @@ class TestLogUncaughtExceptions:
 
 # ── LlmFileHandler ───────────────────────────────────────────────────
 
+
 class TestLlmFileHandler:
     def test_message_counter_increments(self, tmp_path):
         with patch("backend.core.logger.LOG_DIR", str(tmp_path)):
             handler = LlmFileHandler("prompt", delay=True)
             assert handler.message_counter == 1
             record = logging.LogRecord(
-                name="test", level=logging.INFO, pathname="", lineno=0,
-                msg="test message", args=None, exc_info=None,
+                name="test",
+                level=logging.INFO,
+                pathname="",
+                lineno=0,
+                msg="test message",
+                args=None,
+                exc_info=None,
             )
             handler.emit(record)
             assert handler.message_counter == 2
@@ -241,11 +259,15 @@ class TestLlmFileHandler:
             # to avoid ValueError on flush of closed file.
             handler.stream = None
 
+
 # ── Trace context Errors ─────────────────────────────────────────────
+
 
 class TestTraceContextErrors:
     def test_set_context_exception_handled(self):
-        with patch("backend.core.logger._TRACE_LOCAL", spec=[]): # Triggers AttributeError/Exception
+        with patch(
+            "backend.core.logger._TRACE_LOCAL", spec=[]
+        ):  # Triggers AttributeError/Exception
             # Should not raise
             set_trace_context({"a": 1})
 
@@ -262,6 +284,7 @@ class TestTraceContextErrors:
 
 # ── LlmFileHandler Extra ──────────────────────────────────────────────
 
+
 class TestLlmFileHandlerExtra:
     @patch("backend.core.logger.DEBUG", False)
     def test_initialization_no_debug(self, tmp_path):
@@ -269,9 +292,9 @@ class TestLlmFileHandlerExtra:
         session_dir = os.path.join(tmp_path, "llm", "default")
         os.makedirs(session_dir, exist_ok=True)
         dummy_file = os.path.join(session_dir, "old.log")
-        with open(dummy_file, "w") as f:
+        with open(dummy_file, "w", encoding="utf-8") as f:
             f.write("old content")
-            
+
         with patch("backend.core.logger.LOG_DIR", str(tmp_path)):
             handler = LlmFileHandler("prompt", delay=True)
             assert handler.session == "default"
@@ -284,12 +307,12 @@ class TestLlmFileHandlerExtra:
         session_dir = os.path.join(tmp_path, "llm", "default")
         os.makedirs(session_dir, exist_ok=True)
         dummy_file = os.path.join(session_dir, "old.log")
-        with open(dummy_file, "w") as f:
+        with open(dummy_file, "w", encoding="utf-8") as f:
             f.write("old content")
-            
+
         with patch("backend.core.logger.LOG_DIR", str(tmp_path)):
             # Should not raise
-            handler = LlmFileHandler("prompt", delay=True)
+            LlmFileHandler("prompt", delay=True)
             assert os.path.exists(dummy_file)
 
     @patch("backend.core.logger.DEBUG", True)
@@ -297,31 +320,38 @@ class TestLlmFileHandlerExtra:
         with patch("backend.core.logger.LOG_DIR", str(tmp_path)):
             handler = LlmFileHandler("prompt", delay=True)
             assert handler.session != "default"
-            assert len(handler.session) > 0
+            assert handler.session
 
     def test_emit_logic(self, tmp_path):
         with patch("backend.core.logger.LOG_DIR", str(tmp_path)):
             handler = LlmFileHandler("prompt", delay=True)
             record = logging.LogRecord(
-                name="test", level=logging.INFO, pathname="", lineno=0,
-                msg="test message", args=None, exc_info=None,
+                name="test",
+                level=logging.INFO,
+                pathname="",
+                lineno=0,
+                msg="test message",
+                args=None,
+                exc_info=None,
             )
             handler.emit(record)
-            
+
             # Check file exists
             log_file = os.path.join(handler.log_directory, "prompt_001.log")
             assert os.path.exists(log_file)
-            with open(log_file, "r") as f:
+            with open(log_file, "r", encoding="utf-8") as f:
                 assert "test message" in f.read()
 
 
 # ── Extra Coverage ────────────────────────────────────────────────────
+
 
 class TestLoggerExtraCoverage:
     def test_get_file_handler_json(self, tmp_path):
         with patch("backend.core.logger.LOG_JSON", True):
             handler = get_file_handler(str(tmp_path), logging.INFO)
             from pythonjsonlogger.json import JsonFormatter
+
             assert isinstance(handler.formatter, JsonFormatter)
             handler.close()
 
@@ -335,7 +365,7 @@ class TestLoggerExtraCoverage:
         adapter = ForgeLoggerAdapter(extra={"a": 1})
         bound = bind_context(adapter, b=2)
         assert bound.extra == {"a": 1, "b": 2}
-        
+
         # Test with raw logger again to be sure
         logger = logging.getLogger("raw")
         bound2 = bind_context(logger, c=3)

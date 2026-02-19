@@ -83,9 +83,7 @@ class TestDefaultLinterCache:
     @pytest.fixture()
     def linter(self):
         """A linter with no detected backend (linting returns empty results)."""
-        with patch.object(
-            DefaultLinter, "_detect_best_backend", return_value=None
-        ):
+        with patch.object(DefaultLinter, "_detect_best_backend", return_value=None):
             return DefaultLinter(backend="auto", enable_cache=True, cache_ttl=5)
 
     def test_no_backend_returns_empty(self, linter):
@@ -103,17 +101,13 @@ class TestDefaultLinterCache:
         linter._cache["dummy"] = (LintResult([], []), time.time())
         linter._cache_hits = 5
         linter.clear_cache()
-        assert len(linter._cache) == 0
+        assert not linter._cache
         assert linter._cache_hits == 0
         assert linter._cache_misses == 0
 
     def test_cache_eviction(self):
-        with patch.object(
-            DefaultLinter, "_detect_best_backend", return_value=None
-        ):
-            linter = DefaultLinter(
-                backend="auto", enable_cache=True, max_cache_size=2
-            )
+        with patch.object(DefaultLinter, "_detect_best_backend", return_value=None):
+            linter = DefaultLinter(backend="auto", enable_cache=True, max_cache_size=2)
         # Manually populate 3 entries to trigger eviction
         for i in range(3):
             key = f"lint:k{i}"
@@ -121,24 +115,19 @@ class TestDefaultLinterCache:
         assert len(linter._cache) == 2
 
     def test_cache_expiry(self):
-        with patch.object(
-            DefaultLinter, "_detect_best_backend", return_value=None
-        ):
+        with patch.object(DefaultLinter, "_detect_best_backend", return_value=None):
             linter = DefaultLinter(backend="auto", enable_cache=True, cache_ttl=0)
         linter._set_cache("key", LintResult([], []))
         # TTL is 0, so immediate retrieval should return None (expired)
         # Need a tiny passage of time
         import time as _time
+
         _time.sleep(0.01)
         assert linter._get_from_cache("key") is None
 
     def test_cache_hit(self):
-        with patch.object(
-            DefaultLinter, "_detect_best_backend", return_value=None
-        ):
-            linter = DefaultLinter(
-                backend="auto", enable_cache=True, cache_ttl=300
-            )
+        with patch.object(DefaultLinter, "_detect_best_backend", return_value=None):
+            linter = DefaultLinter(backend="auto", enable_cache=True, cache_ttl=300)
         expected = LintResult(
             errors=[LintError(line=1, column=None, message="x")], warnings=[]
         )
@@ -147,9 +136,7 @@ class TestDefaultLinterCache:
         assert got is expected
 
     def test_hash_config(self):
-        with patch.object(
-            DefaultLinter, "_detect_best_backend", return_value=None
-        ):
+        with patch.object(DefaultLinter, "_detect_best_backend", return_value=None):
             linter = DefaultLinter(backend="auto")
         h = linter._hash_config()
         assert isinstance(h, str)
@@ -189,9 +176,7 @@ class TestDefaultLinterBackendDetection:
         assert linter._detected_backend is None
 
     def test_explicit_backend_available(self):
-        with patch.object(
-            DefaultLinter, "_check_backend_available", return_value=True
-        ):
+        with patch.object(DefaultLinter, "_check_backend_available", return_value=True):
             linter = DefaultLinter(backend="ruff")
         assert linter._detected_backend == "ruff"
 

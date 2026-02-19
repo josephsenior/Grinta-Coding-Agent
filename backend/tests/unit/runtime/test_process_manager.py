@@ -22,8 +22,8 @@ from backend.runtime.utils.process_manager import (
 # ProcessManager._extract_process_name
 # ===================================================================
 
-class TestExtractProcessName:
 
+class TestExtractProcessName:
     def setup_method(self):
         self.mgr = ProcessManager()
 
@@ -56,8 +56,8 @@ class TestExtractProcessName:
 # ProcessManager.register/unregister/count
 # ===================================================================
 
-class TestProcessManagerRegistration:
 
+class TestProcessManagerRegistration:
     def test_register_process(self):
         mgr = ProcessManager()
         mgr.register_process("npm run dev", "cmd-1")
@@ -90,8 +90,8 @@ class TestProcessManagerRegistration:
 # ProcessManager.cleanup_all
 # ===================================================================
 
-class TestProcessManagerCleanup:
 
+class TestProcessManagerCleanup:
     @pytest.mark.asyncio
     async def test_cleanup_empty(self):
         mgr = ProcessManager()
@@ -112,8 +112,8 @@ class TestProcessManagerCleanup:
 # _ProcessManagerMetrics
 # ===================================================================
 
-class TestProcessManagerMetrics:
 
+class TestProcessManagerMetrics:
     def test_initial_snapshot(self):
         m = _ProcessManagerMetrics()
         m._init_if_needed()
@@ -173,8 +173,8 @@ class TestProcessManagerMetrics:
 # Warning/severity/recommendation helpers
 # ===================================================================
 
-class TestDiagnosticHelpers:
 
+class TestDiagnosticHelpers:
     def test_generate_warnings_high_active(self):
         metrics = {
             "active_processes": 10,
@@ -199,7 +199,11 @@ class TestDiagnosticHelpers:
 
     def test_recommendations(self):
         metrics = {"cleanup_failures_total": 1}
-        warnings = ["active_processes_without_details", "high_active_process_count", "forced_kill_attempts_detected"]
+        warnings = [
+            "active_processes_without_details",
+            "high_active_process_count",
+            "forced_kill_attempts_detected",
+        ]
         recs = _generate_pm_recommendations(metrics, warnings)
         assert len(recs) == 4  # One per condition
 
@@ -208,8 +212,8 @@ class TestDiagnosticHelpers:
 # Module-level helpers
 # ===================================================================
 
-class TestModuleLevelHelpers:
 
+class TestModuleLevelHelpers:
     def test_get_metrics_snapshot(self):
         snap = get_process_manager_metrics_snapshot()
         assert "registered_total" in snap

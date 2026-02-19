@@ -90,10 +90,11 @@ class TestProcessCoreSection:
 
     def test_no_type_hints_fallback(self):
         """Test fallback when type hints aren't available."""
+
         class NoHintsCfg:
             def __init__(self):
                 self.value = 0
-        
+
         cfg = NoHintsCfg()
         summary = DummySummary()
         process_core_section({"value": 42}, cfg, summary)
@@ -106,9 +107,7 @@ class TestProcessAgentSection:
         summary = DummySummary()
         with patch(
             "backend.core.config.config_sections.AgentConfig.from_toml_section",
-            side_effect=ValidationError.from_exception_data(
-                "AgentConfig", []
-            ),
+            side_effect=ValidationError.from_exception_data("AgentConfig", []),
         ):
             process_agent_section({"agent": {"bad": True}}, cfg, summary)
         assert summary.records
@@ -141,7 +140,7 @@ class TestProcessAgentSection:
             side_effect=TypeError("bad type"),
         ):
             process_agent_section({"agent": {"bad": True}}, cfg, summary)
-        assert len(summary.records) > 0
+        assert summary.records
 
     def test_key_error_records_summary(self):
         """Test KeyError handling."""
@@ -152,7 +151,7 @@ class TestProcessAgentSection:
             side_effect=KeyError("missing_key"),
         ):
             process_agent_section({"agent": {"bad": True}}, cfg, summary)
-        assert len(summary.records) > 0
+        assert summary.records
 
 
 class TestProcessLLMSection:
@@ -201,12 +200,12 @@ class TestProcessLLMSection:
                 "backend.core.config.config_sections.LLMConfig"
             ) as mock_llm_class:
                 mock_instance = MagicMock()
-                mock_instance.from_toml_section.side_effect = ValidationError.from_exception_data(
-                    "LLMConfig", []
+                mock_instance.from_toml_section.side_effect = (
+                    ValidationError.from_exception_data("LLMConfig", [])
                 )
                 mock_llm_class.return_value = mock_instance
                 process_llm_section({"llm": {"bad": True}}, cfg, summary)
-        assert len(summary.records) > 0
+        assert summary.records
         assert summary.records[0][0] == "llm"
 
     def test_llm_no_section_does_nothing(self):
@@ -259,7 +258,7 @@ class TestProcessSecuritySection:
             side_effect=ValidationError.from_exception_data("SecurityConfig", []),
         ):
             process_security_section({"security": {"bad": True}}, cfg, summary)
-        assert len(summary.records) > 0
+        assert summary.records
 
     def test_type_error_records_summary(self):
         """Test TypeError handling."""
@@ -270,7 +269,7 @@ class TestProcessSecuritySection:
             side_effect=TypeError("bad type"),
         ):
             process_security_section({"security": {"bad": True}}, cfg, summary)
-        assert len(summary.records) > 0
+        assert summary.records
 
 
 class TestProcessRuntimeSection:
@@ -314,7 +313,7 @@ class TestProcessRuntimeSection:
             side_effect=ValidationError.from_exception_data("RuntimeConfig", []),
         ):
             process_runtime_section({"runtime": {"bad": True}}, cfg, summary)
-        assert len(summary.records) > 0
+        assert summary.records
 
 
 class TestProcessMcpSection:
@@ -358,7 +357,7 @@ class TestProcessMcpSection:
             side_effect=ValidationError.from_exception_data("MCPConfig", []),
         ):
             process_mcp_section({"mcp": {"bad": True}}, cfg, summary)
-        assert len(summary.records) > 0
+        assert summary.records
 
 
 class TestProcessCondenserSection:
@@ -402,7 +401,7 @@ class TestProcessCondenserSection:
             side_effect=ValidationError.from_exception_data("CondenserConfig", []),
         ):
             process_condenser_section({"condenser": {"bad": True}}, cfg, summary)
-        assert len(summary.records) > 0
+        assert summary.records
 
     def test_condenser_no_default_when_disabled(self):
         """Test that no default condenser is assigned when disabled."""
@@ -455,4 +454,4 @@ class TestProcessExtendedSection:
             side_effect=TypeError("bad type"),
         ):
             process_extended_section({"extended": {"bad": True}}, cfg, summary)
-        assert len(summary.records) > 0
+        assert summary.records

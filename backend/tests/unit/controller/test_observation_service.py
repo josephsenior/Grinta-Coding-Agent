@@ -35,11 +35,14 @@ def _make_pending_service(action=None) -> MagicMock:
     return svc
 
 
-def _make_observation(content: str = "result", cause: int | None = None) -> SimpleNamespace:
+def _make_observation(
+    content: str = "result", cause: int | None = None
+) -> SimpleNamespace:
     return SimpleNamespace(content=content, cause=cause)
 
 
 # ── transition_agent_state_logic ─────────────────────────────────────
+
 
 class TestTransitionLogic:
     @pytest.mark.asyncio
@@ -60,7 +63,9 @@ class TestTransitionLogic:
         controller.tool_pipeline = None
         obs = _make_observation()
         await transition_agent_state_logic(controller, None, obs)
-        controller.set_agent_state_to.assert_called_once_with(AgentState.AWAITING_USER_INPUT)
+        controller.set_agent_state_to.assert_called_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
 
     @pytest.mark.asyncio
     async def test_runs_pipeline_observe_when_ctx_present(self):
@@ -87,6 +92,7 @@ class TestTransitionLogic:
 
 # ── ObservationService._get_log_level ────────────────────────────────
 
+
 class TestGetLogLevel:
     def test_debug_by_default(self):
         ctx = _make_context()
@@ -110,6 +116,7 @@ class TestGetLogLevel:
 
 # ── ObservationService._prepare_observation_for_logging ──────────────
 
+
 class TestPrepareObservation:
     def test_truncates_long_content(self):
         ctx = _make_context()
@@ -129,6 +136,7 @@ class TestPrepareObservation:
 
 
 # ── ObservationService.handle_observation ────────────────────────────
+
 
 class TestHandleObservation:
     @pytest.mark.asyncio

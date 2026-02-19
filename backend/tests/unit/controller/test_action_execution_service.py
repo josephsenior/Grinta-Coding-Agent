@@ -134,7 +134,9 @@ class TestHandleContextWindowError:
             "backend.controller.services.action_execution_service.is_context_window_error",
             return_value=True,
         ):
-            result = await svc._handle_context_window_error(Exception("context too long"))
+            result = await svc._handle_context_window_error(
+                Exception("context too long")
+            )
         assert result is None
         # Should have added a CondensationRequestAction
         ctx.event_stream.add_event.assert_called_once()

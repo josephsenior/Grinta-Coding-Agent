@@ -75,6 +75,7 @@ class AutonomyService:
                 validators=validators,
                 min_confidence=0.7,
                 require_all_pass=False,
+                fail_open_on_empty=False,
             )
             logger.info("TaskValidator enabled for completion checking")
 

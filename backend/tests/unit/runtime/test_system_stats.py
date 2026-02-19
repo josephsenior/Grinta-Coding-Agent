@@ -5,8 +5,6 @@ Targets the 21.2% (26 missed lines) coverage gap.
 
 from __future__ import annotations
 
-import time
-from unittest.mock import MagicMock, patch
 
 from backend.runtime.utils.system_stats import (
     get_system_info,

@@ -188,7 +188,8 @@ class ToolRegistry:
         try:
             result = subprocess.run(
                 [command, *args],
-                check=False, capture_output=True,
+                check=False,
+                capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -204,7 +205,8 @@ class ToolRegistry:
         try:
             result = subprocess.run(
                 [command, *args],
-                check=False, capture_output=True,
+                check=False,
+                capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -224,7 +226,8 @@ class ToolRegistry:
                     "-Command",
                     "$PSVersionTable.PSVersion.ToString()",
                 ],
-                check=False, capture_output=True,
+                check=False,
+                capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -239,7 +242,8 @@ class ToolRegistry:
         try:
             result = subprocess.run(
                 ["bash", "--version"],
-                check=False, capture_output=True,
+                check=False,
+                capture_output=True,
                 text=True,
                 timeout=5,
             )

@@ -19,10 +19,13 @@ from backend.server.utils.input_validation import (
 # validate_file_path
 # ---------------------------------------------------------------------------
 
+
 class TestValidateFilePath:
     def test_normal_path(self):
-        assert validate_file_path("src/main.py") == "src\\main.py" or \
-               validate_file_path("src/main.py") == "src/main.py"
+        assert (
+            validate_file_path("src/main.py") == "src\\main.py"
+            or validate_file_path("src/main.py") == "src/main.py"
+        )
 
     def test_null_bytes_rejected(self):
         with pytest.raises(ValidationError, match="null bytes"):
@@ -64,6 +67,7 @@ class TestValidateFilePath:
 # validate_command
 # ---------------------------------------------------------------------------
 
+
 class TestValidateCommand:
     def test_empty_command(self):
         with pytest.raises(ValidationError, match="Empty"):
@@ -97,6 +101,7 @@ class TestValidateCommand:
 # ---------------------------------------------------------------------------
 # validate_api_parameter
 # ---------------------------------------------------------------------------
+
 
 class TestValidateApiParameter:
     def test_required_empty(self):
@@ -158,6 +163,7 @@ class TestValidateApiParameter:
 # validate_file_upload
 # ---------------------------------------------------------------------------
 
+
 class TestValidateFileUpload:
     def test_valid_upload(self):
         fname, content = validate_file_upload("test.txt", b"hello", max_size=1024)
@@ -188,6 +194,7 @@ class TestValidateFileUpload:
 # _detect_mime_type
 # ---------------------------------------------------------------------------
 
+
 class TestDetectMimeType:
     def test_png(self):
         assert _detect_mime_type(b"\x89PNG", "img.png") == "image/png"
@@ -217,6 +224,7 @@ class TestDetectMimeType:
 # ---------------------------------------------------------------------------
 # sanitize_string
 # ---------------------------------------------------------------------------
+
 
 class TestSanitizeString:
     def test_removes_null_bytes(self):

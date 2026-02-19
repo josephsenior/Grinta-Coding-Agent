@@ -43,7 +43,11 @@ class TestCheckTools:
                     "name": "test",
                     "parameters": {
                         "properties": {
-                            "arg": {"type": "string", "default": "value", "format": "uri"}
+                            "arg": {
+                                "type": "string",
+                                "default": "value",
+                                "format": "uri",
+                            }
                         }
                     },
                 },
@@ -60,7 +64,9 @@ class TestCheckTools:
         tools = [
             {
                 "function": {
-                    "parameters": {"properties": {"x": {"type": "string", "default": "y"}}}
+                    "parameters": {
+                        "properties": {"x": {"type": "string", "default": "y"}}
+                    }
                 }
             }
         ]
@@ -181,12 +187,16 @@ class TestCleanToolsForGemini:
         tools = [
             {
                 "function": {
-                    "parameters": {"properties": {"x": {"type": "string", "default": "a"}}}
+                    "parameters": {
+                        "properties": {"x": {"type": "string", "default": "a"}}
+                    }
                 }
             },
             {
                 "function": {
-                    "parameters": {"properties": {"y": {"type": "string", "default": "b"}}}
+                    "parameters": {
+                        "properties": {"y": {"type": "string", "default": "b"}}
+                    }
                 }
             },
         ]

@@ -61,7 +61,10 @@ class TestSecurityHeadersCall:
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
         assert resp.headers["X-Frame-Options"] == "DENY"
         assert resp.headers["X-XSS-Protection"] == "1; mode=block"
-        assert "Content-Security-Policy" in resp.headers or "Content-Security-Policy-Report-Only" in resp.headers
+        assert (
+            "Content-Security-Policy" in resp.headers
+            or "Content-Security-Policy-Report-Only" in resp.headers
+        )
         assert "Permissions-Policy" in resp.headers
         assert resp.headers["Cross-Origin-Embedder-Policy"] == "require-corp"
         assert resp.headers["Cross-Origin-Opener-Policy"] == "same-origin"
@@ -110,7 +113,11 @@ class TestSecurityHeadersCall:
         csp = resp.headers.get("Content-Security-Policy", "")
         assert "default-src 'self'" in csp
         # Strict should NOT have unsafe-inline
-        assert "'unsafe-inline'" not in csp.split("script-src")[1].split(";")[0] if "script-src" in csp else True
+        assert (
+            "'unsafe-inline'" not in csp.split("script-src")[1].split(";")[0]
+            if "script-src" in csp
+            else True
+        )
 
     @pytest.mark.asyncio
     async def test_csp_report_only_mode(self):
@@ -135,7 +142,11 @@ class TestSecurityHeadersCall:
         resp.headers = {}
         call_next = AsyncMock(return_value=resp)
 
-        with patch.dict(os.environ, {"CSP_REPORT_URI": "https://example.com/report", "CSP_REPORT_ONLY": "0"}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"CSP_REPORT_URI": "https://example.com/report", "CSP_REPORT_ONLY": "0"},
+            clear=False,
+        ):
             await mw(req, call_next)
 
         csp = resp.headers.get("Content-Security-Policy", "")
@@ -200,31 +211,41 @@ class TestShouldSkipCsrfCheck:
 class TestValidateOriginHeader:
     def test_matching_origin(self):
         csrf = CSRFProtection()
-        valid, msg = csrf._validate_origin_header("http://localhost:3000", "http://localhost:3000")
+        valid, msg = csrf._validate_origin_header(
+            "http://localhost:3000", "http://localhost:3000"
+        )
         assert valid is True
         assert msg == ""
 
     def test_mismatching_origin(self):
         csrf = CSRFProtection()
-        valid, msg = csrf._validate_origin_header("http://evil.com", "http://localhost:3000")
+        valid, msg = csrf._validate_origin_header(
+            "http://evil.com", "http://localhost:3000"
+        )
         assert valid is False
         assert "CSRF" in msg
 
     def test_localhost_different_ports(self):
         csrf = CSRFProtection()
-        valid, msg = csrf._validate_origin_header("http://localhost:5173", "http://localhost:3000")
+        valid, msg = csrf._validate_origin_header(
+            "http://localhost:5173", "http://localhost:3000"
+        )
         assert valid is True  # localhost dev scenario
 
 
 class TestValidateRefererHeader:
     def test_matching_referer(self):
         csrf = CSRFProtection()
-        valid, msg = csrf._validate_referer_header("http://localhost:3000/page", "http://localhost:3000")
+        valid, msg = csrf._validate_referer_header(
+            "http://localhost:3000/page", "http://localhost:3000"
+        )
         assert valid is True
 
     def test_mismatching_referer(self):
         csrf = CSRFProtection()
-        valid, msg = csrf._validate_referer_header("http://evil.com/page", "http://localhost:3000")
+        valid, msg = csrf._validate_referer_header(
+            "http://evil.com/page", "http://localhost:3000"
+        )
         assert valid is False
         assert "CSRF" in msg
 
@@ -232,28 +253,55 @@ class TestValidateRefererHeader:
 class TestIsLocalhostDevelopment:
     def test_same_localhost(self):
         csrf = CSRFProtection()
-        assert csrf._is_localhost_development("http://localhost:5173", "http://localhost:3000") is True
+        assert (
+            csrf._is_localhost_development(
+                "http://localhost:5173", "http://localhost:3000"
+            )
+            is True
+        )
 
     def test_127_0_0_1(self):
         csrf = CSRFProtection()
-        assert csrf._is_localhost_development("http://127.0.0.1:5173", "http://127.0.0.1:3000") is True
+        assert (
+            csrf._is_localhost_development(
+                "http://127.0.0.1:5173", "http://127.0.0.1:3000"
+            )
+            is True
+        )
 
     def test_mixed_localhost_127(self):
         csrf = CSRFProtection()
-        assert csrf._is_localhost_development("http://localhost:5173", "http://127.0.0.1:3000") is True
+        assert (
+            csrf._is_localhost_development(
+                "http://localhost:5173", "http://127.0.0.1:3000"
+            )
+            is True
+        )
 
     def test_not_localhost(self):
         csrf = CSRFProtection()
-        assert csrf._is_localhost_development("http://example.com", "http://localhost:3000") is False
+        assert (
+            csrf._is_localhost_development(
+                "http://example.com", "http://localhost:3000"
+            )
+            is False
+        )
 
     def test_different_schemes(self):
         csrf = CSRFProtection()
-        assert csrf._is_localhost_development("https://localhost:5173", "http://localhost:3000") is False
+        assert (
+            csrf._is_localhost_development(
+                "https://localhost:5173", "http://localhost:3000"
+            )
+            is False
+        )
 
     def test_broken_url(self):
         csrf = CSRFProtection()
         # Should return False on any parse error
-        result = csrf._is_localhost_development("not://a valid url::::", "http://localhost")
+        result = csrf._is_localhost_development(
+            "not://a valid url::::", "http://localhost"
+        )
         assert isinstance(result, bool)
 
 

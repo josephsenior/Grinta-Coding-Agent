@@ -42,8 +42,7 @@ def is_text_content(content_item: Any) -> TypeGuard[TextContent]:
     if isinstance(content_item, TextContent):
         return True
     return bool(
-        getattr(content_item, "type", None) == "text"
-        and hasattr(content_item, "text")
+        getattr(content_item, "type", None) == "text" and hasattr(content_item, "text")
     )
 
 
@@ -129,7 +128,7 @@ def apply_user_message_formatting(messages: list[Message]) -> list[Message]:
         if (
             current_role == "user"
             and prev_role == "user"
-            and (len(new_msg.content) > 0)
+            and (new_msg.content)
         ):
             for content_item in new_msg.content:
                 if is_text_content(content_item):

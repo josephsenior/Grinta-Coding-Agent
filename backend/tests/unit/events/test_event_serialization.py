@@ -18,6 +18,7 @@ from backend.events.event import EventSource
 
 # ── truncate_content ─────────────────────────────────────────────────
 
+
 class TestTruncateContent:
     def test_no_truncation_when_none(self):
         assert truncate_content("hello world", None) == "hello world"
@@ -47,6 +48,7 @@ class TestTruncateContent:
 
 # ── event_from_dict ──────────────────────────────────────────────────
 
+
 class TestEventFromDict:
     def test_action_event(self):
         data = {
@@ -73,6 +75,7 @@ class TestEventFromDict:
 
 # ── event_to_dict ────────────────────────────────────────────────────
 
+
 class TestEventToDict:
     def test_action_roundtrip(self):
         action = MessageAction(content="hi")
@@ -91,6 +94,7 @@ class TestEventToDict:
 
 
 # ── event_to_trajectory ─────────────────────────────────────────────
+
 
 class TestEventToTrajectory:
     def test_null_action_returns_none(self):

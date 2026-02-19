@@ -170,7 +170,7 @@ class TestForgeClientResilience:
 
         await client.send_message("hello online")
         client._sio.emit.assert_called_once()
-        assert len(client._offline_queue) == 0
+        assert not client._offline_queue
 
     @pytest.mark.asyncio
     async def test_send_confirmation_buffers_when_disconnected(self):
@@ -188,7 +188,7 @@ class TestForgeClientResilience:
         client._offline_queue.append(("forge_user_action", {"action": "msg2"}))
 
         await client._flush_offline_queue()
-        assert len(client._offline_queue) == 0
+        assert not client._offline_queue
         assert client._sio.emit.call_count == 2
 
     @pytest.mark.asyncio

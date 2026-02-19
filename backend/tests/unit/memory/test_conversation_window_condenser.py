@@ -18,7 +18,9 @@ from backend.memory.condenser.impl.conversation_window_condenser import (
 # ── Helpers ──────────────────────────────────────────────────────────
 
 
-def _msg(eid: int, source: EventSource = EventSource.USER, content: str = "hi") -> MessageAction:
+def _msg(
+    eid: int, source: EventSource = EventSource.USER, content: str = "hi"
+) -> MessageAction:
     m = MessageAction(content=content, wait_for_response=False)
     m.id = eid
     m._source = source  # type: ignore[attr-defined]
@@ -128,7 +130,7 @@ class TestCalculateRecentEventsSlice:
         events = [_msg(i, EventSource.AGENT) for i in range(10)]
         essential = [0]  # 1 essential, 9 non-essential → keep ~4-5
         _slice, first_idx = cond._calculate_recent_events_slice(events, essential)
-        assert len(_slice) >= 1
+        assert _slice
         assert first_idx >= 0
 
     def test_empty_events(self):

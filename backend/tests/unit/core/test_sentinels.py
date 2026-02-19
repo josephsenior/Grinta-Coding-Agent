@@ -18,6 +18,7 @@ from backend.core.type_safety.sentinels import (
 # Sentinel class
 # ---------------------------------------------------------------------------
 
+
 class TestSentinel:
     """Tests for the Sentinel base class."""
 
@@ -57,6 +58,7 @@ class TestSentinel:
 # is_missing / is_not_set / is_set
 # ---------------------------------------------------------------------------
 
+
 class TestSentinelChecks:
     """Tests for sentinel check functions."""
 
@@ -86,6 +88,7 @@ class TestSentinelChecks:
 # default_if_missing
 # ---------------------------------------------------------------------------
 
+
 class TestDefaultIfMissing:
     """Tests for default_if_missing."""
 
@@ -105,6 +108,7 @@ class TestDefaultIfMissing:
 # ---------------------------------------------------------------------------
 # coalesce
 # ---------------------------------------------------------------------------
+
 
 class TestCoalesce:
     """Tests for coalesce."""

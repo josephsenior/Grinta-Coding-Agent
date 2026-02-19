@@ -148,7 +148,7 @@ class TestIndexCodeFile:
         rag.index_code_file("utils.py", "from pathlib import Path\n")
         assert "pathlib" in gs.graph
         neighbors = gs.get_neighbors("utils.py", edge_type=EdgeType.IMPORTS)
-        assert len(neighbors) >= 1
+        assert neighbors
 
     def test_ignores_non_import_lines(self):
         """Non-import lines should not create edges."""

@@ -19,7 +19,7 @@ class TestCheckUltimateEditorDependencies:
 
         assert isinstance(success, bool)
         assert isinstance(message, str)
-        assert len(message) > 0
+        assert message
 
     def test_message_content_indicates_status(self):
         """Test that message reflects success or failure status."""
@@ -27,14 +27,18 @@ class TestCheckUltimateEditorDependencies:
 
         if success:
             # Success message should mention operational status or readiness
-            assert ("operational" in message.lower() or
-                    "READY" in message or
-                    "PASS" in message.upper())
+            assert (
+                "operational" in message.lower()
+                or "READY" in message
+                or "PASS" in message.upper()
+            )
         else:
             # Failure message should mention dependencies or errors
-            assert ("dependencies" in message.lower() or
-                    "missing" in message.lower() or
-                    "failed" in message.lower())
+            assert (
+                "dependencies" in message.lower()
+                or "missing" in message.lower()
+                or "failed" in message.lower()
+            )
 
 
 class TestCheckAtomicRefactorDependencies:
@@ -46,7 +50,7 @@ class TestCheckAtomicRefactorDependencies:
 
         assert isinstance(success, bool)
         assert isinstance(message, str)
-        assert len(message) > 0
+        assert message
 
     def test_success_when_available(self):
         """Test successful check when AtomicRefactor is available."""
@@ -62,8 +66,14 @@ class TestRunProductionHealthCheck:
 
     def test_all_checks_pass(self):
         """Test health check when all dependencies are satisfied."""
-        with patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies", return_value=(True, "UE OK")):
-            with patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies", return_value=(True, "AR OK")):
+        with patch(
+            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            return_value=(True, "UE OK"),
+        ):
+            with patch(
+                "backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
+                return_value=(True, "AR OK"),
+            ):
                 result = run_production_health_check(raise_on_failure=False)
 
         assert result["overall_status"] == "HEALTHY"
@@ -76,8 +86,14 @@ class TestRunProductionHealthCheck:
 
     def test_non_critical_component_failure(self):
         """Test health check when only non-critical component fails."""
-        with patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies", return_value=(True, "UE OK")):
-            with patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies", return_value=(False, "AR failed")):
+        with patch(
+            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            return_value=(True, "UE OK"),
+        ):
+            with patch(
+                "backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
+                return_value=(False, "AR failed"),
+            ):
                 result = run_production_health_check(raise_on_failure=False)
 
         # Should still be healthy since atomic refactor is not critical
@@ -88,8 +104,14 @@ class TestRunProductionHealthCheck:
 
     def test_critical_component_failure(self):
         """Test health check when critical component fails."""
-        with patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies", return_value=(False, "UE failed")):
-            with patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies", return_value=(True, "AR OK")):
+        with patch(
+            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            return_value=(False, "UE failed"),
+        ):
+            with patch(
+                "backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
+                return_value=(True, "AR OK"),
+            ):
                 result = run_production_health_check(raise_on_failure=False)
 
         assert result["overall_status"] == "CRITICAL_FAILURE"
@@ -98,15 +120,27 @@ class TestRunProductionHealthCheck:
 
     def test_critical_failure_raises_with_flag(self):
         """Test that critical failure raises RuntimeError when raise_on_failure=True."""
-        with patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies", return_value=(False, "UE failed")):
-            with patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies", return_value=(True, "AR OK")):
+        with patch(
+            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            return_value=(False, "UE failed"),
+        ):
+            with patch(
+                "backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
+                return_value=(True, "AR OK"),
+            ):
                 with pytest.raises(RuntimeError, match="health check failed"):
                     run_production_health_check(raise_on_failure=True)
 
     def test_critical_failure_no_raise_when_disabled(self):
         """Test critical failure returns result when raise_on_failure=False."""
-        with patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies", return_value=(False, "UE failed")):
-            with patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies", return_value=(True, "AR OK")):
+        with patch(
+            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            return_value=(False, "UE failed"),
+        ):
+            with patch(
+                "backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
+                return_value=(True, "AR OK"),
+            ):
                 result = run_production_health_check(raise_on_failure=False)
 
         # Should return result without raising
@@ -114,8 +148,14 @@ class TestRunProductionHealthCheck:
 
     def test_all_components_fail(self):
         """Test health check when all components fail."""
-        with patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies", return_value=(False, "UE failed")):
-            with patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies", return_value=(False, "AR failed")):
+        with patch(
+            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            return_value=(False, "UE failed"),
+        ):
+            with patch(
+                "backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
+                return_value=(False, "AR failed"),
+            ):
                 result = run_production_health_check(raise_on_failure=False)
 
         assert result["overall_status"] == "CRITICAL_FAILURE"
@@ -124,8 +164,14 @@ class TestRunProductionHealthCheck:
 
     def test_result_structure_complete(self):
         """Test that result has complete expected structure."""
-        with patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies", return_value=(True, "OK")):
-            with patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies", return_value=(True, "OK")):
+        with patch(
+            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            return_value=(True, "OK"),
+        ):
+            with patch(
+                "backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
+                return_value=(True, "OK"),
+            ):
                 result = run_production_health_check(raise_on_failure=False)
 
         # Check all required keys exist
@@ -146,13 +192,25 @@ class TestRunProductionHealthCheck:
     def test_overall_status_values(self):
         """Test that overall_status has expected values."""
         # Test HEALTHY
-        with patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies", return_value=(True, "OK")):
-            with patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies", return_value=(True, "OK")):
+        with patch(
+            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            return_value=(True, "OK"),
+        ):
+            with patch(
+                "backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
+                return_value=(True, "OK"),
+            ):
                 result = run_production_health_check(raise_on_failure=False)
                 assert result["overall_status"] == "HEALTHY"
 
         # Test CRITICAL_FAILURE
-        with patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies", return_value=(False, "FAIL")):
-            with patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies", return_value=(True, "OK")):
+        with patch(
+            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            return_value=(False, "FAIL"),
+        ):
+            with patch(
+                "backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
+                return_value=(True, "OK"),
+            ):
                 result = run_production_health_check(raise_on_failure=False)
                 assert result["overall_status"] == "CRITICAL_FAILURE"

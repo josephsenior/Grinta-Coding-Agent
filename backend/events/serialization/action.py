@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, cast
 
 from backend.core.enums import ActionSecurityRisk
@@ -108,10 +109,29 @@ def _create_action_instance(
     timestamp: str | None,
 ) -> Action:
     """Create action instance with timeout and timestamp if specified."""
+    # Prune arguments that aren't in the constructor's signature to avoid TypeErrors.
+    # This is needed because some Action fields (like confirmation_state) or
+    # normalized arguments (like security_risk) are not accepted by all
+    # action class constructors.
+    sig = inspect.signature(action_class)
+    constructor_args = {}
+    extra_args = {}
+    for k, v in args.items():
+        if k in sig.parameters:
+            constructor_args[k] = v
+        else:
+            extra_args[k] = v
+
     try:
-        decoded_action = action_class(**args)
+        decoded_action = action_class(**constructor_args)
+
+        # Manually set fields that weren't in the constructor but are on the instance.
+        for k, v in extra_args.items():
+            if hasattr(decoded_action, k):
+                setattr(decoded_action, k, v)
+
         if "timeout" in action:
-            blocking = args.get("blocking", False)
+            blocking = constructor_args.get("blocking", False)
             decoded_action.set_hard_timeout(action["timeout"], blocking=blocking)
         if timestamp:
             decoded_action._timestamp = timestamp

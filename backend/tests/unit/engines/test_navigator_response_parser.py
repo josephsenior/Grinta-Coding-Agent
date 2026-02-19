@@ -13,6 +13,7 @@ from backend.events.action import BrowseInteractiveAction
 
 # ── BrowsingActionParserMessage ────────────────────────────────────────
 
+
 class TestBrowsingActionParserMessage:
     def test_check_condition_no_code_block(self):
         parser = BrowsingActionParserMessage()
@@ -32,6 +33,7 @@ class TestBrowsingActionParserMessage:
 
 
 # ── BrowsingActionParserBrowseInteractive ──────────────────────────────
+
 
 class TestBrowsingActionParserBrowseInteractive:
     def test_check_condition_always_true(self):
@@ -77,6 +79,7 @@ class TestBrowsingActionParserBrowseInteractive:
 
 # ── BrowsingResponseParser ─────────────────────────────────────────────
 
+
 class TestBrowsingResponseParser:
     def test_parse_string_input_plain(self):
         parser = BrowsingResponseParser()
@@ -93,39 +96,25 @@ class TestBrowsingResponseParser:
     def test_parse_response_dict(self):
         parser = BrowsingResponseParser()
         response = {
-            "choices": [
-                {"message": {"content": "I'll click```click('#btn')```"}}
-            ]
+            "choices": [{"message": {"content": "I'll click```click('#btn')```"}}]
         }
         result = parser.parse(response)
         assert isinstance(result, BrowseInteractiveAction)
 
     def test_parse_response_none_content(self):
         parser = BrowsingResponseParser()
-        response = {
-            "choices": [
-                {"message": {"content": None}}
-            ]
-        }
+        response = {"choices": [{"message": {"content": None}}]}
         action_str = parser.parse_response(response)
         assert action_str == ""
 
     def test_parse_response_adds_suffix(self):
         parser = BrowsingResponseParser()
-        response = {
-            "choices": [
-                {"message": {"content": "click('#btn')"}}
-            ]
-        }
+        response = {"choices": [{"message": {"content": "click('#btn')"}}]}
         action_str = parser.parse_response(response)
         assert action_str.endswith("```")
 
     def test_parse_response_already_ends_with_backticks(self):
         parser = BrowsingResponseParser()
-        response = {
-            "choices": [
-                {"message": {"content": "text```code```"}}
-            ]
-        }
+        response = {"choices": [{"message": {"content": "text```code```"}}]}
         action_str = parser.parse_response(response)
         assert action_str == "text```code```"

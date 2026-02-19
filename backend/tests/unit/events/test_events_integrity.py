@@ -33,6 +33,7 @@ def _make_event(id: int):
 
 # ── Happy path ────────────────────────────────────────────────────────
 
+
 class TestIterEventsHappyPath:
     def test_yields_all_events(self):
         events = [_make_event(i) for i in range(5)]
@@ -68,6 +69,7 @@ class TestIterEventsHappyPath:
 
 # ── Stops at corruption ───────────────────────────────────────────────
 
+
 class TestIterEventsStopsAtCorruption:
     def test_stops_at_file_not_found(self):
         event0 = _make_event(0)
@@ -93,6 +95,7 @@ class TestIterEventsStopsAtCorruption:
 
 
 # ── Filter integration ────────────────────────────────────────────────
+
 
 class TestIterEventsWithFilter:
     def test_filter_excludes_events(self):
@@ -122,6 +125,7 @@ class TestIterEventsWithFilter:
 
 
 # ── Edge cases ────────────────────────────────────────────────────────
+
 
 class TestIterEventsEdgeCases:
     def test_corruption_at_first_event(self):

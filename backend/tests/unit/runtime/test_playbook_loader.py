@@ -27,6 +27,7 @@ from backend.runtime.playbook_loader import PlaybookLoaderMixin
 # Concrete host stub
 # -----------------------------------------------------------
 
+
 class _FakeRuntime(PlaybookLoaderMixin):
     """Minimal concrete host so the mixin can be exercised."""
 
@@ -50,7 +51,9 @@ class _FakeRuntime(PlaybookLoaderMixin):
         return Path(path)
 
     def run_action(self, action: Any) -> Any:
-        return CmdOutputObservation(content="ok", command_id=0, command="echo ok", exit_code=0)
+        return CmdOutputObservation(
+            content="ok", command_id=0, command="echo ok", exit_code=0
+        )
 
 
 @pytest.fixture()
@@ -63,6 +66,7 @@ def rt():
 # -----------------------------------------------------------
 # _extract_org_name
 # -----------------------------------------------------------
+
 
 class TestExtractOrgName:
     def test_valid_repo_path(self, rt: _FakeRuntime):
@@ -79,6 +83,7 @@ class TestExtractOrgName:
 # _get_org_config_repo_path
 # -----------------------------------------------------------
 
+
 class TestGetOrgConfigRepoPath:
     def test_returns_org_forge_path(self, rt: _FakeRuntime):
         result = rt._get_org_config_repo_path("github.com/acme/repo", "acme")
@@ -88,6 +93,7 @@ class TestGetOrgConfigRepoPath:
 # -----------------------------------------------------------
 # _load_playbooks_from_directory
 # -----------------------------------------------------------
+
 
 class TestLoadPlaybooksFromDirectory:
     def test_no_files_returns_empty(self, rt: _FakeRuntime):
@@ -142,9 +148,12 @@ class TestLoadPlaybooksFromDirectory:
 # _log_clone_failure
 # -----------------------------------------------------------
 
+
 class TestLogCloneFailure:
     def test_with_cmd_output_obs(self, rt: _FakeRuntime):
-        obs = CmdOutputObservation(content="error output", command_id=0, command="git clone", exit_code=128)
+        obs = CmdOutputObservation(
+            content="error output", command_id=0, command="git clone", exit_code=128
+        )
         rt._log_clone_failure(obs, "acme/.Forge")
         assert any("128" in msg for _, msg in rt._logs)
 
@@ -157,6 +166,7 @@ class TestLogCloneFailure:
 # -----------------------------------------------------------
 # get_playbooks_from_org_or_user
 # -----------------------------------------------------------
+
 
 class TestGetPlaybooksFromOrgOrUser:
     def test_short_repo_path_returns_empty(self, rt: _FakeRuntime):
@@ -173,6 +183,7 @@ class TestGetPlaybooksFromOrgOrUser:
 # -----------------------------------------------------------
 # _clone_and_load_org_playbooks
 # -----------------------------------------------------------
+
 
 class TestCloneAndLoadOrgPlaybooks:
     def test_auth_error_returns_empty(self, rt: _FakeRuntime):
@@ -209,6 +220,7 @@ class TestCloneAndLoadOrgPlaybooks:
 # _execute_clone_and_load
 # -----------------------------------------------------------
 
+
 class TestExecuteCloneAndLoad:
     def test_clone_failure_returns_empty(self, rt: _FakeRuntime):
         rt.run_action = MagicMock(
@@ -239,6 +251,7 @@ class TestExecuteCloneAndLoad:
 # get_playbooks_from_selected_repo
 # -----------------------------------------------------------
 
+
 class TestGetPlaybooksFromSelectedRepo:
     def test_no_selected_repo_loads_workspace(self, rt: _FakeRuntime):
         # read returns ErrorObservation, no FORGE_instructions
@@ -263,5 +276,5 @@ class TestGetPlaybooksFromSelectedRepo:
             )
         )
         rt.list_files = MagicMock(return_value=[])
-        result = rt.get_playbooks_from_selected_repo("github.com/acme/repo")
+        rt.get_playbooks_from_selected_repo("github.com/acme/repo")
         assert any("FORGE_instructions" in msg for _, msg in rt._logs)

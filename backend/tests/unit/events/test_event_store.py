@@ -13,8 +13,8 @@ from backend.events.event_store import EventStore, _CachePage, _DUMMY_PAGE
 # _CachePage
 # ===================================================================
 
-class TestCachePage:
 
+class TestCachePage:
     def test_covers_inside_range(self):
         page = _CachePage(events=[{}, {}, {}], start=10, end=13)
         assert page.covers(10) is True
@@ -48,7 +48,6 @@ class TestCachePage:
 
 
 class TestDummyPage:
-
     def test_dummy_page_never_covers(self):
         assert _DUMMY_PAGE.covers(0) is False
         assert _DUMMY_PAGE.covers(100) is False
@@ -62,8 +61,8 @@ class TestDummyPage:
 # EventStore — static / instance helpers
 # ===================================================================
 
-class TestEventStoreHelpers:
 
+class TestEventStoreHelpers:
     def test_get_id_from_filename(self):
         assert EventStore._get_id_from_filename("events/42.json") == 42
         assert EventStore._get_id_from_filename("0.json") == 0
@@ -143,7 +142,14 @@ class TestEventStoreGetLatest:
 
 class TestEventStoreCachePage:
     def test_load_cache_page_success(self):
-        events_data = [{"id": 0, "action": "message", "args": {"content": "hi", "image_urls": [], "wait_for_response": False}, "message": "hi"}]
+        events_data = [
+            {
+                "id": 0,
+                "action": "message",
+                "args": {"content": "hi", "image_urls": [], "wait_for_response": False},
+                "message": "hi",
+            }
+        ]
         fs = MagicMock()
         fs.read.return_value = json.dumps(events_data)
         store = EventStore(sid="s1", file_store=fs, user_id=None)

@@ -32,7 +32,12 @@ class TestExtractRedisStats:
         assert result["cached_users"] == 2
 
     def test_empty_keys(self):
-        info = {"used_memory": 0, "total_commands_processed": 0, "keyspace_hits": 0, "keyspace_misses": 0}
+        info = {
+            "used_memory": 0,
+            "total_commands_processed": 0,
+            "keyspace_hits": 0,
+            "keyspace_misses": 0,
+        }
         result = extract_redis_stats(info, [], [])
         assert result["global_config_cached"] is False
         assert result["cached_users"] == 0
@@ -57,7 +62,9 @@ class TestMergeSettingsWithCache:
     def test_merges_when_global_config_present(self):
         settings = self._make_settings("x")
         cache: dict = {}
-        result = merge_settings_with_cache("user1", settings, "some-config", cache, 100.0)
+        result = merge_settings_with_cache(
+            "user1", settings, "some-config", cache, 100.0
+        )
         assert result.val == "x_merged"
         assert "user1" in cache
 

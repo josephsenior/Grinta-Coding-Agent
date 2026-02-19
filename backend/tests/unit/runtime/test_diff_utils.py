@@ -15,6 +15,7 @@ from backend.runtime.utils.diff import (
 # get_diff
 # ---------------------------------------------------------------------------
 
+
 class TestGetDiff:
     def test_identical_content(self):
         result = get_diff("hello\n", "hello\n")
@@ -81,6 +82,7 @@ class TestGetDiff:
 # _is_binary
 # ---------------------------------------------------------------------------
 
+
 class TestIsBinary:
     def test_empty_not_binary(self):
         assert _is_binary("") is False
@@ -100,6 +102,7 @@ class TestIsBinary:
 # ---------------------------------------------------------------------------
 # _normalize_whitespace
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeWhitespace:
     def test_collapses_spaces(self):
@@ -122,6 +125,7 @@ class TestNormalizeWhitespace:
 # ---------------------------------------------------------------------------
 # get_diff_stats
 # ---------------------------------------------------------------------------
+
 
 class TestGetDiffStats:
     def test_empty_diff(self):

@@ -27,9 +27,7 @@ class TestConversationMetadataResultSet:
 
     def test_full(self):
         mock = MagicMock()
-        rs = ConversationMetadataResultSet(
-            results=[mock], next_page_id="next"
-        )
+        rs = ConversationMetadataResultSet(results=[mock], next_page_id="next")
         assert len(rs.results) == 1
         assert rs.next_page_id == "next"
 
@@ -38,4 +36,4 @@ class TestConversationMetadataResultSet:
         rs1 = ConversationMetadataResultSet()
         rs2 = ConversationMetadataResultSet()
         rs1.results.append(MagicMock())
-        assert len(rs2.results) == 0
+        assert not rs2.results

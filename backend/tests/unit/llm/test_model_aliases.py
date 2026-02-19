@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from backend.llm.model_aliases import ModelAliasManager, get_alias_manager
 
@@ -109,9 +109,7 @@ class TestModelAliasManager(TestCase):
 
     def test_load_aliases_from_explicit_path(self):
         """Test loading aliases from explicit config path."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
             tmp.write('[model_aliases]\nmy-model = "claude-3-7-sonnet"\n')
             tmp_path = Path(tmp.name)
 
@@ -127,9 +125,7 @@ class TestModelAliasManager(TestCase):
     def test_load_aliases_searches_multiple_locations(self):
         """Test loading aliases searches config.toml in multiple locations."""
         # Create a temp file to use
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
             tmp.write('[model_aliases]\nfast-chat = "ollama/llama3.2"\n')
             tmp_path = Path(tmp.name)
 
@@ -152,9 +148,7 @@ class TestModelAliasManager(TestCase):
 
     def test_load_from_file_valid_toml(self):
         """Test _load_from_file with valid TOML."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
             tmp.write(
                 """
 [model_aliases]
@@ -180,9 +174,7 @@ local-coder = "ollama/qwen2.5-coder"
 
     def test_load_from_file_no_model_aliases_section(self):
         """Test _load_from_file when model_aliases section is missing."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
             tmp.write('[other_section]\nkey = "value"\n')
             tmp_path = Path(tmp.name)
 
@@ -194,9 +186,7 @@ local-coder = "ollama/qwen2.5-coder"
 
     def test_load_from_file_invalid_alias_types(self):
         """Test _load_from_file skips non-string alias values."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
             tmp.write(
                 """
 [model_aliases]
@@ -216,9 +206,7 @@ invalid-array = ["gpt-4o", "gpt-4"]
 
     def test_load_from_file_invalid_toml(self):
         """Test _load_from_file handles invalid TOML gracefully."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
             tmp.write("invalid [ toml {")
             tmp_path = Path(tmp.name)
 
@@ -262,9 +250,7 @@ invalid-array = ["gpt-4o", "gpt-4"]
         except ImportError:
             self.skipTest("toml package not available")
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
             tmp.write('[other_section]\nkey = "value"\n')
             tmp_path = Path(tmp.name)
 
@@ -285,10 +271,10 @@ invalid-array = ["gpt-4o", "gpt-4"]
             with tempfile.TemporaryDirectory() as tmpdir:
                 save_path = Path(tmpdir) / "nonexistent" / "config.toml"
                 self.manager._aliases = {"test": "model"}
-                
+
                 # This should fail but not raise
                 self.manager.save_aliases(save_path)
-                
+
                 # Should have logged an error
                 self.assertTrue(mock_logger.error.called or mock_logger.debug.called)
 
@@ -305,9 +291,7 @@ invalid-array = ["gpt-4o", "gpt-4"]
 
     def test_load_aliases_respects_env_variable(self):
         """Test load_aliases uses FORGE_CONFIG environment variable."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
             tmp.write('[model_aliases]\nenv-model = "gpt-4o"\n')
             tmp_path = Path(tmp.name)
 

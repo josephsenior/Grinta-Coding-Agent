@@ -20,6 +20,7 @@ from backend.events.serialization.action import (
 
 # ── _validate_action_dict ────────────────────────────────────────────
 
+
 class TestValidateActionDict:
     def test_valid(self):
         d = {"action": "message", "args": {}}
@@ -39,6 +40,7 @@ class TestValidateActionDict:
 
 
 # ── _normalize_security_risk ─────────────────────────────────────────
+
 
 class TestNormalizeSecurityRisk:
     def test_valid_risk_value(self):
@@ -67,6 +69,7 @@ class TestNormalizeSecurityRisk:
 
 
 # ── action_from_dict ─────────────────────────────────────────────────
+
 
 class TestActionFromDict:
     def test_message_action(self):
@@ -115,6 +118,7 @@ class TestActionFromDict:
 
 
 # ── ACTION_TYPE_TO_CLASS ─────────────────────────────────────────────
+
 
 class TestActionTypeToClass:
     def test_has_common_actions(self):

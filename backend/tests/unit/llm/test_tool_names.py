@@ -128,20 +128,18 @@ class TestToolNames(TestCase):
 
     def test_tool_names_are_non_empty_strings(self):
         """Test that all tool names are non-empty strings."""
-        self.assertTrue(len(tool_names.BROWSER_TOOL_NAME) > 0)
-        self.assertTrue(len(tool_names.EXECUTE_BASH_TOOL_NAME) > 0)
-        self.assertTrue(len(tool_names.FINISH_TOOL_NAME) > 0)
-        self.assertTrue(len(tool_names.LLM_BASED_EDIT_TOOL_NAME) > 0)
-        self.assertTrue(len(tool_names.STR_REPLACE_EDITOR_TOOL_NAME) > 0)
-        self.assertTrue(len(tool_names.TASK_TRACKER_TOOL_NAME) > 0)
+        self.assertTrue(tool_names.BROWSER_TOOL_NAME)
+        self.assertTrue(tool_names.EXECUTE_BASH_TOOL_NAME)
+        self.assertTrue(tool_names.FINISH_TOOL_NAME)
+        self.assertTrue(tool_names.LLM_BASED_EDIT_TOOL_NAME)
+        self.assertTrue(tool_names.STR_REPLACE_EDITOR_TOOL_NAME)
+        self.assertTrue(tool_names.TASK_TRACKER_TOOL_NAME)
 
     def test_tool_names_consistency_with_core_constants(self):
         """Test that tool_names module is consistent with core.constants."""
         from backend.core import constants as core_constants
 
-        self.assertEqual(
-            tool_names.BROWSER_TOOL_NAME, core_constants.BROWSER_TOOL_NAME
-        )
+        self.assertEqual(tool_names.BROWSER_TOOL_NAME, core_constants.BROWSER_TOOL_NAME)
         self.assertEqual(
             tool_names.EXECUTE_BASH_TOOL_NAME, core_constants.EXECUTE_BASH_TOOL_NAME
         )

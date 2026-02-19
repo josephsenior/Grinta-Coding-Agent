@@ -14,6 +14,7 @@ from backend.controller.services.task_validation_service import TaskValidationSe
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_context(has_validator: bool = True, initial_task: str | None = "Do X"):
     """Build a fake ControllerContext with a mock controller."""
     controller = MagicMock()
@@ -39,8 +40,13 @@ def _make_action(force_finish: bool = False):
     return SimpleNamespace(force_finish=force_finish)
 
 
-def _validation_result(passed: bool, reason: str = "", confidence: float = 1.0,
-                        missing_items=None, suggestions=None):
+def _validation_result(
+    passed: bool,
+    reason: str = "",
+    confidence: float = 1.0,
+    missing_items=None,
+    suggestions=None,
+):
     return SimpleNamespace(
         passed=passed,
         reason=reason,
@@ -54,8 +60,8 @@ def _validation_result(passed: bool, reason: str = "", confidence: float = 1.0,
 # _should_validate
 # ===================================================================
 
-class TestShouldValidate:
 
+class TestShouldValidate:
     @pytest.mark.asyncio
     async def test_no_validator(self):
         ctx = _make_context(has_validator=False)
@@ -82,8 +88,8 @@ class TestShouldValidate:
 # handle_finish
 # ===================================================================
 
-class TestHandleFinish:
 
+class TestHandleFinish:
     @pytest.mark.asyncio
     async def test_no_validator_returns_true(self):
         ctx = _make_context(has_validator=False)
@@ -138,8 +144,8 @@ class TestHandleFinish:
 # _build_feedback
 # ===================================================================
 
-class TestBuildFeedback:
 
+class TestBuildFeedback:
     def test_basic_feedback(self):
         val = _validation_result(passed=False, reason="Incomplete", confidence=0.3)
         feedback = TaskValidationService._build_feedback(val)
@@ -149,8 +155,10 @@ class TestBuildFeedback:
 
     def test_with_missing_items(self):
         val = _validation_result(
-            passed=False, reason="Missing", confidence=0.5,
-            missing_items=["tests", "docs"]
+            passed=False,
+            reason="Missing",
+            confidence=0.5,
+            missing_items=["tests", "docs"],
         )
         feedback = TaskValidationService._build_feedback(val)
         assert "- tests" in feedback
@@ -158,8 +166,10 @@ class TestBuildFeedback:
 
     def test_with_suggestions(self):
         val = _validation_result(
-            passed=False, reason="Needs work", confidence=0.6,
-            suggestions=["Add error handling", "Refactor"]
+            passed=False,
+            reason="Needs work",
+            confidence=0.6,
+            suggestions=["Add error handling", "Refactor"],
         )
         feedback = TaskValidationService._build_feedback(val)
         assert "Add error handling" in feedback

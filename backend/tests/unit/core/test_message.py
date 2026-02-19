@@ -18,6 +18,7 @@ from backend.core.message import (
 # ToolCallFunction / ToolCall
 # ---------------------------------------------------------------------------
 
+
 class TestToolCallFunction:
     """Tests for ToolCallFunction model."""
 
@@ -41,7 +42,8 @@ class TestToolCall:
 
     def test_custom_type(self):
         tc = ToolCall(
-            id="x", type="custom",
+            id="x",
+            type="custom",
             function=ToolCallFunction(name="f", arguments="{}"),
         )
         assert tc.type == "custom"
@@ -62,6 +64,7 @@ class TestContent:
 # ---------------------------------------------------------------------------
 # TextContent
 # ---------------------------------------------------------------------------
+
 
 class TestTextContent:
     """Tests for TextContent model."""
@@ -88,6 +91,7 @@ class TestTextContent:
 # ---------------------------------------------------------------------------
 # ImageContent
 # ---------------------------------------------------------------------------
+
 
 class TestImageContent:
     """Tests for ImageContent model."""
@@ -121,6 +125,7 @@ class TestImageContent:
 # ---------------------------------------------------------------------------
 # Message
 # ---------------------------------------------------------------------------
+
 
 class TestMessage:
     """Tests for Message model."""
@@ -223,7 +228,9 @@ class TestMessage:
             role="tool",
             name="tool_name",
             tool_call_id="call_1",
-            content=[ImageContent(image_urls=["http://img.com/x.png"], cache_prompt=True)],
+            content=[
+                ImageContent(image_urls=["http://img.com/x.png"], cache_prompt=True)
+            ],
             vision_enabled=True,
             cache_enabled=True,
         )

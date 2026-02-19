@@ -102,12 +102,12 @@ def _interactive_init(dest: Path) -> None:
     print("\n🔍 Scanning for local LLMs (Ollama, LM Studio, etc.)...")
     local_models = discover_all_local_models()
     suggested_model = "claude-3-7-sonnet"
-    
+
     found_any = False
     for provider, models in local_models.items():
         if models:
             if not found_any:
-                print(f"   ✨ Found local models!")
+                print("   ✨ Found local models!")
                 found_any = True
             print(f"   📦 {provider}: {', '.join(models[:3])}...")
             # Suggest the first local model as a default if nothing else is picked
@@ -117,7 +117,11 @@ def _interactive_init(dest: Path) -> None:
     print("-" * 60)
 
     if dest.exists():
-        confirm = input(f"\n⚠️  {dest.name} already exists. Overwrite? [y/N]: ").strip().lower()
+        confirm = (
+            input(f"\n⚠️  {dest.name} already exists. Overwrite? [y/N]: ")
+            .strip()
+            .lower()
+        )
         if confirm != "y":
             print("   Aborted.")
             return
@@ -137,10 +141,10 @@ def _interactive_init(dest: Path) -> None:
     )
 
     dest.write_text(content, encoding="utf-8")
-    
+
     # Ensure workspace exists
     (dest.parent / "workspace").mkdir(exist_ok=True)
-    
+
     print(f"\n✅ Configuration saved to {dest}")
     print(f"📁 Workspace initialized at {dest.parent}/workspace/")
     print("\n👉 To start, run: poetry run forge serve\n")

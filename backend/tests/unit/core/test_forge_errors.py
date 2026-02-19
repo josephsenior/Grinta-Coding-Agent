@@ -31,8 +31,8 @@ from backend.core.errors import (
 # classify_error
 # ===================================================================
 
-class TestClassifyError:
 
+class TestClassifyError:
     def test_forge_error_returns_own_type(self):
         err = RetryableError("retryable")
         assert classify_error(err) is RetryableError
@@ -76,8 +76,8 @@ class TestClassifyError:
 # Hierarchy
 # ===================================================================
 
-class TestErrorHierarchy:
 
+class TestErrorHierarchy:
     def test_forge_error_is_runtime_error(self):
         assert issubclass(ForgeError, RuntimeError)
 
@@ -141,8 +141,8 @@ class TestErrorHierarchy:
 # Context in AgentRuntimeError
 # ===================================================================
 
-class TestAgentRuntimeErrorContext:
 
+class TestAgentRuntimeErrorContext:
     def test_default_context_empty(self):
         err = AgentRuntimeError("msg")
         assert err.context == {}

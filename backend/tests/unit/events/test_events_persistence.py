@@ -10,6 +10,7 @@ from backend.events.persistence import EventPersistence, _truncate_payload
 
 # ── Helper to build a persistence instance with file-store mock ───────
 
+
 def _make_persistence(**overrides) -> tuple[EventPersistence, MagicMock]:
     file_store = MagicMock()
     defaults = {
@@ -28,6 +29,7 @@ def _make_persistence(**overrides) -> tuple[EventPersistence, MagicMock]:
 
 
 # ── is_critical_event / is_critical_payload ───────────────────────────
+
 
 class TestIsCriticalEventPersist:
     def test_critical_action(self):
@@ -54,6 +56,7 @@ class TestIsCriticalEventPersist:
 
 
 # ── persist_event (sync path) ─────────────────────────────────────────
+
 
 class TestPersistSyncPath:
     def test_writes_with_wal_markers(self):
@@ -84,6 +87,7 @@ class TestPersistSyncPath:
 
 # ── build_cache_payload ───────────────────────────────────────────────
 
+
 class TestBuildCachePayloadPersist:
     def test_returns_none_when_not_full(self):
         p, _ = _make_persistence(cache_size=3)
@@ -106,6 +110,7 @@ class TestBuildCachePayloadPersist:
 
 # ── _normalize_event_path ─────────────────────────────────────────────
 
+
 class TestNormalizeEventPathPersist:
     def test_adds_prefix_when_missing(self):
         result = EventPersistence._normalize_event_path("5.json.pending", "events/dir/")
@@ -125,6 +130,7 @@ class TestNormalizeEventPathPersist:
 
 
 # ── replay_pending_events ─────────────────────────────────────────────
+
 
 class TestReplayPendingEventsPersist:
     def test_no_pending_files_is_noop(self):
@@ -162,6 +168,7 @@ class TestReplayPendingEventsPersist:
 
 # ── close ─────────────────────────────────────────────────────────────
 
+
 class TestClosePersist:
     def test_close_without_durable_writer(self):
         p, _ = _make_persistence()
@@ -175,6 +182,7 @@ class TestClosePersist:
 
 
 # ── _truncate_payload ─────────────────────────────────────────────────
+
 
 class TestTruncatePayloadPersist:
     def test_truncates_large_string_field(self):

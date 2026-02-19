@@ -55,7 +55,7 @@ class MCPProxyManager:
 
     def initialize(self) -> None:
         """Initialize the FastMCP proxy with the current configuration."""
-        if len(self.config["mcpServers"]) == 0:
+        if not self.config["mcpServers"]:
             logger.info(
                 "No MCP servers configured for FastMCP Proxy, skipping initialization."
             )
@@ -75,7 +75,7 @@ class MCPProxyManager:
             allow_origins: List of allowed origins for CORS
 
         """
-        if len(self.config["mcpServers"]) == 0:
+        if not self.config["mcpServers"]:
             logger.info("No MCP servers configured for FastMCP Proxy, skipping mount.")
             return
         if not self.proxy:

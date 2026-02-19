@@ -66,10 +66,6 @@ from backend.server.utils import (
     validate_conversation_id,
 )
 from backend.server.utils.responses import error
-from backend.server.schemas.conversation_info_result_set import (
-    ConversationInfoResultSet,
-)
-from backend.server.schemas.conversation_info import ConversationInfo
 from backend.storage.data_models.conversation_metadata import (
     ConversationMetadata,
     ConversationTrigger,

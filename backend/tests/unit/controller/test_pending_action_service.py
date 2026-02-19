@@ -24,6 +24,7 @@ def _make_action(action_id: int = 1) -> SimpleNamespace:
 
 # ── constructor ──────────────────────────────────────────────────────
 
+
 class TestPendingActionServiceInit:
     def test_initial_state_is_none(self):
         svc = PendingActionService(_make_context(), timeout=30.0)
@@ -32,6 +33,7 @@ class TestPendingActionServiceInit:
 
 
 # ── set / get ────────────────────────────────────────────────────────
+
 
 class TestSetGet:
     def test_set_and_get_returns_action(self):
@@ -71,6 +73,7 @@ class TestSetGet:
 
 
 # ── timeout ──────────────────────────────────────────────────────────
+
 
 class TestTimeout:
     def test_get_returns_none_after_timeout(self):
@@ -120,6 +123,7 @@ class TestTimeout:
 
 # ── slow pending logging ─────────────────────────────────────────────
 
+
 class TestSlowPendingLogging:
     def test_slow_pending_logs_at_60s(self):
         """Actions pending > 60s log at 30s intervals."""
@@ -130,9 +134,11 @@ class TestSlowPendingLogging:
         svc.set(action)
         # Patch the stored timestamp to 90s ago and make elapsed divisible by 30
         svc._pending = (action, time.time() - 90.0)
-        with patch("backend.controller.services.pending_action_service.time") as mock_time:
+        with patch(
+            "backend.controller.services.pending_action_service.time"
+        ) as mock_time:
             mock_time.time.return_value = svc._pending[1] + 90.0
             svc.get()
         # controller.log should have been called for the slow warning
         calls = [c for c in controller.log.call_args_list if "active for" in str(c)]
-        assert len(calls) >= 1
+        assert calls

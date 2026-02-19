@@ -5,10 +5,8 @@ Targets 0% coverage (43 statements).
 
 from __future__ import annotations
 
-import sys
 from unittest.mock import patch
 
-import pytest
 
 from backend.validate_imports import try_import
 

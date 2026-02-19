@@ -13,6 +13,7 @@ from backend.runtime.capabilities import RuntimeCapabilities, detect_capabilitie
 # RuntimeCapabilities dataclass tests
 # ---------------------------------------------------------------------------
 
+
 class TestRuntimeCapabilities:
     """Tests for the frozen RuntimeCapabilities dataclass."""
 
@@ -65,6 +66,7 @@ class TestRuntimeCapabilities:
 # detect_capabilities tests
 # ---------------------------------------------------------------------------
 
+
 class TestDetectCapabilities:
     """Tests for the detect_capabilities factory."""
 
@@ -96,8 +98,10 @@ class TestDetectCapabilities:
     @patch("backend.runtime.capabilities.sys")
     def test_missing_git(self, mock_sys, mock_which):
         mock_sys.platform = "linux"
+
         def _which(name):
             return None if name == "git" else "/usr/bin/tool"
+
         mock_which.side_effect = _which
         cap = detect_capabilities()
         assert cap.has_git is False
@@ -107,8 +111,10 @@ class TestDetectCapabilities:
     @patch("backend.runtime.capabilities.sys")
     def test_missing_tmux_on_linux(self, mock_sys, mock_which):
         mock_sys.platform = "linux"
+
         def _which(name):
             return None if name == "tmux" else "/usr/bin/tool"
+
         mock_which.side_effect = _which
         cap = detect_capabilities()
         assert cap.has_tmux is False
@@ -147,7 +153,9 @@ class TestDetectCapabilities:
     @patch("importlib.import_module", side_effect=ImportError)
     @patch("backend.runtime.capabilities.shutil.which")
     @patch("backend.runtime.capabilities.sys")
-    def test_browser_enabled_but_playwright_missing(self, mock_sys, mock_which, mock_import):
+    def test_browser_enabled_but_playwright_missing(
+        self, mock_sys, mock_which, mock_import
+    ):
         mock_sys.platform = "linux"
         mock_which.return_value = "/usr/bin/tool"
         cap = detect_capabilities(enable_browser=True)

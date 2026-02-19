@@ -251,8 +251,10 @@ class TestCircuitBreakerUnderLoad:
         # Trigger failures
         for _ in range(5):
             try:
+
                 async def fail():
                     raise RuntimeError("boom")
+
                 await cb.async_call(fail)
             except RuntimeError:
                 pass
@@ -268,16 +270,20 @@ class TestCircuitBreakerUnderLoad:
         # Open the breaker
         for _ in range(3):
             try:
+
                 async def fail():
                     raise RuntimeError("boom")
+
                 await cb.async_call(fail)
             except RuntimeError:
                 pass
 
         # Subsequent calls should be blocked
         with pytest.raises(RuntimeError, match="circuit_open"):
+
             async def should_not_run():
                 return "ok"
+
             await cb.async_call(should_not_run)
 
     @pytest.mark.asyncio
@@ -289,8 +295,10 @@ class TestCircuitBreakerUnderLoad:
         # Open the breaker
         for _ in range(3):
             try:
+
                 async def fail():
                     raise RuntimeError("boom")
+
                 await cb.async_call(fail)
             except RuntimeError:
                 pass
@@ -303,6 +311,7 @@ class TestCircuitBreakerUnderLoad:
         # A successful call should close the breaker
         async def succeed():
             return "ok"
+
         result = await cb.async_call(succeed)
         assert result == "ok"
         assert cb.state.state == "closed"
@@ -372,9 +381,7 @@ class TestDurableWriterThroughput:
                     writer.enqueue(_make_persisted(start_id + i))
 
             with ThreadPoolExecutor(max_workers=n_threads) as ex:
-                futs = [
-                    ex.submit(produce, t * n_per_thread) for t in range(n_threads)
-                ]
+                futs = [ex.submit(produce, t * n_per_thread) for t in range(n_threads)]
                 for f in futs:
                     f.result(timeout=10)
 

@@ -79,8 +79,7 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
 
         if enabled:
             logger.info(
-                "RedisCostQuotaMiddleware initialized, "
-                "redis_url: %s, pool_size: %s",
+                "RedisCostQuotaMiddleware initialized, redis_url: %s, pool_size: %s",
                 self.redis_url,
                 connection_pool_size,
             )
@@ -280,9 +279,7 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             allowed = self._apply_limit_checks(key, config, daily_cost, monthly_cost)
 
             if self._should_instrument_redis():
-                self._record_quota_span(
-                    key, config, daily_cost, monthly_cost, allowed
-                )
+                self._record_quota_span(key, config, daily_cost, monthly_cost, allowed)
 
             return allowed
 

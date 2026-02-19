@@ -98,12 +98,17 @@ class TestInitializeTracing(_TracingTestBase):
         mock_set.assert_called_once()
         mock_log.assert_called_once()
 
-    @patch("backend.core.tracing._setup_tracer_provider", side_effect=ImportError("no otel"))
+    @patch(
+        "backend.core.tracing._setup_tracer_provider",
+        side_effect=ImportError("no otel"),
+    )
     def test_import_error_disables(self, mock_setup):
         tracing_mod.initialize_tracing(enabled=True)
         self.assertFalse(tracing_mod._tracing_initialized)
 
-    @patch("backend.core.tracing._setup_tracer_provider", side_effect=RuntimeError("bad"))
+    @patch(
+        "backend.core.tracing._setup_tracer_provider", side_effect=RuntimeError("bad")
+    )
     def test_generic_error_disables(self, mock_setup):
         tracing_mod.initialize_tracing(enabled=True)
         self.assertFalse(tracing_mod._tracing_initialized)

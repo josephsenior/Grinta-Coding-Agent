@@ -13,8 +13,8 @@ from backend.events.persistence import EventPersistence
 # is_critical_event class method
 # ===================================================================
 
-class TestIsCriticalEvent:
 
+class TestIsCriticalEvent:
     def test_critical_action_finish(self):
         event = SimpleNamespace(action="finish", observation=None)
         assert EventPersistence.is_critical_event(event) is True
@@ -60,8 +60,8 @@ class TestIsCriticalEvent:
 # Init
 # ===================================================================
 
-class TestEventPersistenceInit:
 
+class TestEventPersistenceInit:
     def test_default_stats(self):
         ep = EventPersistence(
             sid="sess-1",

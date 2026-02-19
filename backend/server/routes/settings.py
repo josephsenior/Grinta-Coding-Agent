@@ -12,10 +12,10 @@ from pydantic import SecretStr
 from backend.core.config.api_key_manager import api_key_manager
 from backend.core.constants import SECRET_PLACEHOLDER, SETTINGS_CACHE_TTL
 from backend.core.logger import FORGE_logger as logger
-from backend.core.pydantic_compat import model_dump_with_options
 
 # Import these at runtime so FastAPI can resolve them in Annotated types
 from backend.core.provider_types import PROVIDER_TOKEN_TYPE, ProviderType
+from backend.core.pydantic_compat import model_dump_with_options
 from backend.server.dependencies import get_dependencies
 from backend.server.settings import GETSettingsModel
 from backend.server.shared import config
@@ -412,7 +412,7 @@ async def load_settings(
 
         # Cache miss - load from database
         logger.info("Settings cache miss for user '%s', loading from store", cache_key)
-        user_secrets = None
+        user_secrets = settings.secrets_store
         provider_tokens_set = _build_provider_tokens_set(user_secrets, provider_tokens)
 
         response = _build_settings_response(settings, provider_tokens_set)

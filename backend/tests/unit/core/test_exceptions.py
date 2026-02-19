@@ -36,6 +36,7 @@ from backend.core.errors import ForgeError
 # Test that all exceptions are subclasses of ForgeError or AgentError
 # ---------------------------------------------------------------------------
 
+
 class TestExceptionHierarchy:
     """Tests for the exception class hierarchy."""
 
@@ -78,6 +79,7 @@ class TestExceptionHierarchy:
 # ---------------------------------------------------------------------------
 # Individual exception creation tests
 # ---------------------------------------------------------------------------
+
 
 class TestExceptionCreation:
     """Tests for creating and inspecting exceptions."""
@@ -152,7 +154,11 @@ class TestExceptionCreation:
         assert "context window" in str(err)
 
     def test_function_call_errors_with_message(self):
-        for cls in [FunctionCallConversionError, FunctionCallValidationError, FunctionCallNotExistsError]:
+        for cls in [
+            FunctionCallConversionError,
+            FunctionCallValidationError,
+            FunctionCallNotExistsError,
+        ]:
             err = cls("test message")
             assert "test message" in str(err)
 
@@ -189,6 +195,7 @@ class TestExceptionCreation:
 # ---------------------------------------------------------------------------
 # Test that exceptions can be raised and caught
 # ---------------------------------------------------------------------------
+
 
 class TestExceptionRaiseAndCatch:
     """Tests that exceptions integrate with Python's try/except properly."""

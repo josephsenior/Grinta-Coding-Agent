@@ -591,7 +591,7 @@ class StuckDetector:
         events_with_metrics = [
             e
             for e in filtered_history
-            if e.llm_metrics is not None and len(e.llm_metrics.token_usages) > 0
+            if e.llm_metrics is not None and e.llm_metrics.token_usages
         ]
 
         if len(events_with_metrics) < 10:
@@ -632,8 +632,66 @@ class StuckDetector:
         return [
             e.llm_metrics.token_usages[0].prompt_tokens
             for e in events_with_metrics[-10:]
-            if e.llm_metrics and len(e.llm_metrics.token_usages) > 0
+            if e.llm_metrics and e.llm_metrics.token_usages
         ]
+
+    def compute_repetition_score(self, headless_mode: bool = True) -> float:
+        """Compute a 0.0-1.0 score indicating how close the agent is to being stuck.
+
+        This allows the LLM to self-correct before the stuck detector formally triggers.
+        Score meanings:
+        - 0.0: No repetition detected
+        - 0.3-0.5: Mild repetition patterns forming
+        - 0.6-0.8: Strong repetition, approaching stuck threshold
+        - 1.0: Would be flagged as stuck
+
+        Args:
+            headless_mode: Whether to check all history or only post-last-user-message
+
+        Returns:
+            Float between 0.0 and 1.0
+        """
+        history_to_check = self._get_history_to_check(headless_mode)
+        filtered_history = self._filter_relevant_history(history_to_check)
+
+        if len(filtered_history) < 3:
+            return 0.0
+
+        scores: list[float] = []
+
+        last_actions, last_observations = self._collect_recent_events(filtered_history)
+
+        # Check action repetition (4 identical = stuck, 2 identical = 0.5)
+        if len(last_actions) >= 2:
+            identical_count = sum(
+                1 for a in last_actions[1:]
+                if self._eq_no_pid(last_actions[0], a)
+            )
+            scores.append(min(1.0, identical_count / 3.0))
+
+        # Check error rate in recent observations
+        if last_observations:
+            error_count = sum(
+                1 for o in last_observations
+                if isinstance(o, ErrorObservation) or (
+                    isinstance(o, CmdOutputObservation) and getattr(o, "exit_code", 0) != 0
+                )
+            )
+            scores.append(min(1.0, error_count / 3.0))
+
+        # Check semantic diversity in recent actions (low diversity = high score)
+        if len(filtered_history) >= 10:
+            action_intents, observation_outcomes = self._extract_intents_and_outcomes(
+                filtered_history[-20:]
+            )
+            if len(action_intents) >= 4:
+                diversity = self._calculate_intent_diversity(action_intents)
+                scores.append(max(0.0, 1.0 - diversity))
+
+        if not scores:
+            return 0.0
+
+        return round(max(scores), 2)
 
     def _eq_no_pid(self, obj1: Event, obj2: Event) -> bool:
         if isinstance(obj1, CmdRunAction) and isinstance(obj2, CmdRunAction):

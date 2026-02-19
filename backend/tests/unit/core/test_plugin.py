@@ -166,7 +166,7 @@ class TestPluginRegistry:
         reg = PluginRegistry()
         reg.register(_TestPlugin())
         reg.unregister("test-plugin")
-        assert len(reg.plugins) == 0
+        assert not reg.plugins
 
     def test_unregister_missing(self):
         reg = PluginRegistry()
@@ -179,7 +179,7 @@ class TestPluginRegistry:
 
         reg = PluginRegistry()
         reg.register(FuturePlugin())
-        assert len(reg.plugins) == 0
+        assert not reg.plugins
 
     def test_compat_window_deprecation_warning(self):
         """Plugins at the edge of compat window should emit DeprecationWarning."""

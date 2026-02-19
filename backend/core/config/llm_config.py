@@ -343,13 +343,9 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                     env_key = api_key_manager._get_provider_key_from_env(provider)
                     if env_key:
                         self.api_key = SecretStr(env_key)
-                        logger.debug(
-                            "Loaded API key from environment for %s", provider
-                        )
+                        logger.debug("Loaded API key from environment for %s", provider)
                     else:
-                        logger.warning(
-                            "No API key available for model: %s", self.model
-                        )
+                        logger.warning("No API key available for model: %s", self.model)
 
             # ALWAYS sync with api_key_manager if we have a key (explicit or loaded)
             if self.api_key:

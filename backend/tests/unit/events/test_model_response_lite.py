@@ -13,6 +13,7 @@ from backend.events.model_response_lite import (
 
 # ── AssistantToolCallLite ────────────────────────────────────────────
 
+
 class TestAssistantToolCallLite:
     def test_defaults(self):
         tc = AssistantToolCallLite()
@@ -26,6 +27,7 @@ class TestAssistantToolCallLite:
 
 
 # ── AssistantMessageLite ─────────────────────────────────────────────
+
 
 class TestAssistantMessageLite:
     def test_defaults(self):
@@ -45,6 +47,7 @@ class TestAssistantMessageLite:
 
 # ── ChoiceLite ───────────────────────────────────────────────────────
 
+
 class TestChoiceLite:
     def test_default_message_none(self):
         c = ChoiceLite()
@@ -57,6 +60,7 @@ class TestChoiceLite:
 
 
 # ── ModelResponseLite ────────────────────────────────────────────────
+
 
 class TestModelResponseLite:
     def test_defaults(self):

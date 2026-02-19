@@ -14,6 +14,7 @@ from backend.utils.conversation_summary import (
 
 # ── _generate_truncated_title ────────────────────────────────────────
 
+
 class TestGenerateTruncatedTitle:
     def test_short_message(self):
         assert _generate_truncated_title("hello") == "hello"
@@ -36,6 +37,7 @@ class TestGenerateTruncatedTitle:
 
 # ── get_default_conversation_title ───────────────────────────────────
 
+
 class TestGetDefaultTitle:
     def test_basic(self):
         title = get_default_conversation_title("abc12345")
@@ -47,6 +49,7 @@ class TestGetDefaultTitle:
 
 
 # ── generate_conversation_title ──────────────────────────────────────
+
 
 class TestGenerateConversationTitle:
     @pytest.mark.asyncio
@@ -63,9 +66,7 @@ class TestGenerateConversationTitle:
     async def test_success(self):
         registry = MagicMock()
         registry.request_extraneous_completion.return_value = "My Title"
-        result = await generate_conversation_title(
-            "hello world", MagicMock(), registry
-        )
+        result = await generate_conversation_title("hello world", MagicMock(), registry)
         assert result == "My Title"
 
     @pytest.mark.asyncio
@@ -82,9 +83,7 @@ class TestGenerateConversationTitle:
     async def test_llm_error_returns_none(self):
         registry = MagicMock()
         registry.request_extraneous_completion.side_effect = RuntimeError("fail")
-        result = await generate_conversation_title(
-            "hello world", MagicMock(), registry
-        )
+        result = await generate_conversation_title("hello world", MagicMock(), registry)
         assert result is None
 
     @pytest.mark.asyncio
@@ -92,9 +91,7 @@ class TestGenerateConversationTitle:
         long_msg = "a" * 2000
         registry = MagicMock()
         registry.request_extraneous_completion.return_value = "Title"
-        await generate_conversation_title(
-            long_msg, MagicMock(), registry
-        )
+        await generate_conversation_title(long_msg, MagicMock(), registry)
         # Should pass truncated message to LLM
         call_args = registry.request_extraneous_completion.call_args
         messages = call_args[0][2]  # third positional arg

@@ -1,6 +1,5 @@
 """Tests for backend.events.utils — action/observation pair extraction."""
 
-
 from backend.events.action.empty import NullAction
 from backend.events.action.message import MessageAction
 from backend.events.observation import CmdOutputObservation, NullObservation
@@ -18,8 +17,12 @@ def _make_message(id_: int, content: str = "msg") -> MessageAction:
     return m
 
 
-def _make_cmd_obs(cause_: int, content: str = "ok", exit_code: int = 0) -> CmdOutputObservation:
-    obs = CmdOutputObservation(content=content, command_id=0, command="echo", exit_code=exit_code)
+def _make_cmd_obs(
+    cause_: int, content: str = "ok", exit_code: int = 0
+) -> CmdOutputObservation:
+    obs = CmdOutputObservation(
+        content=content, command_id=0, command="echo", exit_code=exit_code
+    )
     obs._cause = cause_
     return obs
 
@@ -31,6 +34,7 @@ def _make_null_obs(cause_: int) -> NullObservation:
 
 
 # ── _build_action_and_observation_maps ────────────────────────────────
+
 
 class TestBuildMaps:
     def test_empty_events(self):
@@ -57,6 +61,7 @@ class TestBuildMaps:
 
 # ── _add_action_observation_pairs ─────────────────────────────────────
 
+
 class TestAddPairs:
     def test_paired(self):
         action_map = {1: _make_message(1)}
@@ -78,6 +83,7 @@ class TestAddPairs:
 
 # ── _add_orphaned_observations ────────────────────────────────────────
 
+
 class TestOrphanedObservations:
     def test_orphaned_cmd_output(self):
         action_map = {}
@@ -95,7 +101,7 @@ class TestOrphanedObservations:
         obs_map = {99: obs}
         tuples = []
         _add_orphaned_observations(tuples, action_map, obs_map)
-        assert len(tuples) == 0
+        assert not tuples
 
     def test_already_paired_not_orphaned(self):
         action = _make_message(1)
@@ -104,10 +110,11 @@ class TestOrphanedObservations:
         obs_map = {1: obs}
         tuples = []
         _add_orphaned_observations(tuples, action_map, obs_map)
-        assert len(tuples) == 0  # cause=1 is in action_map
+        assert not tuples  # cause=1 is in action_map
 
 
 # ── get_pairs_from_events ─────────────────────────────────────────────
+
 
 class TestGetPairsFromEvents:
     def test_empty(self):

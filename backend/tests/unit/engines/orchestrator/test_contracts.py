@@ -31,9 +31,7 @@ class TestChatCompletionToolParam:
 
     def test_tool_param_function_field(self):
         """Test function field is dict."""
-        tool: ChatCompletionToolParam = {
-            "function": {"name": "test", "parameters": {}}
-        }
+        tool: ChatCompletionToolParam = {"function": {"name": "test", "parameters": {}}}
         assert isinstance(tool["function"], dict)
 
     def test_tool_param_with_all_fields(self):
@@ -121,6 +119,7 @@ class TestExecutionResultProtocol:
 
     def test_has_required_attributes(self):
         """Test protocol defines required attributes."""
+
         # Protocol attributes are structural, not runtime
         # Verify a valid implementation has them
         class ValidResult:

@@ -28,6 +28,7 @@ def _make_request(method="POST", path="/api/test", content_length=None):
 
 # --------------- Initialization ---------------
 
+
 class TestInit:
     def test_default_max_size(self):
         limiter = RequestSizeLimiter(_make_app(), enabled=False)
@@ -45,6 +46,7 @@ class TestInit:
 
 
 # --------------- dispatch ---------------
+
 
 class TestDispatch:
     @pytest.mark.asyncio

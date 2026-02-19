@@ -26,7 +26,9 @@ def client():
 
 @pytest.fixture()
 def hook_store(inner_store, client):
-    return WebHookFileStore(file_store=inner_store, base_url="http://hook.test/", client=client)
+    return WebHookFileStore(
+        file_store=inner_store, base_url="http://hook.test/", client=client
+    )
 
 
 class TestWebHookWrite:
@@ -66,7 +68,9 @@ class TestOnWrite:
 
     def test_posts_bytes(self, hook_store, client):
         hook_store._on_write("b.bin", b"\x00\x01")
-        client.post.assert_called_once_with("http://hook.test/b.bin", content=b"\x00\x01")
+        client.post.assert_called_once_with(
+            "http://hook.test/b.bin", content=b"\x00\x01"
+        )
 
 
 class TestOnDelete:

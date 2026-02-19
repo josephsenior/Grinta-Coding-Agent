@@ -47,7 +47,7 @@ class TestSafetyIntegrationE2E:
         assert result.risk_level == ActionSecurityRisk.HIGH
         assert result.blocked_reason is not None
         assert "CRITICAL" in result.blocked_reason
-        assert len(result.matched_patterns) > 0
+        assert result.matched_patterns
 
         print(f"✅ Dangerous command blocked: {result.blocked_reason}")
 

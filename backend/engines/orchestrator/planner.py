@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING, Any
-
-from backend.core.logger import FORGE_logger as logger
 from backend.llm.llm_utils import check_tools
 
 ChatCompletionToolParam = Any
@@ -60,6 +58,11 @@ class OrchestratorPlanner:
         # Lazy cache for check_tools output (model-scoped)
         self._checked_tools_cache: list[ChatCompletionToolParam] | None = None
         self._checked_tools_model: str | None = None
+        # Progressive tool disclosure
+        from backend.engines.orchestrator.tool_selector import ToolSelector
+
+        self._tool_selector = ToolSelector()
+        self._tools_used_this_session: set[str] = set()
 
     # ------------------------------------------------------------------ #
     # Tool assembly
@@ -89,11 +92,28 @@ class OrchestratorPlanner:
         )
         from backend.engines.orchestrator.tools.finish import create_finish_tool
         from backend.engines.orchestrator.tools.think import create_think_tool
-        from backend.engines.orchestrator.tools.note import create_note_tool, create_recall_tool, create_semantic_recall_tool
+        from backend.engines.orchestrator.tools.note import (
+            create_note_tool,
+            create_recall_tool,
+            create_semantic_recall_tool,
+        )
         from backend.engines.orchestrator.tools.run_tests import create_run_tests_tool
-        from backend.engines.orchestrator.tools.apply_patch import create_apply_patch_tool
-        from backend.engines.orchestrator.tools.task_tracker import create_task_tracker_tool
-        from backend.engines.orchestrator.tools.search_code import create_search_code_tool
+        from backend.engines.orchestrator.tools.apply_patch import (
+            create_apply_patch_tool,
+        )
+        from backend.engines.orchestrator.tools.task_tracker import (
+            create_task_tracker_tool,
+        )
+        from backend.engines.orchestrator.tools.search_code import (
+            create_search_code_tool,
+        )
+        # Meta-cognition tools
+        from backend.engines.orchestrator.tools.meta_cognition import (
+            create_clarification_tool,
+            create_escalate_tool,
+            create_proposal_tool,
+            create_uncertainty_tool,
+        )
 
         if getattr(self._config, "enable_cmd", True):
             tools.append(create_cmd_run_tool(use_short_description=use_short_tool_desc))
@@ -116,39 +136,82 @@ class OrchestratorPlanner:
         if getattr(self._config, "enable_search_code", True):
             tools.append(create_search_code_tool())
         if getattr(self._config, "enable_web_search", False):
-            from backend.engines.orchestrator.tools.web_search import create_web_search_tool
+            from backend.engines.orchestrator.tools.web_search import (
+                create_web_search_tool,
+            )
+
             tools.append(create_web_search_tool())
         if getattr(self._config, "enable_workspace_status", True):
-            from backend.engines.orchestrator.tools.workspace_status import create_workspace_status_tool
+            from backend.engines.orchestrator.tools.workspace_status import (
+                create_workspace_status_tool,
+            )
+
             tools.append(create_workspace_status_tool())
         if getattr(self._config, "enable_error_patterns", True):
-            from backend.engines.orchestrator.tools.error_patterns import create_error_patterns_tool
+            from backend.engines.orchestrator.tools.error_patterns import (
+                create_error_patterns_tool,
+            )
+
             tools.append(create_error_patterns_tool())
         if getattr(self._config, "enable_checkpoints", True):
-            from backend.engines.orchestrator.tools.checkpoint import create_checkpoint_tool
+            from backend.engines.orchestrator.tools.checkpoint import (
+                create_checkpoint_tool,
+            )
+
             tools.append(create_checkpoint_tool())
         if getattr(self._config, "enable_project_map", True):
-            from backend.engines.orchestrator.tools.project_map import create_project_map_tool
+            from backend.engines.orchestrator.tools.project_map import (
+                create_project_map_tool,
+            )
+
             tools.append(create_project_map_tool())
         if getattr(self._config, "enable_session_diff", True):
-            from backend.engines.orchestrator.tools.session_diff import create_session_diff_tool
+            from backend.engines.orchestrator.tools.session_diff import (
+                create_session_diff_tool,
+            )
+
             tools.append(create_session_diff_tool())
         if getattr(self._config, "enable_working_memory", True):
-            from backend.engines.orchestrator.tools.working_memory import create_working_memory_tool
+            from backend.engines.orchestrator.tools.working_memory import (
+                create_working_memory_tool,
+            )
+
             tools.append(create_working_memory_tool())
         if getattr(self._config, "enable_verify_state", True):
-            from backend.engines.orchestrator.tools.verify_state import create_verify_state_tool
+            from backend.engines.orchestrator.tools.verify_state import (
+                create_verify_state_tool,
+            )
+
             tools.append(create_verify_state_tool())
+        
+        # Meta-cognition tools - always enabled by default
+        if getattr(self._config, "enable_uncertainty", True):
+            tools.append(create_uncertainty_tool())
+        if getattr(self._config, "enable_proposal", True):
+            tools.append(create_proposal_tool())
+        if getattr(self._config, "enable_clarification", True):
+            tools.append(create_clarification_tool())
+        if getattr(self._config, "enable_escalate", True):
+            tools.append(create_escalate_tool())
 
     def _add_browsing_tool(self, tools: list) -> None:
         if not getattr(self._config, "enable_browsing", False):
             return
+
         import sys
 
         platform_name = getattr(sys, "platform", "")
+
+        # On Windows, use the lightweight web_reader tool since Playwright/BrowserGym
+        # has compatibility issues. On other platforms, utilize the full browser.
         if platform_name == "win32":
-            logger.warning("Windows runtime does not support browsing yet")
+            from backend.engines.orchestrator.tools.web_reader import (
+                create_web_reader_tool,
+            )
+
+            tools.append(create_web_reader_tool())
             return
+
         from backend.engines.orchestrator.tools import create_browser_tool
 
         tools.append(create_browser_tool())
@@ -161,6 +224,15 @@ class OrchestratorPlanner:
                 create_structure_editor_tool(use_short_description=use_short_tool_desc)
             )
 
+    def record_tool_used(self, tool_name: str) -> None:
+        """Record that a tool was used this session (for description tiers)."""
+        self._tools_used_this_session.add(tool_name)
+
+    @property
+    def tool_selector(self):
+        """Expose the tool selector for external notification (e.g. condensation)."""
+        return self._tool_selector
+
     def build_llm_params(
         self,
         messages: list,
@@ -168,16 +240,29 @@ class OrchestratorPlanner:
         tools: list[ChatCompletionToolParam],
     ) -> dict:
         tool_choice = self._determine_tool_choice(messages, state)
-        messages = self._inject_turn_status(messages, state)
+
+        # NOTE: We inject control/status messages *after* tool selection so
+        # tool selection heuristics see the original user/assistant content.
+
+        # Progressive tool disclosure: filter tools based on context
+        if getattr(self._config, "enable_progressive_tools", True):
+            tools = self._tool_selector.select_tools(tools, state, messages)
+
+        # Apply three-tier tool descriptions
+        tools = self._apply_description_tiers(tools)
 
         # Cache check_tools output — only recompute when tools or model changes
+        # Invalidate cache when tool selection changes the list
         current_model = self._llm.config.model if self._llm else ""
-        if (
-            self._checked_tools_cache is None
-            or self._checked_tools_model != current_model
-        ):
+        tool_fingerprint = ",".join(
+            t.get("function", {}).get("name", "") for t in tools
+        )
+        cache_key = f"{current_model}:{tool_fingerprint}"
+        if self._checked_tools_cache is None or self._checked_tools_model != cache_key:
             self._checked_tools_cache = check_tools(tools, self._llm.config)
-            self._checked_tools_model = current_model
+            self._checked_tools_model = cache_key
+
+        messages = self._inject_turn_status(messages, state)
 
         params: dict[str, Any] = {
             "messages": messages,
@@ -196,11 +281,45 @@ class OrchestratorPlanner:
         }
         return params
 
-    def _inject_turn_status(self, messages: list, state: State) -> list:
-        """Append a <CONTEXT_STATUS> block to the last user message.
+    def _apply_description_tiers(self, tools: list) -> list:
+        """Apply three-tier tool descriptions to reduce prompt tokens.
 
-        Gives the LLM visibility into iteration progress, token budget,
-        history size, and scratchpad keys so it can plan accordingly.
+        - Tier 1 (minimal): Tool was used this session — trim description
+        - Tier 2 (short):   Tool is available but not used — keep one-line
+        - Tier 3 (full):    Default — full description (no change)
+
+        For now, tools that have been used get a trimmed description since
+        the LLM already knows what they do from prior invocations.
+        """
+        if not self._tools_used_this_session:
+            return tools
+
+        result = []
+        for tool in tools:
+            fn = tool.get("function", {})
+            name = fn.get("name", "")
+            if name in self._tools_used_this_session:
+                # Tier 1: minimal description for already-used tools
+                desc = fn.get("description", "")
+                if len(desc) > 80:
+                    # Keep only the first sentence
+                    first_sentence = desc.split(".")[0] + "."
+                    trimmed = {
+                        **tool,
+                        "function": {**fn, "description": first_sentence},
+                    }
+                    result.append(trimmed)
+                    continue
+            result.append(tool)
+        return result
+
+    def _inject_turn_status(self, messages: list, state: State) -> list:
+        """Inject a dedicated control/status message for the current turn.
+
+        High-quality behavior:
+        - Does not mutate user message content.
+        - Retry-safe: does not destructively consume signals while building prompts.
+        - Structured tags allow stable parsing/heuristics.
         """
         iter_flag = getattr(state, "iteration_flag", None)
         if iter_flag is None:
@@ -221,6 +340,18 @@ class OrchestratorPlanner:
                 prompt_tok = getattr(atu, "prompt_tokens", 0)
                 comp_tok = getattr(atu, "completion_tokens", 0)
                 ctx_window = getattr(atu, "context_window", 0)
+                try:
+                    prompt_tok = int(prompt_tok)
+                except Exception:
+                    prompt_tok = 0
+                try:
+                    comp_tok = int(comp_tok)
+                except Exception:
+                    comp_tok = 0
+                try:
+                    ctx_window = int(ctx_window)
+                except Exception:
+                    ctx_window = 0
                 if prompt_tok or comp_tok:
                     parts.append(f"tokens_used={prompt_tok + comp_tok}")
                 if ctx_window:
@@ -229,10 +360,19 @@ class OrchestratorPlanner:
             # Budget info
             cost = getattr(metrics, "accumulated_cost", 0.0)
             budget = getattr(metrics, "max_budget_per_task", None)
+            try:
+                cost = float(cost)
+            except Exception:
+                cost = 0.0
+            try:
+                budget_val = float(budget) if budget is not None else None
+            except Exception:
+                budget_val = None
+
             if cost > 0:
                 budget_str = f"cost=${cost:.4f}"
-                if budget:
-                    budget_str += f"/${budget:.2f}"
+                if budget_val is not None:
+                    budget_str += f"/${budget_val:.2f}"
                 parts.append(budget_str)
 
         # History event count
@@ -240,53 +380,156 @@ class OrchestratorPlanner:
         if history:
             parts.append(f"history_events={len(history)}")
 
-        status = "\n\n<CONTEXT_STATUS " + " | ".join(parts) + " />"
+        # Turn signals (typed), with fallbacks for older sessions.
+        planning_directive = None
+        memory_pressure = None
 
-        # Append planning directive if set by PlanningMiddleware
+        ts = getattr(state, "turn_signals", None)
+        if ts is not None:
+            planning_directive = getattr(ts, "planning_directive", None)
+            memory_pressure = getattr(ts, "memory_pressure", None)
+
         extra_data = getattr(state, "extra_data", {})
-        planning_directive = extra_data.pop("planning_directive", None)
+        if planning_directive is None:
+            planning_directive = extra_data.get("planning_directive")
+        if memory_pressure is None:
+            memory_pressure = extra_data.get("memory_pressure")
+
+        if memory_pressure:
+            parts.append(f"memory_pressure={memory_pressure}")
+
+        # Repetition score — proactive stuck proximity signal
+        rep_score = 0.0
+        if ts is not None:
+            rep_score = getattr(ts, "repetition_score", 0.0)
+        if rep_score and rep_score >= 0.3:
+            parts.append(f"repetition_score={rep_score:.1f}")
+
+        # Proactive context pressure warning at ~70% token usage
+        context_pressure_warning = ""
+        try:
+            prompt_tok = int(parts[0].split("=")[0]) if "tokens_used" in " ".join(parts) else 0
+            for p in parts:
+                if p.startswith("tokens_used="):
+                    prompt_tok = int(p.split("=")[1])
+                elif p.startswith("context_window="):
+                    ctx_window = int(p.split("=")[1])
+            if ctx_window and prompt_tok:
+                usage_pct = prompt_tok / ctx_window
+                if usage_pct >= 0.70 and not memory_pressure:
+                    remaining_pct = round((1.0 - usage_pct) * 100)
+                    context_pressure_warning = (
+                        f"\n⚠️ CONTEXT PRESSURE: {remaining_pct}% of context window remaining. "
+                        "Condensation will occur soon. Save critical state NOW:\n"
+                        "1. note(key, value) — persist important findings and decisions\n"
+                        "2. task_tracker(update) — ensure plan reflects current progress\n"
+                        "3. working_memory(update) — save current hypothesis and blockers\n"
+                        "Unsaved context from early turns WILL be lost during condensation."
+                    )
+        except Exception:
+            pass
+
+        status = "<FORGE_CONTEXT_STATUS " + " | ".join(parts) + " />"
+        if context_pressure_warning:
+            status += context_pressure_warning
+
+        # Repetition warning when approaching stuck threshold
+        if rep_score >= 0.6:
+            status += (
+                "\n⚠️ REPETITION WARNING (score={:.1f}/1.0): You are approaching the stuck detection threshold. "
+                "Your recent actions show a repeating pattern. You MUST change strategy:\n"
+                "1. STOP and use think() to analyze why your current approach isn't working\n"
+                "2. Try a fundamentally different approach\n"
+                "3. If editing files, re-read the file first with view command"
+            ).format(rep_score)
+        elif rep_score >= 0.3:
+            status += (
+                "\n📊 Mild repetition detected (score={:.1f}/1.0). Consider varying your approach."
+            ).format(rep_score)
+
+        # First-turn workspace orientation: give the LLM awareness of the
+        # project structure so it doesn't waste a turn exploring blindly.
+        iter_flag = getattr(state, "iteration_flag", None)
+        current_turn = getattr(iter_flag, "current_value", 0) if iter_flag else 0
+        try:
+            current_turn = int(current_turn)
+        except Exception:
+            current_turn = 0
+        if current_turn <= 1:
+            status += (
+                "\n<FIRST_TURN_ORIENTATION>"
+                "\nThis is the first turn. Before diving in:"
+                "\n1. Use workspace_status() to see git branch, modified files, and working directory"
+                "\n2. Use project_map() to understand the repository structure"
+                "\n3. Then plan your approach with think()"
+                "\n</FIRST_TURN_ORIENTATION>"
+            )
+
+        # Active Plan Injection
+        plan = getattr(state, "plan", None)
+        if plan and hasattr(plan, "steps") and plan.steps:
+            active_plan_str = f"Title: {getattr(plan, 'title', 'Current Plan')}\n"
+            for step in plan.steps:
+                status_icon = "✓" if step.status == "completed" else "X" if step.status == "failed" else "O" if step.status == "in_progress" else "-"
+                active_plan_str += f"{step.id} [{status_icon}] {step.description} ({step.status})\n"
+                if step.result:
+                     active_plan_str += f"   Result: {str(step.result)[:200]}...\n"
+                for sub in step.subtasks:
+                     status_icon = "✓" if sub.status == "completed" else "-"
+                     active_plan_str += f"    {sub.id} [{status_icon}] {sub.description}\n"
+            
+            status += f"\n<ACTIVE_PLAN>\n{active_plan_str}</ACTIVE_PLAN>"
+
         if planning_directive:
-            status += f"\n{planning_directive}"
+            status += f"\n<FORGE_DIRECTIVE>\n{planning_directive}\n</FORGE_DIRECTIVE>"
 
         # Context-aware tool hints based on task keywords
         tool_hints = self._get_tool_hints(messages)
         if tool_hints:
             status += f"\n<TOOL_HINTS>{tool_hints}</TOOL_HINTS>"
 
-        # Shallow-copy the list so we don’t mutate the caller’s slice
+        # Insert a dedicated system message just before the last user message.
         msgs = list(messages)
+        insert_at = len(msgs)
         for i in range(len(msgs) - 1, -1, -1):
             msg = msgs[i]
-            if not (isinstance(msg, dict) and msg.get("role") == "user"):
-                continue
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                msgs[i] = {**msg, "content": content + status}
-            elif isinstance(content, list):
-                content = list(content)
-                for j in range(len(content) - 1, -1, -1):
-                    item = content[j]
-                    if isinstance(item, dict) and item.get("type") == "text":
-                        content[j] = {**item, "text": item["text"] + status}
-                        msgs[i] = {**msg, "content": content}
-                        break
-            break
+            if isinstance(msg, dict) and msg.get("role") == "user":
+                insert_at = i
+                break
+
+        control_message = {
+            "role": "system",
+            "content": status,
+        }
+        msgs.insert(insert_at, control_message)
         return msgs
 
     # Tool-keyword mapping for context-aware hints
     _TOOL_HINT_MAP: list[tuple[list[str], str]] = [
-        (["debug", "error", "traceback", "exception", "fails", "broken"],
-         "Consider error_patterns(query) to check for known fixes."),
-        (["search", "find", "grep", "locate", "where"],
-         "Use search_code for codebase search, or web_search for external info."),
-        (["edit", "fix", "change", "modify", "update", "refactor"],
-         "Pick the right editor: str_replace_editor for targeted edits, ultimate_editor for function-level, edit_file for large rewrites. Use verify_state to confirm line contents before str_replace."),
-        (["test", "testing", "pytest", "unittest"],
-         "Use run_tests to execute tests with structured output."),
-        (["git", "commit", "branch", "merge", "diff"],
-         "Use workspace_status for a quick git overview before git operations."),
-        (["remember", "note", "save", "persist"],
-         "Use working_memory(update) for structured cognitive state, note(record) for quick key-value pairs."),
+        (
+            ["debug", "error", "traceback", "exception", "fails", "broken"],
+            "Consider error_patterns(query) to check for known fixes.",
+        ),
+        (
+            ["search", "find", "grep", "locate", "where"],
+            "Use search_code for codebase search, or web_search for external info.",
+        ),
+        (
+            ["edit", "fix", "change", "modify", "update", "refactor"],
+            "Pick the right editor: str_replace_editor for targeted edits, ultimate_editor for function-level, edit_file for large rewrites. Use verify_state to confirm line contents before str_replace.",
+        ),
+        (
+            ["test", "testing", "pytest", "unittest"],
+            "Use run_tests to execute tests with structured output.",
+        ),
+        (
+            ["git", "commit", "branch", "merge", "diff"],
+            "Use workspace_status for a quick git overview before git operations.",
+        ),
+        (
+            ["remember", "note", "save", "persist"],
+            "Use working_memory(update) for structured cognitive state, note(record) for quick key-value pairs.",
+        ),
     ]
 
     def _get_tool_hints(self, messages: list) -> str:
@@ -300,7 +543,8 @@ class OrchestratorPlanner:
                     text = content
                 elif isinstance(content, list):
                     text = " ".join(
-                        item.get("text", "") for item in content
+                        item.get("text", "")
+                        for item in content
                         if isinstance(item, dict) and item.get("type") == "text"
                     )
                 break
@@ -359,7 +603,12 @@ class OrchestratorPlanner:
                 if name in ("str_replace_editor", "edit_file", "structure_editor"):
                     try:
                         import json as _json
-                        args = _json.loads(args_raw) if isinstance(args_raw, str) else args_raw
+
+                        args = (
+                            _json.loads(args_raw)
+                            if isinstance(args_raw, str)
+                            else args_raw
+                        )
                         path = args.get("path", args.get("file_path", ""))
                         if path and args.get("command") != "view":
                             edited_files[path] = edited_files.get(path, 0) + 1
@@ -406,6 +655,12 @@ class OrchestratorPlanner:
         # Force think on the first turn of a complex task
         iter_flag = getattr(state, "iteration_flag", None)
         current_iter = getattr(iter_flag, "current_value", 0) if iter_flag else 0
+        # Defensive: state objects in tests/mocks (or corrupted restore data)
+        # can yield non-int values; treat those as 0.
+        try:
+            current_iter = int(current_iter)
+        except Exception:
+            current_iter = 0
         if current_iter <= 1 and self._is_complex_task(last_user_msg):
             return {"type": "function", "function": {"name": "think"}}
 
@@ -421,9 +676,7 @@ class OrchestratorPlanner:
     def _is_complex_task(self, message: str) -> bool:
         """Heuristic: task has multiple action verbs or conjunctions indicating multi-step work."""
         msg_lower = message.lower()
-        action_count = sum(
-            1 for p in ACTION_PATTERNS if re.search(p, msg_lower)
-        )
+        action_count = sum(1 for p in ACTION_PATTERNS if re.search(p, msg_lower))
         conjunction_count = len(
             re.findall(r"\b(and|plus|also|then|after that|additionally)\b", msg_lower)
         )

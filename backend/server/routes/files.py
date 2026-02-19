@@ -321,7 +321,6 @@ async def list_files(
     return [f for f in file_list if f not in FILES_TO_IGNORE]
 
 
-
 @sub_router.get(
     "/select-file",
     response_model=None,

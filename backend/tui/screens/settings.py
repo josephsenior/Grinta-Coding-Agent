@@ -37,44 +37,6 @@ class SettingsScreen(Screen[None]):
         Binding("ctrl+s", "save", "Save", show=True),
     ]
 
-    CSS = """
-    #settings-outer {
-        height: 100%;
-        padding: 1 2;
-    }
-    #settings-scroll {
-        height: 1fr;
-    }
-    .section {
-        margin: 1 0;
-        padding: 1 2;
-        border: round $primary;
-        height: auto;
-    }
-    .section-title {
-        text-style: bold;
-        color: $accent;
-        margin: 0 0 1 0;
-    }
-    .field-row {
-        height: 3;
-        margin: 0 0 1 0;
-    }
-    .field-label {
-        width: 24;
-        text-style: bold;
-        padding: 0 1 0 0;
-    }
-    .field-input {
-        width: 1fr;
-    }
-    #btn-row {
-        height: 3;
-        margin: 1 0;
-        align: center middle;
-    }
-    """
-
     def __init__(self, client: ForgeClient) -> None:
         super().__init__()
         self.client = client
@@ -160,33 +122,56 @@ class SettingsScreen(Screen[None]):
             self.notify(f"Failed to load settings: {e}", severity="error")
             return
 
-        llm_data = self._settings.get("llm", {})
+        # Safely extract nested values using a helper
+        def safe_get(d, *keys, default=None):
+            """Safely traverse nested dicts, returning default if path invalid."""
+            if not isinstance(d, dict):
+                return default
+            for key in keys:
+                d = d.get(key, {})
+                if not isinstance(d, dict) and key != keys[-1]:
+                    return default
+            return d if d else default
+
+        llm_data = safe_get(self._settings, "llm", default={})
         api_key = str(
             self._settings.get("llm_api_key")
-            or llm_data.get("api_key")
+            or (llm_data.get("api_key") if isinstance(llm_data, dict) else None)
             or self._settings.get("api_key")
             or ""
         )
+        security = safe_get(self._settings, "security", default={})
         confirmation = bool(
             self._settings.get("confirmation_mode")
-            or self._settings.get("security", {}).get("confirmation_mode")
+            or (
+                security.get("confirmation_mode")
+                if isinstance(security, dict)
+                else False
+            )
             or False
         )
+        agent = safe_get(self._settings, "agent", default={})
         max_iter = str(
             self._settings.get("max_iterations")
-            or self._settings.get("agent", {}).get("max_iterations")
+            or (agent.get("max_iterations") if isinstance(agent, dict) else None)
             or 100
         )
 
         if api_key:
             self.query_one("#api-key-input", Input).value = api_key
+        elif self._settings.get("llm_api_key_set"):
+            self.query_one("#api-key-input", Input).value = "**********"
         self.query_one("#confirmation-switch", Switch).value = confirmation
         self.query_one("#max-iterations-input", Input).value = max_iter
 
     async def _load_models(self) -> None:
         try:
             self._models = await self.client.get_models()
-        except Exception:
+            if not self._models:
+                logger.warning("get_models returned empty list")
+        except Exception as e:
+            logger.error(f"Failed to load models: {e}")
+            self.notify(f"Warning: Could not load models: {e}", severity="warning")
             return
 
         select = self.query_one("#model-select", Select)
@@ -202,11 +187,15 @@ class SettingsScreen(Screen[None]):
         select.set_options(options)
         self._models_ready = True
 
-        # Determine current model
-        llm_data = self._settings.get("llm", {})
+        # Determine current model (safely handle nested access)
+        llm_data = (
+            self._settings.get("llm", {})
+            if isinstance(self._settings.get("llm"), dict)
+            else {}
+        )
         current_model = (
             self._settings.get("llm_model")
-            or llm_data.get("model")
+            or (llm_data.get("model") if isinstance(llm_data, dict) else None)
             or self._settings.get("model")
         )
         if current_model:

@@ -90,7 +90,7 @@ class TestGetCatalog:
         """Test get_catalog returns tuple of ModelEntry."""
         catalog = get_catalog()
         assert isinstance(catalog, tuple)
-        assert len(catalog) > 0
+        assert catalog
         assert all(isinstance(e, ModelEntry) for e in catalog)
 
     def test_contains_known_models(self):
@@ -98,7 +98,7 @@ class TestGetCatalog:
         catalog = get_catalog()
         names = [e.name for e in catalog]
         # Should contain at least some common models
-        assert len(names) > 0
+        assert names
 
     def test_caching(self):
         """Test get_catalog caches result."""

@@ -23,6 +23,7 @@ from backend.events.observation import (
 
 # ── _is_valid_image_url ─────────────────────────────────────────────
 
+
 class TestIsValidImageUrl:
     def test_valid(self):
         assert _is_valid_image_url("https://example.com/img.png") is True
@@ -38,6 +39,7 @@ class TestIsValidImageUrl:
 
 
 # ── _get_observation_content ─────────────────────────────────────────
+
 
 class TestGetObservationContent:
     def test_content_attr(self):
@@ -55,6 +57,7 @@ class TestGetObservationContent:
 
 
 # ── _handle_simple_observation ───────────────────────────────────────
+
 
 class TestHandleSimpleObservation:
     def test_basic(self):
@@ -75,6 +78,7 @@ class TestHandleSimpleObservation:
 
 
 # ── convert_observation_to_message ───────────────────────────────────
+
 
 class TestConvertObservation:
     def test_error_observation(self):

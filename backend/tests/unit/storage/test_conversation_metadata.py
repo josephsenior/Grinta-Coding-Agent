@@ -17,7 +17,14 @@ from backend.storage.data_models.conversation_metadata import (
 
 class TestConversationTrigger:
     def test_values(self):
-        expected = {"gui", "suggested_task", "playbook_management", "external_api", "remote_api_key", "unknown"}
+        expected = {
+            "gui",
+            "suggested_task",
+            "playbook_management",
+            "external_api",
+            "remote_api_key",
+            "unknown",
+        }
         actual = {t.value for t in ConversationTrigger}
         assert actual == expected
 

@@ -26,12 +26,11 @@ class TestSecretsManagerInit:
             assert sm._cipher is not None
 
     def test_init_from_env_jwt_secret(self):
-        with patch.dict(
-            "os.environ", {"JWT_SECRET": "jwt-key-789"}, clear=False
-        ):
+        with patch.dict("os.environ", {"JWT_SECRET": "jwt-key-789"}, clear=False):
             with patch.dict("os.environ", {}, clear=False):
                 # Remove SECRET_KEY if present
                 import os
+
                 old = os.environ.pop("SECRET_KEY", None)
                 try:
                     sm = SecretsManager()

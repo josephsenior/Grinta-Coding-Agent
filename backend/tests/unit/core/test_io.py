@@ -62,6 +62,7 @@ class TestFormatJson:
 
     def test_uses_str_default_for_non_serializable(self):
         """Test uses str() as default for non-JSON-serializable objects."""
+
         class CustomObj:
             def __str__(self):
                 return "custom_repr"
@@ -78,20 +79,16 @@ class TestFormatJson:
         obj.__str__.side_effect = RuntimeError("Cannot stringify")
 
         # Mock json.dumps to raise
-        with patch("backend.core.io.json.dumps", side_effect=ValueError("Cannot serialize")):
+        with patch(
+            "backend.core.io.json.dumps", side_effect=ValueError("Cannot serialize")
+        ):
             result = format_json(obj)
             # Should fall back to repr()
             assert "MagicMock" in result
 
     def test_nested_structures(self):
         """Test handles deeply nested structures."""
-        obj = {
-            "level1": {
-                "level2": {
-                    "level3": [1, 2, {"level4": "deep"}]
-                }
-            }
-        }
+        obj = {"level1": {"level2": {"level3": [1, 2, {"level4": "deep"}]}}}
         result = format_json(obj)
         assert json.loads(result) == obj
 

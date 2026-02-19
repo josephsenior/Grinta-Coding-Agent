@@ -23,6 +23,7 @@ def _make_service():
 
 # ── ensure_can_step ──────────────────────────────────────────────────
 
+
 class TestEnsureCanStep:
     @pytest.mark.asyncio
     async def test_passes_when_no_issues(self):

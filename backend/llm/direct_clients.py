@@ -429,7 +429,7 @@ class GeminiClient(DirectLLMClient):
 
         for m in messages:
             content = m.get("content", "")
-            
+
             # Handle list-style content (from Forge's message serialization)
             text_parts = []
             if isinstance(content, list):
@@ -440,14 +440,14 @@ class GeminiClient(DirectLLMClient):
                             caching_requested = True
                     # Image support for Gemini could be added here
                 content = "\n".join(text_parts)
-            
+
             if m["role"] == "system":
                 system_instruction = content
                 continue
-            
+
             role = "user" if m["role"] == "user" else "model"
             gemini_messages.append({"role": role, "parts": [content]})
-        
+
         return system_instruction, gemini_messages, caching_requested
 
     @staticmethod
@@ -514,12 +514,14 @@ class GeminiClient(DirectLLMClient):
         model_name = model_name or self.model_name
         if "/" in model_name:
             model_name = model_name.split("/")[-1]
-        
-        system_instruction, gemini_messages, caching_requested = self._convert_messages(messages)
-        
+
+        system_instruction, gemini_messages, caching_requested = self._convert_messages(
+            messages
+        )
+
         # Handle Context Caching if supported and requested
         from backend.llm.gemini_cache import gemini_cache_manager
-        
+
         cache_name = None
         if caching_requested:
             # We cache everything up to the penultimate message (the history)
@@ -529,11 +531,11 @@ class GeminiClient(DirectLLMClient):
                 cache_name = gemini_cache_manager.get_or_create_cache(
                     model=model_name,
                     system_instruction=system_instruction,
-                    messages=history_to_cache
+                    messages=history_to_cache,
                 )
 
         model_kwargs: dict[str, Any] = {"generation_config": gen_cfg} if gen_cfg else {}
-        
+
         if cache_name:
             # When using a cache, the model is initialized with the cache name
             # and we ONLY send the remaining messages.
@@ -552,7 +554,7 @@ class GeminiClient(DirectLLMClient):
             prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
             history = gemini_messages[:-1] if gemini_messages else []
             chat = model.start_chat(history=history)
-            
+
         return model_name, chat, prompt
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:

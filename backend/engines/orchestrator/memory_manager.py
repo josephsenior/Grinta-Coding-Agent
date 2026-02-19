@@ -84,7 +84,7 @@ class ConversationMemoryManager:
         # If memory pressure is active and the condenser chose NOT to
         # condense (returned a plain View), force condensation so the
         # agent loop can recover from high-memory situations.
-        memory_pressure = state.extra_data.get("memory_pressure")
+        memory_pressure = state.turn_signals.memory_pressure
         if memory_pressure and isinstance(condensation_result, View):
             from backend.memory.condenser.condenser import RollingCondenser
 
@@ -99,7 +99,7 @@ class ConversationMemoryManager:
                 except Exception as exc:
                     logger.warning("Forced condensation failed: %s", exc)
             # Clear the flag after consuming it
-            state.extra_data.pop("memory_pressure", None)
+            state.ack_memory_pressure(source="ConversationMemoryManager")
 
         if isinstance(condensation_result, View):
             return CondensedHistory(condensation_result.events, None)

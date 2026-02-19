@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 
-
 # ── Helpers ──────────────────────────────────────────────────────────
 
 
@@ -83,14 +82,16 @@ class TestAutonomyServiceInitialize:
         agent_config = _make_agent_config()
         agent = _make_agent(agent_config=agent_config)
 
-        with patch(
-            "backend.controller.autonomy.AutonomyController"
-        ) as mock_ac, patch(
-            "backend.controller.services.autonomy_service.SafetyValidator",
-            create=True,
-        ), patch(
-            "backend.controller.services.autonomy_service.CompositeValidator",
-            create=True,
+        with (
+            patch("backend.controller.autonomy.AutonomyController") as mock_ac,
+            patch(
+                "backend.controller.services.autonomy_service.SafetyValidator",
+                create=True,
+            ),
+            patch(
+                "backend.controller.services.autonomy_service.CompositeValidator",
+                create=True,
+            ),
         ):
             svc.initialize(agent)
             mock_ac.assert_called_once_with(agent_config)
@@ -126,9 +127,7 @@ class TestInitializeSafetyValidator:
         agent_config = _make_agent_config(safety_enabled=True)
         agent = _make_agent(agent_config=agent_config)
 
-        with patch(
-            "backend.controller.safety_validator.SafetyValidator"
-        ) as mock_sv:
+        with patch("backend.controller.safety_validator.SafetyValidator") as mock_sv:
             svc._initialize_safety_validator(agent)
             mock_sv.assert_called_once_with(agent_config.safety)
             assert ctrl.safety_validator == mock_sv.return_value
@@ -161,9 +160,7 @@ class TestInitializeTaskValidator:
         agent_config = _make_agent_config(completion_validation=True)
         agent = _make_agent(agent_config=agent_config)
 
-        with patch(
-            "backend.validation.task_validator.CompositeValidator"
-        ) as mock_cv:
+        with patch("backend.validation.task_validator.CompositeValidator") as mock_cv:
             svc._initialize_task_validator(agent)
             mock_cv.assert_called_once()
             assert ctrl.task_validator == mock_cv.return_value

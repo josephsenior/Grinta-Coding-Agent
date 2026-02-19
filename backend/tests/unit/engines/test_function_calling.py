@@ -27,6 +27,7 @@ from backend.events.action import (
 # combine_thought
 # ---------------------------------------------------------------------------
 
+
 class TestCombineThought:
     """Tests for combine_thought."""
 
@@ -60,12 +61,14 @@ class TestCombineThought:
 # set_security_risk
 # ---------------------------------------------------------------------------
 
+
 class TestSetSecurityRisk:
     """Tests for set_security_risk."""
 
     def test_valid_risk_level(self):
         action = CmdRunAction(command="ls")
         from backend.engines.orchestrator.tools.security_utils import RISK_LEVELS
+
         if RISK_LEVELS:
             level = list(RISK_LEVELS)[0]
             set_security_risk(action, {"security_risk": level})
@@ -87,6 +90,7 @@ class TestSetSecurityRisk:
 # ---------------------------------------------------------------------------
 # _handle_cmd_run_tool
 # ---------------------------------------------------------------------------
+
 
 class TestHandleCmdRunTool:
     """Tests for _handle_cmd_run_tool."""
@@ -121,6 +125,7 @@ class TestHandleCmdRunTool:
 # _handle_finish_tool
 # ---------------------------------------------------------------------------
 
+
 class TestHandleFinishTool:
     """Tests for _handle_finish_tool."""
 
@@ -138,25 +143,30 @@ class TestHandleFinishTool:
 # _handle_llm_based_file_edit_tool
 # ---------------------------------------------------------------------------
 
+
 class TestHandleLlmBasedFileEditTool:
     """Tests for _handle_llm_based_file_edit_tool."""
 
     def test_basic_edit(self):
-        action = _handle_llm_based_file_edit_tool({
-            "path": "/workspace/app.py",
-            "content": "print('hello')",
-        })
+        action = _handle_llm_based_file_edit_tool(
+            {
+                "path": "/workspace/app.py",
+                "content": "print('hello')",
+            }
+        )
         assert isinstance(action, FileEditAction)
         assert action.path == "/workspace/app.py"
         assert action.content == "print('hello')"
 
     def test_with_range(self):
-        action = _handle_llm_based_file_edit_tool({
-            "path": "/workspace/app.py",
-            "content": "new line",
-            "start": 5,
-            "end": 10,
-        })
+        action = _handle_llm_based_file_edit_tool(
+            {
+                "path": "/workspace/app.py",
+                "content": "new line",
+                "start": 5,
+                "end": 10,
+            }
+        )
         assert action.start == 5
         assert action.end == 10
 
@@ -173,46 +183,55 @@ class TestHandleLlmBasedFileEditTool:
 # _handle_str_replace_editor_tool
 # ---------------------------------------------------------------------------
 
+
 class TestHandleStrReplaceEditorTool:
     """Tests for _handle_str_replace_editor_tool."""
 
     def test_view_returns_file_read(self):
-        action = _handle_str_replace_editor_tool({
-            "command": "view",
-            "path": "/workspace/app.py",
-            "security_risk": "low",
-        })
+        action = _handle_str_replace_editor_tool(
+            {
+                "command": "view",
+                "path": "/workspace/app.py",
+                "security_risk": "low",
+            }
+        )
         assert isinstance(action, FileReadAction)
         assert action.path == "/workspace/app.py"
 
     def test_view_with_range(self):
-        action = _handle_str_replace_editor_tool({
-            "command": "view",
-            "path": "/workspace/app.py",
-            "view_range": [10, 20],
-            "security_risk": "low",
-        })
+        action = _handle_str_replace_editor_tool(
+            {
+                "command": "view",
+                "path": "/workspace/app.py",
+                "view_range": [10, 20],
+                "security_risk": "low",
+            }
+        )
         assert isinstance(action, FileReadAction)
         assert action.view_range == [10, 20]
 
     def test_str_replace_returns_file_edit(self):
-        action = _handle_str_replace_editor_tool({
-            "command": "str_replace",
-            "path": "/workspace/app.py",
-            "old_str": "x = 1",
-            "new_str": "x = 2",
-            "security_risk": "low",
-        })
+        action = _handle_str_replace_editor_tool(
+            {
+                "command": "str_replace",
+                "path": "/workspace/app.py",
+                "old_str": "x = 1",
+                "new_str": "x = 2",
+                "security_risk": "low",
+            }
+        )
         assert isinstance(action, FileEditAction)
         assert action.path == "/workspace/app.py"
 
     def test_create_returns_file_edit(self):
-        action = _handle_str_replace_editor_tool({
-            "command": "create",
-            "path": "/workspace/new.py",
-            "file_text": "# new file",
-            "security_risk": "low",
-        })
+        action = _handle_str_replace_editor_tool(
+            {
+                "command": "create",
+                "path": "/workspace/new.py",
+                "file_text": "# new file",
+                "security_risk": "low",
+            }
+        )
         assert isinstance(action, FileEditAction)
 
     def test_missing_command_raises(self):
@@ -225,9 +244,11 @@ class TestHandleStrReplaceEditorTool:
 
     def test_invalid_argument_raises(self):
         with pytest.raises(FunctionCallValidationError, match="Unexpected"):
-            _handle_str_replace_editor_tool({
-                "command": "str_replace",
-                "path": "/workspace/app.py",
-                "invalid_arg": "bad",
-                "security_risk": "low",
-            })
+            _handle_str_replace_editor_tool(
+                {
+                    "command": "str_replace",
+                    "path": "/workspace/app.py",
+                    "invalid_arg": "bad",
+                    "security_risk": "low",
+                }
+            )

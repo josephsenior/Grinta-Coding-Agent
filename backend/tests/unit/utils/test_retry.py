@@ -33,7 +33,9 @@ class TestCalculateBackoff:
         assert calculate_backoff(3, cfg) == 2.0
 
     def test_linear(self):
-        cfg = RetryConfig(strategy=RetryStrategy.LINEAR, initial_delay=1.0, jitter=False)
+        cfg = RetryConfig(
+            strategy=RetryStrategy.LINEAR, initial_delay=1.0, jitter=False
+        )
         assert calculate_backoff(0, cfg) == 1.0
         assert calculate_backoff(1, cfg) == 2.0
         assert calculate_backoff(4, cfg) == 5.0

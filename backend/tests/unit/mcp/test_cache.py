@@ -27,7 +27,9 @@ class TestCacheEntry:
 
     def test_create_entry(self):
         """Test creating a cache entry."""
-        entry = CacheEntry(value={"result": "data"}, expires_at=time.time() + 60, size=100)
+        entry = CacheEntry(
+            value={"result": "data"}, expires_at=time.time() + 60, size=100
+        )
         assert entry.value == {"result": "data"}
         assert entry.expires_at > time.time()
         assert entry.size == 100
@@ -231,35 +233,35 @@ class TestSetCache:
         set_cache("other_tool", {"query": "test"}, {"result": "data"})
 
         # Should not be in cache
-        assert len(_tool_cache) == 0
+        assert not _tool_cache
 
     @patch("backend.mcp.cache._CACHEABLE_TOOLS", {"test_tool"})
     def test_does_not_cache_with_refresh_flag(self):
         """Test does not cache when refresh flag is set."""
         set_cache("test_tool", {"query": "test", "refresh": True}, {"result": "data"})
 
-        assert len(_tool_cache) == 0
+        assert not _tool_cache
 
     @patch("backend.mcp.cache._CACHEABLE_TOOLS", {"test_tool"})
     def test_does_not_cache_with_no_cache_flag(self):
         """Test does not cache when no_cache flag is set."""
         set_cache("test_tool", {"query": "test", "no_cache": True}, {"result": "data"})
 
-        assert len(_tool_cache) == 0
+        assert not _tool_cache
 
     @patch("backend.mcp.cache._CACHEABLE_TOOLS", {"test_tool"})
     def test_does_not_cache_errors(self):
         """Test does not cache results with isError flag."""
         set_cache("test_tool", {"query": "test"}, {"isError": True, "error": "failed"})
 
-        assert len(_tool_cache) == 0
+        assert not _tool_cache
 
     @patch("backend.mcp.cache._CACHEABLE_TOOLS", {"test_tool"})
     def test_does_not_cache_nested_errors(self):
         """Test does not cache results with nested isError in content."""
         set_cache("test_tool", {"query": "test"}, {"content": {"isError": True}})
 
-        assert len(_tool_cache) == 0
+        assert not _tool_cache
 
     @patch("backend.mcp.cache._CACHEABLE_TOOLS", {"test_tool"})
     @patch("backend.mcp.cache.MAX_CACHE_ENTRY_BYTES", 50)
@@ -268,7 +270,7 @@ class TestSetCache:
         large_result = {"data": "x" * 1000}  # Large payload
         set_cache("test_tool", {"query": "test"}, large_result)
 
-        assert len(_tool_cache) == 0
+        assert not _tool_cache
 
     @patch("backend.mcp.cache._CACHEABLE_TOOLS", {"test_tool"})
     def test_sets_expiry_with_ttl(self):
@@ -304,7 +306,7 @@ class TestClearCache:
         count = clear_cache()
 
         assert count == 2
-        assert len(_tool_cache) == 0
+        assert not _tool_cache
 
     @patch("backend.mcp.cache._CACHEABLE_TOOLS", {"tool1", "tool2"})
     def test_clears_entries_by_prefix(self):

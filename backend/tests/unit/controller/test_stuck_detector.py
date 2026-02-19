@@ -45,7 +45,9 @@ def _cmd(command: str = "ls") -> CmdRunAction:
     return CmdRunAction(command=command)
 
 
-def _cmd_output(command: str = "ls", content: str = "file.txt", exit_code: int = 0) -> CmdOutputObservation:
+def _cmd_output(
+    command: str = "ls", content: str = "file.txt", exit_code: int = 0
+) -> CmdOutputObservation:
     return CmdOutputObservation(content=content, command=command, exit_code=exit_code)
 
 
@@ -283,7 +285,9 @@ class TestObservationOutcome:
 
     def test_cmd_output_success(self):
         sd = StuckDetector(_state([]))
-        assert sd._extract_observation_outcome(_cmd_output("ls", "file", 0)) == "success"
+        assert (
+            sd._extract_observation_outcome(_cmd_output("ls", "file", 0)) == "success"
+        )
 
     def test_cmd_output_nonzero_exit(self):
         sd = StuckDetector(_state([]))

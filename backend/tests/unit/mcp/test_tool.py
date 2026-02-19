@@ -90,12 +90,8 @@ class TestMCPClientTool(unittest.TestCase):
         self.assertIn("limit", function_params["properties"])
         self.assertIn("fuzzy", function_params["properties"])
         self.assertEqual(function_params["required"], ["query"])
-        self.assertEqual(
-            function_params["properties"]["limit"]["minimum"], 1
-        )
-        self.assertEqual(
-            function_params["properties"]["limit"]["maximum"], 100
-        )
+        self.assertEqual(function_params["properties"]["limit"]["minimum"], 1)
+        self.assertEqual(function_params["properties"]["limit"]["maximum"], 100)
 
     def test_to_param_with_complex_nested_schema(self) -> None:
         """Test to_param handles nested object schemas."""

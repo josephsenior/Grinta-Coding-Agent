@@ -21,6 +21,7 @@ def _make_ctx(action=None, workspace=None):
 
 # ── _resolve_path ─────────────────────────────────────────────────────
 
+
 class TestResolvePath:
     def test_absolute_path_returned_as_is(self):
         ctx = _make_ctx()
@@ -41,6 +42,7 @@ class TestResolvePath:
 
 # ── _read_file ────────────────────────────────────────────────────────
 
+
 class TestReadFile:
     def test_reads_file_content(self, tmp_path):
         f = tmp_path / "test.py"
@@ -60,6 +62,7 @@ class TestReadFile:
 
 
 # ── _simulate_edit ────────────────────────────────────────────────────
+
 
 class TestSimulateEdit:
     def setup_method(self):
@@ -104,6 +107,7 @@ class TestSimulateEdit:
 
 
 # ── execute (FileEditAction) ──────────────────────────────────────────
+
 
 class TestExecuteEdit:
     async def test_generates_diff_for_edit_action(self, tmp_path):
@@ -153,6 +157,7 @@ class TestExecuteEdit:
 
 
 # ── rollback_available metadata ───────────────────────────────────────
+
 
 class TestMetadataPropagation:
     async def test_diff_stored_in_metadata(self, tmp_path):

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from backend.core.enums import ErrorCategory, ErrorSeverity
 from backend.core.exceptions import (
     AgentRuntimeUnavailableError,
@@ -40,6 +39,7 @@ from backend.server.utils.error_formatter import (
 # ErrorAction
 # ---------------------------------------------------------------------------
 
+
 class TestErrorAction:
     def test_basic(self):
         a = ErrorAction(label="Retry", action_type="retry")
@@ -63,6 +63,7 @@ class TestErrorAction:
 # UserFriendlyError
 # ---------------------------------------------------------------------------
 
+
 class TestUserFriendlyError:
     def test_defaults(self):
         e = UserFriendlyError(title="T", message="M")
@@ -77,10 +78,21 @@ class TestUserFriendlyError:
         e = UserFriendlyError(title="T", message="M")
         d = e.to_dict()
         required_keys = {
-            "title", "message", "severity", "category", "icon",
-            "suggestion", "actions", "technical_details", "error_code",
-            "can_retry", "retry_delay", "help_url", "reassurance",
-            "metadata", "timestamp",
+            "title",
+            "message",
+            "severity",
+            "category",
+            "icon",
+            "suggestion",
+            "actions",
+            "technical_details",
+            "error_code",
+            "can_retry",
+            "retry_delay",
+            "help_url",
+            "reassurance",
+            "metadata",
+            "timestamp",
         }
         assert required_keys.issubset(d.keys())
 
@@ -95,6 +107,7 @@ class TestUserFriendlyError:
 # ---------------------------------------------------------------------------
 # Pattern checkers
 # ---------------------------------------------------------------------------
+
 
 class TestPatternCheckers:
     def test_rate_limit(self):
@@ -127,6 +140,7 @@ class TestPatternCheckers:
 # ---------------------------------------------------------------------------
 # Specific formatters
 # ---------------------------------------------------------------------------
+
 
 class TestSpecificFormatters:
     def test_format_llm_no_response(self):
@@ -188,6 +202,7 @@ class TestSpecificFormatters:
 # format_error_for_user  (main entry point)
 # ---------------------------------------------------------------------------
 
+
 class TestFormatErrorForUser:
     def test_mapped_error_type(self):
         err = LLMNoResponseError("timeout")
@@ -214,6 +229,7 @@ class TestFormatErrorForUser:
 # safe_format_error
 # ---------------------------------------------------------------------------
 
+
 class TestSafeFormatError:
     def test_returns_dict(self):
         err = RuntimeError("boom")
@@ -231,6 +247,7 @@ class TestSafeFormatError:
 # ---------------------------------------------------------------------------
 # to_dict
 # ---------------------------------------------------------------------------
+
 
 class TestToDict:
     def test_basic(self):

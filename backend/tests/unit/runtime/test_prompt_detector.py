@@ -16,34 +16,43 @@ from backend.runtime.utils.prompt_detector import (
 # PromptPattern
 # ---------------------------------------------------------------------------
 
+
 class TestPromptPattern:
     """Tests for PromptPattern."""
 
     def test_matches_true(self):
         p = PromptPattern(
-            pattern=r"\(y/n\)", prompt_type=PromptType.YES_NO_CONFIRMATION,
-            response="y\n", description="test",
+            pattern=r"\(y/n\)",
+            prompt_type=PromptType.YES_NO_CONFIRMATION,
+            response="y\n",
+            description="test",
         )
         assert p.matches("Continue? (y/n)") is True
 
     def test_matches_false(self):
         p = PromptPattern(
-            pattern=r"\(y/n\)", prompt_type=PromptType.YES_NO_CONFIRMATION,
-            response="y\n", description="test",
+            pattern=r"\(y/n\)",
+            prompt_type=PromptType.YES_NO_CONFIRMATION,
+            response="y\n",
+            description="test",
         )
         assert p.matches("no prompt here") is False
 
     def test_case_insensitive(self):
         p = PromptPattern(
-            pattern=r"proceed", prompt_type=PromptType.OK_PROCEED,
-            response="y\n", description="test",
+            pattern=r"proceed",
+            prompt_type=PromptType.OK_PROCEED,
+            response="y\n",
+            description="test",
         )
         assert p.matches("PROCEED now") is True
 
     def test_default_confidence(self):
         p = PromptPattern(
-            pattern=r"x", prompt_type=PromptType.UNKNOWN,
-            response="", description="test",
+            pattern=r"x",
+            prompt_type=PromptType.UNKNOWN,
+            response="",
+            description="test",
         )
         assert p.confidence == 1.0
 
@@ -51,6 +60,7 @@ class TestPromptPattern:
 # ---------------------------------------------------------------------------
 # InteractivePromptDetector
 # ---------------------------------------------------------------------------
+
 
 class TestInteractivePromptDetector:
     """Tests for the InteractivePromptDetector class."""
@@ -71,7 +81,9 @@ class TestInteractivePromptDetector:
 
     def test_detect_apt_prompt(self):
         detector = InteractivePromptDetector()
-        output = "After this operation, 50MB will be used.\nDo you want to continue? [Y/n] "
+        output = (
+            "After this operation, 50MB will be used.\nDo you want to continue? [Y/n] "
+        )
         result = detector.detect_prompt(output)
         assert result is not None
 
@@ -103,32 +115,44 @@ class TestInteractivePromptDetector:
     def test_auto_response_disabled(self):
         detector = InteractivePromptDetector(enable_auto_response=False)
         pattern = PromptPattern(
-            pattern=r"test", prompt_type=PromptType.YES_NO_CONFIRMATION,
-            response="y\n", description="test", confidence=1.0,
+            pattern=r"test",
+            prompt_type=PromptType.YES_NO_CONFIRMATION,
+            response="y\n",
+            description="test",
+            confidence=1.0,
         )
         assert detector.should_auto_respond(pattern) is False
 
     def test_no_auto_respond_for_password(self):
         detector = InteractivePromptDetector()
         pattern = PromptPattern(
-            pattern=r"Password:", prompt_type=PromptType.PASSWORD,
-            response="", description="password", confidence=1.0,
+            pattern=r"Password:",
+            prompt_type=PromptType.PASSWORD,
+            response="",
+            description="password",
+            confidence=1.0,
         )
         assert detector.should_auto_respond(pattern) is False
 
     def test_no_auto_respond_for_sudo(self):
         detector = InteractivePromptDetector()
         pattern = PromptPattern(
-            pattern=r"sudo", prompt_type=PromptType.SUDO_PASSWORD,
-            response="", description="sudo", confidence=1.0,
+            pattern=r"sudo",
+            prompt_type=PromptType.SUDO_PASSWORD,
+            response="",
+            description="sudo",
+            confidence=1.0,
         )
         assert detector.should_auto_respond(pattern) is False
 
     def test_should_auto_respond_true(self):
         detector = InteractivePromptDetector()
         pattern = PromptPattern(
-            pattern=r"test", prompt_type=PromptType.YES_NO_CONFIRMATION,
-            response="y\n", description="test", confidence=1.0,
+            pattern=r"test",
+            prompt_type=PromptType.YES_NO_CONFIRMATION,
+            response="y\n",
+            description="test",
+            confidence=1.0,
         )
         assert detector.should_auto_respond(pattern) is True
 
@@ -139,8 +163,10 @@ class TestInteractivePromptDetector:
     def test_get_response(self):
         detector = InteractivePromptDetector()
         pattern = PromptPattern(
-            pattern=r"test", prompt_type=PromptType.OK_PROCEED,
-            response="yes\n", description="test",
+            pattern=r"test",
+            prompt_type=PromptType.OK_PROCEED,
+            response="yes\n",
+            description="test",
         )
         assert detector.get_response(pattern) == "yes\n"
 
@@ -154,6 +180,7 @@ class TestInteractivePromptDetector:
 # ---------------------------------------------------------------------------
 # detect_interactive_prompt convenience function
 # ---------------------------------------------------------------------------
+
 
 class TestDetectInteractivePrompt:
     """Tests for the convenience detect_interactive_prompt function."""
@@ -173,6 +200,7 @@ class TestDetectInteractivePrompt:
 # ---------------------------------------------------------------------------
 # suggest_noninteractive_command
 # ---------------------------------------------------------------------------
+
 
 class TestSuggestNoninteractiveCommand:
     """Tests for suggest_noninteractive_command."""
@@ -213,6 +241,7 @@ class TestSuggestNoninteractiveCommand:
 # ---------------------------------------------------------------------------
 # PromptType enum
 # ---------------------------------------------------------------------------
+
 
 class TestPromptType:
     """Tests for PromptType enum."""

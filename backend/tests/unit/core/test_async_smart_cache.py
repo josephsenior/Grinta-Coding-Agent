@@ -10,12 +10,14 @@ import pytest
 
 # ── AsyncSmartCache (memory fallback) ─────────────────────────────────
 
+
 class TestAsyncSmartCacheMemory:
     @pytest.fixture
     def cache(self):
         with patch.dict("sys.modules", {"redis.asyncio": None, "redis": None}):
             import importlib
             import backend.core.cache.async_smart_cache as _mod
+
             importlib.reload(_mod)
             c = _mod.AsyncSmartCache()
             c.redis_available = False
@@ -71,8 +73,13 @@ class TestAsyncSmartCacheMemory:
         loaded.merge_with_config_settings.return_value = loaded
         store = AsyncMock()
         store.load.return_value = loaded
-        with patch("backend.core.config.utils.load_FORGE_config", return_value=MagicMock()):
-            with patch("backend.core.cache.async_smart_cache.merge_settings_with_cache", return_value=loaded):
+        with patch(
+            "backend.core.config.utils.load_FORGE_config", return_value=MagicMock()
+        ):
+            with patch(
+                "backend.core.cache.async_smart_cache.merge_settings_with_cache",
+                return_value=loaded,
+            ):
                 result = await cache.get_user_settings("u1", store)
         assert result is loaded
 
@@ -113,6 +120,7 @@ class TestAsyncSmartCacheSingleton:
     @pytest.mark.asyncio
     async def test_get_async_smart_cache(self):
         import backend.core.cache.async_smart_cache as mod
+
         mod._async_smart_cache = None
         instance = await mod.get_async_smart_cache()
         assert isinstance(instance, mod.AsyncSmartCache)
@@ -182,7 +190,9 @@ class TestAsyncSmartCacheRedis:
         cache.redis_client.get.return_value = None
 
         fake_config = MagicMock()
-        with patch("backend.core.config.utils.load_FORGE_config", return_value=fake_config):
+        with patch(
+            "backend.core.config.utils.load_FORGE_config", return_value=fake_config
+        ):
             with patch(
                 "backend.core.cache.async_smart_cache.serialize_model",
                 return_value=b"blob",
@@ -311,7 +321,9 @@ class TestAsyncSmartCacheRedis:
         cache.redis_client = None
 
         with patch.object(mod, "aioredis") as mock_aioredis:
-            mock_aioredis.from_url = AsyncMock(side_effect=Exception("connection failed"))
+            mock_aioredis.from_url = AsyncMock(
+                side_effect=Exception("connection failed")
+            )
             with patch(
                 "backend.core.cache.async_smart_cache.get_redis_connection_params",
                 return_value={},
@@ -345,7 +357,9 @@ class TestAsyncSmartCacheRedis:
         cache.redis_client = None
 
         fake_settings = MagicMock()
-        with patch.object(cache, "_get_user_settings_memory", return_value=fake_settings):
+        with patch.object(
+            cache, "_get_user_settings_memory", return_value=fake_settings
+        ):
             result = await cache._get_user_settings_redis("u1", AsyncMock())
 
         assert result is fake_settings
@@ -433,16 +447,16 @@ class TestAsyncSmartCacheRedis:
         cache = mod.AsyncSmartCache()
         cache.redis_available = True
         cache.redis_client = AsyncMock()
-        
+
         # Simulate successful connection
         with patch.object(cache, "_ensure_connection", return_value=True):
             cache._user_settings_cache["u1"] = (MagicMock(), time.time())
-            
+
             # Make delete fail to hit exception handler (line 306)
             cache.redis_client.delete.side_effect = Exception("delete failed")
-            
+
             await cache.invalidate_user_cache("u1")
-        
+
         # Memory cache should still be invalidated
         assert "u1" not in cache._user_settings_cache
 
@@ -470,7 +484,7 @@ class TestAsyncSmartCacheRedis:
                 return_value={},
             ):
                 result = await cache._ensure_connection()
-        
+
         # Should reconnect successfully
         assert result is True
         assert cache.redis_client is new_client
@@ -487,9 +501,11 @@ class TestAsyncSmartCacheRedis:
         # Call get_global_config which should try to ensure connection, fail, then use memory
         fake_config = MagicMock()
         with patch.object(cache, "_ensure_connection", return_value=False):
-            with patch.object(cache, "_get_global_config_memory", return_value=fake_config):
+            with patch.object(
+                cache, "_get_global_config_memory", return_value=fake_config
+            ):
                 result = await cache.get_global_config()
-        
+
         assert result is fake_config
 
     @pytest.mark.asyncio
@@ -503,9 +519,11 @@ class TestAsyncSmartCacheRedis:
 
         fake_settings = MagicMock()
         store = AsyncMock()
-        
+
         with patch.object(cache, "_ensure_connection", return_value=False):
-            with patch.object(cache, "_get_user_settings_memory", return_value=fake_settings):
+            with patch.object(
+                cache, "_get_user_settings_memory", return_value=fake_settings
+            ):
                 result = await cache.get_user_settings("u1", store)
-        
+
         assert result is fake_settings

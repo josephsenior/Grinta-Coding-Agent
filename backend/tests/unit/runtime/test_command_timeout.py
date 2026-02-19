@@ -11,16 +11,16 @@ from backend.runtime.command_timeout import CommandTimeoutMixin, _LONG_RUNNING_P
 
 # ── helper: concrete class that uses the mixin ───────────────────────
 
+
 class _FakeRuntime(CommandTimeoutMixin):
     def __init__(self):
         self.sid = "test-sid"
-        self.config = SimpleNamespace(
-            runtime_config=SimpleNamespace(timeout=120)
-        )
+        self.config = SimpleNamespace(runtime_config=SimpleNamespace(timeout=120))
         self.process_manager = MagicMock()
 
 
 # ── _is_long_running_command ─────────────────────────────────────────
+
 
 class TestIsLongRunning:
     def test_server_commands(self):
@@ -40,6 +40,7 @@ class TestIsLongRunning:
 
 
 # ── _set_action_timeout ──────────────────────────────────────────────
+
 
 class TestSetActionTimeout:
     def test_explicit_timeout_not_overridden(self):
@@ -72,6 +73,7 @@ class TestSetActionTimeout:
 
 
 # ── patterns constant ────────────────────────────────────────────────
+
 
 class TestPatterns:
     def test_has_common_patterns(self):

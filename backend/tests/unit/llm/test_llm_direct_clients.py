@@ -36,19 +36,21 @@ class TestLLMResponse:
         assert resp.usage["total_tokens"] == 15
 
     def test_choices_attribute(self):
-        resp = LLMResponse(
-            content="Hi", model="m", usage={}, finish_reason="length"
-        )
+        resp = LLMResponse(content="Hi", model="m", usage={}, finish_reason="length")
         assert len(resp.choices) == 1
         assert resp.choices[0].message.content == "Hi"
         assert resp.choices[0].message.role == "assistant"
         assert resp.choices[0].finish_reason == "length"
 
     def test_with_tool_calls(self):
-        tcs = [{"id": "tc1", "type": "function", "function": {"name": "f", "arguments": "{}"}}]
-        resp = LLMResponse(
-            content="", model="m", usage={}, tool_calls=tcs
-        )
+        tcs = [
+            {
+                "id": "tc1",
+                "type": "function",
+                "function": {"name": "f", "arguments": "{}"},
+            }
+        ]
+        resp = LLMResponse(content="", model="m", usage={}, tool_calls=tcs)
         assert resp.tool_calls == tcs
         assert resp.choices[0].message.tool_calls == tcs
 
@@ -86,7 +88,10 @@ class TestLLMResponse:
 # ---------------------------------------------------------------------------
 class TestPoolKey:
     def test_with_base_url(self):
-        assert _pool_key("openai", "https://api.openai.com") == "openai::https://api.openai.com"
+        assert (
+            _pool_key("openai", "https://api.openai.com")
+            == "openai::https://api.openai.com"
+        )
 
     def test_without_base_url(self):
         assert _pool_key("anthropic", None) == "anthropic::default"
@@ -115,8 +120,9 @@ class TestSharedHttpClients:
 # ---------------------------------------------------------------------------
 class TestGetDirectClient:
     def test_anthropic_model(self):
-        with patch("backend.llm.direct_clients.Anthropic"), patch(
-            "backend.llm.direct_clients.AsyncAnthropic"
+        with (
+            patch("backend.llm.direct_clients.Anthropic"),
+            patch("backend.llm.direct_clients.AsyncAnthropic"),
         ):
             from backend.llm.direct_clients import AnthropicClient
 
@@ -124,8 +130,9 @@ class TestGetDirectClient:
             assert isinstance(client, AnthropicClient)
 
     def test_claude_model(self):
-        with patch("backend.llm.direct_clients.Anthropic"), patch(
-            "backend.llm.direct_clients.AsyncAnthropic"
+        with (
+            patch("backend.llm.direct_clients.Anthropic"),
+            patch("backend.llm.direct_clients.AsyncAnthropic"),
         ):
             from backend.llm.direct_clients import AnthropicClient
 
@@ -140,8 +147,9 @@ class TestGetDirectClient:
             assert isinstance(client, GeminiClient)
 
     def test_xai_grok_model(self):
-        with patch("backend.llm.direct_clients.OpenAI"), patch(
-            "backend.llm.direct_clients.AsyncOpenAI"
+        with (
+            patch("backend.llm.direct_clients.OpenAI"),
+            patch("backend.llm.direct_clients.AsyncOpenAI"),
         ):
             from backend.llm.direct_clients import OpenAIClient
 
@@ -149,8 +157,9 @@ class TestGetDirectClient:
             assert isinstance(client, OpenAIClient)
 
     def test_ollama_model(self):
-        with patch("backend.llm.direct_clients.OpenAI"), patch(
-            "backend.llm.direct_clients.AsyncOpenAI"
+        with (
+            patch("backend.llm.direct_clients.OpenAI"),
+            patch("backend.llm.direct_clients.AsyncOpenAI"),
         ):
             from backend.llm.direct_clients import OpenAIClient
 
@@ -159,8 +168,9 @@ class TestGetDirectClient:
             assert client._model_name == "llama3"  # prefix stripped
 
     def test_default_openai(self):
-        with patch("backend.llm.direct_clients.OpenAI"), patch(
-            "backend.llm.direct_clients.AsyncOpenAI"
+        with (
+            patch("backend.llm.direct_clients.OpenAI"),
+            patch("backend.llm.direct_clients.AsyncOpenAI"),
         ):
             from backend.llm.direct_clients import OpenAIClient
 
@@ -198,8 +208,9 @@ class TestAnthropicClientHelpers:
     def test_prepare_kwargs(self):
         from backend.llm.direct_clients import AnthropicClient
 
-        with patch("backend.llm.direct_clients.Anthropic"), patch(
-            "backend.llm.direct_clients.AsyncAnthropic"
+        with (
+            patch("backend.llm.direct_clients.Anthropic"),
+            patch("backend.llm.direct_clients.AsyncAnthropic"),
         ):
             client = AnthropicClient("claude-3", "key")
         messages = [
@@ -289,7 +300,9 @@ class TestGeminiClientHelpers:
     def test_gemini_usage_valid(self):
         from backend.llm.direct_clients import GeminiClient
 
-        meta = MagicMock(prompt_token_count=10, candidates_token_count=20, total_token_count=30)
+        meta = MagicMock(
+            prompt_token_count=10, candidates_token_count=20, total_token_count=30
+        )
         resp = MagicMock(usage_metadata=meta)
         usage = GeminiClient._gemini_usage(resp)
         assert usage["prompt_tokens"] == 10
@@ -342,8 +355,9 @@ class TestDirectLLMClientModelName:
             _ = c.model_name
 
     def test_model_name_set(self):
-        with patch("backend.llm.direct_clients.OpenAI"), patch(
-            "backend.llm.direct_clients.AsyncOpenAI"
+        with (
+            patch("backend.llm.direct_clients.OpenAI"),
+            patch("backend.llm.direct_clients.AsyncOpenAI"),
         ):
             from backend.llm.direct_clients import OpenAIClient
 

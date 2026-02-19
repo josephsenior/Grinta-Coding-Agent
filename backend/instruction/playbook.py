@@ -134,7 +134,7 @@ class BasePlaybook(BaseModel):
                 return f.read()
         except PermissionError:
             # Windows NamedTemporaryFile defaults to exclusive access which prevents a second
-            # open() call while the handle is still alive. Tests keep the temporary file open,
+            # open(, encoding="utf-8") call while the handle is still alive. Tests keep the temporary file open,
             # so we fall back to the Win32 CreateFile API that allows shared reads.
             if os.name == "nt":
                 return cls._read_locked_file_windows(path)
@@ -349,7 +349,7 @@ class TaskPlaybook(KnowledgePlaybook):
         content = getattr(self, "content", "")
         variables = self.extract_variables(content)
         logger.debug("This playbook requires user input: %s", variables)
-        return len(variables) > 0
+        return variables
 
     @property
     def inputs(self) -> list[InputMetadata]:

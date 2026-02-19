@@ -45,28 +45,34 @@ class TestRead:
 
 class TestList:
     def test_list_root_files(self):
-        store = InMemoryFileStore({
-            "a.txt": "a",
-            "b.txt": "b",
-        })
+        store = InMemoryFileStore(
+            {
+                "a.txt": "a",
+                "b.txt": "b",
+            }
+        )
         result = store.list("")
         assert sorted(result) == ["a.txt", "b.txt"]
 
     def test_list_subdirectory_files(self):
-        store = InMemoryFileStore({
-            "dir/a.txt": "a",
-            "dir/b.txt": "b",
-            "other.txt": "o",
-        })
+        store = InMemoryFileStore(
+            {
+                "dir/a.txt": "a",
+                "dir/b.txt": "b",
+                "other.txt": "o",
+            }
+        )
         result = store.list("dir/")
         assert sorted(result) == ["dir/a.txt", "dir/b.txt"]
 
     def test_list_shows_subdirs(self):
-        store = InMemoryFileStore({
-            "dir/sub/a.txt": "a",
-            "dir/sub/b.txt": "b",
-            "dir/c.txt": "c",
-        })
+        store = InMemoryFileStore(
+            {
+                "dir/sub/a.txt": "a",
+                "dir/sub/b.txt": "b",
+                "dir/c.txt": "c",
+            }
+        )
         result = store.list("dir/")
         assert "dir/c.txt" in result
         assert "dir/sub/" in result
@@ -77,10 +83,12 @@ class TestList:
         assert result == []
 
     def test_list_deduplicates_subdirs(self):
-        store = InMemoryFileStore({
-            "dir/sub/a.txt": "a",
-            "dir/sub/b.txt": "b",
-        })
+        store = InMemoryFileStore(
+            {
+                "dir/sub/a.txt": "a",
+                "dir/sub/b.txt": "b",
+            }
+        )
         result = store.list("dir/")
         # "dir/sub/" should appear only once
         assert result.count("dir/sub/") == 1
@@ -94,11 +102,13 @@ class TestDelete:
         assert "b.txt" in store.files
 
     def test_delete_by_prefix(self):
-        store = InMemoryFileStore({
-            "dir/a.txt": "a",
-            "dir/b.txt": "b",
-            "other.txt": "o",
-        })
+        store = InMemoryFileStore(
+            {
+                "dir/a.txt": "a",
+                "dir/b.txt": "b",
+                "other.txt": "o",
+            }
+        )
         store.delete("dir/")
         assert store.files == {"other.txt": "o"}
 

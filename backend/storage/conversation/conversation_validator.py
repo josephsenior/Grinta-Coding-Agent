@@ -179,7 +179,7 @@ def create_conversation_validator() -> ConversationValidator:
     """
     conversation_validator_cls = os.environ.get(
         "FORGE_CONVERSATION_VALIDATOR_CLS",
-        "forge.storage.conversation.conversation_validator.ConversationValidator",
+        "backend.storage.conversation.conversation_validator.ConversationValidator",
     )
     ConversationValidatorImpl = get_impl(
         ConversationValidator, conversation_validator_cls

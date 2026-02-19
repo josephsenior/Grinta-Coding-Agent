@@ -358,7 +358,14 @@ class StructureEditor:
             Tuple of (is_valid, error_message)
 
         """
-        if start_line < 1 or end_line > total_lines or start_line > end_line:
+        # Allow start_line == end_line + 1 as a pure-insert (no lines removed) operation.
+        # This is used by insert_code(insert_line=0) → replace_code_range(start=1, end=0).
+        is_pure_insert = start_line == end_line + 1 and end_line >= 0
+        if (
+            start_line < 1
+            or end_line > total_lines
+            or (start_line > end_line and not is_pure_insert)
+        ):
             return (
                 False,
                 f"Invalid line range: {start_line}-{end_line} (file has {total_lines} lines)",
@@ -707,7 +714,7 @@ class StructureEditor:
         end_line = total_lines
 
         if line_range:
-            if len(line_range) >= 1:
+            if line_range:
                 start_line = line_range[0]
             if len(line_range) >= 2 and line_range[1] != -1:
                 end_line = line_range[1]

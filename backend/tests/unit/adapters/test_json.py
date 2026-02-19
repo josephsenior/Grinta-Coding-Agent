@@ -220,7 +220,7 @@ class TestLoads:
         """Test error when repair also fails."""
         # Completely broken JSON that can't be repaired
         with pytest.raises(LLMResponseError, match="No valid JSON"):
-            loads('prefix {broken{nested{unterminated suffix')
+            loads("prefix {broken{nested{unterminated suffix")
 
     def test_loads_empty_json_object(self):
         """Test loading empty JSON object."""

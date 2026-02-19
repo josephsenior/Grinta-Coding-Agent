@@ -4,7 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.events.stream import EventStreamSubscriber, _warn_unclosed_stream, session_exists
+from backend.events.stream import (
+    EventStreamSubscriber,
+    _warn_unclosed_stream,
+    session_exists,
+)
 
 
 class TestEventStreamSubscriber:

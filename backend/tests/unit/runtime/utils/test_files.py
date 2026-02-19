@@ -3,7 +3,7 @@
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch, mock_open
+from unittest.mock import patch
 
 import pytest
 
@@ -31,10 +31,10 @@ class TestResolvePath:
             workspace = Path(tmpdir).resolve()
             workdir = str(workspace / "sub")
             os.makedirs(workdir, exist_ok=True)
-            
+
             test_file = workspace / "test.txt"
             test_file.touch()
-            
+
             result = resolve_path(str(test_file), workdir, str(workspace))
             assert result == test_file
 
@@ -44,12 +44,12 @@ class TestResolvePath:
             workspace = Path(tmpdir).resolve()
             workdir = str(workspace / "subdir")
             os.makedirs(workdir, exist_ok=True)
-            
+
             # Create test file
             test_file = workspace / "subdir" / "test.txt"
             test_file.parent.mkdir(parents=True, exist_ok=True)
             test_file.touch()
-            
+
             result = resolve_path("test.txt", workdir, str(workspace))
             assert result == test_file
 
@@ -59,12 +59,12 @@ class TestResolvePath:
             workspace = Path(tmpdir).resolve()
             workdir = str(workspace / "subdir1" / "subdir2")
             os.makedirs(workdir, exist_ok=True)
-            
+
             # Create file in parent
             parent_file = workspace / "subdir1" / "parent.txt"
             parent_file.parent.mkdir(parents=True, exist_ok=True)
             parent_file.touch()
-            
+
             result = resolve_path("../parent.txt", workdir, str(workspace))
             assert result == parent_file
 
@@ -74,11 +74,11 @@ class TestResolvePath:
             workspace = Path(tmpdir).resolve()
             workdir = str(workspace / "subdir")
             os.makedirs(workdir, exist_ok=True)
-            
+
             # Try to access parent of workspace
             with pytest.raises(PermissionError) as exc_info:
                 resolve_path("../../outside.txt", workdir, str(workspace))
-            
+
             assert "File access not permitted" in str(exc_info.value)
 
     def test_resolve_absolute_path_outside_workspace_raises_error(self):
@@ -86,10 +86,10 @@ class TestResolvePath:
         workspace = "/workspace"
         workdir = "/workspace/subdir"
         file_path = "/etc/passwd"
-        
+
         with pytest.raises(PermissionError) as exc_info:
             resolve_path(file_path, workdir, workspace)
-        
+
         assert "File access not permitted" in str(exc_info.value)
 
     def test_resolve_path_normalizes_path(self):
@@ -97,10 +97,10 @@ class TestResolvePath:
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir).resolve()
             workdir = str(workspace)
-            
+
             test_file = workspace / "test.txt"
             test_file.touch()
-            
+
             # Path with redundant elements
             result = resolve_path("./././test.txt", workdir, str(workspace))
             assert result == test_file
@@ -112,10 +112,10 @@ class TestResolvePath:
             workspace = "C:\\workspace"
             workdir = "C:\\workspace\\sub"
             file_path = "D:\\other\\file.txt"
-            
+
             with pytest.raises(PermissionError) as exc_info:
                 resolve_path(file_path, workdir, workspace)
-            
+
             assert "File access not permitted" in str(exc_info.value)
 
     def test_resolve_path_fallback_for_attribute_error(self):
@@ -124,7 +124,7 @@ class TestResolvePath:
             workspace = "/workspace"
             workdir = "/workspace/sub"
             file_path = "/etc/passwd"
-            
+
             with pytest.raises(PermissionError):
                 resolve_path(file_path, workdir, workspace)
 
@@ -197,13 +197,13 @@ class TestReadFile:
             workspace = Path(tmpdir)
             test_file = workspace / "test.txt"
             test_file.write_text("Hello\nWorld\n")
-            
+
             result = await read_file(
                 "test.txt",
                 str(workspace),
                 str(workspace),
             )
-            
+
             assert isinstance(result, FileReadObservation)
             assert result.path == "test.txt"
             assert result.content == "Hello\nWorld\n"
@@ -215,7 +215,7 @@ class TestReadFile:
             workspace = Path(tmpdir)
             test_file = workspace / "test.txt"
             test_file.write_text("Line 1\nLine 2\nLine 3\nLine 4\n")
-            
+
             result = await read_file(
                 "test.txt",
                 str(workspace),
@@ -223,7 +223,7 @@ class TestReadFile:
                 start=1,
                 end=3,
             )
-            
+
             assert isinstance(result, FileReadObservation)
             assert result.content == "Line 2\nLine 3\n"
 
@@ -235,7 +235,7 @@ class TestReadFile:
             "/workspace/sub",
             "/workspace",
         )
-        
+
         assert isinstance(result, ErrorObservation)
         assert "not allowed to access" in result.content
 
@@ -244,13 +244,13 @@ class TestReadFile:
         """Test reading non-existent file returns ErrorObservation."""
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)
-            
+
             result = await read_file(
                 "nonexistent.txt",
                 str(workspace),
                 str(workspace),
             )
-            
+
             assert isinstance(result, ErrorObservation)
             assert "File not found" in result.content
 
@@ -262,13 +262,13 @@ class TestReadFile:
             test_file = workspace / "binary.bin"
             # Write invalid UTF-8 bytes
             test_file.write_bytes(b"\x80\x81\x82\x83")
-            
+
             result = await read_file(
                 "binary.bin",
                 str(workspace),
                 str(workspace),
             )
-            
+
             assert isinstance(result, ErrorObservation)
             assert "could not be decoded as utf-8" in result.content
 
@@ -279,13 +279,13 @@ class TestReadFile:
             workspace = Path(tmpdir)
             subdir = workspace / "subdir"
             subdir.mkdir()
-            
+
             result = await read_file(
                 "subdir",
                 str(workspace),
                 str(workspace),
             )
-            
+
             assert isinstance(result, ErrorObservation)
             assert "Path is a directory" in result.content
 
@@ -296,7 +296,7 @@ class TestReadFile:
             workspace = Path(tmpdir)
             test_file = workspace / "protected.txt"
             test_file.write_text("content")
-            
+
             # Mock open to raise PermissionError
             with patch("builtins.open", side_effect=PermissionError("Access denied")):
                 result = await read_file(
@@ -304,9 +304,11 @@ class TestReadFile:
                     str(workspace),
                     str(workspace),
                 )
-                
+
                 assert isinstance(result, ErrorObservation)
-                assert "Path is a directory" in result.content  # Current impl maps PermissionError
+                assert (
+                    "Path is a directory" in result.content
+                )  # Current impl maps PermissionError
 
 
 class TestInsertLines:
@@ -316,18 +318,18 @@ class TestInsertLines:
         """Test inserting lines at the beginning of file."""
         to_insert = ["new line 1", "new line 2"]
         original = ["old line 1\n", "old line 2\n"]
-        
+
         result = insert_lines(to_insert, original, start=0, end=-1)
-        
+
         assert result == ["", "new line 1\n", "new line 2\n", ""]
 
     def test_insert_in_middle(self):
         """Test inserting lines in the middle of file."""
         to_insert = ["inserted"]
         original = ["line 1\n", "line 2\n", "line 3\n"]
-        
+
         result = insert_lines(to_insert, original, start=1, end=2)
-        
+
         expected = [
             "line 1\n",
             "inserted\n",
@@ -339,45 +341,45 @@ class TestInsertLines:
         """Test inserting lines at the end of file."""
         to_insert = ["new line"]
         original = ["line 1\n", "line 2\n"]
-        
+
         result = insert_lines(to_insert, original, start=2, end=-1)
-        
+
         assert result == ["line 1\n", "line 2\n", "new line\n", ""]
 
     def test_insert_replacing_entire_file(self):
         """Test replacing entire file content."""
         to_insert = ["brand new"]
         original = ["old 1\n", "old 2\n"]
-        
+
         result = insert_lines(to_insert, original, start=0, end=-1)
-        
+
         assert result == ["", "brand new\n", ""]
 
     def test_insert_empty_list(self):
         """Test inserting empty list."""
         to_insert = []
         original = ["line 1\n", "line 2\n"]
-        
+
         result = insert_lines(to_insert, original, start=1, end=1)
-        
+
         assert result == ["line 1\n", "line 2\n"]
 
     def test_insert_into_empty_file(self):
         """Test inserting into empty file."""
         to_insert = ["first line"]
         original = []
-        
+
         result = insert_lines(to_insert, original, start=0, end=-1)
-        
+
         assert result == ["", "first line\n", ""]
 
     def test_insert_multiple_lines(self):
         """Test inserting multiple lines."""
         to_insert = ["line A", "line B", "line C"]
         original = ["1\n", "2\n", "3\n"]
-        
+
         result = insert_lines(to_insert, original, start=1, end=2)
-        
+
         assert result == [
             "1\n",
             "line A\n",
@@ -397,17 +399,17 @@ class TestWriteFile:
             workspace = Path(tmpdir)
             file_path = "new.txt"
             content = "Hello\nWorld"
-            
+
             result = await write_file(
                 file_path,
                 str(workspace),
                 str(workspace),
                 content,
             )
-            
+
             assert isinstance(result, FileWriteObservation)
             assert result.path == file_path
-            
+
             # Verify file was written
             written_content = (workspace / file_path).read_text()
             assert written_content == "Hello\nWorld\n"
@@ -419,14 +421,14 @@ class TestWriteFile:
             workspace = Path(tmpdir)
             test_file = workspace / "existing.txt"
             test_file.write_text("Old content\n")
-            
+
             result = await write_file(
                 "existing.txt",
                 str(workspace),
                 str(workspace),
                 "New content",
             )
-            
+
             assert isinstance(result, FileWriteObservation)
             written = test_file.read_text()
             assert written == "New content\n"
@@ -438,7 +440,7 @@ class TestWriteFile:
             workspace = Path(tmpdir)
             test_file = workspace / "test.txt"
             test_file.write_text("Line 1\nLine 2\nLine 3\n")
-            
+
             result = await write_file(
                 "test.txt",
                 str(workspace),
@@ -447,7 +449,7 @@ class TestWriteFile:
                 start=1,
                 end=2,
             )
-            
+
             assert isinstance(result, FileWriteObservation)
             written = test_file.read_text()
             assert "Inserted" in written
@@ -460,14 +462,14 @@ class TestWriteFile:
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)
             file_path = "sub/dir/file.txt"
-            
+
             result = await write_file(
                 file_path,
                 str(workspace),
                 str(workspace),
                 "Content",
             )
-            
+
             assert isinstance(result, FileWriteObservation)
             assert (workspace / "sub" / "dir" / "file.txt").exists()
 
@@ -480,7 +482,7 @@ class TestWriteFile:
             "/workspace",
             "bad content",
         )
-        
+
         assert isinstance(result, ErrorObservation)
         assert "Permission error" in result.content
 
@@ -491,7 +493,7 @@ class TestWriteFile:
             workspace = Path(tmpdir)
             subdir = workspace / "subdir"
             subdir.mkdir()
-            
+
             # Mock open to raise IsADirectoryError
             with patch("builtins.open", side_effect=IsADirectoryError):
                 result = await write_file(
@@ -500,7 +502,7 @@ class TestWriteFile:
                     str(workspace),
                     "content",
                 )
-                
+
                 assert isinstance(result, ErrorObservation)
                 assert "Path is a directory" in result.content
 
@@ -512,14 +514,14 @@ class TestWriteFile:
             test_file = workspace / "test.txt"
             # Create file with invalid UTF-8
             test_file.write_bytes(b"\x80\x81\x82")
-            
+
             result = await write_file(
                 "test.txt",
                 str(workspace),
                 str(workspace),
                 "new content",
             )
-            
+
             assert isinstance(result, ErrorObservation)
             assert "could not be decoded as utf-8" in result.content
 
@@ -529,14 +531,14 @@ class TestWriteFile:
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)
             content = "Line 1\nLine 2\nLine 3"
-            
+
             result = await write_file(
                 "test.txt",
                 str(workspace),
                 str(workspace),
                 content,
             )
-            
+
             assert isinstance(result, FileWriteObservation)
             written = (workspace / "test.txt").read_text()
             assert written == "Line 1\nLine 2\nLine 3\n"
@@ -548,7 +550,7 @@ class TestWriteFile:
             workspace = Path(tmpdir)
             test_file = workspace / "test.txt"
             test_file.write_text("Line 1\nLine 2\nLine 3\n")
-            
+
             result = await write_file(
                 "test.txt",
                 str(workspace),
@@ -557,7 +559,7 @@ class TestWriteFile:
                 start=2,
                 end=-1,
             )
-            
+
             assert isinstance(result, FileWriteObservation)
             written = test_file.read_text()
             # Should keep first 2 lines, then append
@@ -572,14 +574,14 @@ class TestWriteFile:
             workspace = Path(tmpdir)
             test_file = workspace / "test.txt"
             test_file.write_text("Very long original content that should be removed\n")
-            
+
             result = await write_file(
                 "test.txt",
                 str(workspace),
                 str(workspace),
                 "Short",
             )
-            
+
             assert isinstance(result, FileWriteObservation)
             written = test_file.read_text()
             assert written == "Short\n"

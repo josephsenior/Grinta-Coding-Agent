@@ -11,11 +11,13 @@ from unittest.mock import MagicMock, patch
 with patch.dict("sys.modules", {"redis": None}):
     import importlib
     import backend.core.cache.smart_config_cache as _mod
+
     importlib.reload(_mod)
     from backend.core.cache.smart_config_cache import SmartConfigCache, get_smart_cache
 
 
 # ── Constructor (memory fallback) ─────────────────────────────────────
+
 
 class TestSmartConfigCacheInit:
     def test_memory_fallback_when_no_redis(self):
@@ -27,6 +29,7 @@ class TestSmartConfigCacheInit:
 
 
 # ── get_global_config (memory) ────────────────────────────────────────
+
 
 class TestGetGlobalConfigMemory:
     @patch("backend.core.config.utils.load_FORGE_config")
@@ -74,6 +77,7 @@ class TestGetGlobalConfigMemory:
 
 # ── get_user_settings (memory) ────────────────────────────────────────
 
+
 class TestGetUserSettingsMemory:
     @patch("backend.core.cache.smart_config_cache.merge_settings_with_cache")
     @patch("backend.core.config.utils.load_FORGE_config")
@@ -109,9 +113,16 @@ class TestGetUserSettingsMemory:
         settings_store = MagicMock()
         settings_store.load.return_value = new_settings
 
-        with patch("backend.core.config.utils.load_FORGE_config", return_value=MagicMock()):
-            with patch("backend.core.cache.smart_config_cache.merge_settings_with_cache", return_value=new_settings):
-                result = cache._get_user_settings_memory("user_1", settings_store, MagicMock())
+        with patch(
+            "backend.core.config.utils.load_FORGE_config", return_value=MagicMock()
+        ):
+            with patch(
+                "backend.core.cache.smart_config_cache.merge_settings_with_cache",
+                return_value=new_settings,
+            ):
+                result = cache._get_user_settings_memory(
+                    "user_1", settings_store, MagicMock()
+                )
         assert result is new_settings
 
     def test_returns_none_when_no_settings(self):
@@ -123,6 +134,7 @@ class TestGetUserSettingsMemory:
 
 
 # ── invalidate ────────────────────────────────────────────────────────
+
 
 class TestInvalidateCache:
     def test_invalidate_user_cache_removes_entry(self):
@@ -146,6 +158,7 @@ class TestInvalidateCache:
 
 # ── get_cache_stats ───────────────────────────────────────────────────
 
+
 class TestGetCacheStats:
     def test_memory_stats_no_cached_data(self):
         cache = SmartConfigCache()
@@ -167,9 +180,11 @@ class TestGetCacheStats:
 
 # ── get_smart_cache singleton ─────────────────────────────────────────
 
+
 class TestGetSmartCacheSingleton:
     def test_returns_instance(self):
         import backend.core.cache.smart_config_cache as mod
+
         mod._smart_cache = None
         instance = get_smart_cache()
         assert isinstance(instance, SmartConfigCache)
@@ -186,7 +201,7 @@ class TestSmartConfigCacheRedis:
         cache.redis = MagicMock()
         mock_ping_return = True
         cache.redis.ping.return_value = mock_ping_return
-        
+
         # Verify that when redis is available, the redis attribute is set correctly
         assert cache.redis_available is True
         assert cache.redis is not None
@@ -206,7 +221,10 @@ class TestSmartConfigCacheRedis:
         assert cache.redis_available is False
         assert cache._global_config_cache is None
 
-    @patch("backend.core.cache.smart_config_cache.serialize_model", return_value=b"serialized")
+    @patch(
+        "backend.core.cache.smart_config_cache.serialize_model",
+        return_value=b"serialized",
+    )
     @patch("backend.core.config.utils.load_FORGE_config")
     def test_get_global_config_redis_hit(self, mock_load_config, mock_serialize):
         # Test cache hit scenario by avoiding deserialize on the happy path
@@ -214,22 +232,24 @@ class TestSmartConfigCacheRedis:
         cache = SmartConfigCache()
         cache.redis_available = True
         cache.redis = MagicMock()
-        
+
         # Mock config to return from load
         mock_cfg = MagicMock()
         mock_load_config.return_value = mock_cfg
-        
+
         # When redis.get returns None, it's a cache miss and load_FORGE_config is called
         cache.redis.get.return_value = None
         result = cache._get_global_config_redis()
-        
+
         # Should load from file when cache misses
         assert result is mock_cfg
         mock_load_config.assert_called_once()
         # Should cache the result
         cache.redis.setex.assert_called_once()
 
-    @patch("backend.core.cache.smart_config_cache.serialize_model", return_value=b"blob")
+    @patch(
+        "backend.core.cache.smart_config_cache.serialize_model", return_value=b"blob"
+    )
     @patch("backend.core.config.utils.load_FORGE_config")
     def test_get_global_config_redis_miss(self, mock_load, _mock_serialize):
         cache = SmartConfigCache()
@@ -266,7 +286,9 @@ class TestSmartConfigCacheRedis:
         result = cache._get_user_settings_redis("u1", settings_store, MagicMock())
         assert result is settings
 
-    @patch("backend.core.cache.smart_config_cache.serialize_model", return_value=b"blob")
+    @patch(
+        "backend.core.cache.smart_config_cache.serialize_model", return_value=b"blob"
+    )
     def test_get_user_settings_redis_miss_no_global_config(self, _mock_serialize):
         cache = SmartConfigCache()
         cache.redis_available = True
@@ -291,15 +313,20 @@ class TestSmartConfigCacheRedis:
         cache.redis.keys.side_effect = [["global"], ["user1", "user2"]]
 
         stats = cache.get_cache_stats()
-        
+
         # Verify redis stats are present
         assert stats["cache_type"] == "redis"
         assert stats["redis_available"] is True
         # Verify that extract_redis_stats was called and returned data
-        assert "redis_used_memory_mb" in stats or "redis_keyspace_hits" in stats or len(stats) > 2
+        assert (
+            "redis_used_memory_mb" in stats
+            or "redis_keyspace_hits" in stats
+            or len(stats) > 2
+        )
 
 
 # ── Memory Cache Tests (fallback path when redis not available) ─────────────────
+
 
 class TestMemoryCache:
     """Test the in-memory fallback cache when Redis is not available."""
@@ -347,7 +374,7 @@ class TestMemoryCache:
         """Test memory cache expiration - reloads after TTL."""
         cache = SmartConfigCache()
         cache.redis_available = False
-        
+
         old_config = MagicMock()
         new_config = MagicMock()
         mock_load.side_effect = [old_config, new_config]
@@ -376,15 +403,19 @@ class TestMemoryCache:
         mock_load_global.return_value = None  # No global config
 
         # First call - cache miss
-        result = cache._get_user_settings_memory("user1", mock_settings_store, MagicMock())
-        assert result is mock_settings  # When no global config, returns original settings
+        result = cache._get_user_settings_memory(
+            "user1", mock_settings_store, MagicMock()
+        )
+        assert (
+            result is mock_settings
+        )  # When no global config, returns original settings
         assert "user1" in cache._user_settings_cache
 
     def test_invalidate_user_memory_cache(self):
         """Test user settings cache invalidation."""
         cache = SmartConfigCache()
         cache.redis_available = False
-        
+
         # Add user to cache
         cached_settings = MagicMock()
         cache._user_settings_cache["user1"] = (cached_settings, time.time())
@@ -427,6 +458,7 @@ class TestMemoryCache:
 
 # ── Edge Cases and Error Scenarios ────────────────────────────────────
 
+
 class TestEdgeCasesAndErrors:
     """Test error handling and edge cases."""
 
@@ -444,7 +476,9 @@ class TestEdgeCasesAndErrors:
 
         global_config = MagicMock()
         with patch.object(cache, "get_global_config", return_value=global_config):
-            result = cache._get_user_settings_redis("user1", settings_store, MagicMock())
+            result = cache._get_user_settings_redis(
+                "user1", settings_store, MagicMock()
+            )
 
         assert result is settings
         settings.merge_with_config_settings.assert_called_once()
@@ -496,6 +530,7 @@ class TestEdgeCasesAndErrors:
 
 # ── Additional Redis Path Coverage ────────────────────────────────────
 
+
 class TestRedisInitializationAndCoverage:
     """Test Redis initialization and coverage of conditional paths."""
 
@@ -545,10 +580,10 @@ class TestRedisInitializationAndCoverage:
     def test_get_smart_cache_singleton(self):
         """Test the global singleton function."""
         import backend.core.cache.smart_config_cache as mod
-        
+
         cache1 = mod.get_smart_cache()
         cache2 = mod.get_smart_cache()
-        
+
         # Should return same instance
         assert cache1 is cache2
 
@@ -556,13 +591,13 @@ class TestRedisInitializationAndCoverage:
         """Test get_global_config public method dispatches correctly."""
         cache = SmartConfigCache()
         cache.redis_available = False
-        
+
         with patch.object(cache, "_get_global_config_memory") as mock_mem:
             mock_config = MagicMock()
             mock_mem.return_value = mock_config
-            
+
             result = cache.get_global_config()
-            
+
             assert result is mock_config
             mock_mem.assert_called_once()
 
@@ -570,13 +605,13 @@ class TestRedisInitializationAndCoverage:
         """Test get_user_settings public method dispatches correctly."""
         cache = SmartConfigCache()
         cache.redis_available = False
-        
+
         with patch.object(cache, "_get_user_settings_memory") as mock_mem:
             mock_settings = MagicMock()
             mock_mem.return_value = mock_settings
-            
+
             result = cache.get_user_settings("user1", MagicMock(), MagicMock())
-            
+
             assert result is mock_settings
             mock_mem.assert_called_once()
 
@@ -584,28 +619,30 @@ class TestRedisInitializationAndCoverage:
         """Test TTL expiration for user settings memory cache."""
         cache = SmartConfigCache()
         cache.redis_available = False
-        
+
         mock_settings = MagicMock()
         mock_settings_store = MagicMock()
         mock_settings_store.load.return_value = mock_settings
-        
+
         # Patch merge_settings_with_cache to return the settings unchanged
-        with patch("backend.core.cache.smart_config_cache.merge_settings_with_cache") as mock_merge:
+        with patch(
+            "backend.core.cache.smart_config_cache.merge_settings_with_cache"
+        ) as mock_merge:
             mock_merge.return_value = mock_settings
-            
+
             # First call
-            result1 = cache._get_user_settings_memory("user1", mock_settings_store, MagicMock())
+            cache._get_user_settings_memory("user1", mock_settings_store, MagicMock())
             assert "user1" in cache._user_settings_cache
-            
+
             # Simulate TTL expiration (>60 seconds)
             cache._user_settings_cache["user1"] = (mock_settings, time.time() - 61)
-            
+
             # Load new one
             new_settings = MagicMock()
             mock_settings_store.load.return_value = new_settings
             mock_merge.return_value = new_settings
-            
-            result2 = cache._get_user_settings_memory("user1", mock_settings_store, MagicMock())
+
+            cache._get_user_settings_memory("user1", mock_settings_store, MagicMock())
             # Should load fresh
             assert mock_settings_store.load.call_count == 2
 
@@ -613,12 +650,14 @@ class TestRedisInitializationAndCoverage:
         """Test user settings cache when load returns None."""
         cache = SmartConfigCache()
         cache.redis_available = False
-        
+
         mock_settings_store = MagicMock()
         mock_settings_store.load.return_value = None
-        
-        result = cache._get_user_settings_memory("user1", mock_settings_store, MagicMock())
-        
+
+        result = cache._get_user_settings_memory(
+            "user1", mock_settings_store, MagicMock()
+        )
+
         assert result is None
 
     def test_get_cache_stats_redis_no_error(self):
@@ -628,8 +667,8 @@ class TestRedisInitializationAndCoverage:
         cache.redis = MagicMock()
         cache.redis.info.return_value = {"used_memory": 1024, "ops_per_sec": 100}
         cache.redis.keys.side_effect = [["global"], []]
-        
+
         stats = cache.get_cache_stats()
-        
+
         assert "redis_error" not in stats
         assert stats["cache_type"] == "redis"

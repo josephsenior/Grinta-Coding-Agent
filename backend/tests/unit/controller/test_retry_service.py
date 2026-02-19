@@ -62,7 +62,9 @@ class TestController:
 
 
 class TestInitialize:
-    @patch("backend.controller.services.retry_service.get_retry_queue", return_value=None)
+    @patch(
+        "backend.controller.services.retry_service.get_retry_queue", return_value=None
+    )
     def test_no_queue(self, mock_get_queue):
         ctx = _make_context()
         svc = RetryService(ctx)

@@ -1,13 +1,11 @@
 """Tests for AgentController — the main agent orchestration controller."""
 
-import asyncio
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.controller.agent_controller import (
     AgentController,
     ERROR_ACTION_NOT_EXECUTED_ERROR,
-    ERROR_ACTION_NOT_EXECUTED_ERROR_ID,
     ERROR_ACTION_NOT_EXECUTED_STOPPED,
     ERROR_ACTION_NOT_EXECUTED_STOPPED_ID,
     TRAFFIC_CONTROL_REMINDER,
@@ -144,14 +142,10 @@ class TestServiceAliasing(unittest.TestCase):
         self.assertIs(self.ctrl.step_decision, self.ctrl.services.step_decision)
 
     def test_exception_handler_alias(self):
-        self.assertIs(
-            self.ctrl.exception_handler, self.ctrl.services.exception_handler
-        )
+        self.assertIs(self.ctrl.exception_handler, self.ctrl.services.exception_handler)
 
     def test_action_execution_alias(self):
-        self.assertIs(
-            self.ctrl.action_execution, self.ctrl.services.action_execution
-        )
+        self.assertIs(self.ctrl.action_execution, self.ctrl.services.action_execution)
 
     def test_unknown_attribute_raises(self):
         with self.assertRaises(AttributeError):
@@ -230,9 +224,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
 
     async def test_step_with_exception_handling_delegates_error(self):
         exc = RuntimeError("boom")
-        with patch.object(
-            self.ctrl, "_step", new_callable=AsyncMock, side_effect=exc
-        ):
+        with patch.object(self.ctrl, "_step", new_callable=AsyncMock, side_effect=exc):
             self.ctrl.services.exception_handler.handle_step_exception = AsyncMock()
             await self.ctrl._step_with_exception_handling()
 
@@ -300,11 +292,14 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.action_execution.execute_action = AsyncMock()
         self.ctrl.services.retry.retry_count = 0
 
-        with patch.object(
-            self.ctrl, "_run_control_flags_safely", new_callable=AsyncMock
-        ) as mock_flags, patch.object(
-            self.ctrl, "_handle_post_execution", new_callable=AsyncMock
-        ) as mock_post:
+        with (
+            patch.object(
+                self.ctrl, "_run_control_flags_safely", new_callable=AsyncMock
+            ) as mock_flags,
+            patch.object(
+                self.ctrl, "_handle_post_execution", new_callable=AsyncMock
+            ) as mock_post,
+        ):
             mock_flags.return_value = True
             await self.ctrl._step()
 
@@ -324,10 +319,11 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.retry.retry_count = 3
         self.ctrl.services.retry.reset_retry_metrics = MagicMock()
 
-        with patch.object(
-            self.ctrl, "_run_control_flags_safely", new_callable=AsyncMock
-        ) as mock_flags, patch.object(
-            self.ctrl, "_handle_post_execution", new_callable=AsyncMock
+        with (
+            patch.object(
+                self.ctrl, "_run_control_flags_safely", new_callable=AsyncMock
+            ) as mock_flags,
+            patch.object(self.ctrl, "_handle_post_execution", new_callable=AsyncMock),
         ):
             mock_flags.return_value = True
             await self.ctrl._step()
@@ -550,7 +546,6 @@ class TestFirstUserMessage(unittest.TestCase):
         msg = MagicMock(spec=MessageAction)
         msg.source = EventSource.USER
         # isinstance check needs real class
-        events = [msg]
 
         with patch(
             "backend.controller.agent_controller.isinstance",

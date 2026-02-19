@@ -105,7 +105,7 @@ class ActionVerifier:
 
             # Verify file has content (cross-platform)
             content_cmd = CmdRunAction(
-                command=f"python3 -c \"import os; p='{file_path}'; lines=sum(1 for _ in open(p)); size=os.path.getsize(p); print(f'{{lines}} lines, {{size}} bytes')\"",
+                command=f"python3 -c \"import os; p='{file_path}'; lines=sum(1 for _ in open(p, encoding='utf-8')); size=os.path.getsize(p); print(f'{{lines}} lines, {{size}} bytes')\"",
                 thought="Verifying file content",
             )
             content_obs = await self._run_runtime_action(content_cmd)

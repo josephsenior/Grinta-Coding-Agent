@@ -112,7 +112,9 @@ class TestMergeSettingsWithCache:
         cache = {}
         current_time = 1000.0
 
-        result = merge_settings_with_cache(user_id, settings, global_config, cache, current_time)
+        result = merge_settings_with_cache(
+            user_id, settings, global_config, cache, current_time
+        )
 
         # Should call merge_with_config_settings
         settings.merge_with_config_settings.assert_called_once()
@@ -129,7 +131,9 @@ class TestMergeSettingsWithCache:
         cache = {}
         current_time = 1000.0
 
-        result = merge_settings_with_cache(user_id, settings, global_config, cache, current_time)
+        result = merge_settings_with_cache(
+            user_id, settings, global_config, cache, current_time
+        )
 
         # Should return settings as-is
         assert result == settings
@@ -162,9 +166,7 @@ class TestMergeSettingsWithCache:
         settings = MagicMock()
         settings.merge_with_config_settings.return_value = MagicMock()
 
-        merge_settings_with_cache(
-            "new_user", settings, {"config": True}, cache, 300.0
-        )
+        merge_settings_with_cache("new_user", settings, {"config": True}, cache, 300.0)
 
         # Cache should still have 256 entries
         assert len(cache) == 256
@@ -182,9 +184,7 @@ class TestMergeSettingsWithCache:
         settings.merge_with_config_settings.return_value = MagicMock()
         original_count = len(cache)
 
-        merge_settings_with_cache(
-            "user0", settings, {"config": True}, cache, 300.0
-        )
+        merge_settings_with_cache("user0", settings, {"config": True}, cache, 300.0)
 
         # Cache count should not change
         assert len(cache) == original_count
@@ -200,9 +200,7 @@ class TestMergeSettingsWithCache:
             settings = MagicMock()
             settings.merge_with_config_settings.return_value = MagicMock()
 
-            merge_settings_with_cache(
-                user_id, settings, None, cache, float(i)
-            )
+            merge_settings_with_cache(user_id, settings, None, cache, float(i))
 
         assert len(cache) == 5
         assert all(f"user{i}" in cache for i in range(5))

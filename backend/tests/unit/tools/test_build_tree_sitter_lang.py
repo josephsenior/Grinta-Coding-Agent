@@ -5,7 +5,7 @@ Tests grammar building, platform-specific output, and argument parsing.
 
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 import tempfile
 import types
 
@@ -76,10 +76,14 @@ class TestMainFunction(unittest.TestCase):
         fake_ts = _make_tree_sitter_module()
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.dict("sys.modules", {"tree_sitter": fake_ts}):
-                result = main([
-                    "--grammar-dir", tmpdir,
-                    "--lang", "nonexistent-grammar",
-                ])
+                result = main(
+                    [
+                        "--grammar-dir",
+                        tmpdir,
+                        "--lang",
+                        "nonexistent-grammar",
+                    ]
+                )
         self.assertEqual(result, 1)
 
     def test_successful_build_returns_0(self) -> None:
@@ -87,11 +91,16 @@ class TestMainFunction(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "tree-sitter-python").mkdir()
             with patch.dict("sys.modules", {"tree_sitter": fake_ts}):
-                result = main([
-                    "--grammar-dir", tmpdir,
-                    "--lang", "tree-sitter-python",
-                    "--out", str(Path(tmpdir) / "output"),
-                ])
+                result = main(
+                    [
+                        "--grammar-dir",
+                        tmpdir,
+                        "--lang",
+                        "tree-sitter-python",
+                        "--out",
+                        str(Path(tmpdir) / "output"),
+                    ]
+                )
         self.assertEqual(result, 0)
         fake_ts.Language.build_library.assert_called_once()
 
@@ -112,11 +121,16 @@ class TestMainFunction(unittest.TestCase):
             (Path(tmpdir) / "tree-sitter-python").mkdir()
             (Path(tmpdir) / "tree-sitter-javascript").mkdir()
             with patch.dict("sys.modules", {"tree_sitter": fake_ts}):
-                result = main([
-                    "--grammar-dir", tmpdir,
-                    "--lang", "tree-sitter-python",
-                    "--lang", "tree-sitter-javascript",
-                ])
+                result = main(
+                    [
+                        "--grammar-dir",
+                        tmpdir,
+                        "--lang",
+                        "tree-sitter-python",
+                        "--lang",
+                        "tree-sitter-javascript",
+                    ]
+                )
         self.assertEqual(result, 0)
         call_args = fake_ts.Language.build_library.call_args
         grammars = call_args[0][1]
@@ -130,11 +144,16 @@ class TestMainFunction(unittest.TestCase):
             (Path(tmpdir) / "tree-sitter-python").mkdir()
             with patch.dict("sys.modules", {"tree_sitter": fake_ts}):
                 # Should still succeed (one grammar found)
-                result = main([
-                    "--grammar-dir", tmpdir,
-                    "--lang", "tree-sitter-python",
-                    "--lang", "tree-sitter-nonexistent",
-                ])
+                result = main(
+                    [
+                        "--grammar-dir",
+                        tmpdir,
+                        "--lang",
+                        "tree-sitter-python",
+                        "--lang",
+                        "tree-sitter-nonexistent",
+                    ]
+                )
         self.assertEqual(result, 0)
 
     def test_custom_output_path(self) -> None:
@@ -145,11 +164,16 @@ class TestMainFunction(unittest.TestCase):
             custom_out.parent.mkdir(parents=True, exist_ok=True)
             with patch.dict("sys.modules", {"tree_sitter": fake_ts}):
                 with patch.dict("os.environ", {"FORGE_PLATFORM": "darwin"}):
-                    main([
-                        "--grammar-dir", tmpdir,
-                        "--lang", "tree-sitter-python",
-                        "--out", str(custom_out),
-                    ])
+                    main(
+                        [
+                            "--grammar-dir",
+                            tmpdir,
+                            "--lang",
+                            "tree-sitter-python",
+                            "--out",
+                            str(custom_out),
+                        ]
+                    )
             call_args = fake_ts.Language.build_library.call_args
             output_path = call_args[0][0]
             self.assertIn("custom", output_path)
@@ -172,6 +196,7 @@ class TestCommandLineIntegration(unittest.TestCase):
 
     def test_help_message_available(self) -> None:
         import io
+
         with patch("sys.stdout", new=io.StringIO()):
             with patch("sys.stderr", new=io.StringIO()):
                 try:

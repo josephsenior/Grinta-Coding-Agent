@@ -84,7 +84,9 @@ class TestHttpSession:
 
         with patch("backend.utils.http_session.CLIENT") as mock_client:
             mock_client.request.return_value = MagicMock()
-            session.request("GET", "http://example.com", headers={"X-Header": "override"})
+            session.request(
+                "GET", "http://example.com", headers={"X-Header": "override"}
+            )
 
             call_args = mock_client.request.call_args
             assert call_args[1]["headers"]["X-Header"] == "override"

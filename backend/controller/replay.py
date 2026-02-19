@@ -81,7 +81,7 @@ class ReplayManager:
     @property
     def is_deterministic(self) -> bool:
         """Return True if no divergences have been observed."""
-        return len(self._divergences) == 0
+        return not self._divergences
 
     def _replayable(self) -> bool:
         return (

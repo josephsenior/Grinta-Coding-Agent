@@ -13,6 +13,7 @@ from backend.memory.view import View
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _event(eid: int = 0):
     """Build a real Event with a specific id."""
     e = MessageAction(content=f"msg-{eid}")
@@ -24,15 +25,15 @@ def _event(eid: int = 0):
 # Basic container protocol
 # ===================================================================
 
-class TestViewContainer:
 
+class TestViewContainer:
     def test_len(self):
         v = View(events=[_event(1), _event(2)])
         assert len(v) == 2
 
     def test_len_empty(self):
         v = View(events=[])
-        assert len(v) == 0
+        assert not v
 
     def test_iter(self):
         evts = [_event(1), _event(2), _event(3)]
@@ -74,8 +75,8 @@ class TestViewContainer:
 # _collect_forgotten_event_ids
 # ===================================================================
 
-class TestCollectForgottenIds:
 
+class TestCollectForgottenIds:
     def test_no_condensation_actions(self):
         evts = [_event(1), _event(2)]
         assert View._collect_forgotten_event_ids(evts) == set()
@@ -106,8 +107,8 @@ class TestCollectForgottenIds:
 # _find_summary_info
 # ===================================================================
 
-class TestFindSummaryInfo:
 
+class TestFindSummaryInfo:
     def test_no_summary_returns_none(self):
         evts = [_event(1)]
         summary, offset = View._find_summary_info(evts)
@@ -148,17 +149,15 @@ class TestFindSummaryInfo:
 # _check_unhandled_condensation_request
 # ===================================================================
 
-class TestCheckUnhandledRequest:
 
+class TestCheckUnhandledRequest:
     def test_no_requests_returns_false(self):
         evts = [_event(1), _event(2)]
         assert View._check_unhandled_condensation_request(evts) is False
 
     def test_handled_request_returns_false(self):
         cra = CondensationRequestAction()
-        ca = CondensationAction(
-            forgotten_events_start_id=1, forgotten_events_end_id=2
-        )
+        ca = CondensationAction(forgotten_events_start_id=1, forgotten_events_end_id=2)
         evts = [cra, ca]
         assert View._check_unhandled_condensation_request(evts) is False
 
@@ -172,8 +171,8 @@ class TestCheckUnhandledRequest:
 # from_events
 # ===================================================================
 
-class TestFromEvents:
 
+class TestFromEvents:
     def test_simple_passthrough(self):
         evts = [_event(1), _event(2)]
         view = View.from_events(evts)

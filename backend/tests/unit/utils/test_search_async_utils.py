@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import unittest
-from dataclasses import dataclass, field
-from unittest.mock import AsyncMock, MagicMock, patch
+from dataclasses import dataclass
+from unittest.mock import AsyncMock, MagicMock
 
 from backend.utils.search_utils import iterate, offset_to_page_id, page_id_to_offset
 
@@ -14,6 +14,7 @@ from backend.utils.search_utils import iterate, offset_to_page_id, page_id_to_of
 # ---------------------------------------------------------------------------
 # search_utils
 # ---------------------------------------------------------------------------
+
 
 class TestOffsetToPageId(unittest.TestCase):
     def test_has_next_returns_encoded(self):
@@ -52,7 +53,9 @@ class TestIterate(unittest.IsolatedAsyncioTestCase):
             results: list
             next_page_id: str | None = None
 
-        mock_fn = AsyncMock(return_value=ResultSet(results=[1, 2, 3], next_page_id=None))
+        mock_fn = AsyncMock(
+            return_value=ResultSet(results=[1, 2, 3], next_page_id=None)
+        )
         items = [item async for item in iterate(mock_fn)]
         self.assertEqual(items, [1, 2, 3])
         mock_fn.assert_awaited_once()

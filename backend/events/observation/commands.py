@@ -132,33 +132,87 @@ class CmdOutputObservation(Observation):
         # Synchronize with base Observation exit_code
         self.exit_code = self.metadata.exit_code
 
-    @staticmethod
-    def _maybe_truncate(content: str, max_size: int = MAX_CMD_OUTPUT_SIZE) -> str:
-        """Truncate the content if it's too large.
+    _ERROR_LINE_PATTERNS = re.compile(
+        r"(?i)(error|Error|ERROR|warning|Warning|WARNING|FAILED|FAIL|fail"
+        r"|traceback|Traceback|exception|Exception|panic|PANIC"
+        r"|ModuleNotFoundError|ImportError|SyntaxError|TypeError|ValueError"
+        r"|NameError|AttributeError|KeyError|IndexError|FileNotFoundError"
+        r"|PermissionError|RuntimeError|AssertionError|OSError|IOError"
+        r"|ENOENT|EACCES|EPERM|segfault|Segmentation fault"
+        r"|npm ERR|cargo error|compile error|build failed)",
+    )
 
-        This helps avoid storing unnecessarily large content in the event stream.
+    @classmethod
+    def _maybe_truncate(cls, content: str, max_size: int = MAX_CMD_OUTPUT_SIZE) -> str:
+        """Truncate content while preserving error-relevant lines from the middle.
+
+        Strategy:
+        - Keep first ~15% of content (command echo + initial output)
+        - Keep last ~35% of content (final errors + exit info)
+        - From the middle ~50%, keep only lines matching error patterns with 2 lines of context
+        - This preserves critical diagnostic info that blind head+tail truncation would lose
 
         Args:
             content: The content to truncate
             max_size: Maximum size before truncation. Defaults to MAX_CMD_OUTPUT_SIZE.
 
         Returns:
-            Original content if not too large, or truncated content otherwise
+            Original content if not too large, or smart-truncated content otherwise
 
         """
         if len(content) <= max_size:
             return content
-        half = max_size // 2
+
         original_length = len(content)
-        truncated = (
-            content[:half]
-            + "\n[... Observation truncated due to length ...]\n"
-            + content[-half:]
+        head_budget = max_size * 15 // 100
+        tail_budget = max_size * 35 // 100
+        middle_budget = max_size - head_budget - tail_budget
+
+        head = content[:head_budget]
+        tail = content[-tail_budget:]
+
+        middle = content[head_budget:-tail_budget] if tail_budget > 0 else content[head_budget:]
+        middle_lines = middle.splitlines(keepends=True)
+
+        error_line_indices: set[int] = set()
+        for i, line in enumerate(middle_lines):
+            if cls._ERROR_LINE_PATTERNS.search(line):
+                for ctx in range(max(0, i - 2), min(len(middle_lines), i + 3)):
+                    error_line_indices.add(ctx)
+
+        if error_line_indices:
+            kept_lines = []
+            sorted_indices = sorted(error_line_indices)
+            prev_idx = -2
+            current_size = 0
+            for idx in sorted_indices:
+                if current_size >= middle_budget:
+                    break
+                if idx > prev_idx + 1:
+                    kept_lines.append("  [...]\n")
+                    current_size += 8
+                line = middle_lines[idx]
+                kept_lines.append(line)
+                current_size += len(line)
+                prev_idx = idx
+            middle_preserved = "".join(kept_lines)
+        else:
+            middle_preserved = ""
+
+        retained = len(head) + len(middle_preserved) + len(tail)
+        pct = round(retained / original_length * 100) if original_length else 100
+        n_error_lines = len(error_line_indices)
+        marker = (
+            f"\n[... Observation truncated: {original_length} chars → ~{retained} chars "
+            f"({pct}% retained, {n_error_lines} error-relevant lines preserved from middle) ...]\n"
         )
+        truncated = head + marker + middle_preserved + marker + tail
+
         logger.debug(
-            "Truncated large command output: %s -> %s chars",
+            "Smart-truncated command output: %s -> %s chars (%d error lines kept)",
             original_length,
             len(truncated),
+            n_error_lines,
         )
         return truncated
 

@@ -40,9 +40,13 @@ def _make_memory(**config_kw) -> ConversationMemory:
 
 # ── _is_valid_image_url ─────────────────────────────────────────────
 
+
 class TestIsValidImageUrl:
     def test_valid_url(self):
-        assert ConversationMemory._is_valid_image_url("https://example.com/img.png") is True
+        assert (
+            ConversationMemory._is_valid_image_url("https://example.com/img.png")
+            is True
+        )
 
     def test_none(self):
         assert ConversationMemory._is_valid_image_url(None) is False
@@ -55,6 +59,7 @@ class TestIsValidImageUrl:
 
 
 # ── _message_with_text ───────────────────────────────────────────────
+
 
 class TestMessageWithText:
     def test_creates_user_message(self):
@@ -69,6 +74,7 @@ class TestMessageWithText:
 
 
 # ── _is_text_content ─────────────────────────────────────────────────
+
 
 class TestIsTextContent:
     def test_real_text_content(self):
@@ -90,6 +96,7 @@ class TestIsTextContent:
 
 # ── _class_name_in_mro ───────────────────────────────────────────────
 
+
 class TestClassNameInMro:
     def test_exact_match(self):
         assert class_name_in_mro("hello", "str") is True
@@ -108,6 +115,7 @@ class TestClassNameInMro:
 
 
 # ── track_decision / add_anchor ──────────────────────────────────────
+
 
 class TestDecisionsAndAnchors:
     def test_track_decision_returns_decision(self):
@@ -140,6 +148,7 @@ class TestDecisionsAndAnchors:
 
 # ── apply_prompt_caching ─────────────────────────────────────────────
 
+
 class TestApplyPromptCaching:
     def test_caches_first_system_and_last_user(self):
         mem = _make_memory()
@@ -165,6 +174,7 @@ class TestApplyPromptCaching:
 
 # ── _apply_user_message_formatting ───────────────────────────────────
 
+
 class TestUserMessageFormatting:
     def test_adds_separator_for_consecutive_user_messages(self):
         m1 = Message(role="user", content=[TextContent(text="first")])
@@ -188,6 +198,7 @@ class TestUserMessageFormatting:
 
 # ── _remove_duplicate_system_prompt_user ─────────────────────────────
 
+
 class TestRemoveDuplicateSystemUser:
     def test_removes_duplicate(self):
         sys_msg = Message(role="system", content=[TextContent(text="prompt")])
@@ -206,6 +217,7 @@ class TestRemoveDuplicateSystemUser:
 
 # ── _extract_first_text ──────────────────────────────────────────────
 
+
 class TestExtractFirstText:
     def test_extracts(self):
         msg = Message(role="user", content=[TextContent(text="hello")])
@@ -217,6 +229,7 @@ class TestExtractFirstText:
     def test_no_content(self):
         msg = Message(role="user", content=[])
         assert extract_first_text(msg) is None
+
 
 class TestStoreRecallNoVector:
     def test_store_noop(self):

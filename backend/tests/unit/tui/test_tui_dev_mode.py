@@ -26,7 +26,9 @@ class TestParseArgs:
         assert args.dev is True
 
     def test_custom_host_port(self):
-        with patch("argparse._sys.argv", ["forge-tui", "--host", "0.0.0.0", "--port", "8080"]):
+        with patch(
+            "argparse._sys.argv", ["forge-tui", "--host", "0.0.0.0", "--port", "8080"]
+        ):
             args = _parse_args()
         assert args.host == "0.0.0.0"
         assert args.port == 8080
@@ -70,7 +72,10 @@ class TestMain:
     @patch("backend.tui.__main__._parse_args")
     def test_main_dispatches_dev(self, mock_parse, mock_run, mock_dev):
         mock_parse.return_value = argparse.Namespace(
-            host="localhost", port=3000, verbose=False, dev=True,
+            host="localhost",
+            port=3000,
+            verbose=False,
+            dev=True,
         )
         main()
         mock_dev.assert_called_once_with("localhost", 3000, False)
@@ -81,7 +86,10 @@ class TestMain:
     @patch("backend.tui.__main__._parse_args")
     def test_main_dispatches_normal(self, mock_parse, mock_run, mock_dev):
         mock_parse.return_value = argparse.Namespace(
-            host="localhost", port=3000, verbose=False, dev=False,
+            host="localhost",
+            port=3000,
+            verbose=False,
+            dev=False,
         )
         main()
         mock_run.assert_called_once_with("localhost", 3000, False)

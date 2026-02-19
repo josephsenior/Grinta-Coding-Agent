@@ -278,7 +278,7 @@ class TestPersistence:
 
     def test_load_corrupted_file_survives(self, tmp_path):
         path = str(tmp_path / "corrupted.json")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write("{corrupted garbage")
         store = GraphMemoryStore(persistence_path=path)
         assert store.graph.number_of_nodes() == 0
@@ -288,7 +288,7 @@ class TestPersistence:
         store = GraphMemoryStore(persistence_path=path)
         store.add_node("X", NodeType.FILE)  # Should trigger auto_save
         assert os.path.exists(path)
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         assert len(data.get("nodes", [])) >= 1
 

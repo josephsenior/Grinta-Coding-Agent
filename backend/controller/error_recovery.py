@@ -359,7 +359,7 @@ class ErrorRecoveryStrategy:
             if filename:
                 # If we have a filename, try to find it
                 base_name = filename.split("/")[-1]
-                if base_name and len(base_name) > 0:
+                if base_name and base_name:
                     actions.append(
                         CmdRunAction(
                             command=f"find . -name '*{base_name}*' -not -path '*/.*' -maxdepth 3 2>/dev/null || true"
@@ -387,7 +387,7 @@ class ErrorRecoveryStrategy:
 
     @staticmethod
     def _recover_tool_call_error(error_str: str) -> list[Action]:
-        """Recover from tool call/parameter errors."""
+        """Recover from tool call/parameter errors with structured feedback."""
         # Check if error might be related to authentication issues
         auth_indicators = [
             "authentication",
@@ -402,20 +402,44 @@ class ErrorRecoveryStrategy:
             )
             return []
 
-        # To prevent infinite loops, we should avoid creating any actions that would trigger LLM calls
-        # because tool call errors often happen during LLM processing, and creating more actions
-        # (like AgentThinkAction or MessageAction) would cause more LLM calls and potentially more tool call errors.
+        # Extract structured error info for the LLM to self-correct
         logger.error(
             "Tool call parameter error: %s%s",
             error_str[:200],
             "..." if len(error_str) > 200 else "",
         )
-        logger.info(
-            "Skipping recovery actions for tool call error to prevent infinite loop"
-        )
 
-        # Return empty list to prevent any recovery actions that could trigger more LLM calls
-        return []
+        # Build a diagnostic message the LLM can use to fix its call
+        # This is returned as a single AgentThinkAction which doesn't trigger
+        # another LLM tool call — it just injects context into history.
+        error_summary = error_str[:300]
+        hint_parts = []
+
+        if "missing" in error_str.lower() and "required" in error_str.lower():
+            # Extract parameter name if possible
+            import re
+            param_match = re.search(r'"(\w+)"', error_str)
+            if param_match:
+                hint_parts.append(f"Missing required parameter: {param_match.group(1)}")
+            hint_parts.append("Check the tool schema and include all required arguments.")
+
+        if "invalid" in error_str.lower() or "unexpected" in error_str.lower():
+            hint_parts.append("A parameter name or value was invalid. Check tool schema for correct names/types.")
+
+        if "not registered" in error_str.lower() or "not exists" in error_str.lower():
+            hint_parts.append("The tool name was not found. Use an existing tool name from your available tools.")
+
+        hint = " ".join(hint_parts) if hint_parts else "Review the error and retry with corrected parameters."
+
+        return [
+            AgentThinkAction(
+                thought=(
+                    f"Tool call error: {error_summary}\n"
+                    f"Recovery hint: {hint}\n"
+                    "I will fix the tool call parameters and retry."
+                ),
+            ),
+        ]
 
     @staticmethod
     def _recover_timeout_error(error_str: str) -> list[Action]:

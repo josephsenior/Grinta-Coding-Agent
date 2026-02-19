@@ -26,7 +26,11 @@ def check_session_api_key(
     """
     # 0) Bypass if local runtime
     import os
-    if os.environ.get("FORGE_RUNTIME") == "local":
+
+    if (
+        os.environ.get("FORGE_RUNTIME") == "local"
+        or os.environ.get("SESSION_API_KEY") == ""
+    ):
         return
 
     # Resolve expected key from the live server config (not an import-time env snapshot)

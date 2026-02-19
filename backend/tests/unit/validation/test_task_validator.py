@@ -60,7 +60,7 @@ class TestTask:
         task2 = Task(description="Task 2")
         task1.requirements.append("Req1")
         assert len(task1.requirements) == 1
-        assert len(task2.requirements) == 0  # Should be independent
+        assert not task2.requirements  # Should be independent
 
 
 class TestValidationResult:
@@ -235,7 +235,7 @@ class TestFileExistsValidator:
         validator = FileExistsValidator()
         description = "Create a file output.txt and save to results.json"
         files = validator._extract_expected_files(description)
-        assert len(files) >= 1
+        assert files
         # Should find at least one file pattern
 
     def test_extract_expected_files_with_various_patterns(self):

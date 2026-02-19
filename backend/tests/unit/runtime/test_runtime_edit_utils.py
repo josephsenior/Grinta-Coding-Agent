@@ -14,6 +14,7 @@ from backend.runtime.utils.edit import (
 
 # ── _extract_code ─────────────────────────────────────────────────────
 
+
 class TestExtractCode:
     def test_extracts_code_from_tags(self):
         response = "Some text <updated_code>print('hello')</updated_code> more text"
@@ -33,7 +34,9 @@ class TestExtractCode:
         assert _extract_code(response) == "actual code"
 
     def test_first_match_when_multiple_tags(self):
-        response = "<updated_code>first</updated_code> <updated_code>second</updated_code>"
+        response = (
+            "<updated_code>first</updated_code> <updated_code>second</updated_code>"
+        )
         assert _extract_code(response) == "first"
 
     def test_empty_tags(self):
@@ -43,6 +46,7 @@ class TestExtractCode:
 
 
 # ── _validate_range (via mixin) ───────────────────────────────────────
+
 
 class _ConcreteEditor(FileEditRuntimeMixin):
     """Concrete subclass to test mixin methods."""
@@ -100,6 +104,7 @@ class TestValidateRange:
 
 # ── _calculate_edit_range ─────────────────────────────────────────────
 
+
 class TestCalculateEditRange:
     def setup_method(self):
         self.editor = _ConcreteEditor()
@@ -127,6 +132,7 @@ class TestCalculateEditRange:
 
 
 # ── check_retry_num ───────────────────────────────────────────────────
+
 
 class TestCheckRetryNum:
     def test_returns_true_when_exceeded(self):

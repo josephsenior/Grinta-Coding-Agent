@@ -15,6 +15,7 @@ from backend.storage.conversation.conversation_resumer import (
 
 # ── ConversationSnapshot dataclass ────────────────────────────────────
 
+
 class TestConversationSnapshot:
     def test_creation(self):
         snap = ConversationSnapshot(
@@ -51,6 +52,7 @@ class TestConversationSnapshot:
 
 # ── ConversationResumer.__init__ ──────────────────────────────────────
 
+
 class TestConversationResumerInit:
     def test_stores_file_store(self):
         fs = MagicMock()
@@ -65,6 +67,7 @@ class TestConversationResumerInit:
 
 
 # ── load ──────────────────────────────────────────────────────────────
+
 
 class TestConversationResumerLoad:
     async def test_returns_none_when_no_metadata(self):
@@ -113,6 +116,7 @@ class TestConversationResumerLoad:
 
 # ── list_sessions ─────────────────────────────────────────────────────
 
+
 class TestListSessions:
     async def test_returns_session_ids(self):
         fs = MagicMock()
@@ -143,6 +147,7 @@ class TestListSessions:
 
 # ── _load_metadata ────────────────────────────────────────────────────
 
+
 class TestLoadMetadata:
     async def test_loads_json_metadata(self):
         fs = MagicMock()
@@ -160,6 +165,7 @@ class TestLoadMetadata:
 
 
 # ── _replay_events ────────────────────────────────────────────────────
+
 
 class TestReplayEvents:
     async def test_empty_events_dir(self):
@@ -265,6 +271,7 @@ class TestReplayEvents:
 
 
 # ── _load_latest_checkpoint ───────────────────────────────────────────
+
 
 class TestLoadLatestCheckpoint:
     async def test_no_checkpoints(self):

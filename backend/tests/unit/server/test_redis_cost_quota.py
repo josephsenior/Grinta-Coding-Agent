@@ -40,7 +40,10 @@ def redis_middleware():
         mw._redis_healthy = True
         # Parent class attributes
         from backend.server.middleware.cost_quota import QuotaConfig
-        mw.config = QuotaConfig(daily_limit=100.0, monthly_limit=1000.0, burst_limit=10.0)
+
+        mw.config = QuotaConfig(
+            daily_limit=100.0, monthly_limit=1000.0, burst_limit=10.0
+        )
         mw.day_window = 86400
         mw.month_window = 86400 * 30
         mw._daily_costs = {}
@@ -150,7 +153,9 @@ class TestCheckQuota:
 
     @pytest.mark.asyncio
     async def test_check_quota_redis_error_fallback(self, redis_middleware):
-        redis_middleware._redis_client.get = AsyncMock(side_effect=Exception("conn lost"))
+        redis_middleware._redis_client.get = AsyncMock(
+            side_effect=Exception("conn lost")
+        )
         result = await redis_middleware._check_quota("user:1")
         assert result is True  # fallback allows
 

@@ -6,7 +6,6 @@ Targets 20.5% coverage (44 statements) by testing the FastAPI app routes.
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 
 import pytest
@@ -79,7 +78,9 @@ class TestViewEndpoint:
         assert "absolute" in resp.text.lower()
 
     def test_nonexistent_file(self, localhost_client):
-        resp = localhost_client.get("/view", params={"path": "/nonexistent_xyz_abc/file.pdf"})
+        resp = localhost_client.get(
+            "/view", params={"path": "/nonexistent_xyz_abc/file.pdf"}
+        )
         assert resp.status_code in (400, 404)
 
     def test_directory_path_rejected(self, localhost_client, tmp_path):

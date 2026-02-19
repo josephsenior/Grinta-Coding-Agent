@@ -1,11 +1,7 @@
 """Comprehensive tests for backend.runtime.utils.bash - Bash command parsing and execution."""
 
-import re
-import traceback
-from unittest.mock import AsyncMock, MagicMock, Mock, patch, call
+from unittest.mock import patch
 
-import pytest
-import bashlex
 
 from backend.runtime.utils.bash import (
     split_bash_commands,
@@ -35,7 +31,7 @@ class TestSplitBashCommands:
         """Test multiple commands separated by semicolons."""
         result = split_bash_commands("echo a; echo b; echo c")
         # Compound commands are kept as one by bashlex
-        assert len(result) >= 1
+        assert result
         assert "echo a" in result[0]
         assert "echo b" in result[0]
         assert "echo c" in result[0]
@@ -136,7 +132,7 @@ EOF"""
         cmd = "cd /tmp && mkdir test || echo failed; ls -la"
         result = split_bash_commands(cmd)
         # bashlex returns compound statements as one command
-        assert len(result) >= 1
+        assert result
         assert "cd /tmp" in result[0]
 
     def test_parsing_error_returns_original(self):
@@ -178,7 +174,7 @@ EOF"""
         """Test multiple commands with various spacing."""
         result = split_bash_commands("echo a  ;  echo b  ;  echo c")
         # Compound commands stay together
-        assert len(result) >= 1
+        assert result
 
     def test_command_with_environment_variable(self):
         """Test command with environment variable."""
@@ -209,7 +205,7 @@ echo "line 2" \\
 echo "line 3" """
         result = split_bash_commands(cmd)
         # Should preserve line continuations
-        assert len(result) >= 1
+        assert result
 
 
 class TestEscapeBashSpecialChars:
@@ -263,7 +259,7 @@ class TestEscapeBashSpecialChars:
         result = escape_bash_special_chars(cmd)
         assert "|" in result
         # Should not have double backslash before unescaped pipe
-        assert not r"\|" in result or r"\\|" not in result
+        assert r"\|" not in result or r"\\|" not in result
 
     def test_normal_semicolon_unchanged(self):
         """Test normal semicolon remains unchanged."""
@@ -404,7 +400,7 @@ class TestBashCommandParsingSecurity:
             result = split_bash_commands(cmd)
             # Should not be empty or None
             assert result is not None
-            assert len(result) > 0
+            assert result
 
     def test_escaped_injection_attempt_preserved(self):
         """Test escaped injection attempts are properly escaped."""
@@ -416,7 +412,7 @@ class TestBashCommandParsingSecurity:
             result = escape_bash_special_chars(cmd)
             # Should preserve or double-escape
             assert result is not None
-            assert len(result) > 0
+            assert result
 
     def test_null_byte_in_command(self):
         """Test handling of null bytes in commands."""
@@ -451,10 +447,10 @@ class TestBashCommandParsingSecurity:
         malformed = [
             'echo "unclosed',
             "echo 'unclosed",
-            'echo "mixed\'',
+            "echo \"mixed'",
         ]
         for cmd in malformed:
             # Should either parse or return original
             result = split_bash_commands(cmd)
             assert result is not None
-            assert len(result) >= 1
+            assert result

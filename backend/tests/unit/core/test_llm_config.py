@@ -116,18 +116,22 @@ class TestSetDefaults:
 class TestFromTomlSection:
     def test_base_section_only(self):
         with suppress_llm_env_export():
-            mapping = LLMConfig.from_toml_section({"model": "gpt-4o", "temperature": 0.3})
+            mapping = LLMConfig.from_toml_section(
+                {"model": "gpt-4o", "temperature": 0.3}
+            )
         assert "llm" in mapping
         assert mapping["llm"].model == "gpt-4o"
         assert mapping["llm"].temperature == 0.3
 
     def test_custom_section_inherits_base(self):
         with suppress_llm_env_export():
-            mapping = LLMConfig.from_toml_section({
-                "model": "gpt-4o",
-                "num_retries": 5,
-                "claude": {"model": "claude-3.5-sonnet"},
-            })
+            mapping = LLMConfig.from_toml_section(
+                {
+                    "model": "gpt-4o",
+                    "num_retries": 5,
+                    "claude": {"model": "claude-3.5-sonnet"},
+                }
+            )
         assert "llm" in mapping
         assert "claude" in mapping
         assert mapping["claude"].model == "claude-3.5-sonnet"
@@ -135,10 +139,12 @@ class TestFromTomlSection:
 
     def test_invalid_custom_section_skipped(self):
         with suppress_llm_env_export():
-            mapping = LLMConfig.from_toml_section({
-                "model": "gpt-4o",
-                "bad": {"temperature": 999},  # invalid
-            })
+            mapping = LLMConfig.from_toml_section(
+                {
+                    "model": "gpt-4o",
+                    "bad": {"temperature": 999},  # invalid
+                }
+            )
         assert "llm" in mapping
         assert "bad" not in mapping
 
@@ -180,6 +186,7 @@ class TestAPIKeyHandling:
     def test_explicit_api_key_preserved(self, monkeypatch):
         """Test explicit API key is preserved."""
         from pydantic import SecretStr
+
         monkeypatch.setenv("OPENAI_API_KEY", "sk-env-key")
         cfg = LLMConfig(model="gpt-4", api_key=SecretStr("sk-explicit-key"))
         # Should preserve explicit key
@@ -188,12 +195,20 @@ class TestAPIKeyHandling:
     def test_no_api_key_warning(self, monkeypatch):
         """Test warning when no API key is available."""
         # Clear all common API keys
-        for key in ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "XAI_API_KEY",
-                    "GEMINI_API_KEY", "DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"]:
+        for key in [
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "XAI_API_KEY",
+            "GEMINI_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "OPENROUTER_API_KEY",
+        ]:
             monkeypatch.delenv(key, raising=False)
 
         # Clear api_key_manager stored keys
         from backend.core.config.llm_config import api_key_manager
+
         api_key_manager.provider_api_keys.clear()
 
         # Should create config but log warning about missing key (lines 349-350)
@@ -225,6 +240,7 @@ class TestAPIKeyHandling:
         assert cfg.model == "gpt-4"
         assert hasattr(cfg, "_has_explicit_api_key")
 
+
 # ---------------------------------------------------------------------------
 # Base URL cleaning with provider configs
 # ---------------------------------------------------------------------------
@@ -248,7 +264,9 @@ class TestBaseURLCleaning:
         """Test custom_llm_provider forbidden for some providers."""
         with suppress_llm_env_export():
             # Anthropic forbids custom_llm_provider
-            cfg = LLMConfig(model="claude-3-5-sonnet-20241022", custom_llm_provider="anthropic")
+            cfg = LLMConfig(
+                model="claude-3-5-sonnet-20241022", custom_llm_provider="anthropic"
+            )
         # Should still create config (just logs warning)
         assert cfg.model == "claude-3-5-sonnet-20241022"
 
@@ -277,7 +295,6 @@ class TestModelDefaults:
             cfg = LLMConfig(model="gpt-4o")  # Non-Gemini, no reasoning_effort specified
         # Should be set to "high" in set_defaults validator (line 207)
         assert cfg.reasoning_effort == "high"
-
 
 
 # ---------------------------------------------------------------------------

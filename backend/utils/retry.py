@@ -28,7 +28,6 @@ class RetryError(Exception):
     """Exception raised when all retry attempts have been exhausted."""
 
 
-
 class RetryExhaustedError(RetryError):
     """Raised when all retry attempts are exhausted with specific attempt count."""
 
@@ -226,15 +225,11 @@ def retry[T](
                     result = f(*args, **kwargs)
                     if attempt > 0:
                         logger.info("Retry succeeded on attempt %d", attempt + 1)
-                    _record_success_metrics(
-                        op_name, attempt + 1, config.max_attempts
-                    )
+                    _record_success_metrics(op_name, attempt + 1, config.max_attempts)
                     return result
                 except retryable_exceptions as e:
                     last_error = e
-                    _record_error_metrics(
-                        op_name, attempt + 1, config.max_attempts, e
-                    )
+                    _record_error_metrics(op_name, attempt + 1, config.max_attempts, e)
 
                     if attempt == config.max_attempts - 1:
                         break

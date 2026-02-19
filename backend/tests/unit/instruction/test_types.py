@@ -49,7 +49,9 @@ class TestInputMetadata:
 
     def test_create_basic_input(self):
         """Test creating basic input metadata."""
-        input_meta = InputMetadata(name="workspace_path", description="Path to workspace")
+        input_meta = InputMetadata(
+            name="workspace_path", description="Path to workspace"
+        )
         assert input_meta.name == "workspace_path"
         assert input_meta.description == "Path to workspace"
 
@@ -145,8 +147,7 @@ class TestPlaybookMetadata:
     def test_multiple_inputs(self):
         """Test metadata with multiple inputs."""
         inputs = [
-            InputMetadata(name=f"input{i}", description=f"Input {i}")
-            for i in range(5)
+            InputMetadata(name=f"input{i}", description=f"Input {i}") for i in range(5)
         ]
         metadata = PlaybookMetadata(inputs=inputs)
         assert len(metadata.inputs) == 5
@@ -222,7 +223,9 @@ class TestPlaybookContentResponse:
 
     def test_create_minimal_content_response(self):
         """Test creating content response with minimal fields."""
-        response = PlaybookContentResponse(content="# Playbook\n\nContent here", path="/path/to/playbook.md")
+        response = PlaybookContentResponse(
+            content="# Playbook\n\nContent here", path="/path/to/playbook.md"
+        )
         assert response.content == "# Playbook\n\nContent here"
         assert response.path == "/path/to/playbook.md"
         assert response.triggers == []
@@ -319,9 +322,7 @@ Some text here.
 
     def test_empty_triggers_list(self):
         """Test explicitly setting empty triggers list."""
-        response = PlaybookContentResponse(
-            content="content", path="/path", triggers=[]
-        )
+        response = PlaybookContentResponse(content="content", path="/path", triggers=[])
         assert response.triggers == []
 
     def test_none_vcs_provider_explicit(self):

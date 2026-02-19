@@ -17,6 +17,7 @@ from backend.events.action import (
     ChangeAgentStateAction,
     MessageAction,
     PlaybookFinishAction,
+    TaskTrackingAction,
 )
 from backend.events.action.agent import RecallAction
 from backend.events.observation import (
@@ -84,6 +85,36 @@ class EventRouterService:
             await self._handle_finish_action(action)
         elif isinstance(action, AgentRejectAction):
             await self._handle_reject_action(action)
+        elif isinstance(action, TaskTrackingAction):
+            await self._handle_task_tracking_action(action)
+
+    async def _handle_task_tracking_action(self, action: TaskTrackingAction) -> None:
+        """Handle task tracking action to update active plan."""
+        from backend.controller.state.state import ActivePlan, PlanStep
+
+        try:
+            # Recursive helper to build steps
+            def _build_step(d: dict) -> PlanStep:
+                return PlanStep(
+                    id=d.get("id", ""),
+                    description=d.get("description", d.get("title", "")),
+                    status=d.get("status", "pending"),
+                    result=d.get("result", d.get("notes")),
+                    tags=d.get("tags", []),
+                    subtasks=[_build_step(s) for s in d.get("subtasks", [])],
+                )
+
+            current_plan = self._ctrl.state.plan
+            current_title = current_plan.title if current_plan else "Current Plan"
+
+            steps = [_build_step(t) for t in action.task_list]
+            self._ctrl.state.plan = ActivePlan(
+                steps=steps,
+                title=current_title,
+            )
+            self._ctrl.log("info", f"Plan updated with {len(steps)} steps.")
+        except Exception as e:
+            self._ctrl.log("error", f"Failed to update plan: {e}")
 
     async def _handle_finish_action(self, action: PlaybookFinishAction) -> None:
         """Handle agent finish action with completion validation."""

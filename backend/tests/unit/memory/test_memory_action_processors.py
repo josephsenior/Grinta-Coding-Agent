@@ -25,33 +25,39 @@ from backend.memory.action_processors import (
 
 # ── _is_tool_based_action ────────────────────────────────────────────
 
+
 class TestIsToolBasedActionProc:
     def test_file_edit_action_is_tool(self):
         from backend.events.action import FileEditAction
+
         action = MagicMock(spec=FileEditAction)
         action.source = EventSource.AGENT
         assert _is_tool_based_action(action) is True
 
     def test_cmd_run_from_agent_is_tool(self):
         from backend.events.action import CmdRunAction
+
         action = MagicMock(spec=CmdRunAction)
         action.source = EventSource.AGENT
         assert _is_tool_based_action(action) is True
 
     def test_cmd_run_from_user_is_not_tool(self):
         from backend.events.action import CmdRunAction
+
         action = MagicMock(spec=CmdRunAction)
         action.source = EventSource.USER
         assert _is_tool_based_action(action) is False
 
     def test_message_action_is_not_tool(self):
         from backend.events.action import MessageAction
+
         action = MagicMock(spec=MessageAction)
         action.source = EventSource.USER
         assert _is_tool_based_action(action) is False
 
 
 # ── _should_emit_user_tool_request ────────────────────────────────────
+
 
 class TestShouldEmitUserToolRequestProc:
     def test_user_no_metadata_returns_true(self):
@@ -75,6 +81,7 @@ class TestShouldEmitUserToolRequestProc:
 
 # ── _build_think_action_message ───────────────────────────────────────
 
+
 class TestBuildThinkActionMessageProc:
     def test_creates_assistant_message_with_thought(self):
         action = MagicMock()
@@ -92,6 +99,7 @@ class TestBuildThinkActionMessageProc:
 
 
 # ── _role_from_assistant_message ──────────────────────────────────────
+
 
 class TestRoleFromAssistantMessageProc:
     def test_valid_roles(self):
@@ -112,6 +120,7 @@ class TestRoleFromAssistantMessageProc:
 
 # ── _content_from_assistant_message ───────────────────────────────────
 
+
 class TestContentFromAssistantMessageProc:
     def test_string_content(self):
         msg = MagicMock()
@@ -124,13 +133,13 @@ class TestContentFromAssistantMessageProc:
         msg = MagicMock()
         msg.content = "   "
         result = _content_from_assistant_message(msg)
-        assert len(result) == 0
+        assert not result
 
     def test_none_content(self):
         msg = MagicMock()
         msg.content = None
         result = _content_from_assistant_message(msg)
-        assert len(result) == 0
+        assert not result
 
     def test_non_string_content(self):
         msg = MagicMock()
@@ -141,6 +150,7 @@ class TestContentFromAssistantMessageProc:
 
 
 # ── _role_from_source ─────────────────────────────────────────────────
+
 
 class TestRoleFromSourceProc:
     def test_user_source(self):
@@ -160,6 +170,7 @@ class TestRoleFromSourceProc:
 
 
 # ── _convert_tool_calls ──────────────────────────────────────────────
+
 
 class TestConvertToolCallsProc:
     def test_none_returns_none(self):
@@ -206,6 +217,7 @@ class TestConvertToolCallsProc:
 
 # ── _ensure_tool_call_function ────────────────────────────────────────
 
+
 class TestEnsureToolCallFunctionProc:
     def test_creates_function_when_missing(self):
         call_dict = {"name": "read_file", "arguments": '{"path": "a.py"}'}
@@ -236,9 +248,11 @@ class TestEnsureToolCallFunctionProc:
 
 # ── _handle_message_action ────────────────────────────────────────────
 
+
 class TestHandleMessageActionProc:
     def test_user_message(self):
         from backend.events.action import MessageAction
+
         action = MessageAction(content="hello")
         action.source = EventSource.USER
         msgs = _handle_message_action(action, vision_is_active=False)
@@ -248,6 +262,7 @@ class TestHandleMessageActionProc:
 
     def test_agent_message(self):
         from backend.events.action import MessageAction
+
         action = MessageAction(content="response")
         action.source = EventSource.AGENT
         msgs = _handle_message_action(action, vision_is_active=False)
@@ -256,6 +271,7 @@ class TestHandleMessageActionProc:
 
     def test_message_with_images(self):
         from backend.events.action import MessageAction
+
         action = MessageAction(
             content="look at this",
             image_urls=["http://example.com/img.png"],
@@ -268,9 +284,11 @@ class TestHandleMessageActionProc:
 
 # ── _handle_user_cmd_action ───────────────────────────────────────────
 
+
 class TestHandleUserCmdActionProc:
     def test_produces_user_message(self):
         from backend.events.action import CmdRunAction
+
         action = CmdRunAction(command="ls -la")
         msgs = _handle_user_cmd_action(action)
         assert len(msgs) == 1
@@ -279,6 +297,7 @@ class TestHandleUserCmdActionProc:
 
 
 # ── _handle_system_message_action ─────────────────────────────────────
+
 
 class TestHandleSystemMessageActionProc:
     def test_produces_system_message(self):
@@ -291,6 +310,7 @@ class TestHandleSystemMessageActionProc:
 
 
 # ── convert_action_to_messages (integration) ──────────────────────────
+
 
 class TestConvertActionToMessagesProc:
     def test_system_message_dispatches(self):

@@ -36,4 +36,4 @@ class AsyncEventStoreWrapper:
                 """Closure to capture event for async executor."""
                 return e
 
-            yield (await loop.run_in_executor(None, get_event))
+            yield await loop.run_in_executor(None, get_event)

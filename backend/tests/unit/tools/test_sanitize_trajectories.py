@@ -241,7 +241,9 @@ class TestSanitizeDict:
         obj = {"valid": "data", "nested": {"observation": "null"}}
         result = _sanitize_dict(obj)
         # Nested null event should be removed
-        assert "nested" not in result or result["nested"] is None or result["nested"] == {}
+        assert (
+            "nested" not in result or result["nested"] is None or result["nested"] == {}
+        )
 
 
 class TestProcessDictContents:
@@ -338,7 +340,7 @@ class TestWriteJsonlFile:
             data = [{"a": 1}, {"b": 2}]
             _write_jsonl_file(temp_path, data)
 
-            with open(temp_path) as f:
+            with open(temp_path, encoding="utf-8") as f:
                 lines = f.readlines()
 
             assert len(lines) == 2
@@ -378,7 +380,7 @@ class TestWriteJsonFile:
             data = {"key": "value"}
             _write_json_file(temp_path, data)
 
-            with open(temp_path) as f:
+            with open(temp_path, encoding="utf-8") as f:
                 loaded = json.load(f)
 
             assert loaded == data
@@ -393,7 +395,7 @@ class TestWriteJsonFile:
         try:
             _write_json_file(temp_path, None)
 
-            with open(temp_path) as f:
+            with open(temp_path, encoding="utf-8") as f:
                 loaded = json.load(f)
 
             assert loaded == {}

@@ -217,7 +217,7 @@ class Runtime(
                 EventStreamSubscriber.RUNTIME, self.on_event, self.sid
             )
         self.plugins = (
-            copy.deepcopy(plugins) if plugins is not None and len(plugins) > 0 else []
+            copy.deepcopy(plugins) if plugins is not None and plugins else []
         )
         self.status_callback = status_callback
         self.attach_to_existing = attach_to_existing
@@ -420,7 +420,7 @@ class Runtime(
                 expose_secrets=False,
             ),
         )
-        if len(env_vars) == 0:
+        if not env_vars:
             return
         try:
             if self.event_stream:
@@ -615,7 +615,7 @@ Please retry the file creation."""
                     return ErrorObservation(content=error_msg)
 
                 # File exists - get size/lines for confirmation
-                size_cmd = f"python3 -c \"print(sum(1 for _ in open('{file_path}')))\""
+                size_cmd = f"python3 -c \"print(sum(1 for _ in open('{file_path}', encoding='utf-8')))\""
                 size_result = self._execute_action_sync(CmdRunAction(command=size_cmd))
 
                 if isinstance(size_result, CmdOutputObservation):

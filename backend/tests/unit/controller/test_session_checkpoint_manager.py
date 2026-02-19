@@ -14,6 +14,7 @@ from backend.controller.state.session_checkpoint_manager import SessionCheckpoin
 # Helpers
 # ===================================================================
 
+
 def _make_file_store():
     fs = MagicMock()
     fs.write = MagicMock()
@@ -33,8 +34,8 @@ def _make_state(json_str: str = '{"key": "value"}'):
 # save_checkpoint
 # ===================================================================
 
-class TestSaveCheckpoint:
 
+class TestSaveCheckpoint:
     def test_basic_save(self):
         fs = _make_file_store()
         mgr = SessionCheckpointManager(sid="s1", file_store=fs)
@@ -54,7 +55,9 @@ class TestSaveCheckpoint:
         path = fs.write.call_args[0][0]
         # Path traversal chars should be stripped
         assert ".." not in path
-        assert "/" not in path.split("checkpoints/")[-1].replace(".json", "").replace("etcpasswd", "")
+        assert "/" not in path.split("checkpoints/")[-1].replace(".json", "").replace(
+            "etcpasswd", ""
+        )
 
     def test_empty_name_after_sanitize_raises(self):
         fs = _make_file_store()
@@ -86,11 +89,15 @@ class TestSaveCheckpoint:
 # list_checkpoints
 # ===================================================================
 
-class TestListCheckpoints:
 
+class TestListCheckpoints:
     def test_lists_json_files(self):
         fs = _make_file_store()
-        fs.list.return_value = ["after_research.json", "before_deploy.json", "notes.txt"]
+        fs.list.return_value = [
+            "after_research.json",
+            "before_deploy.json",
+            "notes.txt",
+        ]
         mgr = SessionCheckpointManager(sid="s1", file_store=fs)
         names = mgr.list_checkpoints()
         assert names == ["after_research", "before_deploy"]
@@ -106,8 +113,8 @@ class TestListCheckpoints:
 # restore_checkpoint
 # ===================================================================
 
-class TestRestoreCheckpoint:
 
+class TestRestoreCheckpoint:
     def test_restore_success(self):
         fs = _make_file_store()
         fs.read.return_value = '{"state_data": true}'
@@ -149,8 +156,8 @@ class TestRestoreCheckpoint:
 # delete_checkpoint
 # ===================================================================
 
-class TestDeleteCheckpoint:
 
+class TestDeleteCheckpoint:
     def test_delete_success(self):
         fs = _make_file_store()
         mgr = SessionCheckpointManager(sid="s1", file_store=fs)

@@ -232,6 +232,10 @@ class AtomicRefactor:
     def _create_backups(self, transaction: RefactorTransaction) -> None:
         """Create backups for all files in transaction.
 
+        Uses the full relative path within the backup directory to avoid
+        collisions when two edited files share the same basename
+        (e.g. ``pkg_a/utils.py`` and ``pkg_b/utils.py``).
+
         Args:
             transaction: Transaction containing edits
 
@@ -241,9 +245,10 @@ class AtomicRefactor:
         )
         for edit in transaction.edits:
             if edit.original_content and transaction.backup_dir:
-                backup_path = os.path.join(
-                    transaction.backup_dir, os.path.basename(edit.file_path)
-                )
+                # Preserve directory structure to avoid basename collisions
+                safe_rel = os.path.relpath(edit.file_path).replace("..", "__parent__")
+                backup_path = os.path.join(transaction.backup_dir, safe_rel)
+                os.makedirs(os.path.dirname(backup_path), exist_ok=True)
                 try:
                     with open(backup_path, "w", encoding="utf-8") as f:
                         f.write(edit.original_content)

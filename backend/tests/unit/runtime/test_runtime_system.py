@@ -49,7 +49,9 @@ class TestFindAvailableTcpPort:
         with patch(
             "backend.runtime.utils.system.check_port_available", return_value=True
         ):
-            port = find_available_tcp_port(min_port=50000, max_port=50000, max_attempts=1)
+            port = find_available_tcp_port(
+                min_port=50000, max_port=50000, max_attempts=1
+            )
             assert port == 50000
 
 

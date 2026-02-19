@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +13,7 @@ class TestDebugMixin(TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+
         # Create a concrete implementation of DebugMixin for testing
         class ConcreteDebugMixin(DebugMixin):
             def vision_is_active(self) -> bool:
@@ -159,9 +159,7 @@ class TestDebugMixin(TestCase):
 
     @patch("backend.llm.debug_mixin.logger")
     @patch("backend.llm.debug_mixin.llm_response_logger")
-    def test_log_response_dict_with_tool_calls(
-        self, mock_response_logger, mock_logger
-    ):
+    def test_log_response_dict_with_tool_calls(self, mock_response_logger, mock_logger):
         """Test logging response dict with tool calls."""
         mock_logger.isEnabledFor.return_value = True
 
@@ -219,9 +217,7 @@ class TestDebugMixin(TestCase):
 
     @patch("backend.llm.debug_mixin.logger")
     @patch("backend.llm.debug_mixin.llm_response_logger")
-    def test_log_response_dict_without_choices(
-        self, mock_response_logger, mock_logger
-    ):
+    def test_log_response_dict_without_choices(self, mock_response_logger, mock_logger):
         """Test logging response dict without choices field."""
         mock_logger.isEnabledFor.return_value = True
 
@@ -235,7 +231,9 @@ class TestDebugMixin(TestCase):
         """Test log_response when debug logging is disabled."""
         mock_logger.isEnabledFor.return_value = False
 
-        with patch("backend.llm.debug_mixin.llm_response_logger") as mock_response_logger:
+        with patch(
+            "backend.llm.debug_mixin.llm_response_logger"
+        ) as mock_response_logger:
             self.mixin.log_response("Test response")
             mock_response_logger.debug.assert_not_called()
 
@@ -306,9 +304,7 @@ class TestDebugMixin(TestCase):
 
     @patch("backend.llm.debug_mixin.logger")
     @patch("backend.llm.debug_mixin.llm_prompt_logger")
-    def test_log_prompt_preserves_message_order(
-        self, mock_prompt_logger, mock_logger
-    ):
+    def test_log_prompt_preserves_message_order(self, mock_prompt_logger, mock_logger):
         """Test that log_prompt preserves message order."""
         mock_logger.isEnabledFor.return_value = True
 
@@ -324,9 +320,7 @@ class TestDebugMixin(TestCase):
 
     @patch("backend.llm.debug_mixin.logger")
     @patch("backend.llm.debug_mixin.llm_response_logger")
-    def test_log_response_multiple_tool_calls(
-        self, mock_response_logger, mock_logger
-    ):
+    def test_log_response_multiple_tool_calls(self, mock_response_logger, mock_logger):
         """Test logging response with multiple tool calls."""
         mock_logger.isEnabledFor.return_value = True
 

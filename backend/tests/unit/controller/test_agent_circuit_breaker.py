@@ -94,8 +94,8 @@ class TestCircuitBreakerInit:
         assert breaker.consecutive_errors == 0
         assert breaker.high_risk_action_count == 0
         assert breaker.stuck_detection_count == 0
-        assert len(breaker.recent_errors) == 0
-        assert len(breaker.recent_actions_success) == 0
+        assert not breaker.recent_errors
+        assert not breaker.recent_actions_success
 
     def test_init_creates_deques_with_maxlen(self):
         """Deques should have maxlen based on config."""
@@ -422,8 +422,8 @@ class TestReset:
         assert breaker.consecutive_errors == 0
         assert breaker.high_risk_action_count == 0
         assert breaker.stuck_detection_count == 0
-        assert len(breaker.recent_errors) == 0
-        assert len(breaker.recent_actions_success) == 0
+        assert not breaker.recent_errors
+        assert not breaker.recent_actions_success
 
 
 class TestUpdateMetrics:

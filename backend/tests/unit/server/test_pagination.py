@@ -15,6 +15,7 @@ from backend.server.utils.pagination import (
 # PaginationParams
 # ---------------------------------------------------------------------------
 
+
 class TestPaginationParams:
     """Tests for the PaginationParams dataclass."""
 
@@ -64,6 +65,7 @@ class TestPaginationParams:
 # ---------------------------------------------------------------------------
 # PaginatedResponse
 # ---------------------------------------------------------------------------
+
 
 class TestPaginatedResponse:
     """Tests for the PaginatedResponse model."""
@@ -158,6 +160,7 @@ class TestPaginatedResponse:
 # OffsetPaginationParams
 # ---------------------------------------------------------------------------
 
+
 class TestOffsetPaginationParams:
     """Tests for the OffsetPaginationParams model."""
 
@@ -175,6 +178,7 @@ class TestOffsetPaginationParams:
 # ---------------------------------------------------------------------------
 # parse_pagination_params
 # ---------------------------------------------------------------------------
+
 
 class TestParsePaginationParams:
     """Tests for the parse_pagination_params function."""

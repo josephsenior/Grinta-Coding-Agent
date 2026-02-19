@@ -20,6 +20,7 @@ def _fresh_telemetry() -> ToolTelemetry:
     t = ToolTelemetry.__new__(ToolTelemetry)
     t._recent_events = []
     import threading
+
     t._recent_lock = threading.Lock()
     t._invocations = None
     t._latency = None
@@ -92,6 +93,7 @@ class TestLifecycleHooks:
         ctx = _make_ctx()
         t.on_plan(ctx)
         from backend.events.observation import ErrorObservation
+
         obs = ErrorObservation(content="fail")
         t.on_observe(ctx, obs)
         events = t.recent_events()
@@ -128,6 +130,7 @@ class TestInternalHelpers:
 
     def test_determine_outcome_failure(self):
         from backend.events.observation import ErrorObservation
+
         t = _fresh_telemetry()
         obs = ErrorObservation(content="err")
         assert t._determine_outcome(obs) == "failure"
@@ -193,6 +196,7 @@ class TestConcurrentSafety:
     def test_thread_safety_record(self):
         """Multiple threads recording should not crash."""
         import threading
+
         t = _fresh_telemetry()
         errors = []
 
@@ -209,5 +213,5 @@ class TestConcurrentSafety:
         for th in threads:
             th.join()
 
-        assert len(errors) == 0
+        assert not errors
         assert len(t.recent_events()) <= 200

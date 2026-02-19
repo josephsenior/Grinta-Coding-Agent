@@ -28,11 +28,13 @@ class TestImportFrom:
         """Test importing from stdlib."""
         result = import_from("os.path.join")
         from os.path import join
+
         assert result is join
 
     def test_import_type(self):
         """Test importing a type."""
         import typing
+
         result = import_from("typing.List")
         assert result is typing.List
 
@@ -40,6 +42,7 @@ class TestImportFrom:
         """Test importing a function."""
         result = import_from("os.path.exists")
         from os.path import exists
+
         assert result is exists
 
     def test_import_from_nested_module(self):
@@ -73,6 +76,7 @@ class TestGetImpl:
 
     def test_subclass_returns_impl(self):
         """Test get_impl with valid subclass."""
+
         class BaseClass:
             pass
 
@@ -87,6 +91,7 @@ class TestGetImpl:
 
     def test_invalid_impl_raises(self):
         """Test get_impl with non-subclass raises AssertionError."""
+
         class BaseClass:
             pass
 
@@ -108,6 +113,7 @@ class TestGetImpl:
 
     def test_builtin_subclass(self):
         """Test get_impl with builtin subclass."""
+
         class MyDict(dict):
             pass
 
@@ -125,6 +131,7 @@ class TestImplMatchesBase:
 
     def test_direct_subclass(self):
         """Test matching with direct subclass."""
+
         class Base:
             pass
 
@@ -135,6 +142,7 @@ class TestImplMatchesBase:
 
     def test_indirect_subclass(self):
         """Test matching with indirect subclass."""
+
         class Base:
             pass
 
@@ -148,6 +156,7 @@ class TestImplMatchesBase:
 
     def test_unrelated_classes(self):
         """Test non-matching with unrelated classes."""
+
         class ClassA:
             pass
 
@@ -164,6 +173,7 @@ class TestMatchesQualifiedNameInMro:
 
     def test_match_in_mro(self):
         """Test finding match in MRO by module and name."""
+
         class Base:
             pass
 
@@ -178,6 +188,7 @@ class TestMatchesQualifiedNameInMro:
 
     def test_no_match_in_mro(self):
         """Test no match in MRO."""
+
         class BaseA:
             pass
 
@@ -238,6 +249,7 @@ class TestMatchesReimportedBase:
 
     def test_matches_reimported(self):
         """Test matching with reimported base."""
+
         class Base:
             pass
 
@@ -252,6 +264,7 @@ class TestMatchesReimportedBase:
 
     def test_no_match_reimported(self):
         """Test no match with reimported base."""
+
         class Base:
             pass
 
@@ -282,6 +295,7 @@ class TestRaiseInvalidImpl:
 
     def test_raises_assertion_error(self):
         """Test raises AssertionError with proper message."""
+
         class Base:
             pass
 
@@ -301,6 +315,7 @@ class TestRaiseInvalidImpl:
 
     def test_error_message_contains_details(self):
         """Test error message contains base and impl details."""
+
         class Base:
             pass
 

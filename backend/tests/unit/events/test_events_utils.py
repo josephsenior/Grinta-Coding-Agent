@@ -62,7 +62,7 @@ class TestBuildActionAndObservationMaps:
 
         action_map, obs_map = _build_action_and_observation_maps([obs])
 
-        assert len(obs_map) == 0
+        assert not obs_map
 
     def test_event_without_id(self):
         """Test event with no ID."""
@@ -165,7 +165,7 @@ class TestAddOrphanedObservations:
 
         _add_orphaned_observations(tuples, action_map, obs_map)
 
-        assert len(tuples) == 0
+        assert not tuples
 
     def test_observation_with_action_skipped(self):
         """Test observation with matching action is not added."""
@@ -179,7 +179,7 @@ class TestAddOrphanedObservations:
         _add_orphaned_observations(tuples, action_map, obs_map)
 
         # Should not add since action exists
-        assert len(tuples) == 0
+        assert not tuples
 
     def test_multiple_orphaned(self):
         """Test multiple orphaned observations."""

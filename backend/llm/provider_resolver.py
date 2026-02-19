@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import functools
 import socket
-from typing import Any
 
 import httpx
 

@@ -111,9 +111,11 @@ class RateLimiter:
             return await call_next(request)
 
         # Check other excluded paths (public endpoints that are called frequently)
-        if (
-            normalized_path in ["/health", "/api/monitoring/health", "/"] or path.startswith(("/assets", "/api/options"))
-        ):
+        if normalized_path in [
+            "/health",
+            "/api/monitoring/health",
+            "/",
+        ] or path.startswith(("/assets", "/api/options")):
             return await call_next(request)
 
         # Get rate limit key (user_id or IP address)

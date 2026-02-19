@@ -11,6 +11,7 @@ from backend.controller.memory_pressure import MemoryPressureMonitor
 
 # ── __init__ ──────────────────────────────────────────────────────────
 
+
 class TestMemoryPressureMonitorInit:
     def test_default_thresholds(self):
         m = MemoryPressureMonitor()
@@ -36,6 +37,7 @@ class TestMemoryPressureMonitorInit:
 
 # ── should_condense ───────────────────────────────────────────────────
 
+
 class TestShouldCondense:
     def test_false_when_below_threshold(self):
         m = MemoryPressureMonitor(warn_mb=1000, check_interval_s=0)
@@ -57,6 +59,7 @@ class TestShouldCondense:
 
 # ── is_critical ───────────────────────────────────────────────────────
 
+
 class TestIsCritical:
     def test_false_below_critical(self):
         m = MemoryPressureMonitor(crit_mb=2000, check_interval_s=0)
@@ -73,6 +76,7 @@ class TestIsCritical:
 
 # ── record_condensation ──────────────────────────────────────────────
 
+
 class TestRecordCondensation:
     def test_increments_count(self):
         m = MemoryPressureMonitor()
@@ -84,6 +88,7 @@ class TestRecordCondensation:
 
 
 # ── snapshot ──────────────────────────────────────────────────────────
+
 
 class TestSnapshot:
     def test_returns_diagnostic_dict(self):
@@ -113,6 +118,7 @@ class TestSnapshot:
 
 
 # ── _sample_rss rate-limiting ─────────────────────────────────────────
+
 
 class TestSampleRss:
     def test_rate_limits_checks(self):

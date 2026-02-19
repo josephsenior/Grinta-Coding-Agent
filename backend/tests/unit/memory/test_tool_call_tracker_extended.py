@@ -43,6 +43,7 @@ def _tool_msg(call_id: str) -> Message:
 
 # ── collect_tool_call_ids ────────────────────────────────────────────
 
+
 class TestCollectToolCallIdsExtended:
     def test_empty(self):
         assert collect_tool_call_ids([]) == set()
@@ -66,6 +67,7 @@ class TestCollectToolCallIdsExtended:
 
 # ── collect_tool_response_ids ────────────────────────────────────────
 
+
 class TestCollectToolResponseIdsExtended:
     def test_empty(self):
         assert collect_tool_response_ids([]) == set()
@@ -76,6 +78,7 @@ class TestCollectToolResponseIdsExtended:
 
 
 # ── flush_resolved_tool_calls ────────────────────────────────────────
+
 
 class TestFlushResolvedExtended:
     def test_no_pending(self):
@@ -107,6 +110,7 @@ class TestFlushResolvedExtended:
 
 
 # ── filter_unmatched_tool_calls ──────────────────────────────────────
+
 
 class TestFilterUnmatchedExtended:
     def test_pass_through(self):

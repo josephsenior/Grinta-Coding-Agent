@@ -187,6 +187,7 @@ class TestMemoryPressureMonitor:
 
         # Manually set last_check to simulate first call
         import time
+
         monitor._last_check = time.monotonic() - 100  # Long ago
 
         # First call should sample
@@ -219,6 +220,7 @@ class TestMemoryPressureMonitor:
 
         # Wait for interval to expire
         import time
+
         time.sleep(0.02)  # Longer than interval
 
         # Second call after interval should sample again

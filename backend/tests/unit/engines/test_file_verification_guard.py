@@ -21,9 +21,12 @@ def guard():
 
 # ── should_enforce_tools ─────────────────────────────────────────────
 
+
 class TestShouldEnforceTools:
     def test_empty_message_strict(self, guard):
-        assert guard.should_enforce_tools("", MagicMock(), strict_mode=True) == "required"
+        assert (
+            guard.should_enforce_tools("", MagicMock(), strict_mode=True) == "required"
+        )
 
     def test_empty_message_not_strict(self, guard):
         assert guard.should_enforce_tools("", MagicMock(), strict_mode=False) == "auto"
@@ -41,10 +44,14 @@ class TestShouldEnforceTools:
         guard.pending_file_operations.append(
             FileOperationContext("edit", ["/tmp/x.py"], False, 1)
         )
-        assert guard.should_enforce_tools("hello", MagicMock(), strict_mode=False) == "required"
+        assert (
+            guard.should_enforce_tools("hello", MagicMock(), strict_mode=False)
+            == "required"
+        )
 
 
 # ── inject_verification_commands ─────────────────────────────────────
+
 
 class TestInjectVerification:
     def test_non_file_op_unchanged(self, guard):
@@ -68,6 +75,7 @@ class TestInjectVerification:
 
 # ── validate_response ────────────────────────────────────────────────
 
+
 class TestValidateResponse:
     def test_no_claims(self, guard):
         ok, msg = guard.validate_response("Just a message", [])
@@ -76,6 +84,7 @@ class TestValidateResponse:
 
     def test_claim_with_tools_ok(self, guard):
         from backend.events.action.files import FileEditAction
+
         action = MagicMock(spec=FileEditAction)
         action.action = "edit"
         ok, msg = guard.validate_response("I created src/main.py", [action])
@@ -84,17 +93,19 @@ class TestValidateResponse:
 
 # ── _extract_file_operation_claims ───────────────────────────────────
 
+
 class TestExtractClaims:
     def test_with_path(self, guard):
         claims = guard._extract_file_operation_claims("I created src/utils/main.py")
-        assert len(claims) >= 1
+        assert claims
 
     def test_no_claims(self, guard):
         claims = guard._extract_file_operation_claims("Just thinking about stuff")
-        assert len(claims) == 0
+        assert not claims
 
 
 # ── mark / cleanup / stats ───────────────────────────────────────────
+
 
 class TestFileOperationManagement:
     def test_mark_verified(self, guard):
@@ -135,5 +146,5 @@ class TestFileOperationManagement:
         )
         guard.stats["verifications_injected"] = 5
         guard.reset()
-        assert len(guard.pending_file_operations) == 0
+        assert not guard.pending_file_operations
         assert guard.stats["verifications_injected"] == 0

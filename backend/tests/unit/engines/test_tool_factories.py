@@ -5,7 +5,9 @@ from __future__ import annotations
 from backend.engines.orchestrator.tools.finish import create_finish_tool
 from backend.engines.orchestrator.tools.think import create_think_tool
 from backend.engines.orchestrator.tools.task_tracker import create_task_tracker_tool
-from backend.engines.orchestrator.tools.condensation_request import create_condensation_request_tool
+from backend.engines.orchestrator.tools.condensation_request import (
+    create_condensation_request_tool,
+)
 from backend.llm.tool_names import FINISH_TOOL_NAME, TASK_TRACKER_TOOL_NAME
 
 

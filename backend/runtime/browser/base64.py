@@ -31,4 +31,4 @@ def png_base64_url_to_image(png_base64_url: str) -> Image.Image:
     """Convert a base64 encoded png image url to a PIL Image."""
     splited = png_base64_url.split(",")
     base64_data = splited[1] if len(splited) == 2 else png_base64_url
-    return Image.open(io.BytesIO(base64.b64decode(base64_data)))
+    return Image.open(io.BytesIO(base64.b64decode(base64_data, encoding="utf-8")))

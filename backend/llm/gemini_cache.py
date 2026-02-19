@@ -5,9 +5,7 @@ from __future__ import annotations
 import hashlib
 import time
 from datetime import timedelta
-from typing import Any
 
-import google.generativeai as genai
 from google.generativeai import caching
 
 from backend.core.logger import FORGE_logger as logger
@@ -68,7 +66,9 @@ class GeminiCacheManager:
                 logger.debug("Reusing Gemini context cache: %s", cache_name)
                 return cache_name
             except Exception:
-                logger.debug("Gemini cache %s expired or not found, recreating", cache_name)
+                logger.debug(
+                    "Gemini cache %s expired or not found, recreating", cache_name
+                )
                 del self._caches[content_hash]
 
         try:
@@ -77,7 +77,9 @@ class GeminiCacheManager:
             contents = []
             for m in messages:
                 role = "user" if m.get("role") == "user" else "model"
-                contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+                contents.append(
+                    {"role": role, "parts": [{"text": m.get("content", "")}]}
+                )
 
             cache = caching.CachedContent.create(
                 model=model,
@@ -86,8 +88,10 @@ class GeminiCacheManager:
                 contents=contents,
                 ttl=timedelta(minutes=ttl_minutes),
             )
-            
-            logger.info("Created new Gemini context cache: %s for model %s", cache.name, model)
+
+            logger.info(
+                "Created new Gemini context cache: %s for model %s", cache.name, model
+            )
             self._caches[content_hash] = cache.name
             return cache.name
 

@@ -109,9 +109,7 @@ class TestReadTask:
         """Test reading task from file argument."""
         args = argparse.Namespace(file="task.txt", task=None)
 
-        with patch(
-            "backend.adapters.io.read_task_from_file", return_value="File task"
-        ):
+        with patch("backend.adapters.io.read_task_from_file", return_value="File task"):
             result = read_task(args, cli_multiline_input=False)
             assert result == "File task"
 
@@ -125,9 +123,7 @@ class TestReadTask:
         """Test file argument takes precedence over task."""
         args = argparse.Namespace(file="task.txt", task="Direct task")
 
-        with patch(
-            "backend.adapters.io.read_task_from_file", return_value="File task"
-        ):
+        with patch("backend.adapters.io.read_task_from_file", return_value="File task"):
             result = read_task(args, cli_multiline_input=False)
             assert result == "File task"
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from backend.events.action.message import MessageAction
 from backend.events.event_filter import EventFilter
 from backend.events.observation import NullObservation
@@ -329,5 +328,3 @@ class TestEventFilterHelpers:
 
         event = MessageAction(content="test")
         assert filter._check_query_filter(event) is True
-
-

@@ -32,6 +32,47 @@ class CircuitBreakerConfig:
     max_error_rate: float = 0.5  # 50% of last N actions
     error_rate_window: int = 10  # Look at last 10 actions
 
+    # Adaptive scaling — when enabled, thresholds scale with task complexity
+    # and iteration budget so that complex tasks get more breathing room.
+    adaptive: bool = True
+
+    def scaled(self, complexity: float, max_iterations: int) -> CircuitBreakerConfig:
+        """Return a copy with thresholds scaled for the given task.
+
+        Scale factors:
+        - complexity 1-3  → 1×  (simple tasks keep defaults)
+        - complexity 4-6  → 1.5×
+        - complexity 7-10 → 2×
+
+        For iteration budget, thresholds grow proportionally when the agent
+        has a large runway (> 100 iterations).
+        """
+        if not self.adaptive:
+            return self
+
+        # Complexity multiplier (1.0 – 2.0)
+        if complexity <= 3:
+            c_mult = 1.0
+        elif complexity <= 6:
+            c_mult = 1.5
+        else:
+            c_mult = 2.0
+
+        # Iteration budget multiplier (1.0 – 1.5)
+        i_mult = min(1.0 + max(0, max_iterations - 100) / 400, 1.5)
+
+        scale = c_mult * i_mult
+
+        return CircuitBreakerConfig(
+            enabled=self.enabled,
+            max_consecutive_errors=max(self.max_consecutive_errors, int(self.max_consecutive_errors * scale)),
+            max_high_risk_actions=max(self.max_high_risk_actions, int(self.max_high_risk_actions * scale)),
+            max_stuck_detections=max(self.max_stuck_detections, int(self.max_stuck_detections * scale)),
+            max_error_rate=min(self.max_error_rate * (1 + (scale - 1) * 0.3), 0.8),
+            error_rate_window=max(self.error_rate_window, int(self.error_rate_window * scale)),
+            adaptive=False,  # prevent re-scaling
+        )
+
 
 @dataclass
 class CircuitBreakerResult:
@@ -190,6 +231,27 @@ class CircuitBreaker:
         """Record a stuck loop detection."""
         self.stuck_detection_count += 1
         logger.warning("Stuck detection #%s recorded", self.stuck_detection_count)
+
+    def adapt(self, complexity: float, max_iterations: int) -> None:
+        """Adapt thresholds to task complexity and iteration budget.
+
+        Should be called once after the first user message is analysed.
+        """
+        new_config = self.config.scaled(complexity, max_iterations)
+        if new_config is not self.config:
+            logger.info(
+                "CircuitBreaker adapted: max_errors %s→%s, max_risk %s→%s, "
+                "error_rate %.0f%%→%.0f%%, window %s→%s",
+                self.config.max_consecutive_errors,
+                new_config.max_consecutive_errors,
+                self.config.max_high_risk_actions,
+                new_config.max_high_risk_actions,
+                self.config.max_error_rate * 100,
+                new_config.max_error_rate * 100,
+                self.config.error_rate_window,
+                new_config.error_rate_window,
+            )
+            self.config = new_config
 
     def reset(self) -> None:
         """Reset circuit breaker state."""

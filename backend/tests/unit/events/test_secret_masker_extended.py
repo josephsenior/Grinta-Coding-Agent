@@ -123,11 +123,7 @@ class TestSecretMaskerNestedStructures(unittest.TestCase):
         self.masker.set_secrets({"KEY": "secret123"})
 
     def test_nested_dict(self):
-        data = {
-            "outer": {
-                "inner": "contains secret123"
-            }
-        }
+        data = {"outer": {"inner": "contains secret123"}}
         result = self.masker.replace_secrets(data)
         self.assertNotIn("secret123", result["outer"]["inner"])
         self.assertIn("<secret_hidden>", result["outer"]["inner"])
@@ -147,15 +143,7 @@ class TestSecretMaskerNestedStructures(unittest.TestCase):
         self.assertNotIn("secret123", result["pair"][1])
 
     def test_deeply_nested(self):
-        data = {
-            "level1": {
-                "level2": {
-                    "level3": [
-                        {"level4": "deep secret123 value"}
-                    ]
-                }
-            }
-        }
+        data = {"level1": {"level2": {"level3": [{"level4": "deep secret123 value"}]}}}
         result = self.masker.replace_secrets(data)
         deep_val = result["level1"]["level2"]["level3"][0]["level4"]
         self.assertNotIn("secret123", deep_val)

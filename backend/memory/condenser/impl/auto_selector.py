@@ -148,7 +148,9 @@ def select_condenser_config(
 
     # 1. Very short session → no condensation needed
     if sig.total_events < _SHORT_SESSION:
-        logger.info("Auto-select condenser: noop (short session, %d events)", sig.total_events)
+        logger.info(
+            "Auto-select condenser: noop (short session, %d events)", sig.total_events
+        )
         return fallback or NoOpCondenserConfig()
 
     # 2. High error ratio → keep recent events for debugging context
@@ -172,7 +174,8 @@ def select_condenser_config(
     if sig.total_events >= _LONG_SESSION:
         if llm_config_name:
             logger.info(
-                "Auto-select condenser: smart (long session, %d events)", sig.total_events
+                "Auto-select condenser: smart (long session, %d events)",
+                sig.total_events,
             )
             return SmartCondenserConfig(
                 llm_config=llm_config_name,

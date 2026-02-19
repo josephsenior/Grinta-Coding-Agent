@@ -126,9 +126,7 @@ class TestDerivePlaybookName:
         assert name == "cursorrules"
 
     def test_unrelated_path_fallback(self):
-        name = BasePlaybook._derive_playbook_name(
-            Path("/a/b/c.md"), Path("/x/y/z")
-        )
+        name = BasePlaybook._derive_playbook_name(Path("/a/b/c.md"), Path("/x/y/z"))
         # Should return something via os.path.relpath fallback
         assert name is not None
 
@@ -152,9 +150,7 @@ class TestCreatePlaybookInstance:
         assert isinstance(inst, RepoPlaybook)
 
     def test_task(self):
-        meta = PlaybookMetadata(
-            inputs=[InputMetadata(name="x", description="d")]
-        )
+        meta = PlaybookMetadata(inputs=[InputMetadata(name="x", description="d")])
         inst = BasePlaybook._create_playbook_instance(
             "tp", "content", meta, Path("t.md"), PlaybookType.TASK
         )
@@ -178,7 +174,9 @@ class TestBasePlaybookLoad:
         pb_dir = tmp_path / "playbooks"
         pb_dir.mkdir()
         pb_file = pb_dir / "review.md"
-        pb_file.write_text("---\nname: review\ntriggers:\n  - review\n---\nReview content.")
+        pb_file.write_text(
+            "---\nname: review\ntriggers:\n  - review\n---\nReview content."
+        )
         result = BasePlaybook.load(pb_file, playbook_dir=pb_dir)
         assert isinstance(result, KnowledgePlaybook)
         assert result.metadata.triggers == ["review"]
@@ -350,7 +348,7 @@ class TestCollectFiles:
 
     def test_collect_special_none(self, tmp_path):
         files = _collect_special_files(tmp_path)
-        assert len(files) == 0
+        assert not files
 
     def test_collect_markdown(self, tmp_path):
         pb_dir = tmp_path / "playbooks"

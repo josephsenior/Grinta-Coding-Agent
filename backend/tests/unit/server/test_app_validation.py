@@ -29,7 +29,7 @@ class TestCheckApiKeySecurity:
             _check_api_key_security(warnings, errors, strict=False)
         assert len(warnings) == 1
         assert "insecure" in warnings[0].lower()
-        assert len(errors) == 0
+        assert not errors
 
     def test_insecure_key_errors_in_strict(self):
         warnings: list[str] = []
@@ -38,7 +38,7 @@ class TestCheckApiKeySecurity:
             mock_cfg.session_api_key = "forge_dev_key"
             _check_api_key_security(warnings, errors, strict=True)
         assert len(errors) == 1
-        assert len(warnings) == 0
+        assert not warnings
 
     def test_secure_key_no_warnings(self):
         warnings: list[str] = []
@@ -46,8 +46,8 @@ class TestCheckApiKeySecurity:
         with patch("backend.server.app.server_config") as mock_cfg:
             mock_cfg.session_api_key = "a-real-secure-key-12345"
             _check_api_key_security(warnings, errors, strict=False)
-        assert len(warnings) == 0
-        assert len(errors) == 0
+        assert not warnings
+        assert not errors
 
 
 # ── _check_budget_sanity ─────────────────────────────────────────────
@@ -74,7 +74,7 @@ class TestCheckBudgetSanity:
         with patch("backend.server.app._forge_config") as mock_cfg:
             mock_cfg.max_budget_per_task = 5.0
             _check_budget_sanity(warnings)
-        assert len(warnings) == 0
+        assert not warnings
 
 
 # ── _check_database_availability ─────────────────────────────────────
@@ -85,7 +85,7 @@ class TestCheckDatabaseAvailability:
         warnings: list[str] = []
         with patch.dict(os.environ, {"KB_STORAGE_TYPE": "file"}, clear=False):
             _check_database_availability(warnings)
-        assert len(warnings) == 0
+        assert not warnings
 
     def test_database_without_asyncpg_warns(self):
         warnings: list[str] = []
@@ -125,7 +125,7 @@ class TestCheckSystemDependencies:
         warnings: list[str] = []
         with patch("shutil.which", return_value="/usr/bin/tmux"):
             _check_system_dependencies(warnings)
-        assert len(warnings) == 0
+        assert not warnings
 
 
 # ── _check_config_file_existence ─────────────────────────────────────
@@ -143,7 +143,7 @@ class TestCheckConfigFileExistence:
         warnings: list[str] = []
         with patch("pathlib.Path.exists", return_value=True):
             _check_config_file_existence(warnings)
-        assert len(warnings) == 0
+        assert not warnings
 
 
 # ── _collect_validation_issues ───────────────────────────────────────

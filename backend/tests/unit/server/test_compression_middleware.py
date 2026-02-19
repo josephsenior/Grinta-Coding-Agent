@@ -84,7 +84,9 @@ class TestShouldCompress:
         req = MagicMock()
         req_headers = {"accept-encoding": accept_encoding}
         req_headers_mock = MagicMock()
-        req_headers_mock.get = MagicMock(side_effect=lambda k, d="": req_headers.get(k, d))
+        req_headers_mock.get = MagicMock(
+            side_effect=lambda k, d="": req_headers.get(k, d)
+        )
         req.headers = req_headers_mock
 
         resp = MagicMock()
@@ -96,7 +98,9 @@ class TestShouldCompress:
         if content_length:
             resp_headers["content-length"] = content_length
         resp_headers_mock = MagicMock()
-        resp_headers_mock.get = MagicMock(side_effect=lambda k, d="": resp_headers.get(k, d))
+        resp_headers_mock.get = MagicMock(
+            side_effect=lambda k, d="": resp_headers.get(k, d)
+        )
         resp_headers_mock.__contains__ = lambda self_unused, k: k in resp_headers
         resp.headers = resp_headers_mock
 
@@ -186,7 +190,13 @@ class TestCompressResponse:
 class TestResponseSizeOptimizer:
     def test_optimize_list_response_default_exclude(self):
         items = [
-            {"id": 1, "name": "foo", "created_at": "2024-01-01", "updated_at": "2024-01-02", "__v": 0},
+            {
+                "id": 1,
+                "name": "foo",
+                "created_at": "2024-01-01",
+                "updated_at": "2024-01-02",
+                "__v": 0,
+            },
             {"id": 2, "name": "bar", "created_at": "2024-01-03"},
         ]
         result = ResponseSizeOptimizer.optimize_list_response(items)
@@ -200,7 +210,9 @@ class TestResponseSizeOptimizer:
 
     def test_optimize_list_response_custom_exclude(self):
         items = [{"id": 1, "secret": "abc", "name": "test"}]
-        result = ResponseSizeOptimizer.optimize_list_response(items, exclude_fields={"secret"})
+        result = ResponseSizeOptimizer.optimize_list_response(
+            items, exclude_fields={"secret"}
+        )
         assert result == [{"id": 1, "name": "test"}]
 
     def test_optimize_empty_list(self):
@@ -228,7 +240,9 @@ class TestPaginateResponse:
 
     def test_page_size_clamped_to_max(self):
         items = list(range(200))
-        result = ResponseSizeOptimizer.paginate_response(items, page=1, page_size=150, max_page_size=50)
+        result = ResponseSizeOptimizer.paginate_response(
+            items, page=1, page_size=150, max_page_size=50
+        )
         assert len(result["items"]) == 50
         assert result["pagination"]["page_size"] == 50
 

@@ -27,6 +27,7 @@ from backend.core.log_formatters import (
 # strip_ansi
 # ===================================================================
 
+
 class TestStripAnsi:
     def test_removes_basic_color(self):
         assert strip_ansi("\x1b[31mRed\x1b[0m") == "Red"
@@ -48,6 +49,7 @@ class TestStripAnsi:
 # _fix_record
 # ===================================================================
 
+
 class TestFixRecord:
     def test_copies_record(self):
         rec = logging.LogRecord("name", logging.INFO, "file", 1, "msg", (), None)
@@ -66,6 +68,7 @@ class TestFixRecord:
 # ===================================================================
 # StackInfoFilter
 # ===================================================================
+
 
 class TestStackInfoFilter:
     def test_passes_all_records(self):
@@ -93,10 +96,13 @@ class TestStackInfoFilter:
 # NoColorFormatter
 # ===================================================================
 
+
 class TestNoColorFormatter:
     def test_strips_ansi_from_message(self):
         fmt = NoColorFormatter("%(message)s")
-        rec = logging.LogRecord("n", logging.INFO, "f", 1, "\x1b[31mRed\x1b[0m", (), None)
+        rec = logging.LogRecord(
+            "n", logging.INFO, "f", 1, "\x1b[31mRed\x1b[0m", (), None
+        )
         output = fmt.format(rec)
         assert "\x1b[" not in output
         assert "Red" in output
@@ -106,10 +112,13 @@ class TestNoColorFormatter:
 # EnhancedJSONFormatter
 # ===================================================================
 
+
 class TestEnhancedJSONFormatter:
     def test_adds_standard_fields(self):
         fmt = EnhancedJSONFormatter()
-        rec = logging.LogRecord("mylogger", logging.INFO, "myfile.py", 42, "hello", (), None)
+        rec = logging.LogRecord(
+            "mylogger", logging.INFO, "myfile.py", 42, "hello", (), None
+        )
         output = fmt.format(rec)
         # Output should be valid JSON-ish string containing expected keys
         assert "timestamp" in output
@@ -120,7 +129,9 @@ class TestEnhancedJSONFormatter:
 
     def test_adds_optional_fields_when_present(self):
         fmt = EnhancedJSONFormatter()
-        rec = logging.LogRecord("mylogger", logging.INFO, "myfile.py", 42, "hello", (), None)
+        rec = logging.LogRecord(
+            "mylogger", logging.INFO, "myfile.py", 42, "hello", (), None
+        )
         rec.request_id = "req-123"
         rec.conversation_id = "conv-456"
         rec.agent_type = "coder"
@@ -139,6 +150,7 @@ class TestEnhancedJSONFormatter:
 # ===================================================================
 # ColoredFormatter
 # ===================================================================
+
 
 class TestColoredFormatter:
     def test_step_message(self):
@@ -163,7 +175,9 @@ class TestColoredFormatter:
             {"AGENT_START": "cyan"},
         )
         monkeypatch.setattr("backend.core.constants.DISABLE_COLOR_PRINTING", False)
-        monkeypatch.setattr("backend.core.log_formatters.colored", lambda text, _c: text)
+        monkeypatch.setattr(
+            "backend.core.log_formatters.colored", lambda text, _c: text
+        )
         fmt = ColoredFormatter()
         rec = logging.LogRecord("n", logging.INFO, "f", 1, "Hello", (), None)
         rec.msg_type = "START"
@@ -174,7 +188,9 @@ class TestColoredFormatter:
     def test_error_format_includes_location(self, monkeypatch):
         monkeypatch.setattr("backend.core.log_formatters.LOG_COLORS", {"ERROR": "red"})
         monkeypatch.setattr("backend.core.constants.DISABLE_COLOR_PRINTING", False)
-        monkeypatch.setattr("backend.core.log_formatters.colored", lambda text, _c: text)
+        monkeypatch.setattr(
+            "backend.core.log_formatters.colored", lambda text, _c: text
+        )
         monkeypatch.setattr("backend.core.constants.DEBUG", False)
         fmt = ColoredFormatter()
         rec = logging.LogRecord("n", logging.ERROR, "file.py", 12, "Boom", (), None)
@@ -201,12 +217,16 @@ class TestColoredFormatter:
 # SensitiveDataFilter
 # ===================================================================
 
+
 class TestSensitiveDataFilter:
     def test_redacts_env_key(self):
         f = SensitiveDataFilter()
-        with patch.dict(os.environ, {"MY_SECRET_KEY": "supersecretvalue123"}, clear=False):
-            rec = logging.LogRecord("n", logging.INFO, "f", 1,
-                                    "Using key supersecretvalue123 now", (), None)
+        with patch.dict(
+            os.environ, {"MY_SECRET_KEY": "supersecretvalue123"}, clear=False
+        ):
+            rec = logging.LogRecord(
+                "n", logging.INFO, "f", 1, "Using key supersecretvalue123 now", (), None
+            )
             f.filter(rec)
             assert "supersecretvalue123" not in rec.msg
             assert "******" in rec.msg
@@ -214,16 +234,18 @@ class TestSensitiveDataFilter:
     def test_skips_short_values(self):
         f = SensitiveDataFilter()
         with patch.dict(os.environ, {"MY_SECRET_KEY": "ab"}, clear=False):
-            rec = logging.LogRecord("n", logging.INFO, "f", 1,
-                                    "Using key ab now", (), None)
+            rec = logging.LogRecord(
+                "n", logging.INFO, "f", 1, "Using key ab now", (), None
+            )
             f.filter(rec)
             # Short values (len<=2) should NOT be redacted
             assert "ab" in rec.msg
 
     def test_redacts_pattern_in_msg(self):
         f = SensitiveDataFilter()
-        rec = logging.LogRecord("n", logging.INFO, "f", 1,
-                                "Setting api_key='sk-test123'", (), None)
+        rec = logging.LogRecord(
+            "n", logging.INFO, "f", 1, "Setting api_key='sk-test123'", (), None
+        )
         f.filter(rec)
         assert "sk-test123" not in rec.msg
         assert "******" in rec.msg
@@ -258,6 +280,7 @@ class TestSensitiveDataFilter:
 # ===================================================================
 # TraceContextFilter
 # ===================================================================
+
 
 class TestTraceContextFilter:
     def test_injects_trace_context(self):
@@ -302,7 +325,9 @@ class TestOpenTelemetryTraceFilter:
                 return DummyContext()
 
         fake_trace = types.SimpleNamespace(get_current_span=lambda: DummySpan())
-        monkeypatch.setitem(sys.modules, "opentelemetry", types.SimpleNamespace(trace=fake_trace))
+        monkeypatch.setitem(
+            sys.modules, "opentelemetry", types.SimpleNamespace(trace=fake_trace)
+        )
 
         f = OpenTelemetryTraceFilter()
         rec = logging.LogRecord("n", logging.INFO, "f", 1, "msg", (), None)
@@ -321,7 +346,9 @@ class TestOpenTelemetryTraceFilter:
                 return DummyContext()
 
         fake_trace = types.SimpleNamespace(get_current_span=lambda: DummySpan())
-        monkeypatch.setitem(sys.modules, "opentelemetry", types.SimpleNamespace(trace=fake_trace))
+        monkeypatch.setitem(
+            sys.modules, "opentelemetry", types.SimpleNamespace(trace=fake_trace)
+        )
 
         f = OpenTelemetryTraceFilter()
         rec = logging.LogRecord("n", logging.INFO, "f", 1, "msg", (), None)

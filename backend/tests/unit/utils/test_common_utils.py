@@ -9,7 +9,7 @@ Tests cover:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -27,23 +27,23 @@ from backend.utils.utils import (
 def base_config() -> ForgeConfig:
     """Provide a base Forge configuration."""
     config = Mock(spec=ForgeConfig)
-    
+
     # Mock LLM config getter/setter
     mock_llm_config = Mock()
     mock_llm_config.model = "gpt-4"
     mock_llm_config.api_key = "base-key"
     mock_llm_config.base_url = "https://api.openai.com/v1"
-    
+
     config.get_llm_config = Mock(return_value=mock_llm_config)
     config.set_llm_config = Mock()
-    
+
     # Mock other config fields
     config.file_store = "local"
     config.file_store_path = "/tmp/files"
     config.file_store_web_hook_url = None
     config.file_store_web_hook_headers = None
     config.file_store_web_hook_batch = 10
-    
+
     return config
 
 
@@ -78,12 +78,12 @@ class TestSetupLlmConfig:
     ) -> None:
         """Test that user settings override base config."""
         mock_deepcopy.side_effect = lambda x: x
-        result = setup_llm_config(base_config, user_settings)
+        setup_llm_config(base_config, user_settings)
 
         # Get the LLM config that was set
         set_call_args = base_config.set_llm_config.call_args
         assert set_call_args is not None
-        
+
         updated_llm_config = set_call_args[0][0]
         assert updated_llm_config.model == "gpt-4-turbo"
         assert updated_llm_config.api_key == "user-api-key"
@@ -95,11 +95,11 @@ class TestSetupLlmConfig:
     ) -> None:
         """Test that partial user settings fill in base config."""
         mock_deepcopy.side_effect = lambda x: x
-        result = setup_llm_config(base_config, minimal_settings)
+        setup_llm_config(base_config, minimal_settings)
 
         set_call_args = base_config.set_llm_config.call_args
         updated_llm_config = set_call_args[0][0]
-        
+
         # API key should be updated
         assert updated_llm_config.api_key == "user-api-key"
         # Model should become empty string (not provided)
@@ -138,7 +138,7 @@ class TestSetupLlmConfig:
         """Test that original config is not modified (deep copy)."""
         original_id = id(base_config)
         result = setup_llm_config(base_config, user_settings)
-        
+
         # The original config should still exist and not be the result
         assert id(base_config) == original_id
         assert base_config != result
@@ -153,9 +153,9 @@ class TestSetupLlmConfig:
         settings.llm_model = ""
         settings.llm_api_key = "key"
         settings.llm_base_url = "url"
-        
+
         setup_llm_config(base_config, settings)
-        
+
         set_call_args = base_config.set_llm_config.call_args
         updated_llm_config = set_call_args[0][0]
         assert updated_llm_config.model == ""
@@ -169,9 +169,9 @@ class TestSetupLlmConfig:
         # Set a custom value in base config
         base_llm_config = base_config.get_llm_config.return_value
         base_llm_config.some_field = "preserved_value"
-        
+
         setup_llm_config(base_config, user_settings)
-        
+
         set_call_args = base_config.set_llm_config.call_args
         updated_llm_config = set_call_args[0][0]
         # The field we didn't modify should still be there
@@ -210,7 +210,7 @@ class TestCreateRegistryAndStats:
         mock_registry_class.assert_called_once()
         mock_stats_class.assert_called_once_with(mock_file_store, "sid_1", "user_1")
         mock_registry.subscribe.assert_called_once()
-        
+
         # Verify returns
         assert registry == mock_registry
         assert stats == mock_conversation_stats
@@ -401,9 +401,7 @@ class TestCreateRegistryAndStats:
         mock_conversation_stats = Mock(spec=ConversationStats)
         mock_stats_class.return_value = mock_conversation_stats
 
-        create_registry_and_conversation_stats(
-            base_config, "sid_1", "user_1", None
-        )
+        create_registry_and_conversation_stats(base_config, "sid_1", "user_1", None)
 
         # Agent class should be None
         call_args = mock_registry_class.call_args
@@ -460,8 +458,8 @@ class TestConfigComplexity:
         settings.llm_base_url = "https://api.example.com:8080/v1/api?version=2"
         settings.agent = None
 
-        result = setup_llm_config(base_config, settings)
-        
+        setup_llm_config(base_config, settings)
+
         set_call_args = base_config.set_llm_config.call_args
         assert set_call_args is not None
         updated_llm_config = set_call_args[0][0]

@@ -147,7 +147,7 @@ class EventStore(EventStoreABC):
         start_id: int = 0,
         end_id: int | None = None,
         reverse: bool = False,
-        filter: EventFilter | None = None,
+        event_filter: EventFilter | None = None,
         limit: int | None = None,
     ) -> Iterable[Event]:
         """Retrieve events from the event stream, optionally filtering out events of a given type.
@@ -158,7 +158,7 @@ class EventStore(EventStoreABC):
             start_id: The ID of the first event to retrieve. Defaults to 0.
             end_id: The ID of the last event to retrieve. Defaults to the last event in the stream.
             reverse: Whether to retrieve events in reverse order. Defaults to False.
-            filter: EventFilter to use
+            event_filter: EventFilter to use
             limit: Maximum number of events to retrieve. Defaults to None (no limit).
 
         Yields:
@@ -193,7 +193,7 @@ class EventStore(EventStoreABC):
                 return
             if event is None:
                 continue
-            if filter and not filter.include(event):
+            if event_filter and not event_filter.include(event):
                 continue
 
             yield event
@@ -201,11 +201,11 @@ class EventStore(EventStoreABC):
             if limit and limit <= num_results:
                 return
 
-    def get_event(self, id: int) -> Event:
+    def get_event(self, event_id: int) -> Event:
         """Get event by ID from persistent storage.
 
         Args:
-            id: Event ID to retrieve
+            event_id: Event ID to retrieve
 
         Returns:
             Event object
@@ -214,7 +214,7 @@ class EventStore(EventStoreABC):
             FileNotFoundError: If event doesn't exist
 
         """
-        filename = self._get_filename_for_id(id, self.user_id)
+        filename = self._get_filename_for_id(event_id, self.user_id)
         last_error: Exception | None = None
         for _ in range(5):
             try:
@@ -262,8 +262,8 @@ class EventStore(EventStoreABC):
             if event.source == source:
                 yield event
 
-    def _get_filename_for_id(self, id: int, user_id: str | None) -> str:
-        return get_conversation_event_filename(self.sid, id, user_id)
+    def _get_filename_for_id(self, event_id: int, user_id: str | None) -> str:
+        return get_conversation_event_filename(self.sid, event_id, user_id)
 
     def _get_filename_for_cache(self, start: int, end: int) -> str:
         return f"{get_conversation_dir(self.sid, self.user_id)}event_cache/{start}-{end}.json"

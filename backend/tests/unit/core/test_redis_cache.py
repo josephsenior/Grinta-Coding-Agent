@@ -108,6 +108,7 @@ class TestDistributedCacheRedisPath:
 
     def test_get_hit(self, redis_cache):
         import json
+
         redis_cache.client.get.return_value = json.dumps({"x": 1}).encode("utf-8")
         assert redis_cache.get("k") == {"x": 1}
         assert redis_cache.stats["hits"] == 1
@@ -205,8 +206,12 @@ class TestDistributedCacheInit:
             mock_redis = MagicMock()
             mock_redis.ping.return_value = True
 
-            with patch("backend.core.cache.redis_cache.ConnectionPool", return_value=mock_pool):
-                with patch("backend.core.cache.redis_cache.Redis", return_value=mock_redis):
+            with patch(
+                "backend.core.cache.redis_cache.ConnectionPool", return_value=mock_pool
+            ):
+                with patch(
+                    "backend.core.cache.redis_cache.Redis", return_value=mock_redis
+                ):
                     cache = DistributedCache(prefix="test", host="localhost")
 
             assert cache.enabled is True
@@ -233,7 +238,10 @@ class TestDistributedCacheRedisEdgeCases:
         circular["self"] = circular
 
         # Even with _json_fallback, deeply nested circular refs will fail
-        with patch("backend.core.cache.redis_cache.json.dumps", side_effect=TypeError("circular")):
+        with patch(
+            "backend.core.cache.redis_cache.json.dumps",
+            side_effect=TypeError("circular"),
+        ):
             assert redis_cache.set("k", {"data": "test"}) is False
             redis_cache.client.setex.assert_not_called()
 

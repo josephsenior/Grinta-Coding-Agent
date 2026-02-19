@@ -51,12 +51,8 @@ class TestValidationRule:
 
     def test_validation_rule_custom_severity(self):
         """Should accept custom severity levels."""
-        rule_error = ValidationRule(
-            name="test", check=MagicMock(), severity="error"
-        )
-        rule_block = ValidationRule(
-            name="test2", check=MagicMock(), severity="block"
-        )
+        rule_error = ValidationRule(name="test", check=MagicMock(), severity="error")
+        rule_block = ValidationRule(name="test2", check=MagicMock(), severity="block")
 
         assert rule_error.severity == "error"
         assert rule_block.severity == "block"
@@ -154,7 +150,7 @@ class TestToolResultValidatorInit:
         validator = ToolResultValidator()
 
         # Should have at least some global rules
-        assert len(validator._global_rules) > 0
+        assert validator._global_rules
 
         # Check for specific built-in rules
         rule_names = {rule.name for rule in validator._global_rules}
@@ -182,9 +178,7 @@ class TestAddRule:
         validator = ToolResultValidator()
         check_func = MagicMock(return_value=None)
 
-        validator.add_rule(
-            "cmd_rule", check_func, action_type="CmdRunAction"
-        )
+        validator.add_rule("cmd_rule", check_func, action_type="CmdRunAction")
 
         assert "CmdRunAction" in validator._action_rules
         assert len(validator._action_rules["CmdRunAction"]) == 1
@@ -194,12 +188,8 @@ class TestAddRule:
         """Should allow multiple rules for same action type."""
         validator = ToolResultValidator()
 
-        validator.add_rule(
-            "rule1", MagicMock(), action_type="CmdRunAction"
-        )
-        validator.add_rule(
-            "rule2", MagicMock(), action_type="CmdRunAction"
-        )
+        validator.add_rule("rule1", MagicMock(), action_type="CmdRunAction")
+        validator.add_rule("rule2", MagicMock(), action_type="CmdRunAction")
 
         assert len(validator._action_rules["CmdRunAction"]) == 2
 
@@ -240,6 +230,21 @@ class TestObserve:
         assert "validation_result" not in ctx.metadata
 
     @pytest.mark.asyncio
+    async def test_observe_appends_validation_block_to_content(self):
+        validator = ToolResultValidator()
+        controller = MagicMock()
+        state = MagicMock()
+        action = CmdRunAction(command="echo hi")
+        ctx = ToolInvocationContext(controller=controller, action=action, state=state)
+
+        # Create a large output to trigger built-in output_size warning.
+        obs = CmdOutputObservation(content="x" * 120_000, command="echo hi")
+
+        await validator.observe(ctx, obs)
+
+        assert "<FORGE_RESULT_VALIDATION>" in obs.content
+
+    @pytest.mark.asyncio
     async def test_observe_runs_global_rules(self):
         """Should run all global validation rules."""
         validator = ToolResultValidator()
@@ -261,9 +266,7 @@ class TestObserve:
         """Should run action-specific rules for matching action."""
         validator = ToolResultValidator()
         check_func = MagicMock(return_value=None)
-        validator.add_rule(
-            "cmd_rule", check_func, action_type="CmdRunAction"
-        )
+        validator.add_rule("cmd_rule", check_func, action_type="CmdRunAction")
 
         action = CmdRunAction(command="test")
         obs = CmdOutputObservation(content="OK", command="test")
@@ -280,9 +283,7 @@ class TestObserve:
         """Should not run action-specific rules for different actions."""
         validator = ToolResultValidator()
         check_func = MagicMock(return_value=None)
-        validator.add_rule(
-            "file_rule", check_func, action_type="FileReadAction"
-        )
+        validator.add_rule("file_rule", check_func, action_type="FileReadAction")
 
         action = CmdRunAction(command="test")
         obs = CmdOutputObservation(content="OK", command="test")
@@ -327,7 +328,7 @@ class TestObserve:
 
         result = ctx.metadata["validation_result"]
         assert result.passed is False
-        assert len(result.errors) > 0
+        assert result.errors
 
     @pytest.mark.asyncio
     async def test_observe_handles_blocking_rule(self):
@@ -347,7 +348,7 @@ class TestObserve:
 
         ctx.block.assert_called_once()
         call_args = ctx.block.call_args
-        assert "result_validation" in call_args.kwargs["reason"]
+        assert "RESULT VALIDATION BLOCKED" in call_args.kwargs["reason"]
 
     @pytest.mark.asyncio
     async def test_observe_gracefully_handles_rule_exception(self):
@@ -364,6 +365,7 @@ class TestObserve:
         controller = MagicMock()
         state = MagicMock()
         ToolInvocationContext(controller=controller, action=action, state=state)
+
     @pytest.mark.asyncio
     async def test_output_size_rule_warns_on_large_content(self):
         """output_size rule should warn when content > 100k chars."""
@@ -379,10 +381,12 @@ class TestObserve:
         await validator.observe(ctx, obs)
 
         result = ctx.metadata["validation_result"]
-        assert len(result.warnings) > 0
+        assert result.warnings
         # Check for truncation warning
         warning_text = " ".join(result.warnings)
-        assert "truncated" in warning_text.lower() or "incomplete" in warning_text.lower()
+        assert (
+            "truncated" in warning_text.lower() or "incomplete" in warning_text.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_output_size_rule_passes_on_small_content(self):
@@ -400,7 +404,7 @@ class TestObserve:
         result = ctx.metadata["validation_result"]
         # Should either have no warnings or no truncation warnings
         truncation_warnings = [w for w in result.warnings if "truncated" in w.lower()]
-        assert len(truncation_warnings) == 0
+        assert not truncation_warnings
 
     @pytest.mark.asyncio
     async def test_error_observation_rule_warns_on_error(self):
@@ -416,7 +420,7 @@ class TestObserve:
         await validator.observe(ctx, obs)
 
         result = ctx.metadata["validation_result"]
-        assert len(result.warnings) > 0
+        assert result.warnings
         # Check for error warning
         warning_text = " ".join(result.warnings)
         assert "error" in warning_text.lower()
@@ -436,8 +440,10 @@ class TestObserve:
 
         result = ctx.metadata["validation_result"]
         # Should not have error observation warnings
-        error_warnings = [w for w in result.warnings if "tool returned error" in w.lower()]
-        assert len(error_warnings) == 0
+        error_warnings = [
+            w for w in result.warnings if "tool returned error" in w.lower()
+        ]
+        assert not error_warnings
 
     @pytest.mark.asyncio
     async def test_empty_result_rule_warns_on_empty_content(self):
@@ -453,7 +459,7 @@ class TestObserve:
         await validator.observe(ctx, obs)
 
         result = ctx.metadata["validation_result"]
-        assert len(result.warnings) > 0
+        assert result.warnings
         # Check for empty warning
         warning_text = " ".join(result.warnings)
         assert "empty" in warning_text.lower()
@@ -474,7 +480,7 @@ class TestObserve:
         result = ctx.metadata["validation_result"]
         # Should not have empty result warnings
         empty_warnings = [w for w in result.warnings if "empty" in w.lower()]
-        assert len(empty_warnings) == 0
+        assert not empty_warnings
 
     @pytest.mark.asyncio
     async def test_empty_result_handles_none_content(self):

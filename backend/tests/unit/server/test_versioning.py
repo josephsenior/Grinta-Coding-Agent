@@ -22,6 +22,7 @@ from backend.server.versioning import (
 # APIVersion enum
 # ---------------------------------------------------------------------------
 
+
 class TestAPIVersion:
     """Tests for the APIVersion enum."""
 
@@ -41,6 +42,7 @@ class TestAPIVersion:
 # ---------------------------------------------------------------------------
 # get_api_version_from_path
 # ---------------------------------------------------------------------------
+
 
 class TestGetApiVersionFromPath:
     """Tests for get_api_version_from_path."""
@@ -71,6 +73,7 @@ class TestGetApiVersionFromPath:
 # add_version_headers
 # ---------------------------------------------------------------------------
 
+
 class TestAddVersionHeaders:
     """Tests for add_version_headers."""
 
@@ -84,6 +87,7 @@ class TestAddVersionHeaders:
 # ---------------------------------------------------------------------------
 # _EXCLUDED_PATHS
 # ---------------------------------------------------------------------------
+
 
 class TestExcludedPaths:
     """Tests for the excluded paths constant."""
@@ -104,6 +108,7 @@ class TestExcludedPaths:
 # ---------------------------------------------------------------------------
 # version_middleware
 # ---------------------------------------------------------------------------
+
 
 class TestVersionMiddleware:
     """Tests for the version_middleware async function."""

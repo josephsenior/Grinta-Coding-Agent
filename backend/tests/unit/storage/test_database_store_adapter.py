@@ -10,8 +10,7 @@ Tests cover:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -69,9 +68,7 @@ class TestCollectionOperations:
         self, adapter: DatabaseStoreAdapter, example_collection: KnowledgeBaseCollection
     ) -> None:
         """Test creating a new collection."""
-        adapter._db_store.create_collection = AsyncMock(
-            return_value=example_collection
-        )
+        adapter._db_store.create_collection = AsyncMock(return_value=example_collection)
 
         result = adapter.create_collection("user_1", "Test Collection", "A test KB")
 
@@ -86,9 +83,7 @@ class TestCollectionOperations:
         self, adapter: DatabaseStoreAdapter, example_collection: KnowledgeBaseCollection
     ) -> None:
         """Test creating a collection without description."""
-        adapter._db_store.create_collection = AsyncMock(
-            return_value=example_collection
-        )
+        adapter._db_store.create_collection = AsyncMock(return_value=example_collection)
 
         result = adapter.create_collection("user_1", "Test Collection")
 
@@ -139,9 +134,7 @@ class TestCollectionOperations:
 
         assert result == []
 
-    def test_list_collections_multiple(
-        self, adapter: DatabaseStoreAdapter
-    ) -> None:
+    def test_list_collections_multiple(self, adapter: DatabaseStoreAdapter) -> None:
         """Test listing multiple collections."""
         col1 = KnowledgeBaseCollection(
             id="col_1", user_id="user_1", name="Collection 1"
@@ -178,9 +171,7 @@ class TestCollectionOperations:
             "col_123", "Updated Name", None
         )
 
-    def test_update_collection_description(
-        self, adapter: DatabaseStoreAdapter
-    ) -> None:
+    def test_update_collection_description(self, adapter: DatabaseStoreAdapter) -> None:
         """Test updating collection description."""
         updated = KnowledgeBaseCollection(
             id="col_123",
@@ -362,9 +353,7 @@ class TestDocumentOperations:
 class TestStatistics:
     """Test statistics aggregation."""
 
-    def test_get_stats_single_collection(
-        self, adapter: DatabaseStoreAdapter
-    ) -> None:
+    def test_get_stats_single_collection(self, adapter: DatabaseStoreAdapter) -> None:
         """Test getting stats with one collection."""
         col = KnowledgeBaseCollection(
             id="col_1",
@@ -387,10 +376,18 @@ class TestStatistics:
     ) -> None:
         """Test getting stats with multiple collections."""
         col1 = KnowledgeBaseCollection(
-            id="col_1", user_id="default", name="Col1", document_count=5, total_size_bytes=1024
+            id="col_1",
+            user_id="default",
+            name="Col1",
+            document_count=5,
+            total_size_bytes=1024,
         )
         col2 = KnowledgeBaseCollection(
-            id="col_2", user_id="default", name="Col2", document_count=10, total_size_bytes=2048
+            id="col_2",
+            user_id="default",
+            name="Col2",
+            document_count=10,
+            total_size_bytes=2048,
         )
         adapter._db_store.list_collections = AsyncMock(return_value=[col1, col2])
 
@@ -430,19 +427,16 @@ class TestStatistics:
 class TestAsyncBridging:
     """Test async-to-sync bridging functionality."""
 
-    def test_run_async_with_existing_loop(
-        self, adapter: DatabaseStoreAdapter
-    ) -> None:
+    def test_run_async_with_existing_loop(self, adapter: DatabaseStoreAdapter) -> None:
         """Test _run_async with existing event loop."""
+
         async def dummy_coro():
             return "result"
 
         result = adapter._run_async(dummy_coro())
         assert result == "result"
 
-    def test_run_async_handles_coroutine(
-        self, adapter: DatabaseStoreAdapter
-    ) -> None:
+    def test_run_async_handles_coroutine(self, adapter: DatabaseStoreAdapter) -> None:
         """Test _run_async correctly executes coroutine."""
         call_count = 0
 
@@ -458,12 +452,8 @@ class TestAsyncBridging:
         self, adapter: DatabaseStoreAdapter, example_collection: KnowledgeBaseCollection
     ) -> None:
         """Test multiple async calls are properly bridged."""
-        adapter._db_store.create_collection = AsyncMock(
-            return_value=example_collection
-        )
-        adapter._db_store.get_collection = AsyncMock(
-            return_value=example_collection
-        )
+        adapter._db_store.create_collection = AsyncMock(return_value=example_collection)
+        adapter._db_store.get_collection = AsyncMock(return_value=example_collection)
 
         col1 = adapter.create_collection("user_1", "Col1")
         col2 = adapter.get_collection(col1.id)
@@ -476,13 +466,9 @@ class TestAsyncBridging:
 class TestIntegrationScenarios:
     """Test realistic usage scenarios."""
 
-    def test_create_and_list_workflow(
-        self, adapter: DatabaseStoreAdapter
-    ) -> None:
+    def test_create_and_list_workflow(self, adapter: DatabaseStoreAdapter) -> None:
         """Test creating a collection and listing it."""
-        col = KnowledgeBaseCollection(
-            id="col_1", user_id="user_1", name="My KB"
-        )
+        col = KnowledgeBaseCollection(id="col_1", user_id="user_1", name="My KB")
         adapter._db_store.create_collection = AsyncMock(return_value=col)
         adapter._db_store.list_collections = AsyncMock(return_value=[col])
 

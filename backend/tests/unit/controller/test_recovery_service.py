@@ -32,6 +32,7 @@ def _make_retry_service() -> MagicMock:
 
 # ── _format_user_message ─────────────────────────────────────────────
 
+
 class TestFormatUserMessage:
     def test_module_not_found(self):
         svc = RecoveryService(_make_context(), _make_retry_service())
@@ -42,28 +43,23 @@ class TestFormatUserMessage:
 
     def test_runtime_crash(self):
         svc = RecoveryService(_make_context(), _make_retry_service())
-        msg = svc._format_user_message(
-            RuntimeError("crash"), ErrorType.RUNTIME_CRASH
-        )
+        msg = svc._format_user_message(RuntimeError("crash"), ErrorType.RUNTIME_CRASH)
         assert "crashed" in msg.lower() or "runtime" in msg.lower()
 
     def test_unknown_error_fallback(self):
         svc = RecoveryService(_make_context(), _make_retry_service())
-        msg = svc._format_user_message(
-            ValueError("oops"), ErrorType.UNKNOWN_ERROR
-        )
+        msg = svc._format_user_message(ValueError("oops"), ErrorType.UNKNOWN_ERROR)
         assert "ValueError" in msg
         assert "oops" in msg
 
     def test_filesystem_error(self):
         svc = RecoveryService(_make_context(), _make_retry_service())
-        msg = svc._format_user_message(
-            OSError("disk"), ErrorType.FILESYSTEM_ERROR
-        )
+        msg = svc._format_user_message(OSError("disk"), ErrorType.FILESYSTEM_ERROR)
         assert "file system" in msg.lower() or "File system" in msg
 
 
 # ── _extract_retry_delay ─────────────────────────────────────────────
+
 
 class TestExtractRetryDelay:
     def test_seconds_pattern(self):
@@ -90,6 +86,7 @@ class TestExtractRetryDelay:
 
 # ── _format_llm_error ────────────────────────────────────────────────
 
+
 class TestFormatLlmError:
     def test_generic_exception_returns_none(self):
         svc = RecoveryService(_make_context(), _make_retry_service())
@@ -97,6 +94,7 @@ class TestFormatLlmError:
 
     def test_api_connection_error(self):
         from backend.llm.exceptions import APIConnectionError as ACE
+
         svc = RecoveryService(_make_context(), _make_retry_service())
         exc = ACE(message="connection refused")
         result = svc._format_llm_error(exc)
@@ -105,6 +103,7 @@ class TestFormatLlmError:
 
     def test_authentication_error(self):
         from backend.llm.exceptions import AuthenticationError as AE
+
         svc = RecoveryService(_make_context(), _make_retry_service())
         exc = AE(message="invalid api key", llm_provider="test", model="test")
         result = svc._format_llm_error(exc)
@@ -114,6 +113,7 @@ class TestFormatLlmError:
 
 # ── _format_rate_limit_error ─────────────────────────────────────────
 
+
 class TestFormatRateLimitError:
     def test_quota_exceeded(self):
         svc = RecoveryService(_make_context(), _make_retry_service())
@@ -122,11 +122,14 @@ class TestFormatRateLimitError:
 
     def test_standard_rate_limit(self):
         svc = RecoveryService(_make_context(), _make_retry_service())
-        result = svc._format_rate_limit_error(Exception("rate limit reached retry in 30s"))
+        result = svc._format_rate_limit_error(
+            Exception("rate limit reached retry in 30s")
+        )
         assert "Rate Limit" in result
 
 
 # ── _emit_recovery_event ─────────────────────────────────────────────
+
 
 class TestEmitRecoveryEvent:
     def test_emits_event(self):
@@ -147,10 +150,12 @@ class TestEmitRecoveryEvent:
 
 # ── _determine_runtime_status ────────────────────────────────────────
 
+
 class TestDetermineRuntimeStatus:
     def test_auth_error(self):
         from backend.llm.exceptions import AuthenticationError as AE
         from backend.core.enums import RuntimeStatus
+
         svc = RecoveryService(_make_context(), _make_retry_service())
         exc = AE(message="bad key", llm_provider="test", model="test")
         status = svc._determine_runtime_status(exc)
@@ -158,6 +163,7 @@ class TestDetermineRuntimeStatus:
 
     def test_generic_error(self):
         from backend.core.enums import RuntimeStatus
+
         svc = RecoveryService(_make_context(), _make_retry_service())
         status = svc._determine_runtime_status(ValueError("oops"))
         assert status == RuntimeStatus.ERROR
@@ -165,10 +171,12 @@ class TestDetermineRuntimeStatus:
 
 # ── react_to_exception (integration-ish) ─────────────────────────────
 
+
 class TestReactToException:
     @pytest.mark.asyncio
     async def test_authentication_error_skips_recovery(self):
         from backend.llm.exceptions import AuthenticationError as AE
+
         ctx = _make_context()
         controller = ctx.get_controller()
         controller.state.agent_state = "RUNNING"

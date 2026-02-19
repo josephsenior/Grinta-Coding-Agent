@@ -8,7 +8,11 @@ import pytest
 from backend.core.enums import ActionSecurityRisk
 from backend.events.action import CmdRunAction, FileWriteAction
 from backend.events.action.message import MessageAction
-from backend.security.analyzer import SecurityAnalyzer, _CMD_RISK_MAP, _SENSITIVE_WRITE_PATHS
+from backend.security.analyzer import (
+    SecurityAnalyzer,
+    _CMD_RISK_MAP,
+    _SENSITIVE_WRITE_PATHS,
+)
 from backend.security.options import SecurityAnalyzers, get_security_analyzer
 
 
@@ -110,9 +114,7 @@ class TestFileWriteRisk:
     @pytest.mark.asyncio
     async def test_python_syntax_error_flagged(self):
         sa = SecurityAnalyzer()
-        action = FileWriteAction(
-            path="broken.py", content="def f(\n  x = \n"
-        )
+        action = FileWriteAction(path="broken.py", content="def f(\n  x = \n")
         risk = await sa.security_risk(action)
         assert risk >= ActionSecurityRisk.HIGH
 

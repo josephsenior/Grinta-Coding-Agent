@@ -65,9 +65,7 @@ class TestDiscoverCommand(TestCase):
     @patch("backend.llm.discover_models.discover_all_local_models")
     def test_discover_with_ollama_models(self, mock_discover):
         """Test discover with Ollama models."""
-        mock_discover.return_value = {
-            "ollama": ["llama3.2", "codellama"]
-        }
+        mock_discover.return_value = {"ollama": ["llama3.2", "codellama"]}
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
             discover_command()
@@ -84,7 +82,7 @@ class TestDiscoverCommand(TestCase):
         """Test discover with multiple providers."""
         mock_discover.return_value = {
             "ollama": ["model1", "model2"],
-            "lmstudio": ["model3"]
+            "lmstudio": ["model3"],
         }
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
@@ -99,9 +97,7 @@ class TestDiscoverCommand(TestCase):
     @patch("backend.llm.discover_models.discover_all_local_models")
     def test_discover_shows_usage_examples(self, mock_discover):
         """Test that discover shows usage examples for Ollama."""
-        mock_discover.return_value = {
-            "ollama": ["llama3.2"]
-        }
+        mock_discover.return_value = {"ollama": ["llama3.2"]}
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
             discover_command()
@@ -117,10 +113,7 @@ class TestStatusCommand(TestCase):
     @patch("backend.llm.discover_models.check_local_providers")
     def test_status_all_running(self, mock_check):
         """Test status when all providers are running."""
-        mock_check.return_value = {
-            "ollama": True,
-            "lmstudio": True
-        }
+        mock_check.return_value = {"ollama": True, "lmstudio": True}
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
             status_command()
@@ -133,10 +126,7 @@ class TestStatusCommand(TestCase):
     @patch("backend.llm.discover_models.check_local_providers")
     def test_status_none_running(self, mock_check):
         """Test status when no providers are running."""
-        mock_check.return_value = {
-            "ollama": False,
-            "lmstudio": False
-        }
+        mock_check.return_value = {"ollama": False, "lmstudio": False}
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
             status_command()
@@ -149,10 +139,7 @@ class TestStatusCommand(TestCase):
     @patch("backend.llm.discover_models.check_local_providers")
     def test_status_mixed(self, mock_check):
         """Test status with mixed provider availability."""
-        mock_check.return_value = {
-            "ollama": True,
-            "lmstudio": False
-        }
+        mock_check.return_value = {"ollama": True, "lmstudio": False}
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
             status_command()
@@ -198,7 +185,7 @@ class TestAliasesCommand(TestCase):
         mock_manager = MagicMock()
         mock_manager.get_all_aliases.return_value = {
             "my-model": "claude-3-7-sonnet",
-            "local-llm": "ollama/llama3.2"
+            "local-llm": "ollama/llama3.2",
         }
         mock_get_manager.return_value = mock_manager
 
@@ -219,7 +206,7 @@ class TestAliasesCommand(TestCase):
         mock_manager = MagicMock()
         mock_manager.get_all_aliases.return_value = {
             "short": "target1",
-            "very-long-alias-name": "target2"
+            "very-long-alias-name": "target2",
         }
         mock_get_manager.return_value = mock_manager
 
@@ -311,7 +298,9 @@ class TestMain(TestCase):
     @patch("backend.llm.discover_models.discover_command")
     def test_main_extra_args_ignored(self, mock_discover):
         """Test that extra arguments are ignored."""
-        with patch.object(sys, "argv", ["discover_models.py", "discover", "extra", "args"]):
+        with patch.object(
+            sys, "argv", ["discover_models.py", "discover", "extra", "args"]
+        ):
             result = main()
 
         mock_discover.assert_called_once()
@@ -330,4 +319,5 @@ class TestMain(TestCase):
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

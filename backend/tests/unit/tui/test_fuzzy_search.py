@@ -62,6 +62,7 @@ class TestFuzzySubsequenceScore:
 # HomeScreen._fuzzy_match_score (static method)
 # ---------------------------------------------------------------------------
 
+
 def _make_conv(title: str = "", status: str = "running", cid: str = "conv-001"):
     """Build a minimal ConversationInfo-like object for testing."""
     return SimpleNamespace(title=title, status=status, conversation_id=cid)
@@ -90,7 +91,9 @@ class TestFuzzyMatchScore:
         assert 0 < score <= 50
 
     def test_all_words_match_returns_high(self):
-        conv = _make_conv(title="database migration complete", status="done", cid="id-1")
+        conv = _make_conv(
+            title="database migration complete", status="done", cid="id-1"
+        )
         # Each word found somewhere across title/status/cid
         score = HomeScreen._fuzzy_match_score("database done", conv)
         # "database" in title (substring → 100), or "database done" not substring → word match

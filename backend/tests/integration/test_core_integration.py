@@ -20,6 +20,7 @@ from backend.controller.agent_circuit_breaker import (
 )
 from backend.controller.health import collect_controller_health
 from backend.controller.memory_pressure import MemoryPressureMonitor
+from backend.controller.state.state import State
 from backend.events.action import ActionSecurityRisk
 
 # ------------------------------------------------------------------ #
@@ -30,10 +31,11 @@ from backend.events.action import ActionSecurityRisk
 def _mock_state(
     history: list | None = None,
     extra_data: dict[str, Any] | None = None,
-) -> MagicMock:
-    state = MagicMock()
+) -> State:
+    state = State(session_id="test-session")
     state.history = history or []
-    state.extra_data = extra_data if extra_data is not None else {}
+    if extra_data:
+        state.extra_data = extra_data
     return state
 
 
@@ -88,8 +90,8 @@ class TestCircuitBreakerDeque:
         cb.record_error(Exception("e"))
         cb.record_success()
         cb.reset()
-        assert len(cb.recent_errors) == 0
-        assert len(cb.recent_actions_success) == 0
+        assert not cb.recent_errors
+        assert not cb.recent_actions_success
         assert cb.consecutive_errors == 0
 
     def test_trips_on_error_rate(self):
@@ -273,13 +275,14 @@ class TestMemoryPressureCondenserWiring:
         fake_condenser.get_condensation.return_value = fake_condensation
         mgr.condenser = fake_condenser
 
-        state = _mock_state(extra_data={"memory_pressure": "CRITICAL"})
+        state = _mock_state()
+        state.turn_signals.memory_pressure = "CRITICAL"
         result = mgr.condense_history(state)
 
         # Should have called get_condensation to force condensation
         fake_condenser.get_condensation.assert_called_once_with(fake_view)
         # Memory pressure flag should be consumed
-        assert "memory_pressure" not in state.extra_data
+        assert state.turn_signals.memory_pressure is None
         # Result should reflect the forced condensation
         assert result.pending_action is fake_condensation.action
 
@@ -302,11 +305,12 @@ class TestMemoryPressureCondenserWiring:
         fake_condenser.get_condensation.side_effect = RuntimeError("condenser failed")
         mgr.condenser = fake_condenser
 
-        state = _mock_state(extra_data={"memory_pressure": "WARNING"})
+        state = _mock_state()
+        state.turn_signals.memory_pressure = "WARNING"
         result = mgr.condense_history(state)
 
         # Flag should still be consumed
-        assert "memory_pressure" not in state.extra_data
+        assert state.turn_signals.memory_pressure is None
         # Falls back to returning the original view
         assert result.events == ["e1"]
 
@@ -330,11 +334,12 @@ class TestMemoryPressureCondenserWiring:
         fake_condenser.condensed_history.return_value = fake_view
         mgr.condenser = fake_condenser
 
-        state = _mock_state(extra_data={"memory_pressure": "CRITICAL"})
+        state = _mock_state()
+        state.turn_signals.memory_pressure = "CRITICAL"
         result = mgr.condense_history(state)
 
         # Flag consumed
-        assert "memory_pressure" not in state.extra_data
+        assert state.turn_signals.memory_pressure is None
         # Events returned as-is (View)
         assert result.events == ["e1", "e2"]
 
@@ -404,7 +409,7 @@ class TestHealthSnapshot:
         snap = collect_controller_health(ctrl)
         # Should have warnings about consecutive errors
         warnings = snap.get("warnings", [])
-        assert len(warnings) > 0 or snap["severity"] in ("yellow", "red")
+        assert warnings or snap["severity"] in ("yellow", "red")
 
 
 # ================================================================== #
@@ -419,10 +424,10 @@ class TestStateExtraData:
         from backend.controller.state.state import State
 
         s = State(session_id="test-1")
-        s.extra_data["memory_pressure"] = "WARNING"
+        s.extra_data["some_metadata"] = "FOO"
         s.extra_data["custom_key"] = 42
 
-        assert s.extra_data["memory_pressure"] == "WARNING"
+        assert s.extra_data["some_metadata"] == "FOO"
         assert s.extra_data["custom_key"] == 42
 
     def test_extra_data_isolation(self):

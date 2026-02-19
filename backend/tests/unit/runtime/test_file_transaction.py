@@ -18,8 +18,8 @@ from backend.runtime.utils.file_transaction import (
 # FileOperationType enum
 # ===================================================================
 
-class TestFileOperationType:
 
+class TestFileOperationType:
     def test_values(self):
         assert FileOperationType.WRITE.value == "write"
         assert FileOperationType.EDIT.value == "edit"
@@ -30,8 +30,8 @@ class TestFileOperationType:
 # FileOperation dataclass
 # ===================================================================
 
-class TestFileOperation:
 
+class TestFileOperation:
     def test_defaults(self):
         op = FileOperation(
             operation_type=FileOperationType.WRITE,
@@ -58,8 +58,8 @@ class TestFileOperation:
 # FileTransaction — write / edit / delete / rollback
 # ===================================================================
 
-class TestFileTransaction:
 
+class TestFileTransaction:
     @pytest.fixture()
     def workspace(self, tmp_path):
         """Create a temp workspace directory."""
@@ -74,7 +74,7 @@ class TestFileTransaction:
         await txn.write_file(file_path, "hello world")
 
         assert os.path.exists(file_path)
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             assert f.read() == "hello world"
         assert len(txn.operations) == 1
         assert txn.operations[0].existed_before is False
@@ -82,7 +82,7 @@ class TestFileTransaction:
     @pytest.mark.asyncio
     async def test_write_existing_file_backups(self, workspace):
         file_path = os.path.join(workspace, "existing.txt")
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write("original")
 
         txn = FileTransaction(runtime=None)
@@ -92,13 +92,13 @@ class TestFileTransaction:
 
         assert txn.operations[0].old_content == "original"
         assert txn.operations[0].existed_before is True
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             assert f.read() == "updated"
 
     @pytest.mark.asyncio
     async def test_edit_file(self, workspace):
         file_path = os.path.join(workspace, "edit_me.txt")
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write("before")
 
         txn = FileTransaction(runtime=None)
@@ -106,7 +106,7 @@ class TestFileTransaction:
 
         await txn.edit_file(file_path, "after")
 
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             assert f.read() == "after"
         assert txn.operations[0].operation_type == FileOperationType.EDIT
 
@@ -121,7 +121,7 @@ class TestFileTransaction:
     @pytest.mark.asyncio
     async def test_delete_file(self, workspace):
         file_path = os.path.join(workspace, "delete_me.txt")
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write("bye")
 
         txn = FileTransaction(runtime=None)
@@ -138,7 +138,7 @@ class TestFileTransaction:
 
         # Should not raise
         await txn.delete_file(os.path.join(workspace, "ghost.txt"))
-        assert len(txn.operations) == 0
+        assert not txn.operations
 
     @pytest.mark.asyncio
     async def test_rollback_write_new_file(self, workspace):
@@ -155,7 +155,7 @@ class TestFileTransaction:
     @pytest.mark.asyncio
     async def test_rollback_write_existing_file(self, workspace):
         file_path = os.path.join(workspace, "rollback_existing.txt")
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write("original content")
 
         txn = FileTransaction(runtime=None)
@@ -164,13 +164,13 @@ class TestFileTransaction:
         await txn.write_file(file_path, "new content")
         await txn.rollback()
 
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             assert f.read() == "original content"
 
     @pytest.mark.asyncio
     async def test_rollback_edit(self, workspace):
         file_path = os.path.join(workspace, "rollback_edit.txt")
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write("before edit")
 
         txn = FileTransaction(runtime=None)
@@ -179,13 +179,13 @@ class TestFileTransaction:
         await txn.edit_file(file_path, "after edit")
         await txn.rollback()
 
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             assert f.read() == "before edit"
 
     @pytest.mark.asyncio
     async def test_rollback_delete(self, workspace):
         file_path = os.path.join(workspace, "rollback_delete.txt")
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write("resurrection")
 
         txn = FileTransaction(runtime=None)
@@ -196,7 +196,7 @@ class TestFileTransaction:
 
         await txn.rollback()
         assert os.path.exists(file_path)
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             assert f.read() == "resurrection"
 
     @pytest.mark.asyncio

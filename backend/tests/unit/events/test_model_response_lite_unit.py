@@ -33,9 +33,7 @@ class TestAssistantMessageLite:
 
     def test_custom(self):
         tc = AssistantToolCallLite(id="tc1")
-        msg = AssistantMessageLite(
-            role="assistant", content="Hello", tool_calls=[tc]
-        )
+        msg = AssistantMessageLite(role="assistant", content="Hello", tool_calls=[tc])
         assert msg.role == "assistant"
         assert msg.content == "Hello"
         assert len(msg.tool_calls) == 1
@@ -119,7 +117,9 @@ class TestModelResponseLiteModel:
         assert lite.model == "mistral"
 
     def test_from_sdk_no_message(self):
-        resp = SimpleNamespace(id="r", model="m", choices=[SimpleNamespace(message=None)])
+        resp = SimpleNamespace(
+            id="r", model="m", choices=[SimpleNamespace(message=None)]
+        )
         lite = ModelResponseLite.from_sdk(resp)
         assert lite.choices[0].message is None
 

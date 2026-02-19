@@ -280,7 +280,7 @@ def _verify_conversation_history(page: Page) -> None:
             f"Found {len(user_messages)} user messages and {len(agent_messages)} agent messages"
         )
 
-        if len(user_messages) == 0 or len(agent_messages) == 0:
+        if not user_messages or not agent_messages:
             page.screenshot(path="test-results/multi_conv_15_no_history.png")
             print("Screenshot saved: multi_conv_15_no_history.png")
             raise AssertionError(

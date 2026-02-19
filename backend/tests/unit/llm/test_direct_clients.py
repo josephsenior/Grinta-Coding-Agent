@@ -16,13 +16,20 @@ from backend.llm.direct_clients import (
 # Helper: mock the SDK constructors to avoid real HTTP clients
 # ---------------------------------------------------------------------------
 
+
 def _mock_openai_sdk():
     """Return a patch context that makes OpenAI + AsyncOpenAI constructors no-ops."""
     return [
         patch("backend.llm.direct_clients.OpenAI"),
         patch("backend.llm.direct_clients.AsyncOpenAI"),
-        patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock(spec=True)),
-        patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock(spec=True)),
+        patch(
+            "backend.llm.direct_clients.get_shared_http_client",
+            return_value=MagicMock(spec=True),
+        ),
+        patch(
+            "backend.llm.direct_clients.get_shared_async_http_client",
+            return_value=MagicMock(spec=True),
+        ),
     ]
 
 
@@ -33,7 +40,10 @@ def _mock_openai_sdk():
 
 class TestPoolKey:
     def test_with_base_url(self):
-        assert _pool_key("openai", "https://api.openai.com") == "openai::https://api.openai.com"
+        assert (
+            _pool_key("openai", "https://api.openai.com")
+            == "openai::https://api.openai.com"
+        )
 
     def test_without_base_url(self):
         assert _pool_key("anthropic", None) == "anthropic::default"
@@ -72,7 +82,13 @@ class TestLLMResponse:
         assert d["model"] == "m"
 
     def test_to_dict_includes_tool_calls(self):
-        tc = [{"id": "t1", "type": "function", "function": {"name": "f", "arguments": "{}"}}]
+        tc = [
+            {
+                "id": "t1",
+                "type": "function",
+                "function": {"name": "f", "arguments": "{}"},
+            }
+        ]
         r = LLMResponse(content="", model="m", usage={}, tool_calls=tc)
         d = r.to_dict()
         assert d["choices"][0]["message"]["tool_calls"] == tc
@@ -83,9 +99,7 @@ class TestLLMResponse:
         assert len(r["choices"]) == 1
 
     def test_custom_finish_reason(self):
-        r = LLMResponse(
-            content="", model="m", usage={}, finish_reason="length"
-        )
+        r = LLMResponse(content="", model="m", usage={}, finish_reason="length")
         assert r.finish_reason == "length"
         assert r.choices[0].finish_reason == "length"
 
@@ -100,8 +114,13 @@ class TestGetDirectClientRouting:
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_openai_default(self, _h, _ah, _oai, _aoai):
         client = get_direct_client("gpt-4o", api_key="sk-test")
         assert type(client).__name__ == "OpenAIClient"
@@ -131,24 +150,39 @@ class TestGetDirectClientRouting:
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_xai_grok_routing(self, _h, _ah, _oai, _aoai):
         client = get_direct_client("xai/grok-3", api_key="key")
         assert type(client).__name__ == "OpenAIClient"
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_grok_routing(self, _h, _ah, _oai, _aoai):
         client = get_direct_client("grok-3-mini", api_key="key")
         assert type(client).__name__ == "OpenAIClient"
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_ollama_routing_strips_prefix(self, _h, _ah, _oai, _aoai):
         client = get_direct_client("ollama/llama3.2", api_key="")
         assert type(client).__name__ == "OpenAIClient"
@@ -156,16 +190,26 @@ class TestGetDirectClientRouting:
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_ollama_defaults_base_url(self, _h, _ah, _oai, _aoai):
         client = get_direct_client("ollama/codestral", api_key="")
         assert client._model_name == "codestral"
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_ollama_custom_base_url_respected(self, _h, _ah, _oai, _aoai):
         client = get_direct_client(
             "ollama/phi3",
@@ -176,8 +220,13 @@ class TestGetDirectClientRouting:
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_ollama_without_prefix(self, _h, _ah, _oai, _aoai):
         """Model name containing 'ollama' but not as prefix still routes."""
         client = get_direct_client("ollama-test-model", api_key="")
@@ -185,16 +234,26 @@ class TestGetDirectClientRouting:
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_unknown_model_defaults_to_openai(self, _h, _ah, _oai, _aoai):
         client = get_direct_client("my-custom-model", api_key="key")
         assert type(client).__name__ == "OpenAIClient"
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_custom_base_url_passthrough(self, _h, _ah, _oai, _aoai):
         client = get_direct_client(
             "my-model", api_key="key", base_url="http://localhost:8080/v1"
@@ -210,8 +269,13 @@ class TestGetDirectClientRouting:
 class TestDirectLLMClientModelName:
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
-    @patch("backend.llm.direct_clients.get_shared_async_http_client", return_value=MagicMock())
-    @patch("backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock())
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
     def test_model_name_set(self, _h, _ah, _oai, _aoai):
         client = get_direct_client("gpt-4o", api_key="k")
         assert client.model_name == "gpt-4o"

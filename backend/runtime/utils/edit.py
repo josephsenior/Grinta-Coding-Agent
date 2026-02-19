@@ -193,7 +193,7 @@ class FileEditRuntimeMixin(ABC):
             updated_lint_error = linter.lint_file_diff(
                 original_file_copy.name, updated_file_copy.name
             )
-            if len(updated_lint_error) > 0:
+            if updated_lint_error:
                 _obs = FileEditObservation(
                     content=diff,
                     path=filepath,

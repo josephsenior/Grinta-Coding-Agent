@@ -12,6 +12,7 @@ from backend.controller.services.iteration_guard_service import IterationGuardSe
 
 # ── helpers ──────────────────────────────────────────────────────────
 
+
 def _make_service() -> tuple[IterationGuardService, MagicMock]:
     context = MagicMock()
     controller = MagicMock()
@@ -23,6 +24,7 @@ def _make_service() -> tuple[IterationGuardService, MagicMock]:
 
 
 # ── _is_limit_error ──────────────────────────────────────────────────
+
 
 class TestIsLimitError:
     def test_limit_keyword(self):
@@ -39,6 +41,7 @@ class TestIsLimitError:
 
 
 # ── _graceful_shutdown_enabled ───────────────────────────────────────
+
 
 class TestGracefulShutdownEnabled:
     def test_default_enabled(self):
@@ -63,6 +66,7 @@ class TestGracefulShutdownEnabled:
 
 # ── run_control_flags ────────────────────────────────────────────────
 
+
 class TestRunControlFlags:
     @pytest.mark.asyncio
     async def test_success(self):
@@ -73,7 +77,9 @@ class TestRunControlFlags:
     @pytest.mark.asyncio
     async def test_limit_error_schedules_shutdown(self):
         svc, ctrl = _make_service()
-        ctrl.state_tracker.run_control_flags.side_effect = RuntimeError("iteration limit")
+        ctrl.state_tracker.run_control_flags.side_effect = RuntimeError(
+            "iteration limit"
+        )
         with patch.object(svc, "_schedule_graceful_shutdown") as mock_shutdown:
             with pytest.raises(RuntimeError):
                 await svc.run_control_flags()

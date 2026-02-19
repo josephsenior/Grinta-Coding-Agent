@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.core.plugin import ForgePlugin, PluginRegistry
+from backend.core.plugin import PluginRegistry
 from backend.core.plugin_template import MyPlugin, register
 
 

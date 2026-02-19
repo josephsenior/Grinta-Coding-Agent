@@ -38,8 +38,13 @@ class TestRetryTask:
 
     def test_roundtrip(self):
         t = RetryTask(
-            id="t1", controller_id="c1", payload={"y": 2}, reason="retry",
-            attempts=2, max_attempts=5, metadata={"k": "v"},
+            id="t1",
+            controller_id="c1",
+            payload={"y": 2},
+            reason="retry",
+            attempts=2,
+            max_attempts=5,
+            metadata={"k": "v"},
         )
         d = t.to_dict()
         t2 = RetryTask.from_dict(d)
@@ -65,7 +70,10 @@ class TestInMemoryRetryBackend:
     async def test_schedule_and_fetch(self):
         b = InMemoryRetryBackend()
         task = RetryTask(
-            id="t1", controller_id="c1", payload={}, reason="test",
+            id="t1",
+            controller_id="c1",
+            payload={},
+            reason="test",
             next_attempt_at=time.time() - 1,  # already ready
         )
         await b.schedule(task)
@@ -78,23 +86,29 @@ class TestInMemoryRetryBackend:
     async def test_fetch_not_ready_yet(self):
         b = InMemoryRetryBackend()
         task = RetryTask(
-            id="t1", controller_id="c1", payload={}, reason="test",
+            id="t1",
+            controller_id="c1",
+            payload={},
+            reason="test",
             next_attempt_at=time.time() + 9999,
         )
         await b.schedule(task)
         ready = await b.fetch_ready("c1", limit=5)
-        assert len(ready) == 0
+        assert not ready
 
     @pytest.mark.asyncio
     async def test_fetch_wrong_controller(self):
         b = InMemoryRetryBackend()
         task = RetryTask(
-            id="t1", controller_id="c1", payload={}, reason="test",
+            id="t1",
+            controller_id="c1",
+            payload={},
+            reason="test",
             next_attempt_at=time.time() - 1,
         )
         await b.schedule(task)
         ready = await b.fetch_ready("c2", limit=5)
-        assert len(ready) == 0
+        assert not ready
 
     @pytest.mark.asyncio
     async def test_mark_success(self):
@@ -108,8 +122,12 @@ class TestInMemoryRetryBackend:
     async def test_mark_failure_requeues(self):
         b = InMemoryRetryBackend()
         task = RetryTask(
-            id="t1", controller_id="c1", payload={}, reason="test",
-            attempts=1, max_attempts=3,
+            id="t1",
+            controller_id="c1",
+            payload={},
+            reason="test",
+            attempts=1,
+            max_attempts=3,
         )
         await b.schedule(task)
         result = await b.mark_failure(task, backoff_seconds=0.0)
@@ -120,8 +138,12 @@ class TestInMemoryRetryBackend:
     async def test_mark_failure_dead_letters(self):
         b = InMemoryRetryBackend()
         task = RetryTask(
-            id="t1", controller_id="c1", payload={}, reason="test",
-            attempts=3, max_attempts=3,
+            id="t1",
+            controller_id="c1",
+            payload={},
+            reason="test",
+            attempts=3,
+            max_attempts=3,
         )
         await b.schedule(task)
         result = await b.mark_failure(task, backoff_seconds=0.0)
@@ -180,8 +202,12 @@ class TestRetryQueue:
     async def test_mark_failure_requeues(self):
         q = self._make_queue()
         task = RetryTask(
-            id="t1", controller_id="c1", payload={}, reason="test",
-            attempts=1, max_attempts=3,
+            id="t1",
+            controller_id="c1",
+            payload={},
+            reason="test",
+            attempts=1,
+            max_attempts=3,
         )
         await q.backend.schedule(task)
         result = await q.mark_failure(task, error_message="some err")
@@ -294,7 +320,12 @@ class TestRedisRetryBackend:
     async def test_mark_failure_requeues(self):
         backend, client, pipe = self._make_backend()
         task = RetryTask(
-            id="t1", controller_id="c1", payload={}, reason="x", attempts=1, max_attempts=3
+            id="t1",
+            controller_id="c1",
+            payload={},
+            reason="x",
+            attempts=1,
+            max_attempts=3,
         )
         result = await backend.mark_failure(task, backoff_seconds=1.0)
         assert result is not None
@@ -305,7 +336,12 @@ class TestRedisRetryBackend:
     async def test_mark_failure_dead_letters(self):
         backend, _client, _pipe = self._make_backend()
         task = RetryTask(
-            id="t1", controller_id="c1", payload={}, reason="x", attempts=3, max_attempts=3
+            id="t1",
+            controller_id="c1",
+            payload={},
+            reason="x",
+            attempts=3,
+            max_attempts=3,
         )
         backend.dead_letter = AsyncMock()
         result = await backend.mark_failure(task, backoff_seconds=1.0)

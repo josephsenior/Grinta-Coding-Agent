@@ -1,7 +1,5 @@
 """Tests for memory tool call tracking utilities."""
 
-
-
 from backend.core.message import Message, TextContent, ToolCall, ToolCallFunction
 from backend.memory.tool_call_tracker import (
     collect_tool_call_ids,
@@ -23,7 +21,8 @@ class TestCollectToolCallIds:
             content=[],
             tool_calls=[
                 ToolCall(
-                    id="call_1", function=ToolCallFunction(name="search", arguments="{}")
+                    id="call_1",
+                    function=ToolCallFunction(name="search", arguments="{}"),
                 ),
                 ToolCall(
                     id="call_2",
@@ -40,7 +39,9 @@ class TestCollectToolCallIds:
             role="user",
             content=[],
             tool_calls=[
-                ToolCall(id="call_x", function=ToolCallFunction(name="test", arguments="{}"))
+                ToolCall(
+                    id="call_x", function=ToolCallFunction(name="test", arguments="{}")
+                )
             ],
         )
         result = collect_tool_call_ids([msg])
@@ -54,7 +55,8 @@ class TestCollectToolCallIds:
                 content=[],
                 tool_calls=[
                     ToolCall(
-                        id="call_1", function=ToolCallFunction(name="search", arguments="{}")
+                        id="call_1",
+                        function=ToolCallFunction(name="search", arguments="{}"),
                     )
                 ],
             ),
@@ -63,7 +65,8 @@ class TestCollectToolCallIds:
                 content=[],
                 tool_calls=[
                     ToolCall(
-                        id="call_2", function=ToolCallFunction(name="read", arguments="{}")
+                        id="call_2",
+                        function=ToolCallFunction(name="read", arguments="{}"),
                     )
                 ],
             ),
@@ -80,7 +83,8 @@ class TestCollectToolCallIds:
                 content=[],
                 tool_calls=[
                     ToolCall(
-                        id="call_1", function=ToolCallFunction(name="search", arguments="{}")
+                        id="call_1",
+                        function=ToolCallFunction(name="search", arguments="{}"),
                     )
                 ],
             ),
@@ -111,8 +115,12 @@ class TestCollectToolCallIds:
             role="assistant",
             content=[],
             tool_calls=[
-                ToolCall(id="call_1", function=ToolCallFunction(name="test1", arguments="{}")),
-                ToolCall(id="call_1", function=ToolCallFunction(name="test2", arguments="{}")),
+                ToolCall(
+                    id="call_1", function=ToolCallFunction(name="test1", arguments="{}")
+                ),
+                ToolCall(
+                    id="call_1", function=ToolCallFunction(name="test2", arguments="{}")
+                ),
             ],
         )
         result = collect_tool_call_ids([msg])
@@ -137,10 +145,14 @@ class TestCollectToolResponseIds:
         """Test collecting from multiple tool messages."""
         messages = [
             Message(
-                role="tool", content=[TextContent(text="result1")], tool_call_id="call_1"
+                role="tool",
+                content=[TextContent(text="result1")],
+                tool_call_id="call_1",
             ),
             Message(
-                role="tool", content=[TextContent(text="result2")], tool_call_id="call_2"
+                role="tool",
+                content=[TextContent(text="result2")],
+                tool_call_id="call_2",
             ),
         ]
         result = collect_tool_response_ids(messages)
@@ -179,10 +191,14 @@ class TestCollectToolResponseIds:
         """Test that duplicate response IDs are deduplicated."""
         messages = [
             Message(
-                role="tool", content=[TextContent(text="result1")], tool_call_id="call_1"
+                role="tool",
+                content=[TextContent(text="result1")],
+                tool_call_id="call_1",
             ),
             Message(
-                role="tool", content=[TextContent(text="result2")], tool_call_id="call_1"
+                role="tool",
+                content=[TextContent(text="result2")],
+                tool_call_id="call_1",
             ),
         ]
         result = collect_tool_response_ids(messages)
@@ -203,7 +219,8 @@ class TestFilterUnmatchedToolCalls:
                 content=[],
                 tool_calls=[
                     ToolCall(
-                        id="call_1", function=ToolCallFunction(name="search", arguments="{}")
+                        id="call_1",
+                        function=ToolCallFunction(name="search", arguments="{}"),
                     )
                 ],
             ),
@@ -247,10 +264,12 @@ class TestFilterUnmatchedToolCalls:
                 content=[],
                 tool_calls=[
                     ToolCall(
-                        id="call_1", function=ToolCallFunction(name="search", arguments="{}")
+                        id="call_1",
+                        function=ToolCallFunction(name="search", arguments="{}"),
                     ),
                     ToolCall(
-                        id="call_2", function=ToolCallFunction(name="read", arguments="{}")
+                        id="call_2",
+                        function=ToolCallFunction(name="read", arguments="{}"),
                     ),
                 ],
             ),
@@ -276,7 +295,8 @@ class TestFilterUnmatchedToolCalls:
                 content=[],
                 tool_calls=[
                     ToolCall(
-                        id="call_1", function=ToolCallFunction(name="search", arguments="{}")
+                        id="call_1",
+                        function=ToolCallFunction(name="search", arguments="{}"),
                     )
                 ],
             ),
@@ -298,10 +318,12 @@ class TestFilterUnmatchedToolCalls:
                 content=[],
                 tool_calls=[
                     ToolCall(
-                        id="call_1", function=ToolCallFunction(name="search", arguments="{}")
+                        id="call_1",
+                        function=ToolCallFunction(name="search", arguments="{}"),
                     ),
                     ToolCall(
-                        id="call_2", function=ToolCallFunction(name="read", arguments="{}")
+                        id="call_2",
+                        function=ToolCallFunction(name="read", arguments="{}"),
                     ),
                 ],
             ),

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.core.exceptions import (
     FunctionCallNotExistsError,
@@ -94,9 +93,7 @@ class TestClassifyByExceptionType:
 
     def test_function_call_not_exists_error(self):
         assert (
-            ErrorRecoveryStrategy.classify_error(
-                FunctionCallNotExistsError("no_func")
-            )
+            ErrorRecoveryStrategy.classify_error(FunctionCallNotExistsError("no_func"))
             == ErrorType.TOOL_CALL_ERROR
         )
 
@@ -245,12 +242,13 @@ class TestGetRecoveryActions:
         )
         assert len(actions) >= 2
 
-    def test_tool_call_error_returns_empty(self):
-        """Tool call errors return empty to prevent infinite loop."""
+    def test_tool_call_error_returns_feedback(self):
+        """Tool call errors return feedback for self-correction."""
         actions = ErrorRecoveryStrategy.get_recovery_actions(
             ErrorType.TOOL_CALL_ERROR, Exception("invalid json")
         )
-        assert actions == []
+        assert actions
+        assert any("tool call error" in (a.thought or "").lower() for a in actions if hasattr(a, "thought"))
 
     def test_tool_call_error_auth_related(self):
         actions = ErrorRecoveryStrategy.get_recovery_actions(
@@ -262,7 +260,7 @@ class TestGetRecoveryActions:
         actions = ErrorRecoveryStrategy.get_recovery_actions(
             ErrorType.TIMEOUT_ERROR, Exception("timed out")
         )
-        assert len(actions) >= 1
+        assert actions
 
     def test_permission_error(self):
         actions = ErrorRecoveryStrategy.get_recovery_actions(
@@ -286,13 +284,13 @@ class TestGetRecoveryActions:
         actions = ErrorRecoveryStrategy.get_recovery_actions(
             ErrorType.SYNTAX_ERROR, Exception("invalid syntax")
         )
-        assert len(actions) >= 1
+        assert actions
 
     def test_unknown_error(self):
         actions = ErrorRecoveryStrategy.get_recovery_actions(
             ErrorType.UNKNOWN_ERROR, Exception("mystery")
         )
-        assert len(actions) >= 1
+        assert actions
 
     def test_authentication_error_returns_empty(self):
         from backend.llm.exceptions import AuthenticationError

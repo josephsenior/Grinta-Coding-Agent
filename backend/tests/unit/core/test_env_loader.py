@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from pydantic import BaseModel, SecretStr
@@ -54,7 +54,7 @@ class TestCastValueToType:
         assert result == {"a": 1}
 
     def test_list_literal(self):
-        result = cast_value_to_type('[1, 2, 3]', list)
+        result = cast_value_to_type("[1, 2, 3]", list)
         assert result == [1, 2, 3]
 
     def test_none_type_passthrough(self):
@@ -71,7 +71,7 @@ class TestCastValueToType:
 
     def test_typed_list_with_int(self):
         """Test casting to typed list of ints."""
-        result = cast_value_to_type('[1, 2, 3]', list[int])
+        result = cast_value_to_type("[1, 2, 3]", list[int])
         assert result == [1, 2, 3]
 
 
@@ -334,7 +334,7 @@ class TestLoadFromEnv:
         from backend.core.config.forge_config import ForgeConfig
 
         cfg = ForgeConfig()
-        original_llm = cfg.get_llm_config()
+        cfg.get_llm_config()
         load_from_env(cfg, {})
         # Should not crash and preserve config
         assert cfg.get_llm_config() is not None
@@ -373,9 +373,7 @@ class TestExportLLMApiKeys:
         from backend.core.config.forge_config import ForgeConfig
 
         cfg = ForgeConfig()
-        with patch(
-            "backend.core.config.api_key_manager.api_key_manager"
-        ) as mock_manager:
+        with patch("backend.core.config.api_key_manager.api_key_manager"):
             export_llm_api_keys(cfg)
             # Should handle gracefully
 
@@ -384,9 +382,7 @@ class TestExportLLMApiKeys:
         from backend.core.config.forge_config import ForgeConfig
 
         cfg = ForgeConfig()
-        with patch(
-            "backend.core.config.api_key_manager.api_key_manager"
-        ) as mock_manager:
+        with patch("backend.core.config.api_key_manager.api_key_manager"):
             export_llm_api_keys(cfg)
             # Should have attempted to set keys
 
@@ -412,9 +408,7 @@ class TestExportLLMApiKeys:
         llm = LLMConfig(model="gpt-4", api_key=SecretStr("sk-test123"))
         cfg.set_llm_config(llm)
 
-        with patch(
-            "backend.core.config.api_key_manager.api_key_manager"
-        ) as mock_manager:
+        with patch("backend.core.config.api_key_manager.api_key_manager"):
             export_llm_api_keys(cfg)
             # Manager methods should have been called if keys exist
             # Just verify it completes without error

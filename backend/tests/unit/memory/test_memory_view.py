@@ -1,6 +1,5 @@
 """Tests for backend.memory.view module — View class and from_events factory."""
 
-
 import pytest
 
 from backend.events.action.message import MessageAction
@@ -24,7 +23,7 @@ class TestViewBasics:
 
     def test_len_empty(self):
         v = View(events=[])
-        assert len(v) == 0
+        assert not v
 
     def test_iter(self):
         events = [_make_event(i) for i in range(3)]
@@ -142,7 +141,7 @@ class TestCheckUnhandledCondensationRequest:
 class TestFromEvents:
     def test_empty_events(self):
         v = View.from_events([])
-        assert len(v) == 0
+        assert not v
         assert v.unhandled_condensation_request is False
 
     def test_filters_forgotten(self):

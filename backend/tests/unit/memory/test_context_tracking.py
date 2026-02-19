@@ -249,8 +249,12 @@ class TestGetContextSummary:
         tracker = ContextTracker()
 
         # Track in order: old, middle, new
-        d1 = tracker.track_decision("Old decision", "R1", DecisionType.ARCHITECTURAL, "C1")
-        d2 = tracker.track_decision("Middle decision", "R2", DecisionType.IMPLEMENTATION, "C2")
+        d1 = tracker.track_decision(
+            "Old decision", "R1", DecisionType.ARCHITECTURAL, "C1"
+        )
+        d2 = tracker.track_decision(
+            "Middle decision", "R2", DecisionType.IMPLEMENTATION, "C2"
+        )
         d3 = tracker.track_decision("New decision", "R3", DecisionType.WORKFLOW, "C3")
 
         # Manually adjust timestamps to ensure ordering
@@ -282,7 +286,11 @@ class TestGetContextSummary:
         summary = tracker.get_context_summary()
 
         # Should have exactly 5 decisions (last 5 created)
-        decision_lines = [line for line in summary.split("\n") if line.startswith("- ") and "Rationale" in line]
+        decision_lines = [
+            line
+            for line in summary.split("\n")
+            if line.startswith("- ") and "Rationale" in line
+        ]
         assert len(decision_lines) == 5
 
 
@@ -349,7 +357,10 @@ class TestRecallFromMemory:
     def test_calls_vector_store_search_with_query_and_k(self):
         """Test calls vector_store.search with correct parameters."""
         mock_store = MagicMock()
-        mock_store.search.return_value = [{"content": "result1"}, {"content": "result2"}]
+        mock_store.search.return_value = [
+            {"content": "result1"},
+            {"content": "result2"},
+        ]
 
         tracker = ContextTracker(vector_store=mock_store)
         results = tracker.recall_from_memory("test query", k=10)

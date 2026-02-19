@@ -74,7 +74,7 @@ def generate_prompt_template(events: str) -> str:
     return template.render(events=events)
 
 
-def generate_prompt(
+async def generate_prompt(
     llm_config: LLMConfig, prompt_template: str, conversation_id: str
 ) -> str:
     """Generate a prompt using LLM configuration and template.
@@ -101,7 +101,7 @@ def generate_prompt(
     manager_impl = get_conversation_manager_impl()
     if manager_impl is None:
         raise RuntimeError("Conversation manager implementation unavailable")
-    raw_prompt = manager_impl.request_llm_completion(
+    raw_prompt = await manager_impl.request_llm_completion(
         "remember_prompt",
         conversation_id,
         llm_config,
@@ -150,10 +150,14 @@ async def build_remember_prompt(
     if settings is None:
         raise ValueError("Settings not found")
 
-    llm_config = LLMConfig(
-        model=settings.llm_model or "",
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
-    )
+    extra_config = {}
+    if settings.llm_model:
+        extra_config["model"] = settings.llm_model
+    if settings.llm_api_key:
+        extra_config["api_key"] = settings.llm_api_key
+    if settings.llm_base_url:
+        extra_config["base_url"] = settings.llm_base_url
+
+    llm_config = LLMConfig(**extra_config)
     prompt_template = generate_prompt_template(stringified_events)
-    return generate_prompt(llm_config, prompt_template, conversation_id)
+    return await generate_prompt(llm_config, prompt_template, conversation_id)

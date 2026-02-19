@@ -288,8 +288,7 @@ class TestStateSaveToSession:
         # Check that at least one call was to agent_state.json or checkpoint
         all_filenames = [call[0][0] for call in mock_store.write.call_args_list]
         has_primary_or_checkpoint = any(
-            "agent_state.json" in f or "state_checkpoints" in f
-            for f in all_filenames
+            "agent_state.json" in f or "state_checkpoints" in f for f in all_filenames
         )
         assert has_primary_or_checkpoint
 

@@ -132,6 +132,10 @@ class ToolResultValidator(ToolInvocationMiddleware):
         # Store result in context metadata for downstream consumers
         ctx.metadata["validation_result"] = result
 
+        # Surface validation to the LLM by annotating the observation content.
+        # This is intentionally compact and machine-parseable.
+        self._annotate_observation(observation, result)
+
         if result.warnings:
             logger.info(
                 "Tool result validation warnings for %s: %s",
@@ -145,7 +149,17 @@ class ToolResultValidator(ToolInvocationMiddleware):
                 "; ".join(result.errors),
             )
         if result.blocked:
-            ctx.block(reason=f"result_validation:{result.block_reason}")
+            # Block downstream handling with a high-quality reason that can
+            # be emitted as an ErrorObservation by the controller.
+            reason = result.block_reason or "Tool result failed validation"
+            ctx.block(
+                reason=(
+                    "RESULT VALIDATION BLOCKED:\n"
+                    f"- action={type(ctx.action).__name__}\n"
+                    f"- reason={reason}\n"
+                    "Fix the tool call or re-run with adjusted parameters."
+                )
+            )
 
     # ------------------------------------------------------------------ #
     # Built-in rules
@@ -155,15 +169,38 @@ class ToolResultValidator(ToolInvocationMiddleware):
         """Register default validation rules."""
 
         # 1. Truncated output detection
-        def check_truncated(ctx: ToolInvocationContext, obs: Observation) -> str | None:
+        # CmdOutputObservation may truncate large command output to MAX_CMD_OUTPUT_SIZE.
+        # When that happens, the LLM cannot see the full output and should usually
+        # re-run with a narrower command or with hidden=true.
+        def check_truncation_marker(
+            ctx: ToolInvocationContext, obs: Observation
+        ) -> str | None:
             content = getattr(obs, "content", "")
-            if isinstance(content, str) and len(content) > 100_000:
-                return f"Output truncated ({len(content)} chars) — may be incomplete"
+            if not isinstance(content, str):
+                return None
+            if "Observation truncated:" in content:
+                return (
+                    "Observation content was truncated — output may be incomplete; "
+                    "re-run with a narrower command or hidden=true"
+                )
             return None
 
-        self.add_rule("output_size", check_truncated, severity="warning")
+        self.add_rule("output_truncated", check_truncation_marker, severity="warning")
 
-        # 2. Error observation passthrough (informational)
+        # 2. Large output detection (even if not truncated)
+        def check_large_output(ctx: ToolInvocationContext, obs: Observation) -> str | None:
+            content = getattr(obs, "content", "")
+            if isinstance(content, str) and len(content) > 100_000:
+                return (
+                    f"Large output ({len(content)} chars) — may be incomplete; "
+                    "consider narrowing"
+                )
+            return None
+
+        # Keep legacy rule name for existing tests/callers.
+        self.add_rule("output_size", check_large_output, severity="warning")
+
+        # 3. Error observation passthrough (informational)
         def check_error_obs(ctx: ToolInvocationContext, obs: Observation) -> str | None:
             from backend.events.observation import ErrorObservation
 
@@ -173,7 +210,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
 
         self.add_rule("error_observation", check_error_obs, severity="warning")
 
-        # 3. Empty result detection
+        # 4. Empty result detection
         def check_empty(ctx: ToolInvocationContext, obs: Observation) -> str | None:
             content = getattr(obs, "content", None)
             if content is not None and isinstance(content, str) and not content.strip():
@@ -181,3 +218,31 @@ class ToolResultValidator(ToolInvocationMiddleware):
             return None
 
         self.add_rule("empty_result", check_empty, severity="warning")
+
+    @staticmethod
+    def _annotate_observation(observation: Observation, result: ValidationResult) -> None:
+        """Append validation information to the observation content.
+
+        Keeps the annotation compact to reduce token overhead.
+        """
+        content = getattr(observation, "content", None)
+        if not isinstance(content, str):
+            return
+
+        if not (result.warnings or result.errors or result.blocked):
+            return
+
+        # Keep message size bounded
+        warnings = result.warnings[:5]
+        errors = result.errors[:5]
+        lines: list[str] = []
+        if warnings:
+            lines.append("warnings: " + "; ".join(warnings))
+        if errors:
+            lines.append("errors: " + "; ".join(errors))
+        if result.blocked:
+            lines.append("blocked: true")
+
+        block = "\n".join(lines)[:1500]
+        annotation = f"\n\n<FORGE_RESULT_VALIDATION>\n{block}\n</FORGE_RESULT_VALIDATION>"
+        setattr(observation, "content", content + annotation)

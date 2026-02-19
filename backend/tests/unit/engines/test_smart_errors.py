@@ -1,4 +1,5 @@
 """Tests for backend.engines.orchestrator.tools.smart_errors — SmartErrorHandler."""
+
 # pylint: disable=protected-access
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ from backend.engines.orchestrator.tools.smart_errors import (
 
 # ── ErrorSuggestion dataclass ──────────────────────────────────────────
 
+
 class TestErrorSuggestion:
     def test_basic(self):
         s = ErrorSuggestion(message="fail", suggestions=["a", "b"], confidence=0.8)
@@ -23,8 +25,11 @@ class TestErrorSuggestion:
 
     def test_auto_fixable(self):
         s = ErrorSuggestion(
-            message="typo", suggestions=["function"], confidence=0.95,
-            auto_fixable=True, fix_code="function",
+            message="typo",
+            suggestions=["function"],
+            confidence=0.95,
+            auto_fixable=True,
+            fix_code="function",
         )
         assert s.auto_fixable is True
         assert s.fix_code == "function"
@@ -32,14 +37,18 @@ class TestErrorSuggestion:
 
 # ── _check_common_typo ─────────────────────────────────────────────────
 
+
 class TestCheckCommonTypo:
-    @pytest.mark.parametrize("typo,correction", [
-        ("functino", "function"),
-        ("fucntion", "function"),
-        ("calss", "class"),
-        ("improt", "import"),
-        ("retrun", "return"),
-    ])
+    @pytest.mark.parametrize(
+        "typo,correction",
+        [
+            ("functino", "function"),
+            ("fucntion", "function"),
+            ("calss", "class"),
+            ("improt", "import"),
+            ("retrun", "return"),
+        ],
+    )
     def test_known_typos(self, typo, correction):
         result = SmartErrorHandler._check_common_typo(typo)
         assert result is not None
@@ -59,6 +68,7 @@ class TestCheckCommonTypo:
 
 # ── _create_fuzzy_match_suggestion ─────────────────────────────────────
 
+
 class TestCreateFuzzyMatchSuggestion:
     def test_high_similarity(self):
         result = SmartErrorHandler._create_fuzzy_match_suggestion("proces", ["process"])
@@ -66,15 +76,22 @@ class TestCreateFuzzyMatchSuggestion:
         assert result.confidence > 0.7
 
     def test_medium_similarity(self):
-        result = SmartErrorHandler._create_fuzzy_match_suggestion("prcs", ["process", "produce"])
-        assert "Similar symbols" in result.message or "Possible matches" in result.message
+        result = SmartErrorHandler._create_fuzzy_match_suggestion(
+            "prcs", ["process", "produce"]
+        )
+        assert (
+            "Similar symbols" in result.message or "Possible matches" in result.message
+        )
 
     def test_low_similarity(self):
-        result = SmartErrorHandler._create_fuzzy_match_suggestion("xyz", ["abcdef", "ghijkl"])
+        result = SmartErrorHandler._create_fuzzy_match_suggestion(
+            "xyz", ["abcdef", "ghijkl"]
+        )
         assert result.auto_fixable is False
 
 
 # ── symbol_not_found ───────────────────────────────────────────────────
+
 
 class TestSymbolNotFound:
     def test_typo_detected(self):
@@ -84,7 +101,7 @@ class TestSymbolNotFound:
 
     def test_fuzzy_match(self):
         result = SmartErrorHandler.symbol_not_found("my_func", ["my_function", "other"])
-        assert len(result.suggestions) > 0
+        assert result.suggestions
 
     def test_no_match_lists_available(self):
         result = SmartErrorHandler.symbol_not_found("zzz", ["alpha", "beta"])
@@ -98,6 +115,7 @@ class TestSymbolNotFound:
 
 # ── _group_symbols_by_type ─────────────────────────────────────────────
 
+
 class TestGroupSymbolsByType:
     def test_separation(self):
         funcs, classes = SmartErrorHandler._group_symbols_by_type(
@@ -109,10 +127,11 @@ class TestGroupSymbolsByType:
     def test_all_functions(self):
         funcs, classes = SmartErrorHandler._group_symbols_by_type(["a", "b", "c"])
         assert len(funcs) == 3
-        assert len(classes) == 0
+        assert not classes
 
 
 # ── _build_symbol_context ──────────────────────────────────────────────
+
 
 class TestBuildSymbolContext:
     def test_both(self):
@@ -126,10 +145,14 @@ class TestBuildSymbolContext:
 
 # ── syntax_error ───────────────────────────────────────────────────────
 
+
 class TestSyntaxError:
     def test_indent_error(self):
         result = SmartErrorHandler.syntax_error("unexpected indent at line 5")
-        assert any("indentation" in s.lower() or "spacing" in s.lower() for s in result.suggestions)
+        assert any(
+            "indentation" in s.lower() or "spacing" in s.lower()
+            for s in result.suggestions
+        )
         assert result.confidence >= 0.8
 
     def test_unterminated_string(self):
@@ -146,11 +169,16 @@ class TestSyntaxError:
 
     def test_eof_error(self):
         result = SmartErrorHandler.syntax_error("unexpected EOF while parsing")
-        assert any("unclosed" in s.lower() or "brackets" in s.lower() for s in result.suggestions)
+        assert any(
+            "unclosed" in s.lower() or "brackets" in s.lower()
+            for s in result.suggestions
+        )
 
     def test_undefined_error(self):
         result = SmartErrorHandler.syntax_error("name 'foo' is not defined")
-        assert any("defined" in s.lower() or "typos" in s.lower() for s in result.suggestions)
+        assert any(
+            "defined" in s.lower() or "typos" in s.lower() for s in result.suggestions
+        )
 
     def test_generic_error(self):
         result = SmartErrorHandler.syntax_error("some random error")
@@ -160,10 +188,11 @@ class TestSyntaxError:
 
 # ── _analyze helpers ───────────────────────────────────────────────────
 
+
 class TestAnalyzeHelpers:
     def test_analyze_indent_error_match(self):
         suggestions, conf = SmartErrorHandler._analyze_indent_error("unexpected indent")
-        assert len(suggestions) > 0
+        assert suggestions
         assert conf == 0.8
 
     def test_analyze_indent_error_no_match(self):
@@ -172,8 +201,10 @@ class TestAnalyzeHelpers:
         assert conf == 0.5
 
     def test_analyze_string_error_match(self):
-        suggestions, conf = SmartErrorHandler._analyze_string_error("unterminated string")
-        assert len(suggestions) > 0
+        suggestions, conf = SmartErrorHandler._analyze_string_error(
+            "unterminated string"
+        )
+        assert suggestions
         assert conf == 0.9
 
     def test_analyze_string_error_no_match(self):
@@ -182,16 +213,19 @@ class TestAnalyzeHelpers:
 
     def test_analyze_eof_error_match(self):
         suggestions, conf = SmartErrorHandler._analyze_eof_error("unexpected eof")
-        assert len(suggestions) > 0
+        assert suggestions
         assert conf == 0.85
 
     def test_analyze_undefined_error_match(self):
-        suggestions, conf = SmartErrorHandler._analyze_undefined_error("name not defined")
-        assert len(suggestions) > 0
+        suggestions, conf = SmartErrorHandler._analyze_undefined_error(
+            "name not defined"
+        )
+        assert suggestions
         assert conf == 0.75
 
 
 # ── _check helpers ─────────────────────────────────────────────────────
+
 
 class TestCheckHelpers:
     def test_check_missing_colon_present(self):
@@ -215,6 +249,7 @@ class TestCheckHelpers:
 
 # ── file_not_found ─────────────────────────────────────────────────────
 
+
 class TestFileNotFound:
     def test_no_similar(self):
         result = SmartErrorHandler.file_not_found("missing.py")
@@ -225,7 +260,7 @@ class TestFileNotFound:
         result = SmartErrorHandler.file_not_found(
             "app.py", ["app.py.bak", "main.py", "apps.py"]
         )
-        assert len(result.suggestions) > 0
+        assert result.suggestions
 
     def test_close_match_auto_fixable(self):
         result = SmartErrorHandler.file_not_found(
@@ -236,13 +271,12 @@ class TestFileNotFound:
             assert result.auto_fixable is True
 
     def test_no_close_matches(self):
-        result = SmartErrorHandler.file_not_found(
-            "zzz.py", ["alpha.js", "beta.rs"]
-        )
+        result = SmartErrorHandler.file_not_found("zzz.py", ["alpha.js", "beta.rs"])
         assert "No similar files" in result.message
 
 
 # ── whitespace_mismatch ────────────────────────────────────────────────
+
 
 class TestWhitespaceMismatch:
     def test_tabs_vs_spaces(self):
@@ -264,13 +298,16 @@ class TestWhitespaceMismatch:
 
 # ── suggest_similar ────────────────────────────────────────────────────
 
+
 class TestSuggestSimilar:
     def test_finds_matches(self):
         matches = SmartErrorHandler.suggest_similar("tset", ["test", "best", "rest"])
         assert "test" in matches
 
     def test_high_threshold_filters(self):
-        matches = SmartErrorHandler.suggest_similar("abc", ["xyz", "lmn"], threshold=0.9)
+        matches = SmartErrorHandler.suggest_similar(
+            "abc", ["xyz", "lmn"], threshold=0.9
+        )
         assert matches == []
 
     def test_empty_candidates(self):
@@ -278,6 +315,7 @@ class TestSuggestSimilar:
 
 
 # ── format_edit_conflict ───────────────────────────────────────────────
+
 
 class TestFormatEditConflict:
     def test_basic(self):
@@ -291,6 +329,7 @@ class TestFormatEditConflict:
 
 
 # ── validate_edit_result ───────────────────────────────────────────────
+
 
 class TestValidateEditResult:
     def test_no_change(self):

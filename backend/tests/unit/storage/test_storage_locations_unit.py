@@ -1,6 +1,5 @@
 """Tests for backend.storage.locations — conversation path helpers."""
 
-
 from backend.storage.locations import (
     get_conversation_agent_state_filename,
     get_conversation_checkpoints_dir,

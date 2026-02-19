@@ -28,7 +28,10 @@ class TestBuildTool:
         with patch("backend.controller.agent_tools.make_function_chunk") as mock_chunk:
             with patch("backend.controller.agent_tools.make_tool_param") as mock_param:
                 mock_chunk.return_value = {"name": "search"}
-                mock_param.return_value = {"type": "function", "function": {"name": "search"}}
+                mock_param.return_value = {
+                    "type": "function",
+                    "function": {"name": "search"},
+                }
 
                 result = build_tool(tool)
 

@@ -275,7 +275,9 @@ class TestSafetyValidator:
     @pytest.mark.asyncio
     async def test_validate_logs_to_audit_when_enabled(self):
         """Test validate calls audit logger when enabled."""
-        config = self.create_mock_config(enable_audit_logging=False)  # Don't load real logger
+        config = self.create_mock_config(
+            enable_audit_logging=False
+        )  # Don't load real logger
 
         # Create validator and manually set audit logger
         validator = SafetyValidator(config)

@@ -11,8 +11,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.core.plugin import (
-    PLUGIN_API_VERSION,
-    PLUGIN_COMPAT_WINDOW,
     ForgePlugin,
     HookType,
     PluginRegistry,
@@ -22,6 +20,7 @@ from backend.core.plugin import (
 # -----------------------------------------------------------
 # Concrete plugin stub
 # -----------------------------------------------------------
+
 
 class _SimplePlugin(ForgePlugin):
     name = "simple-plugin"
@@ -92,6 +91,7 @@ def registry() -> PluginRegistry:
 # HookType
 # -----------------------------------------------------------
 
+
 class TestHookType:
     def test_all_hook_types_present(self):
         hook_names = {h.value for h in HookType}
@@ -103,6 +103,7 @@ class TestHookType:
 # -----------------------------------------------------------
 # PluginRegistry.register
 # -----------------------------------------------------------
+
 
 class TestPluginRegistryRegister:
     def test_register_plugin(self, registry: PluginRegistry):
@@ -141,6 +142,7 @@ class TestPluginRegistryRegister:
 # Dispatch hooks
 # -----------------------------------------------------------
 
+
 class TestDispatchHooks:
     @pytest.mark.asyncio
     async def test_dispatch_action_pre_passes_through(self, registry: PluginRegistry):
@@ -157,7 +159,9 @@ class TestDispatchHooks:
         assert result.mutated is True
 
     @pytest.mark.asyncio
-    async def test_dispatch_action_pre_tolerates_exception(self, registry: PluginRegistry):
+    async def test_dispatch_action_pre_tolerates_exception(
+        self, registry: PluginRegistry
+    ):
         registry.register(_RaisingPlugin())
         action = MagicMock()
         result = await registry.dispatch_action_pre(action)
@@ -187,7 +191,9 @@ class TestDispatchHooks:
         await registry.dispatch_session_start("sid1", {"key": "val"})
 
     @pytest.mark.asyncio
-    async def test_dispatch_session_start_tolerates_exception(self, registry: PluginRegistry):
+    async def test_dispatch_session_start_tolerates_exception(
+        self, registry: PluginRegistry
+    ):
         registry.register(_RaisingPlugin())
         await registry.dispatch_session_start("sid1")
 
@@ -241,15 +247,21 @@ class TestDispatchHooks:
 # ForgePlugin.validate
 # -----------------------------------------------------------
 
+
 class TestForgePluginValidate:
     def test_no_warnings_when_configured(self):
         assert _SimplePlugin().validate() == []
 
     def test_default_name_warns(self):
         class _DefaultPlugin(ForgePlugin):
-            async def on_event(self, e): pass
-            async def on_session_start(self, s, m): pass
-            async def on_session_end(self, s, m): pass
+            async def on_event(self, e):
+                pass
+
+            async def on_session_start(self, s, m):
+                pass
+
+            async def on_session_end(self, s, m):
+                pass
 
         p = _DefaultPlugin()
         warnings = p.validate()
@@ -264,6 +276,7 @@ class TestForgePluginValidate:
 # -----------------------------------------------------------
 # ForgePlugin default hooks
 # -----------------------------------------------------------
+
 
 class TestForgePluginDefaultHooks:
     @pytest.mark.asyncio

@@ -210,13 +210,46 @@ class OrchestratorPromptManager(PromptManager):
     ) -> None:
         super().__init__(prompt_dir, system_prompt_filename)
         self._config = config
+        # Populated dynamically by the orchestrator after MCP tools connect
+        self.mcp_tool_names: list[str] = []
+        self.mcp_tool_descriptions: dict[str, str] = {}
 
     def get_system_message(self, **context: object) -> str:
         """Render with orchestrator defaults (config, cli_mode, identity prefix)."""
         if self._config is not None:
             context.setdefault("config", self._config)
             context.setdefault("cli_mode", getattr(self._config, "cli_mode", False))
+        context.setdefault("mcp_tool_names", self.mcp_tool_names)
+        context.setdefault("mcp_tool_descriptions", self.mcp_tool_descriptions)
         content = super().get_system_message(**context)
         if self._IDENTITY_PREFIX.strip() not in content:
             content = self._IDENTITY_PREFIX + content
+        content = self._inject_scratchpad(content)
         return content
+
+    def _inject_scratchpad(self, content: str) -> str:
+        """Append persistent scratchpad notes so they survive context condensation."""
+        try:
+            from backend.engines.orchestrator.tools.note import _load_notes
+
+            notes = _load_notes()
+            if not notes:
+                return content
+            lines: list[str] = []
+            char_budget = 2000
+            for key, value in notes.items():
+                line = f"  [{key}]: {value}"
+                if len("\n".join(lines + [line])) > char_budget:
+                    lines.append("  ... (additional notes truncated)")
+                    break
+                lines.append(line)
+            scratchpad_block = "\n".join(lines)
+            return (
+                f"{content}\n\n"
+                f"<WORKING_SCRATCHPAD>\n"
+                f"Your persistent notes (survive context condensation):\n"
+                f"{scratchpad_block}\n"
+                f"</WORKING_SCRATCHPAD>"
+            )
+        except Exception:
+            return content

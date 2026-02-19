@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import base64
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -33,9 +33,7 @@ def _encode_metrics(mapping: dict) -> str:
 # ------------------------------------------------------------------
 class TestConversationStatsInit:
     def test_init_no_file_store(self):
-        cs = ConversationStats(
-            file_store=None, conversation_id="c1", user_id=None
-        )
+        cs = ConversationStats(file_store=None, conversation_id="c1", user_id=None)
         assert cs.conversation_id == "c1"
         assert cs.service_to_metrics == {}
         assert cs.restored_metrics == {}
@@ -247,3 +245,59 @@ class TestMergeAndSave:
         cs1.merge_and_save(cs2)
         assert "zero" not in cs1.restored_metrics
         assert "good" in cs1.restored_metrics
+
+    def test_merge_with_active_metrics_logs_error(self):
+        fs = _make_file_store(raise_fnf=True)
+        cs1 = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
+        cs2 = ConversationStats(file_store=None, conversation_id="c2", user_id=None)
+        
+        cs1.service_to_metrics = {"active": Metrics()}
+        
+        # Should log error but not fail
+        cs1.merge_and_save(cs2)
+        assert "active" in cs1.service_to_metrics
+
+
+class TestSaveMetricsEdgeCases:
+    def test_duplicate_service_ids_logs_error(self):
+        fs = _make_file_store(raise_fnf=True)
+        cs = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
+        cs.restored_metrics = {"svc": Metrics()}
+        cs.service_to_metrics = {"svc": Metrics()}
+        
+        # Should log error and prefer service_to_metrics
+        cs.save_metrics()
+        fs.write.assert_called_once()
+
+    def test_unexpected_type_in_combined_metrics(self):
+        fs = _make_file_store(raise_fnf=True)
+        cs = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
+        cs.service_to_metrics = {"weird": "just a string"}
+        
+        cs.save_metrics()
+        written = fs.write.call_args[0][1]
+        decoded = json.loads(base64.b64decode(written).decode())
+        assert decoded["weird"] == {"value": "'just a string'"}
+
+    def test_object_with_get_method(self):
+        fs = _make_file_store(raise_fnf=True)
+        cs = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
+        
+        class MockWithGet:
+            def get(self):
+                return {"val": 123}
+        
+        cs.service_to_metrics = {"obj": MockWithGet()}
+        cs.save_metrics()
+        written = fs.write.call_args[0][1]
+        decoded = json.loads(base64.b64decode(written).decode())
+        assert decoded["obj"] == {"val": 123}
+
+
+class TestMaybeRestoreEdgeCases:
+    def test_invalid_value_type_skips(self):
+        # Value is not dict or Metrics
+        data = _encode_metrics({"svc1": 123})
+        fs = _make_file_store(data=data)
+        cs = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
+        assert cs.restored_metrics == {}

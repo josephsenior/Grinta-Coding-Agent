@@ -58,11 +58,14 @@ class TestRecoveryService(unittest.IsolatedAsyncioTestCase):
         """Test react_to_exception calls _handle_non_recoverable_error when recovery fails."""
         exc = RuntimeError("Fatal error")
 
-        with patch.object(
-            self.service, "_try_error_recovery", new_callable=AsyncMock
-        ) as mock_try, patch.object(
-            self.service, "_handle_non_recoverable_error", new_callable=AsyncMock
-        ) as mock_handle:
+        with (
+            patch.object(
+                self.service, "_try_error_recovery", new_callable=AsyncMock
+            ) as mock_try,
+            patch.object(
+                self.service, "_handle_non_recoverable_error", new_callable=AsyncMock
+            ) as mock_handle,
+        ):
             mock_try.return_value = False
             await self.service.react_to_exception(exc)
 

@@ -68,7 +68,7 @@ class TestCriticalPatterns:
     def test_critical_commands(self, analyzer: CommandAnalyzer, cmd: str):
         risk, reason, recs = analyzer.analyze(cmd)
         assert risk == RiskCategory.CRITICAL, f"{cmd!r} should be CRITICAL, got {risk}"
-        assert len(recs) > 0
+        assert recs
 
 
 # ---------------------------------------------------------------------------

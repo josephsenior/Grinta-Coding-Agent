@@ -27,6 +27,7 @@ class TestClassNameInMro:
 
     def test_finds_class_in_mro(self):
         """Test finds target class name in MRO chain."""
+
         class Base:
             pass
 
@@ -39,6 +40,7 @@ class TestClassNameInMro:
 
     def test_returns_false_for_missing_class(self):
         """Test returns False when class not in MRO."""
+
         class MyClass:
             pass
 
@@ -47,6 +49,7 @@ class TestClassNameInMro:
 
     def test_works_with_class_objects(self):
         """Test works when passed a class instead of instance."""
+
         class MyClass:
             pass
 
@@ -72,6 +75,7 @@ class TestIsInstanceOf:
 
     def test_detects_subclass_instance(self):
         """Test detects subclass instances."""
+
         class Base:
             pass
 
@@ -89,6 +93,7 @@ class TestIsInstanceOf:
 
     def test_resilient_to_module_reloads(self):
         """Test uses duck typing when isinstance fails but name matches."""
+
         # Create a custom class with Message in its name
         class Message_Duplicate:
             pass
@@ -124,6 +129,7 @@ class TestIsTextContent:
 
     def test_rejects_missing_attributes(self):
         """Test returns False when required attributes missing."""
+
         # Create object with type but without text
         class FakeContent:
             type = "text"
@@ -198,13 +204,20 @@ class TestExtractFirstText:
     def test_skips_non_text_content(self):
         """Test skips non-text content items to find text."""
         msg = Message(
-            role="user", content=[ImageContent(image_urls=["http://example.com/img.png"]), TextContent(text="Found text")]
+            role="user",
+            content=[
+                ImageContent(image_urls=["http://example.com/img.png"]),
+                TextContent(text="Found text"),
+            ],
         )
         assert extract_first_text(msg) == "Found text"
 
     def test_returns_none_when_no_text_content(self):
         """Test returns None when no TextContent items exist."""
-        msg = Message(role="user", content=[ImageContent(image_urls=["http://example.com/img.png"])])
+        msg = Message(
+            role="user",
+            content=[ImageContent(image_urls=["http://example.com/img.png"])],
+        )
         assert extract_first_text(msg) is None
 
 
@@ -376,7 +389,10 @@ class TestApplyUserMessageFormatting:
         """Test skips non-text content items."""
         messages = [
             Message(role="user", content=[TextContent(text="First")]),
-            Message(role="user", content=[ImageContent(image_urls=["http://example.com/img.png"])]),
+            Message(
+                role="user",
+                content=[ImageContent(image_urls=["http://example.com/img.png"])],
+            ),
         ]
 
         result = apply_user_message_formatting(messages)

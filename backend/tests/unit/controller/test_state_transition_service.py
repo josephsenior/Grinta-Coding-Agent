@@ -19,7 +19,9 @@ from backend.core.schemas import AgentState
 
 class TestInvalidStateTransitionError:
     def test_message(self):
-        err = InvalidStateTransitionError(AgentState.LOADING, AgentState.FINISHED, "bot")
+        err = InvalidStateTransitionError(
+            AgentState.LOADING, AgentState.FINISHED, "bot"
+        )
         assert "LOADING" in str(err) or "loading" in str(err).lower()
         assert "FINISHED" in str(err) or "finished" in str(err).lower()
         assert "bot" in str(err)
@@ -138,7 +140,7 @@ class TestStateTransitionServiceUnit:
     async def test_same_state_noop(self, svc, ctx):
         await svc.set_agent_state(AgentState.RUNNING)
         assert ctx.state.agent_state == AgentState.RUNNING
-        assert len(ctx.event_stream.events) == 0
+        assert not ctx.event_stream.events
 
     async def test_valid_transition_emits_event(self, svc, ctx):
         await svc.set_agent_state(AgentState.PAUSED)

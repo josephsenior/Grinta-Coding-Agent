@@ -74,6 +74,7 @@ class TestInitializeCoreAttributes:
         assert ctrl.security_analyzer is security
 
         from backend.core.enums import LifecyclePhase
+
         assert ctrl._lifecycle == LifecyclePhase.ACTIVE
 
     def test_falls_back_to_event_stream_sid(self):
@@ -158,9 +159,7 @@ class TestInitializeStateAndTracking:
 
         replay_events = [MagicMock(), MagicMock()]
 
-        with patch(
-            "backend.controller.services.lifecycle_service.StateTracker"
-        ):
+        with patch("backend.controller.services.lifecycle_service.StateTracker"):
             with patch(
                 "backend.controller.services.lifecycle_service.ReplayManager"
             ) as mock_rm:

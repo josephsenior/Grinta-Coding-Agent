@@ -239,10 +239,12 @@ class TestProgressTracker:
         metrics1 = tracker.update(state)
 
         # Add more progress markers
-        state.history.extend([
-            FileEditAction(path="test3.py", content="code"),
-            CmdOutputObservation(content="passed", command="pytest", exit_code=0),
-        ])
+        state.history.extend(
+            [
+                FileEditAction(path="test3.py", content="code"),
+                CmdOutputObservation(content="passed", command="pytest", exit_code=0),
+            ]
+        )
         tracker.milestones.append(Milestone("tests_passing", 50, datetime.now()))
 
         # Second update

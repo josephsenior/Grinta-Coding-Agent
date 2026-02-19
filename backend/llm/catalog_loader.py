@@ -13,6 +13,7 @@ import functools
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Sequence
+from typing import Any
 
 try:
     import tomllib  # Python 3.11+
@@ -41,6 +42,12 @@ class ModelEntry:
     supports_stop_words: bool = True
     supports_response_schema: bool = False
     supports_vision: bool = False
+    # Model-specific parameter overrides for _get_call_kwargs().
+    # These replace the brittle if-elif chain with data-driven config.
+    strip_reasoning_effort: bool = False  # Remove reasoning_effort from kwargs
+    thinking_mode: str | None = None  # "disabled", "budget:<N>", "enabled:<low>:<high>"
+    strip_temperature: bool = False  # Remove temperature when thinking is active
+    strip_top_p: bool = False  # Remove top_p from kwargs
 
 
 @functools.lru_cache(maxsize=1)
@@ -73,6 +80,10 @@ def get_catalog() -> tuple[ModelEntry, ...]:
                 supports_stop_words=info.get("supports_stop_words", True),
                 supports_response_schema=info.get("supports_response_schema", False),
                 supports_vision=info.get("supports_vision", False),
+                strip_reasoning_effort=info.get("strip_reasoning_effort", False),
+                thinking_mode=info.get("thinking_mode"),
+                strip_temperature=info.get("strip_temperature", False),
+                strip_top_p=info.get("strip_top_p", False),
             )
         )
     return tuple(entries)
@@ -203,3 +214,87 @@ def get_provider_info(model: str) -> dict[str, Any]:
         "max_input_tokens": None,
         "max_output_tokens": None,
     }
+
+
+def apply_model_param_overrides(
+    model: str,
+    call_kwargs: dict,
+    reasoning_effort: str | None = None,
+    is_stream: bool = False,
+) -> dict:
+    """Apply data-driven model-specific parameter overrides from the catalog.
+
+    This replaces hand-coded if-elif chains in ``_get_call_kwargs``.
+    If the model is not in the catalog or has no overrides, the kwargs
+    are returned unchanged.
+
+    Args:
+        model: Model name/alias.
+        call_kwargs: The kwargs dict being built for the LLM call.
+        reasoning_effort: The configured reasoning effort level.
+        is_stream: Whether this is a streaming call.
+
+    Returns:
+        The (potentially modified) call_kwargs dict.
+    """
+    entry = lookup(model)
+    if entry is None:
+        # Unknown model — pass reasoning_effort through if set
+        if reasoning_effort is not None:
+            call_kwargs["reasoning_effort"] = reasoning_effort
+        return call_kwargs
+
+    # Strip reasoning_effort if the model doesn't support it natively
+    if entry.strip_reasoning_effort:
+        call_kwargs.pop("reasoning_effort", None)
+
+    # Apply thinking mode configuration
+    if entry.thinking_mode:
+        _apply_thinking_mode(call_kwargs, entry, reasoning_effort, is_stream)
+    elif reasoning_effort is not None and not entry.strip_reasoning_effort:
+        call_kwargs["reasoning_effort"] = reasoning_effort
+
+    # Conditional param stripping
+    if entry.strip_top_p:
+        call_kwargs.pop("top_p", None)
+    if entry.strip_temperature:
+        call_kwargs.pop("temperature", None)
+
+    return call_kwargs
+
+
+def _apply_thinking_mode(
+    call_kwargs: dict,
+    entry: ModelEntry,
+    reasoning_effort: str | None,
+    is_stream: bool,
+) -> None:
+    """Parse ``thinking_mode`` from the catalog and set appropriate kwargs.
+
+    Supported formats:
+    - ``"disabled"`` → ``{"type": "disabled"}``
+    - ``"budget:<N>"`` → ``{"budget_tokens": N}`` (skip in stream if needed)
+    - ``"enabled:<low_budget>:<high_budget>"`` → maps reasoning_effort to budget
+    """
+    mode = entry.thinking_mode
+    if mode == "disabled":
+        call_kwargs["thinking"] = {"type": "disabled"}
+        call_kwargs.pop("reasoning_effort", None)
+    elif mode.startswith("budget:"):
+        tokens = int(mode.split(":")[1])
+        if not is_stream:
+            call_kwargs["thinking"] = {"budget_tokens": tokens}
+            if entry.strip_temperature:
+                call_kwargs.pop("temperature", None)
+            if entry.strip_top_p:
+                call_kwargs.pop("top_p", None)
+        call_kwargs.pop("reasoning_effort", None)
+    elif mode.startswith("enabled:"):
+        parts = mode.split(":")
+        low_budget = int(parts[1]) if len(parts) > 1 else 1024
+        high_budget = int(parts[2]) if len(parts) > 2 else 4096
+        if reasoning_effort in ("low", None):
+            call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": low_budget}
+        elif reasoning_effort in ("medium", "high"):
+            call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": high_budget}
+        call_kwargs.pop("reasoning_effort", None)

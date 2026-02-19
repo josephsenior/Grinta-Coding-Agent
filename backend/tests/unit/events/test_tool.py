@@ -388,6 +388,3 @@ class TestToolCallMetadata:
 
         assert metadata1._raw_response.id == "resp1"
         assert metadata2._raw_response.id == "resp2"
-
-
-

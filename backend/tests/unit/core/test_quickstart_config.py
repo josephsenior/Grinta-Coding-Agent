@@ -29,7 +29,7 @@ class TestGenerateQuickstartConfig:
         result = generate_quickstart_config(base_url="https://api.example.com")
         assert 'base_url = "https://api.example.com"' in result
         # Should NOT be commented out
-        assert '# base_url' not in result
+        assert "# base_url" not in result
 
     def test_custom_budget(self):
         result = generate_quickstart_config(max_budget=10.0)
@@ -41,7 +41,10 @@ class TestGenerateQuickstartConfig:
 
     def test_all_custom(self):
         result = generate_quickstart_config(
-            api_key="key1", model="llama3", base_url="http://localhost:11434", max_budget=1.0
+            api_key="key1",
+            model="llama3",
+            base_url="http://localhost:11434",
+            max_budget=1.0,
         )
         assert 'api_key = "key1"' in result
         assert 'model = "llama3"' in result

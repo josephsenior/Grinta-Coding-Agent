@@ -290,7 +290,7 @@ class TestProperties:
         assert divergences == []
         # Modifying the returned list should not affect internal state
         divergences.append("fake")
-        assert len(rm.divergences) == 0
+        assert not rm.divergences
 
     def test_is_deterministic_true_initially(self):
         rm = ReplayManager(events=[_make_action()])

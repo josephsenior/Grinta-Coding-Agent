@@ -32,6 +32,11 @@ from backend.core.constants import (
     DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED,
     DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED,
     DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS,
+    DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS,
+    DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS,
+    DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
+    DEFAULT_AGENT_MAX_ERROR_RATE,
+    DEFAULT_AGENT_ERROR_RATE_WINDOW,
     DEFAULT_AGENT_MCP_ENABLED,
     DEFAULT_AGENT_MEMORY_ENABLED,
     DEFAULT_AGENT_MEMORY_MAX_THREADS,
@@ -238,6 +243,32 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     cli_mode: bool = Field(
         default=DEFAULT_AGENT_CLI_MODE,
         description="Whether the agent is running in CLI mode",
+    )
+    max_consecutive_errors: int = Field(
+        default=DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS,
+        ge=1,
+        description="Circuit breaker threshold for consecutive errors",
+    )
+    max_high_risk_actions: int = Field(
+        default=DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS,
+        ge=1,
+        description="Circuit breaker threshold for high-risk actions",
+    )
+    max_stuck_detections: int = Field(
+        default=DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
+        ge=1,
+        description="Circuit breaker threshold for stuck-loop detections",
+    )
+    max_error_rate: float = Field(
+        default=DEFAULT_AGENT_MAX_ERROR_RATE,
+        ge=0.0,
+        le=1.0,
+        description="Circuit breaker error-rate threshold over rolling window",
+    )
+    error_rate_window: int = Field(
+        default=DEFAULT_AGENT_ERROR_RATE_WINDOW,
+        ge=3,
+        description="Rolling window size for circuit breaker error-rate checks",
     )
 
     @field_validator("name", "autonomy_level", "system_prompt_filename")

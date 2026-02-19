@@ -1,6 +1,5 @@
 """Tests for backend.core.config.permissions_config — PermissionsConfig and related models."""
 
-
 from backend.core.config.permissions_config import (
     PermissionCategory,
     PermissionRule,
@@ -10,6 +9,7 @@ from backend.core.config.permissions_config import (
 
 
 # ── Enums ────────────────────────────────────────────────────────────
+
 
 class TestRiskLevel:
     def test_values(self):
@@ -34,6 +34,7 @@ class TestPermissionCategory:
 
 
 # ── PermissionRule ───────────────────────────────────────────────────
+
 
 class TestPermissionRule:
     def test_defaults(self):
@@ -64,6 +65,7 @@ class TestPermissionRule:
 
 # ── PermissionsConfig defaults ───────────────────────────────────────
 
+
 class TestPermissionsConfigDefaults:
     def test_default_values(self):
         config = PermissionsConfig()
@@ -77,6 +79,7 @@ class TestPermissionsConfigDefaults:
 
 
 # ── Presets ──────────────────────────────────────────────────────────
+
 
 class TestPresets:
     def test_supervised_preset(self):
@@ -107,6 +110,7 @@ class TestPresets:
 
 # ── check_permission ─────────────────────────────────────────────────
 
+
 class TestCheckPermission:
     def test_allowed_file_read(self):
         config = PermissionsConfig()
@@ -122,12 +126,16 @@ class TestCheckPermission:
 
     def test_denied_file_write(self):
         config = PermissionsConfig(file_write_enabled=False)
-        allowed, reason = config.check_permission(PermissionCategory.FILE_WRITE, "write")
+        allowed, reason = config.check_permission(
+            PermissionCategory.FILE_WRITE, "write"
+        )
         assert allowed is False
 
     def test_denied_file_delete(self):
         config = PermissionsConfig(file_delete_enabled=False)
-        allowed, reason = config.check_permission(PermissionCategory.FILE_DELETE, "delete")
+        allowed, reason = config.check_permission(
+            PermissionCategory.FILE_DELETE, "delete"
+        )
         assert allowed is False
 
     def test_denied_git(self):
@@ -157,24 +165,32 @@ class TestCheckPermission:
 
     def test_denied_force_push_operation(self):
         config = PermissionsConfig(git_allow_force_push=False)
-        allowed, reason = config.check_permission(PermissionCategory.GIT, "git_force_push")
+        allowed, reason = config.check_permission(
+            PermissionCategory.GIT, "git_force_push"
+        )
         assert allowed is False
         assert "force push" in reason.lower()
 
     def test_denied_branch_delete_operation(self):
         config = PermissionsConfig(git_allow_branch_delete=False)
-        allowed, reason = config.check_permission(PermissionCategory.GIT, "git_branch_delete")
+        allowed, reason = config.check_permission(
+            PermissionCategory.GIT, "git_branch_delete"
+        )
         assert allowed is False
 
     def test_denied_sudo_operation(self):
         config = PermissionsConfig(shell_allow_sudo=False)
-        allowed, reason = config.check_permission(PermissionCategory.SHELL, "sudo_command")
+        allowed, reason = config.check_permission(
+            PermissionCategory.SHELL, "sudo_command"
+        )
         assert allowed is False
         assert "sudo" in reason.lower()
 
     def test_allowed_force_push_when_enabled(self):
         config = PermissionsConfig(git_allow_force_push=True)
-        allowed, reason = config.check_permission(PermissionCategory.GIT, "git_force_push")
+        allowed, reason = config.check_permission(
+            PermissionCategory.GIT, "git_force_push"
+        )
         assert allowed is True
         assert reason is None
 

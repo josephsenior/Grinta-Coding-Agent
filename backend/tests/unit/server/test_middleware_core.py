@@ -6,7 +6,7 @@ Tests CORS, cache control, and rate limiting middleware.
 import asyncio
 import unittest
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -435,9 +435,7 @@ class TestMiddlewareIntegration(unittest.TestCase):
             return {"message": "OK"}
 
         with TestClient(app) as client:
-            response = client.get(
-                "/test", headers={"Origin": "http://localhost:3000"}
-            )
+            response = client.get("/test", headers={"Origin": "http://localhost:3000"})
             # CORS headers should be present
             self.assertEqual(response.status_code, 200)
 

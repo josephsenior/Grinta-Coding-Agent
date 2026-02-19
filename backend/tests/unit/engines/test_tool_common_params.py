@@ -32,7 +32,10 @@ class TestCreateToolDefinition:
 
     def test_additional_properties_true(self):
         result = create_tool_definition(
-            name="t", description="d", properties={}, required=[],
+            name="t",
+            description="d",
+            properties={},
+            required=[],
             additional_properties=True,
         )
         assert result["function"]["parameters"]["additionalProperties"] is True

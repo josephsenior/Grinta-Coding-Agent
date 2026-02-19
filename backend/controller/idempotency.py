@@ -42,6 +42,18 @@ _NON_IDEMPOTENT_ACTIONS: set[str] = {
     "FileEditAction",
 }
 
+# Commands that are effectively read-only or verification commands.
+# These should never be blocked by idempotency even if they repeat,
+# because their purpose is to observe state that may have changed.
+_READ_ONLY_COMMAND_PATTERNS: tuple[str, ...] = (
+    "pytest", "python -m pytest", "npm test", "yarn test",
+    "make test", "go test", "cargo test",
+    "cat ", "head ", "tail ", "grep ", "rg ",
+    "ls ", "find ", "tree ", "wc ",
+    "git status", "git diff", "git log",
+    "python -c", "node -e",
+)
+
 # Action types that are always idempotent / safe to repeat.
 _IDEMPOTENT_ACTIONS: set[str] = {
     "FileReadAction",
@@ -112,6 +124,15 @@ class IdempotencyMiddleware(ToolInvocationMiddleware):
 
         if classification == "idempotent":
             return  # Always allow
+
+        # CmdRunAction: allow read-only/verification commands to repeat freely.
+        # After an edit, re-running `pytest` or `cat file.py` is intentional.
+        action_name = type(ctx.action).__name__
+        if action_name == "CmdRunAction":
+            cmd = getattr(ctx.action, "command", "")
+            cmd_stripped = cmd.strip()
+            if any(cmd_stripped.startswith(pat) for pat in _READ_ONLY_COMMAND_PATTERNS):
+                return  # Always allow verification/read commands
 
         # Check for recent duplicate
         now = time.monotonic()

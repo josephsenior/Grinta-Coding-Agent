@@ -23,6 +23,7 @@ class TestImportFrom:
     def test_import_module_level_function(self):
         fn = import_from("os.path.join")
         import os.path
+
         assert fn is os.path.join
 
     def test_import_nonexistent_module(self):
@@ -44,6 +45,7 @@ class TestImplMatchesBase:
     def test_subclass(self):
         class MyError(ValueError):
             pass
+
         assert _impl_matches_base(ValueError, MyError)
 
     def test_unrelated(self):

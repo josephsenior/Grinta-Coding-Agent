@@ -18,6 +18,7 @@ from backend.events.observation import (
     Observation,
     UserRejectObservation,
 )
+from backend.events.observation.agent import AgentCondensationObservation
 from backend.events.serialization.event import truncate_content
 
 if TYPE_CHECKING:
@@ -63,6 +64,8 @@ def convert_observation_to_message(
         return _handle_file_download_observation(event, max_message_chars)
     if isinstance(event, MCPObservation):
         return _handle_mcp_observation(event, max_message_chars)
+    if isinstance(event, AgentCondensationObservation):
+        return _handle_condensation_observation(event, max_message_chars)
 
     # Fallback for generic/simple observations
     return _handle_simple_observation(event, max_message_chars)
@@ -93,12 +96,45 @@ def _handle_simple_observation(
     return Message(role="user", content=[TextContent(text=text)])
 
 
+_CONDENSATION_BANNER = (
+    "\u26a1 CONTEXT CONDENSED — older conversation events were replaced by the summary below.\n"
+    + "─" * 60 + "\n"
+)
+
+_POST_CONDENSATION_RECOVERY = (
+    "\n" + "─" * 60 + "\n"
+    "⚠️ POST-CONDENSATION RECOVERY PROTOCOL:\n"
+    "Your context was just condensed. Prior tool outputs and file contents are gone.\n"
+    "Before continuing, you MUST:\n"
+    "1. recall(key=\"all\") — retrieve your scratchpad to restore decisions and findings\n"
+    "2. Re-read any files you were actively editing (use view command)\n"
+    "3. Review your task tracker (task_tracker view) to confirm current progress\n"
+    "4. Use think() to re-orient: what was I doing? what's next?\n"
+    "Do NOT proceed with edits until you have re-established context.\n"
+)
+
+
+def _handle_condensation_observation(
+    obs: AgentCondensationObservation, max_message_chars: int | None
+) -> Message:
+    """Handle AgentCondensationObservation with an explicit visibility banner."""
+    summary = obs.content or "(no summary provided)"
+    text = truncate_content(
+        _CONDENSATION_BANNER + summary + _POST_CONDENSATION_RECOVERY,
+        max_message_chars,
+    )
+    return Message(role="user", content=[TextContent(text=text)])
+
+
 def _handle_file_read_observation(
     obs: FileReadObservation, max_message_chars: int | None
 ) -> Message:
+    path = getattr(obs, "path", "unknown")
+    text = truncate_content(obs.content, max_message_chars)
+    text = f"[FILE_READ path={path}]\n{text}"
     return Message(
-        role="user", content=[TextContent(text=obs.content)]
-    )  # Content already formatted by read action
+        role="user", content=[TextContent(text=text)]
+    )
 
 
 def _handle_file_edit_observation(
@@ -106,19 +142,67 @@ def _handle_file_edit_observation(
 ) -> Message:
     content_str = str(obs)
     text = truncate_content(content_str, max_message_chars)
+    path = getattr(obs, "path", "unknown")
+    text = f"[FILE_EDIT path={path}]\n{text}"
     return Message(role="user", content=[TextContent(text=text)])
+
+
+_ERROR_CLASSIFIERS: list[tuple[str, list[str]]] = [
+    ("PYTHON_IMPORT_ERROR", ["ModuleNotFoundError", "ImportError", "No module named"]),
+    ("PYTHON_SYNTAX_ERROR", ["SyntaxError:", "IndentationError:", "TabError:"]),
+    ("PYTHON_TYPE_ERROR", ["TypeError:"]),
+    ("PYTHON_NAME_ERROR", ["NameError:", "is not defined"]),
+    ("PYTHON_ATTRIBUTE_ERROR", ["AttributeError:", "has no attribute"]),
+    ("PYTHON_VALUE_ERROR", ["ValueError:"]),
+    ("PYTHON_KEY_ERROR", ["KeyError:"]),
+    ("PYTHON_INDEX_ERROR", ["IndexError:"]),
+    ("FILE_NOT_FOUND", ["FileNotFoundError", "No such file or directory", "ENOENT"]),
+    ("PERMISSION_DENIED", ["PermissionError", "Permission denied", "EACCES"]),
+    ("TIMEOUT_ERROR", ["TimeoutError", "timed out", "ETIMEDOUT"]),
+    ("CONNECTION_ERROR", ["ConnectionError", "ConnectionRefused", "ECONNREFUSED"]),
+    ("RUNTIME_ERROR", ["RuntimeError:"]),
+    ("ASSERTION_ERROR", ["AssertionError:", "assert "]),
+    ("TEST_FAILURE", ["FAILED", "failures=", "tests failed", "ERRORS"]),
+    ("COMMAND_NOT_FOUND", ["command not found", "not recognized as"]),
+    ("NPM_ERROR", ["npm ERR!", "npm error"]),
+    ("GIT_ERROR", ["fatal:", "error: failed to"]),
+    ("MEMORY_ERROR", ["MemoryError", "OutOfMemoryError", "OOM"]),
+    ("DISK_ERROR", ["No space left on device", "ENOSPC"]),
+]
+
+
+def _classify_cmd_error(content: str) -> str | None:
+    """Classify a command output error by scanning content for known patterns.
+
+    Returns the error type string (e.g. 'PYTHON_IMPORT_ERROR') or None.
+    """
+    for error_type, patterns in _ERROR_CLASSIFIERS:
+        for pattern in patterns:
+            if pattern in content:
+                return error_type
+    return None
 
 
 def _handle_cmd_output_observation(
     obs: CmdOutputObservation, max_message_chars: int | None
 ) -> Message:
+    exit_code = getattr(obs, "exit_code", None)
+    exit_tag = f" exit={exit_code}" if exit_code is not None else ""
+
+    error_type_tag = ""
+    if exit_code is not None and exit_code != 0:
+        classified = _classify_cmd_error(obs.content)
+        if classified:
+            error_type_tag = f" error_type={classified}"
+
+    tag = f"[CMD_OUTPUT{exit_tag}{error_type_tag}]"
     if obs.tool_call_metadata is None:
         text = truncate_content(
-            f"\nObserved result of command executed by user:\n{obs.to_agent_observation()}",
+            f"{tag}\nObserved result of command executed by user:\n{obs.to_agent_observation()}",
             max_message_chars,
         )
     else:
-        text = truncate_content(obs.to_agent_observation(), max_message_chars)
+        text = truncate_content(f"{tag}\n{obs.to_agent_observation()}", max_message_chars)
     return Message(role="user", content=[TextContent(text=text)])
 
 
@@ -167,9 +251,9 @@ def _extract_browser_image(
     obs: BrowserOutputObservation,
 ) -> tuple[str | None, str | None]:
     """Extract image URL and type from browser observation."""
-    if obs.set_of_marks is not None and len(obs.set_of_marks) > 0:
+    if obs.set_of_marks is not None and obs.set_of_marks:
         return obs.set_of_marks, "set of marks"
-    if obs.screenshot is not None and len(obs.screenshot) > 0:
+    if obs.screenshot is not None and obs.screenshot:
         return obs.screenshot, "screenshot"
     return None, None
 
@@ -210,9 +294,11 @@ def _add_browser_image_fallback(
 def _handle_error_observation(
     obs: ErrorObservation, max_message_chars: int | None
 ) -> Message:
+    error_id = getattr(obs, "error_id", "UNKNOWN")
     return _handle_simple_observation(
         obs,
         max_message_chars,
+        prefix=f"[ERROR type={error_id}]\n",
         suffix="\n[Error occurred in processing last action]",
     )
 
@@ -237,5 +323,6 @@ def _handle_file_download_observation(
 def _handle_mcp_observation(
     obs: MCPObservation, max_message_chars: int | None
 ) -> Message:
-    text = truncate_content(obs.content, max_message_chars)
+    tool_name = getattr(obs, "name", "unknown")
+    text = truncate_content(f"[MCP_RESULT tool={tool_name}]\n{obs.content}", max_message_chars)
     return Message(role="user", content=[TextContent(text=text)])

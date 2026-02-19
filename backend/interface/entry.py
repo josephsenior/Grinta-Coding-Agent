@@ -19,7 +19,9 @@ def _handle_help_request(parser) -> None:
 
 def _normalize_arguments() -> None:
     """Normalize command line arguments."""
-    if len(sys.argv) == 1 or (len(sys.argv) > 1 and sys.argv[1] not in ["serve", "all", "start", "init"]):
+    if len(sys.argv) == 1 or (
+        len(sys.argv) > 1 and sys.argv[1] not in ["serve", "all", "start", "init"]
+    ):
         sys.argv.insert(1, "serve")
 
 
@@ -34,16 +36,16 @@ def _launch_all_in_one() -> None:
     import httpx
     from backend.tui.app import ForgeApp
     from backend.tui.client import ForgeClient
-    from backend import __version__
 
     # 0. Check for Redis (Mandatory dependency)
     try:
         import redis
-        r = redis.Redis(host='localhost', port=6379, socket_connect_timeout=1)
+
+        r = redis.Redis(host="localhost", port=6379, socket_connect_timeout=1)
         r.ping()
-        print("✅ Redis connection verified.")
+        print("[OK] Redis connection verified.")
     except Exception as e:
-        print("⚠️  Warning: Redis connection failed. Some features may be limited.")
+        print("[WARNING] Redis connection failed. Some features may be limited.")
         print("   If you are running locally, please ensure redis-server is running.")
         print(f"   Error: {e}")
 
@@ -54,7 +56,7 @@ def _launch_all_in_one() -> None:
     # Users can still enable it by setting SESSION_API_KEY explicitly in their terminal shell.
     if not os.environ.get("SESSION_API_KEY"):
         env["SESSION_API_KEY"] = ""
-    
+
     server_cmd = [
         sys.executable,
         "-m",
@@ -63,45 +65,54 @@ def _launch_all_in_one() -> None:
         "--host",
         "127.0.0.1",
         "--port",
-        "3000",
-        "--log-level", "warning"  # Keep logs quiet so they don't corrupt TUI
+        "3001",
+        "--log-level",
+        "warning",  # Keep logs quiet so they don't corrupt TUI
     ]
-    
+
+    # Redirection to a log file instead of a pipe avoids uvicorn blocking
+    # when the stdout pipe buffer fills up, which is common during startup.
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    server_log = open(log_dir / "server.log", "w", encoding="utf-8")
+
     server_proc = subprocess.Popen(
-        server_cmd,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True
+        server_cmd, env=env, stdout=server_log, stderr=subprocess.STDOUT, text=True
     )
 
     def cleanup(sig=None, frame=None):
         print("\nCleanup: Stopping server...")
         server_proc.terminate()
         server_proc.wait()
+        server_log.close()
         sys.exit(0)
 
     # Register cleanup handlers
-    signal.signal(signal.SIGINT, cleanup)
-    signal.signal(signal.SIGTERM, cleanup)
+    try:
+        signal.signal(signal.SIGINT, cleanup)
+        signal.signal(signal.SIGTERM, cleanup)
+    except (ValueError, RuntimeError):
+        # On Windows or non-main threads, some signals may not be available
+        pass
 
     # 2. Wait for server to be ready
-    print("⏳ Waiting for backend to initialize...")
+    print("[*] Waiting for backend to initialize...")
     max_retries = 30
     ready = False
     for i in range(max_retries):
         if server_proc.poll() is not None:
-            print("❌ Backend process exited prematurely.")
-            output, _ = server_proc.communicate()
-            print("\nBackend output:")
-            print("-" * 40)
-            print(output)
-            print("-" * 40)
+            print("[ERROR] Backend process exited prematurely.")
+            server_log.close()
+            with open(log_dir / "server.log", "r", encoding="utf-8") as f:
+                print("\nBackend output:")
+                print("-" * 40)
+                print(f.read())
+                print("-" * 40)
             sys.exit(1)
-            
+
         try:
             with httpx.Client() as client:
-                response = client.get("http://localhost:3000/api/health/live")
+                response = client.get("http://localhost:3001/api/health/ready")
                 if response.status_code == 200:
                     ready = True
                     break
@@ -109,17 +120,17 @@ def _launch_all_in_one() -> None:
             pass
         time.sleep(0.5)
         if i % 5 == 0 and i > 0:
-            print(f"   Still waiting ({i/2}s elapsed)...")
+            print(f"   Still waiting ({i / 2}s elapsed)...")
 
     if not ready:
-        print("❌ Backend failed to start. Aborting.")
+        print("[ERROR] Backend failed to start. Aborting.")
         server_proc.terminate()
         sys.exit(1)
 
     # 3. Launch TUI in foreground
-    print("✅ Backend ready! Launching TUI...")
+    print("[OK] Backend ready! Launching TUI...")
     try:
-        client = ForgeClient(base_url="http://localhost:3000")
+        client = ForgeClient(base_url="http://localhost:3001")
         app = ForgeApp(client)
         app.run()
     finally:
@@ -132,6 +143,11 @@ def _execute_command(args, parser) -> None:
         launch_gui_server()
     elif args.command in ("all", "start"):
         _launch_all_in_one()
+    elif args.command == "health":
+        # Import dynamically to avoid loading heavy modules if not requested
+        from backend.interface.cli.health_check import run_health_check
+
+        run_health_check(args)
     elif args.command == "init":
         from backend.interface.cli.init_project import init_project
 

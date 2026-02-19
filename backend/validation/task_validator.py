@@ -525,6 +525,7 @@ class CompositeValidator(TaskValidator):
         validators: list[TaskValidator],
         min_confidence: float = 0.7,
         require_all_pass: bool = False,
+        fail_open_on_empty: bool = True,
     ) -> None:
         """Initialize composite validator.
 
@@ -532,11 +533,14 @@ class CompositeValidator(TaskValidator):
             validators: List of validators to run
             min_confidence: Minimum confidence threshold to pass
             require_all_pass: If True, all validators must pass
+            fail_open_on_empty: If True, return passed=True when no validators
+                can run successfully. If False, fail closed.
 
         """
         self.validators = validators
         self.min_confidence = min_confidence
         self.require_all_pass = require_all_pass
+        self.fail_open_on_empty = fail_open_on_empty
 
     async def validate_completion(self, task: Task, state: State) -> ValidationResult:
         """Run all validators and combine results.
@@ -552,6 +556,16 @@ class CompositeValidator(TaskValidator):
         results = await self._run_all_validators(task, state)
 
         if not results:
+            if not self.fail_open_on_empty:
+                return ValidationResult(
+                    passed=False,
+                    reason="No validators ran successfully",
+                    confidence=0.0,
+                    missing_items=["Run validation checks before finishing"],
+                    suggestions=[
+                        "Ensure validator prerequisites are met (tests, diff, files)",
+                    ],
+                )
             return ValidationResult(
                 passed=True, reason="No validators ran successfully", confidence=0.0
             )

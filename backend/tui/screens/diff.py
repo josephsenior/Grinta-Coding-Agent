@@ -115,9 +115,7 @@ class DiffScreen(Screen[None]):
             return
 
         if not self._changes:
-            await file_list.mount(
-                Static("No workspace changes", classes="empty-diff")
-            )
+            await file_list.mount(Static("No workspace changes", classes="empty-diff"))
             return
 
         for change in self._changes:

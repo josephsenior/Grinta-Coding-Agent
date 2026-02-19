@@ -17,6 +17,7 @@ from backend.llm.utils.batching import (
 # BatchRequest
 # ---------------------------------------------------------------------------
 
+
 class TestBatchRequest:
     """Tests for the BatchRequest dataclass."""
 
@@ -54,6 +55,7 @@ class TestBatchRequest:
 # BatchResult
 # ---------------------------------------------------------------------------
 
+
 class TestBatchResult:
     """Tests for the BatchResult dataclass."""
 
@@ -76,6 +78,7 @@ class TestBatchResult:
 # ---------------------------------------------------------------------------
 # LLMBatchProcessor
 # ---------------------------------------------------------------------------
+
 
 class TestLLMBatchProcessor:
     """Tests for the LLMBatchProcessor class."""
@@ -180,6 +183,7 @@ class TestLLMBatchProcessor:
 # ---------------------------------------------------------------------------
 # create_batch_processor
 # ---------------------------------------------------------------------------
+
 
 class TestCreateBatchProcessor:
     """Tests for the factory function."""

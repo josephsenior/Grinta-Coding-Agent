@@ -142,7 +142,9 @@ class TestGetEventRuntimeDefaults:
         monkeypatch.setenv("FORGE_EVENT_COALESCE_MAX_BATCH", "40")
 
         # Patch config loading to fail so we use env vars
-        with patch("backend.core.config.utils.load_FORGE_config", side_effect=Exception):
+        with patch(
+            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+        ):
             defaults = get_event_runtime_defaults()
 
         assert defaults.max_queue_size == 4000
@@ -160,7 +162,9 @@ class TestGetEventRuntimeDefaults:
         """Test coalesce boolean environment parsing."""
         get_event_runtime_defaults.cache_clear()
 
-        with patch("backend.core.config.utils.load_FORGE_config", side_effect=Exception):
+        with patch(
+            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+        ):
             # Test "1"
             monkeypatch.setenv("FORGE_EVENT_COALESCE", "1")
             assert get_event_runtime_defaults().coalesce is True
@@ -175,7 +179,9 @@ class TestGetEventRuntimeDefaults:
         """Test async_write boolean environment parsing."""
         get_event_runtime_defaults.cache_clear()
 
-        with patch("backend.core.config.utils.load_FORGE_config", side_effect=Exception):
+        with patch(
+            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+        ):
             # Test "yes"
             monkeypatch.setenv("FORGE_EVENTSTREAM_ASYNC_WRITE", "yes")
             assert get_event_runtime_defaults().async_write is True
@@ -191,7 +197,9 @@ class TestGetEventRuntimeDefaults:
         get_event_runtime_defaults.cache_clear()
         monkeypatch.setenv("FORGE_EVENTSTREAM_WORKERS", "0")
 
-        with patch("backend.core.config.utils.load_FORGE_config", side_effect=Exception):
+        with patch(
+            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+        ):
             defaults = get_event_runtime_defaults()
 
         assert defaults.workers == 1  # minimum
@@ -201,7 +209,9 @@ class TestGetEventRuntimeDefaults:
         get_event_runtime_defaults.cache_clear()
         monkeypatch.setenv("FORGE_EVENT_COALESCE_MAX_BATCH", "-5")
 
-        with patch("backend.core.config.utils.load_FORGE_config", side_effect=Exception):
+        with patch(
+            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+        ):
             defaults = get_event_runtime_defaults()
 
         assert defaults.coalesce_max_batch == 1  # minimum
@@ -230,4 +240,3 @@ class TestGetEventRuntimeDefaults:
 
         assert defaults.max_queue_size == 5000
         assert defaults.drop_policy == "drop_oldest"  # fallback default
-

@@ -21,10 +21,18 @@ class ContextTracker:
     :class:`~backend.memory.conversation_memory.ConversationMemory`.
     """
 
-    def __init__(self, *, vector_store: EnhancedVectorStore | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        vector_store: EnhancedVectorStore | None = None,
+        max_decisions: int = 200,
+        max_anchors: int = 200,
+    ) -> None:
         self.vector_store = vector_store
         self.decisions: dict[str, Decision] = {}
         self.anchors: dict[str, ContextAnchor] = {}
+        self.max_decisions = max_decisions
+        self.max_anchors = max_anchors
 
     def track_decision(
         self,
@@ -46,6 +54,7 @@ class ContextTracker:
             confidence=confidence,
         )
         self.decisions[decision_id] = decision
+        self._prune_decisions_if_needed()
         logger.info("✓ Tracked decision: %s...", description[:50])
         return decision
 
@@ -65,8 +74,23 @@ class ContextTracker:
             last_accessed=datetime.now(),
         )
         self.anchors[anchor_id] = anchor
+        self._prune_anchors_if_needed()
         logger.info("📌 Anchored %s: %s...", category, content[:50])
         return anchor
+
+    def _prune_decisions_if_needed(self) -> None:
+        while len(self.decisions) > self.max_decisions:
+            oldest_key = next(iter(self.decisions), None)
+            if oldest_key is None:
+                break
+            self.decisions.pop(oldest_key, None)
+
+    def _prune_anchors_if_needed(self) -> None:
+        while len(self.anchors) > self.max_anchors:
+            oldest_key = next(iter(self.anchors), None)
+            if oldest_key is None:
+                break
+            self.anchors.pop(oldest_key, None)
 
     def get_context_summary(self) -> str:
         """Get a summary of active anchors and recent decisions for the prompt."""

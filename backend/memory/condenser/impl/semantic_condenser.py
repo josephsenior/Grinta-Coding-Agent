@@ -1,298 +1,227 @@
 """Semantic Condenser - Intelligent Compression with Meaning Preservation.
 
-Uses semantic similarity and importance scoring to compress context
-while preserving the most critical information.
+Uses semantic similarity via SentenceTransformers to compress context
+while preserving the most critical information relative to the current task.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import FORGE_logger as logger
-from backend.events.action import Action, MessageAction
-from backend.events.action.agent import CondensationAction
-from backend.events.event import Event
-from backend.events.observation import Observation
-from backend.memory.condenser.condenser import Condensation, RollingCondenser
+from backend.memory.condenser.condenser import BaseLLMCondenser, Condensation
 from backend.memory.view import View
 
-
-@dataclass
-class EventImportance:
-    """Importance score for an event."""
-
-    event: Event
-    importance_score: float
-    reasons: list[str]  # Why this event is important
+if TYPE_CHECKING:
+    from backend.events.event import Event
 
 
-class SemanticCondenser(RollingCondenser):
-    """Semantic condenser that intelligently compresses context.
+try:
+    from sentence_transformers import SentenceTransformer
+    import numpy as np
+    from numpy.linalg import norm
+    HAS_SENTENCE_TRANSFORMERS = True
+except ImportError:
+    HAS_SENTENCE_TRANSFORMERS = False
+
+
+class SemanticCondenser(BaseLLMCondenser):
+    """Semantic condenser that intelligently compresses context using embeddings.
 
     Features:
-    - Scores events by importance (decisions, errors, file changes)
-    - Preserves semantically important events
-    - Summarizes less critical events
-    - Maintains conversation coherence
+    - computes embeddings for conversation history
+    - semantic similarity scoring against recent context
+    - preserves first N events (system/task context)
+    - keeps recent window (short-term memory)
+    - selectively forgets low-relevance middle events
+    - summarizes forgotten chunks
     """
 
     def __init__(
         self,
-        keep_first: int = 5,
+        llm: Any = None,
         max_size: int = 100,
-        importance_threshold: float = 0.5,
-    ):
+        keep_first: int = 1,
+        max_event_length: int = 10000,
+        similarity_threshold: float = 0.5,
+        model_name: str = "all-MiniLM-L6-v2",
+        token_budget: int | None = None,
+    ) -> None:
         """Initialize semantic condenser.
 
         Args:
-            keep_first: Number of initial events to always keep
+            llm: LLM for summarization
             max_size: Maximum number of events to keep
-            importance_threshold: Minimum importance to keep (0-1)
-
+            keep_first: Number of initial events to always keep
+            max_event_length: Max chars per event (unused by embeddings but kept for compat)
+            similarity_threshold: Validation threshold (0-1)
+            model_name: SentenceTransformer model name
+            token_budget: Optional token budget
         """
-        super().__init__()
-        self.keep_first = keep_first
-        self.max_size = max_size
-        self.importance_threshold = importance_threshold
+        super().__init__(llm, max_size, keep_first, max_event_length)
+        self.token_budget = token_budget
+        
+        if not HAS_SENTENCE_TRANSFORMERS:
+            logger.warning(
+                "sentence-transformers not installed; SemanticCondenser will degrade to FIFO."
+            )
+            self.model = None
+        else:
+            try:
+                logger.info(f"Loading SentenceTransformer: {model_name}")
+                self.model = SentenceTransformer(model_name)
+            except Exception as e:
+                logger.error(f"Failed to load SentenceTransformer model {model_name}: {e}")
+                self.model = None
 
-        logger.info(
-            "Semantic condenser initialized (keep_first=%s, max_size=%s)",
-            keep_first,
-            max_size,
-        )
+        self.similarity_threshold = similarity_threshold
+
+    @staticmethod
+    def _get_extra_config_args(config: Any) -> dict[str, Any]:
+        """Extract semantic-specific config args."""
+        args = BaseLLMCondenser._get_extra_config_args(config)
+        if hasattr(config, "similarity_threshold"):
+            args["similarity_threshold"] = config.similarity_threshold
+        if hasattr(config, "model_name"):
+            args["model_name"] = config.model_name
+        return args
 
     def get_condensation(self, view: View) -> Condensation:
-        """Apply semantic condensation.
-
-        This method:
-        1. Scores each event by importance
-        2. Keeps essential initial events
-        3. Preserves high-importance events
-        4. Forgets low-importance events
-        5. Ensures conversation coherence
-        """
+        """Generate a condensation using semantic relevance."""
         events = view.events
-        if not events or len(events) <= self.max_size:
-            return Condensation(action=CondensationAction(forgotten_event_ids=[]))
+        total_events = len(events)
+        
+        # Fallback if no model or within limits
+        if not self.model or total_events <= self.max_size:
+            return self._fifo_condense(events)
 
-        # Score all events by importance
-        scored_events = self._score_events(events)
+        # 1. Define "Query" (Recent Context)
+        # We use the last 5-10 events as the "query" to determine what's relevant
+        recent_window = max(5, int(self.max_size * 0.1))
+        # Ensure we don't request more events than available
+        available_recent = min(recent_window, total_events)
+        query_events = events[-available_recent:]
+        
+        # Build query text from content/messages
+        query_parts = []
+        for e in query_events:
+            content = getattr(e, "message", getattr(e, "content", getattr(e, "thought", "")))
+            if content:
+                query_parts.append(str(content)[:200])
+        query_text = "\n".join(query_parts)
+        if not query_text.strip():
+            query_text = "current task context"
 
-        # Identify events to keep
-        keep_event_ids = self._select_events_to_keep(scored_events)
+        # 2. Embed Query
+        try:
+            query_embedding = self.model.encode(query_text)
+        except Exception as e:
+            logger.error(f"Embedding failed: {e}")
+            return self._fifo_condense(events)
 
-        # Calculate events to forget
-        all_event_ids = {e.id for e in events}
-        forgotten_event_ids = sorted(all_event_ids - keep_event_ids)
+        # 3. Identify Candidate Range (Middle)
+        # Keep fixed start and fixed end (recent window)
+        candidates_start = self.keep_first
+        # We must keep the recent window to maintain coherence
+        # The candidates are BETWEEN start and (end - recent_window)
+        candidates_end_index = total_events - recent_window
+        
+        if candidates_end_index <= candidates_start:
+             return self._fifo_condense(events)
 
+        candidate_events = events[candidates_start:candidates_end_index]
+        
+        if not candidate_events:
+            return self._fifo_condense(events)
+
+        # Prepare texts for candidates
+        candidate_texts = []
+        for e in candidate_events:
+            txt = getattr(e, "message", getattr(e, "content", getattr(e, "thought", "")))
+            candidate_texts.append(str(txt)[:500] if txt else "empty_event")
+        
+        # 4. Batch Embed Candidates
+        try:
+            candidate_embeddings = self.model.encode(candidate_texts)
+        except Exception as e:
+            logger.warning(f"Batch embedding failed: {e}")
+            return self._fifo_condense(events)
+        
+        # 5. Compute Similarities
+        scores = []
+        q_norm = norm(query_embedding)
+        
+        for emb in candidate_embeddings:
+            s_norm = norm(emb)
+            if q_norm == 0 or s_norm == 0:
+                scores.append(0.0)
+            else:
+                scores.append(np.dot(query_embedding, emb) / (q_norm * s_norm))
+
+        # 6. determine how many to remove
+        # We want to end up with `max_size` events total.
+        # current total = total_events
+        # needed = max_size
+        num_to_remove = total_events - self.max_size
+        
+        if num_to_remove <= 0:
+            return self._fifo_condense(events)
+            
+        if num_to_remove > len(candidate_events):
+            # This implies we can't solve it just by reducing the candidate set. 
+            # We must remove all candidates + potentially some from recent/start? 
+            # Or just accept we are slightly over limit if keep_first/recent are high.
+            # But normally we respect keep_first and recent_window and chew into candidates.
+            num_to_remove = len(candidate_events)
+
+        # Strategy: Find the window of size `num_to_remove` with lowest average relevance.
+        window_size = num_to_remove
+        
+        current_sum = sum(scores[:window_size])
+        min_sum = current_sum
+        best_window_start = 0
+        
+        for i in range(1, len(scores) - window_size + 1):
+            current_sum = current_sum - scores[i-1] + scores[i+window_size-1]
+            if current_sum < min_sum:
+                min_sum = current_sum
+                best_window_start = i
+        
+        # Range in candidate_events to remove
+        remove_start_rel = best_window_start
+        remove_end_rel = best_window_start + window_size
+        
+        # Map to absolute indices in `events`
+        abs_remove_start = candidates_start + remove_start_rel
+        abs_remove_end = candidates_start + remove_end_rel # exclusive
+        
+        forgotten_events = events[abs_remove_start:abs_remove_end]
+        
+        avg_score = min_sum / window_size if window_size > 0 else 0
         logger.info(
-            "Semantic condensation: Keeping %s events, forgetting %s events",
-            len(keep_event_ids),
-            len(forgotten_event_ids),
+            f"Semantic Condenser: Removing {len(forgotten_events)} events "
+            f"(idx {abs_remove_start}-{abs_remove_end}) with avg score {avg_score:.3f}"
         )
 
-        return Condensation(
-            action=CondensationAction(forgotten_event_ids=forgotten_event_ids)
-        )
+        return self._create_summary_and_result(forgotten_events, avg_score)
 
-    def _score_events(self, events: list[Event]) -> list[EventImportance]:
-        """Score events by importance.
+    def _create_summary_and_result(self, forgotten_events: list[Event], avg_score: float = 0.0) -> Condensation:
+        summary_text = f"Condensed {len(forgotten_events)} events with low semantic relevance (avg={avg_score:.2f})."
+        
+        # If LLM is available, we could summarize theoretically, but synchronous call here is tricky
+        # if LLM requires async. BaseLLMCondenser assumes synchronous get_condensation.
+        # So we stick to a metadata summary.
+        
+        return self._create_condensation_result(forgotten_events, summary_text)
 
-        Args:
-            events: List of events to score
-
-        Returns:
-            List of EventImportance objects
-
-        """
-        scored: list[EventImportance] = []
-
-        for event in events:
-            score, reasons = self._calculate_importance(event)
-            scored.append(
-                EventImportance(event=event, importance_score=score, reasons=reasons)
-            )
-
-        return scored
-
-    def _score_action_event(self, event: Action) -> tuple[float, list[str]]:
-        """Calculate importance score for Action events.
-
-        Args:
-            event: Action event
-
-        Returns:
-            Tuple of (score, reasons)
-
-        """
-        score = 0.0
-        reasons: list[str] = []
-
-        if hasattr(event, "action"):
-            action_str = str(event.action).lower()
-
-            if "file" in action_str:
-                score += 0.4
-                reasons.append("file_operation")
-
-            if "delegate" in action_str:
-                score += 0.3
-                reasons.append("delegation")
-
-            if "finish" in action_str:
-                score += 0.5
-                reasons.append("completion")
-
-        if hasattr(event, "command"):
-            cmd_lower = event.command.lower()
-            if any(
-                keyword in cmd_lower
-                for keyword in ["install", "build", "deploy", "setup"]
-            ):
-                score += 0.3
-                reasons.append("setup_command")
-
-        return score, reasons
-
-    def _score_observation_event(self, event: Observation) -> tuple[float, list[str]]:
-        """Calculate importance score for Observation events.
-
-        Args:
-            event: Observation event
-
-        Returns:
-            Tuple of (score, reasons)
-
-        """
-        score = 0.0
-        reasons: list[str] = []
-
-        if hasattr(event, "error") and event.error:
-            score += 0.6
-            reasons.append("error")
-
-        if hasattr(event, "exit_code") and event.exit_code == 0:
-            score += 0.2
-            reasons.append("success")
-
-        if hasattr(event, "content"):
-            content_len = len(str(event.content))
-            if content_len > 1000:
-                score += 0.1
-                reasons.append("detailed_output")
-
-        return score, reasons
-
-    def _score_message_event(self, event: MessageAction) -> tuple[float, list[str]]:
-        """Calculate importance score for MessageAction events.
-
-        Args:
-            event: MessageAction event
-
-        Returns:
-            Tuple of (score, reasons)
-
-        """
-        score = 0.0
-        reasons: list[str] = []
-
-        if hasattr(event, "source") and event.source == "user":
-            score += 0.5
-            reasons.append("user_message")
-
-        if hasattr(event, "content") and "?" in str(event.content):
-            score += 0.2
-            reasons.append("question")
-
-        return score, reasons
-
-    def _calculate_importance(self, event: Event) -> tuple[float, list[str]]:
-        """Calculate importance score for an event.
-
-        Args:
-            event: Event to score
-
-        Returns:
-            Tuple of (score, reasons)
-
-        """
-        score = 0.0
-        reasons: list[str] = []
-
-        # Score based on event type
-        if isinstance(event, Action):
-            score, reasons = self._score_action_event(event)
-        elif isinstance(event, Observation):
-            score, reasons = self._score_observation_event(event)
-        elif isinstance(event, MessageAction):
-            score, reasons = self._score_message_event(event)
-
-        # Normalize score to 0-1
-        score = min(1.0, score)
-
-        if not reasons:
-            reasons.append("normal_importance")
-
-        return score, reasons
-
-    def _select_events_to_keep(self, scored_events: list[EventImportance]) -> set[int]:
-        """Select which events to keep based on importance.
-
-        Args:
-            scored_events: List of scored events
-
-        Returns:
-            Set of event IDs to keep
-
-        """
-        keep_ids = set()
-
-        # Always keep first N events (task description, system messages)
-        for scored in scored_events[: self.keep_first]:
-            keep_ids.add(scored.event.id)
-
-        # Keep recent events (last 20% or at least 10)
-        recent_count = max(10, len(scored_events) // 5)
-        for scored in scored_events[-recent_count:]:
-            keep_ids.add(scored.event.id)
-
-        # Keep high-importance events
-        for scored in scored_events:
-            if scored.importance_score >= self.importance_threshold:
-                keep_ids.add(scored.event.id)
-
-        # If we're still over max_size, remove lowest importance
-        if len(keep_ids) > self.max_size:
-            # Sort by importance
-            sorted_scored = sorted(
-                [s for s in scored_events if s.event.id in keep_ids],
-                key=lambda x: x.importance_score,
-                reverse=True,
-            )
-
-            # Keep only top max_size
-            keep_ids = {s.event.id for s in sorted_scored[: self.max_size]}
-
-        return keep_ids
-
-    def _ensure_coherence(self, events: list[Event], keep_ids: set[int]) -> set[int]:
-        """Ensure conversation coherence by keeping action-observation pairs.
-
-        Args:
-            events: Full list of events
-            keep_ids: Current set of IDs to keep
-
-        Returns:
-            Updated set of IDs to keep
-
-        """
-        coherent_ids = set(keep_ids)
-
-        # For each action we're keeping, keep its observation
-        for i, event in enumerate(events):
-            if event.id in coherent_ids and isinstance(event, Action):
-                # Look for corresponding observation
-                if i + 1 < len(events) and isinstance(events[i + 1], Observation):
-                    coherent_ids.add(events[i + 1].id)
-
-        return coherent_ids
+    def _fifo_condense(self, events: list[Event]) -> Condensation:
+        """Fallback to FIFO behavior."""
+        logger.info("Using FIFO fallback condensation strategy")
+        num_to_remove = len(events) - self.max_size
+        if num_to_remove <= 0: # Should not happen based on caller logic
+             return Condensation(action=None) # type: ignore - needs non-None action usually
+             
+        start = self.keep_first
+        end = start + num_to_remove
+        forgotten = events[start:end]
+        return self._create_condensation_result(forgotten, f"Condensed {len(forgotten)} events (FIFO).")

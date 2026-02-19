@@ -26,9 +26,9 @@ class ActivityPanel(Widget):
     DEFAULT_CSS = """
     ActivityPanel {
         width: 30;
-        border-left: vkey $primary;
+        border-left: vkey #1a1a1a;
         padding: 0 1;
-        background: $surface-darken-1;
+        background: black;
         overflow-y: scroll;
     }
     .ap-heading {
@@ -61,7 +61,7 @@ class ActivityPanel(Widget):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._files: dict[str, str] = {}     # path -> action verb
+        self._files: dict[str, str] = {}  # path -> action verb
         self._thoughts: list[str] = []
         self._playbooks: list[str] = []
         self._cost: float = 0.0

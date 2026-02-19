@@ -18,6 +18,7 @@ from backend.runtime.utils.fallbacks.file_ops import PythonFileOps
 # normalize_path
 # -----------------------------------------------------------
 
+
 class TestNormalizePath:
     def test_string_input(self, tmp_path: Path):
         result = PythonFileOps.normalize_path(str(tmp_path))
@@ -36,6 +37,7 @@ class TestNormalizePath:
 # -----------------------------------------------------------
 # is_hidden
 # -----------------------------------------------------------
+
 
 class TestIsHidden:
     @pytest.mark.skipif(sys.platform == "win32", reason="dotfile not hidden on Windows")
@@ -63,6 +65,7 @@ class TestIsHidden:
 # -----------------------------------------------------------
 # list_directory
 # -----------------------------------------------------------
+
 
 class TestListDirectory:
     def test_non_directory_returns_empty(self, tmp_path: Path):
@@ -109,7 +112,9 @@ class TestListDirectory:
         hidden_dir.mkdir()
         (hidden_dir / "secret.txt").write_text("s")
         (tmp_path / "ok.txt").write_text("ok")
-        result = PythonFileOps.list_directory(tmp_path, recursive=True, include_hidden=False)
+        result = PythonFileOps.list_directory(
+            tmp_path, recursive=True, include_hidden=False
+        )
         names = {p.name for p in result}
         assert "ok.txt" in names
         assert "secret.txt" not in names
@@ -126,6 +131,7 @@ class TestListDirectory:
 # -----------------------------------------------------------
 # safe_read_text
 # -----------------------------------------------------------
+
 
 class TestSafeReadText:
     def test_reads_content(self, tmp_path: Path):
@@ -149,6 +155,7 @@ class TestSafeReadText:
 # safe_write_text
 # -----------------------------------------------------------
 
+
 class TestSafeWriteText:
     def test_writes_content(self, tmp_path: Path):
         f = tmp_path / "out.txt"
@@ -170,6 +177,7 @@ class TestSafeWriteText:
 # get_file_size
 # -----------------------------------------------------------
 
+
 class TestGetFileSize:
     def test_returns_size(self, tmp_path: Path):
         f = tmp_path / "sized.txt"
@@ -184,6 +192,7 @@ class TestGetFileSize:
 # -----------------------------------------------------------
 # is_executable
 # -----------------------------------------------------------
+
 
 class TestIsExecutable:
     @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")

@@ -179,9 +179,7 @@ class TestCollectionOperations:
         manager = KnowledgeBaseManager(user_id="user123")
         result = manager.update_collection("col123", name="New Name")
 
-        mock_store.update_collection.assert_called_once_with(
-            "col123", "New Name", None
-        )
+        mock_store.update_collection.assert_called_once_with("col123", "New Name", None)
         assert result == updated_collection
 
     @patch("backend.knowledge.manager.get_knowledge_base_store")
@@ -681,7 +679,9 @@ class TestAdditionalCoveragePaths:
 
     @patch("backend.knowledge.manager.get_knowledge_base_store")
     @patch("backend.knowledge.manager.EnhancedVectorStore")
-    def test_add_chunk_to_vector_store_success(self, mock_vector_store_cls, mock_get_store):
+    def test_add_chunk_to_vector_store_success(
+        self, mock_vector_store_cls, mock_get_store
+    ):
         """Test _add_chunk_to_vector_store success case."""
         mock_get_store.return_value = MagicMock()
         mock_vector_store = MagicMock()
@@ -705,7 +705,9 @@ class TestAdditionalCoveragePaths:
 
     @patch("backend.knowledge.manager.get_knowledge_base_store")
     @patch("backend.knowledge.manager.EnhancedVectorStore")
-    def test_add_chunk_to_vector_store_error(self, mock_vector_store_cls, mock_get_store):
+    def test_add_chunk_to_vector_store_error(
+        self, mock_vector_store_cls, mock_get_store
+    ):
         """Test _add_chunk_to_vector_store error case."""
         mock_get_store.return_value = MagicMock()
         mock_vector_store = MagicMock()
@@ -766,9 +768,7 @@ class TestAdditionalCoveragePaths:
         mock_vector_store_cls.return_value = mock_vector_store
 
         manager = KnowledgeBaseManager(user_id="user123")
-        chunks = [
-            DocumentChunk(document_id="doc123", chunk_index=0, content="Content")
-        ]
+        chunks = [DocumentChunk(document_id="doc123", chunk_index=0, content="Content")]
         doc = KnowledgeBaseDocument(
             collection_id="col123",
             filename="test.txt",
@@ -786,7 +786,7 @@ class TestAdditionalCoveragePaths:
         mock_get_store.return_value = MagicMock()
         manager = KnowledgeBaseManager(user_id="user123")
         chunks = manager._chunk_content("", "doc123")
-        assert len(chunks) == 0
+        assert not chunks
 
     @patch("backend.knowledge.manager.get_knowledge_base_store")
     def test_chunk_whitespace_only(self, mock_get_store):
@@ -794,11 +794,13 @@ class TestAdditionalCoveragePaths:
         mock_get_store.return_value = MagicMock()
         manager = KnowledgeBaseManager(user_id="user123")
         chunks = manager._chunk_content("   \n\n\t  ", "doc123")
-        assert len(chunks) == 0
+        assert not chunks
 
     @patch("backend.knowledge.manager.get_knowledge_base_store")
     @patch("backend.knowledge.manager.EnhancedVectorStore")
-    def test_delete_collection_vector_error(self, mock_vector_store_cls, mock_get_store):
+    def test_delete_collection_vector_error(
+        self, mock_vector_store_cls, mock_get_store
+    ):
         """Test delete_collection with vector store error."""
         mock_store = MagicMock()
         mock_collection = KnowledgeBaseCollection(

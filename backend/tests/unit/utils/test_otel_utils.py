@@ -16,7 +16,9 @@ class TestRedisSpan:
 
     def test_yields_none_when_otel_not_available(self):
         """Test yields None when OpenTelemetry not installed."""
-        with patch.dict("sys.modules", {"opentelemetry": None, "opentelemetry.trace": None}):
+        with patch.dict(
+            "sys.modules", {"opentelemetry": None, "opentelemetry.trace": None}
+        ):
             with redis_span("test_operation") as span:
                 assert span is None
 
@@ -24,7 +26,9 @@ class TestRedisSpan:
         """Test creates span when OpenTelemetry is available."""
         mock_span = MagicMock()
         mock_tracer = MagicMock()
-        mock_tracer.start_as_current_span.return_value.__enter__.return_value = mock_span
+        mock_tracer.start_as_current_span.return_value.__enter__.return_value = (
+            mock_span
+        )
 
         mock_trace_module = MagicMock()
         mock_trace_module.get_tracer.return_value = mock_tracer
@@ -32,14 +36,18 @@ class TestRedisSpan:
         mock_span_kind_class = MagicMock()
         mock_span_kind_class.CLIENT = "CLIENT"
 
-        with patch.dict("sys.modules", {
-            "opentelemetry": MagicMock(),
-            "opentelemetry.trace": mock_trace_module,
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "opentelemetry": MagicMock(),
+                "opentelemetry.trace": mock_trace_module,
+            },
+        ):
             with patch("opentelemetry.trace.SpanKind", mock_span_kind_class):
                 # Re-import to get patched modules
                 from importlib import reload
                 import backend.utils.otel_utils
+
                 reload(backend.utils.otel_utils)
                 with backend.utils.otel_utils.redis_span("get_key"):
                     # Span should be created (though exact value depends on import state)

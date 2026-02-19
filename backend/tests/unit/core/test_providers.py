@@ -22,11 +22,14 @@ from backend.core.providers import (
 # _get_verified
 # ===================================================================
 
-class TestGetVerified:
 
+class TestGetVerified:
     def test_get_verified_loads_from_catalog(self):
         """Test that _get_verified calls catalog_loader."""
-        with patch("backend.llm.catalog_loader.get_verified_models", return_value=["model-1", "model-2"]) as mock_loader:
+        with patch(
+            "backend.llm.catalog_loader.get_verified_models",
+            return_value=["model-1", "model-2"],
+        ) as mock_loader:
             result = _get_verified("test_provider")
             assert result == ["model-1", "model-2"]
             mock_loader.assert_called_once_with("test_provider")
@@ -36,23 +39,29 @@ class TestGetVerified:
 # _LazyModelList
 # ===================================================================
 
-class TestLazyModelList:
 
+class TestLazyModelList:
     def test_loads_on_first_access(self):
-        with patch("backend.core.providers._get_verified", return_value=["model-a", "model-b"]):
+        with patch(
+            "backend.core.providers._get_verified", return_value=["model-a", "model-b"]
+        ):
             lazy = _LazyModelList("test_provider")
             assert lazy._cached is None
             assert len(lazy) == 2
             assert lazy._cached is not None
 
     def test_contains(self):
-        with patch("backend.core.providers._get_verified", return_value=["gpt-4", "gpt-3.5"]):
+        with patch(
+            "backend.core.providers._get_verified", return_value=["gpt-4", "gpt-3.5"]
+        ):
             lazy = _LazyModelList("openai")
             assert "gpt-4" in lazy
             assert "unknown" not in lazy
 
     def test_iter(self):
-        with patch("backend.core.providers._get_verified", return_value=["a", "b", "c"]):
+        with patch(
+            "backend.core.providers._get_verified", return_value=["a", "b", "c"]
+        ):
             lazy = _LazyModelList("p")
             assert list(lazy) == ["a", "b", "c"]
 
@@ -80,6 +89,7 @@ class TestLazyModelList:
 
     def test_caches_after_first_call(self):
         call_count = {"n": 0}
+
         def mock_get(provider):
             call_count["n"] += 1
             return ["model"]
@@ -95,8 +105,8 @@ class TestLazyModelList:
 # Constants
 # ===================================================================
 
-class TestProviderConstants:
 
+class TestProviderConstants:
     def test_verified_providers(self):
         assert "openai" in VERIFIED_PROVIDERS
         assert "anthropic" in VERIFIED_PROVIDERS

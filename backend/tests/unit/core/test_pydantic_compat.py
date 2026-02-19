@@ -19,6 +19,7 @@ from backend.core.pydantic_compat import (
 # Test models
 # ---------------------------------------------------------------------------
 
+
 class SampleModel(BaseModel):
     name: str = "default"
     value: int = 42
@@ -33,8 +34,8 @@ class NestedModel(BaseModel):
 # model_to_dict
 # ===================================================================
 
-class TestModelToDict:
 
+class TestModelToDict:
     def test_pydantic_model(self):
         m = SampleModel(name="test", value=99)
         d = model_to_dict(m)
@@ -89,8 +90,8 @@ class TestModelToDict:
 # get_model_field_names
 # ===================================================================
 
-class TestGetModelFieldNames:
 
+class TestGetModelFieldNames:
     def test_pydantic_v2_model(self):
         fields = get_model_field_names(SampleModel)
         assert "name" in fields
@@ -150,8 +151,8 @@ class TestGetModelFieldNames:
 # model_dump_with_options
 # ===================================================================
 
-class TestModelDumpWithOptions:
 
+class TestModelDumpWithOptions:
     def test_default_dump(self):
         m = SampleModel(name="test", value=1)
         d = model_dump_with_options(m)
@@ -167,8 +168,10 @@ class TestModelDumpWithOptions:
 
     def test_plain_object_fallback(self):
         """For objects without model_dump, falls back gracefully."""
+
         class Fake:
             pass
+
         obj = Fake()
         # Should not raise
         result = model_dump_with_options(obj)
@@ -219,8 +222,8 @@ class TestModelDumpWithOptions:
 # model_dump_json
 # ===================================================================
 
-class TestModelDumpJson:
 
+class TestModelDumpJson:
     def test_returns_json_string(self):
         m = SampleModel(name="json_test", value=7)
         s = model_dump_json(m)
@@ -237,8 +240,10 @@ class TestModelDumpJson:
 
     def test_plain_object_fallback(self):
         """For non-Pydantic objects, still produces valid JSON."""
+
         class Plain:
             x = 42
+
         result = model_dump_json(Plain())
         assert isinstance(result, str)
         # Should not raise

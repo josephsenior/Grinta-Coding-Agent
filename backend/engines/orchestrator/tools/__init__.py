@@ -8,6 +8,12 @@ from .condensation_request import create_condensation_request_tool
 from .error_patterns import create_error_patterns_tool
 from .finish import create_finish_tool
 from .llm_based_edit import create_llm_based_edit_tool
+from .meta_cognition import (
+    create_clarification_tool,
+    create_escalate_tool,
+    create_proposal_tool,
+    create_uncertainty_tool,
+)
 from .note import create_note_tool, create_recall_tool, create_semantic_recall_tool
 from .project_map import create_project_map_tool
 from .run_tests import create_run_tests_tool
@@ -27,16 +33,20 @@ __all__ = [
     "create_browser_tool",
     "create_checkpoint_tool",
     "create_condensation_request_tool",
+    "create_clarification_tool",
+    "create_escalate_tool",
     "create_finish_tool",
     "create_llm_based_edit_tool",
     "create_note_tool",
     "create_project_map_tool",
+    "create_proposal_tool",
     "create_recall_tool",
     "create_semantic_recall_tool",
     "create_run_tests_tool",
     "create_search_code_tool",
     "create_session_diff_tool",
     "create_think_tool",
+    "create_uncertainty_tool",
     "create_cmd_run_tool",
     "create_error_patterns_tool",
     "create_str_replace_editor_tool",

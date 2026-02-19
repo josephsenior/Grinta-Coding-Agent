@@ -109,7 +109,7 @@ _HIGH_RISK_PATTERNS = [
     r"compile\s*\(",
     r"subprocess\s*\.(call|run|Popen)",
     r"os\s*\.(system|popen|exec)",
-    r"shell\s*=\s*True",
+    r"shell\s*=\s*true",
     r"rm\s+-rf",
     r"del\s+/",
     r"format\s*\(.*%",
@@ -162,7 +162,7 @@ def check_circuit_breaker(conversation_id: str) -> tuple[bool, str | None]:
     recent = tracking["recent_success"][-10:]
     if len(recent) >= 10:
         error_count = sum(1 for s in recent if not s)
-        if error_count / len(recent) > 0.5:
+        if error_count / len(recent) >= 0.5:
             return (
                 True,
                 f"Error rate too high ({error_count / len(recent):.0%}). Circuit breaker tripped.",
@@ -475,5 +475,5 @@ async def get_code_completion(
     return CompletionResult(
         completion=completion,
         stop_reason="stop" if completion else "empty",
-        security_risk=risk.value if risk != ActionSecurityRisk.LOW else None,
+        security_risk=risk.name.lower() if risk != ActionSecurityRisk.LOW else None,
     )

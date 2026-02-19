@@ -18,6 +18,7 @@ def _make_context() -> MagicMock:
 
 # ── init / reset ─────────────────────────────────────────────────────
 
+
 class TestInit:
     def test_initial_state(self):
         ctx = _make_context()
@@ -33,6 +34,7 @@ class TestInit:
 
 
 # ── configure ────────────────────────────────────────────────────────
+
 
 class TestConfigure:
     def test_configure_creates_circuit_breaker(self):
@@ -64,6 +66,7 @@ class TestConfigure:
 
 # ── check ────────────────────────────────────────────────────────────
 
+
 class TestCheck:
     def test_check_returns_none_without_breaker(self):
         ctx = _make_context()
@@ -82,6 +85,7 @@ class TestCheck:
 
 
 # ── record_error / record_success / record_high_risk / record_stuck ─
+
 
 class TestRecording:
     def test_record_error_with_breaker(self):
@@ -142,6 +146,7 @@ class TestRecording:
 
 
 # ── controller property ──────────────────────────────────────────────
+
 
 class TestControllerProperty:
     def test_controller_returns_from_context(self):

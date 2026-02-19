@@ -94,7 +94,7 @@ class TestRealWorldAutonomousScenarios:
             critical_blocked = [
                 log for log in blocked_actions if log.get("risk_level") == "CRITICAL"
             ]
-            assert len(critical_blocked) == 0, (
+            assert not critical_blocked, (
                 f"No critical commands should be blocked: {critical_blocked}"
             )
 
@@ -130,7 +130,7 @@ class TestRealWorldAutonomousScenarios:
                 if isinstance(obs, ErrorObservation) and "SAFETY" in obs.content
             ]
 
-            assert len(error_obs) > 0, "Safety validator should block dangerous command"
+            assert error_obs, "Safety validator should block dangerous command"
             assert "BLOCKED" in error_obs[0].content, (
                 "Should explicitly state command was blocked"
             )
@@ -249,7 +249,7 @@ class TestRealWorldAutonomousScenarios:
                 if hasattr(event, "command") and "pytest" in str(event.command)
             ]
 
-            assert len(test_runs) > 0, "Should have run pytest"
+            assert test_runs, "Should have run pytest"
 
             print(
                 f"✅ Successfully built calculator with tests in {state.iteration} iterations"
@@ -303,7 +303,7 @@ class TestRealWorldAutonomousScenarios:
             file_actions = [
                 event for event in state.history if "test.txt" in str(event)
             ]
-            assert len(file_actions) > 0, (
+            assert file_actions, (
                 "Should include file creation actions in history"
             )
             print(f"✅ Captured {len(file_actions)} file-related events")

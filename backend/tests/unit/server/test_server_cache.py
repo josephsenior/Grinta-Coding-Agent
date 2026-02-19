@@ -14,6 +14,7 @@ from backend.server.utils.cache import CacheKey
 # CacheKey
 # ---------------------------------------------------------------------------
 
+
 class TestCacheKey:
     def test_default_prefix(self):
         key = CacheKey.build("user", "123")
@@ -31,6 +32,7 @@ class TestCacheKey:
 # ---------------------------------------------------------------------------
 # L1 cache operations (no Redis)
 # ---------------------------------------------------------------------------
+
 
 class TestL1Cache:
     """Tests that exercise get/set/delete/clear on the in-memory L1 layer only."""
@@ -98,6 +100,7 @@ class TestL1Cache:
 # ---------------------------------------------------------------------------
 # @cached decorator
 # ---------------------------------------------------------------------------
+
 
 class TestCachedDecorator:
     def setup_method(self):

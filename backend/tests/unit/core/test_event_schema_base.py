@@ -47,7 +47,9 @@ class TestEventMetadata:
 class TestBaseEventSchema:
     def test_defaults(self):
         schema = BaseEventSchema()
-        assert schema.schema_version == EventVersion.V1 or schema.schema_version == "1.0.0"
+        assert (
+            schema.schema_version == EventVersion.V1 or schema.schema_version == "1.0.0"
+        )
 
     def test_to_dict(self):
         schema = BaseEventSchema()
@@ -82,11 +84,15 @@ class TestBaseEventSchema:
 class TestEventSchemaV1:
     def test_version_is_v1(self):
         schema = EventSchemaV1()
-        assert schema.schema_version == EventVersion.V1 or schema.schema_version == "1.0.0"
+        assert (
+            schema.schema_version == EventVersion.V1 or schema.schema_version == "1.0.0"
+        )
 
     def test_validate_version_from_string(self):
         schema = EventSchemaV1.model_validate({"schema_version": "1.0.0"})
-        assert schema.schema_version == EventVersion.V1 or schema.schema_version == "1.0.0"
+        assert (
+            schema.schema_version == EventVersion.V1 or schema.schema_version == "1.0.0"
+        )
 
     def test_roundtrip(self):
         original = EventSchemaV1()

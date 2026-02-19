@@ -1,6 +1,5 @@
 """Tests for backend.events.secret_masker — SecretMasker."""
 
-
 from backend.events.secret_masker import SecretMasker
 
 

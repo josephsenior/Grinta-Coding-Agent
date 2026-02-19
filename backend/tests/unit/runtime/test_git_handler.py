@@ -13,6 +13,7 @@ from backend.runtime.utils.git_handler import CommandResult, GitHandler
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_handler(
     exec_results: list[CommandResult] | None = None,
     create_result: int = 0,
@@ -39,8 +40,8 @@ def _make_handler(
 # CommandResult
 # ===================================================================
 
-class TestCommandResult:
 
+class TestCommandResult:
     def test_basic(self):
         r = CommandResult(content="hello\n", exit_code=0)
         assert r.content == "hello\n"
@@ -55,8 +56,8 @@ class TestCommandResult:
 # GitHandler.set_cwd
 # ===================================================================
 
-class TestSetCwd:
 
+class TestSetCwd:
     def test_sets_cwd(self):
         handler, _ = _make_handler()
         handler.set_cwd("/workspace")
@@ -67,8 +68,8 @@ class TestSetCwd:
 # get_current_branch
 # ===================================================================
 
-class TestGetCurrentBranch:
 
+class TestGetCurrentBranch:
     def test_no_cwd_returns_none(self):
         handler, _ = _make_handler()
         assert handler.get_current_branch() is None
@@ -93,37 +94,43 @@ class TestGetCurrentBranch:
 # get_git_changes
 # ===================================================================
 
-class TestGetGitChanges:
 
+class TestGetGitChanges:
     def test_no_cwd_returns_none(self):
         handler, _ = _make_handler()
         assert handler.get_git_changes() is None
 
     def test_returns_changes(self):
         changes = [{"file": "a.py", "status": "M"}]
-        handler, _ = _make_handler([
-            CommandResult(content=json.dumps(changes), exit_code=0),
-        ])
+        handler, _ = _make_handler(
+            [
+                CommandResult(content=json.dumps(changes), exit_code=0),
+            ]
+        )
         handler.set_cwd("/repo")
         result = handler.get_git_changes()
         assert result == changes
 
     def test_returns_none_on_invalid_json(self):
-        handler, _ = _make_handler([
-            CommandResult(content="not json", exit_code=0),
-        ])
+        handler, _ = _make_handler(
+            [
+                CommandResult(content="not json", exit_code=0),
+            ]
+        )
         handler.set_cwd("/repo")
         assert handler.get_git_changes() is None
 
     def test_error_exit_code_triggers_script_install(self):
         """On first failure, handler tries to install the script and retries."""
         changes = [{"file": "b.py", "status": "A"}]
-        handler, calls = _make_handler([
-            CommandResult(content="", exit_code=1),           # First try fails
-            CommandResult(content="/tmp/abc\n", exit_code=0), # mktemp
-            CommandResult(content="", exit_code=0),           # chmod
-            CommandResult(content=json.dumps(changes), exit_code=0),  # retry
-        ])
+        handler, calls = _make_handler(
+            [
+                CommandResult(content="", exit_code=1),  # First try fails
+                CommandResult(content="/tmp/abc\n", exit_code=0),  # mktemp
+                CommandResult(content="", exit_code=0),  # chmod
+                CommandResult(content=json.dumps(changes), exit_code=0),  # retry
+            ]
+        )
         handler.set_cwd("/repo")
         # We can't easily test this end-to-end because _create_python_script_file
         # opens a local file. Instead verify the handler detects the failure.
@@ -136,8 +143,8 @@ class TestGetGitChanges:
 # get_git_diff
 # ===================================================================
 
-class TestGetGitDiff:
 
+class TestGetGitDiff:
     def test_no_cwd_raises(self):
         handler, _ = _make_handler()
         with pytest.raises(ValueError, match="no_dir"):
@@ -145,21 +152,25 @@ class TestGetGitDiff:
 
     def test_returns_diff(self):
         diff = {"original": "old code", "modified": "new code"}
-        handler, _ = _make_handler([
-            CommandResult(content=json.dumps(diff), exit_code=0),
-        ])
+        handler, _ = _make_handler(
+            [
+                CommandResult(content=json.dumps(diff), exit_code=0),
+            ]
+        )
         handler.set_cwd("/repo")
         result = handler.get_git_diff("file.py")
         assert result == diff
 
     def test_error_after_script_install_raises(self):
         """If both default and custom commands fail, raises ValueError."""
-        handler, _ = _make_handler([
-            CommandResult(content="", exit_code=1),            # First try
-            CommandResult(content="/tmp/xyz\n", exit_code=0),  # mktemp
-            CommandResult(content="", exit_code=0),            # chmod
-            CommandResult(content="", exit_code=1),            # Retry also fails
-        ])
+        handler, _ = _make_handler(
+            [
+                CommandResult(content="", exit_code=1),  # First try
+                CommandResult(content="/tmp/xyz\n", exit_code=0),  # mktemp
+                CommandResult(content="", exit_code=0),  # chmod
+                CommandResult(content="", exit_code=1),  # Retry also fails
+            ]
+        )
         handler.set_cwd("/repo")
         # Manually set git_diff_cmd to something non-default to simulate script already installed
         handler.git_diff_cmd = "python3 /custom/script.py"

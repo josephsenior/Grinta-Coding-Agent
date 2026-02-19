@@ -12,6 +12,7 @@ from backend.runtime.utils.tool_registry import ToolInfo, ToolRegistry
 
 # ── ToolInfo dataclass ────────────────────────────────────────────────
 
+
 class TestToolInfo:
     def test_defaults(self):
         info = ToolInfo(name="git", available=True)
@@ -23,8 +24,11 @@ class TestToolInfo:
 
     def test_all_fields(self):
         info = ToolInfo(
-            name="rg", available=True, path="/usr/bin/rg",
-            version="14.0.0", fallback="grep",
+            name="rg",
+            available=True,
+            path="/usr/bin/rg",
+            version="14.0.0",
+            fallback="grep",
         )
         assert info.path == "/usr/bin/rg"
         assert info.version == "14.0.0"
@@ -32,6 +36,7 @@ class TestToolInfo:
 
 
 # ── _check_command ────────────────────────────────────────────────────
+
 
 class TestCheckCommand:
     def test_returns_true_on_success(self):
@@ -70,6 +75,7 @@ class TestCheckCommand:
 
 # ── _get_version_output ───────────────────────────────────────────────
 
+
 class TestGetVersionOutput:
     def test_returns_first_line(self):
         reg = object.__new__(ToolRegistry)
@@ -88,6 +94,7 @@ class TestGetVersionOutput:
 
 
 # ── Public properties ─────────────────────────────────────────────────
+
 
 class TestRegistryProperties:
     def _build_registry(self, tools: dict[str, ToolInfo]) -> ToolRegistry:

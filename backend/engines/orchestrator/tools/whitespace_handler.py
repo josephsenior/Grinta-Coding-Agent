@@ -502,4 +502,3 @@ class WhitespaceHandler:
 
         # Remove multiple consecutive blank lines (max 2)
         return re.sub(r"\n{4,}", "\n\n\n", code)
-

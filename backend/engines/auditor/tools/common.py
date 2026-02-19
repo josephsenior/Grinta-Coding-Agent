@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from backend.engines.common import (
     create_tool_definition,
@@ -11,11 +11,10 @@ from backend.engines.common import (
 )
 
 if TYPE_CHECKING:
-    from backend.engines.orchestrator.contracts import ChatCompletionToolParam
+    pass
 
 __all__ = [
     "create_tool_definition",
     "get_common_path_param",
     "get_common_pattern_param",
 ]
-

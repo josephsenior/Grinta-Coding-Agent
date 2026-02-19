@@ -8,9 +8,13 @@ from backend.events.action.agent import (
     AgentRejectAction,
     AgentThinkAction,
     ChangeAgentStateAction,
+    ClarificationRequestAction,
+    EscalateToHumanAction,
     PlaybookFinishAction,
+    ProposalAction,
     RecallAction,
     TaskTrackingAction,
+    UncertaintyAction,
 )
 from backend.events.action.browse import BrowseInteractiveAction, BrowseURLAction
 from backend.events.action.commands import CmdRunAction
@@ -37,15 +41,19 @@ __all__ = [
     "BrowseInteractiveAction",
     "BrowseURLAction",
     "ChangeAgentStateAction",
+    "ClarificationRequestAction",
     "CmdRunAction",
+    "EscalateToHumanAction",
     "FileEditAction",
     "FileReadAction",
     "FileWriteAction",
     "MCPAction",
     "MessageAction",
     "NullAction",
+    "ProposalAction",
     "RecallAction",
     "StreamingChunkAction",  # ⚡ CRITICAL FIX: Enable real-time LLM streaming!
     "SystemMessageAction",
     "TaskTrackingAction",
+    "UncertaintyAction",
 ]

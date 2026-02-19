@@ -204,7 +204,7 @@ async def _save_screenshot_if_needed(
         image_data = base64.b64decode(base64_data)
         with open(screenshot_path, "wb") as f:
             f.write(image_data)
-        Image.open(screenshot_path).verify()
+        Image.open(screenshot_path, encoding="utf-8").verify()
     except Exception:
         # Fallback: use PNG converter
         image = png_base64_url_to_image(_ensure_str(obs.get("screenshot")))

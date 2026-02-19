@@ -13,8 +13,8 @@ from backend.runtime.utils.process_registry import TaskCancellationService
 # Init
 # ===================================================================
 
-class TestProcessRegistryInit:
 
+class TestProcessRegistryInit:
     def test_default_label(self):
         svc = TaskCancellationService()
         assert svc._label == "session"
@@ -25,17 +25,17 @@ class TestProcessRegistryInit:
 
     def test_empty_state(self):
         svc = TaskCancellationService()
-        assert len(svc._active_pids) == 0
-        assert len(svc._active_processes) == 0
-        assert len(svc._kill_callbacks) == 0
+        assert not svc._active_pids
+        assert not svc._active_processes
+        assert not svc._kill_callbacks
 
 
 # ===================================================================
 # register / unregister process / pid
 # ===================================================================
 
-class TestRegistration:
 
+class TestRegistration:
     def test_register_process(self):
         svc = TaskCancellationService()
         proc = MagicMock(spec=subprocess.Popen)
@@ -49,7 +49,7 @@ class TestRegistration:
         proc = MagicMock()
         proc.pid = None
         svc.register_process(proc)
-        assert len(svc._active_pids) == 0
+        assert not svc._active_pids
 
     def test_register_pid(self):
         svc = TaskCancellationService()
@@ -81,8 +81,8 @@ class TestRegistration:
 # Kill callbacks
 # ===================================================================
 
-class TestKillCallbacks:
 
+class TestKillCallbacks:
     def test_register_callback(self):
         svc = TaskCancellationService()
         cb = MagicMock()
@@ -92,7 +92,7 @@ class TestKillCallbacks:
     def test_register_empty_key_ignored(self):
         svc = TaskCancellationService()
         svc.register_kill_callback("", MagicMock())
-        assert len(svc._kill_callbacks) == 0
+        assert not svc._kill_callbacks
 
     def test_unregister_callback(self):
         svc = TaskCancellationService()
@@ -110,8 +110,8 @@ class TestKillCallbacks:
 # snapshot
 # ===================================================================
 
-class TestSnapshot:
 
+class TestSnapshot:
     def test_snapshot_empty(self):
         svc = TaskCancellationService()
         snap = svc.snapshot()
@@ -133,8 +133,8 @@ class TestSnapshot:
 # cancel_all
 # ===================================================================
 
-class TestCancelAll:
 
+class TestCancelAll:
     def test_cancels_processes_via_terminate(self):
         svc = TaskCancellationService()
         proc = MagicMock(spec=subprocess.Popen)
@@ -142,7 +142,7 @@ class TestCancelAll:
         svc.register_process(proc)
         svc.cancel_all()
         proc.terminate.assert_called_once()
-        assert len(svc._active_pids) == 0
+        assert not svc._active_pids
 
     def test_kills_on_timeout(self):
         svc = TaskCancellationService()
@@ -159,7 +159,7 @@ class TestCancelAll:
         svc.register_kill_callback("cleanup", cb)
         svc.cancel_all()
         cb.assert_called_once()
-        assert len(svc._kill_callbacks) == 0
+        assert not svc._kill_callbacks
 
     def test_callback_exception_does_not_stop(self):
         svc = TaskCancellationService()
@@ -174,8 +174,10 @@ class TestCancelAll:
     def test_raw_pid_kill_on_nt(self):
         svc = TaskCancellationService()
         svc.register_pid(999)
-        with patch("backend.runtime.utils.process_registry.os.name", "nt"), \
-             patch("backend.runtime.utils.process_registry.subprocess.run") as mock_run:
+        with (
+            patch("backend.runtime.utils.process_registry.os.name", "nt"),
+            patch("backend.runtime.utils.process_registry.subprocess.run") as mock_run,
+        ):
             svc.cancel_all()
             mock_run.assert_called_once()
             args = mock_run.call_args[0][0]
@@ -190,6 +192,6 @@ class TestCancelAll:
         svc.register_pid(2)
         svc.register_kill_callback("x", MagicMock())
         svc.cancel_all()
-        assert len(svc._active_pids) == 0
-        assert len(svc._active_processes) == 0
-        assert len(svc._kill_callbacks) == 0
+        assert not svc._active_pids
+        assert not svc._active_processes
+        assert not svc._kill_callbacks

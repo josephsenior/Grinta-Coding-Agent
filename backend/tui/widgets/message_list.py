@@ -25,8 +25,8 @@ class MessageList(Widget):
     .user-msg {
         margin: 1 0 0 6;
         padding: 0 1;
-        background: $primary 15%;
-        border-left: tall $primary;
+        background: $primary 10%;
+        border-left: tall $primary 40%;
     }
     .user-msg-label {
         color: $primary;
@@ -35,8 +35,8 @@ class MessageList(Widget):
     .assistant-msg {
         margin: 1 6 0 0;
         padding: 0 1;
-        background: $surface-lighten-1;
-        border-left: tall $accent;
+        background: #080808;
+        border-left: tall $accent 40%;
     }
     .assistant-msg-label {
         color: $accent;

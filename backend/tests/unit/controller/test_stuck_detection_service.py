@@ -10,6 +10,7 @@ from backend.controller.services.stuck_detection_service import StuckDetectionSe
 
 # ── is_stuck ─────────────────────────────────────────────────────────
 
+
 class TestIsStuck:
     def test_no_detector(self):
         ctrl = MagicMock(spec=["delegate", "headless_mode"])
@@ -50,6 +51,7 @@ class TestIsStuck:
 
 
 # ── initialize ───────────────────────────────────────────────────────
+
 
 class TestInitialize:
     def test_creates_detector(self):

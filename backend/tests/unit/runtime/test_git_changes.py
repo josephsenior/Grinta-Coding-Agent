@@ -15,6 +15,7 @@ from backend.runtime.utils.git_changes import (
 # _parse_git_status_line
 # ---------------------------------------------------------------------------
 
+
 class TestParseGitStatusLine:
     def test_modified_file(self):
         result = _parse_git_status_line("M\tsrc/main.py", [])
@@ -55,6 +56,7 @@ class TestParseGitStatusLine:
 # ---------------------------------------------------------------------------
 # _normalize_status
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeStatus:
     def test_question_marks_to_added(self):

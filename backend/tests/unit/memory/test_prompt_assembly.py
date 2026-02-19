@@ -20,6 +20,7 @@ from backend.utils.prompt import ConversationInstructions, RepositoryInfo, Runti
 
 # ── helpers ──────────────────────────────────────────────────────────
 
+
 def _make_obs(**kw) -> RecallObservation:
     """Build a minimal RecallObservation with sensible defaults."""
     defaults = {
@@ -58,6 +59,7 @@ def _prompt_manager():
 
 # ── _create_repo_info ────────────────────────────────────────────────
 
+
 class TestCreateRepoInfo:
     def test_with_repo_name(self):
         obs = _make_obs(repo_name="my-repo", repo_directory="/code")
@@ -71,6 +73,7 @@ class TestCreateRepoInfo:
 
 
 # ── _create_runtime_info ─────────────────────────────────────────────
+
 
 class TestCreateRuntimeInfo:
     def test_with_hosts(self):
@@ -87,6 +90,7 @@ class TestCreateRuntimeInfo:
 
 # ── _create_conversation_instructions ────────────────────────────────
 
+
 class TestCreateConversationInstructions:
     def test_with_content(self):
         obs = _make_obs(conversation_instructions="be nice")
@@ -101,6 +105,7 @@ class TestCreateConversationInstructions:
 
 # ── _has_workspace_content ───────────────────────────────────────────
 
+
 class TestHasWorkspaceContent:
     def test_all_empty(self):
         assert not _has_workspace_content(None, RuntimeInfo(date=""), "", None, [])
@@ -114,9 +119,7 @@ class TestHasWorkspaceContent:
         assert _has_workspace_content(None, ri, "", None, [])
 
     def test_instructions(self):
-        assert _has_workspace_content(
-            None, RuntimeInfo(date=""), "do stuff", None, []
-        )
+        assert _has_workspace_content(None, RuntimeInfo(date=""), "do stuff", None, [])
 
     def test_agents(self):
         pk = PlaybookKnowledge(name="a", trigger="t", content="c")
@@ -124,6 +127,7 @@ class TestHasWorkspaceContent:
 
 
 # ── process_recall_observation ───────────────────────────────────────
+
 
 class TestProcessRecallObservation:
     def test_disabled_returns_empty(self):
@@ -136,7 +140,7 @@ class TestProcessRecallObservation:
         cfg = _agent_config()
         pm = _prompt_manager()
         msgs = process_recall_observation(obs, 0, [], cfg, pm)
-        assert len(msgs) >= 1
+        assert msgs
         assert msgs[0].role == "user"
         pm.build_workspace_context.assert_called_once()
 
@@ -146,7 +150,7 @@ class TestProcessRecallObservation:
         cfg = _agent_config()
         pm = _prompt_manager()
         msgs = process_recall_observation(obs, 0, [], cfg, pm)
-        assert len(msgs) >= 1
+        assert msgs
         pm.build_playbook_info.assert_called_once()
 
     def test_unknown_recall_type(self):
@@ -172,6 +176,7 @@ class TestProcessRecallObservation:
 
 # ── filter_agents_in_playbook_obs ────────────────────────────────────
 
+
 class TestFilterAgents:
     def test_no_overlap(self):
         pk = PlaybookKnowledge(name="unique", trigger="t", content="c")
@@ -187,12 +192,16 @@ class TestFilterAgents:
         earlier_obs._id = 0
 
         current_pk = PlaybookKnowledge(name="dup", trigger="t2", content="c2")
-        obs = _make_obs(recall_type=RecallType.KNOWLEDGE, playbook_knowledge=[current_pk])
+        obs = _make_obs(
+            recall_type=RecallType.KNOWLEDGE, playbook_knowledge=[current_pk]
+        )
         result = filter_agents_in_playbook_obs(obs, 1, [earlier_obs])
-        assert len(result) == 0
+        assert not result
 
     def test_non_knowledge_returns_all(self):
         pk = PlaybookKnowledge(name="a", trigger="t", content="c")
-        obs = _make_obs(recall_type=RecallType.WORKSPACE_CONTEXT, playbook_knowledge=[pk])
+        obs = _make_obs(
+            recall_type=RecallType.WORKSPACE_CONTEXT, playbook_knowledge=[pk]
+        )
         result = filter_agents_in_playbook_obs(obs, 0, [])
         assert len(result) == 1

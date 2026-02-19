@@ -88,7 +88,11 @@ class ConversationMemory:
     ) -> Decision:
         """Track a decision made during conversation."""
         return self._ctx.track_decision(
-            description, rationale, decision_type, context, confidence,
+            description,
+            rationale,
+            decision_type,
+            context,
+            confidence,
         )
 
     def add_anchor(
@@ -115,13 +119,17 @@ class ConversationMemory:
         """Retrieve relevant context from persistent vector memory."""
         return self._ctx.recall_from_memory(query, k)
 
-    def _initialize_vector_memory(self) -> None:
-        """Initialize vector memory store for persistent context."""
+    def _initialize_vector_memory(self) -> EnhancedVectorStore | None:
+        """Initialize vector memory store for persistent context.
+
+        Returns:
+            An initialized EnhancedVectorStore, or None if initialization fails.
+        """
         try:
             hybrid_enabled = bool(
                 getattr(self.agent_config, "enable_hybrid_retrieval", False)
             )
-            self._ctx.vector_store = EnhancedVectorStore(
+            store = EnhancedVectorStore(
                 collection_name="conversation_memory",
                 enable_cache=True,
                 enable_reranking=hybrid_enabled,
@@ -130,6 +138,7 @@ class ConversationMemory:
                 "✅ Vector memory initialized for ConversationMemory\n   Accuracy: 92%% | Hybrid retrieval: %s",
                 "enabled" if hybrid_enabled else "disabled",
             )
+            return store
         except Exception as e:
             logger.warning(
                 "Failed to initialize vector memory: %s\n"
@@ -137,7 +146,7 @@ class ConversationMemory:
                 "  pip install chromadb sentence-transformers",
                 e,
             )
-            self._ctx.vector_store = None
+            return None
 
     def apply_prompt_caching(self, messages: list[Message]) -> None:
         """Set prompt caching hints for the first system message and the latest user message."""
@@ -261,6 +270,8 @@ class ConversationMemory:
         vision_is_active: bool,
     ) -> list[Message]:
         """Dispatch an event to the appropriate transformation helper."""
+        self._auto_track_event_context(event)
+
         if is_action_event(event):
             return self._process_action(
                 action=cast(Action, event),
@@ -296,6 +307,74 @@ class ConversationMemory:
             f"Unknown event type without text content: {type(event).__name__}"
         )
 
+    def _auto_track_event_context(self, event: Event) -> None:
+        """Automatically capture durable context signals from events.
+
+        Tracks:
+        - user requirements/goals from user messages
+        - critical errors as anchors
+        - explicit agent planning/decision language as decisions
+        """
+        try:
+            from backend.events.observation import ErrorObservation
+
+            if isinstance(event, MessageAction) and event.source == EventSource.USER:
+                user_text = (event.content or "").strip()
+                if len(user_text) >= 24:
+                    self._add_anchor_if_new(
+                        content=user_text[:600],
+                        category="requirement",
+                        importance=0.95,
+                    )
+                return
+
+            if isinstance(event, ErrorObservation):
+                error_text = (event.content or "").strip()
+                if len(error_text) >= 12:
+                    self._add_anchor_if_new(
+                        content=error_text[:500],
+                        category="error",
+                        importance=0.9,
+                    )
+                return
+
+            if type(event).__name__ == "AgentThinkAction":
+                thought = (getattr(event, "thought", "") or "").strip()
+                if not thought:
+                    return
+                lower = thought.lower()
+                if any(
+                    keyword in lower
+                    for keyword in ("plan", "strategy", "approach", "decide", "next steps")
+                ):
+                    self._track_decision_if_new(thought)
+        except Exception:
+            logger.debug("Auto context tracking skipped for event", exc_info=True)
+
+    def _add_anchor_if_new(
+        self,
+        *,
+        content: str,
+        category: str,
+        importance: float,
+    ) -> None:
+        for anchor in list(self.anchors.values())[-20:]:
+            if anchor.category == category and anchor.content == content:
+                return
+        self.add_anchor(content, category, importance=importance)
+
+    def _track_decision_if_new(self, thought: str) -> None:
+        for decision in list(self.decisions.values())[-20:]:
+            if decision.description == thought[:120]:
+                return
+        self.track_decision(
+            description=thought[:120],
+            rationale="auto-tracked from agent planning thought",
+            decision_type=DecisionType.WORKFLOW,
+            context=thought[:600],
+            confidence=0.6,
+        )
+
     def _flush_resolved_tool_calls(
         self, tool_state: _ToolCallTracking
     ) -> list[Message]:
@@ -318,9 +397,7 @@ class ConversationMemory:
                 )
             except Exception:
                 system_prompt = "You are Forge agent."
-            messages.insert(
-                0, message_with_text("system", system_prompt)
-            )
+            messages.insert(0, message_with_text("system", system_prompt))
             first_system_index = 0
         elif first_system_index != 0:
             sys_msg = messages.pop(first_system_index)
@@ -539,7 +616,7 @@ class ConversationMemory:
         if len(events) > 1 and self._is_user_message(events[1]):
             return True
         events.pop(existing_index)
-        insert_pos = 1 if len(events) >= 1 else 0
+        insert_pos = 1 if events else 0
         events.insert(insert_pos, initial_user_action)
         logger.debug(
             "Repositioned existing initial user action to index %s", insert_pos
@@ -552,7 +629,7 @@ class ConversationMemory:
     def _insert_initial_user_at_index(
         self, events: list[Event], initial_user_action: MessageAction
     ) -> None:
-        insert_pos = 1 if len(events) >= 1 else 0
+        insert_pos = 1 if events else 0
         events.insert(insert_pos, initial_user_action)
         logger.info("Inserted initial user action at index %s", insert_pos)
 
@@ -563,5 +640,3 @@ class ConversationMemory:
         if isinstance(source, EventSource):
             return source == EventSource.USER
         return source == "user"
-
-

@@ -72,7 +72,10 @@ class TestProviderConfig:
 
     def test_validate_base_url_valid(self):
         cfg = ProviderConfig(name="test")
-        assert cfg.validate_base_url("https://api.example.com") == "https://api.example.com"
+        assert (
+            cfg.validate_base_url("https://api.example.com")
+            == "https://api.example.com"
+        )
 
     def test_validate_base_url_no_protocol(self):
         cfg = ProviderConfig(name="test", requires_protocol=True)
@@ -140,7 +143,9 @@ class TestProviderConfigurationManager:
 
     def test_validate_api_key_format_prefix_mismatch(self):
         """Test API key with wrong prefix (should warn but not fail)."""
-        result = self.mgr.validate_api_key_format("openai", "bad-prefix-123456789012345678")
+        result = self.mgr.validate_api_key_format(
+            "openai", "bad-prefix-123456789012345678"
+        )
         assert result is True  # Warns but still returns True
 
     def test_get_environment_variable(self):

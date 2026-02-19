@@ -30,6 +30,7 @@ def _make_context(**overrides) -> MagicMock:
 
 # ── action_requires_confirmation ─────────────────────────────────────
 
+
 class TestActionRequiresConfirmation:
     def test_cmd_run_requires_confirmation(self):
         svc = SafetyService(_make_context())
@@ -53,6 +54,7 @@ class TestActionRequiresConfirmation:
 
 
 # ── evaluate_security_risk ───────────────────────────────────────────
+
 
 class TestEvaluateSecurityRisk:
     def test_high_risk(self):
@@ -98,6 +100,7 @@ class TestEvaluateSecurityRisk:
 
 # ── analyze_security (async) ─────────────────────────────────────────
 
+
 class TestAnalyzeSecurity:
     @pytest.mark.asyncio
     async def test_no_analyzer_sets_unknown(self):
@@ -129,6 +132,7 @@ class TestAnalyzeSecurity:
 
 # ── apply_confirmation_state ─────────────────────────────────────────
 
+
 class TestApplyConfirmationState:
     def test_cli_mode_autonomous_requests_confirmation(self):
         autonomy = MagicMock()
@@ -142,23 +146,25 @@ class TestApplyConfirmationState:
         svc.apply_confirmation_state(
             action, is_high_security_risk=True, is_ask_for_every_action=False
         )
-        assert action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
+        assert (
+            action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
+        )
 
     def test_non_cli_high_risk_confirmation_mode(self):
         autonomy = MagicMock()
         autonomy.should_request_confirmation.return_value = True
         controller = MagicMock()
         controller.agent.config.cli_mode = False
-        ctx = _make_context(
-            autonomy_controller=autonomy, confirmation_mode=True
-        )
+        ctx = _make_context(autonomy_controller=autonomy, confirmation_mode=True)
         ctx.get_controller.return_value = controller
         svc = SafetyService(ctx)
         action = SimpleNamespace(confirmation_state=None)
         svc.apply_confirmation_state(
             action, is_high_security_risk=True, is_ask_for_every_action=False
         )
-        assert action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
+        assert (
+            action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
+        )
 
     def test_autonomous_no_confirmation(self):
         autonomy = MagicMock()
@@ -175,6 +181,7 @@ class TestApplyConfirmationState:
 
 
 # ── finalize_pending_action ──────────────────────────────────────────
+
 
 class TestFinalizePendingAction:
     def test_confirmed(self):

@@ -160,9 +160,12 @@ class TestCheckSystemHealth:
     @pytest.mark.asyncio
     async def test_returns_healthy_status_with_no_issues(self):
         """Test returns healthy status when all checks pass."""
-        with patch("backend.__version__", "1.2.3"), patch(
-            "backend.controller.health.get_circuit_breaker_stats",
-            return_value=[],
+        with (
+            patch("backend.__version__", "1.2.3"),
+            patch(
+                "backend.controller.health.get_circuit_breaker_stats",
+                return_value=[],
+            ),
         ):
             result = await check_system_health()
             assert result.status == "healthy"
@@ -174,9 +177,12 @@ class TestCheckSystemHealth:
         """Test returns degraded status when circuit breaker is open."""
         breaker = CircuitBreakerHealth("api", "OPEN", 10)
 
-        with patch("backend.__version__", "1.0.0"), patch(
-            "backend.controller.health.get_circuit_breaker_stats",
-            return_value=[breaker],
+        with (
+            patch("backend.__version__", "1.0.0"),
+            patch(
+                "backend.controller.health.get_circuit_breaker_stats",
+                return_value=[breaker],
+            ),
         ):
             result = await check_system_health()
             assert result.status == "degraded"
@@ -191,9 +197,12 @@ class TestCheckSystemHealth:
             CircuitBreakerHealth("db", "HALF_OPEN", 3),
         ]
 
-        with patch("backend.__version__", "1.0.0"), patch(
-            "backend.controller.health.get_circuit_breaker_stats",
-            return_value=breakers,
+        with (
+            patch("backend.__version__", "1.0.0"),
+            patch(
+                "backend.controller.health.get_circuit_breaker_stats",
+                return_value=breakers,
+            ),
         ):
             result = await check_system_health()
             assert len(result.circuit_breakers) == 2

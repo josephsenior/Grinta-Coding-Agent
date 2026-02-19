@@ -176,7 +176,13 @@ class TestOrganizeModelsAndProviders:
         models = ["anthropic.model", "openai/gpt-4"]
         result = organize_models_and_providers(models)
         # anthropic.model should be skipped
-        assert "anthropic" not in result or len(result.get("anthropic", ProviderInfo(separator="/", models=[])).models) == 0
+        assert (
+            "anthropic" not in result
+            or len(
+                result.get("anthropic", ProviderInfo(separator="/", models=[])).models
+            )
+            == 0
+        )
 
 
 class TestLocalConfigFunctions:
@@ -195,7 +201,9 @@ class TestLocalConfigFunctions:
         with patch("backend.interface.utils._LOCAL_CONFIG_FILE_PATH") as mock_path:
             mock_path.exists.return_value = True
             with patch("builtins.open", mock_open(read_data=b"")):
-                with patch("backend.interface.utils.tomllib.load", return_value=config_data):
+                with patch(
+                    "backend.interface.utils.tomllib.load", return_value=config_data
+                ):
                     dirs = get_local_config_trusted_dirs()
                     assert len(dirs) == 2
                     assert "/path/to/dir1" in dirs
@@ -326,7 +334,7 @@ class TestEdgeCases:
     def test_provider_info_empty_models_list(self):
         """Test ProviderInfo with empty models list."""
         info = ProviderInfo(separator="/", models=[])
-        assert len(info.models) == 0
+        assert not info.models
 
     def test_extract_model_and_provider_empty_string(self):
         """Test extract_model_and_provider with empty string."""

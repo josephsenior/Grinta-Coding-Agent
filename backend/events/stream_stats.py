@@ -67,9 +67,7 @@ def get_aggregated_event_stream_stats() -> dict[str, int]:
             totals["persist_failures_per_minute"] += stats.get(
                 "persist_failures_per_minute", 0
             )
-            totals["queue_utilization_pct_avg"] += stats.get(
-                "queue_utilization_pct", 0
-            )
+            totals["queue_utilization_pct_avg"] += stats.get("queue_utilization_pct", 0)
             totals["uptime_seconds_sum"] += stats.get("uptime_seconds", 0)
             totals["queue_size"] += stats.get("queue_size", 0)
         except Exception as exc:  # pragma: no cover - defensive

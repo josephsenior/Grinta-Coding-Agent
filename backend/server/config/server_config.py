@@ -23,7 +23,9 @@ def _resolve_session_api_key() -> str:
     # For local/OSS mode, if no key is set, we default to disabled (empty string)
     # to ensure a "One-Click" zero-config experience.
     if os.environ.get("FORGE_RUNTIME") == "local":
-        logger.info("FORGE_RUNTIME=local detected: disabling session API key for zero-config.")
+        logger.info(
+            "FORGE_RUNTIME=local detected: disabling session API key for zero-config."
+        )
         return ""
 
     env_key = os.environ.get("SESSION_API_KEY")

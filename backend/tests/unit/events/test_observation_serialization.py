@@ -22,6 +22,7 @@ from backend.core.enums import RecallType
 
 # ── _validate_observation_dict ───────────────────────────────────────
 
+
 class TestValidateObservationDict:
     def test_valid(self):
         _validate_observation_dict({"observation": "error"})
@@ -32,6 +33,7 @@ class TestValidateObservationDict:
 
 
 # ── _update_cmd_output_metadata ──────────────────────────────────────
+
 
 class TestUpdateCmdOutputMetadata:
     def test_none_creates_new(self):
@@ -52,6 +54,7 @@ class TestUpdateCmdOutputMetadata:
 
 # ── _process_recall_observation_data ─────────────────────────────────
 
+
 class TestProcessRecallData:
     def test_recall_type_string(self):
         extras = {"recall_type": "workspace_context"}
@@ -65,6 +68,7 @@ class TestProcessRecallData:
 
 
 # ── observation_from_dict ────────────────────────────────────────────
+
 
 class TestObservationFromDict:
     def test_error_observation(self):

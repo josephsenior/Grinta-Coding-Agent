@@ -6,7 +6,6 @@ Targets 23.1% coverage (78 statements) by testing BaseShellSession.
 from __future__ import annotations
 
 import os
-from abc import ABC
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -19,9 +18,13 @@ from backend.runtime.utils.unified_shell import BaseShellSession
 # Concrete stub
 # -----------------------------------------------------------
 
+
 class _ConcreteShell(BaseShellSession):
-    def initialize(self): pass
-    def execute(self, action: Any): pass
+    def initialize(self):
+        pass
+
+    def execute(self, action: Any):
+        pass
 
 
 @pytest.fixture()
@@ -32,6 +35,7 @@ def shell(tmp_path) -> _ConcreteShell:
 # -----------------------------------------------------------
 # __init__
 # -----------------------------------------------------------
+
 
 class TestBaseShellSessionInit:
     def test_work_dir_set(self, tmp_path):
@@ -55,6 +59,7 @@ class TestBaseShellSessionInit:
 # cwd property
 # -----------------------------------------------------------
 
+
 class TestCwdProperty:
     def test_returns_current_dir(self, shell, tmp_path):
         assert shell.cwd == str(tmp_path.resolve())
@@ -63,6 +68,7 @@ class TestCwdProperty:
 # -----------------------------------------------------------
 # _normalize_timeout
 # -----------------------------------------------------------
+
 
 class TestNormalizeTimeout:
     def test_none_returns_60(self, shell):
@@ -84,6 +90,7 @@ class TestNormalizeTimeout:
 # -----------------------------------------------------------
 # _prepare_command
 # -----------------------------------------------------------
+
 
 class TestPrepareCommand:
     def test_normal_command(self, shell):
@@ -111,6 +118,7 @@ class TestPrepareCommand:
 # close
 # -----------------------------------------------------------
 
+
 class TestClose:
     def test_sets_closed(self, shell):
         shell.close()
@@ -121,6 +129,7 @@ class TestClose:
 # get_detected_server
 # -----------------------------------------------------------
 
+
 class TestGetDetectedServer:
     def test_default_returns_none(self, shell):
         assert shell.get_detected_server() is None
@@ -129,6 +138,7 @@ class TestGetDetectedServer:
 # -----------------------------------------------------------
 # _update_cwd_from_output
 # -----------------------------------------------------------
+
 
 class TestUpdateCwdFromOutput:
     def test_updates_cwd_on_success(self, shell, tmp_path):

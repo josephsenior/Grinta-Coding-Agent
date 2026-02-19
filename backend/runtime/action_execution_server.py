@@ -521,9 +521,9 @@ class ActionExecutor:
         file_ext = ""
         try:
             guesses = puremagic.magic_file(src_path)
-            if len(guesses) > 0:
+            if guesses:
                 ext = guesses[0].extension.strip()
-                if len(ext) > 0:
+                if ext:
                     file_ext = ext
         except Exception:
             pass

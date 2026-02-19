@@ -24,7 +24,7 @@ class TestProviderType:
     def test_enum_members(self):
         """Test enum has expected members."""
         members = list(ProviderType)
-        assert len(members) >= 1
+        assert members
         assert ProviderType.ENTERPRISE_SSO in members
 
 

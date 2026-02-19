@@ -14,6 +14,7 @@ from backend.memory.agent_memory import Memory
 
 # ── helpers ──────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_event_stream():
     es = MagicMock()
@@ -24,13 +25,16 @@ def mock_event_stream():
 
 @pytest.fixture
 def memory(mock_event_stream):
-    with patch.object(Memory, "_load_global_playbooks"), \
-         patch.object(Memory, "_load_user_playbooks"), \
-         patch("backend.memory.agent_memory.KnowledgeBaseManager"):
+    with (
+        patch.object(Memory, "_load_global_playbooks"),
+        patch.object(Memory, "_load_user_playbooks"),
+        patch("backend.memory.agent_memory.KnowledgeBaseManager"),
+    ):
         return Memory(mock_event_stream, sid="test-sid")
 
 
 # ── __init__ ─────────────────────────────────────────────────────────
+
 
 class TestMemoryInit:
     def test_creates_with_defaults(self, memory: Memory):
@@ -41,14 +45,17 @@ class TestMemoryInit:
         assert memory.knowledge_playbooks == {}
 
     def test_subscribes_to_event_stream(self, mock_event_stream):
-        with patch.object(Memory, "_load_global_playbooks"), \
-             patch.object(Memory, "_load_user_playbooks"), \
-             patch("backend.memory.agent_memory.KnowledgeBaseManager"):
+        with (
+            patch.object(Memory, "_load_global_playbooks"),
+            patch.object(Memory, "_load_user_playbooks"),
+            patch("backend.memory.agent_memory.KnowledgeBaseManager"),
+        ):
             Memory(mock_event_stream, sid="sub-test")
         mock_event_stream.subscribe.assert_called_once()
 
 
 # ── set_repository_info ──────────────────────────────────────────────
+
 
 class TestSetRepositoryInfo:
     def test_sets_info(self, memory):
@@ -65,6 +72,7 @@ class TestSetRepositoryInfo:
 
 # ── set_conversation_instructions ────────────────────────────────────
 
+
 class TestSetConversationInstructions:
     def test_sets(self, memory):
         memory.set_conversation_instructions("be helpful")
@@ -76,6 +84,7 @@ class TestSetConversationInstructions:
 
 
 # ── set_runtime_info ─────────────────────────────────────────────────
+
 
 class TestSetRuntimeInfo:
     def test_with_web_hosts(self, memory):
@@ -97,6 +106,7 @@ class TestSetRuntimeInfo:
 
 # ── _is_transient_error ──────────────────────────────────────────────
 
+
 class TestIsTransientError:
     def test_timeout(self):
         assert Memory._is_transient_error(TimeoutError("timed out"))
@@ -112,6 +122,7 @@ class TestIsTransientError:
 
 
 # ── _should_create_recall_observation ────────────────────────────────
+
 
 class TestShouldCreateRecallObservation:
     def test_has_repo_info(self, memory):
@@ -130,6 +141,7 @@ class TestShouldCreateRecallObservation:
 
 
 # ── _find_playbook_knowledge ─────────────────────────────────────────
+
 
 class TestFindPlaybookKnowledge:
     def test_empty_query(self, memory):
@@ -154,6 +166,7 @@ class TestFindPlaybookKnowledge:
 
 # ── _on_workspace_context_recall ─────────────────────────────────────
 
+
 class TestOnWorkspaceContextRecall:
     def test_returns_observation(self, memory):
         memory.set_repository_info("r", "/d")
@@ -174,6 +187,7 @@ class TestOnWorkspaceContextRecall:
 
 # ── get_playbook_mcp_tools ───────────────────────────────────────────
 
+
 class TestGetPlaybookMcpTools:
     def test_empty(self, memory):
         assert memory.get_playbook_mcp_tools() == []
@@ -188,6 +202,7 @@ class TestGetPlaybookMcpTools:
 
 
 # ── load_user_workspace_playbooks ────────────────────────────────────
+
 
 class TestLoadUserWorkspacePlaybooks:
     def test_loads_both_types(self, memory):

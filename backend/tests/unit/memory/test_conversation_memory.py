@@ -66,7 +66,10 @@ class TestStaticHelpers:
         assert msg.content[0].text == "hello"
 
     def test_is_valid_image_url_valid(self):
-        assert ConversationMemory._is_valid_image_url("https://example.com/img.png") is True
+        assert (
+            ConversationMemory._is_valid_image_url("https://example.com/img.png")
+            is True
+        )
 
     def test_is_valid_image_url_none(self):
         assert ConversationMemory._is_valid_image_url(None) is False
@@ -76,6 +79,20 @@ class TestStaticHelpers:
 
     def test_is_valid_image_url_whitespace(self):
         assert ConversationMemory._is_valid_image_url("   ") is False
+
+
+class TestVectorMemoryInit:
+    def test_enable_vector_memory_does_not_crash_and_sets_store(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        # Patch EnhancedVectorStore constructor to avoid optional deps.
+        import backend.memory.conversation_memory as cm
+
+        fake_store = MagicMock(name="vector_store")
+        monkeypatch.setattr(cm, "EnhancedVectorStore", MagicMock(return_value=fake_store))
+
+        mem = _make_memory(enable_vector_memory=True)
+        assert mem.vector_store is fake_store
 
     def test_is_text_content_true(self):
         tc = TextContent(text="hi")
@@ -130,7 +147,9 @@ class TestDecisionTracking:
 class TestAnchorTracking:
     def test_add_anchor(self):
         mem = _make_memory()
-        a = mem.add_anchor(content="critical info", category="requirement", importance=0.95)
+        a = mem.add_anchor(
+            content="critical info", category="requirement", importance=0.95
+        )
         assert a.content == "critical info"
         assert a.anchor_id in mem.anchors
 

@@ -254,6 +254,22 @@ class SmartCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     model_config = ConfigDict(extra="forbid")
 
 
+class SemanticCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass):
+    """Configuration for SemanticCondenser."""
+
+    type: Literal["semantic"] = Field(default="semantic")
+    llm_config: LLMConfig | str | None = Field(
+        default=None, description="LLM config name to use for summarization (optional)."
+    )
+    max_size: int = Field(default=DEFAULT_SMART_CONDENSER_MAX_SIZE, ge=2)
+    keep_first: int = Field(default=DEFAULT_SMART_CONDENSER_KEEP_FIRST, ge=0)
+    similarity_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    model_name: str = Field(default="all-MiniLM-L6-v2")
+    token_budget: int | None = Field(default=None, ge=1)
+    
+    model_config = ConfigDict(extra="forbid")
+
+
 # Define the union type for all condenser configurations
 CondenserConfig = (
     NoOpCondenserConfig
@@ -268,6 +284,7 @@ CondenserConfig = (
     | ConversationWindowCondenserConfig
     | SmartCondenserConfig
     | AutoCondenserConfig
+    | SemanticCondenserConfig
 )
 
 
@@ -359,6 +376,7 @@ def create_condenser_config(condenser_type: str, data: dict) -> CondenserConfig:
         "browser_output_masking": BrowserOutputCondenserConfig,
         "smart": SmartCondenserConfig,
         "auto": AutoCondenserConfig,
+        "semantic": SemanticCondenserConfig,
     }
     if condenser_type not in condenser_classes:
         msg = f"Unknown condenser type: {condenser_type}"
@@ -378,3 +396,4 @@ StructuredSummaryCondenserConfig.model_rebuild()
 CondenserPipelineConfig.model_rebuild()
 SmartCondenserConfig.model_rebuild()
 AutoCondenserConfig.model_rebuild()
+SemanticCondenserConfig.model_rebuild()

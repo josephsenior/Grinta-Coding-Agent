@@ -203,7 +203,9 @@ class LLM(RetryMixin, DebugMixin):
         resolved_model = alias_manager.resolve_alias(original_model)
 
         if resolved_model != original_model:
-            logger.info("Model alias resolved: %s -> %s", original_model, resolved_model)
+            logger.info(
+                "Model alias resolved: %s -> %s", original_model, resolved_model
+            )
             self.config.model = resolved_model
 
         # Use resolver for local endpoint discovery and provider detection
@@ -229,8 +231,7 @@ class LLM(RetryMixin, DebugMixin):
         _is_local = resolver.is_local_model(self.config.model) or (
             self.config.base_url
             and any(
-                h in self.config.base_url
-                for h in ("localhost", "127.0.0.1", "0.0.0.0")
+                h in self.config.base_url for h in ("localhost", "127.0.0.1", "0.0.0.0")
             )
         )
 
@@ -331,7 +332,12 @@ class LLM(RetryMixin, DebugMixin):
         return key_obj.get_secret_value() if key_obj else None
 
     def _get_call_kwargs(self, **kwargs) -> dict:
-        """Merge default config with call-specific kwargs and handle model-specific parameters."""
+        """Merge default config with call-specific kwargs and handle model-specific parameters.
+
+        Model-specific parameter overrides are now driven by catalog.toml
+        via ``apply_model_param_overrides()``, replacing the previous if-elif chain.
+        The old branches are kept as inline fallback for models not yet in the catalog.
+        """
         is_stream = kwargs.pop("is_stream", False)
 
         # Filter out compatibility parameters that are not used by direct SDKs
@@ -356,44 +362,51 @@ class LLM(RetryMixin, DebugMixin):
         if self.config.top_k is not None:
             call_kwargs["top_k"] = self.config.top_k
 
-        # Handle model-specific tweaks and optimizations
-        model_lower = self.config.model.lower()
-        provider_lower = (self.config.custom_llm_provider or "").lower()
-        is_gemini = "gemini" in model_lower or "gemini" in provider_lower
+        # Data-driven model-specific overrides from catalog.toml
+        from backend.llm.catalog_loader import apply_model_param_overrides, lookup
 
-        if is_gemini:
-            # Gemini specific reasoning mapping
-            if self.config.reasoning_effort in [None, "low"]:
-                # In streaming, we don't support thinking budget yet for Gemini
-                if not is_stream:
-                    call_kwargs["thinking"] = {"budget_tokens": 128}
-                call_kwargs.pop("reasoning_effort", None)
-                # Gemini often doesn't want temperature/top_p when thinking is enabled
-                if not is_stream:
-                    call_kwargs.pop("temperature", None)
-                    call_kwargs.pop("top_p", None)
-            elif self.config.reasoning_effort == "medium":
-                call_kwargs["reasoning_effort"] = "medium"
-                call_kwargs.pop("thinking", None)
-            elif self.config.reasoning_effort == "high":
-                call_kwargs["reasoning_effort"] = "high"
-                call_kwargs.pop("thinking", None)
-        elif "opus-4-1" in model_lower:
-            # Anthropic Opus 4.1 specific tweaks
-            call_kwargs["thinking"] = {"type": "disabled"}
-            call_kwargs.pop("top_p", None)
-        elif "claude" in model_lower:
-            # Claude models don't support reasoning_effort param
-            call_kwargs.pop("reasoning_effort", None)
-            if "claude-3-7" in model_lower or "claude-3.7" in model_lower:
-                # Claude 3.7 supports thinking
-                if self.config.reasoning_effort == "low":
-                    call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 1024}
-                elif self.config.reasoning_effort in ["medium", "high"]:
-                    call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 4096}
+        entry = lookup(self.config.model)
+        if entry and (entry.thinking_mode or entry.strip_reasoning_effort or entry.strip_top_p or entry.strip_temperature):
+            # Use catalog-driven param overrides
+            call_kwargs = apply_model_param_overrides(
+                self.config.model,
+                call_kwargs,
+                reasoning_effort=self.config.reasoning_effort,
+                is_stream=is_stream,
+            )
         else:
-            if self.config.reasoning_effort is not None:
-                call_kwargs["reasoning_effort"] = self.config.reasoning_effort
+            # Legacy fallback for models not yet annotated in catalog.toml
+            model_lower = self.config.model.lower()
+            provider_lower = (self.config.custom_llm_provider or "").lower()
+            is_gemini = "gemini" in model_lower or "gemini" in provider_lower
+
+            if is_gemini:
+                if self.config.reasoning_effort in [None, "low"]:
+                    if not is_stream:
+                        call_kwargs["thinking"] = {"budget_tokens": 128}
+                    call_kwargs.pop("reasoning_effort", None)
+                    if not is_stream:
+                        call_kwargs.pop("temperature", None)
+                        call_kwargs.pop("top_p", None)
+                elif self.config.reasoning_effort == "medium":
+                    call_kwargs["reasoning_effort"] = "medium"
+                    call_kwargs.pop("thinking", None)
+                elif self.config.reasoning_effort == "high":
+                    call_kwargs["reasoning_effort"] = "high"
+                    call_kwargs.pop("thinking", None)
+            elif "opus-4-1" in model_lower:
+                call_kwargs["thinking"] = {"type": "disabled"}
+                call_kwargs.pop("top_p", None)
+            elif "claude" in model_lower:
+                call_kwargs.pop("reasoning_effort", None)
+                if "claude-3-7" in model_lower or "claude-3.7" in model_lower:
+                    if self.config.reasoning_effort == "low":
+                        call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 1024}
+                    elif self.config.reasoning_effort in ["medium", "high"]:
+                        call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 4096}
+            else:
+                if self.config.reasoning_effort is not None:
+                    call_kwargs["reasoning_effort"] = self.config.reasoning_effort
 
         if self.config.seed is not None:
             call_kwargs["seed"] = self.config.seed
@@ -571,7 +584,7 @@ class LLM(RetryMixin, DebugMixin):
         self, args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> list[dict]:
         """Extract and normalize messages from args and kwargs."""
-        if len(args) > 0:
+        if args:
             messages_kwarg = args[0]
         elif "messages" in kwargs:
             messages_kwarg = kwargs.pop("messages")

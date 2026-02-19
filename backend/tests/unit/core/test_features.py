@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from backend.core.features import FeatureFlags, FeatureUnavailableError, get_feature_flags
+from backend.core.features import (
+    FeatureFlags,
+    FeatureUnavailableError,
+    get_feature_flags,
+)
 
 
 class TestFeatureUnavailableError:
