@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     pass
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.message import Message, TextContent
 from backend.events.event import Event
 from backend.events.observation.agent import AgentCondensationObservation

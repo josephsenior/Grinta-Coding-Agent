@@ -27,8 +27,8 @@ from backend.events.action import ChangeAgentStateAction, MessageAction
 from backend.events.event import Event, EventSource
 from backend.events.observation import ErrorObservation
 from backend.core.provider_types import (
-    CUSTOM_SECRETS_TYPE,
-    PROVIDER_TOKEN_TYPE,
+    CustomSecretsType,
+    ProviderTokenType,
     CustomSecret,
 )
 from backend.mcp import add_mcp_tools_to_agent
@@ -180,8 +180,8 @@ class AgentSession:
         config: ForgeConfig,
         agent: Agent,
         max_iterations: int,
-        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
-        custom_secrets: CUSTOM_SECRETS_TYPE | None = None,
+        vcs_provider_tokens: ProviderTokenType | None = None,
+        custom_secrets: CustomSecretsType | None = None,
         max_budget_per_task: float | None = None,
         agent_to_llm_config: dict[str, LLMConfig] | None = None,
         agent_configs: dict[str, AgentConfig] | None = None,
@@ -739,8 +739,8 @@ class AgentSession:
 
     def override_provider_tokens_with_custom_secret(
         self,
-        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
-        custom_secrets: CUSTOM_SECRETS_TYPE | None,
+        vcs_provider_tokens: ProviderTokenType | None,
+        custom_secrets: CustomSecretsType | None,
     ):
         """Filter out provider tokens that have been overridden by custom secrets.
 

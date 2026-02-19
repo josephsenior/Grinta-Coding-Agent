@@ -15,10 +15,7 @@ from pathlib import Path
 from collections.abc import Sequence
 from typing import Any
 
-try:
-    import tomllib  # Python 3.11+
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib  # Python 3.11+
 
 _CATALOG_PATH = Path(__file__).with_name("catalog.toml")
 

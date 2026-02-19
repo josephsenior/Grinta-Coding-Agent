@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 # Retry parameters for transient flush failures
 _MAX_FLUSH_RETRIES = 3

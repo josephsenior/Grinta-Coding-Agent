@@ -8,7 +8,7 @@ from backend.core.constants import (
     EVICTION_SPIKE_THRESHOLD,
     IDLE_RECLAIM_SPIKE_THRESHOLD,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.runtime.pool import (
     PooledRuntime,
     RuntimePool,

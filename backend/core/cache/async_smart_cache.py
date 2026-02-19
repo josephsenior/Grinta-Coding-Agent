@@ -15,7 +15,7 @@ from backend.core.cache.utils import (
     get_redis_connection_params,
     merge_settings_with_cache,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.forge_config import ForgeConfig
@@ -149,9 +149,9 @@ class AsyncSmartCache:
                 return config
 
             # Cache miss - load from file
-            from backend.core.config.utils import load_FORGE_config
+            from backend.core.config.utils import load_forge_config
 
-            config = load_FORGE_config()
+            config = load_forge_config()
 
             # Cache for 5 minutes (global config rarely changes)
             await client.setex(
@@ -178,9 +178,9 @@ class AsyncSmartCache:
             return self._global_config_cache
 
         # Cache miss - load from file
-        from backend.core.config.utils import load_FORGE_config
+        from backend.core.config.utils import load_forge_config
 
-        config = load_FORGE_config()
+        config = load_forge_config()
 
         # Cache in memory
         self._global_config_cache = config

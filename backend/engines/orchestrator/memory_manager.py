@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.message import Message, TextContent
 from backend.events.action import MessageAction
 from backend.memory.condenser import Condenser

@@ -1,58 +1,51 @@
 """Forge automation framework package."""
 
 import os
+import warnings
 from pathlib import Path
+from importlib.metadata import version, PackageNotFoundError
 
-__package_name__ = "FORGE_ai"
+__version__ = "0.55.0"
+__package_name__ = "forge-ai"
 
 
-def get_version():
-    """Get the package version from pyproject.toml or installed package metadata.
+def get_version() -> str:
+    """Get the package version from metadata or pyproject.toml fallback.
 
     Returns:
         Version string or 'unknown' if version cannot be determined
 
     """
+    # 1. Try metadata (installed package)
     try:
-        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        candidate_paths = [
-            Path(root_dir) / "pyproject.toml",
-            Path(root_dir) / "forge" / "pyproject.toml",
-        ]
-        for file_path in candidate_paths:
-            if file_path.is_file():
-                with open(file_path, encoding="utf-8") as f:
-                    for line in f:
-                        if line.strip().startswith("version ="):
-                            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    except FileNotFoundError:
-        pass
-    try:
-        from importlib.metadata import version
-
         return version(__package_name__)
-    except ImportError:
+    except PackageNotFoundError:
         pass
-    try:
-        from pkg_resources import DistributionNotFound, get_distribution
 
-        return get_distribution(__package_name__).version
-    except (ImportError, DistributionNotFound):
+    # 2. Try pyproject.toml (local dev)
+    try:
+        root_dir = Path(__file__).resolve().parent.parent
+        pyproject_path = root_dir / "pyproject.toml"
+        if pyproject_path.exists():
+            with open(pyproject_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip().startswith("version ="):
+                        return line.split("=", 1)[1].strip().strip('"').strip("'")
+    except Exception:
         pass
-    return "unknown"
+
+    return "0.55.0" # Default fallback
 
 
 try:
     __version__ = get_version()
 except Exception as _exc:
-    import warnings as _w
-
-    _w.warn(
+    warnings.warn(
         f"Forge: could not determine package version ({_exc!r}); "
-        "reporting 'unknown'. Check that pyproject.toml is readable.",
+        "reporting '0.55.0'.",
         stacklevel=1,
     )
-    __version__ = "unknown"
+    __version__ = "0.55.0"
 
 
 __all__ = ["__version__", "__package_name__", "get_version"]

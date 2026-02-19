@@ -29,13 +29,14 @@ if [[ $(echo "$PYTHON_VERSION >= 3.12" | bc -l) -eq 0 ]]; then
 fi
 echo -e "${GREEN}✅ Python version ok: $PYTHON_VERSION${NC}"
 
-# Check for Poetry
-if ! command -v poetry &> /dev/null; then
-    echo -e "${YELLOW}📦 Poetry not found. Installing...${NC}"
-    curl -sSL https://install.python-poetry.org | python3 -
+# Check for uv
+if ! command -v uv &> /dev/null; then
+    echo -e "${YELLOW}📦 uv not found. Installing...${NC}"
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source "$HOME/.cargo/env" 2>/dev/null || true
     export PATH="$HOME/.local/bin:$PATH"
 fi
-echo -e "${GREEN}✅ Poetry found!${NC}"
+echo -e "${GREEN}✅ uv found!${NC}"
 
 # Step 1: Configuration
 if [ ! -f "config.toml" ]; then
@@ -44,16 +45,16 @@ if [ ! -f "config.toml" ]; then
 fi
 
 # Step 2: Install dependencies
-echo -e "${YELLOW}📦 Step 2: Installing dependencies...${NC}"
-poetry install
+echo -e "${YELLOW}📦 Step 2: Syncing dependencies...${NC}"
+uv sync
 
 # Step 3: Auto-discover local models
 echo -e "${YELLOW}🤖 Step 3: Discovering local models (Ollama/LM Studio/vLLM)...${NC}"
-poetry run python3 -m backend.llm.discover_models aliases
+uv run python3 -m backend.llm.discover_models aliases
 echo -e "${GREEN}✅ Model discovery complete.${NC}"
 
 echo -e "\n${GREEN}✅ Forge is ready!${NC}"
 echo -e "${CYAN}💡 To start Forge:${NC}"
-echo -e "   1. Start the server: ${YELLOW}poetry run forge serve${NC}"
-echo -e "   2. Start the TUI:    ${YELLOW}poetry run forge-tui${NC}"
+echo -e "   1. Start the server: ${YELLOW}uv run forge serve${NC}"
+echo -e "   2. Start the TUI:    ${YELLOW}uv run forge-tui${NC}"
 echo -e "\nOr just run: ${CYAN}make run${NC}"

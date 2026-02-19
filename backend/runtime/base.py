@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Self, cast
 import httpx
 
 from backend.core.exceptions import AgentRuntimeDisconnectedError
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events import EventSource, EventStream, EventStreamSubscriber
 from backend.events.action import (
     Action,
@@ -76,7 +76,7 @@ if TYPE_CHECKING:
     from backend.events.event import Event
     from backend.instruction import BasePlaybook
     from backend.core.provider_types import (
-        PROVIDER_TOKEN_TYPE,
+        ProviderTokenType,
         ProviderToken,
         ProviderType,
     )
@@ -128,7 +128,7 @@ def _default_env_vars(runtime_config: RuntimeConfig) -> dict[str, str]:
 
 
 def _normalize_provider_tokens(
-    tokens: PROVIDER_TOKEN_TYPE | None,
+    tokens: ProviderTokenType | None,
 ) -> MappingProxyType[ProviderType, ProviderToken]:
     """Ensure provider tokens are stored as an immutable mapping."""
     if isinstance(tokens, MappingProxyType):
@@ -196,7 +196,7 @@ class Runtime(
         attach_to_existing: bool = False,
         headless_mode: bool = False,
         user_id: str | None = None,
-        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+        vcs_provider_tokens: ProviderTokenType | None = None,
         workspace_base: str | None = None,
     ) -> None:
         """Initialize runtime state, subscriptions, plugins, and provider credentials."""

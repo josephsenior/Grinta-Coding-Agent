@@ -12,7 +12,7 @@ from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     pass

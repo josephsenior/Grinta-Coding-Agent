@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 from .atomic_refactor import AtomicRefactor, RefactorResult, RefactorTransaction
 from .smart_errors import SmartErrorHandler

@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action.action import Action
 from backend.events.action.message import MessageAction
 from backend.events.event import Event, EventSource

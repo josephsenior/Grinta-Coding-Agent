@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 
 @dataclass(frozen=True, slots=True)

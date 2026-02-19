@@ -10,7 +10,7 @@ import tempfile
 import time
 from typing import Any, Self, cast
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 try:
     import fcntl  # type: ignore[import-not-found, unused-ignore]

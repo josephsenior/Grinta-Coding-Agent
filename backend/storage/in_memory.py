@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.storage.files import FileStore
 
 

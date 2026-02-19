@@ -15,7 +15,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     import socketio  # type: ignore[import-untyped]

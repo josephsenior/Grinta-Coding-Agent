@@ -26,7 +26,7 @@ from backend.core.config.utils import (
     finalize_config,
     get_agent_config_arg,
     get_llm_config_arg,
-    load_FORGE_config,
+    load_forge_config,
     load_from_env,
     load_from_toml,
     parse_arguments,
@@ -57,7 +57,7 @@ __all__ = [
     "get_llm_config_arg",
     "load_from_env",
     "load_from_toml",
-    "load_FORGE_config",
+    "load_forge_config",
     "parse_arguments",
     "setup_config_from_args",
 ]

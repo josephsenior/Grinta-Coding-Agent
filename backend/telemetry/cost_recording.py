@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 # Global cost recorder callback (registered by server middleware on startup)
 _cost_recorder: Callable[[str, float], None] | None = None

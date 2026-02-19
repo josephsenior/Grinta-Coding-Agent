@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import Depends, HTTPException, Request, status
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.server.shared import ConversationStoreImpl, config
 from backend.server.store_factory import get_conversation_store_instance
 from backend.server.user_auth import get_user_id

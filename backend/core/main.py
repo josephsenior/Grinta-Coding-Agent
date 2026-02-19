@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from backend.events.action.action import Action
     from backend.events.event import Event
     from backend.events.stream import EventStream
-    from backend.core.provider_types import PROVIDER_TOKEN_TYPE
+    from backend.core.provider_types import ProviderTokenType
     from backend.memory.agent_memory import Memory
     from backend.llm.llm_registry import LLMRegistry
     from backend.runtime.base import Runtime
@@ -41,7 +41,7 @@ from backend.core.config import (
     setup_config_from_args,
 )
 from backend.core.config.mcp_config import ForgeMCPConfigImpl
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.loop import run_agent_until_done
 from backend.core.schemas import AgentState
 from backend.core.setup import (
@@ -91,7 +91,7 @@ def _setup_runtime_and_repo(
     agent,
     headless_mode: bool,
     *,
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+    vcs_provider_tokens: ProviderTokenType | None = None,
     repo_initializer: Callable[[Runtime], str | None] | None = None,
     event_stream: EventStream | None = None,
     env_vars: dict[str, str] | None = None,
@@ -159,14 +159,14 @@ async def _setup_memory_and_mcp(
         )
 
     if agent.config.enable_mcp:
-        _, FORGE_mcp_stdio_servers = (
+        _, forge_mcp_stdio_servers = (
             ForgeMCPConfigImpl.create_default_mcp_server_config(
                 config_.mcp_host,
                 config_,
                 None,
             )
         )
-        runtime.config.mcp.stdio_servers.extend(FORGE_mcp_stdio_servers)
+        runtime.config.mcp.stdio_servers.extend(forge_mcp_stdio_servers)
         await add_mcp_tools_to_agent(agent, runtime, memory)
 
     return memory

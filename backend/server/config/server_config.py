@@ -4,7 +4,7 @@ import os
 import secrets
 from pathlib import Path
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.server.types import AppMode, ServerConfigInterface
 from backend.utils.import_utils import get_impl
 

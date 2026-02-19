@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from pydantic import SecretStr
 
 from backend.core.provider_types import (
-    PROVIDER_TOKEN_TYPE,
+    ProviderTokenType,
     ProviderToken,
     ProviderType,
 )
@@ -43,7 +43,7 @@ class ProviderHandler:
     # -- read-only access ---------------------------------------------------
 
     @property
-    def provider_tokens(self) -> PROVIDER_TOKEN_TYPE:
+    def provider_tokens(self) -> ProviderTokenType:
         """Read-only access to provider tokens."""
         return self._provider_tokens
 

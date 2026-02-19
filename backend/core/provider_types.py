@@ -189,16 +189,16 @@ class CreatePlaybook(BaseModel):
 # Type aliases
 # ---------------------------------------------------------------------------
 
-PROVIDER_TOKEN_TYPE = Mapping[ProviderType, ProviderToken]
-CUSTOM_SECRETS_TYPE = Mapping[str, CustomSecret]
-PROVIDER_TOKEN_FIELD_TYPE = dict[ProviderType, ProviderToken]
-CUSTOM_SECRETS_FIELD_TYPE = dict[str, CustomSecret]
-PROVIDER_TOKEN_TYPE_WITH_JSON_SCHEMA = Annotated[
-    PROVIDER_TOKEN_FIELD_TYPE,
+ProviderTokenType = Mapping[ProviderType, ProviderToken]
+CustomSecretsType = Mapping[str, CustomSecret]
+ProviderTokenFieldType = dict[ProviderType, ProviderToken]
+CustomSecretsFieldType = dict[str, CustomSecret]
+ProviderTokenWithTypeSchema = Annotated[
+    ProviderTokenFieldType,
     WithJsonSchema({"type": "object", "additionalProperties": {"type": "string"}}),
 ]
-CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA = Annotated[
-    CUSTOM_SECRETS_FIELD_TYPE,
+CustomSecretsWithTypeSchema = Annotated[
+    CustomSecretsFieldType,
     WithJsonSchema({"type": "object", "additionalProperties": {"type": "string"}}),
 ]
 

@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Callable
 
 from backend.controller import AgentController
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
 from backend.memory.agent_memory import Memory
 from backend.runtime.base import Runtime

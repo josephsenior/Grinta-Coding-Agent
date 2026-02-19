@@ -6,7 +6,7 @@ concern is isolated from connection lifecycle and event routing.
 
 from __future__ import annotations
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action import NullAction
 from backend.events.action.agent import RecallAction
 from backend.events.async_event_store_wrapper import AsyncEventStoreWrapper

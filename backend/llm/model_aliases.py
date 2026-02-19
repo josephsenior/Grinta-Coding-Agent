@@ -12,12 +12,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
-try:
-    import tomllib  # Python 3.11+
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib  # Python 3.11+
 
 
 class ModelAliasManager:
@@ -159,7 +156,7 @@ class ModelAliasManager:
             path: Path to save aliases to
         """
         try:
-            import toml
+            import tomli_w
 
             # Read existing config if it exists
             config: dict[str, Any] = {}
@@ -171,13 +168,13 @@ class ModelAliasManager:
             config["model_aliases"] = self._aliases
 
             # Write back
-            with open(path, "w", encoding="utf-8") as f:
-                toml.dump(config, f)
+            with open(path, "wb") as f:
+                f.write(tomli_w.dumps(config).encode("utf-8"))
 
             logger.info("Saved %d aliases to %s", len(self._aliases), path)
         except ImportError:
             logger.error(
-                "toml package not available for writing. Install with: pip install toml"
+                "tomli-w package not available for writing. Install with: pip install tomli-w"
             )
         except Exception as e:
             logger.error("Failed to save aliases: %s", e)

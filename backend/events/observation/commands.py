@@ -13,7 +13,7 @@ from backend.core.constants import (
     CMD_OUTPUT_PS1_END,
     MAX_CMD_OUTPUT_SIZE,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.schemas import ObservationType
 from backend.core.schemas.metadata import CmdOutputMetadataSchema
 from backend.events.observation.observation import Observation

@@ -13,7 +13,7 @@ import frontmatter
 from pydantic import BaseModel, ValidationError
 
 from backend.core.exceptions import PlaybookValidationError
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.instruction.types import InputMetadata, PlaybookMetadata, PlaybookType
 
 

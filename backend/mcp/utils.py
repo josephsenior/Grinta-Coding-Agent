@@ -22,7 +22,7 @@ from backend.core.config.mcp_config import (
     MCPSSEServerConfig,
     MCPStdioServerConfig,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.events.observation.mcp import MCPObservation
 from backend.mcp.cache import get_cached, set_cache

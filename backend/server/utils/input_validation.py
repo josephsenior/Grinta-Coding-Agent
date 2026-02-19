@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from urllib.parse import unquote
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 
 class ValidationError(Exception):

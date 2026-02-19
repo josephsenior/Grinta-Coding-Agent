@@ -7,11 +7,11 @@ from collections.abc import Sequence
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action.message import MessageAction
 from backend.core.provider_types import (
-    CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA,
-    PROVIDER_TOKEN_TYPE,
+    CustomSecretsWithTypeSchema,
+    ProviderTokenType,
     ProviderToken,
     ProviderType,
 )
@@ -96,8 +96,8 @@ async def initialize_conversation(
 
 
 def _process_git_provider_tokens(
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
-) -> PROVIDER_TOKEN_TYPE:
+    vcs_provider_tokens: ProviderTokenType | None,
+) -> ProviderTokenType:
     """Process and normalize git provider tokens.
 
     Args:
@@ -117,7 +117,7 @@ def _process_git_provider_tokens(
 
 
 def _process_custom_secrets(
-    custom_secrets: CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA | Any | None,
+    custom_secrets: CustomSecretsWithTypeSchema | Any | None,
 ) -> MappingProxyType:
     """Process and normalize custom secrets.
 
@@ -166,19 +166,19 @@ def _normalize_provider_list(
 
 
 def _get_normalized_provider_tokens(
-    provider_tokens: PROVIDER_TOKEN_TYPE | None,
-    default_tokens: PROVIDER_TOKEN_TYPE | None,
-) -> PROVIDER_TOKEN_TYPE | None:
+    provider_tokens: ProviderTokenType | None,
+    default_tokens: ProviderTokenType | None,
+) -> ProviderTokenType | None:
     """Get normalized provider tokens, falling back to defaults if needed."""
     normalized = _process_git_provider_tokens(provider_tokens)
     return normalized if normalized else default_tokens
 
 
 def _ensure_provider_tokens_for_providers(
-    normalized_tokens: PROVIDER_TOKEN_TYPE | None,
+    normalized_tokens: ProviderTokenType | None,
     providers_set: Sequence[ProviderType | str] | None,
     user_id: str | None,
-) -> PROVIDER_TOKEN_TYPE:
+) -> ProviderTokenType:
     """Ensure tokens exist for all requested providers."""
     normalized_providers = _normalize_provider_list(providers_set)
     if not normalized_providers:
@@ -193,8 +193,8 @@ def _ensure_provider_tokens_for_providers(
 def _build_session_init_args(
     settings: Any,
     conversation_metadata: ConversationMetadata,
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
-    custom_secrets: CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA | None,
+    vcs_provider_tokens: ProviderTokenType | None,
+    custom_secrets: CustomSecretsWithTypeSchema | None,
     conversation_instructions: str | None,
     mcp_config: MCPConfig | None,
 ) -> dict[str, Any]:
@@ -255,8 +255,8 @@ def _create_initial_message_action(
 
 async def start_conversation(
     user_id: str | None,
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
-    custom_secrets: CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA | None,
+    vcs_provider_tokens: ProviderTokenType | None,
+    custom_secrets: CustomSecretsWithTypeSchema | None,
     initial_user_msg: str | None,
     image_urls: list[str] | None,
     replay_json: str | None,
@@ -354,8 +354,8 @@ async def start_conversation(
 
 async def create_new_conversation(
     user_id: str | None,
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
-    custom_secrets: CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA | None,
+    vcs_provider_tokens: ProviderTokenType | None,
+    custom_secrets: CustomSecretsWithTypeSchema | None,
     selected_repository: str | None,
     selected_branch: str | None,
     initial_user_msg: str | None,
@@ -420,7 +420,7 @@ async def create_new_conversation(
 
 def create_provider_tokens_object(
     providers_set: list[ProviderType],
-) -> PROVIDER_TOKEN_TYPE:
+) -> ProviderTokenType:
     """Create provider tokens object for the given providers."""
     provider_information: dict[ProviderType, ProviderToken] = {
         provider: ProviderToken(token=None, user_id=None) for provider in providers_set
@@ -432,7 +432,7 @@ async def setup_init_conversation_settings(
     user_id: str | None,
     conversation_id: str,
     providers_set: Sequence[ProviderType | str] | None = None,
-    provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+    provider_tokens: ProviderTokenType | None = None,
 ) -> ConversationInitData:
     """Prepare conversation settings for joining an existing session.
 

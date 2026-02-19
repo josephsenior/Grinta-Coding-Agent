@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.core.config.llm_config import LLMConfig
 from backend.core.errors import SessionInvariantError
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.pydantic_compat import model_to_dict
 from backend.events.event_filter import EventFilter
 from backend.events.event_store import EventStore

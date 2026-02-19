@@ -12,7 +12,7 @@ import mimetypes
 import os
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action import FileReadAction, FileWriteAction
 from backend.core.enums import FileEditSource
 from backend.events.observation import (

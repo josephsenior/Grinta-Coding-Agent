@@ -4,7 +4,7 @@ import os
 import re
 from re import Pattern
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 # Initialize distributed tracing (opt-in — requires `telemetry` extras)
 OTEL_ENABLED = os.getenv(

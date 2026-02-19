@@ -15,7 +15,7 @@ from pydantic import Field
 from starlette.background import BackgroundTask
 
 from backend.core.exceptions import AgentRuntimeUnavailableError
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action import FileReadAction
 from backend.events.action.files import FileWriteAction
 from backend.events.observation import ErrorObservation, FileReadObservation

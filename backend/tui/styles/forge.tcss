@@ -392,3 +392,54 @@ ConversationListItem.-highlight {
 #btn-row { height: 3; margin: 1 0; align: center middle; }
 #settings-outer { height: 100%; padding: 1 2; background: black; }
 #settings-scroll { height: 1fr; }
+
+/* ── Welcome Screen ── */
+WelcomeScreen {
+    align: center middle;
+    background: black;
+}
+
+#welcome-container {
+    width: 60;
+    height: auto;
+    padding: 2 4;
+    border: double $accent;
+    background: #080808;
+}
+
+#welcome-title {
+    width: 100%;
+    text-align: center;
+    text-style: bold;
+    color: $accent;
+    margin-bottom: 1;
+}
+
+#welcome-subtitle {
+    width: 100%;
+    text-align: center;
+    color: #888888;
+    margin-bottom: 2;
+}
+
+.setup-step {
+    margin-bottom: 1;
+}
+
+.setup-step Label {
+    text-style: bold;
+    color: #eeeeee;
+    margin-bottom: 1;
+}
+
+.help-text {
+    color: #555555;
+    text-style: italic;
+    font-size: small;
+}
+
+#welcome-actions {
+    margin-top: 1;
+    align: center middle;
+}
+

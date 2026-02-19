@@ -17,10 +17,10 @@ from pydantic.json import pydantic_encoder
 
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.core.provider_types import (
-    CUSTOM_SECRETS_TYPE,
-    CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA,
-    PROVIDER_TOKEN_TYPE,
-    PROVIDER_TOKEN_TYPE_WITH_JSON_SCHEMA,
+    CustomSecretsType,
+    CustomSecretsWithTypeSchema,
+    ProviderTokenType,
+    ProviderTokenWithTypeSchema,
     CustomSecret,
     ProviderToken,
     ProviderType,
@@ -33,8 +33,8 @@ if TYPE_CHECKING:
 class UserSecrets(BaseModel):
     """Container for storing provider tokens and custom secrets for a user."""
 
-    provider_tokens: PROVIDER_TOKEN_TYPE_WITH_JSON_SCHEMA | None = None
-    custom_secrets: CUSTOM_SECRETS_TYPE_WITH_JSON_SCHEMA = Field(default_factory=dict)
+    provider_tokens: ProviderTokenWithTypeSchema | None = None
+    custom_secrets: CustomSecretsWithTypeSchema = Field(default_factory=dict)
     model_config = ConfigDict(
         frozen=True, validate_assignment=True, arbitrary_types_allowed=True
     )
@@ -42,7 +42,7 @@ class UserSecrets(BaseModel):
     @field_serializer("provider_tokens")
     def provider_tokens_serializer(
         self,
-        provider_tokens: PROVIDER_TOKEN_TYPE,
+        provider_tokens: ProviderTokenType,
         info: SerializationInfo,
     ) -> dict[str, dict[str, str | Any]]:
         """Serialize provider tokens with optional secret exposure.
@@ -80,7 +80,7 @@ class UserSecrets(BaseModel):
 
     @field_serializer("custom_secrets")
     def custom_secrets_serializer(
-        self, custom_secrets: CUSTOM_SECRETS_TYPE, info: SerializationInfo
+        self, custom_secrets: CustomSecretsType, info: SerializationInfo
     ):
         """Serialize custom secrets with optional secret exposure.
 
@@ -165,7 +165,7 @@ class UserSecrets(BaseModel):
     @classmethod
     def convert_dict_to_mappingproxy(
         cls,
-        data: dict[str, dict[str, Any] | MappingProxyType] | PROVIDER_TOKEN_TYPE | None,
+        data: dict[str, dict[str, Any] | MappingProxyType] | ProviderTokenType | None,
     ) -> dict[str, MappingProxyType | None]:
         """Custom deserializer to convert dictionary into MappingProxyType.
 

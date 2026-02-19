@@ -11,6 +11,7 @@ from textual.binding import Binding
 from backend.tui.client import ForgeClient
 from backend.tui.screens.help import HelpScreen
 from backend.tui.screens.home import HomeScreen
+from backend.tui.screens.welcome import WelcomeScreen
 
 logger = logging.getLogger("forge.tui")
 
@@ -23,11 +24,10 @@ class ForgeApp(App[None]):
 
     Lifecycle
     ---------
-    1. HomeScreen is pushed on startup.
-    2. When the user selects a conversation, HomeScreen pushes ChatScreen
+    1. WelcomeScreen is pushed if config.toml is missing.
+    2. HomeScreen is pushed if config exists.
+    3. When the user selects a conversation, HomeScreen pushes ChatScreen
        on top (via ``app.open_chat``).
-    3. When ChatScreen is dismissed (Ctrl+Q), we naturally pop back to
-       HomeScreen — no callbacks or asyncio hacks required.
     4. Settings and Help are modal screens that push/pop cleanly.
     """
 
@@ -44,8 +44,36 @@ class ForgeApp(App[None]):
         self.client = client or ForgeClient()
 
     async def on_mount(self) -> None:
-        """Push the home screen on startup."""
+        """Push the home screen on startup, or welcome if first run."""
+        config_path = Path.cwd() / "config.toml"
+        if not config_path.exists():
+            self.push_screen(WelcomeScreen(), self._on_welcome_finished)
+        else:
+            self._start_main_flow()
+
+    def _on_welcome_finished(self, setup_completed: bool) -> None:
+        """Called when user finishes the onboarding wizard."""
+        if setup_completed:
+            self.notify("Setup complete! Welcome to Forge.", severity="information")
+            self._start_main_flow()
+        else:
+            self.exit()
+
+    def _start_main_flow(self) -> None:
+        """Load home screen and verify connectivity."""
         self.push_screen(HomeScreen(self.client))
+        # Check if server is up
+        self.run_worker(self._check_connectivity())
+
+    async def _check_connectivity(self) -> None:
+        """Silently check if the backend is reachable."""
+        is_up = await self.client.health_check()
+        if not is_up:
+            self.notify(
+                "Forge backend is offline. Start it with 'uv run forge serve'",
+                severity="error",
+                timeout=10,
+            )
 
     # ── global actions ────────────────────────────────────────────
 

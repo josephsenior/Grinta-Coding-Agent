@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
 from backend.events import EventSource
 from backend.events.action import ActionConfirmationStatus

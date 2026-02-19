@@ -11,7 +11,7 @@ from fastapi.routing import Mount
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend import __version__
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.logger import get_trace_context
 from backend.core.tracing import initialize_tracing
 from backend.server.error_handlers import register_exception_handlers

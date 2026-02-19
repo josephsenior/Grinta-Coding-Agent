@@ -12,7 +12,7 @@ import random
 import time
 from typing import TYPE_CHECKING
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.logger import get_trace_context
 from backend.server.middleware.cost_quota import (
     CostQuotaMiddleware,

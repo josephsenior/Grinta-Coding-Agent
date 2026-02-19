@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 
 def _run_subprocess(

@@ -74,10 +74,10 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 ```
 
 ### 🐧 Linux / macOS / Manual
-1. **Prerequisites:** Python 3.12+ and [Poetry](https://python-poetry.org/docs/#installation).
-2. **Install:** `poetry install`
-3. **Start Backend:** `python start_server.py` (Defaults to http://localhost:3000)
-4. **Start TUI:** `python -m backend.tui` in a new terminal.
+1. **Prerequisites:** Python 3.12+ and [uv](https://docs.astral.sh/uv/).
+2. **Install:** `uv sync`
+3. **Start Backend:** `uv run python start_server.py`
+4. **Start TUI:** `uv run forge-tui`
 
 ---
 

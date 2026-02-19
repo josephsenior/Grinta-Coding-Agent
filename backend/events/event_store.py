@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 import time
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.event_store_abc import EventStoreABC
 from backend.events.serialization.event import event_from_dict
 from backend.storage.locations import (

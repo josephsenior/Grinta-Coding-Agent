@@ -12,7 +12,7 @@ from typing import (
     runtime_checkable,
 )
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.engines.orchestrator.streaming_checkpoint import StreamingCheckpoint
 
 if TYPE_CHECKING:

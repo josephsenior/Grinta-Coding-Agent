@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action import CmdRunAction, FileEditAction
 from backend.events.observation import CmdOutputObservation, ErrorObservation
 

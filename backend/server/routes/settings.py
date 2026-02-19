@@ -11,10 +11,10 @@ from pydantic import SecretStr
 
 from backend.core.config.api_key_manager import api_key_manager
 from backend.core.constants import SECRET_PLACEHOLDER, SETTINGS_CACHE_TTL
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 # Import these at runtime so FastAPI can resolve them in Annotated types
-from backend.core.provider_types import PROVIDER_TOKEN_TYPE, ProviderType
+from backend.core.provider_types import ProviderTokenType, ProviderType
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.server.dependencies import get_dependencies
 from backend.server.settings import GETSettingsModel
@@ -368,7 +368,7 @@ def invalidate_settings_cache(user_id: str | None = None) -> None:
 )
 async def load_settings(
     provider_tokens: Annotated[
-        PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
+        ProviderTokenType | None, Depends(get_provider_tokens)
     ],
     settings_store: Annotated[Any, Depends(get_user_settings_store)],
     settings: Annotated[Settings, Depends(get_user_settings)],
@@ -434,7 +434,7 @@ async def load_settings(
 
 def _build_provider_tokens_set(
     user_secrets: Any,
-    provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    provider_tokens: ProviderTokenType | None,
 ) -> dict[ProviderType, str | None]:
     """Build provider tokens set dict.
 

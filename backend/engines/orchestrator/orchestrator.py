@@ -26,7 +26,7 @@ from backend.core.errors import (
     ContextLimitError,
     ToolExecutionError,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.message import Message
 from backend.events.action import AgentThinkAction, MessageAction, PlaybookFinishAction
 from backend.events.action.files import FileReadAction

@@ -9,10 +9,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib  # Python 3.11+
 
 from backend.core import logger
 from backend.core.config.forge_config import ForgeConfig
@@ -28,10 +25,10 @@ def _load_toml_config(toml_file: str) -> dict | None:
         with open(toml_file, "rb") as toml_contents:
             return tomllib.load(toml_contents)
     except FileNotFoundError as e:
-        logger.FORGE_logger.error("Config file not found: %s. Error: %s", toml_file, e)
+        logger.forge_logger.error("Config file not found: %s. Error: %s", toml_file, e)
         return None
     except Exception as e:
-        logger.FORGE_logger.error(
+        logger.forge_logger.error(
             "Cannot parse config file %s. Exception: %s", toml_file, e
         )
         return None
@@ -42,7 +39,7 @@ def get_llm_config_arg(
 ) -> LLMConfig | None:
     """Get a group of llm settings from the config file."""
     llm_config_arg = llm_config_arg.strip("[]").removeprefix("llm.")
-    logger.FORGE_logger.debug(
+    logger.forge_logger.debug(
         'Loading llm config "%s" from %s', llm_config_arg, toml_file
     )
     toml_config = _load_toml_config(toml_file)
@@ -50,7 +47,7 @@ def get_llm_config_arg(
         return None
     if "llm" in toml_config and llm_config_arg in toml_config["llm"]:
         return LLMConfig(**toml_config["llm"][llm_config_arg])
-    logger.FORGE_logger.debug(
+    logger.forge_logger.debug(
         'LLM config "%s" not found in %s', llm_config_arg, toml_file
     )
     return None
@@ -61,7 +58,7 @@ def _resolve_llm_config_from_cli(
 ) -> LLMConfig:
     """Resolve LLM config from CLI parameter."""
     if llm_config_name in config.llms:
-        logger.FORGE_logger.debug(
+        logger.forge_logger.debug(
             "Using LLM config '%s' from loaded configuration", llm_config_name
         )
         return config.llms[llm_config_name]
@@ -83,7 +80,7 @@ def _try_user_config_llm(llm_config_name: str, config_file: str) -> LLMConfig | 
     if config_file == user_config or not os.path.exists(user_config):
         return None
 
-    logger.FORGE_logger.debug(
+    logger.forge_logger.debug(
         "Trying to load LLM config '%s' from user config: %s",
         llm_config_name,
         user_config,
@@ -96,10 +93,10 @@ def apply_llm_config_override(config: ForgeConfig, args: argparse.Namespace) -> 
     if not args.llm_config:
         return
 
-    logger.FORGE_logger.debug("CLI specified LLM config: %s", args.llm_config)
+    logger.forge_logger.debug("CLI specified LLM config: %s", args.llm_config)
     llm_config = _resolve_llm_config_from_cli(args.llm_config, config, args.config_file)
     config.set_llm_config(llm_config)
-    logger.FORGE_logger.debug("Set LLM config from CLI parameter: %s", args.llm_config)
+    logger.forge_logger.debug("Set LLM config from CLI parameter: %s", args.llm_config)
 
 
 def apply_additional_overrides(config: ForgeConfig, args: argparse.Namespace) -> None:

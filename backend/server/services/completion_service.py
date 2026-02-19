@@ -19,7 +19,7 @@ from backend.controller.agent_circuit_breaker import (
 from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.core.cache.async_smart_cache import AsyncSmartCache
 from backend.core.constants import COMPLETION_TIMEOUT
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action import ActionSecurityRisk
 from backend.llm.cost_tracker import record_llm_cost_from_response
 

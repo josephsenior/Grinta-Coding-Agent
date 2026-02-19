@@ -5,7 +5,7 @@ import re
 
 from backend.core.config import ForgeConfig
 from backend.core.constants import MAX_FILENAME_LENGTH
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.server.shared import config as shared_config
 
 

@@ -9,7 +9,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from backend.core.exceptions import FunctionCallNotExistsError
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.engines.locator.tools import (
     SearchEntityTool,
     SearchRepoTool,
@@ -33,13 +33,13 @@ if TYPE_CHECKING:
 
 def _create_action_from_tool_call(tool_call, arguments: dict) -> Action:
     """Create appropriate action from tool call."""
-    ALL_FUNCTIONS = [
+    all_functions = [
         "explore_tree_structure",
         "search_code_snippets",
         "get_entity_contents",
     ]
 
-    if tool_call.function.name in ALL_FUNCTIONS:
+    if tool_call.function.name in all_functions:
         func_name = tool_call.function.name
         # Convert arguments to JSON string for the python command
         args_json = json.dumps(arguments)
@@ -53,7 +53,10 @@ def _create_action_from_tool_call(tool_call, arguments: dict) -> Action:
         return CmdRunAction(command=command)
     if tool_call.function.name == create_finish_tool()["function"]["name"]:
         return PlaybookFinishAction(final_thought=arguments.get("message", ""))
-    msg = f"Tool {tool_call.function.name} is not registered. (arguments: {arguments}). Please check the tool name and retry with an existing tool."
+    msg = (
+        f"Tool {tool_call.function.name} is not registered. (arguments: {arguments}). "
+        "Please check the tool name and retry with an existing tool."
+    )
     raise FunctionCallNotExistsError(
         msg,
     )

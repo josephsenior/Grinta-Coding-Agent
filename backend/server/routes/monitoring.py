@@ -12,7 +12,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from backend.controller import collect_controller_health as _collect_controller_health
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.stream import get_aggregated_event_stream_stats
 from backend.runtime.utils.process_manager import (
     get_process_manager_health_snapshot as _get_process_manager_health_snapshot,

@@ -3,7 +3,7 @@
 import uvicorn
 from fastapi import FastAPI, WebSocket
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.utils.shutdown_listener import should_continue
 
 app = FastAPI()

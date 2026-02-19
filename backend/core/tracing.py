@@ -8,13 +8,19 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Global tracing configuration
-_tracing_initialized = False
-_tracer = None
-_trace_provider = None
+class _TracingState:
+    """Internal state container for initialized tracing components."""
+
+    initialized = False
+    tracer = None
+    trace_provider = None
+
+
+_state = _TracingState()
 
 
 def initialize_tracing(
+
     service_name: str = "forge",
     service_version: str = "1.0.0",
     exporter: str = "console",
@@ -202,14 +208,12 @@ def _apply_span_processor(
 
 
 def _finalize_tracer(trace_module, tracer_provider, service_name, service_version):
-    global _trace_provider, _tracer
-    _trace_provider = tracer_provider
-    _tracer = trace_module.get_tracer(service_name, service_version)
+    _state.trace_provider = tracer_provider
+    _state.tracer = trace_module.get_tracer(service_name, service_version)
 
 
 def _set_initialized():
-    global _tracing_initialized
-    _tracing_initialized = True
+    _state.initialized = True
 
 
 def _log_tracing_initialized(
@@ -234,9 +238,7 @@ def get_tracer(name: str | None = None) -> Any:
         Tracer instance or None if tracing not initialized
 
     """
-    global _tracer
-
-    if not _tracing_initialized:
+    if not _state.initialized:
         # Auto-initialize with defaults
         initialize_tracing(
             service_name=os.getenv("TRACING_SERVICE_NAME", "forge"),
@@ -247,32 +249,30 @@ def get_tracer(name: str | None = None) -> Any:
             enabled=os.getenv("TRACING_ENABLED", "true").lower() == "true",
         )
 
-    if _tracer is None:
+    if _state.tracer is None:
         try:
             from opentelemetry import trace
 
             service_name = os.getenv("TRACING_SERVICE_NAME", "forge")
-            _tracer = trace.get_tracer(name or service_name)
+            _state.tracer = trace.get_tracer(name or service_name)
         except ImportError:
             logger.warning("OpenTelemetry not available")
             return None
 
-    return _tracer
+    return _state.tracer
 
 
 def shutdown_tracing() -> None:
     """Shutdown tracing provider."""
-    global _tracing_initialized, _trace_provider
-
-    if _trace_provider:
+    if _state.trace_provider:
         try:
-            _trace_provider.shutdown()
+            _state.trace_provider.shutdown()
             logger.info("Tracing shutdown")
         except Exception as e:
             logger.error("Error shutting down tracing: %s", e, exc_info=True)
         finally:
-            _trace_provider = None
-            _tracing_initialized = False
+            _state.trace_provider = None
+            _state.initialized = False
 
 
 # Auto-initialize tracing on module import if enabled

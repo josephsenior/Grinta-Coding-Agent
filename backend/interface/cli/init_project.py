@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 TEMPLATE_BASIC_AGENT_YAML = """
 name: "{name}"

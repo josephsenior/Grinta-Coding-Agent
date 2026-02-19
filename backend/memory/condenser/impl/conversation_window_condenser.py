@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.core.config.condenser_config import ConversationWindowCondenserConfig
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action.agent import CondensationAction, RecallAction
 from backend.events.action.message import MessageAction, SystemMessageAction
 from backend.events.event import EventSource

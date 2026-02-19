@@ -18,7 +18,7 @@ import os
 import time
 from typing import Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 # Optional psutil — degrade gracefully on platforms where it is unavailable.
 try:

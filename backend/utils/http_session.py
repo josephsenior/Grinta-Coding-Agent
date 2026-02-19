@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 CLIENT = httpx.Client()
 

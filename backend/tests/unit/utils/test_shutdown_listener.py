@@ -1,9 +1,9 @@
 """Tests for backend.utils.shutdown_listener — shutdown signal handling."""
 
-from __future__ import annotations
-
+import signal as _signal
 import threading
-from unittest.mock import MagicMock
+import time
+from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 import pytest
@@ -274,3 +274,125 @@ class TestSignalHandlerIntegration:
 
         failing_listener.assert_called_once()
         successful_listener.assert_called_once()
+
+
+# ── Internal details for coverage ──────────────────────────────────────
+
+
+class TestShutdownListenerInternal:
+    """Test internal functions of shutdown_listener for coverage."""
+
+    def test_register_signal_handler_mocked(self):
+        """Test _register_signal_handler and the signal handler."""
+        import backend.utils.shutdown_listener as mod
+
+        with patch("signal.signal") as mock_signal, patch(
+            "signal.getsignal"
+        ) as mock_getsignal:
+            mock_getsignal.return_value = _signal.SIG_DFL
+            mod._register_signal_handler(_signal.SIGINT)
+
+            mock_signal.assert_called_once()
+            args, _ = mock_signal.call_args
+            assert args[0] == _signal.SIGINT
+            handler = args[1]
+            assert callable(handler)
+
+            # Test the handler function
+            mod._should_exit = False
+            mod._shutdown_listeners.clear()
+            mock_listener = MagicMock()
+            mod.add_shutdown_listener(mock_listener)
+
+            # Call handler directly
+            handler(_signal.SIGINT, None)
+
+            assert mod._should_exit is True
+            mock_listener.assert_called_once()
+
+    def test_handler_exception_path(self):
+        """Test the signal handler's exception handling for listeners."""
+        import backend.utils.shutdown_listener as mod
+
+        with patch("signal.signal") as mock_signal, patch(
+            "signal.getsignal", return_value=_signal.SIG_DFL
+        ):
+            mod._register_signal_handler(_signal.SIGINT)
+            handler = mock_signal.call_args[0][1]
+
+            mod._should_exit = False
+            mod._shutdown_listeners.clear()
+            failing_listener = MagicMock(side_effect=Exception("Crash"))
+            mod.add_shutdown_listener(failing_listener)
+
+            # Should not raise exception
+            handler(_signal.SIGINT, None)
+            failing_listener.assert_called_once()
+
+    def test_register_signal_handlers_not_main_thread(self):
+        """Test _register_signal_handlers is skipped outside main thread."""
+        import backend.utils.shutdown_listener as mod
+
+        # MUST reset _should_exit to None to bypass early return
+        mod._should_exit = None
+
+        mock_main = MagicMock()
+        mock_current = MagicMock()
+
+        # Patch directly where it is used in the module
+        with patch(
+            "backend.utils.shutdown_listener.threading.main_thread",
+            return_value=mock_main,
+        ), patch(
+            "backend.utils.shutdown_listener.threading.current_thread",
+            return_value=mock_current,
+        ):
+            mod._register_signal_handlers()
+            assert mod._should_exit is False
+            # If it's not the main thread, it shouldn't register signal handlers
+
+    def test_sleep_long_duration_chunks(self):
+        """Test sleep_if_should_continue with delay > 1 hits the loop."""
+        import backend.utils.shutdown_listener as mod
+
+        mod._should_exit = False
+        start = time.time()
+        # Sleep for slightly over 1s to trigger at least one loop iteration
+        sleep_if_should_continue(1.2)
+        elapsed = time.time() - start
+        assert elapsed >= 1.0
+
+    @pytest.mark.asyncio
+    async def test_async_sleep_long_duration_chunks(self):
+        """Test async_sleep_if_should_continue with delay > 1 hits the loop."""
+        import backend.utils.shutdown_listener as mod
+
+        mod._should_exit = False
+        start = time.time()
+        await async_sleep_if_should_continue(1.2)
+        elapsed = time.time() - start
+        assert elapsed >= 1.0
+
+    @pytest.mark.asyncio
+    async def test_async_sleep_long_duration_wake_early(self):
+        """Test async_sleep_if_should_continue wake early on shutdown."""
+        import asyncio
+
+        import backend.utils.shutdown_listener as mod
+
+        mod._should_exit = False
+
+        # Spawn task to trigger shutdown after a short delay
+        async def delayed_shutdown():
+            await asyncio.sleep(0.2)
+            mod._should_exit = True
+
+        task = asyncio.create_task(delayed_shutdown())
+
+        start = time.time()
+        # Sleep for long duration, should wake up when shutdown flag is set
+        await async_sleep_if_should_continue(5.0)
+        elapsed = time.time() - start
+
+        await task
+        assert elapsed < 3.0  # Should wake earlier than 5.0 seconds

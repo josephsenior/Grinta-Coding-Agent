@@ -8,9 +8,9 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, FastAPI, Path, status
 from fastapi.responses import JSONResponse
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.provider_types import (
-    PROVIDER_TOKEN_TYPE,
+    ProviderTokenType,
     CustomSecret,
     ProviderToken,
     ProviderType,
@@ -131,7 +131,7 @@ def _merge_provider_tokens(
 
 async def check_provider_tokens(
     incoming_provider_tokens: POSTProviderModel,
-    existing_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    existing_provider_tokens: ProviderTokenType | None,
 ) -> tuple[str, dict[str, ProviderToken]]:
     """Check and validate incoming provider tokens.
 
@@ -174,7 +174,7 @@ async def store_provider_tokens(
     provider_info: POSTProviderModel,
     secrets_store: Annotated[Any, Depends(get_secrets_store)],
     provider_tokens: Annotated[
-        PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
+        ProviderTokenType | None, Depends(get_provider_tokens)
     ],
 ) -> JSONResponse:
     """Store or update git provider authentication tokens.

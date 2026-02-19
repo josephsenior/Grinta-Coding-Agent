@@ -18,7 +18,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.backpressure import BackpressureManager
 from backend.events.coalescing import EventCoalescer
 from backend.events.config import get_event_runtime_defaults

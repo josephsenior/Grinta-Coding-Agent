@@ -15,7 +15,7 @@ import asyncio
 import sys
 from collections.abc import Callable
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 _shutdown_handlers: list[Callable] = []
 _shutdown_in_progress = False

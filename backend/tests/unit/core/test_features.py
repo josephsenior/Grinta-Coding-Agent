@@ -35,7 +35,7 @@ class TestFeatureFlags:
 
     def test_security_risk_always_false(self):
         flags = FeatureFlags()
-        assert flags.security_risk_assessment_enabled is False
+        assert flags.risk_assessment_enabled is False
 
     def test_get_flags_for_ui_structure(self):
         flags = FeatureFlags()

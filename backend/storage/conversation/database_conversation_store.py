@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import asyncpg
 from asyncpg import Pool
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.provider_types import ProviderType
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.data_models.conversation_metadata import (

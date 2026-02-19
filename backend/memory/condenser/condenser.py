@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action.agent import CondensationAction
 from backend.events.compaction import EventCompactor
 from backend.events.serialization.event import event_to_dict

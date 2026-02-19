@@ -19,10 +19,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib  # Python 3.11+
 
 from pydantic import SecretStr, ValidationError
 
@@ -117,7 +114,7 @@ class ConfigLoadSummary:
                 for issue in grouped[section]
             )
             lines.append(f"[{section}] {reasons}")
-        logger.FORGE_logger.warning(
+        logger.forge_logger.warning(
             "Configuration sections skipped or partially applied while loading %s:\n%s",
             self._toml_file,
             "\n".join(lines),
@@ -163,7 +160,7 @@ def load_from_toml(cfg: ForgeConfig, toml_file: str = "config.toml") -> None:
         except FileNotFoundError:
             return
         except Exception as e:
-            logger.FORGE_logger.warning(
+            logger.forge_logger.warning(
                 "Cannot parse config from toml, toml values have not been applied.\nError: %s",
                 e,
             )
@@ -171,7 +168,7 @@ def load_from_toml(cfg: ForgeConfig, toml_file: str = "config.toml") -> None:
                 raise ValueError(f"Invalid TOML in {toml_file}") from e
             return
         if "core" not in toml_config:
-            logger.FORGE_logger.warning(
+            logger.forge_logger.warning(
                 "No [core] section found in %s. Core settings will use defaults.",
                 toml_file,
             )
@@ -254,13 +251,13 @@ def get_agent_config_arg(
 ) -> AgentConfig | None:
     """Get a group of agent settings from the config file."""
     agent_config_arg = agent_config_arg.strip("[]").removeprefix("agent.")
-    logger.FORGE_logger.debug("Loading agent config from %s", agent_config_arg)
+    logger.forge_logger.debug("Loading agent config from %s", agent_config_arg)
     toml_config = _load_toml_config(toml_file)
     if toml_config is None:
         return None
     if "agent" in toml_config and agent_config_arg in toml_config["agent"]:
         return AgentConfig(**toml_config["agent"][agent_config_arg])
-    logger.FORGE_logger.debug("Loading from toml failed for %s", agent_config_arg)
+    logger.forge_logger.debug("Loading from toml failed for %s", agent_config_arg)
     return None
 
 
@@ -276,7 +273,7 @@ def _validate_condenser_section(
         "condenser" not in toml_config
         or condenser_config_arg not in toml_config["condenser"]
     ):
-        logger.FORGE_logger.error(
+        logger.forge_logger.error(
             "Condenser config section [condenser.%s] not found in %s",
             condenser_config_arg,
             toml_file,
@@ -289,7 +286,7 @@ def _process_llm_condenser(
     condenser_data: dict, condenser_config_arg: str, toml_file: str
 ) -> dict | None:
     llm_config_name = condenser_data["llm_config"]
-    logger.FORGE_logger.debug(
+    logger.forge_logger.debug(
         "Condenser [%s] requires LLM config [%s]. Loading it...",
         condenser_config_arg,
         llm_config_name,
@@ -299,7 +296,7 @@ def _process_llm_condenser(
     ):
         condenser_data["llm_config"] = referenced_llm_config
         return condenser_data
-    logger.FORGE_logger.error(
+    logger.forge_logger.error(
         "Failed to load required LLM config '%s' for condenser '%s'.",
         llm_config_name,
         condenser_config_arg,
@@ -325,7 +322,7 @@ def get_condenser_config_arg(
 ) -> CondenserConfig | None:
     """Get a group of condenser settings from the config file by name."""
     condenser_config_arg = condenser_config_arg.strip("[]").removeprefix("condenser.")
-    logger.FORGE_logger.debug(
+    logger.forge_logger.debug(
         "Loading condenser config [%s] from %s", condenser_config_arg, toml_file
     )
 
@@ -341,7 +338,7 @@ def get_condenser_config_arg(
 
     condenser_type = condenser_data.get("type")
     if not condenser_type:
-        logger.FORGE_logger.error(
+        logger.forge_logger.error(
             'Missing "type" field in [condenser.%s] section of %s',
             condenser_config_arg,
             toml_file,
@@ -358,14 +355,14 @@ def get_condenser_config_arg(
         from backend.core.config.condenser_config import create_condenser_config
 
         config = create_condenser_config(condenser_type, condenser_data)
-        logger.FORGE_logger.info(
+        logger.forge_logger.info(
             "Successfully loaded condenser config [%s] from %s",
             condenser_config_arg,
             toml_file,
         )
         return config
     except (ValidationError, ValueError) as e:
-        logger.FORGE_logger.error(
+        logger.forge_logger.error(
             "Invalid condenser configuration for [%s]: %s.", condenser_config_arg, e
         )
         return None
@@ -386,11 +383,11 @@ def register_custom_agents(config: ForgeConfig) -> None:
             try:
                 agent_cls = get_impl(Agent, classpath)
                 Agent.register(agent_name, agent_cls)
-                logger.FORGE_logger.info(
+                logger.forge_logger.info(
                     "Registered custom agent '%s' from %s", agent_name, classpath
                 )
             except Exception as e:
-                logger.FORGE_logger.error(
+                logger.forge_logger.error(
                     "Failed to register agent '%s': %s", agent_name, e
                 )
 
@@ -416,7 +413,7 @@ def parse_arguments() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 
 
-def load_FORGE_config(
+def load_forge_config(
     set_logging_levels: bool = True, config_file: str = "config.toml"
 ) -> ForgeConfig:
     """Load the configuration from the specified config file and environment variables."""
@@ -447,7 +444,7 @@ def setup_config_from_args(args: argparse.Namespace) -> ForgeConfig:
     2. config.toml in current directory (or --config-file location if specified)
     3. ~/.Forge/settings.json and ~/.Forge/config.toml
     """
-    config = load_FORGE_config(config_file=args.config_file)
+    config = load_forge_config(config_file=args.config_file)
     apply_llm_config_override(config, args)
     apply_additional_overrides(config, args)
     return config

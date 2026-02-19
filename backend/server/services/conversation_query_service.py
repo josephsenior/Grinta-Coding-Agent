@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
 from backend.runtime import get_runtime_cls
 from backend.server.schemas.conversation_info import ConversationInfo

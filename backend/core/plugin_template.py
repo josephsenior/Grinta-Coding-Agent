@@ -63,11 +63,10 @@ class MyPlugin(ForgePlugin):
 
     # ── Validation ──────────────────────────────────────
 
-    def validate(self) -> list[str]:
-        return super().validate()
-        # Add your own checks here, e.g.:
-        # if not os.environ.get("MY_PLUGIN_API_KEY"):
-        #     warnings.append("MY_PLUGIN_API_KEY env var not set")
+    # def validate(self) -> list[str]:
+    #     """Add your own checks here and return a list of warnings."""
+    #     warnings = super().validate()
+    #     return warnings
 
 
 def register(registry: PluginRegistry) -> None:

@@ -18,7 +18,7 @@ from backend.core.alerting import (
     get_alert_client,
     get_slo_tracker,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 PromCounter = Any
 PromHistogram = Any

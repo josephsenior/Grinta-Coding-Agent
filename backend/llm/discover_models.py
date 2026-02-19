@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import sys
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.llm.model_aliases import get_alias_manager
 from backend.llm.provider_resolver import (
     check_local_providers,

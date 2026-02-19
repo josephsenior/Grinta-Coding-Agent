@@ -25,9 +25,9 @@ class EventRuntimeDefaults:
 def get_event_runtime_defaults() -> EventRuntimeDefaults:
     """Resolve event runtime defaults from Forge config, then env fallback."""
     try:
-        from backend.core.config.utils import load_FORGE_config
+        from backend.core.config.utils import load_forge_config
 
-        cfg = load_FORGE_config()
+        cfg = load_forge_config()
         event_cfg = getattr(cfg, "event_stream", None)
         if event_cfg is not None:
             return EventRuntimeDefaults(

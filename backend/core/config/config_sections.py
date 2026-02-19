@@ -19,7 +19,7 @@ from backend.core.config.llm_config import LLMConfig
 from backend.core.config.mcp_config import MCPConfig
 from backend.core.config.runtime_config import RuntimeConfig
 from backend.core.config.security_config import SecurityConfig
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.utils import ConfigLoadSummary

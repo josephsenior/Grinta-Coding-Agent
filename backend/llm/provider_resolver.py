@@ -12,7 +12,7 @@ import socket
 
 import httpx
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.llm.catalog_loader import lookup
 
 # Common local provider endpoints

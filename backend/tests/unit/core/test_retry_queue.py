@@ -272,7 +272,7 @@ class TestRedisRetryBackend:
         fake_redis.ConnectionPool.from_url.return_value = "pool"
         fake_redis.Redis.return_value = client
 
-        rq.REDIS_AVAILABLE = True
+        rq.redis_available = True
         rq.redis = fake_redis
 
         backend = RedisRetryBackend("redis://localhost:6379")
@@ -397,7 +397,7 @@ class TestGetRetryQueue:
         import backend.core.retry_queue as rq
 
         rq._retry_queue = None
-        rq.REDIS_AVAILABLE = True
+        rq.redis_available = True
 
         with patch("backend.core.retry_queue.RedisRetryBackend") as backend_cls:
             backend_cls.return_value = MagicMock()

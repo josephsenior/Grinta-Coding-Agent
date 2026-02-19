@@ -7,7 +7,7 @@ from backend.controller.state.control_flags import (
     IterationControlFlag,
 )
 from backend.controller.state.state import State
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action.agent import ChangeAgentStateAction
 from backend.events.action.empty import NullAction
 from backend.events.event_filter import EventFilter

@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.schemas import RetryConfig, RetryStrategy
 from backend.utils.metrics_labels import sanitize_operation_label
 

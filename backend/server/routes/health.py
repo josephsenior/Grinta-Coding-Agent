@@ -30,9 +30,9 @@ def _check_storage() -> dict:
 def _check_config() -> dict:
     """Validate that the core config is loadable."""
     try:
-        from backend.core.config import load_FORGE_config
+        from backend.core.config import load_forge_config
 
-        cfg = load_FORGE_config()
+        cfg = load_forge_config()
         return {
             "status": "ok",
             "workspace_base": str(getattr(cfg, "workspace_base", "?")),

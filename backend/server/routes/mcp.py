@@ -17,7 +17,7 @@ from fastmcp.server.dependencies import get_http_request
 # Import SecretStr from pydantic
 from pydantic import SecretStr
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.logger import get_trace_context
 from backend.core.provider_types import ProviderToken, ProviderType
 from backend.server.user_auth import (

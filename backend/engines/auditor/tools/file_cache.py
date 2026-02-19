@@ -12,7 +12,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 from backend.core.cache.factory import create_distributed_cache
 

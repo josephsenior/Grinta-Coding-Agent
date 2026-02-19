@@ -5,7 +5,7 @@ Ensures all Forge competitive advantages are available at startup.
 
 from typing import Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 
 def check_ultimate_editor_dependencies() -> tuple[bool, str]:

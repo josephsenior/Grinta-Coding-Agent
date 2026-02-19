@@ -19,7 +19,7 @@ from backend.core.config.mcp_config import (
     MCPSSEServerConfig,
     MCPStdioServerConfig,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.mcp.error_collector import mcp_error_collector
 from backend.mcp.tool import MCPClientTool
 

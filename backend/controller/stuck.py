@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action.action import Action
 from backend.events.action.commands import CmdRunAction
 from backend.events.action.empty import NullAction
@@ -681,7 +681,7 @@ class StuckDetector:
 
         # Check semantic diversity in recent actions (low diversity = high score)
         if len(filtered_history) >= 10:
-            action_intents, observation_outcomes = self._extract_intents_and_outcomes(
+            action_intents, _ = self._extract_intents_and_outcomes(
                 filtered_history[-20:]
             )
             if len(action_intents) >= 4:

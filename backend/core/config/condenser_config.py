@@ -122,7 +122,10 @@ class AmortizedForgettingCondenserConfig(BaseModel, metaclass=CanonicalModelMeta
     )
     token_budget: int | None = Field(
         default=None,
-        description="Optional token budget.  When set, condensation also triggers if the estimated token count of the view exceeds this limit.",
+        description=(
+            "Optional token budget.  When set, condensation also triggers if "
+            "the estimated token count of the view exceeds this limit."
+        ),
         ge=1,
     )
     model_config = ConfigDict(extra="forbid")
@@ -147,7 +150,10 @@ class LLMAttentionCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     token_budget: int | None = Field(
         default=None,
-        description="Optional token budget.  When set, condensation also triggers if the estimated token count of the view exceeds this limit.",
+        description=(
+            "Optional token budget.  When set, condensation also triggers if "
+            "the estimated token count of the view exceeds this limit."
+        ),
         ge=1,
     )
     model_config = ConfigDict(extra="forbid")
@@ -176,7 +182,10 @@ class StructuredSummaryCondenserConfig(BaseModel, metaclass=CanonicalModelMetacl
     )
     token_budget: int | None = Field(
         default=None,
-        description="Optional token budget.  When set, condensation also triggers if the estimated token count of the view exceeds this limit.",
+        description=(
+            "Optional token budget.  When set, condensation also triggers if "
+            "the estimated token count of the view exceeds this limit."
+        ),
         ge=1,
     )
     model_config = ConfigDict(extra="forbid")
@@ -248,7 +257,10 @@ class SmartCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     token_budget: int | None = Field(
         default=None,
-        description="Optional token budget.  When set, condensation also triggers if the estimated token count of the view exceeds this limit.",
+        description=(
+            "Optional token budget.  When set, condensation also triggers if "
+            "the estimated token count of the view exceeds this limit."
+        ),
         ge=1,
     )
     model_config = ConfigDict(extra="forbid")
@@ -330,7 +342,7 @@ def condenser_config_from_toml_section(
             else:
                 # IMPROVED BEHAVIOR: If LLM config reference is missing, fall back to NoOpCondenser
                 # This prevents creating LLM-based condensers with None config which could fail silently
-                logger.FORGE_logger.warning(
+                logger.forge_logger.warning(
                     "LLM config '%s' not found for condenser type '%s'. Falling back to NoOpCondenser for safety.",
                     llm_config_name,
                     condenser_type,
@@ -340,7 +352,7 @@ def condenser_config_from_toml_section(
             config = create_condenser_config(condenser_type, data)
         condenser_mapping["condenser"] = config
     except (ValidationError, ValueError) as e:
-        logger.FORGE_logger.warning(
+        logger.forge_logger.warning(
             "Invalid condenser configuration: %s. Using NoOpCondenserConfig.", e
         )
         config = NoOpCondenserConfig(type="noop")

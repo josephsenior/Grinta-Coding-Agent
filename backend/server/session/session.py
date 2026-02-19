@@ -25,7 +25,7 @@ from backend.events.observation.agent import RecallObservation
 from backend.events.observation.error import ErrorObservation
 from backend.events.serialization import event_from_dict, event_to_dict
 from backend.events.stream import EventStreamSubscriber
-from backend.core.provider_types import CUSTOM_SECRETS_TYPE, PROVIDER_TOKEN_TYPE
+from backend.core.provider_types import CustomSecretsType, ProviderTokenType
 from backend.core.enums import RuntimeStatus
 from backend.server.constants import ROOM_KEY
 from backend.server.session.agent_session import AgentSession
@@ -203,17 +203,17 @@ class Session:
         self,
         settings: Settings,
     ) -> tuple[
-        PROVIDER_TOKEN_TYPE | None,
+        ProviderTokenType | None,
         str | None,
         str | None,
-        CUSTOM_SECRETS_TYPE | None,
+        CustomSecretsType | None,
         str | None,
     ]:
         """Extract conversation-specific data from settings."""
-        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None
+        vcs_provider_tokens: ProviderTokenType | None = None
         selected_repository = None
         selected_branch = None
-        custom_secrets: CUSTOM_SECRETS_TYPE | None = None
+        custom_secrets: CustomSecretsType | None = None
         conversation_instructions = None
 
         if isinstance(settings, ConversationInitData):
@@ -236,8 +236,8 @@ class Session:
         agent,
         max_iterations: int,
         max_budget_per_task: float | None,
-        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
-        custom_secrets: CUSTOM_SECRETS_TYPE | None,
+        vcs_provider_tokens: ProviderTokenType | None,
+        custom_secrets: CustomSecretsType | None,
         selected_repository: str | None,
         selected_branch: str | None,
         initial_message: MessageAction | None,

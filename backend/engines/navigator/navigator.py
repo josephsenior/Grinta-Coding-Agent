@@ -18,7 +18,7 @@ from browsergym.utils.obs import flatten_axtree_to_str
 from backend.controller.agent import Agent
 from backend.controller.state.state import State
 from backend.core.config import AgentConfig
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.message import ImageContent, Message, TextContent
 from backend.engines.navigator.response_parser import BrowsingResponseParser
 from backend.engines.navigator.state_tracker import BrowsingStateTracker, PageVisit

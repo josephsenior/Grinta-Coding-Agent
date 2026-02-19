@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.runtime.pool import call_async_disconnect
 from backend.runtime.telemetry import RuntimeTelemetry, runtime_telemetry
 

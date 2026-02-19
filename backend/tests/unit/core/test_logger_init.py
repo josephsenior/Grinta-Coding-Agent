@@ -38,14 +38,14 @@ def test_logger_init_json_and_file(tmp_path):
                 # Check if handlers were added
                 assert any(
                     isinstance(h, logging.FileHandler)
-                    for h in logger_mod.FORGE_logger.handlers
+                    for h in logger_mod.forge_logger.handlers
                 )
                 # Check for JSON formatter (should be applied to console handler in JSON mode)
                 from pythonjsonlogger.json import JsonFormatter
 
                 assert any(
                     isinstance(h.formatter, JsonFormatter)
-                    for h in logger_mod.FORGE_logger.handlers
+                    for h in logger_mod.forge_logger.handlers
                 )
 
 

@@ -17,7 +17,7 @@ from fastapi import status
 from fastapi.responses import JSONResponse
 
 from backend.core.provider_types import (
-    PROVIDER_TOKEN_TYPE,
+    ProviderTokenType,
     CreatePlaybook,
     ProviderType,
     SuggestedTask,
@@ -122,7 +122,7 @@ def validate_remote_api_request(
 async def verify_repository_access(
     repository: str | None,
     vcs_provider: ProviderType | None,
-    provider_tokens: PROVIDER_TOKEN_TYPE,
+    provider_tokens: ProviderTokenType,
 ) -> None:
     """Verify user has access to the specified repository.
 
@@ -152,11 +152,11 @@ def apply_conversation_overrides(
 
 
 def normalize_provider_tokens(
-    provider_tokens: PROVIDER_TOKEN_TYPE | None,
-) -> PROVIDER_TOKEN_TYPE:
+    provider_tokens: ProviderTokenType | None,
+) -> ProviderTokenType:
     """Normalize provider tokens into a MappingProxyType keyed by ProviderType."""
     if provider_tokens is None:
-        return cast(PROVIDER_TOKEN_TYPE, MappingProxyType({}))
+        return cast(ProviderTokenType, MappingProxyType({}))
     if isinstance(provider_tokens, MappingProxyType):
         return provider_tokens
 
@@ -170,16 +170,16 @@ def normalize_provider_tokens(
         normalized_dict[k] = v
 
     return cast(
-        PROVIDER_TOKEN_TYPE,
+        ProviderTokenType,
         MappingProxyType(normalized_dict),
     )
 
 
 def prepare_conversation_params(
     user_id: str | None,
-    provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    provider_tokens: ProviderTokenType | None,
     user_secrets: UserSecrets | None,
-) -> tuple[str, PROVIDER_TOKEN_TYPE, UserSecrets]:
+) -> tuple[str, ProviderTokenType, UserSecrets]:
     """Prepare conversation parameters with defaults."""
     normalized_tokens = normalize_provider_tokens(provider_tokens)
     return (
@@ -200,7 +200,7 @@ async def handle_regular_conversation(
     conversation_trigger: ConversationTrigger,
     conversation_instructions: str | None,
     vcs_provider: ProviderType | None,
-    provider_tokens: PROVIDER_TOKEN_TYPE,
+    provider_tokens: ProviderTokenType,
     user_secrets: UserSecrets,
     mcp_config: Any | None,
 ) -> Any:

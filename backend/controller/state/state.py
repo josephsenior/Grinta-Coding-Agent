@@ -14,7 +14,7 @@ from backend.controller.state.control_flags import (
     BudgetControlFlag,
     IterationControlFlag,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
 from backend.events.action import MessageAction
 from backend.events.action.agent import PlaybookFinishAction

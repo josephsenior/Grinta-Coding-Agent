@@ -5,7 +5,7 @@ import time
 import importlib
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.schemas import (
     ActionSchemaUnion,
     ObservationSchemaUnion,

@@ -18,7 +18,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.server.utils.responses import error
 
 if TYPE_CHECKING:

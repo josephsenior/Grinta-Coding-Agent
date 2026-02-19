@@ -13,7 +13,7 @@ from collections import deque
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from backend.adapters import json
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.durable_writer import DurableEventWriter, PersistedEvent
 from backend.storage.locations import get_conversation_events_dir
 

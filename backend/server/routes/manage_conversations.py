@@ -17,9 +17,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Imports needed for InitSessionRequest model_rebuild
 from backend.core.config.mcp_config import MCPConfig
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.provider_types import (
-    PROVIDER_TOKEN_TYPE,
+    ProviderTokenType,
     CreatePlaybook,
     ProviderType,
     SuggestedTask,
@@ -196,7 +196,7 @@ async def new_conversation(
     data: InitSessionRequest,
     user_id: Annotated[str | None, Depends(get_user_id)] = None,
     provider_tokens: Annotated[
-        PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
+        ProviderTokenType | None, Depends(get_provider_tokens)
     ] = None,
     user_secrets: Annotated[UserSecrets | None, Depends(get_user_secrets)] = None,
     auth_type: Annotated[AuthType | None, Depends(get_auth_type)] = None,
@@ -417,7 +417,7 @@ async def start_conversation(
     conversation_id: str = Depends(validate_conversation_id),
     user_id: str = Depends(get_user_id),
     provider_tokens: Annotated[
-        PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
+        ProviderTokenType | None, Depends(get_provider_tokens)
     ] = None,
     settings: Settings = Depends(get_user_settings),
     conversation_store: Annotated[Any | None, Depends(get_conversation_store)] = None,
@@ -547,7 +547,7 @@ async def get_playbook_management_conversations(
     limit: int = 20,
     conversation_store: Annotated[Any | None, Depends(get_conversation_store)] = None,
     provider_tokens: Annotated[
-        PROVIDER_TOKEN_TYPE | None, Depends(get_provider_tokens)
+        ProviderTokenType | None, Depends(get_provider_tokens)
     ] = None,
 ) -> Any:
     """Get conversations for the playbook management page with pagination."""

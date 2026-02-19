@@ -4,7 +4,7 @@ import copy
 from typing import Any
 
 from backend.core.config import LLMConfig
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.message import Message
 
 

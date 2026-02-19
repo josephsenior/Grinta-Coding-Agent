@@ -13,7 +13,7 @@ import asyncio
 import os
 from typing import Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 _pool: Any | None = None
 _pool_lock = asyncio.Lock()

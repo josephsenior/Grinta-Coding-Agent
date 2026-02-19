@@ -43,7 +43,7 @@ class FeatureFlags:
         self._config = config
 
     @property
-    def security_risk_assessment_enabled(self) -> bool:
+    def risk_assessment_enabled(self) -> bool:
         """Check if security risk assessment is enabled.
 
         Always False in Forge Core.
@@ -58,7 +58,7 @@ class FeatureFlags:
         """
         return {
             "security_risk_assessment": {
-                "enabled": self.security_risk_assessment_enabled,
+                "enabled": self.risk_assessment_enabled,
                 "coming_soon": True,
                 "tier": "pro",
                 "description": "Security risk assessment for agent actions",

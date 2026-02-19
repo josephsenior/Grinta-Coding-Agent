@@ -18,8 +18,8 @@ from collections.abc import Callable
 
 from fastapi import Request, Response
 
-from backend.core.logger import ACCESS_logger
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import access_logger
+from backend.core.logger import forge_logger as logger
 
 
 class RequestTracingMiddleware:
@@ -53,7 +53,7 @@ class RequestTracingMiddleware:
         start_time = time.time()
 
         # Log request start (access log channel)
-        ACCESS_logger.info(
+        access_logger.info(
             "Request started: %s %s",
             request.method,
             request.url.path,
@@ -72,7 +72,7 @@ class RequestTracingMiddleware:
         except Exception as e:
             # Log error with request ID
             duration_ms = (time.time() - start_time) * 1000
-            ACCESS_logger.error(
+            access_logger.error(
                 "Request failed: %s %s",
                 request.method,
                 request.url.path,
@@ -95,7 +95,7 @@ class RequestTracingMiddleware:
         response.headers["X-Response-Time"] = f"{duration_ms:.2f}ms"
 
         # Log request completion (access log channel)
-        ACCESS_logger.info(
+        access_logger.info(
             "Request completed: %s %s",
             request.method,
             request.url.path,

@@ -34,4 +34,4 @@ def create_glob_tool():
     )
 
 
-GlobTool = create_glob_tool()
+GLOB_TOOL = create_glob_tool()

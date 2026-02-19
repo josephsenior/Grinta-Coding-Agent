@@ -10,7 +10,7 @@ import traceback
 from typing import TYPE_CHECKING
 
 from backend.core.exceptions import LLMContextWindowExceedError
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.llm.exceptions import (
     APIConnectionError,
     APIError,

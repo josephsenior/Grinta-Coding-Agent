@@ -155,7 +155,10 @@ def _create_action_from_tool_call(tool_call: Any, arguments: dict[str, Any]) -> 
         return _create_glob_action(arguments)
     if mcp_tool_names and function_name in mcp_tool_names:
         return _create_mcp_action(tool_call, arguments)
-    msg = f"Tool {function_name} is not registered. (arguments: {arguments}). Please check the tool name and retry with an existing tool."
+    msg = (
+        f"Tool {function_name} is not registered. (arguments: {arguments}). "
+        "Please check the tool name and retry with an existing tool."
+    )
     raise FunctionCallNotExistsError(
         msg,
     )

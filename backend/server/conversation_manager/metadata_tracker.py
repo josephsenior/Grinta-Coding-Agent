@@ -12,7 +12,7 @@ from collections.abc import Callable
 from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.schemas import ObservationType
 from backend.events.observation.commands import CmdOutputObservation
 from backend.server.constants import ROOM_KEY

@@ -19,7 +19,7 @@ from pydantic import (
 from pydantic.json import pydantic_encoder
 
 from backend.core.config.mcp_config import MCPConfig
-from backend.core.config.utils import load_FORGE_config
+from backend.core.config.utils import load_forge_config
 from backend.storage.data_models.knowledge_base import KnowledgeBaseSettings
 from backend.storage.data_models.user_secrets import UserSecrets
 
@@ -235,7 +235,7 @@ class Settings(BaseModel):
             _settings_from_config_cache_loader_id
         _settings_from_config_cache = None
         _settings_from_config_cache_time = current_time
-        _settings_from_config_cache_loader_id = id(load_FORGE_config)
+        _settings_from_config_cache_loader_id = id(load_forge_config)
         return
 
     @staticmethod
@@ -250,9 +250,9 @@ class Settings(BaseModel):
         if cached is None:
             return None
 
-        cache_is_mocked = Mock is not None and isinstance(load_FORGE_config, Mock)
+        cache_is_mocked = Mock is not None and isinstance(load_forge_config, Mock)
         cache_loader_matches = _settings_from_config_cache_loader_id == id(
-            load_FORGE_config
+            load_forge_config
         )
         cache_fresh = (
             current_time - _settings_from_config_cache_time
@@ -310,7 +310,7 @@ class Settings(BaseModel):
             _settings_from_config_cache_loader_id
         _settings_from_config_cache = settings
         _settings_from_config_cache_time = current_time
-        _settings_from_config_cache_loader_id = id(load_FORGE_config)
+        _settings_from_config_cache_loader_id = id(load_forge_config)
 
     @staticmethod
     def from_config() -> Settings | None:
@@ -332,7 +332,7 @@ class Settings(BaseModel):
         if cached_settings is not None:
             return cached_settings
 
-        app_config = load_FORGE_config()
+        app_config = load_forge_config()
 
         # Check for explicit LLM config that should skip settings
         if Settings._check_explicit_llm_config(app_config):

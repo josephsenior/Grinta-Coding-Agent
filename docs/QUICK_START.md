@@ -3,9 +3,9 @@
 ## Prerequisites
 
 - Python 3.12+
-- `poetry`
+- `uv` (Recommended) or `pip`
 
-## Option 1: Windows bootstrap script
+## Option 1: Windows bootstrap script (Recommended)
 
 From PowerShell in the repo root:
 
@@ -13,31 +13,30 @@ From PowerShell in the repo root:
 .\START_HERE.ps1
 ```
 
-This script installs dependencies and starts:
-
-- Backend API on http://localhost:3000
-- TUI in a new terminal window
+This script handles everything:
+- Checks for `uv` and Python versions
+- Syncs dependencies
+- Discover local models (Ollama/LM Studio)
+- Starts the Unified Interface (Backend + TUI)
 
 ## Option 2: Manual start
 
-### 1) Backend
+### 1) Sync dependencies
 
 ```powershell
-poetry install
-python start_server.py
+uv sync
 ```
 
-### 2) TUI (new terminal)
+### 2) Start Unified Interface
 
 ```powershell
-python -m backend.tui
+uv run forge all
 ```
 
-Or using the script entry point:
+Or start separately:
 
-```powershell
-forge-tui --port 3000
-```
+- **Backend:** `uv run python start_server.py`
+- **TUI:** `uv run forge-tui`
 
 ## URLs
 
@@ -46,21 +45,18 @@ forge-tui --port 3000
 
 ## Common issues
 
-### Poetry not found
+### uv not found
 
-Add Poetry scripts dir to PATH for the current shell:
-
-```powershell
-$env:Path += ";$env:APPDATA\Python\Scripts"
-```
-
-### Lock/dependency drift
+Install `uv` via the official installer:
 
 ```powershell
-poetry lock --no-update
-poetry install --no-root
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
+
+### Locally hosted models
+
+Ensure **Ollama** or **LM Studio** is running. Forge auto-discovers them on startup.
 
 ### Port already in use
 
-Change the backend port via environment variable or `--port` flag on the TUI.
+Change the backend port via environment variable `FORGE_PORT`.

@@ -8,7 +8,7 @@ from backend.core.constants import (
     DEFAULT_MAIN_MODULE,
     DEFAULT_PYTHON_PREFIX,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config import ForgeConfig

@@ -6,8 +6,8 @@ import os
 from datetime import UTC, datetime
 from typing import Literal
 
-from backend.core.config.utils import load_FORGE_config
-from backend.core.logger import FORGE_logger as logger
+from backend.core.config.utils import load_forge_config
+from backend.core.logger import forge_logger as logger
 from backend.server.config.server_config import ServerConfig
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.data_models.conversation_metadata import ConversationMetadata
@@ -44,7 +44,7 @@ class ConversationValidator:
                 self._mode = env_mode  # type: ignore[assignment]
             else:
                 try:
-                    config = load_FORGE_config()
+                    config = load_forge_config()
                     self._mode = config.security.validation_mode
                 except Exception:
                     self._mode = "permissive"
@@ -98,7 +98,7 @@ class ConversationValidator:
                 "Anonymous access is not allowed in strict validation mode."
             )
 
-        config = load_FORGE_config()
+        config = load_forge_config()
         server_config = ServerConfig()
         store_cls: type[ConversationStore] = get_impl(
             ConversationStore, server_config.conversation_store_class
@@ -132,7 +132,7 @@ class ConversationValidator:
     async def _ensure_metadata_exists(
         self, conversation_id: str, user_id: str | None
     ) -> ConversationMetadata:
-        config = load_FORGE_config()
+        config = load_forge_config()
         server_config = ServerConfig()
         conversation_store_class: type[ConversationStore] = get_impl(
             ConversationStore,

@@ -32,7 +32,7 @@ from backend.core.constants import (
     DEFAULT_LLM_TOP_P,
 )
 from backend.core.logger import LOG_DIR
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 
 @contextmanager

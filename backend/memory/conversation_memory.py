@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, cast
 
 from backend.core.config.agent_config import AgentConfig
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.message import Message
 from backend.core.schemas import ActionType
 from backend.events.action import (

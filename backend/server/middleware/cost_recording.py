@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.server.middleware.cost_quota import CostQuotaMiddleware
 
 # Redis availability detection (matches redis_cost_quota.py)

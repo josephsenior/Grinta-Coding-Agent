@@ -13,7 +13,7 @@ from collections import deque
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.config import get_event_runtime_defaults
 from backend.events.event import Event
 

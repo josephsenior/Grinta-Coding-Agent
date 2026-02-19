@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.server.user_auth import get_user_id
 from backend.server.utils.pagination import PaginatedResponse, parse_pagination_params
 from backend.server.utils.responses import error, success

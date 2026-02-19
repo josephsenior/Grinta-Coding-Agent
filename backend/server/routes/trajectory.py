@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, status
 from fastapi.responses import JSONResponse
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.server.dependencies import get_dependencies
 from backend.server.services.trajectory_service import export_trajectory
 from backend.server.session.conversation import ServerConversation

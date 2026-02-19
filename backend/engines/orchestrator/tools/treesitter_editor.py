@@ -64,7 +64,7 @@ try:  # pragma: no cover - exercised in integration tests
 except ImportError:  # pragma: no cover - handled in __init__
     TREE_SITTER_AVAILABLE = False
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 
 @dataclass

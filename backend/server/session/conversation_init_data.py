@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 from pydantic import ConfigDict, Field
 
 from backend.core.provider_types import (
-    CUSTOM_SECRETS_TYPE,
-    PROVIDER_TOKEN_TYPE,
+    CustomSecretsType,
+    ProviderTokenType,
     ProviderType,
 )
 from backend.storage.data_models.settings import Settings
@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 class ConversationInitData(Settings):
     """Session initialization data for the web environment - a deep copy of the global config is made and then overridden with this data."""
 
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = Field(default=None, frozen=True)
-    custom_secrets: CUSTOM_SECRETS_TYPE | None = Field(default=None, frozen=True)
+    vcs_provider_tokens: ProviderTokenType | None = Field(default=None, frozen=True)
+    custom_secrets: CustomSecretsType | None = Field(default=None, frozen=True)
     selected_repository: str | None = Field(default=None)
     replay_json: str | None = Field(default=None)
     selected_branch: str | None = Field(default=None)

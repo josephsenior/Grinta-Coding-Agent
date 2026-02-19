@@ -22,7 +22,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from uvicorn import run
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action import (
     BrowseInteractiveAction,
     BrowseURLAction,

@@ -10,7 +10,7 @@ from collections.abc import Callable
 
 from fastapi import Request, Response
 
-from backend.core.logger import ACCESS_logger
+from backend.core.logger import access_logger
 
 
 class RequestSizeLoggingMiddleware:
@@ -105,7 +105,7 @@ class RequestSizeLoggingMiddleware:
         request_id: str | None,
         streaming: bool = False,
     ) -> None:
-        ACCESS_logger.info(
+        access_logger.info(
             "Request sizes",
             extra={
                 "request_id": request_id,

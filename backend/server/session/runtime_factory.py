@@ -17,8 +17,8 @@ from backend.core.main import _setup_runtime_and_repo
 from backend.core.setup import initialize_repository_for_runtime
 from backend.events.stream import EventStream
 from backend.core.provider_types import (
-    CUSTOM_SECRETS_TYPE,
-    PROVIDER_TOKEN_TYPE,
+    CustomSecretsType,
+    ProviderTokenType,
     ProviderToken,
     ProviderType,
 )
@@ -52,8 +52,8 @@ async def create_runtime(
     llm_registry: LLMRegistry,
     status_callback: Callable[..., Any] | None,
     session_logger: LoggerAdapter,
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
-    custom_secrets: CUSTOM_SECRETS_TYPE | None = None,
+    vcs_provider_tokens: ProviderTokenType | None = None,
+    custom_secrets: CustomSecretsType | None = None,
     selected_repository: str | None = None,
     selected_branch: str | None = None,
 ) -> RuntimeResult:
@@ -145,8 +145,8 @@ def _ensure_no_existing_runtime(runtime: Runtime | None) -> None:
 
 
 async def _prepare_runtime_env(
-    custom_secrets: CUSTOM_SECRETS_TYPE | None,
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+    custom_secrets: CustomSecretsType | None,
+    vcs_provider_tokens: ProviderTokenType | None,
 ) -> dict[str, str]:
     custom_secret_dict = dict(custom_secrets or {})
     custom_secrets_handler = UserSecrets(custom_secrets=custom_secret_dict)
@@ -168,8 +168,8 @@ async def _prepare_runtime_env(
 
 def _resolve_repo_tokens(
     runtime_cls: type,
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
-    custom_secrets: CUSTOM_SECRETS_TYPE | None,
+    vcs_provider_tokens: ProviderTokenType | None,
+    custom_secrets: CustomSecretsType | None,
 ) -> MappingProxyType[ProviderType, ProviderToken] | None:
     if isinstance(vcs_provider_tokens, MappingProxyType):
         return vcs_provider_tokens
@@ -183,7 +183,7 @@ def _can_use_shared_helper(config: ForgeConfig) -> bool:
 
 
 def _build_repo_initializer(
-    repo_tokens: PROVIDER_TOKEN_TYPE | None,
+    repo_tokens: ProviderTokenType | None,
     selected_repository: str | None,
     selected_branch: str | None,
 ) -> Callable[[Runtime], str | None] | None:
@@ -211,7 +211,7 @@ async def _create_direct(
     llm_registry: LLMRegistry,
     status_callback: Callable[..., Any] | None,
     session_logger: LoggerAdapter,
-    repo_tokens: PROVIDER_TOKEN_TYPE | None,
+    repo_tokens: ProviderTokenType | None,
     env_vars: dict[str, str],
     selected_repository: str | None,
     selected_branch: str | None,
@@ -289,7 +289,7 @@ def _create_with_helper(
     llm_registry: LLMRegistry,
     status_callback: Callable[..., Any] | None,
     session_logger: LoggerAdapter,
-    repo_tokens: PROVIDER_TOKEN_TYPE | None,
+    repo_tokens: ProviderTokenType | None,
     env_vars: dict[str, str],
     repo_initializer: Callable[[Runtime], str | None] | None,
 ) -> RuntimeResult:

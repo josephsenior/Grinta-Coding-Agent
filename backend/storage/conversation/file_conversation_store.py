@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import TypeAdapter
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.storage import get_file_store
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.data_models.conversation_metadata import ConversationMetadata

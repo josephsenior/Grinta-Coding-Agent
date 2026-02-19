@@ -26,7 +26,7 @@ from backend.controller.rate_governor import LLMRateGovernor
 from backend.controller.state.state import State
 from backend.controller.tool_pipeline import ToolInvocationContext
 from backend.core.enums import LifecyclePhase
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
 from backend.events import EventSource, EventStream, EventStreamSubscriber
 from backend.events.action import (

@@ -16,7 +16,6 @@ OPTIONAL_TOP_LEVEL_MODULES = {
     "redis",
     # memory
     "chromadb",
-    "qdrant_client",
     "sentence_transformers",
     # telemetry
     "opentelemetry",

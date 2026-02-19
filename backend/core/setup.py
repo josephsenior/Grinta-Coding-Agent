@@ -21,7 +21,7 @@ from backend.controller.agent import Agent
 from backend.controller.state.state import State
 from backend.core.constants import GENERAL_TIMEOUT
 from backend.core.exceptions import AgentNotRegisteredError
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events import EventStream
 from backend.memory.agent_memory import Memory
 from backend.llm.llm_registry import LLMRegistry
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from backend.events.event import Event
     from backend.instruction.playbook import BasePlaybook
     from backend.core.provider_types import (
-        PROVIDER_TOKEN_TYPE,
+        ProviderTokenType,
         ProviderToken,
         ProviderType,
     )
@@ -110,7 +110,7 @@ def create_runtime(
     sid: str | None = None,
     headless_mode: bool = True,
     agent: Agent | None = None,
-    vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+    vcs_provider_tokens: ProviderTokenType | None = None,
     *,
     event_stream: EventStream | None = None,
     env_vars: dict[str, str] | None = None,
@@ -180,7 +180,7 @@ def _create_secret_store(provider_tokens: dict) -> UserSecrets | None:
     return UserSecrets(provider_tokens=provider_tokens) if provider_tokens else None
 
 
-def get_provider_tokens() -> PROVIDER_TOKEN_TYPE | None:
+def get_provider_tokens() -> ProviderTokenType | None:
     """Retrieve provider tokens from environment variables and return them as a dictionary.
 
     Returns:
@@ -195,7 +195,7 @@ def get_provider_tokens() -> PROVIDER_TOKEN_TYPE | None:
 
 def initialize_repository_for_runtime(
     runtime: Runtime,
-    immutable_provider_tokens: PROVIDER_TOKEN_TYPE | None = None,
+    immutable_provider_tokens: ProviderTokenType | None = None,
     selected_repository: str | None = None,
     selected_branch: str | None = None,
 ) -> str | None:

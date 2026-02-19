@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from ast import literal_eval
-from types import UnionType
+from types import NoneType, UnionType
 from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel, SecretStr
@@ -32,7 +32,7 @@ def _get_optional_type(union_type: UnionType | type | None) -> type | None:
         return None
     if get_origin(union_type) is UnionType:
         types = get_args(union_type)
-        return next((t for t in types if t is not type(None)), None)
+        return next((t for t in types if t is not NoneType), None)
     return union_type if isinstance(union_type, type) else None
 
 
@@ -105,9 +105,9 @@ def _process_field_value(
                         sub_config.model, cast_value
                     )
             except Exception:
-                logger.FORGE_logger.debug("Failed to sync API key manager")
+                logger.forge_logger.debug("Failed to sync API key manager")
     except (ValueError, TypeError):
-        logger.FORGE_logger.error(
+        logger.forge_logger.error(
             "Error setting env var %s=<redacted>: check that the value is of the right type",
             env_var_name,
         )
@@ -180,6 +180,6 @@ def export_llm_api_keys(cfg: ForgeConfig) -> None:
                 api_key_manager.set_api_key(llm.model, llm.api_key)
                 api_key_manager.set_environment_variables(llm.model, llm.api_key)
     except Exception:
-        logger.FORGE_logger.debug(
+        logger.forge_logger.debug(
             "Failed to export LLM API keys after configuration load"
         )

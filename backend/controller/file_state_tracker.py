@@ -7,14 +7,13 @@ alongside the scratchpad, and is injected into context via the planner.
 
 from __future__ import annotations
 
-import json
 import os
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from backend.controller.tool_pipeline import ToolInvocationMiddleware
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from backend.controller.tool_pipeline import ToolInvocationContext

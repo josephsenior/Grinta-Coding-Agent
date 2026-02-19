@@ -11,15 +11,15 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 try:  # pragma: no cover - optional dependency
     import redis.asyncio as redis
 
-    REDIS_AVAILABLE = True
+    redis_available = True
 except ImportError:  # pragma: no cover - skip redis backend when unavailable
     redis = None  # type: ignore
-    REDIS_AVAILABLE = False
+    redis_available = False
 
 
 @dataclass
@@ -32,8 +32,8 @@ class RetryTask:
     reason: str
     attempts: int = 0
     max_attempts: int = 3
-    next_attempt_at: float = field(default_factory=lambda: time.time())
-    created_at: float = field(default_factory=lambda: time.time())
+    next_attempt_at: float = field(default_factory=time.time)
+    created_at: float = field(default_factory=time.time)
     last_error: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -174,7 +174,7 @@ class RedisRetryBackend(BaseRetryBackend):
         pool_size: int = 10,
         connection_timeout: float = 5.0,
     ) -> None:
-        if not REDIS_AVAILABLE:
+        if not redis_available:
             raise RuntimeError("redis.asyncio is required for RedisRetryBackend")
         self.redis_url = redis_url
         self._pool = redis.ConnectionPool.from_url(
@@ -379,7 +379,7 @@ def get_retry_queue() -> RetryQueue | None:
     poll_interval = float(os.getenv("RETRY_QUEUE_POLL_INTERVAL", "5.0"))
 
     backend: BaseRetryBackend
-    if backend_name == "redis" and REDIS_AVAILABLE:
+    if backend_name == "redis" and redis_available:
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         pool_size = int(os.getenv("REDIS_POOL_SIZE", "10"))
         timeout = float(os.getenv("REDIS_TIMEOUT", "5.0"))

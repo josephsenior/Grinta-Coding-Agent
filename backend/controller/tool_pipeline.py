@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from backend.controller.tool_telemetry import ToolTelemetry
 from backend.core.constants import LOG_ALL_EVENTS
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from backend.controller.agent_controller import AgentController

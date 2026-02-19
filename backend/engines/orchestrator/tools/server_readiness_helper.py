@@ -8,7 +8,7 @@ import time
 
 import requests
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 
 def wait_for_server_ready(

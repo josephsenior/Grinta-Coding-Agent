@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 try:
     import tomllib  # Python 3.11+
 except ImportError:
+    # This should not happen on Python 3.12, but we keep the fallback structure
+    # for compatibility with older environments if they bypass our version check.
     import tomli as tomllib  # type: ignore[no-redef]
 
 from pydantic import BaseModel, Field
@@ -73,18 +75,18 @@ def _add_trusted_dir(config: dict, folder_path: str) -> None:
 def _save_local_config(config: dict) -> None:
     """Save config to local config file."""
     try:
-        import toml
+        import tomli_w
 
-        with open(_LOCAL_CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
-            toml.dump(config, f)
+        with open(_LOCAL_CONFIG_FILE_PATH, "wb") as f:
+            f.write(tomli_w.dumps(config).encode("utf-8"))
     except ImportError:
         # Fallback to a very simple manual dump if only runtime dirs are involved
-        # or just log a warning. For now, we prefer keeping toml as an optional
-        # for these rare write operations.
+        # or just log a warning. For now, we prefer keeping tomli-w for these
+        # rare write operations.
         from backend.core import logger
 
-        logger.FORGE_logger.warning(
-            "The 'toml' package is required to save configuration changes. Please install it with 'pip install toml'."
+        logger.forge_logger.warning(
+            "The 'tomli-w' package is required to save configuration changes. Please install it with 'pip install tomli-w'."
         )
 
 

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 import backend.engines.locator.function_calling as locagent_function_calling
 from backend.core.config import AgentConfig
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.engines.locator.graph_cache import GraphCache
 from backend.engines.orchestrator import Orchestrator
 from backend.utils.prompt import (

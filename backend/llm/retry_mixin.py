@@ -12,7 +12,7 @@ from tenacity import (
 )
 
 from backend.core.exceptions import LLMNoResponseError
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.utils.tenacity_metrics import (
     tenacity_after_factory,
     tenacity_before_sleep_factory,

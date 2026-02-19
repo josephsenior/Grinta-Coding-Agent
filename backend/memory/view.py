@@ -6,7 +6,7 @@ from typing import overload
 
 from pydantic import BaseModel
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action.agent import CondensationAction, CondensationRequestAction
 from backend.events.event import Event
 from backend.events.observation.agent import AgentCondensationObservation

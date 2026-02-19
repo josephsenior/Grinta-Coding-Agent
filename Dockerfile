@@ -10,21 +10,18 @@
 # --- Builder stage: install deps + build ---
 FROM python:3.12-slim AS builder
 
+# Install uv binary
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uv/bin/uv
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl build-essential python3-dev libffi-dev && \
     rm -rf /var/lib/apt/lists/*
 
-ENV POETRY_HOME="/opt/poetry" \
-    POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_NO_INTERACTION=1
-RUN pip install --no-cache-dir poetry==2.1.3
-ENV PATH="$POETRY_HOME/bin:$PATH"
-
 WORKDIR /build
 
-COPY pyproject.toml poetry.toml poetry.lock* ./
-RUN poetry install --no-root --no-directory --only main 2>/dev/null || \
-    poetry install --no-root --no-directory
+# Copy manifest and sync dependencies (using --system to populate site-packages)
+COPY pyproject.toml ./
+RUN /uv/bin/uv pip install --system --no-cache -e .
 
 COPY backend/ ./backend/
 COPY config.template.toml start_server.py ./

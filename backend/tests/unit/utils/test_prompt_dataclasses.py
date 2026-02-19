@@ -111,7 +111,7 @@ class TestPromptManagerInit:
                 "playbook_info.j2",
                 "knowledge_base_info.j2",
             ]:
-                with open(os.path.join(tmpdir, name, encoding="utf-8"), "w") as f:
+                with open(os.path.join(tmpdir, name), "w", encoding="utf-8") as f:
                     f.write("{{ content }}")
 
             pm = PromptManager(prompt_dir=tmpdir)
@@ -129,7 +129,7 @@ class TestPromptManagerInit:
                 "playbook_info.j2",
                 "knowledge_base_info.j2",
             ]:
-                with open(os.path.join(tmpdir, name, encoding="utf-8"), "w") as f:
+                with open(os.path.join(tmpdir, name), "w", encoding="utf-8") as f:
                     f.write("custom")
 
             pm = PromptManager(prompt_dir=tmpdir, system_prompt_filename="custom.j2")

@@ -262,35 +262,35 @@ def log_uncaught_exceptions(
 
 
 sys.excepthook = log_uncaught_exceptions
-FORGE_logger = logging.getLogger("forge")
-ACCESS_logger = logging.getLogger("forge.access")
+forge_logger = logging.getLogger("forge")
+access_logger = logging.getLogger("forge.access")
 current_log_level = logging.INFO
 if LOG_LEVEL in logging.getLevelNamesMapping():
     current_log_level = logging.getLevelNamesMapping()[LOG_LEVEL]
-FORGE_logger.setLevel(current_log_level)
-ACCESS_logger.setLevel(current_log_level)
+forge_logger.setLevel(current_log_level)
+access_logger.setLevel(current_log_level)
 if DEBUG:
-    FORGE_logger.addFilter(StackInfoFilter())
+    forge_logger.addFilter(StackInfoFilter())
 if current_log_level == logging.DEBUG:
-    FORGE_logger.debug("DEBUG mode enabled.")
+    forge_logger.debug("DEBUG mode enabled.")
 if LOG_JSON:
-    FORGE_logger.addHandler(json_log_handler(current_log_level))
-    ACCESS_logger.addHandler(json_log_handler(current_log_level))
+    forge_logger.addHandler(json_log_handler(current_log_level))
+    access_logger.addHandler(json_log_handler(current_log_level))
 else:
-    FORGE_logger.addHandler(get_console_handler(current_log_level))
-    ACCESS_logger.addHandler(get_console_handler(current_log_level))
-FORGE_logger.addFilter(SensitiveDataFilter(FORGE_logger.name))
-FORGE_logger.addFilter(TraceContextFilter())
+    forge_logger.addHandler(get_console_handler(current_log_level))
+    access_logger.addHandler(get_console_handler(current_log_level))
+forge_logger.addFilter(SensitiveDataFilter(forge_logger.name))
+forge_logger.addFilter(TraceContextFilter())
 # Optionally correlate logs with active OpenTelemetry spans
 if OTEL_LOG_CORRELATION:
-    FORGE_logger.addFilter(OpenTelemetryTraceFilter())
-FORGE_logger.propagate = False
-ACCESS_logger.addFilter(SensitiveDataFilter(ACCESS_logger.name))
-ACCESS_logger.addFilter(TraceContextFilter())
+    forge_logger.addFilter(OpenTelemetryTraceFilter())
+forge_logger.propagate = False
+access_logger.addFilter(SensitiveDataFilter(access_logger.name))
+access_logger.addFilter(TraceContextFilter())
 # Apply OTEL correlation to access logs as well
 if OTEL_LOG_CORRELATION:
-    ACCESS_logger.addFilter(OpenTelemetryTraceFilter())
-ACCESS_logger.propagate = False
+    access_logger.addFilter(OpenTelemetryTraceFilter())
+access_logger.propagate = False
 
 # Add log shipping handler if enabled
 LOG_SHIPPING_ENABLED = os.getenv("LOG_SHIPPING_ENABLED", "false").lower() in [
@@ -304,20 +304,20 @@ if LOG_SHIPPING_ENABLED:
 
         log_shipper = get_log_shipper()
         if log_shipper:
-            FORGE_logger.addHandler(LogShippingHandler(log_shipper))
-            ACCESS_logger.addHandler(LogShippingHandler(log_shipper))
-            FORGE_logger.debug("Log shipping handler added")
+            forge_logger.addHandler(LogShippingHandler(log_shipper))
+            access_logger.addHandler(LogShippingHandler(log_shipper))
+            forge_logger.debug("Log shipping handler added")
     except Exception as e:
-        FORGE_logger.warning("Failed to initialize log shipping: %s", e)
+        forge_logger.warning("Failed to initialize log shipping: %s", e)
 
-FORGE_logger.debug("Logging initialized")
+forge_logger.debug("Logging initialized")
 LOG_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs"
 )
 if LOG_TO_FILE:
-    FORGE_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
-    ACCESS_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
-    FORGE_logger.debug("Logging to file in: %s", LOG_DIR)
+    forge_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
+    access_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
+    forge_logger.debug("Logging to file in: %s", LOG_DIR)
 LOQUACIOUS_LOGGERS = [
     "engineio",
     "engineio.server",
@@ -362,7 +362,7 @@ class LlmFileHandler(logging.FileHandler):
                 try:
                     os.unlink(file_path)
                 except Exception as e:
-                    FORGE_logger.exception(
+                    forge_logger.exception(
                         "Failed to delete %s. Reason: %s", file_path, e
                     )
         filename = f"{self.filename}_{self.message_counter:03}.log"
@@ -381,7 +381,7 @@ class LlmFileHandler(logging.FileHandler):
         self.stream = self._open()
         super().emit(record)
         self.stream.close()
-        FORGE_logger.debug("Logging to %s", self.baseFilename)
+        forge_logger.debug("Logging to %s", self.baseFilename)
         self.message_counter += 1
 
 
@@ -415,11 +415,10 @@ class ForgeLoggerAdapter(logging.LoggerAdapter):
     extra: dict
 
     def __init__(
-        self, logger: logging.Logger = FORGE_logger, extra: dict | None = None
+        self, logger: logging.Logger = forge_logger, extra: dict | None = None
     ) -> None:
         """Initialize the adapter with a logger and optional context."""
-        self.logger = logger
-        self.extra = extra or {}
+        super().__init__(logger, extra or {})
 
     def bind(self, **context: Any) -> ForgeLoggerAdapter:
         """Return a new adapter with additional context merged into extra.

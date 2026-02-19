@@ -221,7 +221,7 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         if name in self.llms:
             return self.llms[name]
         if name is not None and name != "llm":
-            logger.FORGE_logger.warning(
+            logger.forge_logger.warning(
                 "llm config group %s not found, using default config", name
             )
         if "llm" not in self.llms:

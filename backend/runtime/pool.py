@@ -183,7 +183,7 @@ class WarmRuntimePool(RuntimePool):
 
 
 def call_async_disconnect(runtime: Runtime) -> None:
-    from backend.core.logger import FORGE_logger as logger
+    from backend.core.logger import forge_logger as logger
 
     disconnect_fn = getattr(runtime, "disconnect", None)
     try:

@@ -41,4 +41,4 @@ def create_grep_tool():
     )
 
 
-GrepTool = create_grep_tool()
+GREP_TOOL = create_grep_tool()

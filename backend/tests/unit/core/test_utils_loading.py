@@ -19,7 +19,7 @@ from backend.core.config.utils import (
     load_from_toml,
     register_custom_agents,
     finalize_config,
-    load_FORGE_config,
+    load_forge_config,
     setup_config_from_args,
     parse_arguments,
 )
@@ -189,7 +189,7 @@ class TestMainEntryPoints:
     @patch("backend.core.config.utils.register_custom_agents")
     def test_load_FORGE_config_calls(self, *mocks):
         # This test only verifies that the other functions are called
-        load_FORGE_config(set_logging_levels=True)
+        load_forge_config(set_logging_levels=True)
         for m in mocks:
             assert m.called
 
@@ -204,7 +204,7 @@ class TestMainEntryPoints:
                                 "backend.core.config.utils.register_custom_agents"
                             ):
                                 # This will execute the body of load_FORGE_config
-                                load_FORGE_config(set_logging_levels=True)
+                                load_forge_config(set_logging_levels=True)
 
     def test_setup_config_from_args_execution(self):
         args = MagicMock()

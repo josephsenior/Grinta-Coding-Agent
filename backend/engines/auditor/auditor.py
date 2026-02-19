@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from backend.events.action import Action
 
 from backend.core.config import AgentConfig
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.engines.auditor import function_calling as readonly_function_calling
 from backend.engines.auditor.tools.file_cache import FileCache
 from backend.engines.orchestrator.orchestrator import Orchestrator
@@ -43,7 +43,15 @@ class Auditor(Orchestrator):
     # Override base class attribute - initialized lazily via property
     # Use sentinel object instead of None for better type safety
     _prompt_manager: PromptManager | _UninitializedPromptManager  # type: ignore[assignment]
-    "\n    Enhanced read-only code exploration engine.\n\n    Features:\n    - Structure-aware exploration (Tree-sitter for 40+ languages)\n    - Semantic search (find code by meaning)\n    - File caching (reduces redundant reads)\n    - All read-only tools from Orchestrator\n    "
+    """
+    Enhanced read-only code exploration engine.
+
+    Features:
+    - Structure-aware exploration (Tree-sitter for 40+ languages)
+    - Semantic search (find code by meaning)
+    - File caching (reduces redundant reads)
+    - All read-only tools from Orchestrator
+    """
 
     def __init__(self, config: AgentConfig, llm_registry: LLMRegistry) -> None:
         """Initialize Ultimate Auditor.

@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events import EventSource
 from backend.events.action import CmdRunAction, FileReadAction, FileWriteAction
 from backend.events.observation import (
@@ -23,7 +23,7 @@ from backend.events.observation import (
 from backend.utils.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
-    from backend.core.provider_types import PROVIDER_TOKEN_TYPE
+    from backend.core.provider_types import ProviderTokenType
     from backend.core.enums import RuntimeStatus
 
 
@@ -54,7 +54,7 @@ class GitSetupMixin:
 
     async def clone_or_init_repo(
         self,
-        vcs_provider_tokens: PROVIDER_TOKEN_TYPE | None,
+        vcs_provider_tokens: ProviderTokenType | None,
         selected_repository: str | None,
         selected_branch: str | None,
     ) -> str:

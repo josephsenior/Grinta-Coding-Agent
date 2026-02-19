@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.runtime.plugins.agent_skills.repo_ops.indexing import (
     CodeEntity,
     CodeIndexer,

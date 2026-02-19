@@ -13,7 +13,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, Field, field_validator
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.server.user_auth import get_user_settings_store
 
 if TYPE_CHECKING:

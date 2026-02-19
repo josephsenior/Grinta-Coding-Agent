@@ -28,7 +28,7 @@ import subprocess
 from threading import RLock
 from typing import TYPE_CHECKING
 
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.observation import ErrorObservation
 from backend.events.observation.commands import (
     CmdOutputMetadata,

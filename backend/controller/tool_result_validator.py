@@ -24,7 +24,7 @@ from backend.controller.tool_pipeline import (
     ToolInvocationContext,
     ToolInvocationMiddleware,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from backend.events.observation import Observation

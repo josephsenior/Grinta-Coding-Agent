@@ -24,7 +24,7 @@ from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.core.config.mcp_config import MCPStdioServerConfig
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.events.action import Action
 from backend.events.serialization import event_from_dict, event_to_dict
 from backend.runtime.utils.system_stats import (

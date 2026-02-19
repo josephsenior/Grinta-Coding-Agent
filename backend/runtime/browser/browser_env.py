@@ -25,7 +25,7 @@ from backend.core.constants import (
     BROWSER_EVAL_GET_REWARDS_ACTION,
 )
 from backend.core.exceptions import BrowserInitException
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 from backend.runtime.browser.base64 import image_to_png_base64_url
 from backend.utils.shutdown_listener import should_continue, should_exit
 from backend.utils.tenacity_metrics import (

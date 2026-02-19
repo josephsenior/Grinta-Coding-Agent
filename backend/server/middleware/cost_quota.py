@@ -26,7 +26,7 @@ from backend.core.constants import (
     QUOTA_EXEMPT_PATH_PREFIXES,
     QUOTA_EXEMPT_PATHS,
 )
-from backend.core.logger import FORGE_logger as logger
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from fastapi import Request, Response
