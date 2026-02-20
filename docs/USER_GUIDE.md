@@ -67,7 +67,7 @@ python start_server.py
 
 Terminal 2 — TUI:
 ```bash
-python -m backend.tui
+python -m tui
 ```
 
 The backend starts on `http://localhost:3000`. The TUI connects automatically.
@@ -133,7 +133,7 @@ section-prefixed name in uppercase:
 ```bash
 python start_server.py
 # In another terminal:
-python -m backend.tui
+python -m tui
 ```
 
 ### 2. Create a Conversation

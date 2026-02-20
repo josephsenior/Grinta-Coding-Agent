@@ -311,6 +311,9 @@ enable_cmd = true
 # Whether the think tool is enabled
 enable_think = true
 
+# Whether the web search tool is enabled (DuckDuckGo, no API key required)
+enable_web_search = true
+
 # Whether the finish tool is enabled
 enable_finish = true
 
@@ -362,8 +365,36 @@ classpath = "my_package.my_module.MyCustomAgent"
 # Environment variables to set at the launch of the runtime
 #runtime_startup_env_vars = {}
 
-# BrowserGym environment to use for evaluation
-#browsergym_eval_env = ""
+#################################### MCP  #####################################
+# Model Context Protocol (MCP) server configuration
+##############################################################################
+[mcp]
+# Enable MCP to connect external tool servers
+enabled = false
+
+# Define MCP servers - uncomment examples to use, or add your own.
+# Each server provides tools that the agent can call.
+
+# Example: Fetch MCP server (fetch web pages, no API key required)
+#[[mcp.servers]]
+#name = "fetch"
+#type = "stdio"
+#command = "uvx"
+#args = ["mcp-server-fetch"]
+
+# Example: shadcn-ui component library (via SuperGateway proxy)
+#[[mcp.servers]]
+#name = "shadcn"
+#type = "sse"
+#url = "http://localhost:8090/sse"
+
+# Example: GitHub integration (via MCP server)
+#[[mcp.servers]]
+#name = "github"
+#type = "stdio"
+#command = "npx"
+#args = ["@modelcontextprotocol/server-github"]
+#env = {"GITHUB_PERSONAL_ACCESS_TOKEN" = "your_token_here"}
 
 #################################### Condenser #################################
 # Condensers control how conversation history is managed and compressed when

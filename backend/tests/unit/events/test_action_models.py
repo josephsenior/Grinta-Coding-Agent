@@ -24,7 +24,6 @@ from backend.events.action.agent import (
     RecallAction,
     TaskTrackingAction,
 )
-from backend.events.action.browse import BrowseInteractiveAction, BrowseURLAction
 from backend.events.action.commands import CmdRunAction
 from backend.events.action.empty import NullAction
 from backend.events.action.files import FileEditAction, FileReadAction, FileWriteAction
@@ -290,51 +289,6 @@ class TestFileEditAction(unittest.TestCase):
         f = FileEditAction(path="u.py", command="undo_edit")
         r = repr(f)
         self.assertIn("Undo Edit", r)
-
-
-# ---------------------------------------------------------------------------
-# BrowseURLAction
-# ---------------------------------------------------------------------------
-class TestBrowseURLAction(unittest.TestCase):
-    def test_action_type(self):
-        self.assertEqual(BrowseURLAction.action, ActionType.BROWSE)
-
-    def test_runnable(self):
-        self.assertTrue(BrowseURLAction.runnable)
-
-    def test_message_property(self):
-        b = BrowseURLAction(url="https://example.com")
-        self.assertIn("https://example.com", b.message)
-
-    def test_str_with_thought(self):
-        b = BrowseURLAction(url="http://x.com", thought="check docs")
-        s = str(b)
-        self.assertIn("THOUGHT: check docs", s)
-        self.assertIn("http://x.com", s)
-
-    def test_return_axtree_default(self):
-        self.assertFalse(BrowseURLAction().return_axtree)
-
-
-# ---------------------------------------------------------------------------
-# BrowseInteractiveAction
-# ---------------------------------------------------------------------------
-class TestBrowseInteractiveAction(unittest.TestCase):
-    def test_action_type(self):
-        self.assertEqual(BrowseInteractiveAction.action, ActionType.BROWSE_INTERACTIVE)
-
-    def test_runnable(self):
-        self.assertTrue(BrowseInteractiveAction.runnable)
-
-    def test_message_property(self):
-        b = BrowseInteractiveAction(browser_actions="click('#btn')")
-        self.assertIn("click('#btn')", b.message)
-
-    def test_str(self):
-        b = BrowseInteractiveAction(browser_actions="scroll()", thought="read more")
-        s = str(b)
-        self.assertIn("THOUGHT: read more", s)
-        self.assertIn("scroll()", s)
 
 
 # ---------------------------------------------------------------------------

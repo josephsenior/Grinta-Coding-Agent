@@ -57,7 +57,6 @@ _READ_ONLY_COMMAND_PATTERNS: tuple[str, ...] = (
 # Action types that are always idempotent / safe to repeat.
 _IDEMPOTENT_ACTIONS: set[str] = {
     "FileReadAction",
-    "BrowseURLAction",
     "AgentThinkAction",
     "MessageAction",
 }

@@ -43,31 +43,31 @@ def main():
 
     # Core imports
     print("Checking core modules...")
-    try_import("backend.server.app", "Main FastAPI app")
-    try_import("backend.server.listen", "Server entry point")
+    try_import("backend.api.app", "Main FastAPI app")
+    try_import("backend.api.listen", "Server entry point")
 
     # Route imports (from app.py)
     print("\nChecking route modules...")
     routes_to_check = [
-        ("backend.server.routes.conversation", "Conversation routes"),
-        ("backend.server.routes.features", "Features routes"),
-        ("backend.server.routes.feedback", "Feedback routes"),
-        ("backend.server.routes.files", "File routes"),
-        ("backend.server.routes.git", "Git routes"),
-        ("backend.server.routes.global_export", "Export routes"),
-        ("backend.server.routes.knowledge_base", "Knowledge base routes"),
-        ("backend.server.routes.manage_conversations", "Manage conversations routes"),
-        ("backend.server.routes.memory", "Memory routes"),
-        ("backend.server.routes.monitoring", "Monitoring routes"),
-        ("backend.server.routes.public", "Public API routes"),
-        ("backend.server.routes.secrets", "Secrets routes"),
-        ("backend.server.routes.settings", "Settings routes"),
-        ("backend.server.routes.templates", "Templates routes"),
-        ("backend.server.routes.trajectory", "Trajectory routes"),
-        ("backend.server.routes.profile", "Profile routes"),
-        ("backend.server.routes.notifications", "Notifications routes"),
-        ("backend.server.routes.search", "Search routes"),
-        ("backend.server.routes.mcp", "MCP routes"),
+        ("backend.api.routes.conversation", "Conversation routes"),
+        ("backend.api.routes.features", "Features routes"),
+        ("backend.api.routes.feedback", "Feedback routes"),
+        ("backend.api.routes.files", "File routes"),
+        ("backend.api.routes.git", "Git routes"),
+        ("backend.api.routes.global_export", "Export routes"),
+        ("backend.api.routes.knowledge_base", "Knowledge base routes"),
+        ("backend.api.routes.manage_conversations", "Manage conversations routes"),
+        ("backend.api.routes.memory", "Memory routes"),
+        ("backend.api.routes.monitoring", "Monitoring routes"),
+        ("backend.api.routes.public", "Public API routes"),
+        ("backend.api.routes.secrets", "Secrets routes"),
+        ("backend.api.routes.settings", "Settings routes"),
+        ("backend.api.routes.templates", "Templates routes"),
+        ("backend.api.routes.trajectory", "Trajectory routes"),
+        ("backend.api.routes.profile", "Profile routes"),
+        ("backend.api.routes.notifications", "Notifications routes"),
+        ("backend.api.routes.search", "Search routes"),
+        ("backend.api.routes.mcp", "MCP routes"),
     ]
 
     for module_name, description in routes_to_check:

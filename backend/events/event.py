@@ -18,6 +18,7 @@ Functions:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -194,6 +195,22 @@ class Event:
     def tool_call_metadata(self, value: ToolCallMetadata | None) -> None:
         """Set tool call metadata."""
         self._tool_call_metadata = value
+
+    @property
+    def tool_result(self) -> dict[str, Any] | None:
+        """Structured result metadata for tool/action execution.
+
+        This is optional and best-effort. It exists to make tool outcomes
+        machine-checkable without requiring parsing of free-form strings.
+        """
+        if not hasattr(self, "_tool_result"):
+            return None
+        value: Any = getattr(self, "_tool_result")
+        return value if isinstance(value, dict) else None
+
+    @tool_result.setter
+    def tool_result(self, value: dict[str, Any] | None) -> None:
+        self._tool_result = value
 
     @property
     def response_id(self) -> str | None:

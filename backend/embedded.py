@@ -35,7 +35,7 @@ def _run_server(host: str, port: int) -> None:
     import uvicorn  # imported here so the main thread can start fast
 
     uvicorn.run(
-        "backend.server.listen:app",
+        "backend.api.listen:app",
         host=host,
         port=port,
         log_level="error",   # suppress uvicorn's startup noise in embedded mode
@@ -107,8 +107,8 @@ def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = Fals
     print(" ready ✓")
 
     # Launch the TUI
-    from backend.tui.app import ForgeApp
-    from backend.tui.client import ForgeClient
+    from tui.app import ForgeApp
+    from tui.client import ForgeClient
 
     base_url = f"http://{host}:{port}"
     client = ForgeClient(base_url=base_url)

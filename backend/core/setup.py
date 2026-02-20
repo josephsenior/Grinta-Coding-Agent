@@ -33,14 +33,14 @@ from backend.utils.async_utils import call_async_from_sync
 if TYPE_CHECKING:
     from backend.core.config import ForgeConfig
     from backend.events.event import Event
-    from backend.instruction.playbook import BasePlaybook
+    from backend.playbook_engine.playbook import BasePlaybook
     from backend.core.provider_types import (
         ProviderTokenType,
         ProviderToken,
         ProviderType,
     )
     from backend.runtime.base import Runtime
-    from backend.server.services.conversation_stats import ConversationStats
+    from backend.api.services.conversation_stats import ConversationStats
 
 
 def _instantiate_runtime(runtime_cls: type[object], **kwargs: Any) -> Runtime:

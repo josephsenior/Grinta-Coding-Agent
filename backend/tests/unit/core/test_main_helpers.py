@@ -137,7 +137,7 @@ def test_auto_continue_response():
 
 @patch("backend.core.main.create_memory")
 @patch("backend.core.main.add_mcp_tools_to_agent")
-@patch("backend.core.main.ForgeMCPConfigImpl.create_default_mcp_server_config")
+@patch("backend.core.main.ForgeMCPConfig.create_default_mcp_server_config")
 @pytest.mark.asyncio
 async def test_setup_memory_and_mcp_with_mcp(
     mock_mcp_cfg, mock_add_mcp, mock_create_mem
@@ -146,11 +146,12 @@ async def test_setup_memory_and_mcp_with_mcp(
     config.mcp_host = "localhost"
     mock_runtime = MagicMock()
     mock_runtime.event_stream = MagicMock()
-    mock_runtime.config.mcp.stdio_servers = []
+    mock_runtime.config.mcp.servers = []
     mock_agent = MagicMock()
     mock_agent.config.enable_mcp = True
 
-    mock_mcp_cfg.return_value = (None, ["server1"])
+    server_mock = MagicMock()
+    mock_mcp_cfg.return_value = (server_mock, [])
 
     await _setup_memory_and_mcp(
         config, mock_runtime, "sid", None, None, None, mock_agent
@@ -158,7 +159,7 @@ async def test_setup_memory_and_mcp_with_mcp(
 
     mock_create_mem.assert_called()
     mock_add_mcp.assert_called()
-    assert "server1" in mock_runtime.config.mcp.stdio_servers
+    assert server_mock in mock_runtime.config.mcp.servers
 
 
 def test_create_early_status_callback():

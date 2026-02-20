@@ -361,13 +361,6 @@ class Settings(BaseModel):
         if not self.mcp_config:
             self.mcp_config = config_settings.mcp_config
             return self
-        merged_mcp = MCPConfig(
-            sse_servers=list(config_settings.mcp_config.sse_servers)
-            + list(self.mcp_config.sse_servers),
-            stdio_servers=list(config_settings.mcp_config.stdio_servers)
-            + list(self.mcp_config.stdio_servers),
-            shttp_servers=list(config_settings.mcp_config.shttp_servers)
-            + list(self.mcp_config.shttp_servers),
-        )
+        merged_mcp = config_settings.mcp_config.merge(self.mcp_config)
         self.mcp_config = merged_mcp
         return self

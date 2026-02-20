@@ -66,7 +66,7 @@ class TestCreateTaskTrackerTool:
         assert "command" in props
         enum = props["command"].get("enum", [])
         assert "view" in enum
-        assert "plan" in enum
+        assert "update" in enum
 
     def test_task_list_property_exists(self):
         props = _props(self.tool)
@@ -81,7 +81,7 @@ class TestCreateTaskTrackerTool:
         items = task_list.get("items", {})
         required_item_fields = items.get("required", [])
         assert "id" in required_item_fields
-        assert "title" in required_item_fields
+        assert "description" in required_item_fields
         assert "status" in required_item_fields
 
     def test_task_status_enum(self):
@@ -89,9 +89,9 @@ class TestCreateTaskTrackerTool:
         items = task_list.get("items", {})
         status_prop = items.get("properties", {}).get("status", {})
         status_enum = status_prop.get("enum", [])
-        assert "todo" in status_enum
+        assert "pending" in status_enum
         assert "in_progress" in status_enum
-        assert "done" in status_enum
+        assert "completed" in status_enum
 
     def test_task_list_not_in_required(self):
         # task_list is optional (only required for plan command)

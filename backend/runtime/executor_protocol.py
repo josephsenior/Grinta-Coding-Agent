@@ -15,8 +15,6 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from backend.events.action import (
-    BrowseInteractiveAction,
-    BrowseURLAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -72,9 +70,3 @@ class ActionExecutorProtocol(Protocol):
     async def write(self, action: FileWriteAction) -> Observation: ...
 
     async def edit(self, action: FileEditAction) -> Observation: ...
-
-    async def browse(self, action: BrowseURLAction) -> Observation: ...
-
-    async def browse_interactive(
-        self, action: BrowseInteractiveAction
-    ) -> Observation: ...

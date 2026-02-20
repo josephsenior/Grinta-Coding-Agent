@@ -7,16 +7,12 @@ import sys
 
 def _sanitize_sys_path():
     backend_root = os.path.abspath(os.path.dirname(__file__))
-    # We must NOT put backend_root at index 0, because it contains a folder named 'mcp'
-    # which shadows the official 'mcp' Python library used by fastmcp.
-    # Instead, we ensure the project root is in path, so we can use 'backend.mcp'.
     project_root = os.path.dirname(backend_root)
     if project_root in sys.path:
         sys.path.remove(project_root)
     sys.path.insert(0, project_root)
 
     _preload_pydantic_root_model()
-    _prefer_installed_mcp()
 
 
 def _preload_pydantic_root_model() -> None:
@@ -24,23 +20,6 @@ def _preload_pydantic_root_model() -> None:
         pass  # type: ignore  # pylint: disable=unused-import
     except Exception:
         pass
-
-
-def _prefer_installed_mcp() -> None:
-    try:
-        real_mcp = importlib.import_module("mcp")
-    except ModuleNotFoundError:
-        return
-    _restrict_mcp_path(real_mcp)
-    sys.modules["mcp"] = real_mcp
-
-
-def _restrict_mcp_path(module: object) -> None:
-    if not hasattr(module, "__path__"):
-        return
-    paths = [p for p in module.__path__ if "site-packages" in p]  # type: ignore[attr-defined]
-    if paths:
-        module.__path__ = paths  # type: ignore[attr-defined]
 
 
 _sanitize_sys_path()

@@ -4,8 +4,8 @@ import tempfile
 from backend.events import EventSource
 from backend.events.observation import NullObservation
 from backend.events.stream import EventStream
-from backend.server.routes.trajectory import get_trajectory
-from backend.server.session.conversation import ServerConversation
+from backend.api.routes.trajectory import get_trajectory
+from backend.api.session.conversation import ServerConversation
 from backend.core.config import ForgeConfig
 from backend.storage.local import LocalFileStore
 

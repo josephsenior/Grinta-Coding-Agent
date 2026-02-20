@@ -376,6 +376,13 @@ classpath = "my_package.my_module.MyCustomAgent"
 # BrowserGym environment to use for evaluation
 #browsergym_eval_env = ""
 
+#################################### MCP  #####################################
+# Model Context Protocol (MCP) server configuration
+##############################################################################
+[mcp]
+# Enable MCP to connect external tool servers
+enabled = true
+
 #################################### Condenser #################################
 # Condensers control how conversation history is managed and compressed when
 # the context grows too large. Each agent uses one condenser configuration.

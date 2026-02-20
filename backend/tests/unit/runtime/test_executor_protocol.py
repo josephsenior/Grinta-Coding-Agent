@@ -7,8 +7,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from backend.events.action import (
-    BrowseInteractiveAction,
-    BrowseURLAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -70,14 +68,6 @@ class TestActionExecutorProtocol:
         """Test protocol specifies edit method for FileEditAction."""
         assert hasattr(ActionExecutorProtocol, "edit")
 
-    def test_protocol_has_browse_method(self):
-        """Test protocol specifies browse method for BrowseURLAction."""
-        assert hasattr(ActionExecutorProtocol, "browse")
-
-    def test_protocol_has_browse_interactive_method(self):
-        """Test protocol specifies browse_interactive method."""
-        assert hasattr(ActionExecutorProtocol, "browse_interactive")
-
 
 # ── Protocol Compliance ────────────────────────────────────────────────
 
@@ -98,8 +88,6 @@ class TestProtocolCompliance:
         mock_executor.read = AsyncMock()
         mock_executor.write = AsyncMock()
         mock_executor.edit = AsyncMock()
-        mock_executor.browse = AsyncMock()
-        mock_executor.browse_interactive = AsyncMock()
 
         # isinstance check should work with runtime_checkable protocol
         assert isinstance(mock_executor, ActionExecutorProtocol)
@@ -148,31 +136,23 @@ class TestProtocolCompliance:
         executor.read = AsyncMock()
         executor.write = AsyncMock()
         executor.edit = AsyncMock()
-        executor.browse = AsyncMock()
-        executor.browse_interactive = AsyncMock()
 
         cmd_action = CmdRunAction(command="echo test")
         file_read_action = FileReadAction(path="test.txt")
         file_write_action = FileWriteAction(path="out.txt", content="data")
         file_edit_action = FileEditAction(path="edit.txt")
-        browse_action = BrowseURLAction(url="https://example.com")
-        browse_interactive_action = BrowseInteractiveAction(browser_actions="navigate")
 
         await executor.run_action(cmd_action)
         await executor.run(cmd_action)
         await executor.read(file_read_action)
         await executor.write(file_write_action)
         await executor.edit(file_edit_action)
-        await executor.browse(browse_action)
-        await executor.browse_interactive(browse_interactive_action)
 
         executor.run_action.assert_called_once()
         executor.run.assert_called_once_with(cmd_action)
         executor.read.assert_called_once_with(file_read_action)
         executor.write.assert_called_once_with(file_write_action)
         executor.edit.assert_called_once_with(file_edit_action)
-        executor.browse.assert_called_once_with(browse_action)
-        executor.browse_interactive.assert_called_once_with(browse_interactive_action)
 
     def test_can_access_initial_cwd_property(self):
         """Test initial_cwd property can be accessed on compliant object."""

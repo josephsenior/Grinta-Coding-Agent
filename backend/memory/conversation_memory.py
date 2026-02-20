@@ -19,6 +19,8 @@ from backend.events.observation.agent import RecallObservation
 from backend.events.observation.observation import Observation
 from backend.memory.action_processors import convert_action_to_messages
 from backend.memory.context_tracking import ContextTracker
+from backend.memory.graph_store import GraphMemoryStore
+from backend.core.workspace_context import ensure_forge_dir
 from backend.memory.memory_types import (
     ContextAnchor,
     Decision,
@@ -59,11 +61,19 @@ class ConversationMemory:
 
         # Initialize vector memory if enabled
         vector_store: EnhancedVectorStore | None = None
+        graph_store: GraphMemoryStore | None = None
         if bool(getattr(config, "enable_vector_memory", False)):
             vector_store = self._initialize_vector_memory()
+            try:
+                forge_dir = ensure_forge_dir()
+                graph_store = GraphMemoryStore(
+                    persistence_path=str(forge_dir / "graph_memory.json")
+                )
+            except Exception as e:
+                logger.warning("Failed to initialize graph memory store: %s", e)
 
         # Context tracking (decisions, anchors, vector memory)
-        self._ctx = ContextTracker(vector_store=vector_store)
+        self._ctx = ContextTracker(vector_store=vector_store, graph_store=graph_store)
 
     # Delegate context-tracking API to ContextTracker
     @property

@@ -44,6 +44,11 @@ You are have access to the following environment variables
 {% if runtime_info.date %}
 Today's date is {{ runtime_info.date }} (UTC).
 {% endif %}
+<HINT>
+Remember to use your task_tracker tool to maintain a structured plan. 
+Call `task_tracker(command='view')` to check your progress and `task_tracker(command='update', task_list=[...])` to record completion of steps.
+This helps you stay organized and recover context if the session is interrupted.
+</HINT>
 </RUNTIME_INFORMATION>
 {% if conversation_instructions and conversation_instructions.content -%}
 <CONVERSATION_INSTRUCTIONS>

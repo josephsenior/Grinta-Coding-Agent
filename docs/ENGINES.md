@@ -10,7 +10,7 @@ task types. The **Orchestrator** is the default and handles most coding tasks.
 | Engine | Purpose | Best For |
 |--------|---------|----------|
 | **Orchestrator** | Full-featured CodeAct agent | Coding, debugging, refactoring |
-| **Navigator** | Web browsing agent | Web interaction, research |
+| **MCP Browser** | Remote web browsing via MCP | Web interaction, research |
 | **Locator** | Code navigation via graph | Finding files, symbols, dependencies |
 | **Auditor** | Code review engine | Code quality analysis |
 | **Echo** | Test/debug echo | Testing, development |
@@ -30,7 +30,7 @@ Think → Act → Observe → Repeat
 
 1. **Observe** current project state
 2. **Reason** about the next step
-3. **Act** (edit file, run command, browse web)
+3. **Act** (edit file, run command, browse web via MCP)
 4. **Observe** the result
 5. **Repeat** until task is complete or budget exhausted
 
@@ -40,7 +40,7 @@ Think → Act → Observe → Repeat
 |----------|-------|
 | **File editing** | `str_replace_editor`, `llm_based_edit`, `atomic_refactor`, `whitespace_handler` |
 | **Commands** | `bash` |
-| **Browser** | `browser` |
+| **Browser** | `MCP Browser (browser-use)` |
 | **Reasoning** | `think`, `finish`, `task_tracker`, `condensation_request` |
 | **Code quality** | `smart_errors`, `health_check` |
 | **Security** | `security_utils` |
@@ -83,24 +83,22 @@ best practices, and few-shot examples.
 
 ---
 
-## 2. Navigator (Browser Agent)
+## 2. MCP Browser (Remote Browsing)
 
-The Navigator implements a BrowserGym-based agent for full-featured web
-browsing. It parses web pages, tracks browsing state, and can interact
-with websites programmatically.
+Web browsing is decoupled from the core Forge engine via the Model Context
+Protocol. This allows for flexible browsing engines like `browser-use` or
+other MCP-compatible agents.
 
 ### How It Works
 
 ```
-Navigate → Parse Page → Extract Info → Act on Page → Report
+Forge → MCP Request → MCP Browser Server → Web Interaction → Forge
 ```
 
 ### Key Components
 
-- **Navigator** (`navigator.py`): Main browsing loop
-- **Response Parser** (`response_parser.py`): Parses LLM browsing instructions
-- **State Tracker** (`state_tracker.py`): Tracks browsing state
-- **Utils** (`utils.py`): Page parsing, prompt building, error handling
+- **MCP Integration** (`mcp_integration/`): Universal protocol bridge
+- **MCP Toolset**: Dynamically discovered tools like `navigate`, `click`, etc.
 
 ### When to Use
 
@@ -111,16 +109,16 @@ Navigate → Parse Page → Extract Info → Act on Page → Report
 
 ### Configuration
 
-```toml
-[core]
-enable_browser = true
+MCP tools are automatically discovered and enabled when the `enable_browsing`
+flag is set and a corresponding MCP server is connected.
 
+```toml
 [agent]
 enable_browsing = true
 ```
 
-> **Note:** Requires GPT-4-class model for best results due to complex
-> HTML structure parsing.
+> **Note:** Remote browsing via MCP provides superior isolation and
+> flexibility compared to in-process browser automation.
 
 ---
 

@@ -258,7 +258,6 @@ class ToolTelemetry:
     def _action_schema_map() -> dict[str, type[ActionSchemaUnion]]:
         from backend.core.schemas.actions import (
             AgentRejectActionSchema,
-            BrowseInteractiveActionSchema,
             ChangeAgentStateActionSchema,
             CmdRunActionSchema,
             FileEditActionSchema,
@@ -277,7 +276,6 @@ class ToolTelemetry:
             "run": CmdRunActionSchema,
             "message": MessageActionSchema,
             "system": SystemMessageActionSchema,
-            "browse_interactive": BrowseInteractiveActionSchema,
             "finish": PlaybookFinishActionSchema,
             "reject": AgentRejectActionSchema,
             "change_agent_state": ChangeAgentStateActionSchema,
@@ -419,9 +417,6 @@ class ToolTelemetry:
             "thought",
             "start",
             "end",
-            "browser_actions",
-            "browsergym_send_msg_to_user",
-            "return_axtree",
             "url",
             "agent",
             "state",

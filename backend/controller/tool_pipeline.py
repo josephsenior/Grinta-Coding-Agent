@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import os
+import subprocess
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -264,6 +265,117 @@ class CostQuotaMiddleware(ToolInvocationMiddleware):
             )
         finally:
             ctx.metadata["cost_snapshot"] = metrics.accumulated_cost
+
+        # Annotate the observation so the LLM can see its per-action cost
+        # inline. Skipped for micro-costs (<$0.0001) to avoid noise.
+        if observation is not None and delta >= 0.0001:
+            self._annotate_cost(observation, delta, metrics)
+
+    @staticmethod
+    def _annotate_cost(
+        observation: Observation, delta: float, metrics: Any
+    ) -> None:
+        """Append a compact cost footprint tag to the observation content."""
+        content = getattr(observation, "content", None)
+        if not isinstance(content, str):
+            return
+        total = metrics.accumulated_cost
+        max_budget = getattr(metrics, "max_budget_per_task", None)
+        if max_budget and max_budget > 0:
+            remaining = max_budget - total
+            budget_part = f"  |  budget_remaining: ${remaining:.4f}"
+        else:
+            budget_part = ""
+        annotation = (
+            f"\n<COST_FOOTPRINT>"
+            f"step: ${delta:.4f}  |  session: ${total:.4f}{budget_part}"
+            f"</COST_FOOTPRINT>"
+        )
+        setattr(observation, "content", content + annotation)
+
+
+class ContextWindowMiddleware(ToolInvocationMiddleware):
+    """Emits proactive context-window utilization warnings at 70 % and 90 %.
+
+    Mirrors the cost-threshold pattern used by ``BudgetGuardService`` but
+    tracks token utilisation instead of dollar spend.  Fires at most once
+    per threshold per session to avoid alert fatigue.
+
+    Why this matters: without proactive warnings the LLM only learns the
+    context window is full *after* the API returns an error — at which point
+    Forge must trigger emergency condensation.  This middleware gives the LLM
+    a chance to call ``request_condensation()`` voluntarily before overflow.
+    """
+
+    _THRESHOLDS: tuple[float, ...] = (0.70, 0.90)
+
+    def __init__(self, controller: AgentController) -> None:
+        self.controller = controller
+        self._alerted_thresholds: set[float] = set()
+
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
+        llm = getattr(self.controller.agent, "llm", None)
+        metrics = getattr(llm, "metrics", None)
+        if metrics is None:
+            return
+        token_usages = getattr(metrics, "token_usages", [])
+        if not token_usages:
+            return
+        last = token_usages[-1]
+        context_window = getattr(last, "context_window", 0)
+        if context_window <= 0:
+            return
+        prompt_tokens = getattr(last, "prompt_tokens", 0)
+        pct = prompt_tokens / context_window
+        for threshold in self._THRESHOLDS:
+            if pct >= threshold and threshold not in self._alerted_thresholds:
+                self._alerted_thresholds.add(threshold)
+                self._emit_alert(threshold, prompt_tokens, context_window, pct)
+
+    def _emit_alert(
+        self,
+        threshold: float,
+        prompt_tokens: int,
+        context_window: int,
+        pct: float,
+    ) -> None:
+        pct_int = int(threshold * 100)
+        content = (
+            f"⚠️ Context window {pct_int}% full: "
+            f"{prompt_tokens:,}/{context_window:,} tokens used. "
+            "Call request_condensation() to free context space before overflow."
+        )
+        logger.warning(
+            "Context window threshold %d%% crossed for session %s — %d/%d tokens",
+            pct_int,
+            self.controller.id,
+            prompt_tokens,
+            context_window,
+            extra={"session_id": self.controller.id},
+        )
+        try:
+            from backend.events.event import EventSource
+            from backend.events.observation.status import StatusObservation
+
+            obs = StatusObservation(
+                content=content,
+                status_type="context_window_alert",
+                extras={
+                    "threshold": threshold,
+                    "pct_used": round(pct, 4),
+                    "prompt_tokens": prompt_tokens,
+                    "context_window": context_window,
+                },
+            )
+            self.controller.event_stream.add_event(obs, EventSource.ENVIRONMENT)
+        except Exception:
+            logger.debug(
+                "Failed to emit context window alert for session %s",
+                self.controller.id,
+                exc_info=True,
+            )
 
 
 class LoggingMiddleware(ToolInvocationMiddleware):
@@ -694,3 +806,70 @@ class EditVerifyMiddleware(ToolInvocationMiddleware):
             + "moving on."
             + "\n</VERIFY_HINT>"
         )
+
+
+class AutoCheckMiddleware(ToolInvocationMiddleware):
+    """Automatically checks syntax of files after editing."""
+
+    async def observe(
+        self, ctx: ToolInvocationContext, observation: Observation | None
+    ) -> None:
+        if observation is None:
+            return
+
+        from backend.events.action import FileEditAction, FileWriteAction
+        from backend.events.observation import ErrorObservation
+
+        # Check if success (not ErrorObservation)
+        if isinstance(observation, ErrorObservation):
+            return
+
+        # Check action type
+        if not isinstance(ctx.action, (FileEditAction, FileWriteAction)):
+            return
+
+        path = getattr(ctx.action, "path", None)
+        if not path:
+            return
+
+        _, ext = os.path.splitext(path)
+        ext = ext.lower()
+
+        cmd = None
+        if ext == ".py":
+            cmd = ["python", "-m", "py_compile", path]
+        elif ext in (".js", ".ts"):
+            cmd = ["node", "--check", path]
+
+        if not cmd:
+            return
+
+        try:
+            # Run check
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, check=False
+            )
+
+            current_content = getattr(observation, "content", "") or ""
+
+            if result.returncode != 0:
+                stderr = result.stderr.strip()
+                # If stderr is empty, try stdout (sometimes tools print to stdout)
+                if not stderr:
+                    stderr = result.stdout.strip()
+                
+                observation.content = (
+                    current_content
+                    + f"\n<SYNTAX_CHECK_FAILED>\n{stderr}\n</SYNTAX_CHECK_FAILED>"
+                )
+            else:
+                observation.content = (
+                    current_content + "\n<SYNTAX_CHECK_PASSED />"
+                )
+        except Exception as e:
+            # If check tool is missing (e.g. node not found), handle gracefully
+            current_content = getattr(observation, "content", "") or ""
+            observation.content = (
+                current_content 
+                + f"\n<SYNTAX_CHECK_FAILED>\nMiddleware execution error: {e}\n</SYNTAX_CHECK_FAILED>"
+            )

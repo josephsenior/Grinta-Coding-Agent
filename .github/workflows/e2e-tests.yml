@@ -48,7 +48,7 @@ jobs:
           BACKEND_HOST: 0.0.0.0
           BACKEND_PORT: 3000
         run: |
-          poetry run uvicorn backend.server.listen:app \
+          poetry run uvicorn backend.api.listen:app \
             --host $BACKEND_HOST --port $BACKEND_PORT &
           until nc -z localhost $BACKEND_PORT; do sleep 0.5; done
           echo "Backend started on port $BACKEND_PORT"
@@ -65,4 +65,4 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          pkill -f "uvicorn backend.server" || true
+          pkill -f "uvicorn backend.api" || true

@@ -171,14 +171,12 @@ Event
 │   ├── CmdRunAction        # Shell command execution
 │   ├── FileEditAction      # File modification
 │   ├── FileWriteAction     # File creation
-│   ├── BrowseURLAction     # Browser navigation
 │   ├── MessageAction       # Agent ↔ user messages
 │   └── NullAction          # No-op
 └── Observation (runtime → agent)
     ├── CmdOutputObservation # Command output + exit code
     ├── FileEditObservation  # Edit confirmation
     ├── ErrorObservation     # Error details
-    ├── BrowserOutputObservation
     └── AgentCondensationObservation  # Memory condensation marker
 ```
 
@@ -407,10 +405,10 @@ class TestMyFeature:
 
 ## Common Pitfalls
 
-### 1. Import Order
-The `backend/mcp/` directory shadows the `mcp` PyPI package. Always import
-as `backend.mcp` not bare `mcp` from within the project. The `conftest.py`
-handles sys.path manipulation for tests.
+### 1. Model Context Protocol (MCP)
+The `backend/mcp_integration/` directory contains Forge's internal MCP logic. Always import
+from `backend.mcp_integration` (not `mcp`) when using Forge's specific client or tool
+registry utilities. The bare `mcp` package refers to the official SDK.
 
 ### 2. Event Loop Management
 Tests use a custom `pytest_pyfunc_call` hook for async tests instead of

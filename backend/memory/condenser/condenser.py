@@ -303,6 +303,17 @@ class BaseLLMCondenser(RollingCondenser, ABC):
             **cls._get_extra_config_args(config),
         )
         condenser.token_budget = getattr(config, "token_budget", None)
+        # If no explicit token_budget was configured but the LLM reports its context
+        # size, derive a safe 80% budget so _exceeds_token_budget() is active by
+        # default for any LLM-backed condenser. This prevents large single-event
+        # observations (e.g. 50K-char bash output) from overflowing the context
+        # window before the event-count threshold is reached.
+        if condenser.token_budget is None and llm_instance is not None:
+            max_input = getattr(
+                getattr(llm_instance, "config", None), "max_input_tokens", None
+            )
+            if max_input:
+                condenser.token_budget = int(max_input * 0.80)
         return condenser
 
     @staticmethod

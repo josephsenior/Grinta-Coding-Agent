@@ -17,12 +17,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 from textual.widgets import Input, Label, ListView, Select, Static
 
-from backend.tui.app import ForgeApp
-from backend.tui.client import ConversationInfo, ForgeClient
-from backend.tui.screens.chat import ChatScreen
-from backend.tui.screens.home import ConversationListItem, HomeScreen
-from backend.tui.screens.settings import SettingsScreen
-from backend.tui.screens.help import HelpScreen
+from tui.app import ForgeApp
+from tui.client import ConversationInfo, ForgeClient
+from tui.screens.chat import ChatScreen
+from tui.screens.home import ConversationListItem, HomeScreen
+from tui.screens.settings import SettingsScreen
+from tui.screens.help import HelpScreen
 
 
 def _make_mock_client() -> MagicMock:

@@ -117,7 +117,8 @@ class TestResolvePath:
     def test_relative_path(self):
         with tempfile.TemporaryDirectory() as td:
             # Create the file so validation passes
-            open(os.path.join(td, "test.txt", encoding="utf-8"), "w").close()
+            with open(os.path.join(td, "test.txt"), "w", encoding="utf-8") as f:
+                f.write("test")
             result = resolve_path("test.txt", td)
             assert os.path.isabs(result)
             assert result.endswith("test.txt")
@@ -280,9 +281,10 @@ class TestDirectoryViewing:
         with tempfile.TemporaryDirectory() as td:
             # Create structure
             os.makedirs(os.path.join(td, "subdir"))
-            open(os.path.join(td, "file1.txt", encoding="utf-8"), "w").close()
-            open(os.path.join(td, "subdir", "file2.txt", encoding="utf-8"), "w").close()
-            open(os.path.join(td, ".hidden", encoding="utf-8"), "w").close()
+            # Corrected: open args and context manager
+            with open(os.path.join(td, "file1.txt"), "w", encoding="utf-8") as f: f.write("f1")
+            with open(os.path.join(td, "subdir", "file2.txt"), "w", encoding="utf-8") as f: f.write("f2")
+            with open(os.path.join(td, ".hidden"), "w", encoding="utf-8") as f: f.write("h")
 
             entries, hidden = _list_directory_recursive(td, max_depth=2)
             assert any("file1.txt" in e for e in entries)
@@ -297,6 +299,7 @@ class TestDirectoryViewing:
 
     def test_handle_directory_view(self):
         with tempfile.TemporaryDirectory() as td:
-            open(os.path.join(td, "readme.md", encoding="utf-8"), "w").close()
+            with open(os.path.join(td, "readme.md"), "w", encoding="utf-8") as f:
+                f.write("test")
             obs = handle_directory_view(td, "/workspace")
             assert "readme.md" in obs.content

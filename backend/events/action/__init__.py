@@ -16,7 +16,6 @@ from backend.events.action.agent import (
     TaskTrackingAction,
     UncertaintyAction,
 )
-from backend.events.action.browse import BrowseInteractiveAction, BrowseURLAction
 from backend.events.action.commands import CmdRunAction
 from backend.events.action.empty import NullAction
 from backend.events.action.files import (
@@ -38,8 +37,6 @@ __all__ = [
     "PlaybookFinishAction",
     "AgentRejectAction",
     "AgentThinkAction",
-    "BrowseInteractiveAction",
-    "BrowseURLAction",
     "ChangeAgentStateAction",
     "ClarificationRequestAction",
     "CmdRunAction",

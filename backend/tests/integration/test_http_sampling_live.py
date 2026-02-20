@@ -48,7 +48,7 @@ def build_client(env: dict, tracer_store: list[_TestSpan] | None = None):
     if tracer_store is not None:
         fake = _TestTracer(tracer_store)
 
-        def _get_tracer(_name: str = "backend.server"):
+        def _get_tracer(_name: str = "backend.api"):
             return fake
 
         setattr(ot_trace, "get_tracer", _get_tracer)
@@ -56,9 +56,9 @@ def build_client(env: dict, tracer_store: list[_TestSpan] | None = None):
     # Force a fresh import of the app module
     import sys
 
-    if "backend.server.app" in sys.modules:
-        importlib.reload(importlib.import_module("backend.server.app"))
-    from backend.server.app import app  # type: ignore
+    if "backend.api.app" in sys.modules:
+        importlib.reload(importlib.import_module("backend.api.app"))
+    from backend.api.app import app  # type: ignore
 
     return TestClient(app)
 

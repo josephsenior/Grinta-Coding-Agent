@@ -18,7 +18,6 @@ from backend.events.action.agent import (
     RecallAction,
     TaskTrackingAction,
 )
-from backend.events.action.browse import BrowseInteractiveAction, BrowseURLAction
 from backend.events.action.commands import CmdRunAction
 from backend.events.action.empty import NullAction
 from backend.events.action.files import (
@@ -36,8 +35,6 @@ from backend.events.action.message import (
 actions = (
     NullAction,
     CmdRunAction,
-    BrowseURLAction,
-    BrowseInteractiveAction,
     FileReadAction,
     FileWriteAction,
     FileEditAction,

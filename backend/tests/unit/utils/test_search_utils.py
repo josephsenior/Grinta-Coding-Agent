@@ -1,8 +1,11 @@
 """Tests for search pagination utilities."""
 
 import base64
+from unittest.mock import AsyncMock, MagicMock
 
-from backend.utils.search_utils import offset_to_page_id, page_id_to_offset
+import pytest
+
+from backend.utils.search_utils import iterate, offset_to_page_id, page_id_to_offset
 
 
 class TestOffsetToPageId:
@@ -117,3 +120,57 @@ class TestRoundTrip:
         assert page_id is None
         result = page_id_to_offset(page_id)
         assert result == 0
+
+    def test_isdigit_fallback(self):
+        """Test numeric string as fallthrough offset."""
+        assert page_id_to_offset("123") == 123
+
+    def test_empty_string(self):
+        """Test empty string page ID."""
+        assert page_id_to_offset("") == 0
+
+    def test_invalid_base64(self):
+        """Test invalid base64 string page ID."""
+        assert page_id_to_offset("not-base64!!!") == 0
+
+
+class TestIterate:
+    @pytest.mark.asyncio
+    async def test_iterate_single_page(self):
+        """Test iterate over a single page of results."""
+        mock_fn = AsyncMock()
+        result_set = MagicMock()
+        result_set.results = ["a", "b"]
+        result_set.next_page_id = None
+        mock_fn.return_value = result_set
+
+        results = []
+        async for r in iterate(mock_fn):
+            results.append(r)
+
+        assert results == ["a", "b"]
+        mock_fn.assert_called_once_with(page_id=None)
+
+    @pytest.mark.asyncio
+    async def test_iterate_multiple_pages(self):
+        """Test iterate over multiple pages of results."""
+        mock_fn = AsyncMock()
+
+        page1 = MagicMock()
+        page1.results = [1]
+        page1.next_page_id = "page2"
+
+        page2 = MagicMock()
+        page2.results = [2]
+        page2.next_page_id = None
+
+        mock_fn.side_effect = [page1, page2]
+
+        results = []
+        async for r in iterate(mock_fn, extra="param"):
+            results.append(r)
+
+        assert results == [1, 2]
+        assert mock_fn.call_count == 2
+        mock_fn.assert_any_call(page_id=None, extra="param")
+        mock_fn.assert_any_call(page_id="page2", extra="param")

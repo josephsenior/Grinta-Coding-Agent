@@ -28,7 +28,7 @@ from backend.utils.prompt import ConversationInstructions, RepositoryInfo, Runti
 
 if TYPE_CHECKING:
     from backend.core.config.mcp_config import MCPConfig
-    from backend.instruction import (
+    from backend.playbook_engine import (
         BasePlaybook,
         KnowledgePlaybook,
         RepoPlaybook,
@@ -394,7 +394,7 @@ class Memory:
 
         This is typically called from agent_session or setup once the workspace is cloned.
         """
-        from backend.instruction import KnowledgePlaybook, RepoPlaybook
+        from backend.playbook_engine import KnowledgePlaybook, RepoPlaybook
 
         logger.info(
             "Loading user workspace playbooks: %s", [m.name for m in user_playbooks]
@@ -407,7 +407,7 @@ class Memory:
 
     def _load_global_playbooks(self) -> None:
         """Loads playbooks from the global playbooks_dir."""
-        from backend.instruction import load_playbooks_from_dir
+        from backend.playbook_engine import load_playbooks_from_dir
 
         repo_agents, knowledge_agents = load_playbooks_from_dir(GLOBAL_PLAYBOOKS_DIR)
         for name, agent_knowledge in knowledge_agents.items():
@@ -420,7 +420,7 @@ class Memory:
 
         Creates the directory if it doesn't exist.
         """
-        from backend.instruction import load_playbooks_from_dir
+        from backend.playbook_engine import load_playbooks_from_dir
 
         try:
             os.makedirs(USER_PLAYBOOKS_DIR, exist_ok=True)

@@ -15,7 +15,6 @@ from backend.events.observation.agent import (
     RecallFailureObservation,
     RecallObservation,
 )
-from backend.events.observation.browse import BrowserOutputObservation
 from backend.events.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
@@ -38,7 +37,6 @@ from backend.events.observation.task_tracking import TaskTrackingObservation
 observations = (
     NullObservation,
     CmdOutputObservation,
-    BrowserOutputObservation,
     FileReadObservation,
     FileWriteObservation,
     FileEditObservation,

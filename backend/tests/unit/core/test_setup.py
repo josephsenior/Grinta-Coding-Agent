@@ -41,7 +41,7 @@ def test_filter_plugins_by_config():
     mock_agent = MagicMock()
     mock_agent.config.disabled_plugins = ["plugin1"]
     # Patch the logger in the core module to ensure it's captured
-    with patch("backend.core.logger.FORGE_logger.info") as mock_info:
+    with patch("backend.core.logger.forge_logger.info") as mock_info:
         assert filter_plugins_by_config(plugins, agent=mock_agent) == []
         mock_info.assert_called()
 

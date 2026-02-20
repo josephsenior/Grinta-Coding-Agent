@@ -46,7 +46,6 @@ class TaskSignals:
     user_message_count: int = 0
     code_edit_count: int = 0
     cmd_run_count: int = 0
-    browse_action_count: int = 0
     condensation_count: int = 0
     # Derived ratios
     error_ratio: float = 0.0
@@ -82,8 +81,6 @@ def compute_signals(events: list[Event]) -> TaskSignals:
         cls_name = type(ev).__name__
         if cls_name == "FileEditAction":
             sig.code_edit_count += 1
-        if cls_name in ("BrowseURLAction", "BrowseInteractiveAction"):
-            sig.browse_action_count += 1
 
         if isinstance(ev, Observation):
             total_obs_len += len(ev.content)
@@ -106,7 +103,6 @@ _SHORT_SESSION = 30
 _MEDIUM_SESSION = 150
 _LONG_SESSION = 400
 _HIGH_ERROR_RATIO = 0.15
-_HEAVY_BROWSE = 5
 
 
 def select_condenser_config(
@@ -136,13 +132,12 @@ def select_condenser_config(
 
     logger.debug(
         "Condenser auto-select signals: events=%d errors=%d error_ratio=%.2f "
-        "edits=%d cmds=%d browse=%d condensations=%d",
+        "edits=%d cmds=%d condensations=%d",
         sig.total_events,
         sig.error_count,
         sig.error_ratio,
         sig.code_edit_count,
         sig.cmd_run_count,
-        sig.browse_action_count,
         sig.condensation_count,
     )
 
@@ -161,14 +156,6 @@ def select_condenser_config(
         return RecentEventsCondenserConfig(
             keep_first=3, max_events=min(sig.total_events, 80)
         )
-
-    # 3. Heavy browsing → observation masking (browser output is bulky)
-    if sig.browse_action_count >= _HEAVY_BROWSE:
-        logger.info(
-            "Auto-select condenser: observation_masking (heavy browsing, %d actions)",
-            sig.browse_action_count,
-        )
-        return ObservationMaskingCondenserConfig(attention_window=50)
 
     # 4. Long session with LLM available → smart or LLM summarizing
     if sig.total_events >= _LONG_SESSION:

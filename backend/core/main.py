@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from backend.memory.agent_memory import Memory
     from backend.llm.llm_registry import LLMRegistry
     from backend.runtime.base import Runtime
-    from backend.server.services.conversation_stats import ConversationStats
+    from backend.api.services.conversation_stats import ConversationStats
 
 
 from backend.adapters import read_input, read_task
@@ -40,7 +40,7 @@ from backend.core.config import (
     parse_arguments,
     setup_config_from_args,
 )
-from backend.core.config.mcp_config import ForgeMCPConfigImpl
+from backend.core.config.mcp_config import ForgeMCPConfig
 from backend.core.logger import forge_logger as logger
 from backend.core.loop import run_agent_until_done
 from backend.core.schemas import AgentState
@@ -55,7 +55,7 @@ from backend.core.setup import (
 from backend.events import EventSource, EventStreamSubscriber
 from backend.events.action import MessageAction, NullAction
 from backend.events.observation import AgentStateChangedObservation
-from backend.mcp import add_mcp_tools_to_agent
+from backend.mcp_integration import add_mcp_tools_to_agent
 from backend.runtime import (
     RuntimeAcquireResult,
     RuntimeOrchestrator,
@@ -159,14 +159,15 @@ async def _setup_memory_and_mcp(
         )
 
     if agent.config.enable_mcp:
-        _, forge_mcp_stdio_servers = (
-            ForgeMCPConfigImpl.create_default_mcp_server_config(
-                config_.mcp_host,
-                config_,
-                None,
-            )
+        # Add default Forge SHTTP server endpoint
+        default_server, _ = ForgeMCPConfig.create_default_mcp_server_config(
+            config_.mcp_host,
+            config_,
+            None,
         )
-        runtime.config.mcp.stdio_servers.extend(forge_mcp_stdio_servers)
+        if default_server:
+            runtime.config.mcp.servers.append(default_server)
+
         await add_mcp_tools_to_agent(agent, runtime, memory)
 
     return memory

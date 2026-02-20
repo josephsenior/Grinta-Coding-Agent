@@ -206,7 +206,7 @@ class TestGetPlaybookMcpTools:
 
 class TestLoadUserWorkspacePlaybooks:
     def test_loads_both_types(self, memory):
-        from backend.instruction import KnowledgePlaybook, RepoPlaybook
+        from backend.playbook_engine import KnowledgePlaybook, RepoPlaybook
 
         repo_pb = MagicMock(spec=RepoPlaybook)
         repo_pb.name = "repo_pb"

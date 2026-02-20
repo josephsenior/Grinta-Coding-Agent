@@ -18,7 +18,7 @@ from backend.core.pydantic_compat import model_dump_with_options
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
-    from backend.core.config.mcp_config import MCPStdioServerConfig
+    from backend.core.config.mcp_config import MCPServerConfig
 
 logger = logging.getLogger(__name__)
 fastmcp_logger = fastmcp_get_logger("fastmcp")
@@ -53,8 +53,18 @@ class MCPProxyManager:
         if logger_level is not None:
             fastmcp_logger.setLevel(logger_level)
 
-    def initialize(self) -> None:
-        """Initialize the FastMCP proxy with the current configuration."""
+    def initialize(self, mcp_config: MCPServerConfig | list[MCPServerConfig] | None = None) -> None:
+        """Initialize the FastMCP proxy with the current configuration.
+
+        Args:
+            mcp_config: Optional MCP server configuration(s) to use.
+        """
+        if mcp_config:
+            if not isinstance(mcp_config, list):
+                mcp_config = [mcp_config]
+            tools = {t.name: model_dump_with_options(t) for t in mcp_config}
+            self.config["mcpServers"].update(tools)
+
         if not self.config["mcpServers"]:
             logger.info(
                 "No MCP servers configured for FastMCP Proxy, skipping initialization."
@@ -122,7 +132,7 @@ class MCPProxyManager:
     async def update_and_remount(
         self,
         app: FastAPI,
-        stdio_servers: list[MCPStdioServerConfig],
+        stdio_servers: list[MCPServerConfig],
         allow_origins: list[str] | None = None,
     ) -> None:
         """Update the tools configuration and remount the proxy to the app.
@@ -133,7 +143,7 @@ class MCPProxyManager:
 
         Args:
             app: FastAPI application to mount to
-            stdio_servers: List of stdio server configurations
+            stdio_servers: List of server configurations
             allow_origins: List of allowed origins for CORS
 
         """

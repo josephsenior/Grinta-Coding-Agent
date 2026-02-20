@@ -10,7 +10,6 @@ from backend.core.exceptions import (
     FunctionCallValidationError,
 )
 from backend.engines.orchestrator.function_calling import (
-    _handle_browser_tool,
     _handle_cmd_run_tool,
     _handle_condensation_request_tool,
     _handle_finish_tool,
@@ -25,7 +24,6 @@ from backend.engines.orchestrator.function_calling import (
 )
 from backend.events.action import (
     AgentThinkAction,
-    BrowseInteractiveAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -235,20 +233,6 @@ class TestHandleCondensationRequestTool:
 
 
 # ---------------------------------------------------------------------------
-# _handle_browser_tool
-# ---------------------------------------------------------------------------
-
-class TestHandleBrowserTool:
-    def test_creates_browse_interactive_action(self):
-        action = _handle_browser_tool({"code": "browser.click('#btn')"})
-        assert isinstance(action, BrowseInteractiveAction)
-
-    def test_missing_code_raises(self):
-        with pytest.raises(FunctionCallValidationError, match="code"):
-            _handle_browser_tool({})
-
-
-# ---------------------------------------------------------------------------
 # _handle_mcp_tool
 # ---------------------------------------------------------------------------
 
@@ -279,7 +263,7 @@ class TestHandleTaskTrackerTool:
         args = {
             "command": "plan",
             "task_list": [
-                {"id": "task-1", "title": "Do X", "status": "todo", "notes": ""},
+                {"id": "task-1", "description": "Do X", "status": "pending"},
             ],
         }
         action = _handle_task_tracker_tool(args)
@@ -308,13 +292,12 @@ class TestHandleTaskTrackerTool:
     def test_normalizes_missing_task_fields(self):
         args = {
             "command": "plan",
-            "task_list": [{"title": "My task"}],  # missing id, status, notes
+            "task_list": [{"description": "My task"}],  # missing id, status
         }
         action = _handle_task_tracker_tool(args)
         task = action.task_list[0]
-        assert task["id"] == "task-1"
-        assert task["status"] == "todo"
-        assert task["notes"] == ""
+        assert task["id"] == "step-1"
+        assert task["status"] == "pending"
 
     def test_non_plan_command_with_empty_task_list(self):
         args = {"command": "update", "task_list": []}

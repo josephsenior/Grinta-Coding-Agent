@@ -31,8 +31,6 @@ from backend.events import EventSource, EventStream, EventStreamSubscriber
 from backend.events.action import (
     Action,
     AgentThinkAction,
-    BrowseInteractiveAction,
-    BrowseURLAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -49,7 +47,7 @@ from backend.events.observation import (
     Observation,
 )
 from backend.events.serialization.action import ACTION_TYPE_TO_CLASS
-from backend.server.provider_handler import ProviderHandler
+from backend.api.provider_handler import ProviderHandler
 from backend.runtime.capabilities import RuntimeCapabilities
 from backend.runtime.command_timeout import CommandTimeoutMixin
 from backend.runtime.env_manager import EnvManagerMixin
@@ -74,7 +72,7 @@ if TYPE_CHECKING:
     from backend.core.config import ForgeConfig, RuntimeConfig
     from backend.core.config.mcp_config import MCPConfig, MCPStdioServerConfig
     from backend.events.event import Event
-    from backend.instruction import BasePlaybook
+    from backend.playbook_engine import BasePlaybook
     from backend.core.provider_types import (
         ProviderTokenType,
         ProviderToken,
@@ -493,6 +491,21 @@ class Runtime(
         observation.cause = event.id
         observation.tool_call_metadata = event.tool_call_metadata
 
+        # Attach a structured result payload for downstream consumers.
+        # This avoids fragile parsing of free-form observation content.
+        try:
+            exit_code: int | None = getattr(observation, "exit_code", None)
+        except Exception:
+            exit_code = None
+
+        observation.tool_result = {
+            "ok": not isinstance(observation, ErrorObservation),
+            "retryable": isinstance(observation, ErrorObservation),
+            "exit_code": exit_code,
+            "action": getattr(event, "action", None),
+            "observation": getattr(observation, "observation", None),
+        }
+
         if isinstance(observation, NullObservation):
             return False
 
@@ -585,7 +598,7 @@ class Runtime(
 
         """
         # Only verify file operations
-        if not isinstance(action, FileEditAction):
+        if not isinstance(action, (FileEditAction, FileWriteAction)):
             return None
 
         # Skip verification if action already failed
@@ -593,45 +606,37 @@ class Runtime(
             return None
 
         try:
-            # Verify file exists (cross-platform: works on both bash and PowerShell)
             file_path = action.path
-            verify_cmd = f"python3 -c \"import os; print('VERIFIED:EXISTS' if os.path.isfile('{file_path}') else 'ERROR:MISSING')\""
-            verify_result = self._execute_action_sync(CmdRunAction(command=verify_cmd))
+            file_on_disk = Path(file_path)
 
-            if isinstance(verify_result, CmdOutputObservation):
-                if "ERROR:MISSING" in verify_result.content:
-                    # CRITICAL: File was not created despite tool execution
-                    logger.error(
-                        "HALLUCINATION DETECTED: File %s missing after edit_file",
-                        file_path,
-                    )
-                    error_msg = f"""❌ CRITICAL VERIFICATION FAILURE:
-File {file_path} does NOT exist despite edit_file tool execution.
-This indicates a hallucination or execution failure.
+            if not file_on_disk.is_file():
+                logger.error(
+                    "VERIFICATION FAILURE: File %s missing after file operation",
+                    file_path,
+                )
+                error_msg = (
+                    "❌ CRITICAL VERIFICATION FAILURE:\n"
+                    f"File {file_path} does NOT exist after file operation execution.\n"
+                    "This indicates an execution failure or stale workspace base.\n\n"
+                    f"Original observation: {observation.content[:200]}\n\n"
+                    "Please retry the file creation."
+                )
+                return ErrorObservation(content=error_msg)
 
-Original observation: {observation.content[:200]}
+            # File exists - count lines (best-effort; don't fail if unreadable)
+            try:
+                with file_on_disk.open("r", encoding="utf-8", errors="replace") as f:
+                    line_count = sum(1 for _ in f)
+            except Exception:
+                line_count = None
 
-Please retry the file creation."""
-                    return ErrorObservation(content=error_msg)
+            if line_count is not None:
+                enhanced_content = (
+                    f"{observation.content}\n\n"
+                    f"✅ VERIFICATION: File {file_path} confirmed to exist ({line_count} lines)"
+                )
+                return FileWriteObservation(content=enhanced_content, path=file_path)
 
-                # File exists - get size/lines for confirmation
-                size_cmd = f"python3 -c \"print(sum(1 for _ in open('{file_path}', encoding='utf-8')))\""
-                size_result = self._execute_action_sync(CmdRunAction(command=size_cmd))
-
-                if isinstance(size_result, CmdOutputObservation):
-                    try:
-                        lines = int(size_result.content.strip())
-                        # Enhance the original observation with verification
-                        enhanced_content = f"""{observation.content}
-
-✅ VERIFICATION: File {file_path} confirmed to exist ({lines} lines)"""
-                        return FileWriteObservation(
-                            content=enhanced_content, path=file_path
-                        )
-                    except ValueError:
-                        pass
-
-            # Return original observation if verification inconclusive
             return None
 
         except Exception as e:
@@ -693,7 +698,7 @@ Please retry the file creation."""
 
     @abstractmethod
     def get_mcp_config(
-        self, extra_stdio_servers: list[MCPStdioServerConfig] | None = None
+        self, extra_servers: list[Any] | None = None
     ) -> MCPConfig:
         """Get MCP configuration for this runtime."""
 
@@ -729,30 +734,6 @@ Please retry the file creation."""
     def list_files(self, path: str, recursive: bool = False) -> list[str]:
         """List files within the runtime environment."""
         raise NotImplementedError
-
-    @abstractmethod
-    def browse(self, action: BrowseURLAction) -> Observation:
-        """Browse a URL and return page content.
-
-        Args:
-            action: Browse action with URL to visit
-
-        Returns:
-            Observation with page content
-
-        """
-
-    @abstractmethod
-    def browse_interactive(self, action: BrowseInteractiveAction) -> Observation:
-        """Execute interactive browser commands using BrowserGym.
-
-        Args:
-            action: Browse interactive action with browser commands
-
-        Returns:
-            Observation with browser interaction results
-
-        """
 
     @abstractmethod
     async def call_tool_mcp(self, action: MCPAction) -> Observation:

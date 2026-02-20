@@ -681,7 +681,7 @@ class StuckDetector:
 
         # Check semantic diversity in recent actions (low diversity = high score)
         if len(filtered_history) >= 10:
-            action_intents, _ = self._extract_intents_and_outcomes(
+            action_intents, observation_outcomes = self._extract_intents_and_outcomes(
                 filtered_history[-20:]
             )
             if len(action_intents) >= 4:

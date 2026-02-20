@@ -19,7 +19,7 @@ from backend.events.observation import (
     ErrorObservation,
     FileReadObservation,
 )
-from backend.instruction import BasePlaybook
+from backend.playbook_engine import BasePlaybook
 from backend.runtime.playbook_loader import PlaybookLoaderMixin
 
 

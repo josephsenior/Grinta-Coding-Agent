@@ -30,48 +30,6 @@ def _build_plugin_args(plugins: list[PluginRequirement] | None) -> list[str]:
     return ["--plugins"] + [plugin.name for plugin in plugins]
 
 
-def _validate_env_part(part: str) -> bool:
-    """Validate environment part for command injection.
-
-    Args:
-        part: Environment part to validate
-
-    Returns:
-        True if valid, False otherwise
-
-    """
-    if not part:
-        return False
-
-    dangerous_chars = [";", "&", "|", "`", "$", "(", ")", "<", ">", '"', "'", "\\"]
-    return not any(char in part for char in dangerous_chars)
-
-
-def _build_browsergym_args(browsergym_eval_env: str | None) -> list[str]:
-    """Build BrowserGym environment arguments with security validation.
-
-    Args:
-        browsergym_eval_env: BrowserGym environment string
-
-    Returns:
-        BrowserGym arguments list
-
-    """
-    if not browsergym_eval_env:
-        return []
-
-    # Split and validate environment string to prevent command injection
-    env_parts = browsergym_eval_env.split(" ")
-    validated_parts = [
-        part.strip() for part in env_parts if _validate_env_part(part.strip())
-    ]
-
-    if validated_parts:
-        return ["--browsergym-eval-env"] + validated_parts
-
-    return []
-
-
 def _validate_and_get_username(
     override_username: str | None, run_as_forge: bool
 ) -> str:
@@ -146,7 +104,6 @@ def get_action_execution_server_startup_command(
 
     # Build command components
     plugin_args = _build_plugin_args(plugins)
-    browsergym_args = _build_browsergym_args(runtime_config.browsergym_eval_env)
     username = _validate_and_get_username(override_username, app_config.run_as_Forge)
     user_id = override_user_id or (1000 if app_config.run_as_Forge else 0)
 
@@ -168,7 +125,6 @@ def get_action_execution_server_startup_command(
         username,
         "--user-id",
         str(user_id),
-        *browsergym_args,
     ]
 
     if not app_config.enable_browser:

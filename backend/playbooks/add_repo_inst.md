@@ -24,7 +24,7 @@ agent: Orchestrator
 ---
 
 This repository contains the code for Forge, an automated AI software engineer. It has a Python backend
-(in the `backend` directory) with a Textual TUI (in `backend/tui`).
+(in the `backend` directory) with a Textual TUI (in `tui`).
 
 ## General Setup:
 
@@ -50,8 +50,8 @@ Backend:
 
 TUI (Terminal User Interface):
 
-- Located in `backend/tui`
-- Launch: `python -m backend.tui` or `forge-tui`
+- Located in `tui`
+- Launch: `python -m tui` or `forge-tui`
 - Built with Textual framework (Python)
 ```
 

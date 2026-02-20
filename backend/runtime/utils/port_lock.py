@@ -59,7 +59,7 @@ class PortLock:
 
         self.lock_fd = os.open(
             self.lock_file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC
-        , encoding="utf-8")
+        )
         assert fcntl is not None
         fcntl_module = cast(Any, fcntl)
         start_time = time.time()
@@ -99,7 +99,7 @@ class PortLock:
             try:
                 self.lock_fd = os.open(
                     self.lock_file_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY
-                , encoding="utf-8")
+                )
                 self._locked = True
                 self._write_lock_info()
                 logger.debug("Acquired lock for port %s", self.port)

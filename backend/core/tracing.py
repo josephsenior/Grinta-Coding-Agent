@@ -64,7 +64,7 @@ def _should_initialize(enabled: bool) -> bool:
     if not enabled:
         logger.debug("Tracing disabled")
         return False
-    if _tracing_initialized:
+    if _state.initialized:
         logger.debug("Tracing already initialized")
         return False
     return True

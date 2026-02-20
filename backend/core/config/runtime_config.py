@@ -32,10 +32,6 @@ class RuntimeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default_factory=dict,
         description="The environment variables to set at the launch of the runtime",
     )
-    browsergym_eval_env: str | None = Field(
-        default=None,
-        description="The BrowserGym environment to use for browser evaluation",
-    )
     selected_repo: str | None = Field(
         default=None, description="Selected repository for runtime operations"
     )

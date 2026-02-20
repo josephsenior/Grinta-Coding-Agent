@@ -10,6 +10,26 @@ project_root = Path(__file__).parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+
+def _load_dotenv_local() -> None:
+    """Load .env.local into os.environ if present (mirrors PS1 startup scripts)."""
+    dotenv_path = project_root / ".env.local"
+    if not dotenv_path.exists():
+        return
+    with dotenv_path.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key and key not in os.environ:  # never overwrite existing env vars
+                os.environ[key] = val
+
+
+_load_dotenv_local()
+
 # Set environment variables
 os.environ.setdefault('PORT', '3000')
 
@@ -24,7 +44,7 @@ if __name__ == '__main__':
     print('Press Ctrl+C to stop the server.\n')
 
     uvicorn.run(
-        'backend.server.listen:app',
+        'backend.api.listen:app',
         host=host,
         port=port,
         log_level='info',

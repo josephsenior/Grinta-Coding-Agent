@@ -8,7 +8,6 @@ from backend.events.action import (
     Action,
     ActionConfirmationStatus,
     ActionSecurityRisk,
-    BrowseInteractiveAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -23,7 +22,6 @@ class SafetyService:
 
     _CONFIRMATION_TYPES = (
         CmdRunAction,
-        BrowseInteractiveAction,
         FileEditAction,
         FileReadAction,
     )

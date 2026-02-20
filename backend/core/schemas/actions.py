@@ -172,34 +172,6 @@ class SystemMessageActionSchema(ActionSchemaV1):
         return validate_non_empty_string(v, name="content")
 
 
-class BrowseInteractiveActionSchema(ActionSchemaV1):
-    """Schema for BrowseInteractiveAction."""
-
-    action_type: Literal["browse_interactive"] = Field(
-        ActionType.BROWSE_INTERACTIVE.value, frozen=True
-    )
-    runnable: bool = Field(True, frozen=True)
-    browser_actions: str = Field(
-        ...,
-        min_length=1,
-        description="Browser actions to perform (BrowserGym action code)",
-    )
-    browsergym_send_msg_to_user: str | None = Field(
-        default=None, description="Message to display to user"
-    )
-    return_axtree: bool = Field(
-        default=False, description="Whether to return accessibility tree"
-    )
-
-    @field_validator("browser_actions")
-    @classmethod
-    def validate_browser_actions(cls, v: str) -> str:
-        """Validate browser actions is non-empty."""
-        from backend.core.type_safety.type_safety import validate_non_empty_string
-
-        return validate_non_empty_string(v, name="browser_actions")
-
-
 class PlaybookFinishActionSchema(ActionSchemaV1):
     """Schema for PlaybookFinishAction."""
 
@@ -249,7 +221,6 @@ ActionSchemaUnion = Union[
     CmdRunActionSchema,
     MessageActionSchema,
     SystemMessageActionSchema,
-    BrowseInteractiveActionSchema,
     PlaybookFinishActionSchema,
     AgentRejectActionSchema,
     ChangeAgentStateActionSchema,

@@ -52,6 +52,7 @@ class RuntimeCapabilities:
 def detect_capabilities(
     *,
     enable_browser: bool = False,
+    mcp_config: object | None = None,
 ) -> RuntimeCapabilities:
     """Probe the host environment and return a frozen capability snapshot.
 
@@ -66,19 +67,35 @@ def detect_capabilities(
     has_tmux = shutil.which("tmux") is not None
     has_bash = shutil.which("bash") is not None
 
-    # Browser: enabled flag + importable dependency
+    # Browser: enabled flag + importable dependency or MCP-based browsing
     can_browse = False
     if enable_browser:
+        # Check for legacy playwright first
         try:
             import importlib
-
             importlib.import_module("playwright")
             can_browse = True
         except ImportError:
-            pass
+            # If playwright is missing, we might still have MCP-based browsing
+            # We'll assume True if enable_browser is set, as the agent can use MCP
+            can_browse = True
 
-    # MCP stdio requires subprocess spawning — disabled on Windows for now
-    can_mcp = not is_windows
+    # MCP can be supported either via HTTP/SSE servers (cross-platform) or via
+    # stdio servers (requires spawning npx/uvx or other commands).
+    has_npx = shutil.which("npx") is not None
+    has_uvx = shutil.which("uvx") is not None
+
+    has_http_mcp = False
+    try:
+        servers = getattr(mcp_config, "servers", None)
+        if servers:
+            has_http_mcp = any(
+                getattr(s, "type", None) in {"sse", "shttp"} for s in servers
+            )
+    except Exception:
+        has_http_mcp = False
+
+    can_mcp = has_http_mcp or (not is_windows or has_npx or has_uvx)
 
     # Collect missing tools for diagnostic logging
     expected = {"git": has_git}

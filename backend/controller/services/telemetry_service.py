@@ -23,8 +23,10 @@ class TelemetryService:
         from backend.controller.pre_exec_diff import PreExecDiffMiddleware
         from backend.controller.rollback_middleware import RollbackMiddleware
         from backend.controller.tool_pipeline import (
+            AutoCheckMiddleware,
             CircuitBreakerMiddleware,
             ConflictDetectionMiddleware,
+            ContextWindowMiddleware,
             CostQuotaMiddleware,
             EditVerifyMiddleware,
             ErrorPatternMiddleware,
@@ -58,6 +60,7 @@ class TelemetryService:
             IdempotencyMiddleware(),
             CircuitBreakerMiddleware(controller),
             CostQuotaMiddleware(controller),
+            ContextWindowMiddleware(controller),
         ]
         if planning_enabled:
             middlewares.append(PlanningMiddleware(controller))
@@ -69,6 +72,8 @@ class TelemetryService:
         middlewares.append(PreExecDiffMiddleware())
         # Auto-verify hint after file edits
         middlewares.append(EditVerifyMiddleware())
+        # Auto-check syntax after file edits
+        middlewares.append(AutoCheckMiddleware())
         # Warn when re-editing a file without verifying in between
         middlewares.append(ConflictDetectionMiddleware())
         # Auto-query error_patterns DB when errors arrive

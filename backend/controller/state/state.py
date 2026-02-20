@@ -24,7 +24,7 @@ from backend.memory.view import View
 from backend.storage.locations import get_conversation_agent_state_filename
 
 if TYPE_CHECKING:
-    from backend.server.services.conversation_stats import ConversationStats
+    from backend.api.services.conversation_stats import ConversationStats
     from backend.storage.files import FileStore
 
 RESUMABLE_STATES = [

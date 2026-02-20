@@ -3,9 +3,6 @@
 from backend.memory.condenser.impl.amortized_forgetting_condenser import (
     AmortizedForgettingCondenser,
 )
-from backend.memory.condenser.impl.browser_output_condenser import (
-    BrowserOutputCondenser,
-)
 from backend.memory.condenser.impl.conversation_window_condenser import (
     ConversationWindowCondenser,
 )
@@ -33,7 +30,6 @@ from backend.memory.condenser.impl.structured_summary_condenser import (
 
 __all__ = [
     "AmortizedForgettingCondenser",
-    "BrowserOutputCondenser",
     "CondenserPipeline",
     "ConversationWindowCondenser",
     "ImportantEventSelection",

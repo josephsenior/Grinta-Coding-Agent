@@ -19,7 +19,7 @@ backend/
 
 ## Package Structure
 
-All Python code lives under `backend/`. The CLI and TUI entry points are in `backend/interface/` and `backend/tui/` respectively.  Scripts like `forge` and `forge-tui` are configured in `pyproject.toml`.
+All Python code lives under `backend/`. The CLI and TUI entry points are in `backend/cli/` and `tui/` respectively.  Scripts like `forge` and `forge-tui` are configured in `pyproject.toml`.
 
 ## Running Tests
 

@@ -14,8 +14,6 @@ from backend.core.message import (
 from backend.events.action import (
     Action,
     AgentThinkAction,
-    BrowseInteractiveAction,
-    BrowseURLAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -78,8 +76,6 @@ def _is_tool_based_action(action: Action) -> bool:
         AgentThinkAction,
         FileEditAction,
         FileReadAction,
-        BrowseInteractiveAction,
-        BrowseURLAction,
         MCPAction,
         TaskTrackingAction,
     )

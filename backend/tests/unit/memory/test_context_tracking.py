@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 
 from backend.memory.context_tracking import ContextTracker
+from backend.memory.graph_store import GraphMemoryStore, NodeType
 from backend.memory.memory_types import DecisionType
 
 
@@ -27,6 +28,42 @@ class TestContextTrackerInit:
         assert tracker.vector_store is mock_store
         assert tracker.decisions == {}
         assert tracker.anchors == {}
+
+
+class TestGraphRAGWiring:
+    def test_store_in_memory_indexes_graph(self, tmp_path):
+        mock_store = MagicMock()
+        graph_store = GraphMemoryStore(persistence_path=str(tmp_path / "graph.json"))
+        tracker = ContextTracker(vector_store=mock_store, graph_store=graph_store)
+
+        tracker.store_in_memory(
+            event_id="e1",
+            role="observation",
+            content="import os\nfrom foo import bar\n",
+            metadata={"file_path": "example.py"},
+        )
+
+        assert graph_store.graph.has_node("example.py")
+
+    def test_recall_from_memory_prepends_graph_rag_context(self, tmp_path):
+        mock_store = MagicMock()
+        # Ensure semantic search returns a seed with file_path metadata
+        mock_store.search.return_value = [
+            {
+                "content_text": "something about the file",
+                "metadata": {"file_path": "example.py"},
+            }
+        ]
+        graph_store = GraphMemoryStore(persistence_path=str(tmp_path / "graph.json"))
+        tracker = ContextTracker(vector_store=mock_store, graph_store=graph_store)
+
+        # Create a minimal node so graph expansion doesn't error.
+        graph_store.add_node("example.py", NodeType.FILE)
+
+        results = tracker.recall_from_memory("example", k=3)
+        assert results
+        assert results[0]["role"] == "graph_rag"
+        assert "### Semantic Matches" in results[0]["content_text"]
 
 
 class TestTrackDecision:

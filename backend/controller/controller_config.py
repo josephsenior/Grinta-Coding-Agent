@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from backend.core.config import AgentConfig, LLMConfig
     from backend.events.event import Event
     from backend.security.analyzer import SecurityAnalyzer
-    from backend.server.services.conversation_stats import ConversationStats
+    from backend.api.services.conversation_stats import ConversationStats
     from backend.storage.files import FileStore
 
 from backend.controller.agent import Agent

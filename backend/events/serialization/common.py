@@ -17,4 +17,5 @@ COMMON_METADATA_FIELDS = (
 UNDERSCORE_KEYS = list(COMMON_METADATA_FIELDS) + [
     "llm_metrics",
     "reason",
+    "tool_result",
 ]

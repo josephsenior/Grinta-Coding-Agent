@@ -50,8 +50,6 @@ class ActionExecutionClient(Runtime):
             "read",
             "write",
             "edit",
-            "browse",
-            "browse_interactive",
             "think",
             "null",
             "finish_playbook",
@@ -101,7 +99,7 @@ class ActionExecutionClient(Runtime):
     async def connect(self) -> None:
         pass
 
-    def get_mcp_config(self, extra_stdio_servers: list[Any] | None = None) -> Any:
+    def get_mcp_config(self, extra_servers: list[Any] | None = None) -> Any:
         if sys.platform == "win32":
             from backend.core.config.mcp_config import MCPConfig
 
@@ -110,31 +108,32 @@ class ActionExecutionClient(Runtime):
         resp = self._send_action_server_request("GET", "/mcp_config")  # type: ignore[unreachable]
         data = resp.json()
 
-        from backend.core.config.mcp_config import MCPConfig, MCPSSEServerConfig
+        from backend.core.config.mcp_config import MCPConfig, MCPServerConfig
 
         config = MCPConfig(
-            sse_servers=data.get("sse_servers", []),
-            stdio_servers=data.get("stdio_servers", []),
-            shttp_servers=data.get("shttp_servers", []),
+            servers=[MCPServerConfig(**s) for s in data.get("servers", [])]
         )
 
         # Add default SSE server if none from server
-        if not config.sse_servers:
-            config.sse_servers.append(
-                MCPSSEServerConfig(
-                    url=f"{getattr(self, 'action_execution_server_url', '')}/mcp"
+        if not config.servers:
+            config.servers.append(
+                MCPServerConfig(
+                    name="default",
+                    type="sse",
+                    url=f"{getattr(self, 'action_execution_server_url', '')}/mcp",
+                    transport="sse"
                 )
             )
 
-        if extra_stdio_servers:
-            config.stdio_servers.extend(extra_stdio_servers)
+        if extra_servers:
+            config.servers.extend(extra_servers)
             # Update server if needed
             self._send_action_server_request(
                 "POST",
                 "/mcp_config",
-                json={"stdio_servers": [s.__dict__ for s in config.stdio_servers]},
+                json={"servers": [s.model_dump() for s in config.servers]},
             )
-            self._last_updated_mcp_stdio_servers = config.stdio_servers
+            self._last_updated_mcp_stdio_servers = extra_servers
 
         return config
 
@@ -194,12 +193,6 @@ class ActionExecutionClient(Runtime):
             "GET", "/list_files", params={"path": path, "recursive": recursive}
         )
         return resp.json()
-
-    def browse(self, action: Any) -> Any:
-        return self._execute_action_on_server(action)
-
-    def browse_interactive(self, action: Any) -> Any:
-        return self._execute_action_on_server(action)
 
     async def call_tool_mcp(self, action: Any) -> Any:
         """Call an MCP tool.  Not available on Windows."""

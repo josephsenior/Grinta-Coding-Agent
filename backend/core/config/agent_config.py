@@ -155,6 +155,10 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         description="Enable task planning and decomposition (task tracker tool)",
     )
     enable_mcp: bool = Field(default=DEFAULT_AGENT_MCP_ENABLED)
+    enable_web_search: bool = Field(
+        default=True,
+        description="Enable the web_search tool (DuckDuckGo, no API key required)",
+    )
     enable_auto_planning: bool = Field(
         default=DEFAULT_AGENT_AUTO_PLANNING_ENABLED,
         description="Automatically decompose complex tasks before execution",

@@ -21,7 +21,7 @@ poetry install
 python start_server.py
 
 # TUI (separate terminal)
-python -m backend.tui
+python -m tui
 ```
 
 ## How to Contribute
@@ -74,12 +74,12 @@ types: feat, fix, refactor, docs, test, chore, perf
 | `backend/controller/services/` | Service classes composing the controller |
 | `backend/events/` | Event sourcing, backpressure-aware stream, durable writer |
 | `backend/storage/` | File & DB storage implementations |
-| `backend/server/` | FastAPI app, routes, middleware, Socket.IO |
+| `backend/api/` | FastAPI app, routes, middleware, Socket.IO |
 | `backend/engines/` | Agent engines (orchestrator, echo, etc.) |
 | `backend/memory/` | Context condensers, RAG, vector store |
 | `backend/core/` | Config (Pydantic), exceptions, schemas, logging |
 | `backend/security/` | Security analyzer, input validation |
-| `backend/tui/` | Textual TUI (screens, widgets, client) |
+| `tui/` | Textual TUI (screens, widgets, client) |
 
 ### Controller Service Map
 

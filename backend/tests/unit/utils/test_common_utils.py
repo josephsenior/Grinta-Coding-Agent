@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from backend.llm.llm_registry import LLMRegistry
-from backend.server.services.conversation_stats import ConversationStats
+from backend.api.services.conversation_stats import ConversationStats
 from backend.storage.data_models.settings import Settings
 from backend.core.config.forge_config import ForgeConfig
 from backend.utils.utils import (

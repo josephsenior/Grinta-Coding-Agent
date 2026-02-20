@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 import shlex
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlparse
 
 from pydantic import (
@@ -19,6 +19,7 @@ from pydantic import (
 
 from backend._canonical import CanonicalModelMetaclass
 from backend.core.constants import DEFAULT_FORGE_MCP_CONFIG_CLS
+from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.forge_config import ForgeConfig
@@ -54,50 +55,38 @@ def _validate_mcp_url(url: str) -> str:
         raise ValueError(msg) from e
 
 
-class MCPSSEServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for a single MCP server.
+class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
+    """Unified configuration for MCP servers (stdio, SSE, or sHTTP).
 
     Attributes:
-        url: The server URL
-        api_key: Optional API key for authentication
-
-    """
-
-    url: str
-    api_key: str | None = None
-
-    @field_validator("url")
-    @classmethod
-    def validate_url(cls, v: str) -> str:
-        """Validate URL format for MCP servers."""
-        return _validate_mcp_url(v)
-
-
-class MCPStdioServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for a MCP server that uses stdio.
-
-    Attributes:
-        name: The name of the server
-        command: The command to run the server
-        args: The arguments to pass to the server
-        env: The environment variables to set for the server
+        name: The server name (required for stdio, optional for remote)
+        type: Server type - stdio, sse, or shttp
+        command: Command to run (stdio only)
+        args: Arguments to pass to command (stdio only)
+        env: Environment variables (stdio only)
+        url: Server URL (sse and shttp only)
+        api_key: Optional API key (sse and shttp only)
+        transport: Transport protocol for shttp (sse or shttp, defaults to sse)
 
     """
 
     name: str
-    command: str
+    type: Literal["stdio", "sse", "shttp"]
+    command: str | None = None
     args: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
+    url: str | None = None
+    api_key: str | None = None
+    transport: Literal["sse", "shttp"] = "sse"
 
     @field_validator("name", mode="before")
     @classmethod
-    def validate_server_name(cls, v: str) -> str:
-        """Validate server name for stdio MCP servers with type-safe validation."""
+    def validate_name(cls, v: str) -> str:
+        """Validate server name."""
         from backend.core.type_safety.type_safety import validate_non_empty_string
 
-        # Use type-safe validation
         try:
-            validate_non_empty_string(v, name="server_name")
+            validate_non_empty_string(v, name="name")
         except ValueError as e:
             raise ValueError(f"Server name cannot be empty: {e}") from e
 
@@ -109,11 +98,12 @@ class MCPStdioServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     @field_validator("command", mode="before")
     @classmethod
-    def validate_command(cls, v: str) -> str:
-        """Validate command for stdio MCP servers with type-safe validation."""
+    def validate_command(cls, v: str | None) -> str | None:
+        """Validate command for stdio servers."""
+        if v is None:
+            return None
         from backend.core.type_safety.type_safety import validate_non_empty_string
 
-        # Use type-safe validation
         try:
             validate_non_empty_string(v, name="command")
         except ValueError as e:
@@ -122,24 +112,13 @@ class MCPStdioServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         v = v.strip()
         if " " in v:
             msg = "Command should be a single executable without spaces (use arguments field for parameters)"
-            raise ValueError(
-                msg,
-            )
+            raise ValueError(msg)
         return v
 
     @field_validator("args", mode="before")
     @classmethod
     def parse_args(cls, v) -> list[str]:
-        """Parse arguments from string or return list as-is.
-
-        Supports shell-like argument parsing using shlex.split().
-
-        Examples:
-        - "-y mcp-remote https://example.com"
-        - '--config "path with spaces" --debug'
-        - "arg1 arg2 arg3"
-
-        """
+        """Parse arguments from string or return list as-is."""
         if isinstance(v, str):
             if not v.strip():
                 return []
@@ -147,12 +126,8 @@ class MCPStdioServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             try:
                 return shlex.split(v)
             except ValueError as e:
-                msg = f"""Invalid argument format: {
-                    e!s
-                }. Use shell-like format, e.g., "arg1 arg2" or '--config "value with spaces"'"""
-                raise ValueError(
-                    msg,
-                ) from e
+                msg = f"Invalid argument format: {e!s}. Use shell-like format, e.g., \"arg1 arg2\" or '--config \"value with spaces\"'"
+                raise ValueError(msg) from e
         return v or []
 
     @field_validator("env", mode="before")
@@ -177,94 +152,82 @@ class MCPStdioServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 msg = "Environment variable key cannot be empty"
                 raise ValueError(msg)
             if not re.match("^[a-zA-Z_][a-zA-Z0-9_]*$", key):
-                msg = (
-                    f"Invalid environment variable name '{key}'. Must start with "
-                    "letter or underscore, contain only alphanumeric characters "
-                    "and underscores"
-                )
-                raise ValueError(
-                    msg,
-                )
+                msg = f"Invalid environment variable name '{key}'. Must start with letter or underscore, contain only alphanumeric characters and underscores"
+                raise ValueError(msg)
             env[key] = value
         return env
 
-    def __eq__(self, other):
-        """Override equality operator to compare server configurations.
+    @field_validator("url", mode="before")
+    @classmethod
+    def validate_url(cls, v: str | None) -> str | None:
+        """Validate URL format for remote MCP servers."""
+        if v is None:
+            return None
+        return _validate_mcp_url(v)
 
-        Two server configurations are considered equal if they have the same
-        name, command, args, and env values. The order of args is important,
-        but the order of env variables is not.
-        """
-        if not isinstance(other, MCPStdioServerConfig):
+    @model_validator(mode="after")
+    def validate_type_specific_fields(self) -> MCPServerConfig:
+        """Ensure required fields are present for the server type."""
+        if self.type == "stdio":
+            if not self.command:
+                msg = "stdio servers must specify 'command'"
+                raise ValueError(msg)
+        elif self.type in ("sse", "shttp"):
+            if not self.url:
+                msg = f"{self.type} servers must specify 'url'"
+                raise ValueError(msg)
+            if self.type == "sse":
+                self.transport = "sse"
+        return self
+
+    @classmethod
+    def from_dict(cls, name: str, data: dict) -> MCPServerConfig:
+        """Create MCPServerConfig from a dictionary (e.g. from config.json)."""
+        config = data.copy()
+        config["name"] = name
+        if "command" in config and "type" not in config:
+            config["type"] = "stdio"
+        elif "url" in config and "type" not in config:
+            config["type"] = "sse"
+        return cls(**config)
+
+    def __eq__(self, other):
+        """Override equality operator to compare server configurations."""
+        if not isinstance(other, MCPServerConfig):
             return False
         return (
             self.name == other.name
+            and self.type == other.type
             and self.command == other.command
-            and (self.args == other.args)
-            and (set(self.env.items()) == set(other.env.items()))
+            and self.args == other.args
+            and set(self.env.items()) == set(other.env.items())
+            and self.url == other.url
+            and self.api_key == other.api_key
+            and self.transport == other.transport
         )
 
 
-class MCPSHTTPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for HTTP-based MCP servers.
-
-    Attributes:
-        url: URL of the MCP HTTP server
-        api_key: Optional API key for authentication
-
-    """
-
-    url: str
-    api_key: str | None = None
-
-    @field_validator("url", mode="before")
-    @classmethod
-    def validate_url(cls, v: str) -> str:
-        """Validate URL format for MCP servers."""
-        return _validate_mcp_url(v)
+# Backward compat: type aliases for imports (mark as deprecated)
+MCPRemoteServerConfig = MCPServerConfig
+MCPStdioServerConfig = MCPServerConfig
 
 
 class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for MCP (Message Control Protocol) settings.
 
     Attributes:
-        sse_servers: List of MCP SSE server configs
-        stdio_servers: List of MCP stdio server configs. These servers will be
-            added to the MCP Router running inside runtime container.
-        shttp_servers: List of MCP HTTP server configs.
+        enabled: Whether MCP is enabled
+        servers: List of MCP server configurations
 
     """
 
-    sse_servers: list[MCPSSEServerConfig] = Field(default_factory=list)
-    stdio_servers: list[MCPStdioServerConfig] = Field(default_factory=list)
-    shttp_servers: list[MCPSHTTPServerConfig] = Field(default_factory=list)
+    enabled: bool = False
+    servers: list[MCPServerConfig] = Field(default_factory=list)
     model_config = ConfigDict(extra="forbid")
 
-    @staticmethod
-    def _normalize_servers(servers_data: list[dict | str]) -> list[dict]:
-        """Normalize SSE server configurations into a consistent format."""
-        normalized = []
-        for server in servers_data:
-            if isinstance(server, str):
-                normalized.append({"url": server})
-            else:
-                normalized.append(server)
-        return normalized
-
-    @model_validator(mode="before")
-    @classmethod
-    def convert_string_urls(cls, data):
-        """Convert string URLs to MCPSSEServerConfig objects."""
-        if isinstance(data, dict):
-            if "sse_servers" in data:
-                data["sse_servers"] = cls._normalize_servers(data["sse_servers"])
-            if "shttp_servers" in data:
-                data["shttp_servers"] = cls._normalize_servers(data["shttp_servers"])
-        return data
-
     def validate_servers(self) -> None:
-        """Validate that server URLs are valid and unique."""
-        urls = [server.url for server in self.sse_servers]
+        """Validate that server URLs (for remote servers) are unique."""
+        urls = [s.url for s in self.servers if s.url]
         if len(set(urls)) != len(urls):
             msg = "Duplicate MCP server URLs are not allowed"
             raise ValueError(msg)
@@ -280,46 +243,75 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     @classmethod
     def from_toml_section(cls, data: dict) -> dict[str, MCPConfig]:
-        """Create a mapping of MCPConfig instances from a toml dictionary representing the [mcp] section.
+        """Create MCPConfig from [mcp] section of toml file.
 
-        The configuration is built from all keys in data.
+        Filters out stdio servers on Windows unless explicitly enabled.
 
         Returns:
-            dict[str, MCPConfig]: A mapping where the key "mcp" corresponds to the [mcp] configuration
+            dict[str, MCPConfig]: A mapping where key "mcp" contains the config
 
         """
+        import platform
+        import json
+
+        _known_keys = {"enabled", "servers"}
+        unknown = set(data) - _known_keys
+        if unknown:
+            msg = f"Invalid MCP configuration: unknown keys: {', '.join(sorted(unknown))}"
+            raise ValueError(msg)
+
         mcp_mapping: dict[str, MCPConfig] = {}
         try:
-            if "sse_servers" in data:
-                data["sse_servers"] = cls._normalize_servers(data["sse_servers"])
-                servers: list[
-                    MCPSSEServerConfig | MCPStdioServerConfig | MCPSHTTPServerConfig
-                ] = [MCPSSEServerConfig(**server) for server in data["sse_servers"]]
-                data["sse_servers"] = servers
-            if "stdio_servers" in data:
-                servers = [
-                    MCPStdioServerConfig(**server) for server in data["stdio_servers"]
-                ]
-                data["stdio_servers"] = servers
-            if "shttp_servers" in data:
-                data["shttp_servers"] = cls._normalize_servers(data["shttp_servers"])
-                servers = [
-                    MCPSHTTPServerConfig(**server) for server in data["shttp_servers"]
-                ]
-                data["shttp_servers"] = servers
-            mcp_config = MCPConfig.model_validate(data)
+            enabled = data.get("enabled", False)
+            servers_data = data.get("servers", [])
+            if isinstance(servers_data, dict):
+                # Handle case where single server is a dict
+                servers_data = [servers_data]
+
+            servers = [MCPServerConfig(**s) for s in servers_data]
+
+            # Load additional servers from backend/runtime/mcp/config.json if it exists
+            mcp_json_path = os.path.join("backend", "runtime", "mcp", "config.json")
+            if os.path.exists(mcp_json_path):
+                try:
+                    with open(mcp_json_path) as f:
+                        mcp_json = json.load(f)
+                        if "mcpServers" in mcp_json:
+                            existing_names = {s.name for s in servers}
+                            for name, srv_data in mcp_json["mcpServers"].items():
+                                if name == "default":
+                                    continue
+                                if name not in existing_names:
+                                    servers.append(MCPServerConfig.from_dict(name, srv_data))
+                                    # Use print instead of logger to avoid circular import issues during config load
+                                    print(f"Loaded MCP server '{name}' from {mcp_json_path}")
+                except Exception as e:
+                    print(f"Failed to load MCP servers from {mcp_json_path}: {e}")
+
+            # Filter out stdio servers on Windows unless explicitly enabled
+            if (
+                platform.system() == "Windows"
+                and not os.getenv("FORGE_ENABLE_WINDOWS_MCP")
+            ):
+                original_count = len(servers)
+                # Allow npx/uvx-based servers even on Windows
+                servers = [s for s in servers if s.type != "stdio" or s.name in ("browser-use", "context7", "shadcn", "github", "fetch", "duckduckgo", "magic", "rigour")]
+                skipped = original_count - len(servers)
+                if skipped > 0:
+                    logger.info(
+                        "Windows stdlib MCP disabled by default: filtered out %s stdio server(s); HTTP/SSE MCP remains enabled.",
+                        skipped,
+                    )
+
+            mcp_config = cls(enabled=enabled, servers=servers)
             mcp_config.validate_servers()
-            mcp_mapping["mcp"] = cls(
-                sse_servers=mcp_config.sse_servers,
-                stdio_servers=mcp_config.stdio_servers,
-                shttp_servers=mcp_config.shttp_servers,
-            )
+            mcp_mapping["mcp"] = mcp_config
         except ValidationError as e:
             msg = f"Invalid MCP configuration: {e}"
             raise ValueError(msg) from e
         return mcp_mapping
 
-    def merge(self, other: MCPConfig):
+    def merge(self, other: MCPConfig) -> MCPConfig:
         """Merge this config with another MCP config.
 
         Args:
@@ -330,10 +322,25 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         """
         return MCPConfig(
-            sse_servers=self.sse_servers + other.sse_servers,
-            stdio_servers=self.stdio_servers + other.stdio_servers,
-            shttp_servers=self.shttp_servers + other.shttp_servers,
+            enabled=self.enabled or other.enabled,
+            servers=self.servers + other.servers,
         )
+
+    # Backward compatibility: support old three-list format
+    @property
+    def sse_servers(self) -> list:
+        """Backward compat: return SSE servers from unified list."""
+        return [s for s in self.servers if s.type == "sse"]
+
+    @property
+    def stdio_servers(self) -> list:
+        """Backward compat: return stdio servers from unified list."""
+        return [s for s in self.servers if s.type == "stdio"]
+
+    @property
+    def shttp_servers(self) -> list:
+        """Backward compat: return sHTTP servers from unified list."""
+        return [s for s in self.servers if s.type == "shttp"]
 
 
 class ForgeMCPConfig:
@@ -344,7 +351,7 @@ class ForgeMCPConfig:
         host: str,
         config: ForgeConfig,
         user_id: str | None = None,
-    ) -> tuple[MCPSHTTPServerConfig | None, list[MCPStdioServerConfig]]:
+    ) -> tuple[MCPServerConfig | None, list[MCPServerConfig]]:
         """Create a default MCP server configuration.
 
         Args:
@@ -352,13 +359,15 @@ class ForgeMCPConfig:
             config: ForgeConfig
             user_id: Optional user ID for the MCP server
         Returns:
-            tuple[MCPSHTTPServerConfig | None, list[MCPStdioServerConfig]]:
-                A tuple containing the default SHTTP server configuration
+            tuple[MCPServerConfig | None, list[MCPServerConfig]]:
+                A tuple containing the default remote server configuration
                 (or None) and a list of MCP stdio server configurations
 
         """
-        stdio_servers: list[MCPStdioServerConfig] = []
-        shttp_servers = MCPSHTTPServerConfig(url=f"http://{host}/mcp/mcp", api_key=None)
+        stdio_servers: list[MCPServerConfig] = []
+        shttp_servers = MCPServerConfig(
+            name="forge-mcp", type="shttp", url=f"http://{host}/mcp/mcp", api_key=None
+        )
         return (shttp_servers, stdio_servers)
 
 
@@ -369,9 +378,8 @@ FORGE_mcp_config_cls = os.environ.get(
 ForgeMCPConfigImpl = get_impl(ForgeMCPConfig, FORGE_mcp_config_cls)
 
 __all__ = [
-    "MCPSSEServerConfig",
+    "MCPRemoteServerConfig",
     "MCPStdioServerConfig",
-    "MCPSHTTPServerConfig",
     "MCPConfig",
     "ForgeMCPConfig",
     "ForgeMCPConfigImpl",

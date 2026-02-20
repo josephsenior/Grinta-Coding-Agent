@@ -44,6 +44,14 @@ def create_finish_tool() -> ChatCompletionToolParam:
                 "description": "Concrete next steps the user should take to continue",
                 "items": {"type": "string"},
             },
+            "lessons_learned": {
+                "type": "string",
+                "description": (
+                    "Internal reflection on what you learned during this task. "
+                    "Identify recurring patterns, mistakes you made, or verified "
+                    "solutions that should be remembered for future sessions."
+                ),
+            },
         },
         required=["message"],
     )

@@ -27,6 +27,7 @@ TOP_KEYS = [
     "action",
     "observation",
     "tool_call_metadata",
+    "tool_result",
     "llm_metrics",
 ]
 from backend.events.serialization.common import UNDERSCORE_KEYS
@@ -79,6 +80,8 @@ def _process_key_value(key: str, value: Any) -> Any:
         return EventSource(value)
     if key == "tool_call_metadata":
         return _process_tool_call_metadata(value)
+    if key == "tool_result":
+        return value if isinstance(value, dict) else None
     if key == "llm_metrics":
         return _process_llm_metrics(value)
     return value

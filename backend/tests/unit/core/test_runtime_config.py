@@ -19,7 +19,6 @@ class TestRuntimeConfigDefaults:
         assert cfg.timeout == DEFAULT_RUNTIME_TIMEOUT
         assert cfg.enable_auto_lint is DEFAULT_RUNTIME_AUTO_LINT_ENABLED
         assert cfg.runtime_startup_env_vars == {}
-        assert cfg.browsergym_eval_env is None
         assert cfg.selected_repo is None
         assert cfg.close_delay == DEFAULT_RUNTIME_CLOSE_DELAY
         assert cfg.keep_runtime_alive is DEFAULT_RUNTIME_KEEP_ALIVE
@@ -43,7 +42,6 @@ class TestRuntimeConfigValidation:
             timeout=300,
             enable_auto_lint=False,
             runtime_startup_env_vars={"FOO": "BAR"},
-            browsergym_eval_env="webarena",
             selected_repo="owner/repo",
             close_delay=30,
             keep_runtime_alive=True,
@@ -51,7 +49,6 @@ class TestRuntimeConfigValidation:
         assert cfg.timeout == 300
         assert cfg.enable_auto_lint is False
         assert cfg.runtime_startup_env_vars == {"FOO": "BAR"}
-        assert cfg.browsergym_eval_env == "webarena"
         assert cfg.selected_repo == "owner/repo"
         assert cfg.close_delay == 30
         assert cfg.keep_runtime_alive is True

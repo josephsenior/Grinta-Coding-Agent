@@ -136,6 +136,10 @@ if (-not $readyPort) {
 }
 # --- End non-stream readiness probe ---
 
+# Auto-register with Forge: set env var so Python picks it up in _setup_memory_and_mcp
+$env:FORGE_SHADCN_MCP_URL = "http://localhost:$Port/sse"
+Write-Host "[env] FORGE_SHADCN_MCP_URL=http://localhost:$Port/sse (auto-registered with Forge)" -ForegroundColor Green
+
 if ($NoServe) { Write-Host '[done] Proxy running only. Use Get-Job/Receive-Job to monitor.' -ForegroundColor Yellow; exit 0 }
 
 Write-Host "[4/5] Launching Forge server..." -ForegroundColor Cyan

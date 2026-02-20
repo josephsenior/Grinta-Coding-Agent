@@ -1,5 +1,10 @@
 """Structured task tracking tool definition for CodeAct runs."""
 
+import json
+import os
+from pathlib import Path
+from typing import Any, List
+
 from backend.engines.orchestrator.tools.common import (
     create_tool_definition,
     get_command_param,
@@ -12,6 +17,32 @@ _TASK_TRACKER_DESCRIPTION = (
     "Use `view` to see the current plan steps and `update` to overwrite the plan."
     "Always `view` if unsure, then `update` to keep the plan current."
 )
+
+
+class TaskTracker:
+    """Manages the persistence of the task plan to disk."""
+
+    def __init__(self, workspace_root: str | Path | None = None):
+        """Initialize the task tracker with a workspace root."""
+        if workspace_root is None:
+            workspace_root = os.environ.get("FORGE_WORKSPACE_DIR", ".")
+        self.file_path = Path(workspace_root) / ".forge" / "active_plan.json"
+
+    def load_from_file(self) -> List[dict[str, Any]]:
+        """Load the task list from disk."""
+        if not self.file_path.exists():
+            return []
+        try:
+            with open(self.file_path, encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return []
+
+    def save_to_file(self, task_list: List[dict[str, Any]]) -> None:
+        """Save the task list to disk."""
+        self.file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            json.dump(task_list, f, indent=2, ensure_ascii=False)
 
 
 def create_task_tracker_tool() -> ChatCompletionToolParam:

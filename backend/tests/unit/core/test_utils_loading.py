@@ -34,7 +34,7 @@ class TestConfigLoadSummary:
         summary.record("core", "invalid", "bad value")
         summary.record_missing("agent", "section missing")
 
-        with patch("backend.core.logger.FORGE_logger.warning") as mock_warn:
+        with patch("backend.core.logger.forge_logger.warning") as mock_warn:
             summary.emit()
             mock_warn.assert_called_once()
             # args[0] is fmt, args[1] is file, args[2] is issues
@@ -58,7 +58,7 @@ class TestConfigLoadSummary:
 
     def test_emit_empty(self):
         summary = ConfigLoadSummary("test.toml")
-        with patch("backend.core.logger.FORGE_logger.warning") as mock_warn:
+        with patch("backend.core.logger.forge_logger.warning") as mock_warn:
             summary.emit()
             mock_warn.assert_not_called()
 
@@ -240,7 +240,7 @@ class TestLoadFromToml:
         toml_file = tmp_path / "bad.toml"
         toml_file.write_text("invalid = toml = here")
         cfg = ForgeConfig()
-        with patch("backend.core.logger.FORGE_logger.warning") as mock_warn:
+        with patch("backend.core.logger.forge_logger.warning") as mock_warn:
             load_from_toml(cfg, str(toml_file))
             mock_warn.assert_called()
 
@@ -256,7 +256,7 @@ class TestLoadFromToml:
         toml_file = tmp_path / "config.toml"
         toml_file.write_text('[agent]\nname = "test"')
         cfg = ForgeConfig()
-        with patch("backend.core.logger.FORGE_logger.warning") as mock_warn:
+        with patch("backend.core.logger.forge_logger.warning") as mock_warn:
             load_from_toml(cfg, str(toml_file))
             mock_warn.assert_any_call(
                 "No [core] section found in %s. Core settings will use defaults.",
@@ -355,7 +355,7 @@ class TestCoverageGapsV2:
         with patch(
             "backend.core.config.utils._load_toml_config", return_value={"agent": {}}
         ):
-            with patch("backend.core.logger.FORGE_logger.debug") as mock_debug:
+            with patch("backend.core.logger.forge_logger.debug") as mock_debug:
                 assert get_agent_config_arg("my_agent") is None
                 mock_debug.assert_any_call(
                     "Loading from toml failed for %s", "my_agent"
@@ -372,7 +372,7 @@ class TestCoverageGapsV2:
             ) as mock_create:
                 mock_cfg = MagicMock()
                 mock_create.return_value = mock_cfg
-                with patch("backend.core.logger.FORGE_logger.info") as mock_info:
+                with patch("backend.core.logger.forge_logger.info") as mock_info:
                     get_condenser_config_arg("c1")
                     mock_info.assert_called()
 
@@ -381,7 +381,7 @@ class TestCoverageGapsV2:
             "backend.core.config.utils._load_toml_config",
             return_value={"condenser": {"c2": {}}},
         ):
-            with patch("backend.core.logger.FORGE_logger.error") as mock_error:
+            with patch("backend.core.logger.forge_logger.error") as mock_error:
                 get_condenser_config_arg("c2")
                 mock_error.assert_called_with(
                     'Missing "type" field in [condenser.%s] section of %s',
@@ -399,7 +399,7 @@ class TestCoverageGapsV2:
             with patch(
                 "backend.core.config.utils.get_llm_config_arg", return_value=None
             ):
-                with patch("backend.core.logger.FORGE_logger.error") as mock_error:
+                with patch("backend.core.logger.forge_logger.error") as mock_error:
                     get_condenser_config_arg("c3")
                     mock_error.assert_any_call(
                         "Failed to load required LLM config '%s' for condenser '%s'.",

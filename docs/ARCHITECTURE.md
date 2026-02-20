@@ -86,7 +86,7 @@ Abstract `FileStore` interface with implementations:
 
 ## TUI Architecture
 
-The TUI is built with [Textual](https://textual.textualize.io/) and lives in `backend/tui/`.
+The TUI is built with [Textual](https://textual.textualize.io/) and lives in `tui/`.
 It communicates with the backend via the same REST + Socket.IO protocol.
 
 ### Key Components

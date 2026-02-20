@@ -18,7 +18,7 @@ from backend.events.observation import (
     ErrorObservation,
     FileReadObservation,
 )
-from backend.instruction import BasePlaybook, load_playbooks_from_dir
+from backend.playbook_engine import BasePlaybook, load_playbooks_from_dir
 from backend.utils.async_utils import GENERAL_TIMEOUT, call_async_from_sync
 
 if TYPE_CHECKING:

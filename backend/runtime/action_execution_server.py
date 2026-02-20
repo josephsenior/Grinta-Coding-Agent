@@ -24,13 +24,12 @@ from uvicorn import run
 
 from backend.core.logger import forge_logger as logger
 from backend.events.action import (
-    BrowseInteractiveAction,
-    BrowseURLAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
     FileWriteAction,
 )
+from backend.events.action.mcp import MCPAction
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.events.observation import (
     CmdOutputObservation,
@@ -104,8 +103,8 @@ class ActionExecutor:
         username: str,
         user_id: int,
         enable_browser: bool,
-        browsergym_eval_env: str | None,
         tool_registry: Any | None = None,  # ToolRegistry for cross-platform support
+        mcp_config: Any | None = None,
     ) -> None:
         """Create runtime executor, initialize workspace, and prepare tooling integrations."""
         self.username = username
@@ -113,7 +112,6 @@ class ActionExecutor:
         self._initial_cwd = work_dir
         self.max_memory_gb: int | None = None  # Will be set during ainit if available
         self.enable_browser = enable_browser
-        self.browsergym_eval_env = browsergym_eval_env
         self.browser: BrowserEnv | None = None
 
         self.bash_session: BashSession | None = None
@@ -133,6 +131,10 @@ class ActionExecutor:
         # Ensure downloads directory exists
         os.makedirs(self.downloads_directory, exist_ok=True)
 
+        # MCP clients are created lazily on first use.
+        self._mcp_config = mcp_config
+        self._mcp_clients: list[Any] | None = None
+
     @property
     def initial_cwd(self) -> str:
         """Get the initial working directory for the action execution server."""
@@ -147,9 +149,7 @@ class ActionExecutor:
             logger.info("Initializing browser environment...")
             from backend.runtime.browser.browser_env import BrowserEnv
 
-            self.browser = BrowserEnv(
-                browsergym_eval_env=self.browsergym_eval_env,
-            )
+            self.browser = BrowserEnv()
             logger.info("Browser environment initialized successfully")
         except Exception as e:
             logger.error("Failed to initialize browser: %s", e)
@@ -373,176 +373,151 @@ class ActionExecutor:
             return handle_file_read_errors(filepath, working_dir)
 
     async def write(self, action: FileWriteAction) -> Observation:
-        """Write content to a file with proper error handling."""
+        """Write a file and return an observation."""
+        assert self.bash_session is not None
+
+        working_dir = self.bash_session.cwd
+        filepath = resolve_path(action.path, working_dir)
+
+        try:
+            ensure_directory_exists(filepath)
+            file_exists = os.path.exists(filepath)
+            error_obs = write_file_content(filepath, action, file_exists)
+            if error_obs:
+                return error_obs
+            return FileWriteObservation(
+                content=f"Wrote file: {action.path}",
+                path=action.path,
+            )
+        except Exception as e:
+            logger.error("Error writing file %s: %s", action.path, e, exc_info=True)
+            return ErrorObservation(f"Failed to write file {action.path}: {e}")
+
+    async def edit(self, action: FileEditAction) -> Observation:
+        """Edit a file (FILE_EDITOR or LLM-based) and return an observation."""
         assert self.bash_session is not None
         working_dir = self.bash_session.cwd
         filepath = resolve_path(action.path, working_dir)
 
-        # Ensure directory exists
-        ensure_directory_exists(filepath)
-
-        # Prepare file metadata
-        file_exists = os.path.exists(filepath)
-        file_stat = os.stat(filepath) if file_exists else None
-
-        # Write file content
-        write_result = write_file_content(filepath, action, file_exists)
-        if isinstance(write_result, ErrorObservation):
-            return write_result
-
-        # Set file permissions and ownership
-        set_file_permissions(filepath, file_exists, file_stat)
-
-        return FileWriteObservation(content="", path=filepath)
-
-    async def edit(self, action: FileEditAction) -> Observation:
-        """Execute file edit operation."""
-        # We always expect FILE_EDITOR source now
-        assert action.impl_source == FileEditSource.FILE_EDITOR
-        from backend.core.schemas import ActionConfirmationStatus
-
-        is_mutating_file_edit = action.command != "view"
-        is_preview = (
-            is_mutating_file_edit
-            and getattr(action, "confirmation_state", None)
-            == ActionConfirmationStatus.AWAITING_CONFIRMATION
-        )
-
-        # Handle directory viewing specially
-        dir_obs = self._handle_edit_directory_view(action)
-        if dir_obs:
-            return dir_obs
-
-        result_str, (old_content, new_content) = execute_file_editor(
-            self.file_editor,
-            command=action.command,
-            path=action.path,
-            file_text=action.file_text,
-            old_str=action.old_str,
-            new_str=action.new_str,
-            insert_line=action.insert_line,
-            enable_linting=False,
-            dry_run=is_preview,
-        )
-        if is_preview and not result_str.startswith("ERROR:"):
-            result_str = (
-                "Preview generated (no changes applied). Confirm to apply these edits."
-            )
-
-        safe_old, safe_new, safe_diff = self._prepare_edit_observation_contents(
-            old_content, new_content, action.path
-        )
-
-        return FileEditObservation(
-            content=result_str,
-            path=action.path,
-            prev_exist=old_content is not None,
-            old_content=safe_old,
-            new_content=safe_new,
-            impl_source=FileEditSource.FILE_EDITOR,
-            diff=safe_diff,
-            preview=is_preview,
-        )
-
-    def _handle_edit_directory_view(self, action: FileEditAction) -> Observation | None:
-        """Handle 'view' command when path is a directory."""
-        if action.command != "view":
-            return None
+        # Directory view support
         try:
-            resolved_path = resolve_path(action.path, self._initial_cwd)
-            if os.path.exists(resolved_path) and os.path.isdir(resolved_path):
-                return handle_directory_view(resolved_path, action.path)
-        except (Exception, OSError, ValueError):
-            pass
-        return None
-
-    def _prepare_edit_observation_contents(
-        self, old_content: str | None, new_content: str | None, path: str
-    ) -> tuple[str | None, str | None, str]:
-        """Truncate contents and generate diff for observation."""
-        max_chars = get_max_edit_observation_chars()
-
-        def truncate(text, label):
-            return (
-                truncate_large_text(text, max_chars, label=label)
-                if text is not None
-                else None
-            )
-
-        safe_old = truncate(old_content, "edit.old_content")
-        safe_new = truncate(new_content, "edit.new_content")
-
-        diff_text = get_diff(old=safe_old or "", new=safe_new or "", path=path)
-        safe_diff = truncate_large_text(diff_text, max_chars, label="edit.diff")
-
-        return safe_old, safe_new, safe_diff
-
-    async def browse(self, action: BrowseURLAction) -> Observation:
-        """Browse URL and return page content."""
-        if self.browser is None:
-            return ErrorObservation(
-                "Browser functionality is not supported or disabled."
-            )
-        await self._ensure_browser_ready()
-        from backend.runtime.browser import browse
-
-        return await browse(action, self.browser, self.initial_cwd)
-
-    async def browse_interactive(self, action: BrowseInteractiveAction) -> Observation:
-        """Execute interactive browser commands via BrowserGym.
-
-        Args:
-            action: Browse interactive action with browser commands
-
-        Returns:
-            Browser observation with command results or error
-
-        """
-        if self.browser is None:
-            return ErrorObservation(
-                "Browser functionality is not supported or disabled."
-            )
-        await self._ensure_browser_ready()
-        from backend.runtime.browser import browse
-
-        browser_observation = await browse(action, self.browser, self.initial_cwd)
-        if not browser_observation.error:
-            return browser_observation
-        curr_files = os.listdir(self.downloads_directory)
-        new_download = False
-        for file in curr_files:
-            if file not in self.downloaded_files:
-                new_download = True
-                self.downloaded_files.append(file)
-                break
-        if not new_download:
-            return browser_observation
-        src_path = os.path.join(self.downloads_directory, self.downloaded_files[-1])
-        file_ext = ""
-        try:
-            guesses = puremagic.magic_file(src_path)
-            if guesses:
-                ext = guesses[0].extension.strip()
-                if ext:
-                    file_ext = ext
+            if os.path.isdir(filepath) and (action.command == "view" or not action.command):
+                return handle_directory_view(filepath, action.path)
         except Exception:
             pass
-        tgt_path = os.path.join(
-            "/workspace", f"file_{len(self.downloaded_files)}{file_ext}"
-        )
-        shutil.copy(src_path, tgt_path)
-        return FileDownloadObservation(
-            content=f"Execution of the previous action {action.browser_actions} resulted in a file download. The downloaded file is saved at location: {tgt_path}",
-            file_path=tgt_path,
-        )
+
+        # FILE_EDITOR mode (default)
+        if action.impl_source == FileEditSource.FILE_EDITOR or action.command:
+            command = action.command or "write"
+            result_str, (old_content, new_content) = execute_file_editor(
+                self.file_editor,
+                command=command,
+                path=action.path,
+                file_text=action.file_text,
+                view_range=action.view_range,
+                old_str=action.old_str,
+                new_str=action.new_str,
+                insert_line=action.insert_line,
+                enable_linting=bool(os.environ.get("ENABLE_AUTO_LINT", "").lower() in {"1", "true", "yes"}),
+            )
+            max_chars = get_max_edit_observation_chars()
+            result_str = truncate_large_text(result_str, max_chars, label="edit")
+            return FileEditObservation(
+                content=result_str,
+                path=action.path,
+                prev_exist=old_content is not None,
+                old_content=old_content,
+                new_content=new_content,
+                impl_source=FileEditSource.FILE_EDITOR,
+            )
+
+        # LLM-based range editing: apply by translating into a FileWriteAction
+        try:
+            old_text = ""
+            if os.path.exists(filepath) and os.path.isfile(filepath):
+                with open(filepath, encoding="utf-8", errors="replace") as f:
+                    old_text = f.read()
+
+            write_action = FileWriteAction(
+                path=action.path,
+                content=action.content,
+                start=action.start,
+                end=action.end,
+                thought=action.thought,
+            )
+            write_obs = await self.write(write_action)
+            if isinstance(write_obs, ErrorObservation):
+                return write_obs
+
+            with open(filepath, encoding="utf-8", errors="replace") as f:
+                new_text = f.read()
+
+            diff = get_diff(old_text, new_text, action.path)
+            return FileEditObservation(
+                content=diff,
+                path=action.path,
+                prev_exist=bool(old_text),
+                old_content=old_text,
+                new_content=new_text,
+                impl_source=FileEditSource.LLM_BASED_EDIT,
+            )
+        except Exception as e:
+            logger.error("Error editing file %s: %s", action.path, e, exc_info=True)
+            return ErrorObservation(f"Failed to edit file {action.path}: {e}")
+
+    async def mcp(self, action: MCPAction) -> Observation:
+        """Execute an MCP tool call using Forge's MCP client integration."""
+        try:
+            from backend.mcp_integration.utils import (
+                _is_windows_stdio_mcp_disabled,
+                call_tool_mcp,
+                create_mcps,
+            )
+            from backend.core.config.utils import load_forge_config
+
+            if self._mcp_clients is None:
+                # Prefer injected config (e.g. in-process runtime), fallback to load.
+                cfg = self._mcp_config
+                if cfg is None:
+                    cfg = load_forge_config().mcp
+
+                servers = getattr(cfg, "servers", []) or []
+                if _is_windows_stdio_mcp_disabled():
+                    servers = [s for s in servers if getattr(s, "type", None) != "stdio"]
+                self._mcp_clients = await create_mcps(servers)
+
+            return await call_tool_mcp(self._mcp_clients, action)  # type: ignore[arg-type]
+        except Exception as e:
+            logger.error("MCP call failed for %s: %s", action.name, e, exc_info=True)
+            return ErrorObservation(
+                content=(
+                    f"MCP tool call failed for '{action.name}': {type(e).__name__}: {e}. "
+                    "Use non-MCP tools as a fallback or check MCP configuration."
+                )
+            )
 
     def close(self) -> None:
-        """Close action execution server and clean up resources."""
-        self.memory_monitor.stop_monitoring()
+        """Clean up resources owned by the in-process executor."""
+        try:
+            self.cancellation_service.cancel_all()
+        except Exception:
+            pass
+        try:
+            self.memory_monitor.stop_monitoring()
+        except Exception:
+            pass
         if self.bash_session is not None:
-            self.bash_session.close()
+            try:
+                self.bash_session.close()
+            except Exception:
+                pass
+            self.bash_session = None
         if self.browser is not None:
-            self.browser.close()
+            try:
+                self.browser.close()
+            except Exception:
+                pass
+            self.browser = None
 
 
 # Initialize global variables for client and proxies
@@ -664,12 +639,6 @@ if __name__ == "__main__":
         default=True,
         help="Enable the browser environment",
     )
-    parser.add_argument(
-        "--browsergym-eval-env",
-        type=str,
-        help="BrowserGym environment used for browser evaluation",
-        default=None,
-    )
     args = parser.parse_args()
 
     logger.info("Starting file viewer server")
@@ -703,7 +672,6 @@ if __name__ == "__main__":
                 username=args.username,
                 user_id=args.user_id,
                 enable_browser=args.enable_browser,
-                browsergym_eval_env=args.browsergym_eval_env,
             )
             logger.info(
                 "ActionExecutor instance created. Starting async initialization..."
@@ -730,7 +698,9 @@ if __name__ == "__main__":
                     api_key=os.environ.get("SESSION_API_KEY"),
                     logger_level=logger.getEffectiveLevel(),
                 )
-                mcp_proxy_manager.initialize()
+                from backend.core.config.utils import load_forge_config
+                forge_config = load_forge_config()
+                mcp_proxy_manager.initialize(forge_config.mcp.servers)
                 allowed_origins = ["*"]
                 try:
                     await mcp_proxy_manager.mount_to_app(app, allowed_origins)

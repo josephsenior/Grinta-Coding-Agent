@@ -3,8 +3,8 @@ import logging
 
 from backend.core.config import ForgeConfig
 from backend.llm.llm_registry import LLMRegistry
-from backend.server.services.conversation_stats import ConversationStats
-from backend.server.session.session import Session
+from backend.api.services.conversation_stats import ConversationStats
+from backend.api.session.session import Session
 from backend.storage.local import LocalFileStore
 
 

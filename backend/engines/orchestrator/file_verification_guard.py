@@ -240,12 +240,13 @@ class FileVerificationGuard:
 
     def _create_stale_read_action(self, file_path: str) -> Action | None:
         """Create a command to re-read a stale file before editing."""
-        from backend.events.action import CmdRunAction
+        from backend.events.action import FileReadAction
 
         try:
-            cmd = f"cat -n {file_path} | head -100"
-            return CmdRunAction(
-                command=cmd,
+            return FileReadAction(
+                path=file_path,
+                start=1,
+                end=200,
                 thought=(
                     f"[STALE-READ PREVENTION] Re-reading {file_path} before edit — "
                     f"file content may have changed since last read."
@@ -302,22 +303,16 @@ class FileVerificationGuard:
         return None
 
     def _create_verification_command(self, file_path: str) -> Action | None:
-        from backend.events.action import CmdRunAction
+        from backend.events.action import FileReadAction
 
         try:
-            if file_path.endswith(".py"):
-                # Syntax-check Python files immediately so errors are caught,
-                # then show the tail (where edits landed) rather than the head.
-                cmd = (
-                    f"python -m py_compile {file_path} && "
-                    f"echo '[{file_path}: syntax OK]' && "
-                    f"tail -40 {file_path}"
-                )
-            else:
-                cmd = f"ls -lah {file_path} && echo '---' && tail -40 {file_path}"
-            return CmdRunAction(
-                command=cmd,
-                thought=f"[AUTO-VERIFY] Verifying file operation on {file_path}",
+            # Cross-platform, runtime-native verification: re-read a small preview.
+            # Deeper checks (existence/line count) are handled in runtime verification.
+            return FileReadAction(
+                path=file_path,
+                start=1,
+                end=200,
+                thought=f"[AUTO-VERIFY] Re-reading {file_path} after file operation",
             )
         except Exception:  # pragma: no cover - defensive
             return None
@@ -357,14 +352,18 @@ class FileVerificationGuard:
         if file_op_claims:
             # Verify that corresponding tools were called
             from backend.core.schemas import ActionType
-            from backend.events.action import CmdRunAction
 
             has_file_edit = any(
                 getattr(a, "action", None) == ActionType.EDIT for a in actions
             )
-            has_cmd_run = any(isinstance(a, CmdRunAction) for a in actions)
+            has_file_write = any(
+                getattr(a, "action", None) == ActionType.WRITE for a in actions
+            )
+            has_file_read = any(
+                getattr(a, "action", None) == ActionType.READ for a in actions
+            )
 
-            if not has_file_edit and not has_cmd_run:
+            if not (has_file_edit or has_file_write or has_file_read):
                 # Claimed file operation but no tools called!
                 error = "⚠️ HALLUCINATION PREVENTED: Response claims file operations but no tools called.\n"
                 error += "Claimed operations:\n"

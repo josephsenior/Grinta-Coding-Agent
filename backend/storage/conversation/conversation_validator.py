@@ -8,7 +8,7 @@ from typing import Literal
 
 from backend.core.config.utils import load_forge_config
 from backend.core.logger import forge_logger as logger
-from backend.server.config.server_config import ServerConfig
+from backend.api.config.server_config import ServerConfig
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.data_models.conversation_metadata import ConversationMetadata
 from backend.utils.conversation_summary import get_default_conversation_title

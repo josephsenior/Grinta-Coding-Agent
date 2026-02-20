@@ -17,7 +17,6 @@ from backend.core.exceptions import (
     FunctionCallValidationError,
 )
 from backend.llm.tool_names import (
-    BROWSER_TOOL_NAME,
     EXECUTE_BASH_TOOL_NAME,
     FINISH_TOOL_NAME,
     LLM_BASED_EDIT_TOOL_NAME,
@@ -103,7 +102,6 @@ def _get_tool_name_mapping() -> dict[str, str]:
     return {
         EXECUTE_BASH_TOOL_NAME: "execute_bash",
         STR_REPLACE_EDITOR_TOOL_NAME: "str_replace_editor",
-        BROWSER_TOOL_NAME: "browser",
         FINISH_TOOL_NAME: "finish",
         LLM_BASED_EDIT_TOOL_NAME: "edit_file",
     }

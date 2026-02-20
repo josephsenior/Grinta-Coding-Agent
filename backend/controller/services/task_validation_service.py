@@ -30,6 +30,9 @@ class TaskValidationService:
             True if finish should proceed (validation passed or not configured),
             False if validation failed and the agent should continue working.
         """
+        # Save any lessons learned before finishing
+        await self._save_lessons_learned(action)
+
         # Lightweight check: if code was edited, ensure tests were run recently
         if not getattr(action, "force_finish", False):
             if not await self._check_test_coverage(action):
@@ -42,6 +45,42 @@ class TaskValidationService:
             if not await self._validate_and_handle(action):
                 return False
         return True
+
+    async def _save_lessons_learned(self, action: PlaybookFinishAction) -> None:
+        """Persist lessons learned to a repository-level memory file."""
+        outputs = getattr(action, "outputs", {})
+        if not outputs or not isinstance(outputs, dict):
+            return
+            
+        lesson = outputs.get("lessons_learned")
+        if not lesson or not str(lesson).strip():
+            return
+            
+        import os
+        from datetime import datetime
+        
+        # Path to project-level session memory
+        project_root = self._context.get_controller().config.file_store.root_dir if self._context.get_controller().config.file_store else "."
+        memories_path = os.path.join(project_root, ".Forge", "lessons.md")
+        
+        try:
+            os.makedirs(os.path.dirname(memories_path), exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+            initial_task = self._context.get_controller()._get_initial_task()
+            summary = initial_task.description[:100] if initial_task else "Task"
+            
+            entry = (
+                f"\n## {timestamp} — {summary}\n"
+                f"{lesson}\n"
+            )
+            
+            with open(memories_path, "a", encoding="utf-8") as f:
+                f.write(entry)
+                
+            logger.info("Saved lessons learned to %s", memories_path)
+        except Exception as e:
+            logger.warning("Failed to save lessons learned: %s", e)
 
     # ── internals ───────────────────────────────────────────────────
 

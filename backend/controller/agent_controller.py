@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from backend.core.config import AgentConfig, LLMConfig
     from backend.events.event import Event
     from backend.security.analyzer import SecurityAnalyzer
-    from backend.server.services.conversation_stats import ConversationStats
+    from backend.api.services.conversation_stats import ConversationStats
     from backend.storage.files import FileStore
 
 from backend.controller.agent import Agent
@@ -384,6 +384,23 @@ class AgentController:
                     obs.tool_call_metadata = meta
                 obs.cause = getattr(self._pending_action, "id", None)
                 self.event_stream.add_event(obs, EventSource.AGENT)
+        # Emit ErrorObservations for any agent-queued actions that will be dropped
+        # so the LLM history stays coherent — unmatched tool calls are explained
+        # rather than silently pruned by filter_unmatched_tool_calls.
+        agent_pending = getattr(self.agent, "pending_actions", None)
+        if agent_pending:
+            for dropped_action in list(agent_pending):
+                if meta := getattr(dropped_action, "tool_call_metadata", None):
+                    obs = ErrorObservation(
+                        content=(
+                            "Action dropped: agent was reset before this tool call "
+                            "could execute. Re-run this action if still needed."
+                        ),
+                        error_id=ERROR_ACTION_NOT_EXECUTED_ERROR_ID,
+                    )
+                    obs.tool_call_metadata = meta
+                    obs.cause = getattr(dropped_action, "id", None)
+                    self.event_stream.add_event(obs, EventSource.AGENT)
         self._pending_action = None
         self.agent.reset()
 

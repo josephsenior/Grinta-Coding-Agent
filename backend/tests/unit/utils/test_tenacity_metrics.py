@@ -149,3 +149,13 @@ class TestTenacityAfterFactory:
         # Should not crash; outcome is None → not successful → check max attempts
         # No stop attr → max_attempts is None → isinstance check fails
         mock_record.assert_not_called()
+
+    def test_after_factory_outer_exception_suppressed(self):
+        """Test that the outer try-except in _after suppresses errors."""
+        # Force sanitize_operation_label to fail
+        with patch("backend.utils.tenacity_metrics.sanitize_operation_label", side_effect=ValueError("label error")):
+            hook = tenacity_after_factory("fail_op")
+            rs = _make_retry_state()
+            # This should hit the except Exception: block and logger.debug
+            hook(rs)
+            # Should not raise exception

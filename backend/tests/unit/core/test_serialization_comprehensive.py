@@ -120,11 +120,6 @@ class TestDeserializeAction:
         ev = deserialize_event(d)
         assert ev.__class__.__name__ == "SystemMessageActionSchema"
 
-    def test_browse_interactive_action(self):
-        d = _action_dict("browse_interactive", browser_actions="click(1)")
-        ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "BrowseInteractiveActionSchema"
-
     def test_unknown_action_type_raises(self):
         with pytest.raises(ValueError, match="Unknown action type"):
             deserialize_event(_action_dict("nonexistent"))

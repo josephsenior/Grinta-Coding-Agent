@@ -2,7 +2,6 @@
 
 from .apply_patch import create_apply_patch_tool
 from .bash import create_cmd_run_tool
-from .browser import create_browser_tool
 from .checkpoint import create_checkpoint_tool
 from .condensation_request import create_condensation_request_tool
 from .error_patterns import create_error_patterns_tool
@@ -30,7 +29,6 @@ from .workspace_status import create_workspace_status_tool
 
 __all__ = [
     "create_apply_patch_tool",
-    "create_browser_tool",
     "create_checkpoint_tool",
     "create_condensation_request_tool",
     "create_clarification_tool",

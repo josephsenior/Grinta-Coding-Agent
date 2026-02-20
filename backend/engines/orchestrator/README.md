@@ -91,12 +91,9 @@ CmdRunAction(
 
 ### Browser Automation
 
-**BrowseInteractiveAction** - Navigate and interact with websites:
-```python
-BrowseInteractiveAction(
-    browser_actions="goto('http://example.com')\nclick('button#submit')"
-)
-```
+**MCP Browser** - Modular browsing via Model Context Protocol. The
+orchestrator can access web browsing capabilities if an MCP server
+(like `browser-use`) is connected and `enable_browsing` is set to true.
 
 ### Communication
 

@@ -225,7 +225,7 @@ jobs:
           RUNTIME_CONTAINER_IMAGE=$image_name \
           TEST_IN_CI=true \
           RUN_AS_Forge=false \
-          poetry run pytest -n 0 -raRs --reruns 2 --reruns-delay 5 -s ./tests/runtime --ignore=tests/runtime/test_browsergym_envs.py --durations=10
+          poetry run pytest -n 0 -raRs --reruns 2 --reruns-delay 5 -s ./tests/runtime --durations=10
         env:
           DEBUG: "1"
 
@@ -284,7 +284,7 @@ jobs:
           RUNTIME_CONTAINER_IMAGE=$image_name \
           TEST_IN_CI=true \
           RUN_AS_Forge=true \
-          poetry run pytest -n 0 -raRs --reruns 2 --reruns-delay 5 -s ./tests/runtime --ignore=tests/runtime/test_browsergym_envs.py --durations=10
+          poetry run pytest -n 0 -raRs --reruns 2 --reruns-delay 5 -s ./tests/runtime --durations=10
         env:
           DEBUG: "1"
 

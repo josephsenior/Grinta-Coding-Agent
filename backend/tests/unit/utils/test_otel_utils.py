@@ -85,3 +85,15 @@ class TestRedisSpan:
             assert span is not None
         with redis_span("sadd") as span:
             assert span is not None
+
+    def test_handles_trace_context_import_error(self):
+        """Test handles missing trace context import error."""
+        # This triggers the inner ImportError for trace context injection
+        with patch.dict("sys.modules", {"backend.core.logger": None}):
+            from importlib import reload
+
+            import backend.utils.otel_utils
+
+            reload(backend.utils.otel_utils)
+            with backend.utils.otel_utils.redis_span("lpush") as span:
+                assert span is not None

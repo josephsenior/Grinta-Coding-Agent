@@ -10,11 +10,6 @@ from backend.llm import tool_names
 class TestToolNames(TestCase):
     """Test tool_names module constants."""
 
-    def test_browser_tool_name_exported(self):
-        """Test that BROWSER_TOOL_NAME is exported."""
-        self.assertTrue(hasattr(tool_names, "BROWSER_TOOL_NAME"))
-        self.assertIsInstance(tool_names.BROWSER_TOOL_NAME, str)
-
     def test_execute_bash_tool_name_exported(self):
         """Test that EXECUTE_BASH_TOOL_NAME is exported."""
         self.assertTrue(hasattr(tool_names, "EXECUTE_BASH_TOOL_NAME"))
@@ -43,7 +38,6 @@ class TestToolNames(TestCase):
     def test_all_exports_in_all_list(self):
         """Test that __all__ contains all expected exports."""
         expected_exports = [
-            "BROWSER_TOOL_NAME",
             "EXECUTE_BASH_TOOL_NAME",
             "FINISH_TOOL_NAME",
             "LLM_BASED_EDIT_TOOL_NAME",
@@ -51,12 +45,6 @@ class TestToolNames(TestCase):
             "TASK_TRACKER_TOOL_NAME",
         ]
         self.assertEqual(set(tool_names.__all__), set(expected_exports))
-
-    def test_browser_tool_name_value(self):
-        """Test BROWSER_TOOL_NAME has expected value from constants."""
-        from backend.core.constants import BROWSER_TOOL_NAME
-
-        self.assertEqual(tool_names.BROWSER_TOOL_NAME, BROWSER_TOOL_NAME)
 
     def test_execute_bash_tool_name_value(self):
         """Test EXECUTE_BASH_TOOL_NAME has expected value from constants."""
@@ -93,7 +81,6 @@ class TestToolNames(TestCase):
     def test_import_from_tool_names(self):
         """Test that constants can be imported from tool_names."""
         from backend.llm.tool_names import (
-            BROWSER_TOOL_NAME,
             EXECUTE_BASH_TOOL_NAME,
             FINISH_TOOL_NAME,
             LLM_BASED_EDIT_TOOL_NAME,
@@ -102,7 +89,6 @@ class TestToolNames(TestCase):
         )
 
         # Verify all imports succeeded
-        self.assertIsNotNone(BROWSER_TOOL_NAME)
         self.assertIsNotNone(EXECUTE_BASH_TOOL_NAME)
         self.assertIsNotNone(FINISH_TOOL_NAME)
         self.assertIsNotNone(LLM_BASED_EDIT_TOOL_NAME)
@@ -110,8 +96,8 @@ class TestToolNames(TestCase):
         self.assertIsNotNone(TASK_TRACKER_TOOL_NAME)
 
     def test_all_list_length(self):
-        """Test that __all__ contains exactly 6 exports."""
-        self.assertEqual(len(tool_names.__all__), 6)
+        """Test that __all__ contains exactly 5 exports."""
+        self.assertEqual(len(tool_names.__all__), 5)
 
     def test_no_extra_exports(self):
         """Test that only expected constants are exported in __all__."""
@@ -128,7 +114,6 @@ class TestToolNames(TestCase):
 
     def test_tool_names_are_non_empty_strings(self):
         """Test that all tool names are non-empty strings."""
-        self.assertTrue(tool_names.BROWSER_TOOL_NAME)
         self.assertTrue(tool_names.EXECUTE_BASH_TOOL_NAME)
         self.assertTrue(tool_names.FINISH_TOOL_NAME)
         self.assertTrue(tool_names.LLM_BASED_EDIT_TOOL_NAME)
@@ -139,7 +124,6 @@ class TestToolNames(TestCase):
         """Test that tool_names module is consistent with core.constants."""
         from backend.core import constants as core_constants
 
-        self.assertEqual(tool_names.BROWSER_TOOL_NAME, core_constants.BROWSER_TOOL_NAME)
         self.assertEqual(
             tool_names.EXECUTE_BASH_TOOL_NAME, core_constants.EXECUTE_BASH_TOOL_NAME
         )

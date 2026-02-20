@@ -7104,7 +7104,7 @@
         "properties": {
           "sse_servers": {
             "items": {
-              "$ref": "#/components/schemas/MCPSSEServerConfig"
+              "$ref": "#/components/schemas/MCPRemoteServerConfig"
             },
             "type": "array",
             "title": "Sse Servers"
@@ -7118,7 +7118,7 @@
           },
           "shttp_servers": {
             "items": {
-              "$ref": "#/components/schemas/MCPSHTTPServerConfig"
+              "$ref": "#/components/schemas/MCPRemoteServerConfig"
             },
             "type": "array",
             "title": "Shttp Servers"
@@ -7129,7 +7129,7 @@
         "title": "MCPConfig",
         "description": "Configuration for MCP (Message Control Protocol) settings.\n\nAttributes:\n    sse_servers: List of MCP SSE server configs\n    stdio_servers: List of MCP stdio server configs. These servers will be added to the MCP Router running inside runtime container.\n    shttp_servers: List of MCP HTTP server configs."
       },
-      "MCPSHTTPServerConfig": {
+      "MCPRemoteServerConfig": {
         "properties": {
           "url": {
             "type": "string",
@@ -7145,39 +7145,19 @@
               }
             ],
             "title": "Api Key"
-          }
-        },
-        "type": "object",
-        "required": [
-          "url"
-        ],
-        "title": "MCPSHTTPServerConfig",
-        "description": "Configuration for HTTP-based MCP servers.\n\nAttributes:\n    url: URL of the MCP HTTP server\n    api_key: Optional API key for authentication"
-      },
-      "MCPSSEServerConfig": {
-        "properties": {
-          "url": {
-            "type": "string",
-            "title": "Url"
           },
-          "api_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Key"
+          "transport": {
+            "type": "string",
+            "title": "Transport",
+            "default": "sse"
           }
         },
         "type": "object",
         "required": [
           "url"
         ],
-        "title": "MCPSSEServerConfig",
-        "description": "Configuration for a single MCP server.\n\nAttributes:\n    url: The server URL\n    api_key: Optional API key for authentication"
+        "title": "MCPRemoteServerConfig",
+        "description": "Configuration for remote MCP servers (SSE or HTTP).\n\nAttributes:\n    url: The server URL\n    api_key: Optional API key for authentication\n    transport: Transport type (sse or shttp)"
       },
       "MCPStdioServerConfig": {
         "properties": {

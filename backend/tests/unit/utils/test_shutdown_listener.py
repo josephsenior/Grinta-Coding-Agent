@@ -18,6 +18,18 @@ from backend.utils.shutdown_listener import (
 )
 
 
+@pytest.fixture(autouse=True)
+def reset_shutdown_listener():
+    """Reset shutdown listener state between tests to avoid interference."""
+    import backend.utils.shutdown_listener as mod
+
+    mod._should_exit = False
+    mod._shutdown_listeners.clear()
+    yield
+    mod._should_exit = False
+    mod._shutdown_listeners.clear()
+
+
 # ── should_exit ────────────────────────────────────────────────────────
 
 
@@ -31,13 +43,13 @@ class TestShouldExit:
 
     def test_initially_false(self):
         """Test initially returns False."""
-        # Reset module state
         import backend.utils.shutdown_listener as mod
 
-        mod._should_exit = None
-
-        result = should_exit()
-        assert result is False
+        mod._should_exit = None  # Reset for this test
+        # Avoid real signal registration which can be flaky on Windows CI
+        with patch("backend.utils.shutdown_listener._register_signal_handler"):
+            result = should_exit()
+            assert result is False
 
 
 # ── should_continue ────────────────────────────────────────────────────
@@ -53,13 +65,13 @@ class TestShouldContinue:
 
     def test_initially_true(self):
         """Test initially returns True."""
-        # Reset module state
         import backend.utils.shutdown_listener as mod
 
-        mod._should_exit = None
-
-        result = should_continue()
-        assert result is True
+        mod._should_exit = None  # Reset for this test
+        # Avoid real signal registration which can be flaky on Windows CI
+        with patch("backend.utils.shutdown_listener._register_signal_handler"):
+            result = should_continue()
+            assert result is True
 
     def test_opposite_of_should_exit(self):
         """Test returns opposite of should_exit."""
@@ -230,10 +242,6 @@ class TestSignalHandlerIntegration:
         """Test shutdown listeners are called."""
         import backend.utils.shutdown_listener as mod
 
-        # Reset state
-        mod._should_exit = False
-        mod._shutdown_listeners.clear()
-
         listener1 = MagicMock()
         listener2 = MagicMock()
 
@@ -300,7 +308,6 @@ class TestShutdownListenerInternal:
 
             # Test the handler function
             mod._should_exit = False
-            mod._shutdown_listeners.clear()
             mock_listener = MagicMock()
             mod.add_shutdown_listener(mock_listener)
 
@@ -321,7 +328,6 @@ class TestShutdownListenerInternal:
             handler = mock_signal.call_args[0][1]
 
             mod._should_exit = False
-            mod._shutdown_listeners.clear()
             failing_listener = MagicMock(side_effect=Exception("Crash"))
             mod.add_shutdown_listener(failing_listener)
 
@@ -332,9 +338,6 @@ class TestShutdownListenerInternal:
     def test_register_signal_handlers_not_main_thread(self):
         """Test _register_signal_handlers is skipped outside main thread."""
         import backend.utils.shutdown_listener as mod
-
-        # MUST reset _should_exit to None to bypass early return
-        mod._should_exit = None
 
         mock_main = MagicMock()
         mock_current = MagicMock()

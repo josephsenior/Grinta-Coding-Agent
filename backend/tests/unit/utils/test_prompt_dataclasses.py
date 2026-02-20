@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import os
 import tempfile
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from backend.core.message import Message, TextContent
 from backend.utils.prompt import (
     UNINITIALIZED_PROMPT_MANAGER,
     ConversationInstructions,
+    OrchestratorPromptManager,
     PromptManager,
     RepositoryInfo,
     RuntimeInfo,
@@ -181,3 +184,88 @@ class TestPromptManagerRendering:
     def test_build_knowledge_base_info(self, pm):
         result = pm.build_knowledge_base_info(kb_results=[1, 2, 3])
         assert "3" in result
+
+
+class TestPromptManagerTurnsReminder:
+    def test_add_turns_left_reminder(self, tmp_path):
+        """Test turns left reminder is appended to user message."""
+        (tmp_path / "system_prompt.j2").write_text("S")
+        (tmp_path / "user_prompt.j2").write_text("U")
+        (tmp_path / "additional_info.j2").write_text("A")
+        (tmp_path / "playbook_info.j2").write_text("P")
+        (tmp_path / "knowledge_base_info.j2").write_text("K")
+        pm = PromptManager(prompt_dir=str(tmp_path))
+
+        msg = Message(role="user", content=[TextContent(text="Help me")])
+        messages = [msg]
+
+        state = MagicMock()
+        state.iteration_flag.max_value = 10
+        state.iteration_flag.current_value = 3
+
+        pm.add_turns_left_reminder(messages, state)
+
+        assert len(msg.content) == 2
+        assert "7 turns left" in msg.content[1].text
+
+
+class TestOrchestratorPromptManager:
+    @pytest.fixture
+    def pm(self, tmp_path):
+        """Fixture providing OrchestratorPromptManager with minimal templates."""
+        (tmp_path / "system_prompt.j2").write_text("System: {{ msg }}")
+        (tmp_path / "user_prompt.j2").write_text("User")
+        (tmp_path / "additional_info.j2").write_text("Info")
+        (tmp_path / "playbook_info.j2").write_text("Playbook")
+        (tmp_path / "knowledge_base_info.j2").write_text("KB")
+        return OrchestratorPromptManager(prompt_dir=str(tmp_path))
+
+    def test_get_system_message_injects_identity(self, pm):
+        """Test system message has identity prefix."""
+        with patch(
+            "backend.utils.prompt.OrchestratorPromptManager._inject_scratchpad",
+            side_effect=lambda x: x,
+        ):
+            result = pm.get_system_message(msg="hello")
+            assert "You are Forge agent." in result
+            assert "System: hello" in result
+
+    def test_get_system_message_with_config(self, pm):
+        """Test system message with config injects context."""
+        config = MagicMock()
+        config.cli_mode = True
+        pm._config = config
+        with patch(
+            "backend.utils.prompt.OrchestratorPromptManager._inject_scratchpad",
+            side_effect=lambda x: x,
+        ):
+            result = pm.get_system_message(msg="hi")
+            assert "You are Forge agent." in result
+
+    def test_inject_scratchpad_success(self, pm):
+        """Test scratchpad injection when notes exist."""
+        with patch("backend.engines.orchestrator.tools.note._load_notes") as mock_load:
+            mock_load.return_value = {"todo": "buy milk"}
+            content = "Original content"
+            result = pm._inject_scratchpad(content)
+            assert "Original content" in result
+            assert "<WORKING_SCRATCHPAD>" in result
+            assert "[todo]: buy milk" in result
+
+    def test_inject_scratchpad_no_notes(self, pm):
+        """Test scratchpad injection when no notes exist."""
+        with patch("backend.engines.orchestrator.tools.note._load_notes") as mock_load:
+            mock_load.return_value = {}
+            content = "Original content"
+            result = pm._inject_scratchpad(content)
+            assert result == content
+
+    def test_inject_scratchpad_exception(self, pm):
+        """Test scratchpad injection handles exceptions."""
+        with patch(
+            "backend.engines.orchestrator.tools.note._load_notes",
+            side_effect=Exception("Crash"),
+        ):
+            content = "Original content"
+            result = pm._inject_scratchpad(content)
+            assert result == content

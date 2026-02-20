@@ -72,9 +72,7 @@ optional-dependencies.all = [
   "opentelemetry-exporter-otlp-proto-grpc>=1.33.1,<2",
   "protobuf>=5,<6",
 ]
-optional-dependencies.browser = [
-  "numpy>=2.3.2,<3",
-]
+optional-dependencies.browser = []
 optional-dependencies.caching = []
 
 optional-dependencies.containers = [
@@ -86,9 +84,9 @@ optional-dependencies.telemetry = [
   "protobuf>=5,<6",
 ]
 urls = { Repository = "https://github.com/Forge/Forge" }
-scripts.forge = "backend.interface.entry:main"
-scripts.Forge = "backend.interface.entry:main"
-scripts.forge-tui = "backend.tui.__main__:main"
+scripts.forge = "backend.cli.entry:main"
+scripts.Forge = "backend.cli.entry:main"
+scripts.forge-tui = "tui.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [
@@ -116,7 +114,6 @@ test = [
   "pytest-cov>=4.1.0,<7.0.0",
   "pytest-asyncio>=0.21.1,<1.0.0",
   "pytest-xdist>=3.8.0,<4.0.0",
-  "pytest-playwright>=0.7.0",
   "pytest-timeout>=2.4.0",
 ]
 

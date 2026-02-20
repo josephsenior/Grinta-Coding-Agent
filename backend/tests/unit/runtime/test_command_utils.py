@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 
 
 from backend.runtime.utils.command import (
-    _build_browsergym_args,
     _build_plugin_args,
     _validate_and_get_username,
     _validate_env_part,
@@ -76,38 +75,6 @@ class TestValidateEnvPart:
 
 
 # ---------------------------------------------------------------------------
-# _build_browsergym_args
-# ---------------------------------------------------------------------------
-
-
-class TestBuildBrowsergymArgs:
-    """Tests for _build_browsergym_args."""
-
-    def test_none_env(self):
-        assert _build_browsergym_args(None) == []
-
-    def test_empty_string(self):
-        assert _build_browsergym_args("") == []
-
-    def test_valid_env(self):
-        result = _build_browsergym_args("openended")
-        assert result == ["--browsergym-eval-env", "openended"]
-
-    def test_multiple_parts(self):
-        result = _build_browsergym_args("env1 env2")
-        assert result == ["--browsergym-eval-env", "env1", "env2"]
-
-    def test_dangerous_parts_filtered(self):
-        result = _build_browsergym_args("good ;bad $evil clean")
-        # Only "good" and "clean" should survive
-        assert ";bad" not in result
-        assert "$evil" not in result
-        if result:
-            assert "good" in result
-            assert "clean" in result
-
-
-# ---------------------------------------------------------------------------
 # _validate_and_get_username
 # ---------------------------------------------------------------------------
 
@@ -151,13 +118,11 @@ class TestGetStartupCommand:
         run_as_forge=True,
         enable_browser=True,
         workspace_mount="/workspace",
-        browsergym_env=None,
     ):
         cfg = MagicMock()
         cfg.run_as_Forge = run_as_forge
         cfg.enable_browser = enable_browser
         cfg.workspace_mount_path_in_runtime = workspace_mount
-        cfg.runtime_config.browsergym_eval_env = browsergym_env
         return cfg
 
     def test_basic_command(self):

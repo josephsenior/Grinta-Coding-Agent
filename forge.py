@@ -9,7 +9,7 @@ Starts the backend server and TUI in one process — no second terminal needed.
 
 For the two-terminal workflow (separate server + TUI), run:
     python start_server.py        # terminal 1
-    python -m backend.tui         # terminal 2
+    python -m tui         # terminal 2
 """
 
 import os

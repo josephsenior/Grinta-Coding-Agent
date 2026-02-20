@@ -121,6 +121,16 @@ class PromptManager:
         system_message = self.system_template.render(**context).strip()
         return refine_prompt(system_message)
 
+    def set_prompt_tier(self, tier: str) -> None:
+        """Set a coarse prompt tier for subsequent system prompt rendering.
+
+        Tiers are a lightweight mechanism to avoid always injecting large,
+        rarely-needed blocks (e.g. repo lessons) into every turn.
+
+        Known tiers: "base", "debug".
+        """
+        self._prompt_tier = tier
+
     def get_example_user_message(self) -> str:
         """This is an initial user message that can be provided to the agent.
 
@@ -186,9 +196,14 @@ class PromptManager:
             ),
             None,
         ):
-            reminder_text = f"\n\nENVIRONMENT REMINDER: You have {
+            turns_left = (
                 state.iteration_flag.max_value - state.iteration_flag.current_value
-            } turns left to complete the task. When finished reply with <finish></finish>."
+            )
+            reminder_text = (
+                "\n\nENVIRONMENT REMINDER: You have "
+                f"{turns_left} turns left to complete the task. "
+                "When finished reply with <finish></finish>."
+            )
             latest_user_message.content.append(TextContent(text=reminder_text))
 
 
@@ -219,13 +234,49 @@ class OrchestratorPromptManager(PromptManager):
         if self._config is not None:
             context.setdefault("config", self._config)
             context.setdefault("cli_mode", getattr(self._config, "cli_mode", False))
+
         context.setdefault("mcp_tool_names", self.mcp_tool_names)
         context.setdefault("mcp_tool_descriptions", self.mcp_tool_descriptions)
         content = super().get_system_message(**context)
         if self._IDENTITY_PREFIX.strip() not in content:
             content = self._IDENTITY_PREFIX + content
         content = self._inject_scratchpad(content)
+        tier = getattr(self, "_prompt_tier", "base")
+        if tier == "debug":
+            content = self._inject_lessons_learned(content)
         return content
+
+    def _inject_lessons_learned(self, content: str) -> str:
+        """Inject lessons learned from .Forge/lessons.md into the system prompt."""
+        try:
+            # Try to locate the lessons file in the project root
+            # We assume the CWD or a known parent contains .Forge
+            lessons_path = os.path.join(".Forge", "lessons.md")
+            if not os.path.exists(lessons_path):
+                # Fallback to repository memory path
+                lessons_path = os.path.join("memories", "repo", "lessons.md")
+                if not os.path.exists(lessons_path):
+                    return content
+            
+            with open(lessons_path, "r", encoding="utf-8") as f:
+                lessons = f.read().strip()
+            
+            if not lessons:
+                return content
+                
+            # Keep only the last 3000 chars to avoid prompt bloat
+            if len(lessons) > 3000:
+                lessons = "... (earlier lessons truncated)\n" + lessons[-3000:]
+                
+            return (
+                f"{content}\n\n"
+                f"<REPOSITORY_LESSONS_LEARNED>\n"
+                f"Historical insights and verified solutions for this codebase:\n"
+                f"{lessons}\n"
+                f"</REPOSITORY_LESSONS_LEARNED>"
+            )
+        except Exception:
+            return content
 
     def _inject_scratchpad(self, content: str) -> str:
         """Append persistent scratchpad notes so they survive context condensation."""

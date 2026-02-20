@@ -88,10 +88,10 @@ class StepGuardService:
                 self._MAX_REPLAN_ATTEMPTS,
             )
             self._inject_replan_directive(controller)
-        else:
-            # Replanning exhausted — fall back to original error recovery
-            self._replan_attempts = 0
+            return True
 
+        # Replanning exhausted — fall back to the original error recovery path
+        self._replan_attempts = 0
         await controller._react_to_exception(
             AgentStuckInLoopError("Agent got stuck in a loop")
         )

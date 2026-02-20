@@ -18,8 +18,6 @@ from backend.core.exceptions import AgentRuntimeDisconnectedError
 from backend.core.logger import forge_logger as logger
 from backend.events.action import (
     ActionSecurityRisk,
-    BrowseInteractiveAction,
-    BrowseURLAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -164,8 +162,8 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             username=self._username or "forge",
             user_id=self._user_id,
             enable_browser=self.config.enable_browser,
-            browsergym_eval_env=self.config.runtime_config.browsergym_eval_env,
             tool_registry=self._tool_registry,  # Pass ToolRegistry for cross-platform support
+            mcp_config=getattr(self.config, "mcp", None),
         )
 
         # Initialize ActionExecutor (this sets up bash, plugins, etc.)
@@ -178,6 +176,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         # Populate the capability matrix once at startup
         self.capabilities = detect_capabilities(
             enable_browser=self.config.enable_browser,
+            mcp_config=getattr(self.config, "mcp", None),
         )
         if self.capabilities.missing_tools:
             logger.warning(
@@ -262,18 +261,6 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
         return call_async_from_sync(self._executor.edit, 15.0, action)
-
-    def browse(self, action: BrowseURLAction) -> Observation:
-        """Browse URL via ActionExecutor."""
-        if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
-        return call_async_from_sync(self._executor.browse, 15.0, action)
-
-    def browse_interactive(self, action: BrowseInteractiveAction) -> Observation:
-        """Browse interactively via ActionExecutor."""
-        if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
-        return call_async_from_sync(self._executor.browse_interactive, 15.0, action)
 
     def list_files(self, path: str | None = None, recursive: bool = False) -> list[str]:
         """List files in the specified path."""
@@ -383,7 +370,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         # For in-process, file is already accessible
         return Path(path)  # pylint: disable=redefined-outer-name,reimported
 
-    def get_mcp_config(self, extra_stdio_servers: list[Any] | None = None) -> Any:
+    def get_mcp_config(self, extra_servers: list[Any] | None = None) -> Any:
         """Get MCP configuration."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")

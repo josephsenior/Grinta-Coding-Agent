@@ -152,14 +152,14 @@ update-openapi:
 # Start backend
 start-backend:
 	@echo "$(YELLOW)Starting backend...$(RESET)"
-	@uv run uvicorn backend.server.listen:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload --reload-exclude "./workspace"
+	@uv run uvicorn backend.api.listen:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload --reload-exclude "./workspace"
 
 # Run the app
 run:
 	@echo "$(YELLOW)Running the app...$(RESET)"
 	@mkdir -p logs
 	@echo "$(YELLOW)Starting backend server...$(RESET)"
-	@uv run uvicorn backend.server.listen:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) &
+	@uv run uvicorn backend.api.listen:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) &
 	@echo "$(YELLOW)Waiting for the backend to start...$(RESET)"
 	@until nc -z localhost $(BACKEND_PORT); do sleep 0.1; done
 	@echo "$(GREEN)Backend started successfully on $(BACKEND_HOST_PORT).$(RESET)"
@@ -273,7 +273,7 @@ help:
 	@echo "  $(GREEN)setup-config$(RESET)        - Setup the configuration for Forge by providing LLM API key,"
 	@echo "                        LLM Model name, and workspace directory."
 	@echo "  $(GREEN)start-backend$(RESET)       - Start the backend server for the Forge project."
-	@echo "  $(GREEN)run$(RESET)                 - Start the backend, then launch the TUI with: python -m backend.tui"
+	@echo "  $(GREEN)run$(RESET)                 - Start the backend, then launch the TUI with: python -m tui"
 	@echo "  $(GREEN)help$(RESET)                - Display this help message, providing information on available targets."
 
 # Phony targets

@@ -95,7 +95,6 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
     """
     from backend.core.schemas.actions import (
         AgentRejectActionSchema,
-        BrowseInteractiveActionSchema,
         ChangeAgentStateActionSchema,
         CmdRunActionSchema,
         FileEditActionSchema,
@@ -118,7 +117,6 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
         "run": CmdRunActionSchema,
         "message": MessageActionSchema,
         "system": SystemMessageActionSchema,
-        "browse_interactive": BrowseInteractiveActionSchema,
         "finish": PlaybookFinishActionSchema,
         "reject": AgentRejectActionSchema,
         "change_agent_state": ChangeAgentStateActionSchema,

@@ -7,7 +7,6 @@ from backend.events.observation.agent import (
     AgentThinkObservation,
     RecallObservation,
 )
-from backend.events.observation.browse import BrowserOutputObservation
 from backend.events.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
@@ -31,7 +30,6 @@ __all__ = [
     "AgentCondensationObservation",
     "AgentStateChangedObservation",
     "AgentThinkObservation",
-    "BrowserOutputObservation",
     "CmdOutputMetadata",
     "CmdOutputObservation",
     "ErrorObservation",

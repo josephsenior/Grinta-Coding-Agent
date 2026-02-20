@@ -110,6 +110,15 @@ class Orchestrator(Agent):
             safety_manager=self.safety_manager,
         )
         self.tools = self.planner.build_toolset()
+
+        # Tool registry self-check: ensure every tool exposed to the LLM has a
+        # corresponding dispatch handler.
+        from backend.engines.orchestrator.tool_registry import validate_internal_toolset
+
+        validate_internal_toolset(
+            self.tools,
+            strict=bool(getattr(self.config, "strict_tool_registry_check", True)),
+        )
         self.executor: ExecutorProtocol = OrchestratorExecutor(
             llm=self.llm,
             safety_manager=self.safety_manager,
@@ -232,6 +241,23 @@ class Orchestrator(Agent):
         initial_user_message = self.memory_manager.get_initial_user_message(
             state.history
         )
+
+        # Prompt tiers: avoid injecting large, rarely-needed blocks every turn.
+        # Escalate to "debug" when we recently touched files or saw tool errors.
+        try:
+            from backend.events.observation import ErrorObservation
+            from backend.events.action import FileEditAction, FileWriteAction
+
+            recent = state.history[-12:] if len(state.history) > 12 else state.history
+            has_recent_error = any(isinstance(e, ErrorObservation) for e in recent)
+            has_recent_file_op = any(
+                isinstance(e, (FileEditAction, FileWriteAction)) for e in recent
+            )
+            tier = "debug" if (has_recent_error or has_recent_file_op) else "base"
+            self.prompt_manager.set_prompt_tier(tier)
+        except Exception:
+            pass
+
         messages = self.memory_manager.build_messages(
             condensed_history=condensed.events,
             initial_user_message=initial_user_message,
@@ -588,12 +614,25 @@ class Orchestrator(Agent):
     def response_to_actions(self, response) -> list[Action]:
         """Convert an LLM response into executable actions."""
         return codeact_function_calling.response_to_actions(
-            response, mcp_tool_names=list(self.mcp_tools.keys())
+            response, 
+            mcp_tool_names=list(self.mcp_tools.keys()),
+            mcp_tools=self.mcp_tools
         )
 
     def set_mcp_tools(self, mcp_tools: list[dict]) -> None:
         """Set MCP tools and sync names to prompt manager for dynamic discovery."""
         super().set_mcp_tools(mcp_tools)
+
+        # Warn early if MCP tool names collide with internal tool names.
+        from backend.engines.orchestrator.tool_registry import (
+            validate_mcp_tool_name_collisions,
+        )
+
+        validate_mcp_tool_name_collisions(
+            self.tools,
+            self.mcp_tools.keys(),
+            strict=bool(getattr(self.config, "strict_mcp_tool_name_collision", False)),
+        )
         # Sync connected tool names and descriptions so the system prompt reflects reality
         pm = getattr(self, "_prompt_manager", None)
         if pm and hasattr(pm, "mcp_tool_names"):
@@ -607,3 +646,21 @@ class Orchestrator(Agent):
                     descriptions[name] = first_line
             if hasattr(pm, "mcp_tool_descriptions"):
                 pm.mcp_tool_descriptions = descriptions
+        # Surface any MCP connection failures before the first user response so the
+        # agent immediately knows which tools are unavailable, avoiding wasted turns
+        # diagnosing connectivity issues at call-time.
+        from backend.mcp_integration.error_collector import mcp_error_collector
+
+        errors = mcp_error_collector.get_errors()
+        if errors:
+            lines = [
+                "WARNING: Some MCP servers failed to connect. "
+                "The following tools may be unavailable:",
+            ]
+            for err in errors:
+                lines.append(
+                    f"  - {err.server_name} ({err.server_type}): {err.error_message}"
+                )
+            lines.append("Do not attempt to call these tools. Plan accordingly.")
+            think = AgentThinkAction(thought="\n".join(lines))
+            self.pending_actions.appendleft(think)
