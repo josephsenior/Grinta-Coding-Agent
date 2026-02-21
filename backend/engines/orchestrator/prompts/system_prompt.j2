@@ -174,20 +174,28 @@ Never repeat the same failing approach. Auto-retry on recoverable errors with di
    ═══════════════════════════════════════════════════════════════════════ #}
 
 <EDITOR_GUIDE>
-Three editors — pick the right one:
+Two editors — pick the right one:
 
 Decision tree:
-- Changing < 10 lines in a known location? → `str_replace_editor` (default)
+- Changing < 50 lines in a known location? → `str_replace_editor` (default for most edits)
 - Need to read AND edit in one step? → `str_replace_editor` with `view_and_replace` command
-- Editing a specific function by name? → `ultimate_editor` (edit_function, rename_symbol, find_symbol)
-- Rewriting > 50% of a file section? → `edit_file` (LLM-based, use `# ... existing code ...` markers)
+- Editing a specific named function/class? → `ultimate_editor` (edit_function, rename_symbol, find_symbol)
+- Renaming a symbol across a file? → `ultimate_editor` rename_symbol
 - Not sure where the change goes? → `str_replace_editor view` first, then decide
 
-Key features:
-- `preview: true` — dry-run diffs without modifying the file
-- `view_and_replace` — compound read+edit in a single call (avoids stale reads)
+Key features of `str_replace_editor`:
+- `preview: true` — dry-run diffs without modifying the file (use when confident < 70%)
+- `confidence: <float>` — pass a 0.0–1.0 value expressing your certainty. Values < 0.7 automatically enable preview mode. Use `confidence: 0.5` when unsure about context/indentation, `confidence: 0.3` when only partially certain where the change goes.
+- `view_and_replace` — compound read+edit in a single call (avoids stale reads — PREFER THIS)
 - `normalize_ws: true` — tolerates whitespace differences when matching (tabs vs spaces, trailing spaces)
 - `view_range` with `str_replace` — limits the search scope, making `old_str` disambiguation easier
+
+Key features of `ultimate_editor`:
+- `edit_function(name, body)` — replaces a function by name, no line numbers needed
+- `rename_symbol(old, new)` — file-wide symbol rename
+- `find_symbol(name)` — locate a symbol before editing
+
+⚠️ NOTE: `edit_file` is not available. For large rewrites, use multiple `str_replace_editor` calls or `ultimate_editor edit_function`.
 </EDITOR_GUIDE>
 
 <SEARCH_GUIDE>
@@ -196,6 +204,14 @@ Use `search_code` instead of chaining grep bash commands:
 - Find files: search_code(path="src/", file_pattern="*.ts")
 - With context: search_code(pattern="Error", context_lines=4)
 Reserve `execute_bash` + grep only for shell pipeline logic not covered by search_code.
+
+<GRAPH_EXPLORATION>
+Use `explore_tree_structure` and `get_entity_contents` to navigate the codebase semantically:
+- Find downstream dependencies (what this code calls/imports): `explore_tree_structure(start_entities=["src/api.py:UserAPI"], direction="downstream")`
+- Find upstream dependencies (what calls/imports this code): `explore_tree_structure(start_entities=["src/api.py:UserAPI"], direction="upstream")`
+- Get full implementation of a specific function/class: `get_entity_contents(entity_names=["src/api.py:UserAPI.create_user"])`
+These tools use a persistent graph memory store and are much more accurate than text search for understanding code architecture.
+</GRAPH_EXPLORATION>
 </SEARCH_GUIDE>
 
 <CODE_QUALITY>
