@@ -101,11 +101,18 @@ class OrchestratorPlanner:
         from backend.engines.orchestrator.tools.apply_patch import (
             create_apply_patch_tool,
         )
+        from backend.engines.orchestrator.tools.batch_edit import (
+            create_batch_edit_tool,
+        )
         from backend.engines.orchestrator.tools.task_tracker import (
             create_task_tracker_tool,
         )
         from backend.engines.orchestrator.tools.search_code import (
             create_search_code_tool,
+        )
+        from backend.engines.orchestrator.tools.explore_code import (
+            create_explore_tree_structure_tool,
+            create_get_entity_contents_tool,
         )
         from backend.engines.orchestrator.tools.check_tool_status import (
             create_check_tool_status_tool,
@@ -144,10 +151,13 @@ class OrchestratorPlanner:
             tools.append(create_run_tests_tool())
         if getattr(self._config, "enable_apply_patch", True):
             tools.append(create_apply_patch_tool())
+            tools.append(create_batch_edit_tool())
         if getattr(self._config, "enable_task_tracker", True):
             tools.append(create_task_tracker_tool())
         if getattr(self._config, "enable_search_code", True):
             tools.append(create_search_code_tool())
+            tools.append(create_explore_tree_structure_tool())
+            tools.append(create_get_entity_contents_tool())
         if getattr(self._config, "enable_terminal", True):
             tools.append(create_terminal_open_tool())
             tools.append(create_terminal_input_tool())
@@ -214,13 +224,23 @@ class OrchestratorPlanner:
 
     def _add_browsing_tool(self, tools: list) -> None:
         if getattr(self._config, "enable_browsing", False):
-            # We now rely on external MCP (like cursor-ide-browser or browser-use)
+            # We now rely on external MCP (like browser-use)
             pass
 
     def _add_editor_tools(self, tools: list, use_short_tool_desc: bool) -> None:
         if getattr(self._config, "enable_editor", True):
-            from backend.engines.orchestrator.tools import create_structure_editor_tool
+            from backend.engines.orchestrator.tools import (
+                create_str_replace_editor_tool,
+                create_structure_editor_tool,
+            )
 
+            # Primary editor: str_replace_editor for targeted line-level edits
+            tools.append(
+                create_str_replace_editor_tool(
+                    use_short_description=use_short_tool_desc
+                )
+            )
+            # Advanced editor: ultimate_editor (tree-sitter AST) for symbol-level refactoring
             tools.append(
                 create_structure_editor_tool(use_short_description=use_short_tool_desc)
             )
