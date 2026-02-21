@@ -152,3 +152,20 @@ class RecallFailureObservation(Observation):
         return self.error_message or self.content
 
     __test__ = False
+
+
+@dataclass
+class DelegateTaskObservation(Observation):
+    """Result of a delegated subtask."""
+
+    success: bool = True
+    error_message: str = ""
+    observation: ClassVar[str] = ObservationType.DELEGATE_TASK_RESULT
+
+    @property
+    def message(self) -> str:
+        if self.success:
+            return f"Delegated task completed: {self.content}"
+        return f"Delegated task failed: {self.error_message or self.content}"
+
+    __test__ = False

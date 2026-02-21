@@ -27,20 +27,77 @@ from backend.engines.orchestrator.tools import (
     create_structure_editor_tool,
     create_think_tool,
 )
+from backend.engines.orchestrator.tools.terminal import (
+    TERMINAL_OPEN_TOOL_NAME,
+    TERMINAL_INPUT_TOOL_NAME,
+    TERMINAL_READ_TOOL_NAME,
+    build_terminal_open_action,
+    build_terminal_input_action,
+    build_terminal_read_action,
+)
 from backend.engines.orchestrator.tools.apply_patch import build_apply_patch_action
-from backend.engines.orchestrator.tools.note import build_note_action, build_recall_action
+from backend.engines.orchestrator.tools.note import (
+    build_note_action,
+    build_recall_action,
+)
 from backend.engines.orchestrator.tools.run_tests import build_run_tests_action
-from backend.engines.orchestrator.tools.search_code import build_search_code_action, SEARCH_CODE_TOOL_NAME
-from backend.engines.orchestrator.tools.web_search import build_web_search_action, WEB_SEARCH_TOOL_NAME
-from backend.engines.orchestrator.tools.check_tool_status import build_check_tool_status_action
-from backend.engines.orchestrator.tools.web_reader import build_web_reader_action, WEB_READER_TOOL_NAME
-from backend.engines.orchestrator.tools.workspace_status import build_workspace_status_action, WORKSPACE_STATUS_TOOL_NAME
-from backend.engines.orchestrator.tools.error_patterns import build_error_patterns_action, ERROR_PATTERNS_TOOL_NAME
-from backend.engines.orchestrator.tools.checkpoint import build_checkpoint_action, CHECKPOINT_TOOL_NAME
-from backend.engines.orchestrator.tools.project_map import build_project_map_action, PROJECT_MAP_TOOL_NAME
-from backend.engines.orchestrator.tools.session_diff import build_session_diff_action, SESSION_DIFF_TOOL_NAME
-from backend.engines.orchestrator.tools.verify_state import build_verify_state_action, VERIFY_STATE_TOOL_NAME
-from backend.engines.orchestrator.tools.working_memory import build_working_memory_action, WORKING_MEMORY_TOOL_NAME
+from backend.engines.orchestrator.tools.search_code import (
+    build_search_code_action,
+    SEARCH_CODE_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.web_search import (
+    build_web_search_action,
+    WEB_SEARCH_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.check_tool_status import (
+    build_check_tool_status_action,
+)
+from backend.engines.orchestrator.tools.web_reader import (
+    build_web_reader_action,
+    WEB_READER_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.workspace_status import (
+    build_workspace_status_action,
+    WORKSPACE_STATUS_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.error_patterns import (
+    build_error_patterns_action,
+    ERROR_PATTERNS_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.checkpoint import (
+    build_checkpoint_action,
+    CHECKPOINT_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.project_map import (
+    build_project_map_action,
+    PROJECT_MAP_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.session_diff import (
+    build_session_diff_action,
+    SESSION_DIFF_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.verify_state import (
+    build_verify_state_action,
+    VERIFY_STATE_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.working_memory import (
+    build_working_memory_action,
+    WORKING_MEMORY_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.revert_to_safe_state import (
+    build_revert_to_safe_state_action,
+    REVERT_TO_SAFE_STATE_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.delegate_task import (
+    build_delegate_task_action,
+    DELEGATE_TASK_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.meta_cognition import (
+    UNCERTAINTY_TOOL_NAME,
+    CLARIFICATION_TOOL_NAME,
+    ESCALATE_TOOL_NAME,
+    PROPOSAL_TOOL_NAME,
+)
 from backend.engines.common import (
     common_response_to_actions,
 )
@@ -78,6 +135,7 @@ def register_semantic_recall(fn: Callable[[str, int], list[dict[str, Any]]]) -> 
 def get_semantic_recall_fn() -> Callable[[str, int], list[dict[str, Any]]] | None:
     """Return the registered semantic recall callback, or None."""
     return _semantic_recall_registry.get("fn")
+
 
 if TYPE_CHECKING:
     ModelResponse = Any
@@ -123,7 +181,9 @@ def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
             msg,
         )
     raw_is_input = arguments.get("is_input", False)
-    is_input = raw_is_input is True or (isinstance(raw_is_input, str) and raw_is_input.lower() == "true")
+    is_input = raw_is_input is True or (
+        isinstance(raw_is_input, str) and raw_is_input.lower() == "true"
+    )
     action = CmdRunAction(command=arguments["command"], is_input=is_input)
     if "timeout" in arguments:
         try:
@@ -162,6 +222,7 @@ def _handle_note_tool(arguments: dict) -> AgentThinkAction:
     value = arguments.get("value", "")
     if not key:
         from backend.core.exceptions import FunctionCallValidationError as _E
+
         raise _E('Missing required argument "key" in tool call note')
     return build_note_action(key, value)
 
@@ -215,6 +276,7 @@ def _handle_apply_patch_tool(arguments: dict) -> CmdRunAction:
     """Handle APPLY_PATCH_TOOL: apply a unified diff to the workspace."""
     if "patch" not in arguments:
         from backend.core.exceptions import FunctionCallValidationError as _E
+
         raise _E('Missing required argument "patch" in tool call apply_patch')
     check_only = arguments.get("check_only", "false") == "true"
     return build_apply_patch_action(patch=arguments["patch"], check_only=check_only)
@@ -355,7 +417,9 @@ def _normalize_whitespace(text: str) -> str:
     return "".join(normalized)
 
 
-def _ws_tolerant_replace(file_content: str, old_str: str, new_str: str) -> tuple[str | None, str | None]:
+def _ws_tolerant_replace(
+    file_content: str, old_str: str, new_str: str
+) -> tuple[str | None, str | None]:
     """Try whitespace-normalized matching to find and replace old_str in file_content.
 
     Returns (new_content, None) on success, or (None, error_message) on failure.
@@ -367,7 +431,10 @@ def _ws_tolerant_replace(file_content: str, old_str: str, new_str: str) -> tuple
     if count == 0:
         return None, "No match found even with whitespace normalization."
     if count > 1:
-        return None, f"Whitespace-normalized old_str matches {count} locations — must be unique."
+        return (
+            None,
+            f"Whitespace-normalized old_str matches {count} locations — must be unique.",
+        )
 
     norm_start = norm_content.index(norm_old)
     norm_end = norm_start + len(norm_old)
@@ -375,7 +442,6 @@ def _ws_tolerant_replace(file_content: str, old_str: str, new_str: str) -> tuple
     orig_start = _map_normalized_offset_to_original(file_content, norm_start)
     orig_end = _map_normalized_offset_to_original(file_content, norm_end)
 
-    original_matched = file_content[orig_start:orig_end]
     new_content = file_content[:orig_start] + new_str + file_content[orig_end:]
     return new_content, None
 
@@ -392,7 +458,11 @@ def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
             norm_pos += 1
         orig_pos += 1
         if ch in (" ", "\t"):
-            while orig_pos < len(original) and original[orig_pos] in (" ", "\t") and norm_pos < norm_offset:
+            while (
+                orig_pos < len(original)
+                and original[orig_pos] in (" ", "\t")
+                and norm_pos < norm_offset
+            ):
                 if original[orig_pos] == "\t":
                     norm_pos += 4
                 else:
@@ -423,17 +493,21 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
         return [AgentThinkAction(thought=f"[VIEW_AND_REPLACE] File not found: {path}")]
 
     if not old_str:
-        return [FileReadAction(
-            path=path,
-            impl_source=FileReadSource.FILE_EDITOR,
-            view_range=view_range,
-        )]
+        return [
+            FileReadAction(
+                path=path,
+                impl_source=FileReadSource.FILE_EDITOR,
+                view_range=view_range,
+            )
+        ]
 
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
             content = f.read()
     except OSError as exc:
-        return [AgentThinkAction(thought=f"[VIEW_AND_REPLACE] Cannot read {path}: {exc}")]
+        return [
+            AgentThinkAction(thought=f"[VIEW_AND_REPLACE] Cannot read {path}: {exc}")
+        ]
 
     search_content = content
     if view_range and len(view_range) >= 2:
@@ -446,15 +520,23 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
         if normalize_ws:
             new_content, err = _ws_tolerant_replace(search_content, old_str, new_str)
             if err:
-                return [AgentThinkAction(
-                    thought=f"[VIEW_AND_REPLACE] {err} Use view command to check the actual content."
-                )]
+                return [
+                    AgentThinkAction(
+                        thought=f"[VIEW_AND_REPLACE] {err} Use view command to check the actual content."
+                    )
+                ]
         else:
-            return [AgentThinkAction(
-                thought=f"[VIEW_AND_REPLACE] old_str not found in {path}"
-                + (f" (within lines {view_range[0]}-{view_range[1]})" if view_range else "")
-                + ". Use view command to check the actual content."
-            )]
+            return [
+                AgentThinkAction(
+                    thought=f"[VIEW_AND_REPLACE] old_str not found in {path}"
+                    + (
+                        f" (within lines {view_range[0]}-{view_range[1]})"
+                        if view_range
+                        else ""
+                    )
+                    + ". Use view command to check the actual content."
+                )
+            ]
 
     edit_kwargs = {"old_str": old_str, "new_str": new_str}
     if normalize_ws:
@@ -474,7 +556,9 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
     return [read_action, edit_action]
 
 
-def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThinkAction:
+def _preview_str_replace_edit(
+    path: str, command: str, kwargs: dict
+) -> AgentThinkAction:
     """Generate a unified diff preview of what a str_replace or insert would produce."""
     import difflib
     import os
@@ -494,13 +578,17 @@ def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThi
         old_str = kwargs.get("old_str", "")
         new_str = kwargs.get("new_str", "")
         if not old_str:
-            return AgentThinkAction(thought="[PREVIEW] old_str is required for str_replace preview")
+            return AgentThinkAction(
+                thought="[PREVIEW] old_str is required for str_replace preview"
+            )
         original_text = "".join(original_lines)
         count = original_text.count(old_str)
         if count == 0:
             return AgentThinkAction(thought=f"[PREVIEW] old_str not found in {path}")
         if count > 1:
-            return AgentThinkAction(thought=f"[PREVIEW] old_str matches {count} locations — must be unique")
+            return AgentThinkAction(
+                thought=f"[PREVIEW] old_str matches {count} locations — must be unique"
+            )
         new_text = original_text.replace(old_str, new_str, 1)
         new_lines = new_text.splitlines(keepends=True)
     elif command == "insert":
@@ -510,8 +598,10 @@ def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThi
         new_lines[insert_line:insert_line] = [insert_text]
 
     diff = difflib.unified_diff(
-        original_lines, new_lines,
-        fromfile=f"a/{path}", tofile=f"b/{path}",
+        original_lines,
+        new_lines,
+        fromfile=f"a/{path}",
+        tofile=f"b/{path}",
         lineterm="",
     )
     diff_text = "\n".join(diff)
@@ -527,7 +617,9 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action | list[Action]:
 
     # Handle preview/dry-run mode — show what the edit would produce
     raw_preview = other_kwargs.pop("preview", False)
-    preview = raw_preview is True or (isinstance(raw_preview, str) and raw_preview.lower() == "true")
+    preview = raw_preview is True or (
+        isinstance(raw_preview, str) and raw_preview.lower() == "true"
+    )
     if preview and command in ("str_replace", "insert"):
         return _preview_str_replace_edit(path, command, other_kwargs)
 
@@ -567,9 +659,12 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action | list[Action]:
     return action
 
 
-def _handle_check_tool_status_tool(arguments: dict, mcp_tools: dict[str, Any]) -> AgentThinkAction:
+def _handle_check_tool_status_tool(
+    arguments: dict, mcp_tools: dict[str, Any]
+) -> AgentThinkAction:
     """Handle check_tool_status tool call."""
     return build_check_tool_status_action(arguments, mcp_tools)
+
 
 def _handle_think_tool(arguments: dict) -> AgentThinkAction:
     """Handle ThinkTool tool call."""
@@ -593,9 +688,9 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
             f'Missing required argument "command" in tool call {TASK_TRACKER_TOOL_NAME}'
         )
         raise FunctionCallValidationError(msg)
-        
+
     command = arguments["command"]
-    
+
     # Legacy command support
     if command == "plan":
         command = "update"
@@ -607,12 +702,14 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
         )
 
     tracker = TaskTracker()
-    
+
     # Validation/Normalization logic
     def normalize_step(s: dict, idx: int) -> dict:
         if not isinstance(s, dict):
-            raise FunctionCallValidationError(f"Task item must be a dictionary, got {type(s)}")
-        
+            raise FunctionCallValidationError(
+                f"Task item must be a dictionary, got {type(s)}"
+            )
+
         # Support both old and new keys for backward compatibility during migration
         return {
             "id": s.get("id", f"step-{idx}"),
@@ -620,11 +717,13 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
             "status": s.get("status", "pending"),
             "result": s.get("result", s.get("notes", None)),
             "tags": s.get("tags", []),
-            "subtasks": [normalize_step(sub, i) for i, sub in enumerate(s.get("subtasks", []))]
+            "subtasks": [
+                normalize_step(sub, i) for i, sub in enumerate(s.get("subtasks", []))
+            ],
         }
 
     normalized_task_list = []
-    
+
     if command == "view":
         # Load from disk if viewing
         raw_task_list = tracker.load_from_file()
@@ -649,9 +748,7 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
     if command == "update":
         tracker.save_to_file(normalized_task_list)
 
-    return TaskTrackingAction(
-        command=command, task_list=normalized_task_list
-    )
+    return TaskTrackingAction(command=command, task_list=normalized_task_list)
 
 
 def _handle_mcp_tool(
@@ -885,6 +982,83 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
         return MessageAction(content=f"❌ Structure Editor error: {str(e)}")
 
 
+def _handle_uncertainty_tool(arguments: dict) -> AgentThinkAction:
+    """Handle uncertainty tool — let the LLM flag doubt rather than guess."""
+    level = arguments.get("uncertainty_level", 0.5)
+    thought = arguments.get("thought", "")
+    concerns = arguments.get("specific_concerns", [])
+    requested = arguments.get("requested_information", "")
+    concerns_str = (
+        "\n".join(f"  - {c}" for c in concerns) if concerns else "  (none listed)"
+    )
+    parts = [
+        f"[UNCERTAINTY] Confidence level: {level:.0%}",
+        f"Reasoning: {thought}",
+        f"Specific concerns:\n{concerns_str}",
+    ]
+    if requested:
+        parts.append(f"Requested information: {requested}")
+    return AgentThinkAction(thought="\n".join(parts))
+
+
+def _handle_clarification_tool(arguments: dict) -> AgentThinkAction:
+    """Handle clarification tool — pause and surface question to user."""
+    question = arguments.get("question", "")
+    context = arguments.get("context", "")
+    options = arguments.get("options", [])
+    if not question:
+        raise FunctionCallValidationError(
+            'Missing required argument "question" in tool call clarification'
+        )
+    parts = [f"[CLARIFICATION NEEDED] {question}"]
+    if context:
+        parts.append(f"Context: {context}")
+    if options:
+        opts_str = "\n".join(f"  {i + 1}. {o}" for i, o in enumerate(options))
+        parts.append(f"Options:\n{opts_str}")
+    return AgentThinkAction(thought="\n".join(parts))
+
+
+def _handle_proposal_tool(arguments: dict) -> AgentThinkAction:
+    """Handle proposal tool — present options before committing."""
+    options = arguments.get("options", [])
+    rationale = arguments.get("rationale", "")
+    recommended = arguments.get("recommended")
+    if not options:
+        raise FunctionCallValidationError(
+            'Missing required argument "options" in tool call proposal'
+        )
+    parts = [f"[PROPOSAL] {rationale}"]
+    for i, opt in enumerate(options):
+        tag = " ← RECOMMENDED" if recommended is not None and i == recommended else ""
+        approach = opt.get("approach", f"Option {i + 1}")
+        pros = opt.get("pros", [])
+        cons = opt.get("cons", [])
+        parts.append(f"\nOption {i + 1}{tag}: {approach}")
+        if pros:
+            parts.append("  Pros: " + "; ".join(pros))
+        if cons:
+            parts.append("  Cons: " + "; ".join(cons))
+    return AgentThinkAction(thought="\n".join(parts))
+
+
+def _handle_escalate_tool(arguments: dict) -> AgentThinkAction:
+    """Handle escalate_to_human tool — request human intervention."""
+    reason = arguments.get("reason", "")
+    attempts = arguments.get("attempts_made", [])
+    help_needed = arguments.get("specific_help_needed", "")
+    if not reason:
+        raise FunctionCallValidationError(
+            'Missing required argument "reason" in tool call escalate_to_human'
+        )
+    parts = [f"[ESCALATE TO HUMAN] {reason}"]
+    if attempts:
+        parts.append("Attempts made:\n" + "\n".join(f"  - {a}" for a in attempts))
+    if help_needed:
+        parts.append(f"Help needed: {help_needed}")
+    return AgentThinkAction(thought="\n".join(parts))
+
+
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
@@ -912,22 +1086,36 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,
         WEB_READER_TOOL_NAME: _handle_web_reader_tool,
-        "check_tool_status": lambda args: _handle_check_tool_status_tool(args, {}), # Simplified for static map
+        "check_tool_status": lambda args: _handle_check_tool_status_tool(
+            args, {}
+        ),  # Simplified for static map
         WORKSPACE_STATUS_TOOL_NAME: _handle_workspace_status_tool,
         ERROR_PATTERNS_TOOL_NAME: _handle_error_patterns_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
         PROJECT_MAP_TOOL_NAME: _handle_project_map_tool,
+        REVERT_TO_SAFE_STATE_TOOL_NAME: build_revert_to_safe_state_action,
         SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,
         VERIFY_STATE_TOOL_NAME: _handle_verify_state_tool,
         WORKING_MEMORY_TOOL_NAME: _handle_working_memory_tool,
+        DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
+        TERMINAL_OPEN_TOOL_NAME: build_terminal_open_action,
+        TERMINAL_INPUT_TOOL_NAME: build_terminal_input_action,
+        TERMINAL_READ_TOOL_NAME: build_terminal_read_action,
+        # Meta-cognition tools
+        UNCERTAINTY_TOOL_NAME: _handle_uncertainty_tool,
+        CLARIFICATION_TOOL_NAME: _handle_clarification_tool,
+        PROPOSAL_TOOL_NAME: _handle_proposal_tool,
+        ESCALATE_TOOL_NAME: _handle_escalate_tool,
     }
 
 
 def response_to_actions(
-    response: ModelResponse, mcp_tool_names: list[str] | None = None, mcp_tools: dict[str, Any] | None = None
+    response: ModelResponse,
+    mcp_tool_names: list[str] | None = None,
+    mcp_tools: dict[str, Any] | None = None,
 ) -> list[Action]:
     """Convert LLM response to agent actions."""
-    
+
     def process_with_mcp_tools(tc, args):
         # Allow passing mcp_tools to specific tool handlers
         if tc.function.name == "check_tool_status":

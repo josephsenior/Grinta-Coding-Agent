@@ -127,6 +127,111 @@ def truncate_large_text(value: str, max_chars: int, *, label: str) -> str:
     return value[:half] + "\n[... Truncated by Forge due to size ...]\n" + value[-half:]
 
 
+# Default max chars for bash command output (configurable via env var).
+_DEFAULT_MAX_CMD_OUTPUT_CHARS = 40_000
+
+
+def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
+    """Truncate bash command output with error-aware head+tail strategy.
+
+    Unlike generic truncation, this function:
+    - Preserves the first HEAD_LINES lines for command context
+    - Always preserves the last TAIL_LINES lines (final status/results)
+    - Extracts and surfaces any lines containing error/traceback keywords
+      so the LLM sees failure information even mid-truncation
+
+    Args:
+        output: Raw command output string.
+        max_chars: Maximum number of characters to keep. Reads
+            ``FORGE_MAX_CMD_OUTPUT_CHARS`` env var if not set, defaulting to
+            40 000 characters (~80-120 lines for typical terminal output).
+
+    Returns:
+        Possibly-truncated output string with a clear [TRUNCATED] notice.
+    """
+    if max_chars is None:
+        raw = os.environ.get("FORGE_MAX_CMD_OUTPUT_CHARS", "")
+        try:
+            max_chars = int(raw) if raw else _DEFAULT_MAX_CMD_OUTPUT_CHARS
+        except (ValueError, TypeError):
+            max_chars = _DEFAULT_MAX_CMD_OUTPUT_CHARS
+
+    if max_chars <= 0 or len(output) <= max_chars:
+        return output
+
+    lines = output.splitlines(keepends=True)
+    total_lines = len(lines)
+
+    # Keep first 20% of max_chars budget for head, 60% for tail, 20% for errors
+    head_budget = int(max_chars * 0.20)
+    tail_budget = int(max_chars * 0.60)
+    error_budget = max_chars - head_budget - tail_budget
+
+    # --- Extract error/traceback lines (prioritise what the LLM most needs) ---
+    ERROR_KEYWORDS = (
+        "error",
+        "traceback",
+        "exception",
+        "fatal",
+        "fail",
+        "panic",
+        "abort",
+        "critical",
+        "stderr",
+        "assert",
+        "warning",
+    )
+    error_lines: list[str] = []
+    error_chars = 0
+    for line in lines:
+        if any(kw in line.lower() for kw in ERROR_KEYWORDS):
+            if error_chars + len(line) <= error_budget:
+                error_lines.append(line)
+                error_chars += len(line)
+
+    # --- Head: first portion for context ---
+    head_lines: list[str] = []
+    head_chars = 0
+    for line in lines:
+        if head_chars + len(line) > head_budget:
+            break
+        head_lines.append(line)
+        head_chars += len(line)
+
+    # --- Tail: last portion for final status ---
+    tail_lines: list[str] = []
+    tail_chars = 0
+    for line in reversed(lines):
+        if tail_chars + len(line) > tail_budget:
+            break
+        tail_lines.insert(0, line)
+        tail_chars += len(line)
+
+    skipped = total_lines - len(head_lines) - len(tail_lines)
+    truncation_notice = (
+        f"\n[FORGE: Output truncated — {skipped} lines hidden. "
+        f"Showing first {len(head_lines)} lines, last {len(tail_lines)} lines"
+    )
+    if error_lines:
+        truncation_notice += (
+            f", plus {len(error_lines)} error/warning lines extracted]\n"
+            + "".join(error_lines)
+        )
+    else:
+        truncation_notice += "]\n"
+
+    logger.warning(
+        "Truncated bash output from %d lines (%d chars) → head=%d tail=%d errors=%d",
+        total_lines,
+        len(output),
+        len(head_lines),
+        len(tail_lines),
+        len(error_lines),
+    )
+
+    return "".join(head_lines) + truncation_notice + "".join(tail_lines)
+
+
 def get_max_edit_observation_chars() -> int:
     """Read and validate max edit observation payload size from environment."""
     raw_value = os.environ.get("FORGE_MAX_EDIT_OBS_CHARS", "200000")

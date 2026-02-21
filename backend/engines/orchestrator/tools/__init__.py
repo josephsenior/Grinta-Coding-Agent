@@ -13,6 +13,8 @@ from .meta_cognition import (
     create_proposal_tool,
     create_uncertainty_tool,
 )
+from .delegate_task import create_delegate_task_tool
+from .revert_to_safe_state import create_revert_to_safe_state_tool
 from .note import create_note_tool, create_recall_tool, create_semantic_recall_tool
 from .project_map import create_project_map_tool
 from .run_tests import create_run_tests_tool
@@ -26,6 +28,11 @@ from .web_search import create_web_search_tool
 from .verify_state import create_verify_state_tool
 from .working_memory import create_working_memory_tool
 from .workspace_status import create_workspace_status_tool
+from .terminal import (
+    create_terminal_open_tool,
+    create_terminal_input_tool,
+    create_terminal_read_tool,
+)
 
 __all__ = [
     "create_apply_patch_tool",
@@ -54,4 +61,9 @@ __all__ = [
     "create_verify_state_tool",
     "create_working_memory_tool",
     "create_workspace_status_tool",
+    "create_delegate_task_tool",
+    "create_revert_to_safe_state_tool",
+    "create_terminal_open_tool",
+    "create_terminal_input_tool",
+    "create_terminal_read_tool",
 ]

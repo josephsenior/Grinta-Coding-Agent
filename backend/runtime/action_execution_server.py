@@ -10,13 +10,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
-import shutil
 import sys
 import time
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, cast
 
-import puremagic
 from binaryornot.check import is_binary
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -34,11 +32,15 @@ from backend.core.enums import FileEditSource, FileReadSource
 from backend.events.observation import (
     CmdOutputObservation,
     ErrorObservation,
-    FileDownloadObservation,
     FileEditObservation,
     FileReadObservation,
     FileWriteObservation,
     Observation,
+)
+from backend.events.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
 )
 from backend.runtime.file_operations import (
     ensure_directory_exists,
@@ -51,7 +53,7 @@ from backend.runtime.file_operations import (
     read_text_file,
     read_video_file,
     resolve_path,
-    set_file_permissions,
+    truncate_cmd_output,
     truncate_large_text,
     write_file_content,
 )
@@ -69,6 +71,7 @@ from backend.runtime.utils.diff import get_diff
 from backend.runtime.utils.file_editor import FileEditor
 from backend.runtime.utils.memory_monitor import MemoryMonitor
 from backend.runtime.utils.process_registry import TaskCancellationService
+from backend.runtime.utils.terminal_manager import TerminalManager
 from backend.utils.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
@@ -116,6 +119,9 @@ class ActionExecutor:
 
         self.bash_session: BashSession | None = None
         self.cancellation_service = TaskCancellationService(label=f"runtime:{work_dir}")
+        self.terminal_manager = TerminalManager(
+            work_dir=self._initial_cwd, username=username
+        )
         self.lock = asyncio.Lock()
         self.plugins: dict[str, Plugin] = {}
         # We need the file editor for ACI actions (view) even if we use helper functions
@@ -196,6 +202,7 @@ class ActionExecutor:
             self.bash_session.close()
         if self.browser:
             self.browser.close()
+        self.terminal_manager.close_all()
 
     async def ainit(self) -> None:
         """Initialize action execution server asynchronously."""
@@ -306,6 +313,11 @@ class ActionExecutor:
                 await call_sync_from_async(bash_session.execute, action),
             )
 
+            # Truncate oversized bash output before it enters the context window.
+            # Uses error-aware head+tail strategy so errors are never dropped.
+            if isinstance(observation.content, str):
+                observation.content = truncate_cmd_output(observation.content)
+
             # Check for detected servers and add to observation extras
             detected_server = cast(Any, bash_session.get_detected_server())
             if detected_server:
@@ -327,6 +339,18 @@ class ActionExecutor:
         except Exception as e:
             logger.error("Error running command: %s", e)
             return ErrorObservation(str(e))
+
+    async def terminal_run(self, action: TerminalRunAction) -> Observation:
+        """Start a new interactive terminal session."""
+        return await call_sync_from_async(self.terminal_manager.run, action)
+
+    async def terminal_input(self, action: TerminalInputAction) -> Observation:
+        """Send input to an interactive terminal session."""
+        return await call_sync_from_async(self.terminal_manager.input, action)
+
+    async def terminal_read(self, action: TerminalReadAction) -> Observation:
+        """Read the output of an interactive terminal session."""
+        return await call_sync_from_async(self.terminal_manager.read, action)
 
     def _resolve_path(self, path: str, working_dir: str) -> str:
         """Resolve a relative or absolute path to an absolute path with security validation."""
@@ -401,7 +425,9 @@ class ActionExecutor:
 
         # Directory view support
         try:
-            if os.path.isdir(filepath) and (action.command == "view" or not action.command):
+            if os.path.isdir(filepath) and (
+                action.command == "view" or not action.command
+            ):
                 return handle_directory_view(filepath, action.path)
         except Exception:
             pass
@@ -418,7 +444,10 @@ class ActionExecutor:
                 old_str=action.old_str,
                 new_str=action.new_str,
                 insert_line=action.insert_line,
-                enable_linting=bool(os.environ.get("ENABLE_AUTO_LINT", "").lower() in {"1", "true", "yes"}),
+                enable_linting=bool(
+                    os.environ.get("ENABLE_AUTO_LINT", "").lower()
+                    in {"1", "true", "yes"}
+                ),
             )
             max_chars = get_max_edit_observation_chars()
             result_str = truncate_large_text(result_str, max_chars, label="edit")
@@ -483,7 +512,9 @@ class ActionExecutor:
 
                 servers = getattr(cfg, "servers", []) or []
                 if _is_windows_stdio_mcp_disabled():
-                    servers = [s for s in servers if getattr(s, "type", None) != "stdio"]
+                    servers = [
+                        s for s in servers if getattr(s, "type", None) != "stdio"
+                    ]
                 self._mcp_clients = await create_mcps(servers)
 
             return await call_tool_mcp(self._mcp_clients, action)  # type: ignore[arg-type]
@@ -512,6 +543,10 @@ class ActionExecutor:
             except Exception:
                 pass
             self.bash_session = None
+        try:
+            self.terminal_manager.close_all()
+        except Exception:
+            pass
         if self.browser is not None:
             try:
                 self.browser.close()
@@ -699,6 +734,7 @@ if __name__ == "__main__":
                     logger_level=logger.getEffectiveLevel(),
                 )
                 from backend.core.config.utils import load_forge_config
+
                 forge_config = load_forge_config()
                 mcp_proxy_manager.initialize(forge_config.mcp.servers)
                 allowed_origins = ["*"]

@@ -35,14 +35,23 @@ def create_project_map_tool() -> dict:
                 "properties": {
                     "command": {
                         "type": "string",
-                        "enum": ["tree", "imports", "symbols", "recent", "callers", "test_coverage"],
+                        "enum": [
+                            "tree",
+                            "imports",
+                            "symbols",
+                            "recent",
+                            "callers",
+                            "test_coverage",
+                            "semantic_search",
+                        ],
                         "description": (
                             "tree: directory tree (depth-limited). "
                             "imports: show what a file imports and what imports it. "
                             "symbols: list classes/functions/top-level names in a file. "
                             "recent: git log of recently modified files. "
                             "callers: find all files referencing a given symbol name. "
-                            "test_coverage: find test files that likely test a given source file."
+                            "test_coverage: find test files that likely test a given source file. "
+                            "semantic_search: robust AST-based search for symbol references."
                         ),
                     },
                     "path": {
@@ -94,6 +103,13 @@ def build_project_map_action(arguments: dict) -> CmdRunAction | AgentThinkAction
         return _build_callers_action(symbol, path)
     elif command == "test_coverage":
         return _build_test_coverage_action(path)
+    elif command == "semantic_search":
+        symbol = arguments.get("symbol", "")
+        if not symbol:
+            return AgentThinkAction(
+                thought="[PROJECT_MAP] 'semantic_search' requires the 'symbol' parameter."
+            )
+        return _build_semantic_search_action(symbol, path)
     else:
         return AgentThinkAction(
             thought=f"[PROJECT_MAP] Unknown command: {command}. Use tree/imports/symbols/recent/callers/test_coverage."
@@ -192,9 +208,9 @@ def _build_test_coverage_action(path: str) -> CmdRunAction:
         f"echo '--- Tests by naming convention ---' && "
         # Find test files matching naming conventions
         f"find . -type f \\( "
-        f"-name \"test_${{basename_no_ext}}.py\" -o "
-        f"-name \"${{basename_no_ext}}_test.py\" -o "
-        f"-name \"test_${{basename_no_ext}}.*.py\" "
+        f'-name "test_${{basename_no_ext}}.py" -o '
+        f'-name "${{basename_no_ext}}_test.py" -o '
+        f'-name "test_${{basename_no_ext}}.*.py" '
         f"\\) ! -path '*/__pycache__/*' 2>/dev/null | head -20 && "
         f"echo '' && echo '--- Tests that import this module ---' && "
         # Find test files that import the module
@@ -207,4 +223,19 @@ def _build_test_coverage_action(path: str) -> CmdRunAction:
         f"find \"$dirname_path\" -name 'conftest.py' -type f 2>/dev/null | head -10 || "
         f"echo '(none)'"
     )
+    return CmdRunAction(command=cmd)
+
+
+def _build_semantic_search_action(symbol: str, path: str) -> CmdRunAction:
+    """Robust AST-based reference search using the semantic_analyzer script."""
+    import sys
+    import shlex
+    import backend.engines.orchestrator.tools.semantic_analyzer as sa
+
+    safe_symbol = shlex.quote(symbol)
+    safe_path = shlex.quote(path)
+    python_exe = sys.executable or "python"
+    script_path = sa.__file__
+
+    cmd = f"{python_exe} {shlex.quote(script_path)} find_references {safe_symbol} {safe_path}"
     return CmdRunAction(command=cmd)

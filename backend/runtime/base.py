@@ -40,7 +40,6 @@ from backend.events.action import (
 from backend.events.action.mcp import MCPAction
 from backend.events.observation import (
     AgentThinkObservation,
-    CmdOutputObservation,
     ErrorObservation,
     FileWriteObservation,
     NullObservation,
@@ -70,7 +69,7 @@ from backend.utils.async_utils import (
 if TYPE_CHECKING:
     from pydantic import SecretStr
     from backend.core.config import ForgeConfig, RuntimeConfig
-    from backend.core.config.mcp_config import MCPConfig, MCPStdioServerConfig
+    from backend.core.config.mcp_config import MCPConfig
     from backend.events.event import Event
     from backend.playbook_engine import BasePlaybook
     from backend.core.provider_types import (
@@ -94,6 +93,7 @@ AGENT_LEVEL_ACTIONS: frozenset[str] = frozenset(
         "finish",
         "reject",
         "delegate",
+        "delegate_task",
         "condensation",
         "condensation_request",
         "task_tracking",
@@ -214,9 +214,7 @@ class Runtime(
             event_stream.subscribe(
                 EventStreamSubscriber.RUNTIME, self.on_event, self.sid
             )
-        self.plugins = (
-            copy.deepcopy(plugins) if plugins is not None and plugins else []
-        )
+        self.plugins = copy.deepcopy(plugins) if plugins is not None and plugins else []
         self.status_callback = status_callback
         self.attach_to_existing = attach_to_existing
         self.config = copy.deepcopy(config)
@@ -697,9 +695,7 @@ class Runtime(
         """
 
     @abstractmethod
-    def get_mcp_config(
-        self, extra_servers: list[Any] | None = None
-    ) -> MCPConfig:
+    def get_mcp_config(self, extra_servers: list[Any] | None = None) -> MCPConfig:
         """Get MCP configuration for this runtime."""
 
     @abstractmethod

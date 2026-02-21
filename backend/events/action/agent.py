@@ -261,7 +261,11 @@ class UncertaintyAction(Action):
         """Get uncertainty expression message."""
         if self.thought:
             return f"Expressing uncertainty: {self.thought}"
-        concerns = ", ".join(self.specific_concerns) if self.specific_concerns else "general uncertainty"
+        concerns = (
+            ", ".join(self.specific_concerns)
+            if self.specific_concerns
+            else "general uncertainty"
+        )
         return f"Uncertainty ({self.uncertainty_level:.0%} confidence): {concerns}"
 
     __test__ = False
@@ -355,5 +359,26 @@ class EscalateToHumanAction(Action):
     def message(self) -> str:
         """Get escalation message."""
         return f"Requesting human assistance: {self.reason}"
+
+    __test__ = False
+
+
+@dataclass
+class DelegateTaskAction(Action):
+    """An action where the orchestrator delegates a subtask to a worker agent.
+
+    Attributes:
+        task_description (str): What the worker should do.
+        files (list[str]): Relevant files for the task.
+    """
+
+    task_description: str = ""
+    files: list[str] = field(default_factory=list)
+    action: ClassVar[str] = ActionType.DELEGATE_TASK
+
+    @property
+    def message(self) -> str:
+        """Get delegation message."""
+        return f"Delegating task: {self.task_description[:50]}..."
 
     __test__ = False

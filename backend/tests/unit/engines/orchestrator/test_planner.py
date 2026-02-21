@@ -1,4 +1,5 @@
 """Tests for backend.engines.orchestrator.planner."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -15,6 +16,7 @@ from backend.engines.orchestrator.planner import (
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_config(**kwargs):
     cfg = MagicMock()
@@ -52,12 +54,37 @@ def _make_state() -> MagicMock:
     state = MagicMock()
     state.to_llm_metadata.return_value = {}
     state.agent_name = "Orchestrator"
+    state.plan = None
+    state.history = []
+    state.extra_data = {}
+    # Properly configure turn_signals so float comparisons don't get MagicMock
+    ts = MagicMock()
+    ts.planning_directive = None
+    ts.memory_pressure = None
+    ts.repetition_score = 0.0
+    state.turn_signals = ts
+    # Properly configure iteration_flag
+    it = MagicMock()
+    it.current_value = 2
+    it.max_value = 30
+    state.iteration_flag = it
+    # Properly configure metrics
+    metrics = MagicMock()
+    atu = MagicMock()
+    atu.prompt_tokens = 0
+    atu.completion_tokens = 0
+    atu.context_window = 0
+    metrics.accumulated_token_usage = atu
+    metrics.accumulated_cost = 0.0
+    metrics.max_budget_per_task = None
+    state.metrics = metrics
     return state
 
 
 # ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------
+
 
 class TestPatternConstants:
     def test_question_patterns_not_empty(self):
@@ -77,6 +104,7 @@ class TestPatternConstants:
 # __init__
 # ---------------------------------------------------------------------------
 
+
 class TestOrchestratorPlannerInit:
     def test_initial_cache_is_none(self):
         p = _make_planner()
@@ -94,6 +122,7 @@ class TestOrchestratorPlannerInit:
 # ---------------------------------------------------------------------------
 # _should_use_short_tool_descriptions
 # ---------------------------------------------------------------------------
+
 
 class TestShouldUseShortToolDescriptions:
     def test_gpt4_uses_short(self):
@@ -126,19 +155,23 @@ class TestShouldUseShortToolDescriptions:
 # _llm_supports_tool_choice
 # ---------------------------------------------------------------------------
 
+
 class TestLlmSupportsToolChoice:
-    @pytest.mark.parametrize("model", [
-        "gpt-4-turbo",
-        "gpt-3.5-turbo",
-        "claude-3-opus",
-        "claude-sonnet-3-5",
-        "claude-opus-4",
-        "claude-haiku",
-        "gemini-pro",
-        "mistral-7b",
-        "command-r-plus",
-        "deepseek-coder",
-    ])
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "gpt-4-turbo",
+            "gpt-3.5-turbo",
+            "claude-3-opus",
+            "claude-sonnet-3-5",
+            "claude-opus-4",
+            "claude-haiku",
+            "gemini-pro",
+            "mistral-7b",
+            "command-r-plus",
+            "deepseek-coder",
+        ],
+    )
     def test_supported_models(self, model):
         p = _make_planner(llm=_make_llm(model))
         assert p._llm_supports_tool_choice() is True
@@ -151,6 +184,7 @@ class TestLlmSupportsToolChoice:
 # ---------------------------------------------------------------------------
 # _get_last_user_message
 # ---------------------------------------------------------------------------
+
 
 class TestGetLastUserMessage:
     def setup_method(self):
@@ -184,6 +218,7 @@ class TestGetLastUserMessage:
 # ---------------------------------------------------------------------------
 # _is_question / _is_action
 # ---------------------------------------------------------------------------
+
 
 class TestIsQuestion:
     def setup_method(self):
@@ -253,6 +288,7 @@ class TestIsAction:
 # _determine_tool_choice
 # ---------------------------------------------------------------------------
 
+
 class TestDetermineToolChoice:
     def setup_method(self):
         self.state = _make_state()
@@ -286,6 +322,7 @@ class TestDetermineToolChoice:
 # build_toolset (integration-style with mocked internal builders)
 # ---------------------------------------------------------------------------
 
+
 class TestBuildToolset:
     def _mock_tool(self, name: str):
         t = MagicMock()
@@ -297,9 +334,15 @@ class TestBuildToolset:
         p._checked_tools_cache = ["old_cache"]
 
         with (
-            patch("backend.engines.orchestrator.planner.OrchestratorPlanner._add_core_tools"),
-            patch("backend.engines.orchestrator.planner.OrchestratorPlanner._add_browsing_tool"),
-            patch("backend.engines.orchestrator.planner.OrchestratorPlanner._add_editor_tools"),
+            patch(
+                "backend.engines.orchestrator.planner.OrchestratorPlanner._add_core_tools"
+            ),
+            patch(
+                "backend.engines.orchestrator.planner.OrchestratorPlanner._add_browsing_tool"
+            ),
+            patch(
+                "backend.engines.orchestrator.planner.OrchestratorPlanner._add_editor_tools"
+            ),
         ):
             p.build_toolset()
 
@@ -308,9 +351,15 @@ class TestBuildToolset:
     def test_build_toolset_returns_list(self):
         p = _make_planner()
         with (
-            patch("backend.engines.orchestrator.planner.OrchestratorPlanner._add_core_tools"),
-            patch("backend.engines.orchestrator.planner.OrchestratorPlanner._add_browsing_tool"),
-            patch("backend.engines.orchestrator.planner.OrchestratorPlanner._add_editor_tools"),
+            patch(
+                "backend.engines.orchestrator.planner.OrchestratorPlanner._add_core_tools"
+            ),
+            patch(
+                "backend.engines.orchestrator.planner.OrchestratorPlanner._add_browsing_tool"
+            ),
+            patch(
+                "backend.engines.orchestrator.planner.OrchestratorPlanner._add_editor_tools"
+            ),
         ):
             result = p.build_toolset()
         assert isinstance(result, list)
@@ -320,24 +369,17 @@ class TestBuildToolset:
 # _add_browsing_tool — Windows skip path
 # ---------------------------------------------------------------------------
 
+
 class TestAddBrowsingTool:
     def test_windows_uses_web_reader_tool(self):
-        import sys
+        # NOTE: Browsing implementation moved to MCP in recent versions.
+        # This test is kept to verify that no legacy browsing tools are
+        # inadvertently added when enable_browsing=True.
         cfg = _make_config(enable_browsing=True)
         p = _make_planner(config=cfg)
         tools = []
-        original_platform = sys.platform
-        try:
-            import backend.engines.orchestrator.planner as planner_mod
-            import importlib, types
-            # Patch sys.platform directly inside the module
-            with patch.object(sys, "platform", "win32"):
-                p._add_browsing_tool(tools)
-        finally:
-            pass
-        assert tools
-        names = [t.get("function", {}).get("name") for t in tools if isinstance(t, dict)]
-        assert "web_reader" in names
+        p._add_browsing_tool(tools)
+        assert tools == []
 
     def test_browsing_disabled_adds_nothing(self):
         cfg = _make_config(enable_browsing=False)
@@ -351,6 +393,7 @@ class TestAddBrowsingTool:
 # build_llm_params — cache logic
 # ---------------------------------------------------------------------------
 
+
 class TestBuildLlmParams:
     def test_check_tools_cache_populated_on_first_call(self):
         p = _make_planner()
@@ -359,7 +402,9 @@ class TestBuildLlmParams:
         tools = [MagicMock()]
         checked = [MagicMock(name="checked")]
 
-        with patch("backend.engines.orchestrator.planner.check_tools", return_value=checked) as mock_ct:
+        with patch(
+            "backend.engines.orchestrator.planner.check_tools", return_value=checked
+        ) as mock_ct:
             params = p.build_llm_params(messages, state, tools)
 
         assert p._checked_tools_cache is checked
@@ -375,7 +420,9 @@ class TestBuildLlmParams:
         tools = [MagicMock()]
         checked = [MagicMock(name="checked")]
 
-        with patch("backend.engines.orchestrator.planner.check_tools", return_value=checked) as mock_ct:
+        with patch(
+            "backend.engines.orchestrator.planner.check_tools", return_value=checked
+        ) as mock_ct:
             p.build_llm_params(messages, state, tools)
             p.build_llm_params(messages, state, tools)
 
@@ -389,7 +436,9 @@ class TestBuildLlmParams:
         tools = [MagicMock()]
         checked = [MagicMock(name="checked")]
 
-        with patch("backend.engines.orchestrator.planner.check_tools", return_value=checked) as mock_ct:
+        with patch(
+            "backend.engines.orchestrator.planner.check_tools", return_value=checked
+        ) as mock_ct:
             p.build_llm_params(messages, state, tools)
             # Simulate model change
             p._llm.config.model = "new-model-x"
@@ -429,9 +478,11 @@ class TestBuildLlmParams:
         it.max_value = 3
         state.iteration_flag = it
         # Provide typed turn signals
-        state.turn_signals = MagicMock()
-        state.turn_signals.planning_directive = "[AUTO-PLAN] do planning"
-        state.turn_signals.memory_pressure = "WARNING"
+        ts = MagicMock()
+        ts.planning_directive = "[AUTO-PLAN] do planning"
+        ts.memory_pressure = "WARNING"
+        ts.repetition_score = 0.0
+        state.turn_signals = ts
         state.extra_data = {}
 
         messages = [
@@ -466,3 +517,31 @@ class TestBuildLlmParams:
             params = p.build_llm_params(messages, state, [])
         assert "tool_choice" in params
         assert params["tool_choice"] == "required"
+
+
+# ---------------------------------------------------------------------------
+# Meta-cognition tools
+# ---------------------------------------------------------------------------
+
+
+class TestMetaCognitionTools:
+    def test_meta_cognition_tools_added_by_default(self):
+        p = _make_planner()
+        tools = []
+        p._add_core_tools(tools, use_short_tool_desc=True)
+        names = [t.get("function", {}).get("name") for t in tools]
+        assert "uncertainty" in names
+        assert "clarification" in names
+        assert "escalate_to_human" in names
+        assert "proposal" in names
+
+    def test_meta_cognition_tools_can_be_disabled(self):
+        cfg = _make_config(enable_meta_cognition=False)
+        p = _make_planner(config=cfg)
+        tools = []
+        p._add_core_tools(tools, use_short_tool_desc=True)
+        names = [t.get("function", {}).get("name") for t in tools]
+        assert "uncertainty" not in names
+        assert "clarification" not in names
+        assert "escalate_to_human" not in names
+        assert "proposal" not in names

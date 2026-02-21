@@ -111,6 +111,16 @@ class MessageObservationSchema(ObservationSchemaV1):
         return validate_non_empty_string(v, name="content")
 
 
+class TerminalObservationSchema(ObservationSchemaV1):
+    """Schema for TerminalObservation."""
+
+    observation_type: Literal["terminal"] = Field(
+        ObservationType.TERMINAL.value, frozen=True
+    )
+    session_id: str = Field(..., min_length=1, description="Terminal session ID")
+    content: str = Field(..., description="Terminal output buffer")
+
+
 # Union type for all observation schemas
 ObservationSchemaUnion = Union[
     CmdOutputObservationSchema,
@@ -118,4 +128,5 @@ ObservationSchemaUnion = Union[
     FileEditObservationSchema,
     ErrorObservationSchema,
     MessageObservationSchema,
+    TerminalObservationSchema,
 ]

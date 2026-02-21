@@ -310,6 +310,20 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             mock_observation
         )
 
+    @patch("backend.utils.async_utils.run_or_schedule")
+    async def test_handle_delegate_task_action(self, mock_run_schedule):
+        """Test _handle_delegate_task_action schedules worker execution."""
+        from backend.events.action.agent import DelegateTaskAction
+
+        action = DelegateTaskAction(
+            task_description="Build a new feature", files=["main.py"]
+        )
+
+        await self.service._handle_delegate_task_action(action)
+
+        # Should schedule the background task
+        mock_run_schedule.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

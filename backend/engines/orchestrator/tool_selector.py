@@ -19,30 +19,37 @@ if TYPE_CHECKING:
     from backend.controller.state.state import State
 
 # Tool names (must match the function names in tool definitions)
-_CORE_TOOLS = frozenset({
-    # Execution
-    "execute_bash",
-    "bash",
-    # File editing
-    "str_replace_editor",
-    "structure_editor",
-    # Search & navigation
-    "search_code",
-    "project_map",
-    # Reasoning
-    "think",
-    "finish",
-    # Memory — lightweight
-    "note",
-    "recall",
-    "semantic_recall",
-    # Testing
-    "run_tests",
-    # Verification
-    "verify_state",
-    # Task tracking
-    "task_tracker",
-})
+_CORE_TOOLS = frozenset(
+    {
+        # Execution
+        "execute_bash",
+        "bash",
+        # File editing
+        "str_replace_editor",
+        "structure_editor",
+        # Search & navigation
+        "search_code",
+        "project_map",
+        # Reasoning
+        "think",
+        "finish",
+        # Memory — lightweight
+        "note",
+        "recall",
+        "semantic_recall",
+        # Testing
+        "run_tests",
+        # Verification
+        "verify_state",
+        # Task tracking
+        "task_tracker",
+        # Meta-cognition — always available for expressing uncertainty and seeking guidance
+        "uncertainty",
+        "clarification",
+        "proposal",
+        "escalate_to_human",
+    }
+)
 
 # Research keywords that unlock web tools
 _RESEARCH_KEYWORDS = re.compile(

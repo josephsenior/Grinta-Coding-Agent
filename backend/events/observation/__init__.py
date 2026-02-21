@@ -25,6 +25,7 @@ from backend.events.observation.reject import UserRejectObservation
 from backend.events.observation.status import StatusObservation
 from backend.events.observation.success import SuccessObservation
 from backend.events.observation.task_tracking import TaskTrackingObservation
+from backend.events.observation.terminal import TerminalObservation
 
 __all__ = [
     "AgentCondensationObservation",
@@ -45,5 +46,6 @@ __all__ = [
     "StatusObservation",
     "SuccessObservation",
     "TaskTrackingObservation",
+    "TerminalObservation",
     "UserRejectObservation",
 ]

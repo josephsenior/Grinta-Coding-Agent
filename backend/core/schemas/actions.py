@@ -213,6 +213,39 @@ class NullActionSchema(ActionSchemaV1):
     runnable: bool = Field(False, frozen=True)
 
 
+class TerminalRunActionSchema(ActionSchemaV1):
+    """Schema for TerminalRunAction."""
+
+    action_type: Literal["terminal_run"] = Field(
+        ActionType.TERMINAL_RUN.value, frozen=True
+    )
+    runnable: bool = Field(True, frozen=True)
+    command: str = Field(..., min_length=1, description="Command to start session")
+    cwd: str | None = Field(default=None, description="Working directory")
+
+
+class TerminalInputActionSchema(ActionSchemaV1):
+    """Schema for TerminalInputAction."""
+
+    action_type: Literal["terminal_input"] = Field(
+        ActionType.TERMINAL_INPUT.value, frozen=True
+    )
+    runnable: bool = Field(True, frozen=True)
+    session_id: str = Field(..., min_length=1, description="Terminal session ID")
+    input: str = Field(..., description="Input string")
+    is_control: bool = Field(default=False, description="Is control char (C-c, etc.)")
+
+
+class TerminalReadActionSchema(ActionSchemaV1):
+    """Schema for TerminalReadAction."""
+
+    action_type: Literal["terminal_read"] = Field(
+        ActionType.TERMINAL_READ.value, frozen=True
+    )
+    runnable: bool = Field(True, frozen=True)
+    session_id: str = Field(..., min_length=1, description="Terminal session ID")
+
+
 # Union type for all action schemas
 ActionSchemaUnion = Union[
     FileReadActionSchema,
@@ -225,4 +258,7 @@ ActionSchemaUnion = Union[
     AgentRejectActionSchema,
     ChangeAgentStateActionSchema,
     NullActionSchema,
+    TerminalRunActionSchema,
+    TerminalInputActionSchema,
+    TerminalReadActionSchema,
 ]

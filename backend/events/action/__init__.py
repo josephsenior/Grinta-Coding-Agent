@@ -24,6 +24,11 @@ from backend.events.action.files import (
     FileWriteAction,
 )
 from backend.events.action.mcp import MCPAction
+from backend.events.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 from backend.events.action.message import (
     MessageAction,
     StreamingChunkAction,
@@ -52,5 +57,8 @@ __all__ = [
     "StreamingChunkAction",  # ⚡ CRITICAL FIX: Enable real-time LLM streaming!
     "SystemMessageAction",
     "TaskTrackingAction",
+    "TerminalInputAction",
+    "TerminalReadAction",
+    "TerminalRunAction",
     "UncertaintyAction",
 ]

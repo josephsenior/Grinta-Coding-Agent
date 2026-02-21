@@ -110,6 +110,23 @@ class OrchestratorPlanner:
         from backend.engines.orchestrator.tools.check_tool_status import (
             create_check_tool_status_tool,
         )
+        from backend.engines.orchestrator.tools.delegate_task import (
+            create_delegate_task_tool,
+        )
+        from backend.engines.orchestrator.tools.revert_to_safe_state import (
+            create_revert_to_safe_state_tool,
+        )
+        from backend.engines.orchestrator.tools.terminal import (
+            create_terminal_open_tool,
+            create_terminal_input_tool,
+            create_terminal_read_tool,
+        )
+        from backend.engines.orchestrator.tools.meta_cognition import (
+            create_uncertainty_tool,
+            create_clarification_tool,
+            create_escalate_tool,
+            create_proposal_tool,
+        )
 
         if getattr(self._config, "enable_cmd", True):
             tools.append(create_cmd_run_tool(use_short_description=use_short_tool_desc))
@@ -131,6 +148,10 @@ class OrchestratorPlanner:
             tools.append(create_task_tracker_tool())
         if getattr(self._config, "enable_search_code", True):
             tools.append(create_search_code_tool())
+        if getattr(self._config, "enable_terminal", True):
+            tools.append(create_terminal_open_tool())
+            tools.append(create_terminal_input_tool())
+            tools.append(create_terminal_read_tool())
         if getattr(self._config, "enable_check_tool_status", True):
             tools.append(create_check_tool_status_tool())
         if getattr(self._config, "enable_web_search", False):
@@ -139,6 +160,10 @@ class OrchestratorPlanner:
             )
 
             tools.append(create_web_search_tool())
+        if getattr(self._config, "enable_swarming", True):
+            tools.append(create_delegate_task_tool())
+        if getattr(self._config, "enable_rollback", True):
+            tools.append(create_revert_to_safe_state_tool())
         if getattr(self._config, "enable_workspace_status", True):
             from backend.engines.orchestrator.tools.workspace_status import (
                 create_workspace_status_tool,
@@ -181,6 +206,11 @@ class OrchestratorPlanner:
             )
 
             tools.append(create_verify_state_tool())
+        if getattr(self._config, "enable_meta_cognition", True):
+            tools.append(create_uncertainty_tool())
+            tools.append(create_clarification_tool())
+            tools.append(create_escalate_tool())
+            tools.append(create_proposal_tool())
 
     def _add_browsing_tool(self, tools: list) -> None:
         if getattr(self._config, "enable_browsing", False):
@@ -379,7 +409,9 @@ class OrchestratorPlanner:
         # Proactive context pressure warning at ~70% token usage
         context_pressure_warning = ""
         try:
-            prompt_tok = int(parts[0].split("=")[0]) if "tokens_used" in " ".join(parts) else 0
+            prompt_tok = (
+                int(parts[0].split("=")[0]) if "tokens_used" in " ".join(parts) else 0
+            )
             for p in parts:
                 if p.startswith("tokens_used="):
                     prompt_tok = int(p.split("=")[1])
@@ -441,14 +473,26 @@ class OrchestratorPlanner:
         if plan and hasattr(plan, "steps") and plan.steps:
             active_plan_str = f"Title: {getattr(plan, 'title', 'Current Plan')}\n"
             for step in plan.steps:
-                status_icon = "✓" if step.status == "completed" else "X" if step.status == "failed" else "O" if step.status == "in_progress" else "-"
-                active_plan_str += f"{step.id} [{status_icon}] {step.description} ({step.status})\n"
+                status_icon = (
+                    "✓"
+                    if step.status == "completed"
+                    else "X"
+                    if step.status == "failed"
+                    else "O"
+                    if step.status == "in_progress"
+                    else "-"
+                )
+                active_plan_str += (
+                    f"{step.id} [{status_icon}] {step.description} ({step.status})\n"
+                )
                 if step.result:
-                     active_plan_str += f"   Result: {str(step.result)[:200]}...\n"
+                    active_plan_str += f"   Result: {str(step.result)[:200]}...\n"
                 for sub in step.subtasks:
-                     status_icon = "✓" if sub.status == "completed" else "-"
-                     active_plan_str += f"    {sub.id} [{status_icon}] {sub.description}\n"
-            
+                    status_icon = "✓" if sub.status == "completed" else "-"
+                    active_plan_str += (
+                        f"    {sub.id} [{status_icon}] {sub.description}\n"
+                    )
+
             status += f"\n<ACTIVE_PLAN>\n{active_plan_str}</ACTIVE_PLAN>"
 
         if planning_directive:

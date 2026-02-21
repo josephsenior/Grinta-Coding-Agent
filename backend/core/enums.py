@@ -64,6 +64,9 @@ class ActionType(str, Enum):
     WRITE = "write"
     EDIT = "edit"
     RUN = "run"
+    TERMINAL_RUN = "terminal_run"
+    TERMINAL_INPUT = "terminal_input"
+    TERMINAL_READ = "terminal_read"
     BROWSE = "browse"
     BROWSE_INTERACTIVE = "browse_interactive"
     MCP = "call_tool_mcp"
@@ -87,6 +90,7 @@ class ActionType(str, Enum):
     PROPOSAL = "proposal"
     CLARIFICATION = "clarification"
     ESCALATE = "escalate"
+    DELEGATE_TASK = "delegate_task"
 
 
 class LifecyclePhase(str, Enum):
@@ -148,6 +152,8 @@ class ObservationType(str, Enum):
     SERVER_READY = "server_ready"
     RECALL_FAILURE = "recall_failure"
     STATUS = "status"
+    TERMINAL = "terminal"
+    DELEGATE_TASK_RESULT = "delegate_task_result"
 
 
 class ExitReason(str, Enum):

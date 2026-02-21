@@ -47,6 +47,9 @@ class ActionExecutionClient(Runtime):
     _SERVER_ACTIONS: frozenset[str] = frozenset(
         {
             "run",
+            "terminal_run",
+            "terminal_input",
+            "terminal_read",
             "read",
             "write",
             "edit",
@@ -121,7 +124,7 @@ class ActionExecutionClient(Runtime):
                     name="default",
                     type="sse",
                     url=f"{getattr(self, 'action_execution_server_url', '')}/mcp",
-                    transport="sse"
+                    transport="sse",
                 )
             )
 
@@ -147,6 +150,15 @@ class ActionExecutionClient(Runtime):
         return self._execute_action_on_server(action)
 
     def edit(self, action: Any) -> Any:
+        return self._execute_action_on_server(action)
+
+    def terminal_run(self, action: Any) -> Any:
+        return self._execute_action_on_server(action)
+
+    def terminal_input(self, action: Any) -> Any:
+        return self._execute_action_on_server(action)
+
+    def terminal_read(self, action: Any) -> Any:
         return self._execute_action_on_server(action)
 
     def copy_to(
