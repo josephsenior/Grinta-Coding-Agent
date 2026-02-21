@@ -275,12 +275,50 @@ class KnowledgePlaybook(BasePlaybook):
     def match_trigger(self, message: str) -> str | None:
         """Match a trigger in the message.
 
-        It returns the first trigger that matches the message.
+        Uses a two-tier strategy:
+        1. Fast substring match (exact keyword containment).
+        2. Lightweight semantic match using word-overlap similarity,
+           activated only when no substring match is found.
+
+        Returns the first matching trigger, or None.
         """
-        message = message.lower()
-        return next(
-            (trigger for trigger in self.triggers if trigger.lower() in message), None
-        )
+        message_lower = message.lower()
+
+        # Tier 1: exact substring (fast path)
+        for trigger in self.triggers:
+            if trigger.lower() in message_lower:
+                return trigger
+
+        # Tier 2: word-overlap similarity (lightweight semantic fallback)
+        threshold = 0.55
+        message_words = set(re.findall(r"\w+", message_lower))
+        if not message_words:
+            return None
+
+        best_trigger: str | None = None
+        best_score: float = 0.0
+
+        for trigger in self.triggers:
+            trigger_words = set(re.findall(r"\w+", trigger.lower()))
+            if not trigger_words:
+                continue
+            # Jaccard-like similarity weighted toward trigger coverage
+            overlap = message_words & trigger_words
+            if not overlap:
+                continue
+            # How much of the trigger's vocabulary appears in the message
+            coverage = len(overlap) / len(trigger_words)
+            # Penalise very short triggers (single-word) to reduce false positives
+            length_bonus = min(1.0, len(trigger_words) / 2)
+            score = coverage * length_bonus
+            if score > best_score:
+                best_score = score
+                best_trigger = trigger
+
+        if best_score >= threshold:
+            return best_trigger
+
+        return None
 
     @property
     def triggers(self) -> list[str]:

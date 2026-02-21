@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from backend.core.schemas import AgentState
 from backend.events import EventSource, RecallType
+from backend.events import EventStream
 from backend.events.action import (
     Action,
     AgentRejectAction,
@@ -20,8 +21,12 @@ from backend.events.action import (
     TaskTrackingAction,
 )
 from backend.events.action.agent import (
-    RecallAction,
+    ClarificationRequestAction,
     DelegateTaskAction,
+    EscalateToHumanAction,
+    ProposalAction,
+    RecallAction,
+    UncertaintyAction,
 )
 from backend.events.observation import (
     Observation,
@@ -93,6 +98,11 @@ class EventRouterService:
             await self._handle_task_tracking_action(action)
         elif isinstance(action, DelegateTaskAction):
             await self._handle_delegate_task_action(action)
+        elif isinstance(
+            action,
+            (ClarificationRequestAction, ProposalAction, UncertaintyAction, EscalateToHumanAction),
+        ):
+            await self._handle_meta_cognition_action(action)
 
     async def _handle_task_tracking_action(self, action: TaskTrackingAction) -> None:
         """Handle task tracking action to update active plan."""
@@ -146,7 +156,16 @@ class EventRouterService:
                 str(action),
                 extra={"msg_type": "ACTION", "event_source": EventSource.USER},
             )
-            first_user_message = self._ctrl._first_user_message()
+            first_user_message = next(
+                (
+                    e
+                    for e in self._ctrl.event_stream.search_events(
+                        start_id=self._ctrl.state.start_id
+                    )
+                    if isinstance(e, MessageAction) and e.source == EventSource.USER
+                ),
+                None,
+            )
             is_first_user_message = (
                 action.id == first_user_message.id if first_user_message else False
             )
@@ -156,7 +175,14 @@ class EventRouterService:
                 else RecallType.KNOWLEDGE
             )
             recall_action = RecallAction(query=action.content, recall_type=recall_type)
-            self._ctrl._pending_action = recall_action
+
+            pending_service = getattr(self._ctrl, "pending_action_service", None)
+            if pending_service is not None:
+                pending_service.set(recall_action)
+            else:
+                action_service = getattr(self._ctrl, "action_service", None)
+                if action_service is not None:
+                    action_service.set_pending_action(recall_action)
             self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
             if self._ctrl.get_agent_state() != AgentState.RUNNING:
                 await self._ctrl.set_agent_state_to(AgentState.RUNNING)
@@ -167,110 +193,185 @@ class EventRouterService:
     async def _handle_delegate_task_action(self, action: DelegateTaskAction) -> None:
         """Handle delegating a subtask to a worker agent."""
         import uuid
-        from backend.controller.controller_config import ControllerConfig
-        from backend.controller.agent_controller import AgentController
-        from backend.events.stream import EventStream
         from backend.utils.async_utils import run_or_schedule
+        from backend.api.services.conversation_stats import ConversationStats
+        from backend.controller.agent import Agent
+        from backend.controller.agent_controller import AgentController
+        from backend.controller.controller_config import ControllerConfig
+        from backend.core.config.agent_config import AgentConfig
 
         # Background task so we don't block the routing loop
-        async def _run_subagent():
+        async def _execute_single_worker(
+            task_description: str, files: list
+        ) -> tuple[bool, str, str]:
+            """Run one worker agent and return (success, content, error_message)."""
             try:
                 # Get the base agent config but clear history
                 parent_config = self._ctrl.config
                 worker_id = f"{parent_config.sid}_sub_{uuid.uuid4().hex[:8]}"
 
-                # Find the agent config for 'coder' or fallback to the parent's agent config
-                agent_configs = getattr(parent_config, "agent_configs", {})
-                worker_agent_config = agent_configs.get("coder")
-                if not worker_agent_config:
-                    self._ctrl.log(
-                        "warning",
-                        "No 'coder' config found, falling back to basic agent",
-                    )
-                    from backend.core.config import AgentConfig
-
-                    worker_agent_config = AgentConfig(
-                        "coder", description="Worker Agent"
-                    )
-
-                # The LLM configuration - we can inherit from parent or look up specific one
-                agent_to_llm_config = getattr(parent_config, "agent_to_llm_config", {})
-                llm_config = agent_to_llm_config.get(
-                    "coder", agent_to_llm_config.get(parent_config.agent.name)
+                file_store = (
+                    parent_config.file_store
+                    or getattr(self._ctrl.event_stream, "file_store", None)
                 )
+                if file_store is None:
+                    raise RuntimeError("No file_store available for worker event stream")
 
-                if not llm_config:
-                    raise RuntimeError("No suitable LLM config found for worker agent")
+                user_id = getattr(parent_config, "user_id", None)
+
+                # Find the agent config for 'coder' or fallback to the parent's agent config
+                agent_configs = getattr(parent_config, "agent_configs", None) or {}
+                worker_agent_config = agent_configs.get("coder")
+                if worker_agent_config is None:
+                    # Fall back to the currently running agent's config.
+                    worker_agent_config = getattr(self._ctrl.agent, "config", None)
+
+                if worker_agent_config is None:
+                    # Last-ditch: try to construct a minimal config targeting Orchestrator.
+                    worker_agent_config = AgentConfig(name="Orchestrator")
+
+                # Ensure config is a proper AgentConfig instance.
+                if not isinstance(worker_agent_config, AgentConfig):
+                    try:
+                        worker_agent_config = AgentConfig.model_validate(worker_agent_config)
+                    except Exception as exc:
+                        raise RuntimeError(
+                            f"Invalid worker agent config type: {type(worker_agent_config)}"
+                        ) from exc
+
+                # Prefer a dedicated LLM config if provided in agent_to_llm_config.
+                agent_to_llm_config = (
+                    getattr(parent_config, "agent_to_llm_config", None) or {}
+                )
+                llm_cfg = agent_to_llm_config.get("coder") or agent_to_llm_config.get(
+                    worker_agent_config.name
+                )
+                if llm_cfg is not None:
+                    worker_agent_config = worker_agent_config.model_copy(
+                        deep=True, update={"llm_config": llm_cfg}
+                    )
 
                 # Setup isolated event stream
-                worker_stream = EventStream(worker_id)
+                worker_stream = EventStream(worker_id, file_store=file_store, user_id=user_id)
                 self._ctrl.log(
                     "info",
-                    f"Spawning worker agent {worker_id} for task: {action.task_description[:50]}...",
+                    f"Spawning worker agent {worker_id} for task: {task_description[:50]}...",
                 )
 
-                # Send the initial user message/directive to the worker
-                from backend.events.action import MessageAction
+                # Send the initial user message/directive to the worker.
+                # Inject parent's working memory, notes, and task plan so the
+                # sub-agent has full context without needing to rediscover it.
+                parent_context_lines: list[str] = [
+                    f"You are a worker agent delegated the following task:\n\n{task_description}\n\nFocus ONLY on this task. Once completed, finish."
+                ]
 
-                init_msg = MessageAction(
-                    content=f"You are a worker agent delegated the following task:\n\n{action.task_description}\n\nFocus ONLY on this task. Once completed, finish.",
-                )
-                worker_stream.add_event(init_msg, EventSource.USER)
+                # --- inherit parent working memory ---
+                try:
+                    from backend.engines.orchestrator.tools.working_memory import (
+                        get_full_working_memory,
+                    )
+                    wm = get_full_working_memory()
+                    if wm:
+                        parent_context_lines.append(
+                            f"\n\nPARENT WORKING MEMORY (read-only context):\n{wm}"
+                        )
+                except Exception:
+                    pass
 
-                from backend.controller.agent import Agent
+                # --- inherit parent notes ---
+                try:
+                    from backend.engines.orchestrator.tools.note import (
+                        _load_notes,
+                    )
+                    notes = _load_notes()
+                    if notes:
+                        notes_text = "\n".join(
+                            f"  {k}: {v}" for k, v in list(notes.items())[:20]
+                        )
+                        parent_context_lines.append(
+                            f"\n\nPARENT NOTES (key-value context):\n{notes_text}"
+                        )
+                except Exception:
+                    pass
 
-                worker_agent = Agent(
-                    name="coder",
-                    config=worker_agent_config,
-                    llm_config=llm_config,
-                )
-
-                # Initialize the agent
-                worker_agent.initialize()
+                # --- inherit parent task plan ---
+                try:
+                    from backend.engines.orchestrator.tools.task_tracker import (
+                        TaskTracker,
+                    )
+                    tasks = TaskTracker().load_from_file()
+                    if tasks:
+                        task_lines = ["PARENT TASK PLAN (for context):"]
+                        for t in tasks:
+                            status_icon = {"completed": "✓", "in_progress": "O", "failed": "X"}.get(
+                                t.get("status", ""), "-"
+                            )
+                            task_lines.append(
+                                f"  [{status_icon}] {t.get('id', '?')} — {t.get('description', t.get('title', ''))}"
+                                f" ({t.get('status', 'pending')})"
+                            )
+                        parent_context_lines.append("\n\n" + "\n".join(task_lines))
+                except Exception:
+                    pass
 
                 # We need to reuse the same file store/workspace as the parent
+                llm_registry = getattr(self._ctrl.agent, "llm_registry", None)
+                if llm_registry is None:
+                    raise RuntimeError("Parent agent does not expose llm_registry")
+
+                try:
+                    agent_cls = Agent.get_cls(worker_agent_config.name)
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Worker agent class not registered: {worker_agent_config.name}"
+                    ) from exc
+
+                worker_agent = agent_cls(config=worker_agent_config, llm_registry=llm_registry)
+
+                conversation_stats = ConversationStats(
+                    file_store=file_store,
+                    conversation_id=worker_id,
+                    user_id=user_id,
+                )
+
                 worker_config = ControllerConfig(
                     sid=worker_id,
                     event_stream=worker_stream,
                     agent=worker_agent,
-                    user_id=parent_config.user_id,
-                    file_store=parent_config.file_store,  # Share workspace!
+                    conversation_stats=conversation_stats,
+                    iteration_delta=parent_config.iteration_delta,
+                    budget_per_task_delta=parent_config.budget_per_task_delta,
+                    user_id=user_id,
+                    file_store=file_store,  # Share workspace!
                     headless_mode=True,  # No UI for sub-agent
                     agent_to_llm_config=agent_to_llm_config,
                     agent_configs=agent_configs,
-                    # Provide an empty initial state, new conversation stats
+                    confirmation_mode=False,
+                    security_analyzer=parent_config.security_analyzer,
                 )
 
                 worker_controller = AgentController(worker_config)
 
+                init_msg = MessageAction(content="\n".join(parent_context_lines))
+                worker_controller.event_stream.add_event(init_msg, EventSource.USER)
+
                 # Ensure the worker starts running
                 await worker_controller.set_agent_state_to(AgentState.RUNNING)
 
-                # Emulate the main execution loop for the headless worker
-                while worker_controller.get_agent_state() in (
-                    AgentState.RUNNING,
-                    AgentState.AWAITING_USER_INPUT,
-                    AgentState.PAUSED,
-                ):
-                    action_to_exe = (
-                        await worker_controller.action_execution.get_next_action()
-                    )
-                    if action_to_exe is None:
-                        # Agent decided to stop or error occurred
+                # Emulate the main execution loop for the headless worker.
+                # We reuse the controller's own step() logic.
+                max_steps = max(10, int(getattr(parent_config, "iteration_delta", 50) or 50))
+                for _ in range(max_steps):
+                    if worker_controller.get_agent_state() not in (
+                        AgentState.RUNNING,
+                        AgentState.AWAITING_USER_INPUT,
+                        AgentState.PAUSED,
+                    ):
                         break
-
-                    await worker_controller.action_execution.execute_action(
-                        action_to_exe
-                    )
-                    await worker_controller._handle_post_execution()
-
-                    # Drain internal queues like the parent loop does
-                    while worker_controller._can_drain_pending():
-                        a = await worker_controller.action_execution.get_next_action()
-                        if a is None:
-                            break
-                        await worker_controller.action_execution.execute_action(a)
-                        await worker_controller._handle_post_execution()
+                    worker_controller.step()
+                    step_task = getattr(worker_controller, "_step_task", None)
+                    if step_task is not None:
+                        await step_task
 
                 # Cleanup the worker
                 await worker_controller.close(set_stop_state=False)
@@ -289,22 +390,56 @@ class EventRouterService:
                 if outputs:
                     extracted_outputs = outputs
 
-                obs = DelegateTaskObservation(
-                    success=success,
-                    content=str(extracted_outputs)
-                    if extracted_outputs
-                    else f"Worker completed with status: {final_state.value}",
-                    error_message=""
-                    if success
-                    else f"Agent did not finish gracefully (State: {final_state.value}).",
-                )
+                content = str(extracted_outputs) if extracted_outputs else f"Worker completed with status: {final_state.value}"
+                error_message = "" if success else f"Agent did not finish gracefully (State: {final_state.value})."
+                return success, content, error_message
 
             except Exception as e:
                 self._ctrl.log("error", f"Worker execution failed: {e}", exc_info=True)
+                return False, "", f"Worker execution crashed: {e}"
+
+        async def _run_subagent():
+            """Dispatch single or parallel workers and post the final observation."""
+            import asyncio
+
+            parallel_tasks = getattr(action, "parallel_tasks", [])
+            if parallel_tasks:
+                # Parallel mode — run all workers concurrently
+                self._ctrl.log(
+                    "info",
+                    f"Running {len(parallel_tasks)} sub-agents in parallel",
+                )
+                results = await asyncio.gather(
+                    *[
+                        _execute_single_worker(
+                            t.get("task_description", ""),
+                            t.get("files", []),
+                        )
+                        for t in parallel_tasks
+                    ],
+                    return_exceptions=False,
+                )
+                all_success = all(r[0] for r in results)
+                parts = []
+                for i, (s, c, e) in enumerate(results):
+                    label = parallel_tasks[i].get("task_description", f"Task {i+1}")[:40]
+                    status = "OK" if s else "FAILED"
+                    parts.append(f"[{status}] {label}\n{c or e}")
+                combined_content = "\n\n".join(parts)
                 obs = DelegateTaskObservation(
-                    success=False,
-                    content="",
-                    error_message=f"Worker execution crashed: {e}",
+                    success=all_success,
+                    content=combined_content,
+                    error_message="" if all_success else "One or more parallel workers failed.",
+                )
+            else:
+                # Single worker mode
+                success, content, error_message = await _execute_single_worker(
+                    action.task_description, getattr(action, "files", [])
+                )
+                obs = DelegateTaskObservation(
+                    success=success,
+                    content=content,
+                    error_message=error_message,
                 )
 
             # Ensure the observation maps to the exact action that requested it
@@ -314,6 +449,29 @@ class EventRouterService:
 
         # Run the subagent without blocking
         run_or_schedule(_run_subagent())
+
+    async def _handle_meta_cognition_action(self, action: Action) -> None:
+        """Handle meta-cognition actions (clarification, proposal, uncertainty, escalation).
+
+        In FULL autonomy mode, the agent continues without pausing.
+        In BALANCED or SUPERVISED mode, the agent pauses and waits for user input.
+        """
+        from backend.controller.autonomy import AutonomyLevel
+
+        autonomy_ctrl = getattr(self._ctrl, "autonomy_controller", None)
+        autonomy_level = (
+            getattr(autonomy_ctrl, "autonomy_level", AutonomyLevel.BALANCED.value)
+            if autonomy_ctrl
+            else AutonomyLevel.BALANCED.value
+        )
+
+        if autonomy_level != AutonomyLevel.FULL.value:
+            self._ctrl.log(
+                "info",
+                "Meta-cognition action requires user input, pausing agent.",
+                extra={"action_type": type(action).__name__},
+            )
+            await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
 
     # ── observation dispatch ──────────────────────────────────────────
 

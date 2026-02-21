@@ -247,7 +247,7 @@ class KnowledgeBaseManager:
         )
 
         # Chunk the content
-        chunks = self._chunk_content(content, document.id, metadata)
+        chunks = self._chunk_content(content, document.id, metadata, filename=filename)
         document.chunk_count = len(chunks)
 
         # Store document first (so we have an ID)
@@ -293,17 +293,170 @@ class KnowledgeBaseManager:
         content: str,
         document_id: str,
         metadata: dict[str, Any] | None = None,
+        filename: str | None = None,
     ) -> list[DocumentChunk]:
         """Split content into chunks for vector storage.
 
-        Uses a simple sliding window approach with overlap.
+        Uses AST-aware chunking for supported code files (via tree-sitter)
+        and falls back to a sliding window for plain text / unsupported
+        languages.
         """
-        chunk_size = 1000  # characters
-        chunk_overlap = 200  # overlap between chunks
+        if filename:
+            ast_chunks = self._try_ast_chunk(content, document_id, metadata, filename)
+            if ast_chunks is not None:
+                return ast_chunks
 
-        chunks = []
-        start = 0
+        return self._sliding_window_chunk(content, document_id, metadata)
+
+    def _try_ast_chunk(
+        self,
+        content: str,
+        document_id: str,
+        metadata: dict[str, Any] | None,
+        filename: str,
+    ) -> list[DocumentChunk] | None:
+        """Attempt AST-aware chunking using tree-sitter.
+
+        Returns None if tree-sitter is unavailable or the language is
+        unsupported, signalling the caller to fall back.
+        """
+        try:
+            from backend.engines.orchestrator.tools.treesitter_editor import (
+                LANGUAGE_EXTENSIONS,
+                TREE_SITTER_AVAILABLE,
+                _get_parser,
+            )
+        except ImportError:
+            return None
+
+        if not TREE_SITTER_AVAILABLE or _get_parser is None:
+            return None
+
+        import os
+
+        ext = os.path.splitext(filename)[1].lower()
+        lang = LANGUAGE_EXTENSIONS.get(ext)
+        if not lang:
+            return None
+
+        try:
+            parser = _get_parser(lang)
+            tree = parser.parse(content.encode("utf-8"))
+        except Exception:
+            return None
+
+        # Collect top-level definitions
+        root = tree.root_node
+        boundaries: list[tuple[int, int]] = []  # (byte_start, byte_end)
+
+        # Walk only the immediate children of root for top-level symbols
+        for child in root.children:
+            node_type = child.type
+            # Accept definitions, declarations, classes, modules etc.
+            if any(
+                keyword in node_type
+                for keyword in (
+                    "function",
+                    "method",
+                    "class",
+                    "module",
+                    "interface",
+                    "struct",
+                    "enum",
+                    "impl",
+                    "trait",
+                    "declaration",
+                    "definition",
+                )
+            ):
+                boundaries.append((child.start_byte, child.end_byte))
+
+        if not boundaries:
+            # No meaningful symbols found — fall back
+            return None
+
+        # Merge symbols into chunks that respect a max size
+        max_chunk_bytes = 1500
+        overlap_bytes = 200
+        chunks: list[DocumentChunk] = []
         chunk_index = 0
+
+        current_start = 0
+        for sym_start, sym_end in boundaries:
+            # Include any inter-symbol text (imports, comments) before this symbol
+            segment_end = sym_end
+            segment = content[current_start:segment_end]
+
+            if len(segment.encode("utf-8")) > max_chunk_bytes and chunks:
+                # This symbol alone is too big — split it with sliding window
+                sub_chunks = self._sliding_window_chunk(
+                    segment, document_id, metadata, chunk_size=max_chunk_bytes, start_index=chunk_index
+                )
+                chunks.extend(sub_chunks)
+                chunk_index += len(sub_chunks)
+                current_start = segment_end
+                continue
+
+            # Try to accumulate with previous if small
+            if chunks and len((content[chunks[-1].metadata.get("_byte_start", 0):segment_end]).encode("utf-8")) <= max_chunk_bytes:
+                # Merge into last chunk
+                last = chunks[-1]
+                merged = content[last.metadata.get("_byte_start", 0):segment_end]
+                chunks[-1] = DocumentChunk(
+                    document_id=document_id,
+                    chunk_index=last.chunk_index,
+                    content=merged,
+                    metadata={**(metadata or {}), "_byte_start": last.metadata.get("_byte_start", 0)},
+                )
+                current_start = segment_end
+            else:
+                # Start a new chunk, including a small overlap from previous
+                overlap_start = max(0, current_start - overlap_bytes) if chunk_index > 0 else current_start
+                chunk_text = content[overlap_start:segment_end]
+                if chunk_text.strip():
+                    chunks.append(
+                        DocumentChunk(
+                            document_id=document_id,
+                            chunk_index=chunk_index,
+                            content=chunk_text,
+                            metadata={**(metadata or {}), "_byte_start": overlap_start},
+                        )
+                    )
+                    chunk_index += 1
+                current_start = segment_end
+
+        # Capture any trailing content after the last symbol
+        if current_start < len(content):
+            trailing = content[current_start:]
+            if trailing.strip():
+                chunks.append(
+                    DocumentChunk(
+                        document_id=document_id,
+                        chunk_index=chunk_index,
+                        content=trailing,
+                        metadata=metadata or {},
+                    )
+                )
+
+        # Strip internal bookkeeping from metadata
+        for c in chunks:
+            c.metadata.pop("_byte_start", None)
+
+        return chunks if chunks else None
+
+    def _sliding_window_chunk(
+        self,
+        content: str,
+        document_id: str,
+        metadata: dict[str, Any] | None = None,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200,
+        start_index: int = 0,
+    ) -> list[DocumentChunk]:
+        """Character-based sliding window chunking (fallback)."""
+        chunks: list[DocumentChunk] = []
+        start = 0
+        chunk_index = start_index
 
         while start < len(content):
             end = start + chunk_size

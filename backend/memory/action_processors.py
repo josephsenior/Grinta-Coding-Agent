@@ -21,7 +21,20 @@ from backend.events.action import (
     PlaybookFinishAction,
     TaskTrackingAction,
 )
+from backend.events.action.agent import (
+    ClarificationRequestAction,
+    EscalateToHumanAction,
+    ProposalAction,
+    UncertaintyAction,
+)
 from backend.events.action.mcp import MCPAction
+
+_META_COGNITION_ACTION_TYPES = (
+    ClarificationRequestAction,
+    ProposalAction,
+    UncertaintyAction,
+    EscalateToHumanAction,
+)
 from backend.events.action.message import SystemMessageAction
 from backend.events.event import EventSource
 from backend.events.model_response_lite import ModelResponseLite
@@ -78,6 +91,7 @@ def _is_tool_based_action(action: Action) -> bool:
         FileReadAction,
         MCPAction,
         TaskTrackingAction,
+        *_META_COGNITION_ACTION_TYPES,
     )
     if isinstance(action, tool_action_classes):
         return True
@@ -94,6 +108,9 @@ def _handle_tool_based_action(
 
     if isinstance(action, AgentThinkAction):
         return _build_think_action_message(action)
+
+    if isinstance(action, _META_COGNITION_ACTION_TYPES):
+        return _build_meta_cognition_message(action)
 
     tool_metadata = _require_tool_metadata(action)
     llm_response = _extract_llm_response(tool_metadata)
@@ -139,6 +156,13 @@ def _build_think_action_message(action: Action) -> list[Message]:
         TextContent(text=f"🤔 {think_text}")
     ]
     return [Message(role="assistant", content=think_content)]
+
+
+def _build_meta_cognition_message(action: Action) -> list[Message]:
+    """Build a user-visible assistant message from a meta-cognition action."""
+    msg_text = getattr(action, "message", "") or str(action)
+    content: list[TextContent | ImageContent] = [TextContent(text=msg_text)]
+    return [Message(role="assistant", content=content)]
 
 
 def _require_tool_metadata(action: Action):

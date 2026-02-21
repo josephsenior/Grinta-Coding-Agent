@@ -371,24 +371,40 @@ def event_to_trajectory(
     return d
 
 
-def truncate_content(content: str, max_chars: int | None = None) -> str:
-    """Truncate long content, keeping a small head and large tail.
+def truncate_content(
+    content: str,
+    max_chars: int | None = None,
+    strategy: str = "tail_heavy",
+) -> str:
+    """Truncate long content using a context-appropriate strategy.
 
-    Command output typically ends with the most important information (error
-    messages, tracebacks, test results).  Keeping 12 % from the start for
-    context and 88 % from the end ensures errors are never truncated away.
+    Strategies:
+        tail_heavy  – 12% head / 88% tail. Best for command output, errors,
+                      and tracebacks where the end carries the most signal.
+        head_heavy  – 88% head / 12% tail. Best for file reads and directory
+                      listings where the beginning matters most.
+        balanced    – 50% head / 50% tail. Best for search results and
+                      general content where both ends are useful.
     """
     if max_chars is None or len(content) <= max_chars or max_chars < 0:
         return content
     original_len = len(content)
-    # At least 20 % of head context if max_chars is small; the rest goes to the tail.
-    # Otherwise at least 200 chars.
-    head = min(max_chars // 5, 200) if max_chars < 1000 else max(200, max_chars // 8)
-    tail = max(0, max_chars - head)
+
+    min_head = min(max_chars // 5, 200) if max_chars < 1000 else max(200, max_chars // 8)
+
+    if strategy == "head_heavy":
+        tail = min_head  # give the tail the minimum
+        head = max(0, max_chars - tail)
+    elif strategy == "balanced":
+        head = max_chars // 2
+        tail = max_chars - head
+    else:  # tail_heavy (default)
+        head = min_head
+        tail = max(0, max_chars - head)
+
     retained = head + tail
     pct = round(retained / original_len * 100)
-    return (
-        content[:head]
-        + f"\n[... Observation truncated: {original_len} chars → {retained} chars ({pct}% retained) ...]\n"
-        + content[-tail:] if tail > 0 else f"\n[... Observation truncated: {original_len} chars → {retained} chars ({pct}% retained) ...]\n"
-    )
+    banner = f"\n[... Observation truncated: {original_len} chars → {retained} chars ({pct}% retained) ...]\n"
+    if tail > 0:
+        return content[:head] + banner + content[-tail:]
+    return content[:head] + banner

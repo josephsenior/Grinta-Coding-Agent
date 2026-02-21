@@ -36,6 +36,10 @@ from backend.engines.orchestrator.tools.terminal import (
     build_terminal_read_action,
 )
 from backend.engines.orchestrator.tools.apply_patch import build_apply_patch_action
+from backend.engines.orchestrator.tools.batch_edit import (
+    build_batch_edit_action,
+    BATCH_EDIT_TOOL_NAME,
+)
 from backend.engines.orchestrator.tools.note import (
     build_note_action,
     build_recall_action,
@@ -615,6 +619,16 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action | list[Action]:
     path, command = _validate_str_replace_editor_args(arguments)
     other_kwargs = {k: v for k, v in arguments.items() if k not in ["command", "path"]}
 
+    # Handle confidence-based auto-preview: low confidence forces preview mode
+    confidence = other_kwargs.pop("confidence", None)
+    if confidence is not None and isinstance(confidence, (int, float)) and float(confidence) < 0.7:
+        logger.info(
+            "[confidence] Low confidence (%.2f) on %s — switching to preview mode",
+            confidence,
+            path,
+        )
+        other_kwargs.setdefault("preview", True)
+
     # Handle preview/dry-run mode — show what the edit would produce
     raw_preview = other_kwargs.pop("preview", False)
     preview = raw_preview is True or (
@@ -982,27 +996,26 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
         return MessageAction(content=f"❌ Structure Editor error: {str(e)}")
 
 
-def _handle_uncertainty_tool(arguments: dict) -> AgentThinkAction:
+def _handle_uncertainty_tool(arguments: dict) -> Action:
     """Handle uncertainty tool — let the LLM flag doubt rather than guess."""
+    from backend.events.action.agent import UncertaintyAction
+
     level = arguments.get("uncertainty_level", 0.5)
     thought = arguments.get("thought", "")
     concerns = arguments.get("specific_concerns", [])
     requested = arguments.get("requested_information", "")
-    concerns_str = (
-        "\n".join(f"  - {c}" for c in concerns) if concerns else "  (none listed)"
+    return UncertaintyAction(
+        uncertainty_level=float(level),
+        thought=thought,
+        specific_concerns=list(concerns) if concerns else [],
+        requested_information=requested or "",
     )
-    parts = [
-        f"[UNCERTAINTY] Confidence level: {level:.0%}",
-        f"Reasoning: {thought}",
-        f"Specific concerns:\n{concerns_str}",
-    ]
-    if requested:
-        parts.append(f"Requested information: {requested}")
-    return AgentThinkAction(thought="\n".join(parts))
 
 
-def _handle_clarification_tool(arguments: dict) -> AgentThinkAction:
+def _handle_clarification_tool(arguments: dict) -> Action:
     """Handle clarification tool — pause and surface question to user."""
+    from backend.events.action.agent import ClarificationRequestAction
+
     question = arguments.get("question", "")
     context = arguments.get("context", "")
     options = arguments.get("options", [])
@@ -1010,17 +1023,18 @@ def _handle_clarification_tool(arguments: dict) -> AgentThinkAction:
         raise FunctionCallValidationError(
             'Missing required argument "question" in tool call clarification'
         )
-    parts = [f"[CLARIFICATION NEEDED] {question}"]
-    if context:
-        parts.append(f"Context: {context}")
-    if options:
-        opts_str = "\n".join(f"  {i + 1}. {o}" for i, o in enumerate(options))
-        parts.append(f"Options:\n{opts_str}")
-    return AgentThinkAction(thought="\n".join(parts))
+    return ClarificationRequestAction(
+        question=question,
+        context=context or "",
+        options=list(options) if options else [],
+        thought=question,
+    )
 
 
-def _handle_proposal_tool(arguments: dict) -> AgentThinkAction:
+def _handle_proposal_tool(arguments: dict) -> Action:
     """Handle proposal tool — present options before committing."""
+    from backend.events.action.agent import ProposalAction
+
     options = arguments.get("options", [])
     rationale = arguments.get("rationale", "")
     recommended = arguments.get("recommended")
@@ -1028,22 +1042,29 @@ def _handle_proposal_tool(arguments: dict) -> AgentThinkAction:
         raise FunctionCallValidationError(
             'Missing required argument "options" in tool call proposal'
         )
-    parts = [f"[PROPOSAL] {rationale}"]
-    for i, opt in enumerate(options):
-        tag = " ← RECOMMENDED" if recommended is not None and i == recommended else ""
-        approach = opt.get("approach", f"Option {i + 1}")
-        pros = opt.get("pros", [])
-        cons = opt.get("cons", [])
-        parts.append(f"\nOption {i + 1}{tag}: {approach}")
-        if pros:
-            parts.append("  Pros: " + "; ".join(pros))
-        if cons:
-            parts.append("  Cons: " + "; ".join(cons))
-    return AgentThinkAction(thought="\n".join(parts))
+    return ProposalAction(
+        options=list(options),
+        recommended=int(recommended) if recommended is not None else 0,
+        rationale=rationale or "",
+        thought=rationale or "",
+    )
 
 
-def _handle_escalate_tool(arguments: dict) -> AgentThinkAction:
+def _handle_batch_edit_tool(arguments: dict) -> CmdRunAction:
+    """Handle batch_edit tool call — atomic multi-file str_replace with rollback."""
+    edits = arguments.get("edits")
+    if not edits or not isinstance(edits, list):
+        raise FunctionCallValidationError(
+            'Missing or invalid "edits" argument in batch_edit tool call'
+        )
+    preview = arguments.get("preview", False)
+    return build_batch_edit_action(edits, preview=bool(preview))
+
+
+def _handle_escalate_tool(arguments: dict) -> Action:
     """Handle escalate_to_human tool — request human intervention."""
+    from backend.events.action.agent import EscalateToHumanAction
+
     reason = arguments.get("reason", "")
     attempts = arguments.get("attempts_made", [])
     help_needed = arguments.get("specific_help_needed", "")
@@ -1051,12 +1072,12 @@ def _handle_escalate_tool(arguments: dict) -> AgentThinkAction:
         raise FunctionCallValidationError(
             'Missing required argument "reason" in tool call escalate_to_human'
         )
-    parts = [f"[ESCALATE TO HUMAN] {reason}"]
-    if attempts:
-        parts.append("Attempts made:\n" + "\n".join(f"  - {a}" for a in attempts))
-    if help_needed:
-        parts.append(f"Help needed: {help_needed}")
-    return AgentThinkAction(thought="\n".join(parts))
+    return EscalateToHumanAction(
+        reason=reason,
+        attempts_made=list(attempts) if attempts else [],
+        specific_help_needed=help_needed or "",
+        thought=reason,
+    )
 
 
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
@@ -1098,6 +1119,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         VERIFY_STATE_TOOL_NAME: _handle_verify_state_tool,
         WORKING_MEMORY_TOOL_NAME: _handle_working_memory_tool,
         DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
+        BATCH_EDIT_TOOL_NAME: _handle_batch_edit_tool,
         TERMINAL_OPEN_TOOL_NAME: build_terminal_open_action,
         TERMINAL_INPUT_TOOL_NAME: build_terminal_input_action,
         TERMINAL_READ_TOOL_NAME: build_terminal_read_action,

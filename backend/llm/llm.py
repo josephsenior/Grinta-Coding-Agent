@@ -69,9 +69,16 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
             return InternalServerError(str(exc), model=model, llm_provider="openai")
         if isinstance(exc, _oai.APIStatusError):
             status = getattr(exc, "status_code", None)
+            # Treat transient transport / server errors as retryable.
+            if status == 408:
+                return Timeout(str(exc), model=model, llm_provider="openai")
             if status == 503:
                 return ServiceUnavailableError(
                     str(exc), model=model, llm_provider="openai"
+                )
+            if isinstance(status, int) and 500 <= status <= 599:
+                return InternalServerError(
+                    str(exc), model=model, llm_provider="openai", status_code=status
                 )
             return APIError(
                 str(exc), model=model, llm_provider="openai", status_code=status
@@ -105,9 +112,15 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
             return InternalServerError(str(exc), model=model, llm_provider="anthropic")
         if isinstance(exc, _anth.APIStatusError):
             status = getattr(exc, "status_code", None)
+            if status == 408:
+                return Timeout(str(exc), model=model, llm_provider="anthropic")
             if status == 503:
                 return ServiceUnavailableError(
                     str(exc), model=model, llm_provider="anthropic"
+                )
+            if isinstance(status, int) and 500 <= status <= 599:
+                return InternalServerError(
+                    str(exc), model=model, llm_provider="anthropic", status_code=status
                 )
             return APIError(
                 str(exc), model=model, llm_provider="anthropic", status_code=status
@@ -167,6 +180,8 @@ LLM_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     APIConnectionError,
     RateLimitError,
     ServiceUnavailableError,
+    Timeout,
+    InternalServerError,
     LLMNoResponseError,
 )
 
@@ -187,6 +202,8 @@ class LLM(RetryMixin, DebugMixin):
         metrics: Metrics | None = None,
         retry_listener: Callable[[int, int], None] | None = None,
     ) -> None:
+        # Initialize DebugMixin (sets `self.debug`, default False) via MRO.
+        super().__init__()
         self.config: LLMConfig = copy.deepcopy(config)
         self.service_id = service_id
         self.metrics: Metrics = (
@@ -281,8 +298,6 @@ class LLM(RetryMixin, DebugMixin):
                 self.config.model,
                 exc,
             )
-            from backend.llm.model_features import ModelFeatures
-
             self._cached_features = ModelFeatures()
 
         # Handle custom tokenizer
@@ -455,9 +470,43 @@ class LLM(RetryMixin, DebugMixin):
             completion_tokens=completion_tokens,
             cache_read_tokens=cache_read,
             cache_write_tokens=cache_write,
-            context_window=0,
+            context_window=self._get_context_window_for_metrics(),
             response_id=response.id,
         )
+
+    def _get_context_window_for_metrics(self) -> int:
+        """Return a best-effort context window (total tokens) for the active model.
+
+        Prefer catalog-driven model features; fall back to config fields.
+        Returns 0 when unknown.
+        """
+
+        def _as_int(value: Any) -> int | None:
+            try:
+                if value is None:
+                    return None
+                iv = int(value)
+                return iv if iv > 0 else None
+            except Exception:
+                return None
+
+        # Model catalog limits (preferred)
+        max_in = _as_int(getattr(self.features, "max_input_tokens", None))
+        max_out = _as_int(getattr(self.features, "max_output_tokens", None))
+
+        # Config limits (fallback)
+        if max_in is None:
+            max_in = _as_int(getattr(self.config, "max_input_tokens", None))
+        if max_out is None:
+            max_out = _as_int(getattr(self.config, "max_output_tokens", None))
+
+        if max_in is not None and max_out is not None:
+            return max_in + max_out
+        if max_in is not None:
+            return max_in
+        # Last-ditch: some providers treat max_tokens as a total window, but we
+        # don't rely on that heuristic. Unknown → 0.
+        return 0
 
     def completion(self, *args, **kwargs) -> Any:
         """Synchronous completion call."""
@@ -538,38 +587,72 @@ class LLM(RetryMixin, DebugMixin):
         return await _acompletion_with_retry(**call_kwargs)
 
     async def astream(self, *args, **kwargs) -> AsyncIterator[dict[str, Any]]:
-        """Asynchronous streaming call with cancellation support."""
+        """Asynchronous streaming call with cancellation support and retry.
+
+        Unlike ``acompletion`` we cannot wrap the entire generator with
+        tenacity's ``@retry`` because it expects a normal return value.
+        Instead we implement a manual retry loop that restarts the stream
+        from scratch on transient failures (same exception set as
+        ``acompletion``).
+        """
+        import asyncio as _asyncio
+
         messages = self._extract_messages(args, kwargs)
 
         # Merge default kwargs
         call_kwargs = self._get_call_kwargs(is_stream=True, **kwargs)
 
-        # Log prompt
-        self.log_prompt(messages)
+        max_attempts = self.config.num_retries if hasattr(self.config, "num_retries") else 3
+        retry_min = self.config.retry_min_wait if hasattr(self.config, "retry_min_wait") else 1
+        retry_max = self.config.retry_max_wait if hasattr(self.config, "retry_max_wait") else 10
 
-        try:
-            # Type: ignore needed because mypy doesn't understand async generator return types
-            # astream returns an async iterator, not a coroutine
-            stream_iter = self.client.astream(messages=messages, **call_kwargs)
-            async for chunk in stream_iter:  # type: ignore[attr-defined]
-                # Check for cancellation during stream
-                if await self._check_cancelled():
-                    logger.debug("LLM stream cancelled by user.")
-                    break
+        for attempt in range(1, max_attempts + 1):
+            yielded_any = False
+            try:
+                # Log prompt on each attempt
+                self.log_prompt(messages)
 
-                # Log chunk content if available
-                if chunk.get("choices") and chunk["choices"][0].get("delta"):
-                    content = chunk["choices"][0]["delta"].get("content", "")
-                    if content:
-                        self.log_response(content)
+                stream_iter = self.client.astream(messages=messages, **call_kwargs)
+                async for chunk in stream_iter:  # type: ignore[attr-defined]
+                    # Check for cancellation during stream
+                    if await self._check_cancelled():
+                        logger.debug("LLM stream cancelled by user.")
+                        return
 
-                yield chunk
-        except Exception as e:
-            logger.error("LLM astream error: %s", e)
-            mapped = _map_provider_exception(e, self.config.model)
-            if mapped is not e:
-                raise mapped from e
-            raise
+                    # Log chunk content if available
+                    if chunk.get("choices") and chunk["choices"][0].get("delta"):
+                        content = chunk["choices"][0]["delta"].get("content", "")
+                        if content:
+                            self.log_response(content)
+
+                    yield chunk
+                    yielded_any = True
+
+                # Completed successfully — exit retry loop
+                return
+
+            except Exception as e:
+                is_retryable = isinstance(e, LLM_RETRY_EXCEPTIONS)
+                is_last = attempt >= max_attempts
+
+                if not is_retryable or is_last or yielded_any:
+                    # Don't retry if we already yielded chunks to the caller
+                    # (partial results can't be replayed), or non-retryable
+                    logger.error("LLM astream error: %s", e)
+                    mapped = _map_provider_exception(e, self.config.model)
+                    if mapped is not e:
+                        raise mapped from e
+                    raise
+
+                wait = min(retry_max, retry_min * (2 ** (attempt - 1)))
+                logger.warning(
+                    "LLM astream transient error (attempt %d/%d): %s — retrying in %.1fs",
+                    attempt,
+                    max_attempts,
+                    e,
+                    wait,
+                )
+                await _asyncio.sleep(wait)
 
     async def _check_cancelled(self) -> bool:
         """Check if the request has been cancelled."""

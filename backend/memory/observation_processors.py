@@ -70,6 +70,17 @@ def _get_observation_content(obs: Observation) -> str:
     return str(obs)
 
 
+def _is_valid_image_url(url: object) -> bool:
+    """Return True when the provided value looks like a usable image reference.
+
+    This is intentionally permissive: URLs, data-URLs, and local/relative paths
+    are all treated as valid as long as they are non-empty strings.
+    """
+    if not isinstance(url, str):
+        return False
+    return bool(url.strip())
+
+
 def _handle_simple_observation(
     obs: Observation,
     max_message_chars: int | None,
@@ -120,7 +131,7 @@ def _handle_file_read_observation(
     obs: FileReadObservation, max_message_chars: int | None
 ) -> Message:
     path = getattr(obs, "path", "unknown")
-    text = truncate_content(obs.content, max_message_chars)
+    text = truncate_content(obs.content, max_message_chars, strategy="head_heavy")
     text = f"[FILE_READ path={path}]\n{text}"
     return Message(
         role="user", content=[TextContent(text=text)]
@@ -131,7 +142,7 @@ def _handle_file_edit_observation(
     obs: FileEditObservation, max_message_chars: int | None
 ) -> Message:
     content_str = str(obs)
-    text = truncate_content(content_str, max_message_chars)
+    text = truncate_content(content_str, max_message_chars, strategy="balanced")
     path = getattr(obs, "path", "unknown")
     text = f"[FILE_EDIT path={path}]\n{text}"
     return Message(role="user", content=[TextContent(text=text)])
@@ -186,13 +197,16 @@ def _handle_cmd_output_observation(
             error_type_tag = f" error_type={classified}"
 
     tag = f"[CMD_OUTPUT{exit_tag}{error_type_tag}]"
+    # Use tail_heavy for errors (traceback at end), balanced otherwise
+    cmd_strategy = "tail_heavy" if (exit_code is not None and exit_code != 0) else "balanced"
     if obs.tool_call_metadata is None:
         text = truncate_content(
             f"{tag}\nObserved result of command executed by user:\n{obs.to_agent_observation()}",
             max_message_chars,
+            strategy=cmd_strategy,
         )
     else:
-        text = truncate_content(f"{tag}\n{obs.to_agent_observation()}", max_message_chars)
+        text = truncate_content(f"{tag}\n{obs.to_agent_observation()}", max_message_chars, strategy=cmd_strategy)
     return Message(role="user", content=[TextContent(text=text)])
 
 
@@ -229,5 +243,5 @@ def _handle_mcp_observation(
     obs: MCPObservation, max_message_chars: int | None
 ) -> Message:
     tool_name = getattr(obs, "name", "unknown")
-    text = truncate_content(f"[MCP_RESULT tool={tool_name}]\n{obs.content}", max_message_chars)
+    text = truncate_content(f"[MCP_RESULT tool={tool_name}]\n{obs.content}", max_message_chars, strategy="balanced")
     return Message(role="user", content=[TextContent(text=text)])

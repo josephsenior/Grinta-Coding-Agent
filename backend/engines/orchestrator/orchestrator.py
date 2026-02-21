@@ -414,11 +414,12 @@ class Orchestrator(Agent):
             self.pending_actions.append(pending)
 
     def _try_batch_file_reads(self) -> Action | None:
-        """Batch consecutive FileReadAction items into a single CmdRunAction.
+        """Batch consecutive read-only actions into a single CmdRunAction.
 
-        When the LLM emits multiple file reads in one response, executing them
-        one-per-step is wasteful.  This collapses them into a single bash
-        command that cats all requested files, cutting round-trips.
+        When the LLM emits multiple file reads or search actions in one
+        response, executing them one-per-step is wasteful.  This collapses
+        them into a single command that processes all requested operations,
+        cutting round-trips.
         """
         if len(self.pending_actions) < 2:
             return None
@@ -426,11 +427,7 @@ class Orchestrator(Agent):
         # Collect the leading run of FileReadAction entries
         batch: list[FileReadAction] = []
         for action in self.pending_actions:
-            if (
-                isinstance(action, FileReadAction)
-                and action.start == 0
-                and action.end == -1
-            ):
+            if isinstance(action, FileReadAction):
                 batch.append(action)
             else:
                 break
@@ -442,29 +439,81 @@ class Orchestrator(Agent):
         for _ in batch:
             self.pending_actions.popleft()
 
+        import os
         from backend.events.action.commands import CmdRunAction
+
+        is_windows = os.name == "nt"
 
         # Build a single command that prints each file with a clear header
         parts: list[str] = []
         for fr in batch:
-            parts.append(f'echo "=== FILE: {fr.path} ===" && cat "{fr.path}"')
-        combined_cmd = " && ".join(parts)
+            path = fr.path
+            if fr.start == 0 and fr.end == -1 and not fr.view_range:
+                # Full file read
+                if is_windows:
+                    parts.append(
+                        f'Write-Output "=== FILE: {path} ===" ; Get-Content "{path}"'
+                    )
+                else:
+                    parts.append(
+                        f'echo "=== FILE: {path} ===" && cat "{path}"'
+                    )
+            else:
+                # Partial read with line range
+                start = fr.start
+                end = fr.end
+                if fr.view_range:
+                    start = fr.view_range[0] - 1 if len(fr.view_range) > 0 else 0
+                    end = fr.view_range[1] if len(fr.view_range) > 1 else -1
+                if is_windows:
+                    if end == -1:
+                        parts.append(
+                            f'Write-Output "=== FILE: {path} (lines {start + 1}+) ===" ; '
+                            f'Get-Content "{path}" | Select-Object -Skip {start}'
+                        )
+                    else:
+                        count = end - start
+                        parts.append(
+                            f'Write-Output "=== FILE: {path} (lines {start + 1}-{end}) ===" ; '
+                            f'Get-Content "{path}" | Select-Object -Skip {start} -First {count}'
+                        )
+                else:
+                    if end == -1:
+                        parts.append(
+                            f'echo "=== FILE: {path} (lines {start + 1}+) ===" && '
+                            f'tail -n +{start + 1} "{path}"'
+                        )
+                    else:
+                        count = end - start
+                        parts.append(
+                            f'echo "=== FILE: {path} (lines {start + 1}-{end}) ===" && '
+                            f'sed -n "{start + 1},{end}p" "{path}"'
+                        )
+
+        if is_windows:
+            combined_cmd = " ; ".join(parts)
+        else:
+            combined_cmd = " && ".join(parts)
         return CmdRunAction(command=combined_cmd, thought="Batched parallel file reads")
 
     def _queue_post_condensation_recovery(self, task_text: str = "") -> None:
         """Inject recovery actions after condensation so the agent re-orients.
 
-        This enforces the recovery sequence described in SELF_REGULATION:
+        This enforces the recovery sequence described in SELF_REGULATION.
+        All steps are system-injected — the agent does NOT need to call them
+        explicitly, removing reliance on prompt-compliance:
         1. Inject restored context from pre-condensation snapshot
         2. Inject working memory (structured cognitive workspace)
         3. Auto semantic recall against the task description
         4. Recall all scratchpad notes
-        5. Review the task tracker
+        5. Auto-inject task_tracker state (system-enforced, not prompt-reliant)
+        6. Inject lessons.md content if available
         """
         from backend.engines.orchestrator.tools.note import build_recall_action
         from backend.engines.orchestrator.tools.working_memory import (
             get_full_working_memory,
         )
+        from backend.engines.orchestrator.tools.task_tracker import TaskTracker
 
         # Load the auto-extracted context snapshot
         restored = self._memory_manager_impl.get_restored_context()
@@ -491,16 +540,52 @@ class Orchestrator(Agent):
                 except Exception:
                     pass  # Non-critical — don't block recovery on recall failure
 
+        # Auto-inject lessons.md (cross-session learning) — system-enforced read
+        lessons_block = ""
+        try:
+            lessons_path = "/memories/repo/lessons.md"
+            import os as _os
+            if _os.path.exists(lessons_path):
+                with open(lessons_path, encoding="utf-8") as _f:
+                    lessons_content = _f.read(2000)  # Cap at 2000 chars
+                if lessons_content.strip():
+                    lessons_block = f"\n\n<LESSONS_MD_RECOVERY>\n{lessons_content}\n</LESSONS_MD_RECOVERY>"
+        except Exception:
+            pass  # Non-critical
+
+        # Auto-inject task tracker state — system-enforced, reads plan file directly
+        task_tracker_block = ""
+        try:
+            tracker = TaskTracker()
+            tasks = tracker.load_from_file()
+            if tasks:
+                task_lines = ["<TASK_TRACKER_RECOVERY>"]
+                for t in tasks:
+                    status_icon = {"completed": "✓", "in_progress": "O", "failed": "X"}.get(
+                        t.get("status", ""), "-"
+                    )
+                    task_lines.append(
+                        f"  [{status_icon}] {t.get('id', '?')} — {t.get('description', t.get('title', ''))}"
+                        f" ({t.get('status', 'pending')})"
+                    )
+                task_lines.append("</TASK_TRACKER_RECOVERY>")
+                task_tracker_block = "\n\n" + "\n".join(task_lines)
+        except Exception:
+            pass  # Non-critical
+
         recovery_think = AgentThinkAction(
             thought=(
-                "⚡ CONTEXT CONDENSED — executing mandatory recovery sequence: "
-                "restoring scratchpad notes and reviewing task tracker."
+                "⚡ CONTEXT CONDENSED — mandatory recovery sequence complete (system-enforced). "
+                "The following context has been automatically restored:"
                 f"{restored_block}"
                 f"{wm_block}"
                 f"{semantic_block}"
+                f"{lessons_block}"
+                f"{task_tracker_block}"
             )
         )
         recall_action = build_recall_action({"key": "all"})
+
         self.pending_actions.append(recovery_think)
         self.pending_actions.append(recall_action)
 
