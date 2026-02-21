@@ -49,6 +49,12 @@ class GraphMemoryStore:
         self.graph.add_node(node_id, type=node_type.value, **attributes)
         self._auto_save()
 
+    def get_node(self, node_id: str) -> dict | None:
+        """Get a node and its attributes."""
+        if node_id in self.graph:
+            return self.graph.nodes[node_id]
+        return None
+
     def add_edge(
         self, source_id: str, target_id: str, edge_type: EdgeType, **attributes
     ):

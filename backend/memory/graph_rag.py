@@ -161,13 +161,28 @@ class GraphRAG:
                 name_node = editor._get_name_node(node)
                 if name_node:
                     sym = _node_text(name_node)
+                    line_start = node.start_point[0] + 1
+                    line_end = node.end_point[0] + 1
                     if parent_class:
                         qual = f"{parent_class}.{sym}"
-                        self.graph_store.add_node(qual, NodeType.FUNCTION)
+                        self.graph_store.add_node(
+                            qual,
+                            NodeType.FUNCTION,
+                            file_path=file_path,
+                            line_start=line_start,
+                            line_end=line_end,
+                            parent_id=parent_class,
+                        )
                         self.graph_store.add_edge(file_path, qual, EdgeType.DEFINES)
                         self.graph_store.add_edge(qual, parent_class, EdgeType.CALLS)
                     else:
-                        self.graph_store.add_node(sym, NodeType.FUNCTION)
+                        self.graph_store.add_node(
+                            sym,
+                            NodeType.FUNCTION,
+                            file_path=file_path,
+                            line_start=line_start,
+                            line_end=line_end,
+                        )
                         self.graph_store.add_edge(file_path, sym, EdgeType.DEFINES)
 
             # ----------------------------------------------------------------
@@ -184,7 +199,15 @@ class GraphRAG:
                 name_node = editor._get_name_node(node)
                 if name_node:
                     cls_name = _node_text(name_node)
-                    self.graph_store.add_node(cls_name, NodeType.CLASS)
+                    line_start = node.start_point[0] + 1
+                    line_end = node.end_point[0] + 1
+                    self.graph_store.add_node(
+                        cls_name,
+                        NodeType.CLASS,
+                        file_path=file_path,
+                        line_start=line_start,
+                        line_end=line_end,
+                    )
                     self.graph_store.add_edge(file_path, cls_name, EdgeType.DEFINES)
                     classes_found.append(cls_name)
                     # Recurse into class body with parent_class set

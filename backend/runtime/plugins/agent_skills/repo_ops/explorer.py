@@ -12,22 +12,26 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.logger import forge_logger as logger
-from backend.runtime.plugins.agent_skills.repo_ops.indexing import (
-    CodeEntity,
-    CodeIndexer,
-    Dependency,
-)
+from backend.memory.graph_store import GraphMemoryStore, NodeType, EdgeType
+from backend.memory.graph_rag import GraphRAG
+from backend.memory.vector_store import EnhancedVectorStore
 
-# Global indexer instance (lazy initialization)
-_indexer: CodeIndexer | None = None
+# Global graph store instance (lazy initialization)
+_graph_store: GraphMemoryStore | None = None
+_graph_rag: GraphRAG | None = None
 
 
-def _get_indexer(workspace_root: str = "/workspace") -> CodeIndexer:
-    """Get or create the global code indexer."""
-    global _indexer
-    if _indexer is None:
-        _indexer = CodeIndexer(workspace_root=workspace_root)
-    return _indexer
+def _get_graph_store(workspace_root: str = "/workspace") -> tuple[GraphMemoryStore, GraphRAG]:
+    """Get or create the global graph store and GraphRAG."""
+    global _graph_store, _graph_rag
+    if _graph_store is None:
+        _graph_store = GraphMemoryStore()
+        # We don't strictly need a real vector store for just graph traversal,
+        # but GraphRAG requires it. We can pass a dummy or initialize a real one.
+        # For now, we'll initialize a real one if needed, or just use GraphRAG for indexing.
+        vector_store = EnhancedVectorStore()
+        _graph_rag = GraphRAG(vector_store, _graph_store)
+    return _graph_store, _graph_rag
 
 
 def explore_tree_structure(
@@ -53,17 +57,21 @@ def explore_tree_structure(
     Returns:
         Dictionary with explored entities and dependencies
     """
-    indexer = _get_indexer(workspace_root)
+    graph_store, graph_rag = _get_graph_store(workspace_root)
 
     # Index files if needed
     for entity_id in start_entities:
         if ":" in entity_id:
             file_path = entity_id.split(":")[0]
-            indexer.index_file(file_path)
+            full_path = os.path.join(workspace_root, file_path)
+            if os.path.exists(full_path):
+                with open(full_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                graph_rag.index_code_file(file_path, content)
 
     # Collect results
-    explored_entities: dict[str, CodeEntity] = {}
-    explored_dependencies: list[Dependency] = []
+    explored_entities: dict[str, dict] = {}
+    explored_dependencies: list[dict] = []
 
     def traverse(entity_id: str, depth: int, visited: set[str]) -> None:
         """Recursively traverse the graph."""
@@ -75,36 +83,75 @@ def explore_tree_structure(
         visited.add(entity_id)
 
         # Get entity
-        entity = indexer.graph.entities.get(entity_id)
-        if not entity:
+        # In GraphMemoryStore, the node ID might be just the symbol name or file path.
+        # We need to handle the "file:symbol" format from start_entities.
+        node_id = entity_id
+        if ":" in entity_id:
+            node_id = entity_id.split(":")[1]
+            
+        node = graph_store.get_node(node_id)
+        if not node:
             # Try to resolve as file path
-            if os.path.exists(entity_id):
-                indexer.index_file(entity_id)
-                entity = indexer.graph.entities.get(entity_id)
+            if os.path.exists(os.path.join(workspace_root, entity_id)):
+                with open(os.path.join(workspace_root, entity_id), "r", encoding="utf-8") as f:
+                    content = f.read()
+                graph_rag.index_code_file(entity_id, content)
+                node = graph_store.get_node(entity_id)
 
-        if not entity:
+        if not node:
             return
 
         # Apply entity type filter
-        if entity_type_filter and entity.entity_type not in entity_type_filter:
+        if entity_type_filter and node.get("type") not in entity_type_filter:
             return
 
-        explored_entities[entity_id] = entity
+        explored_entities[node_id] = {
+            "entity_id": node_id,
+            "entity_type": node.get("type"),
+            "file_path": node.get("file_path"),
+            "name": node_id,
+            "line_start": node.get("line_start"),
+            "line_end": node.get("line_end"),
+            "parent_id": node.get("parent_id"),
+        }
 
         # Get dependencies
-        deps = indexer.graph.get_dependencies(
-            entity_id, direction=direction, dependency_types=dependency_type_filter
-        )
+        # GraphMemoryStore uses get_neighbors, which returns outgoing edges.
+        # For upstream, we need predecessors.
+        deps = []
+        if direction in ("downstream", "both"):
+            for neighbor in graph_store.get_neighbors(node_id):
+                if dependency_type_filter and neighbor["relationship"] not in dependency_type_filter:
+                    continue
+                deps.append({
+                    "from_entity": node_id,
+                    "to_entity": neighbor["id"],
+                    "dependency_type": neighbor["relationship"],
+                })
+        
+        if direction in ("upstream", "both"):
+            if node_id in graph_store.graph:
+                for pred in graph_store.graph.predecessors(node_id):
+                    edge_data = graph_store.graph.get_edge_data(pred, node_id)
+                    for data in edge_data.values():
+                        if dependency_type_filter and data.get("type") not in dependency_type_filter:
+                            continue
+                        deps.append({
+                            "from_entity": pred,
+                            "to_entity": node_id,
+                            "dependency_type": data.get("type"),
+                        })
+
         explored_dependencies.extend(deps)
 
         # Traverse dependencies
         for dep in deps:
             next_entity_id = (
-                dep.to_entity if direction == "downstream" else dep.from_entity
+                dep["to_entity"] if direction == "downstream" else dep["from_entity"]
             )
             if direction == "both":
                 next_entity_id = (
-                    dep.to_entity if dep.from_entity == entity_id else dep.from_entity
+                    dep["to_entity"] if dep["from_entity"] == node_id else dep["from_entity"]
                 )
             traverse(next_entity_id, depth + 1, visited)
 
@@ -115,26 +162,8 @@ def explore_tree_structure(
 
     # Format results
     return {
-        "entities": [
-            {
-                "entity_id": e.entity_id,
-                "entity_type": e.entity_type,
-                "file_path": e.file_path,
-                "name": e.name,
-                "line_start": e.line_start,
-                "line_end": e.line_end,
-                "parent_id": e.parent_id,
-            }
-            for e in explored_entities.values()
-        ],
-        "dependencies": [
-            {
-                "from_entity": d.from_entity,
-                "to_entity": d.to_entity,
-                "dependency_type": d.dependency_type,
-            }
-            for d in explored_dependencies
-        ],
+        "entities": list(explored_entities.values()),
+        "dependencies": explored_dependencies,
     }
 
 
@@ -150,7 +179,7 @@ def get_entity_contents(
     Returns:
         Dictionary mapping entity IDs to their content
     """
-    indexer = _get_indexer(workspace_root)
+    graph_store, graph_rag = _get_graph_store(workspace_root)
     results: dict[str, str] = {}
 
     for entity_name in entity_names:
@@ -177,14 +206,13 @@ def get_entity_contents(
                 continue
 
             # Find specific symbol
-            indexer.index_file(file_path)
-            entity_id = f"{file_path}:{symbol_path}"
-
-            entity = indexer.graph.entities.get(entity_id)
-            if entity:
+            graph_rag.index_code_file(file_path, content)
+            
+            node = graph_store.get_node(symbol_path)
+            if node and node.get("line_start") and node.get("line_end"):
                 lines = content.splitlines()
                 entity_content = "\n".join(
-                    lines[entity.line_start - 1 : entity.line_end]
+                    lines[node["line_start"] - 1 : node["line_end"]]
                 )
                 results[entity_name] = entity_content
             else:
