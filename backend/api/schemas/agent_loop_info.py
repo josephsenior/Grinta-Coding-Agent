@@ -19,7 +19,6 @@ class AgentLoopInfo:
 
     conversation_id: str
     url: str | None
-    session_api_key: str | None
     event_store: EventStoreABC | None
     status: ConversationStatus = field(default=ConversationStatus.RUNNING)
     runtime_status: RuntimeStatus | None = None

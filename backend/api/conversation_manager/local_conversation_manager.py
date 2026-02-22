@@ -725,7 +725,6 @@ class LocalConversationManager(ConversationManager):
         return AgentLoopInfo(
             conversation_id=session.sid,
             url=self._get_conversation_url(session.sid),
-            session_api_key=None,
             event_store=session.agent_session.event_stream,  # type: ignore[arg-type]
             status=_get_status_from_session(session),
             runtime_status=getattr(

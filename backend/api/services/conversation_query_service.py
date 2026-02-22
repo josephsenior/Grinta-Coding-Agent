@@ -107,7 +107,6 @@ async def get_conversation_info(
             agent_state=getattr(agent_loop_info, "agent_state", None),
             num_connections=num_connections,
             url=agent_loop_info.url if agent_loop_info else None,
-            session_api_key=getattr(agent_loop_info, "session_api_key", None),
             pr_number=conversation.pr_number,
         )
     except Exception as e:

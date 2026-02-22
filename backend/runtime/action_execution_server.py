@@ -63,7 +63,6 @@ from backend.runtime.file_viewer_server import start_file_viewer_server
 from backend.runtime.mcp.proxy import MCPProxyManager
 from backend.runtime.plugins import ALL_PLUGINS, Plugin
 from backend.runtime.server_routes import (
-    register_auth_middleware,
     register_exception_handlers,
     register_routes,
 )
@@ -768,8 +767,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 register_exception_handlers(app)
-session_api_key = os.environ.get("SESSION_API_KEY", "")
-register_auth_middleware(app, session_api_key)
 register_routes(app, get_client, get_mcp_proxy)
 
 
@@ -871,8 +868,8 @@ if __name__ == "__main__":
             else:
                 logger.info("Initializing MCP Proxy Manager...")
                 mcp_proxy_manager = MCPProxyManager(
-                    auth_enabled=bool(os.environ.get("SESSION_API_KEY")),
-                    api_key=os.environ.get("SESSION_API_KEY"),
+                    auth_enabled=False,
+                    api_key=None,
                     logger_level=logger.getEffectiveLevel(),
                 )
                 from backend.core.config.utils import load_forge_config

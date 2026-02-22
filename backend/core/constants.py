@@ -193,7 +193,6 @@ DEFAULT_CIRCUIT_TIMEOUT_SECONDS = 60
 
 # ── Action Execution ────────────────────────────────────────────────
 ROOT_GID = 0
-SESSION_API_KEY_HEADER = "X-Session-API-Key"
 
 # ── Logging & Debug (env-var driven) ────────────────────────────────
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()

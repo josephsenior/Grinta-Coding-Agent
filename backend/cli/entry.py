@@ -52,10 +52,6 @@ def _launch_all_in_one() -> None:
     # 1. Start backend server in background
     env = os.environ.copy()
     env["FORGE_RUNTIME"] = "local"
-    # Ensure zero-config for local sessions by disabling the mandatory API key requirement
-    # Users can still enable it by setting SESSION_API_KEY explicitly in their terminal shell.
-    if not os.environ.get("SESSION_API_KEY"):
-        env["SESSION_API_KEY"] = ""
 
     server_cmd = [
         sys.executable,

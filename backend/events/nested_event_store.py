@@ -26,7 +26,6 @@ class NestedEventStore(EventStoreABC):
     base_url: str
     sid: str
     user_id: str | None
-    session_api_key: str | None = None
 
     def _build_search_params(
         self,
@@ -51,9 +50,6 @@ class NestedEventStore(EventStoreABC):
         search_str = urlencode(search_params)
         url = f"{self.base_url}/events?{search_str}"
         headers: dict[str, str] = {}
-        if self.session_api_key:
-            headers["X-Session-API-Key"] = self.session_api_key
-
         response = httpx.get(url, headers=headers)
         if response.status_code == status.HTTP_404_NOT_FOUND:
             return None

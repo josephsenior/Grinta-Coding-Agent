@@ -6,7 +6,6 @@ single concern.
 
 from __future__ import annotations
 
-import secrets
 from typing import Any
 
 from socketio.exceptions import (
@@ -15,7 +14,6 @@ from socketio.exceptions import (
 
 from backend.core.logger import forge_logger as logger
 from backend.core.provider_types import ProviderType
-from backend.api.shared import server_config
 
 
 def parse_latest_event_id(query_params: dict[str, Any]) -> int:
@@ -62,25 +60,4 @@ def validate_connection_params(
         raise SocketIOConnectionRefusedError("No conversation_id in query params")
 
 
-def invalid_session_api_key(
-    query_params: dict[str, Any],
-    auth: dict[str, Any] | None = None,
-) -> bool:
-    """Return *True* if the session API key is missing or doesn't match.
 
-    Expected source:
-    1. Socket.IO ``auth`` payload (handshake auth)
-    """
-    expected_key = getattr(server_config, "session_api_key", "")
-    if not expected_key:
-        return False
-
-    # Prefer auth payload
-    if auth and isinstance(auth, dict):
-        provided_key = (
-            auth.get("session_api_key") or auth.get("apiKey") or auth.get("token")
-        )
-        if provided_key is not None:
-            return not secrets.compare_digest(str(provided_key), expected_key)
-
-    return True  # Missing key ⇒ invalid

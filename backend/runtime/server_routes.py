@@ -66,25 +66,6 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
 
-def register_auth_middleware(
-    app: FastAPI,
-    session_api_key: str | None,
-) -> None:
-    """Register authentication middleware on the FastAPI app."""
-
-    @app.middleware("http")
-    async def authenticate_requests(request: Request, call_next):
-        if request.url.path not in ["/alive", "/server_info"]:
-            if session_api_key:
-                token = request.headers.get("X-Session-API-Key")
-                if token != session_api_key:
-                    return JSONResponse(
-                        status_code=403,
-                        content={"detail": "Invalid or missing API Key"},
-                    )
-        return await call_next(request)
-
-
 def register_routes(
     app: FastAPI,
     get_client: Any,

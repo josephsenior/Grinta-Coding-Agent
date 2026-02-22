@@ -136,16 +136,7 @@ def _collect_validation_issues(strict: bool) -> tuple[list[str], list[str]]:
 def _check_api_key_security(
     warnings: list[str], errors: list[str], strict: bool
 ) -> None:
-    """Check if SESSION_API_KEY is insecure."""
-    if getattr(server_config, "session_api_key", "") == "forge_dev_key":
-        msg = (
-            "SESSION_API_KEY is set to the insecure default 'forge_dev_key'. "
-            "Set SESSION_API_KEY env var or let Forge auto-generate one."
-        )
-        if strict:
-            errors.append(msg)
-        else:
-            warnings.append(msg)
+    pass  # auth removed
 
 
 def _check_budget_sanity(warnings: list[str]) -> None:

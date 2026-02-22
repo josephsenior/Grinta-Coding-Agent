@@ -40,7 +40,6 @@ class ServerConfig(ServerConfigInterface):
 
     def __init__(self) -> None:
         """Initialize server configuration."""
-        self.session_api_key = ""
 
     def verify_config(self) -> None:
         """Validate that no unsupported config class overrides are provided."""
