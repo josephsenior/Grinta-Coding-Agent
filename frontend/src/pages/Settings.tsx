@@ -12,6 +12,8 @@ import {
   Check,
   Loader2,
   ChevronRight,
+  BookOpen,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +30,8 @@ import { toast } from "sonner";
 import { getSettings, saveSettings } from "@/api/settings";
 import type { MCPServerConfig, SettingsResponse } from "@/types/settings";
 import { cn } from "@/lib/utils";
+import KnowledgeBase from "./KnowledgeBase";
+import Monitoring from "./Monitoring";
 
 // ─── Model Section ────────────────────────────────────────────────────────────
 
@@ -499,7 +503,7 @@ function MCPSection({
 
 // ─── Sidebar nav item ─────────────────────────────────────────────────────────
 
-type Section = "model" | "mcp";
+type Section = "model" | "mcp" | "knowledge" | "monitoring";
 
 function SidebarItem({
   label,
@@ -582,35 +586,55 @@ export default function Settings() {
             active={activeSection === "mcp"}
             onClick={() => setActiveSection("mcp")}
           />
+          <SidebarItem
+            label="Knowledge Base"
+            icon={BookOpen}
+            active={activeSection === "knowledge"}
+            onClick={() => setActiveSection("knowledge")}
+          />
+          <SidebarItem
+            label="Monitoring"
+            icon={Activity}
+            active={activeSection === "monitoring"}
+            onClick={() => setActiveSection("monitoring")}
+          />
         </nav>
       </aside>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="mx-auto max-w-2xl">
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading settings...
-            </div>
-          ) : error ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-              Failed to load settings. Check that the backend is running.
-            </div>
-          ) : settings ? (
-            <>
-              {activeSection === "model" && (
-                <ModelSection settings={settings} onSave={handleSave} />
-              )}
-              {activeSection === "mcp" && (
+      <div className="flex-1 overflow-y-auto">
+        {activeSection === "knowledge" ? (
+          <KnowledgeBase />
+        ) : activeSection === "monitoring" ? (
+          <Monitoring />
+        ) : (
+          <div className="p-8">
+            <div className="mx-auto max-w-2xl">
+              {isLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading settings...
+                </div>
+              ) : error ? (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                  Failed to load settings. Check that the backend is running.
+                </div>
+              ) : settings ? (
                 <>
-                  <Separator className="mb-6" />
-                  <MCPSection settings={settings} onSave={handleSave} />
+                  {activeSection === "model" && (
+                    <ModelSection settings={settings} onSave={handleSave} />
+                  )}
+                  {activeSection === "mcp" && (
+                    <>
+                      <Separator className="mb-6" />
+                      <MCPSection settings={settings} onSave={handleSave} />
+                    </>
+                  )}
                 </>
-              )}
-            </>
-          ) : null}
-        </div>
+              ) : null}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

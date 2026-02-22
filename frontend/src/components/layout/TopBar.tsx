@@ -1,13 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import {
-  Hammer,
-  Settings,
-  Sun,
-  Moon,
-  Search,
-  Activity,
-  BookOpen,
-} from "lucide-react";
+import { Hammer, Settings, Sun, Moon, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -21,9 +13,6 @@ import { CommandMenu } from "@/components/common/CommandMenu";
 
 const navItems = [
   { to: "/", icon: Hammer, label: "Home" },
-  { to: "/knowledge", icon: BookOpen, label: "Knowledge" },
-  { to: "/monitoring", icon: Activity, label: "Monitoring" },
-  { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function TopBar() {
@@ -67,7 +56,7 @@ export function TopBar() {
           </nav>
         </div>
 
-        {/* Right: Search + Theme */}
+        {/* Right: Search + Theme + Settings */}
         <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -93,6 +82,23 @@ export function TopBar() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Toggle theme</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                to="/settings"
+                className={cn(
+                  "inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                  location.pathname.startsWith("/settings")
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground",
+                )}
+              >
+                <Settings className="h-4 w-4" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
           </Tooltip>
         </div>
       </header>
