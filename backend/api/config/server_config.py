@@ -1,65 +1,12 @@
 """Server configuration defaults and helpers for loading overrides."""
 
 import os
-import secrets
-from pathlib import Path
 
 from backend.core.logger import forge_logger as logger
 from backend.api.types import AppMode, ServerConfigInterface
 from backend.utils.import_utils import get_impl
 
-_DEFAULT_INSECURE_KEY = "forge_dev_key"
 
-
-def _resolve_session_api_key() -> str:
-    """Return the session API key, auto-generating one if not configured.
-
-    Priority:
-      1. FORGE_RUNTIME="local" → Explicitly return "" for zero-config.
-      2. SESSION_API_KEY environment variable (explicit override)
-      3. Existing key persisted in .env.local
-      4. Auto-generate a new random key (unless in local dev mode)
-    """
-    # For local/OSS mode, if no key is set, we default to disabled (empty string)
-    # to ensure a "One-Click" zero-config experience.
-    if os.environ.get("FORGE_RUNTIME") == "local":
-        logger.info(
-            "FORGE_RUNTIME=local detected: disabling session API key for zero-config."
-        )
-        return ""
-
-    env_key = os.environ.get("SESSION_API_KEY")
-    if env_key is not None:
-        # If explicitly set (even to empty string), respect it
-        val = env_key.strip()
-        if val != _DEFAULT_INSECURE_KEY:
-            return val
-
-    # Try to read from .env.local (persisted from a previous run)
-    env_local = Path(".env.local")
-    if env_local.exists():
-        for line in env_local.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("SESSION_API_KEY="):
-                persisted = line.split("=", 1)[1].strip().strip("\"'")
-                if persisted and persisted != _DEFAULT_INSECURE_KEY:
-                    return persisted
-
-    # Auto-generate a cryptographically secure key
-    new_key = f"forge_{secrets.token_urlsafe(32)}"
-    try:
-        # Append to .env.local so it persists across restarts
-        with open(env_local, "a", encoding="utf-8") as f:
-            f.write(f"\nSESSION_API_KEY={new_key}\n")
-        logger.info(
-            "Auto-generated SESSION_API_KEY and saved to .env.local. Set SESSION_API_KEY env var to override."
-        )
-    except OSError:
-        logger.warning(
-            "Could not write .env.local — auto-generated key will not persist. Set SESSION_API_KEY env var explicitly."
-        )
-
-    return new_key
 
 
 class ServerConfig(ServerConfigInterface):
@@ -92,8 +39,8 @@ class ServerConfig(ServerConfigInterface):
     monitoring_listener_class: str = "backend.api.monitoring.MonitoringListener"
 
     def __init__(self) -> None:
-        """Initialize server configuration and resolve session API key."""
-        self.session_api_key = _resolve_session_api_key()
+        """Initialize server configuration."""
+        self.session_api_key = ""
 
     def verify_config(self) -> None:
         """Validate that no unsupported config class overrides are provided."""

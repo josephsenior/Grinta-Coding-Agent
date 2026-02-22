@@ -38,7 +38,6 @@ from backend.api.middleware.security_headers import (
     SecurityHeadersMiddleware,
 )
 from backend.api.middleware.audit_logger import AuditLoggerMiddleware
-from backend.api.middleware.token_auth import SimpleTokenAuthMiddleware
 from backend.api.route_registry import register_routes
 from backend.api.routes.mcp import mcp_server
 from backend.api.shared import config as _forge_config
@@ -330,11 +329,6 @@ app = FastAPI(
 # while still respecting configured origins for production
 
 app.add_middleware(LocalhostCORSMiddleware)
-
-# 0.25. Authentication (after CORS, before other middleware)
-# SECURITY COMPLIANCE: Default to Token Authentication for all environments
-
-app.add_middleware(SimpleTokenAuthMiddleware)
 
 # 0.5. Request ID (add unique request IDs for tracing)
 

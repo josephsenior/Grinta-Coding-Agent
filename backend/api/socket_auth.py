@@ -60,8 +60,6 @@ def validate_connection_params(
     if not conversation_id:
         logger.error("No conversation_id in query params")
         raise SocketIOConnectionRefusedError("No conversation_id in query params")
-    if invalid_session_api_key(query_params, auth):
-        raise SocketIOConnectionRefusedError("invalid_session_api_key")
 
 
 def invalid_session_api_key(
