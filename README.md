@@ -66,8 +66,16 @@ See the [Architecture Deep Dive](docs/ARCHITECTURE.md) for a full walkthrough of
 
 ## 🚀 Quick Start
 
-### 🪟 Windows (Recommended)
-Run the bootstrap script at the repository root. It installs dependencies, sets up the environment, and starts both the server and the TUI:
+### 🐳 Docker (Recommended)
+Run the helper script to setup config and launch:
+```bash
+./docker_start.sh   # Linux/macOS
+# or
+.\DOCKER_START.ps1  # Windows
+```
+
+### 🪟 Windows (Local)
+Run the bootstrap script at the repository root. It installs dependencies, sets up the environment, and starts the app:
 
 ```powershell
 .\START_HERE.ps1
@@ -76,8 +84,9 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 ### 🐧 Linux / macOS / Manual
 1. **Prerequisites:** Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 2. **Install:** `uv sync`
-3. **Start Backend:** `uv run python start_server.py`
-4. **Start TUI:** `uv run forge-tui`
+3. **Setup Config:** `cp config.template.toml config.toml`
+4. **Start Backend:** `uv run python start_server.py`
+5. **Start TUI:** `uv run forge-tui`
 
 ---
 

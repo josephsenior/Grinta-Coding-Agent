@@ -16,7 +16,7 @@
 # IMPORTANT: Change this key before deploying to any shared/public environment.
 # If left empty or removed, the server will auto-generate a secure random key
 # and persist it to .env.local on first startup.
-# session_api_key = ""
+session_api_key = ""
 
 #################################### Core ####################################
 # General core configurations
