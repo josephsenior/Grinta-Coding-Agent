@@ -1,8 +1,9 @@
 import { useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "cmdk";
-import { Hammer, Settings, BookOpen, Brain, Activity, MessageSquare } from "lucide-react";
+import { Hammer, Settings, BookOpen, Activity, MessageSquare, Plus } from "lucide-react";
 import { useConversations } from "@/hooks/use-conversations";
+import { useAppStore } from "@/stores/app-store";
 import { cn } from "@/lib/utils";
 
 interface CommandMenuProps {
@@ -13,6 +14,7 @@ interface CommandMenuProps {
 export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
   const navigate = useNavigate();
   const { data } = useConversations();
+  const setNewConvOpen = useAppStore((s) => s.setNewConvOpen);
 
   // Keyboard shortcut: Ctrl+K
   const handleKeyDown = useCallback(
@@ -45,24 +47,28 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
 
+        <CommandGroup heading="Actions">
+          <CommandItem onSelect={() => runCommand(() => setNewConvOpen(true))}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Conversation
+            <span className="ml-auto text-xs text-muted-foreground">Ctrl+N</span>
+          </CommandItem>
+        </CommandGroup>
+
         <CommandGroup heading="Pages">
           <CommandItem onSelect={() => runCommand(() => navigate("/"))}>
             <Hammer className={cn("mr-2 h-4 w-4")} />
             Home
           </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => navigate("/settings"))}>
-            <Settings className={cn("mr-2 h-4 w-4")} />
-            Settings
-          </CommandItem>
           <CommandItem onSelect={() => runCommand(() => navigate("/knowledge"))}>
             <BookOpen className={cn("mr-2 h-4 w-4")} />
             Knowledge Base
           </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => navigate("/memory"))}>
-            <Brain className={cn("mr-2 h-4 w-4")} />
-            Memory
+          <CommandItem onSelect={() => runCommand(() => navigate("/settings"))}>
+            <Settings className={cn("mr-2 h-4 w-4")} />
+            Settings
           </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => navigate("/monitoring"))}>
+          <CommandItem onSelect={() => runCommand(() => navigate("/settings"))}>
             <Activity className={cn("mr-2 h-4 w-4")} />
             Monitoring
           </CommandItem>

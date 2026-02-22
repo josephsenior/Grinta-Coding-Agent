@@ -6,7 +6,7 @@ import { Layout } from "@/components/layout/Layout";
 import Home from "@/pages/Home";
 import Chat from "@/pages/Chat";
 import Settings from "@/pages/Settings";
-import Monitoring from "@/pages/Monitoring";
+import KnowledgeBase from "@/pages/KnowledgeBase";
 import { useEffect } from "react";
 import { useAppStore } from "@/stores/app-store";
 
@@ -38,7 +38,7 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/chat/:id" element={<Chat />} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="/monitoring" element={<Monitoring />} />
+              <Route path="/knowledge" element={<KnowledgeBase />} />
             </Route>
           </Routes>
           <Toaster richColors position="bottom-right" />

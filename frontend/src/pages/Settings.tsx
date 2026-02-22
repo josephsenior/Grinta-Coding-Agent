@@ -12,7 +12,6 @@ import {
   Check,
   Loader2,
   ChevronRight,
-  BookOpen,
   Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,7 +29,6 @@ import { toast } from "sonner";
 import { getSettings, saveSettings } from "@/api/settings";
 import type { MCPServerConfig, SettingsResponse } from "@/types/settings";
 import { cn } from "@/lib/utils";
-import KnowledgeBase from "./KnowledgeBase";
 import Monitoring from "./Monitoring";
 
 // ─── Model Section ────────────────────────────────────────────────────────────
@@ -413,14 +411,19 @@ function MCPSection({
   return (
     <section>
       <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Server className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-base font-semibold">MCP Servers</h2>
-          {servers.length > 0 && (
-            <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-              {servers.length}
-            </Badge>
-          )}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Server className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-base font-semibold">MCP Servers</h2>
+            {servers.length > 0 && (
+              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                {servers.length}
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            External tools &amp; integrations for the agent
+          </p>
         </div>
         <Button
           size="sm"
@@ -503,7 +506,7 @@ function MCPSection({
 
 // ─── Sidebar nav item ─────────────────────────────────────────────────────────
 
-type Section = "model" | "mcp" | "knowledge" | "monitoring";
+type Section = "model" | "mcp" | "monitoring";
 
 function SidebarItem({
   label,
@@ -587,12 +590,6 @@ export default function Settings() {
             onClick={() => setActiveSection("mcp")}
           />
           <SidebarItem
-            label="Knowledge Base"
-            icon={BookOpen}
-            active={activeSection === "knowledge"}
-            onClick={() => setActiveSection("knowledge")}
-          />
-          <SidebarItem
             label="Monitoring"
             icon={Activity}
             active={activeSection === "monitoring"}
@@ -603,9 +600,7 @@ export default function Settings() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {activeSection === "knowledge" ? (
-          <KnowledgeBase />
-        ) : activeSection === "monitoring" ? (
+        {activeSection === "monitoring" ? (
           <Monitoring />
         ) : (
           <div className="p-8">
