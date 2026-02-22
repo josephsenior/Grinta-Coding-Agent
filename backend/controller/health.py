@@ -202,12 +202,28 @@ def collect_controller_health(controller: Any) -> dict[str, Any]:
     cb_service = getattr(controller, "circuit_breaker_service", None)
     cb_state = getattr(cb_service, "state", None)
     cb_state_name = getattr(cb_state, "name", str(cb_state) if cb_state else None)
-    cb_failures = getattr(cb_service, "failure_count", 0)
-    if not isinstance(cb_failures, (int, float)):
-        cb_failures = getattr(cb_service, "consecutive_errors", 0)
-    if not isinstance(cb_failures, (int, float)):
-        cb_failures = 0
-    if cb_state_name == "OPEN" or cb_failures >= 5:
+
+    cb_failures_raw = getattr(cb_service, "failure_count", None)
+    cb_consecutive_raw = getattr(cb_service, "consecutive_errors", None)
+
+    cb_failures = cb_failures_raw if isinstance(cb_failures_raw, (int, float)) else 0
+    cb_consecutive = (
+        cb_consecutive_raw if isinstance(cb_consecutive_raw, (int, float)) else 0
+    )
+    cb_failures = max(cb_failures, cb_consecutive)
+
+    cb_max_consecutive = getattr(getattr(cb_service, "config", None), "max_consecutive_errors", None)
+    max_consecutive_int = (
+        int(cb_max_consecutive)
+        if isinstance(cb_max_consecutive, (int, float))
+        else None
+    )
+
+    if cb_state_name == "OPEN":
+        warnings.append("circuit_breaker_open")
+    elif max_consecutive_int is not None and cb_consecutive >= max_consecutive_int:
+        warnings.append("circuit_breaker_consecutive_errors")
+    elif cb_failures >= 5:
         warnings.append("circuit_breaker_unhealthy")
 
     retry_service = getattr(controller, "retry_service", None)

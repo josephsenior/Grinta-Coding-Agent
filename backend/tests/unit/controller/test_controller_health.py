@@ -115,7 +115,7 @@ class TestCollectControllerHealth:
 
         result = collect_controller_health(controller)
         assert result["severity"] == "red"
-        assert "circuit_breaker_unhealthy" in result["warnings"]
+        assert "circuit_breaker_open" in result["warnings"]
 
     def test_retry_pending_warning(self):
         from backend.controller.health import collect_controller_health

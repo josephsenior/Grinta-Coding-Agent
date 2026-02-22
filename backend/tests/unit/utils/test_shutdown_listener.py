@@ -294,9 +294,8 @@ class TestShutdownListenerInternal:
         """Test _register_signal_handler and the signal handler."""
         import backend.utils.shutdown_listener as mod
 
-        with patch("signal.signal") as mock_signal, patch(
-            "signal.getsignal"
-        ) as mock_getsignal:
+        with patch("backend.utils.shutdown_listener.signal.signal") as mock_signal, \
+             patch("backend.utils.shutdown_listener.signal.getsignal") as mock_getsignal:
             mock_getsignal.return_value = _signal.SIG_DFL
             mod._register_signal_handler(_signal.SIGINT)
 
@@ -312,7 +311,10 @@ class TestShutdownListenerInternal:
             mod.add_shutdown_listener(mock_listener)
 
             # Call handler directly
-            handler(_signal.SIGINT, None)
+            try:
+                handler(_signal.SIGINT, None)
+            except KeyboardInterrupt:
+                pass  # expected from default_int_handler
 
             assert mod._should_exit is True
             mock_listener.assert_called_once()
@@ -331,28 +333,41 @@ class TestShutdownListenerInternal:
             failing_listener = MagicMock(side_effect=Exception("Crash"))
             mod.add_shutdown_listener(failing_listener)
 
-            # Should not raise exception
-            handler(_signal.SIGINT, None)
+            # Should not raise exception (except KeyboardInterrupt from fallback)
+            try:
+                handler(_signal.SIGINT, None)
+            except KeyboardInterrupt:
+                pass
             failing_listener.assert_called_once()
 
-    def test_register_signal_handlers_not_main_thread(self):
-        """Test _register_signal_handlers is skipped outside main thread."""
+    def test_register_signal_handler_sig_ign(self):
+        """Test with SIG_IGN to ensure we hit elif but not assign."""
         import backend.utils.shutdown_listener as mod
+        
+        with patch("backend.utils.shutdown_listener.signal.signal"), \
+             patch("backend.utils.shutdown_listener.signal.getsignal", return_value=_signal.SIG_IGN):
+            mod._register_signal_handler(_signal.SIGINT)
 
-        mock_main = MagicMock()
-        mock_current = MagicMock()
-
-        # Patch directly where it is used in the module
-        with patch(
-            "backend.utils.shutdown_listener.threading.main_thread",
-            return_value=mock_main,
-        ), patch(
-            "backend.utils.shutdown_listener.threading.current_thread",
-            return_value=mock_current,
-        ):
-            mod._register_signal_handlers()
-            assert mod._should_exit is False
-            # If it's not the main thread, it shouldn't register signal handlers
+    def test_register_signal_handlers_actually_not_main_thread(self):
+        """Test _register_signal_handlers from a real non-main thread."""
+        import backend.utils.shutdown_listener as mod
+        import threading
+        
+        # Reset to ensure we run registration again
+        mod._should_exit = None
+        
+        exceptions = []
+        def run():
+            try:
+                mod._register_signal_handlers()
+            except Exception as e:
+                exceptions.append(e)
+                
+        t = threading.Thread(target=run)
+        t.start()
+        t.join()
+        
+        assert not exceptions
 
     def test_sleep_long_duration_chunks(self):
         """Test sleep_if_should_continue with delay > 1 hits the loop."""
@@ -399,3 +414,54 @@ class TestShutdownListenerInternal:
 
         await task
         assert elapsed < 3.0  # Should wake earlier than 5.0 seconds
+
+    def test_handler_fallback_none(self):
+        """Test handler when fallback_handler is None (Line 40 coverage)."""
+        import backend.utils.shutdown_listener as mod
+        import signal as _sig
+
+        with patch("signal.signal") as mock_signal, \
+             patch("signal.getsignal", return_value=None):
+            # Line 34-40: neither callable nor SIG_DFL
+            mod._register_signal_handler(_sig.SIGINT)
+            handler = mock_signal.call_args[0][1]
+            
+            # Should not crash when called
+            # No KeyboardInterrupt because fallback_handler is None
+            handler(_sig.SIGINT, None)
+            assert mod._should_exit is True
+
+    def test_register_signal_handlers_main_thread_success(self):
+        """Test _register_signal_handlers actually calls registration (Line 75)."""
+        import backend.utils.shutdown_listener as mod
+        
+        # Reset to ensure we run registration
+        mod._should_exit = None
+        
+        with patch("backend.utils.shutdown_listener._register_signal_handler") as mock_reg, \
+             patch("threading.current_thread", return_value=threading.main_thread()):
+            mod._register_signal_handlers()
+            assert mock_reg.called
+            assert mod._should_exit is False
+
+    @pytest.mark.asyncio
+    async def test_async_sleep_loop_iteration(self):
+        """Ensure the while loop in async sleep is fully covered (Line 127)."""
+        import backend.utils.shutdown_listener as mod
+        mod._should_exit = False
+        
+        # We use a mocked sleep to avoid real time waiting and ensure we hit the line
+        with patch("asyncio.sleep", new_callable=MagicMock) as mock_sleep:
+            # We need to make it return a coro
+            async def mock_coro(d): return None
+            mock_sleep.side_effect = mock_coro
+            
+            # setup time.time to simulate passage of time
+            # 1st call: start_time
+            # 2nd call: loop check 1 (0 diff)
+            # 3rd call: loop check 2 (after 1s sleep)
+            with patch("time.time", side_effect=[10.0, 10.0, 11.5, 12.5]):
+                await async_sleep_if_should_continue(2.0)
+            
+            # Should have called sleep(1) at least once
+            mock_sleep.assert_any_call(1)

@@ -132,3 +132,13 @@ class TestStopIfShouldExit:
         # Should be able to create multiple instances
         assert stop_cond1 is not None
         assert stop_cond2 is not None
+
+    def test_local_fallback_callable_returns_true(self):
+        """Test that line 36 is covered when mod.should_exit() fails."""
+        stop_condition = stop_if_should_exit()
+        retry_state = MagicMock()
+
+        import backend.utils.tenacity_stop as ts
+        # mock should_exit to raise first, then return False for the fallback call
+        with patch.object(ts, "should_exit", side_effect=[RuntimeError("Fail"), False]):
+            assert stop_condition(retry_state) is False

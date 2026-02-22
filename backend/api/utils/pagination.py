@@ -24,12 +24,10 @@ class PaginationParams:
 
     def __post_init__(self):
         """Validate and normalize pagination parameters."""
-        if self.page < 1:
-            self.page = 1
+        self.page = max(self.page, 1)
         if self.limit < 1:
             self.limit = 20
-        if self.limit > self.max_limit:
-            self.limit = self.max_limit
+        self.limit = min(self.limit, self.max_limit)
 
     @property
     def offset(self) -> int:
@@ -97,8 +95,7 @@ class CursorPaginationParams(BaseModel):
 
     def __post_init__(self):
         """Validate limit."""
-        if self.limit > 100:
-            self.limit = 100
+        self.limit = min(self.limit, 100)
         if self.limit < 1:
             self.limit = 20
 

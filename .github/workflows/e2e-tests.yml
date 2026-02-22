@@ -1,6 +1,6 @@
 name: End-to-End Tests
 
-# NOTE: These tests were written for the old React frontend (Playwright browser automation).
+# NOTE: These tests were written for a legacy web UI.
 # The frontend has been replaced by a Textual TUI. These tests need to be rewritten
 # to test against the backend API directly. Disabled until then.
 
@@ -9,7 +9,7 @@ on:
 
 jobs:
   e2e-tests:
-    # Disabled — Playwright-based tests require the removed React frontend.
+    # Disabled — legacy UI tests require the removed React frontend.
     # TODO: Rewrite e2e tests to validate via backend API / TUI integration.
     if: false
     runs-on: ubuntu-latest

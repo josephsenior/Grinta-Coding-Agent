@@ -99,3 +99,41 @@ def create_get_entity_contents_tool():
         },
         required=["entity_names"],
     )
+
+def build_explore_tree_structure_action(arguments: dict) -> "AgentThinkAction":
+    """Build action for explore_tree_structure tool."""
+    from backend.events.action import AgentThinkAction
+    from backend.runtime.plugins.agent_skills.repo_ops.explorer import explore_tree_structure
+    import json
+
+    start_entities = arguments.get("start_entities", [])
+    direction = arguments.get("direction", "downstream")
+    traversal_depth = arguments.get("traversal_depth", 2)
+    entity_type_filter = arguments.get("entity_type_filter")
+    dependency_type_filter = arguments.get("dependency_type_filter")
+
+    try:
+        result = explore_tree_structure(
+            start_entities=start_entities,
+            direction=direction,
+            traversal_depth=traversal_depth,
+            entity_type_filter=entity_type_filter,
+            dependency_type_filter=dependency_type_filter,
+        )
+        return AgentThinkAction(thought=f"[EXPLORE_TREE_STRUCTURE]\n{json.dumps(result, indent=2)}")
+    except Exception as e:
+        return AgentThinkAction(thought=f"[EXPLORE_TREE_STRUCTURE] Error: {e}")
+
+def build_get_entity_contents_action(arguments: dict) -> "AgentThinkAction":
+    """Build action for get_entity_contents tool."""
+    from backend.events.action import AgentThinkAction
+    from backend.runtime.plugins.agent_skills.repo_ops.explorer import get_entity_contents
+    import json
+
+    entity_names = arguments.get("entity_names", [])
+
+    try:
+        result = get_entity_contents(entity_names=entity_names)
+        return AgentThinkAction(thought=f"[GET_ENTITY_CONTENTS]\n{json.dumps(result, indent=2)}")
+    except Exception as e:
+        return AgentThinkAction(thought=f"[GET_ENTITY_CONTENTS] Error: {e}")

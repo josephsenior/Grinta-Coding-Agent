@@ -33,6 +33,7 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.observation_service = MagicMock()
         self.mock_controller.observation_service.handle_observation = AsyncMock()
         self.mock_controller.state = MagicMock()
+        self.mock_controller.state.start_id = 0
         self.mock_controller.event_stream = MagicMock()
         self.mock_controller.get_agent_state = MagicMock(
             return_value=AgentState.RUNNING
@@ -191,9 +192,8 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         action.source = EventSource.USER
         action.id = 1
 
-        first_msg = MagicMock()
-        first_msg.id = 1
-        self.mock_controller._first_user_message.return_value = first_msg
+        # Implementation determines the first user message by scanning the event stream.
+        self.mock_controller.event_stream.search_events.return_value = [action]
 
         with patch(
             "backend.controller.services.event_router_service.RecallAction"
@@ -216,9 +216,12 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         action.source = EventSource.USER
         action.id = 2
 
-        first_msg = MagicMock()
-        first_msg.id = 1
-        self.mock_controller._first_user_message.return_value = first_msg
+        first_action = MessageAction(content="First message")
+        first_action.source = EventSource.USER
+        first_action.id = 1
+
+        # Implementation determines the first user message by scanning the event stream.
+        self.mock_controller.event_stream.search_events.return_value = [first_action, action]
 
         with patch(
             "backend.controller.services.event_router_service.RecallAction"

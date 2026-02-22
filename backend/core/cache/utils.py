@@ -14,7 +14,7 @@ def extract_redis_stats(
         "redis_total_commands": info.get("total_commands_processed", 0),
         "redis_keyspace_hits": info.get("keyspace_hits", 0),
         "redis_keyspace_misses": info.get("keyspace_misses", 0),
-        "global_config_cached": global_keys,
+        "global_config_cached": bool(global_keys),
         "cached_users": len(user_keys),
     }
 

@@ -42,9 +42,7 @@ def get_config():
     return config
 
 
-mcp_server = FastMCP(
-    "mcp", stateless_http=True, dependencies=None, mask_error_details=True
-)
+mcp_server = FastMCP("mcp", stateless_http=True, mask_error_details=True)
 
 # Optional OpenTelemetry setup for MCP instrumentation
 _OTEL_MCP_ENABLED = os.getenv(

@@ -134,7 +134,7 @@ def build_search_code_action(
             cmd = f"find {safe_path} -type f | head -n {max_results}"
         return CmdRunAction(command=cmd)
 
-    # Search mode — build rg command with grep fallback
+    # Search mode — build rg command with grep fallback, then wrap in structured XML
     safe_pattern = shlex.quote(pattern)
     safe_path = shlex.quote(path)
 
@@ -153,12 +153,22 @@ def build_search_code_action(
     rg_flags_str = " ".join(rg_flags)
     grep_flags_str = " ".join(f for f in grep_flags if f)
 
-    # Try rg first (respects .gitignore, much faster), fall back to grep
-    cmd = (
+    # Build the raw search command
+    raw_search = (
         f"if command -v rg >/dev/null 2>&1; then "
         f"rg {rg_flags_str} {safe_pattern} {safe_path}; "
         f"else "
         f"grep {grep_flags_str} {safe_pattern} {safe_path} | head -n {max_results}; "
         f"fi"
+    )
+
+    # Wrap output in structured XML so the LLM can parse results unambiguously.
+    # Format: <search_results pattern="..." path="...">\n...matches...\n</search_results>
+    safe_pattern_display = pattern.replace('"', '\\"')
+    safe_path_display = path.replace('"', '\\"')
+    cmd = (
+        f'echo "<search_results pattern=\"{safe_pattern_display}\" path=\"{safe_path_display}\">" && '
+        f'( {raw_search} ) && '
+        f'echo "</search_results>"'
     )
     return CmdRunAction(command=cmd)

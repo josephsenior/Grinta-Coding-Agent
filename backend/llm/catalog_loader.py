@@ -277,7 +277,7 @@ def _apply_thinking_mode(
     if mode == "disabled":
         call_kwargs["thinking"] = {"type": "disabled"}
         call_kwargs.pop("reasoning_effort", None)
-    elif mode.startswith("budget:"):
+    elif mode and mode.startswith("budget:"):
         tokens = int(mode.split(":")[1])
         if not is_stream:
             call_kwargs["thinking"] = {"budget_tokens": tokens}
@@ -286,7 +286,7 @@ def _apply_thinking_mode(
             if entry.strip_top_p:
                 call_kwargs.pop("top_p", None)
         call_kwargs.pop("reasoning_effort", None)
-    elif mode.startswith("enabled:"):
+    elif mode and mode.startswith("enabled:"):
         parts = mode.split(":")
         low_budget = int(parts[1]) if len(parts) > 1 else 1024
         high_budget = int(parts[2]) if len(parts) > 2 else 4096

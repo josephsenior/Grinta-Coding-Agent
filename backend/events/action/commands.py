@@ -33,6 +33,8 @@ class CmdRunAction(Action):
     cwd: str | None = None
     hidden: bool = False
     stdin: str | None = None
+    is_background: bool = False
+    grep_pattern: str | None = None
     action: ClassVar[str] = ActionType.RUN
     runnable: ClassVar[bool] = True
     confirmation_state: ActionConfirmationStatus = ActionConfirmationStatus.CONFIRMED

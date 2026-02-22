@@ -328,12 +328,14 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             model_lower = model.lower()
 
             # Check prefix matches first (most specific)
-            if provider := self._check_prefix_match(model, model_lower):
-                return provider
+            found = self._check_prefix_match(model, model_lower)
+            if found:
+                return found
 
             # Check keyword matches (moderately specific)
-            if provider := self._check_keyword_match(model_lower):
-                return provider
+            found = self._check_keyword_match(model_lower)
+            if found:
+                return found
 
             # Check fallback patterns (least specific)
             return self._check_fallback_patterns(model_lower)

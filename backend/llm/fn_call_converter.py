@@ -651,7 +651,7 @@ def _validate_required_parameters(
     found_params: set, required_params: set, fn_name: str
 ) -> None:
     """Validate that all required parameters are present."""
-    if missing_params := (required_params - found_params):
+    if missing_params := required_params - found_params:
         msg = f"Missing required parameters for function '{fn_name}': {missing_params}"
         raise FunctionCallValidationError(msg)
 
@@ -872,8 +872,10 @@ def _create_tool_call(
 def _trim_content_before_function(content: Any) -> Any:
     """Trim content before function call."""
     if isinstance(content, list):
-        assert content
-        assert content[-1]["type"] == "text"
+        if not content:
+            return content
+        if content[-1].get("type") != "text":
+            return content
         content[-1]["text"] = content[-1]["text"].split("<function=")[0].strip()
     elif isinstance(content, str):
         content = content.split("<function=")[0].strip()

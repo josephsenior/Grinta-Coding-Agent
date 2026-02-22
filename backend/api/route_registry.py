@@ -76,7 +76,7 @@ def _register_sampling_debug(app: FastAPI) -> None:
     from fastapi import Query
     from fastapi.responses import JSONResponse
 
-    @app.get("/api/monitoring/sampling_debug", tags=["v1", "monitoring"])
+    @app.get("/api/v1/monitoring/sampling_debug", tags=["v1", "monitoring"])
     async def sampling_debug(
         path: str | None = Query(
             default=None, description="Optional path to compute effective sample"

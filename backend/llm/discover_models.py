@@ -92,7 +92,7 @@ def aliases_command() -> None:
         return
 
     print(f"\n✓ {len(aliases)} aliases defined:\n")
-    max_alias_len = max(len(a) for a in aliases.keys())
+    max_alias_len = max(len(a) for a in aliases)
 
     for alias, target in aliases.items():
         print(f"  {alias:<{max_alias_len}} → {target}")

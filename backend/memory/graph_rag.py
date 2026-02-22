@@ -17,15 +17,12 @@ logger = logging.getLogger(__name__)
 
 # TreeSitter is optional; fall back gracefully if unavailable
 _TREESITTER_AVAILABLE = False
-try:
-    from backend.engines.orchestrator.tools.treesitter_editor import (
-        TreeSitterEditor,
-        TREE_SITTER_AVAILABLE,
-    )
+from backend.utils.treesitter_editor import (
+    TreeSitterEditor,
+    TREE_SITTER_AVAILABLE,
+)
 
-    _TREESITTER_AVAILABLE = TREE_SITTER_AVAILABLE
-except ImportError:
-    TREE_SITTER_AVAILABLE = False
+_TREESITTER_AVAILABLE = TREE_SITTER_AVAILABLE
 
 
 class GraphRAG:

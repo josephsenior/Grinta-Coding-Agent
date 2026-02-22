@@ -11,9 +11,9 @@ from dataclasses import dataclass
 
 from backend.core.logger import forge_logger as logger
 
+from backend.utils.treesitter_editor import EditResult, SymbolLocation, TreeSitterEditor
 from .atomic_refactor import AtomicRefactor, RefactorResult, RefactorTransaction
 from .smart_errors import SmartErrorHandler
-from .treesitter_editor import EditResult, SymbolLocation, TreeSitterEditor
 from .whitespace_handler import WhitespaceHandler
 
 

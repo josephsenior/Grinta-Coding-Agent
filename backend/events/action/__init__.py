@@ -9,6 +9,9 @@ from backend.events.action.agent import (
     AgentThinkAction,
     ChangeAgentStateAction,
     ClarificationRequestAction,
+    CondensationAction,
+    CondensationRequestAction,
+    DelegateTaskAction,
     EscalateToHumanAction,
     PlaybookFinishAction,
     ProposalAction,
@@ -16,6 +19,7 @@ from backend.events.action.agent import (
     TaskTrackingAction,
     UncertaintyAction,
 )
+from backend.events.action.browse import BrowseInteractiveAction
 from backend.events.action.commands import CmdRunAction
 from backend.events.action.empty import NullAction
 from backend.events.action.files import (
@@ -45,6 +49,10 @@ __all__ = [
     "ChangeAgentStateAction",
     "ClarificationRequestAction",
     "CmdRunAction",
+    "CondensationAction",
+    "CondensationRequestAction",
+    "BrowseInteractiveAction",
+    "DelegateTaskAction",
     "EscalateToHumanAction",
     "FileEditAction",
     "FileReadAction",

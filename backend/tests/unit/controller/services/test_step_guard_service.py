@@ -50,7 +50,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.set_agent_state_to.assert_called_once()
 
     async def test_ensure_can_step_stuck_detection_blocks(self):
-        """Test ensure_can_step returns False when stuck detection triggers."""
+        """Test ensure_can_step eventually blocks when stuck persists."""
         from backend.core.exceptions import AgentStuckInLoopError
 
         self.mock_controller.circuit_breaker_service = None
@@ -59,10 +59,19 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         mock_stuck_service.is_stuck.return_value = True
         self.mock_controller.stuck_service = mock_stuck_service
 
-        result = await self.service.ensure_can_step()
+        # First two stuck detections inject a replan directive and still allow stepping.
+        result1 = await self.service.ensure_can_step()
+        result2 = await self.service.ensure_can_step()
+        self.assertTrue(result1)
+        self.assertTrue(result2)
+        self.mock_controller._react_to_exception.assert_not_awaited()
 
-        self.assertFalse(result)
-        self.mock_controller._react_to_exception.assert_called_once()
+        # After replanning attempts are exhausted, stuck detection blocks stepping
+        # and triggers error recovery.
+        result3 = await self.service.ensure_can_step()
+        self.assertFalse(result3)
+        self.mock_controller._react_to_exception.assert_awaited_once()
+
         # Check exception type
         call_args = self.mock_controller._react_to_exception.call_args[0]
         self.assertIsInstance(call_args[0], AgentStuckInLoopError)
@@ -189,10 +198,16 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.stuck_service = mock_stuck_service
         self.mock_controller.circuit_breaker_service = mock_cb_service
 
-        result = await self.service._handle_stuck_detection(self.mock_controller)
-
-        self.assertFalse(result)
+        # First stuck detection injects a replan directive and still allows stepping.
+        result1 = await self.service._handle_stuck_detection(self.mock_controller)
+        self.assertTrue(result1)
         mock_cb_service.record_stuck_detection.assert_called_once()
+        self.mock_controller._react_to_exception.assert_not_awaited()
+
+        # Second stuck detection still replans.
+        result2 = await self.service._handle_stuck_detection(self.mock_controller)
+        self.assertTrue(result2)
+        self.assertEqual(mock_cb_service.record_stuck_detection.call_count, 2)
 
     async def test_handle_stuck_detection_stuck_calls_react_to_exception(self):
         """Test _handle_stuck_detection calls _react_to_exception with AgentStuckInLoopError."""
@@ -204,10 +219,17 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.stuck_service = mock_stuck_service
         self.mock_controller.circuit_breaker_service = None
 
-        result = await self.service._handle_stuck_detection(self.mock_controller)
+        # First two stuck detections inject replans and still allow stepping.
+        result1 = await self.service._handle_stuck_detection(self.mock_controller)
+        result2 = await self.service._handle_stuck_detection(self.mock_controller)
+        self.assertTrue(result1)
+        self.assertTrue(result2)
+        self.mock_controller._react_to_exception.assert_not_awaited()
 
-        self.assertFalse(result)
-        self.mock_controller._react_to_exception.assert_called_once()
+        # After replanning is exhausted, we fall back to error recovery and block.
+        result3 = await self.service._handle_stuck_detection(self.mock_controller)
+        self.assertFalse(result3)
+        self.mock_controller._react_to_exception.assert_awaited_once()
 
         # Verify exception type
         call_args = self.mock_controller._react_to_exception.call_args[0]
@@ -223,11 +245,16 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.stuck_service = mock_stuck_service
         self.mock_controller.circuit_breaker_service = None
 
-        result = await self.service._handle_stuck_detection(self.mock_controller)
+        # Should still attempt replanning before blocking.
+        result1 = await self.service._handle_stuck_detection(self.mock_controller)
+        result2 = await self.service._handle_stuck_detection(self.mock_controller)
+        self.assertTrue(result1)
+        self.assertTrue(result2)
+        self.mock_controller._react_to_exception.assert_not_awaited()
 
-        # Should still return False and call _react_to_exception
-        self.assertFalse(result)
-        self.mock_controller._react_to_exception.assert_called_once()
+        result3 = await self.service._handle_stuck_detection(self.mock_controller)
+        self.assertFalse(result3)
+        self.mock_controller._react_to_exception.assert_awaited_once()
 
     async def test_ensure_can_step_both_checks_fail(self):
         """Test ensure_can_step returns False when circuit breaker trips first."""

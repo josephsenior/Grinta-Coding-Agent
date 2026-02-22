@@ -30,6 +30,9 @@ class ToolTelemetry:
     _instance: ToolTelemetry | None = None
     _instance_lock = threading.Lock()
 
+    _shared_invocations: PromCounter | None = None
+    _shared_latency: PromHistogram | None = None
+
     def __init__(self) -> None:
         self._recent_events: list[dict[str, Any]] = []
         self._recent_lock = threading.Lock()
@@ -54,17 +57,50 @@ class ToolTelemetry:
             self._latency = None
             return
 
-        self._invocations = runtime_counter(
-            "forge_tool_invocations_total",
-            "Number of tool invocations processed by the agent controller",
-            labelnames=("tool", "outcome"),
-        )
-        self._latency = runtime_histogram(
-            "forge_tool_latency_seconds",
-            "Duration of tool invocations executed by the agent controller",
-            labelnames=("tool", "outcome"),
-            buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf")),
-        )
+        if type(self)._shared_invocations is not None and type(self)._shared_latency is not None:
+            self._invocations = type(self)._shared_invocations
+            self._latency = type(self)._shared_latency
+            return
+
+        registry = getattr(prometheus_client, "REGISTRY", None)
+        names_to_collectors = getattr(registry, "_names_to_collectors", {}) if registry is not None else {}
+        existing_invocations = names_to_collectors.get("forge_tool_invocations_total")
+        existing_latency = names_to_collectors.get("forge_tool_latency_seconds")
+        if existing_invocations is not None and existing_latency is not None:
+            type(self)._shared_invocations = existing_invocations
+            type(self)._shared_latency = existing_latency
+            self._invocations = existing_invocations
+            self._latency = existing_latency
+            return
+
+        try:
+            invocations = runtime_counter(
+                "forge_tool_invocations_total",
+                "Number of tool invocations processed by the agent controller",
+                labelnames=("tool", "outcome"),
+            )
+            latency = runtime_histogram(
+                "forge_tool_latency_seconds",
+                "Duration of tool invocations executed by the agent controller",
+                labelnames=("tool", "outcome"),
+                buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf")),
+            )
+        except ValueError:
+            # If metrics were already registered (e.g. tests resetting the singleton),
+            # prefer reusing the existing collectors instead of failing import-time.
+            existing_invocations = names_to_collectors.get("forge_tool_invocations_total")
+            existing_latency = names_to_collectors.get("forge_tool_latency_seconds")
+            if existing_invocations is None or existing_latency is None:
+                self._invocations = None
+                self._latency = None
+                return
+            invocations = existing_invocations
+            latency = existing_latency
+
+        type(self)._shared_invocations = invocations
+        type(self)._shared_latency = latency
+        self._invocations = invocations
+        self._latency = latency
 
     # ------------------------------------------------------------------ #
     # Lifecycle hooks invoked by middleware/pipeline

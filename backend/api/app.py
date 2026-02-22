@@ -382,25 +382,29 @@ if _otel_enabled:
         tracer = trace.get_tracer("forge.server")
 
         async def otel_wrapper(request: Request, call_next):
+            request_path = request.url.path
             route_path = getattr(
                 getattr(request.scope.get("route", None), "path", None),
                 "__str__",
                 lambda: None,
             )()
             if not route_path:
-                route_path = request.url.path
-            # Determine effective sample rate using helper (regex > simple > base)
-            effective_rate = get_effective_http_sample(route_path)
+                route_path = request_path
+
+            # Determine effective sample rate using helper (regex > simple > base).
+            # Use the concrete request path so overrides work even on 404s where
+            # the resolved route path may be a generic mount/template.
+            effective_rate = get_effective_http_sample(request_path)
             # Head sampling: skip span creation if random() > effective_rate
-            if random.random() > effective_rate:
+            if random.random() >= effective_rate:
                 return await call_next(request)
             with tracer.start_as_current_span(
-                name=f"HTTP {request.method} {route_path}",
+                name=f"HTTP {request.method} {request_path}",
                 kind=SpanKind.SERVER,
             ) as span:
                 span.set_attribute("http.method", request.method)
                 span.set_attribute("http.route", route_path)
-                span.set_attribute("http.target", request.url.path)
+                span.set_attribute("http.target", request_path)
                 span.set_attribute("http.url", str(request.url))
                 span.set_attribute(
                     "forge.request_id",

@@ -131,6 +131,8 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
 
         mcp_client = MCPClient()
         server_config = MCPRemoteServerConfig(
+            name="test-sse",
+            type="sse",
             url="http://localhost:8000/sse",
             api_key="test_key_123",
             transport="sse"
@@ -155,6 +157,8 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
 
         mcp_client = MCPClient()
         server_config = MCPRemoteServerConfig(
+            name="test-shttp",
+            type="shttp",
             url="http://localhost:8000/mcp",
             api_key="shttp_key_456",
             transport="shttp"
@@ -170,7 +174,7 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         MCPClient()
 
         with self.assertRaises(ValidationError):
-            MCPRemoteServerConfig(url="", transport="sse")
+            MCPRemoteServerConfig(name="bad", type="sse", url="", transport="sse")
 
     @patch("backend.mcp_integration.client.Client")
     @patch("backend.mcp_integration.client.SSETransport")
@@ -184,7 +188,12 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         mock_client_class.return_value = mock_client_instance
 
         mcp_client = MCPClient()
-        server_config = MCPRemoteServerConfig(url="http://localhost:8000/sse", transport="sse")
+        server_config = MCPRemoteServerConfig(
+            name="test-sse",
+            type="sse",
+            url="http://localhost:8000/sse",
+            transport="sse",
+        )
 
         await mcp_client.connect_http(server_config, conversation_id="conv_abc123")
 
@@ -207,7 +216,12 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         mock_client_class.return_value = mock_client_instance
 
         mcp_client = MCPClient()
-        server_config = MCPRemoteServerConfig(url="http://localhost:8000/sse", transport="sse")
+        server_config = MCPRemoteServerConfig(
+            name="test-sse",
+            type="sse",
+            url="http://localhost:8000/sse",
+            transport="sse",
+        )
 
         with self.assertRaises(McpError):
             await mcp_client.connect_http(server_config)
@@ -227,7 +241,12 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         mock_client_class.return_value = mock_client_instance
 
         mcp_client = MCPClient()
-        server_config = MCPRemoteServerConfig(url="http://localhost:8000/sse", transport="sse")
+        server_config = MCPRemoteServerConfig(
+            name="test-sse",
+            type="sse",
+            url="http://localhost:8000/sse",
+            transport="sse",
+        )
 
         with self.assertRaises(ConnectionError):
             await mcp_client.connect_http(server_config)
@@ -250,6 +269,7 @@ class TestMCPClientStdioConnection(unittest.IsolatedAsyncioTestCase):
         mcp_client = MCPClient()
         server_config = MCPStdioServerConfig(
             name="test-server",
+            type="stdio",
             command="python",
             args=["-m", "mcp_server"],
             env={"DEBUG": "1"},
@@ -274,6 +294,7 @@ class TestMCPClientStdioConnection(unittest.IsolatedAsyncioTestCase):
         mcp_client = MCPClient()
         server_config = MCPStdioServerConfig(
             name="bad-server",
+            type="stdio",
             command="nonexistent_mcp_server",
             args=[],
         )

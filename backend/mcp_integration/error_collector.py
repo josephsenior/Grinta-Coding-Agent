@@ -55,7 +55,7 @@ class MCPErrorCollector:
     def has_errors(self) -> bool:
         """Check if there are any collected errors."""
         with self._lock:
-            return self._errors
+            return bool(self._errors)
 
     def clear_errors(self) -> None:
         """Clear all collected errors."""

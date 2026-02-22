@@ -30,7 +30,7 @@ class TestAsyncSmartCacheMemory:
         assert result is False
 
     @pytest.mark.asyncio
-    @patch("backend.core.config.utils.load_FORGE_config")
+    @patch("backend.core.config.utils.load_forge_config")
     async def test_get_global_config_memory_miss(self, mock_load, cache):
         fake_config = MagicMock()
         mock_load.return_value = fake_config
@@ -39,7 +39,7 @@ class TestAsyncSmartCacheMemory:
         assert cache._global_config_cache is fake_config
 
     @pytest.mark.asyncio
-    @patch("backend.core.config.utils.load_FORGE_config")
+    @patch("backend.core.config.utils.load_forge_config")
     async def test_get_global_config_memory_hit(self, mock_load, cache):
         fake = MagicMock()
         cache._global_config_cache = fake
@@ -49,7 +49,7 @@ class TestAsyncSmartCacheMemory:
         mock_load.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("backend.core.config.utils.load_FORGE_config")
+    @patch("backend.core.config.utils.load_forge_config")
     async def test_get_global_config_memory_expired(self, mock_load, cache):
         new_config = MagicMock()
         mock_load.return_value = new_config
@@ -74,7 +74,7 @@ class TestAsyncSmartCacheMemory:
         store = AsyncMock()
         store.load.return_value = loaded
         with patch(
-            "backend.core.config.utils.load_FORGE_config", return_value=MagicMock()
+            "backend.core.config.utils.load_forge_config", return_value=MagicMock()
         ):
             with patch(
                 "backend.core.cache.async_smart_cache.merge_settings_with_cache",
@@ -191,7 +191,7 @@ class TestAsyncSmartCacheRedis:
 
         fake_config = MagicMock()
         with patch(
-            "backend.core.config.utils.load_FORGE_config", return_value=fake_config
+            "backend.core.config.utils.load_forge_config", return_value=fake_config
         ):
             with patch(
                 "backend.core.cache.async_smart_cache.serialize_model",

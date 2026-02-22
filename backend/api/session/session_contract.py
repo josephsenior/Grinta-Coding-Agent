@@ -71,9 +71,7 @@ def normalize_replay_cursor(
         start_id = max(0, since_id + 1)
 
     resolved_limit = default_limit if limit is None else int(limit)
-    if resolved_limit < 1:
-        resolved_limit = 1
-    if resolved_limit > max_limit:
-        resolved_limit = max_limit
+    resolved_limit = max(resolved_limit, 1)
+    resolved_limit = min(resolved_limit, max_limit)
 
     return ReplayCursor(since_id=since_id, start_id=start_id, limit=resolved_limit)

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 
 from backend.memory.graph_rag import GraphRAG
 from backend.memory.graph_store import EdgeType, GraphMemoryStore, NodeType
@@ -164,6 +166,56 @@ class TestIndexCodeFile:
         rag.index_code_file("a.py", "import b\n")
         rag.index_code_file("b.py", "import c\n")
         assert gs.graph.number_of_nodes() >= 3  # a.py, b, b.py, c
+
+    def test_extracts_classes_and_functions_with_line_numbers(self, tmp_path):
+        """Indexing a file extracts classes and functions with line numbers."""
+        # GraphRAG only indexes classes/functions when TreeSitter is available.
+        # In minimal test environments (like Windows CI) TreeSitter is optional,
+        # and GraphRAG intentionally falls back to the naive import parser.
+        import backend.memory.graph_rag as graph_rag_module
+
+        if not getattr(graph_rag_module, "_TREESITTER_AVAILABLE", False):
+            pytest.skip("TreeSitter not available; GraphRAG uses naive import parsing")
+
+        gs = GraphMemoryStore()
+        rag = GraphRAG(vector_store=MagicMock(), graph_store=gs)
+        code = '''
+class MyClass:
+    def my_method(self):
+        pass
+
+def my_function():
+    pass
+'''
+        file_path = tmp_path / "test.py"
+        file_path.write_text(code, encoding="utf-8")
+        
+        rag.index_code_file(str(file_path), code)
+        
+        # Check class node
+        class_node = gs.get_node("MyClass")
+        assert class_node is not None
+        assert class_node["type"] == "class"
+        assert class_node["file_path"] == str(file_path)
+        assert class_node["line_start"] == 2
+        assert class_node["line_end"] == 4
+        
+        # Check method node
+        method_node = gs.get_node("MyClass.my_method")
+        assert method_node is not None
+        assert method_node["type"] == "function"
+        assert method_node["file_path"] == str(file_path)
+        assert method_node["line_start"] == 3
+        assert method_node["line_end"] == 4
+        assert method_node["parent_id"] == "MyClass"
+        
+        # Check function node
+        func_node = gs.get_node("my_function")
+        assert func_node is not None
+        assert func_node["type"] == "function"
+        assert func_node["file_path"] == str(file_path)
+        assert func_node["line_start"] == 6
+        assert func_node["line_end"] == 7
 
 
 class TestFormatContext:

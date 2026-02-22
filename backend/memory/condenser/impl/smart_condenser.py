@@ -7,6 +7,8 @@ critical information during condensation, preventing loss of key insights.
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,7 +16,7 @@ if TYPE_CHECKING:
 
 from backend.core.logger import forge_logger as logger
 from backend.events.action import Action, MessageAction
-from backend.events.action.agent import CondensationAction
+from backend.events.action.agent import CondensationAction, TaskTrackingAction
 from backend.events.event import Event, EventSource
 from backend.events.observation import ErrorObservation, Observation
 from backend.memory.condenser.condenser import BaseLLMCondenser, Condensation
@@ -139,6 +141,19 @@ class SmartCondenser(BaseLLMCondenser):
         if first_user_msg:
             essential.add(first_user_msg.id)
 
+        # --- Task tracker anchors ------------------------------------------------
+        # TaskTrackingAction events represent explicit human/agent goals; losing them
+        # during condensation causes the agent to lose track of what it was doing.
+        # We keep ALL task-tracker events regardless of their age.
+        for event in events:
+            if isinstance(event, TaskTrackingAction):
+                essential.add(event.id)
+
+        # Also load the active plan and keep the most recent task-tracker event
+        # that corresponds to any in-progress task (belt-and-suspenders anchor).
+        self._anchor_active_plan_events(events, essential)
+        # -------------------------------------------------------------------------
+
         # Keep critical errors (recent ones)
         recent_events = events[-50:]
         for event in recent_events:
@@ -152,6 +167,71 @@ class SmartCondenser(BaseLLMCondenser):
                     essential.add(event.id)
 
         return essential
+
+    def _anchor_active_plan_events(self, events: list[Event], essential: set[int]) -> None:
+        """Load .forge/active_plan.json and mark the most recent TaskTrackingAction
+        event as essential. This creates a hard condensation anchor so the LLM
+        always wakes up after condensation knowing exactly which task it was on.
+
+        Args:
+            events: All events in the current view.
+            essential: The set to add essential event IDs into (mutated in place).
+        """
+        workspace_root = os.environ.get("FORGE_WORKSPACE_DIR", ".")
+        plan_path = Path(workspace_root) / ".forge" / "active_plan.json"
+        if not plan_path.exists():
+            return
+        try:
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return
+
+        # Find in-progress task IDs from the plan.
+        # The plan file schema has evolved; tolerate either:
+        #  - {"tasks": [...]} (preferred)
+        #  - [...]            (legacy / simplified)
+        in_progress_task_ids: set[str] = set()
+        if isinstance(plan, dict):
+            tasks = plan.get("tasks", [])
+        elif isinstance(plan, list):
+            tasks = plan
+        else:
+            return
+        for task in tasks:
+            if not isinstance(task, dict):
+                continue
+            if task.get("status") == "in_progress":
+                tid = task.get("id") or task.get("title") or ""
+                if tid:
+                    in_progress_task_ids.add(str(tid))
+
+        if not in_progress_task_ids:
+            # No in-progress tasks — anchor the last task-tracker event
+            for event in reversed(events):
+                if isinstance(event, TaskTrackingAction):
+                    essential.add(event.id)
+                    logger.debug(
+                        "SmartCondenser: anchored last TaskTrackingAction id=%s", event.id
+                    )
+                    break
+            return
+
+        # Anchor the most recent TaskTrackingAction that references an in-progress task
+        for event in reversed(events):
+            if isinstance(event, TaskTrackingAction):
+                content = getattr(event, "content", "") or ""
+                if any(tid in content for tid in in_progress_task_ids):
+                    essential.add(event.id)
+                    logger.debug(
+                        "SmartCondenser: anchored in-progress TaskTrackingAction id=%s", event.id
+                    )
+                    break
+        else:
+            # Fallback: anchor last TaskTrackingAction regardless
+            for event in reversed(events):
+                if isinstance(event, TaskTrackingAction):
+                    essential.add(event.id)
+                    break
 
     def _score_event_importance(
         self,
@@ -207,6 +287,10 @@ class SmartCondenser(BaseLLMCondenser):
             # User messages are important
             if isinstance(event, MessageAction) and event.source == EventSource.USER:
                 score = 0.9
+
+            # Task tracker updates are critical anchors — never drop them
+            elif isinstance(event, TaskTrackingAction):
+                score = 1.0
 
             # Errors are important
             elif isinstance(event, ErrorObservation):
@@ -319,7 +403,10 @@ Respond ONLY with a JSON array of scores in order:
 
         """
         try:
-            content = response.choices[0].message.content
+            choices = getattr(response, "choices", None)
+            if not choices or len(choices) == 0:
+                raise ValueError("LLM response has no choices")
+            content = choices[0].message.content
 
             # Extract JSON array from response
             # Handle both raw array and wrapped in markdown

@@ -82,8 +82,17 @@ class PromptManager:
             msg = "Prompt directory is not set"
             raise ValueError(msg)
         self.prompt_dir: str = prompt_dir
+        
+        # We always include a shared prompts directory as a fallback
+        shared_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "engines", "shared", "prompts"
+        )
+        search_paths = [prompt_dir]
+        if os.path.isdir(shared_dir):
+            search_paths.append(shared_dir)
+
         # nosec B701 - Template rendering for prompts (not HTML), autoescape enabled
-        self.env = Environment(loader=FileSystemLoader(prompt_dir), autoescape=True)
+        self.env = Environment(loader=FileSystemLoader(search_paths), autoescape=True)
         self.system_template: Template = self._load_template(system_prompt_filename)
         self.user_template: Template = self._load_template("user_prompt.j2")
         self.additional_info_template: Template = self._load_template(

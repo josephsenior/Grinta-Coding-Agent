@@ -44,7 +44,7 @@ class ActionExecutionService:
     async def get_next_action(self) -> Action | None:
         """Get the next action from the agent, with automatic repair for validation errors."""
         max_repair_attempts = 3
-        
+
         error_logged = False
         for attempt in range(max_repair_attempts + 1):
             try:
@@ -57,7 +57,7 @@ class ActionExecutionService:
                 action = self._context.agent.step(self._context.state)
                 action.source = EventSource.AGENT
                 return action
-                
+
             except (
                 LLMMalformedActionError,
                 LLMNoActionError,
@@ -69,26 +69,26 @@ class ActionExecutionService:
                 error_msg = str(exc)
                 if isinstance(exc, FunctionCallValidationError):
                     error_msg = f"Tool validation failed: {exc}\nPlease correct the tool arguments and try again."
-                elif isinstance(exc, FunctionCallNotExistsError):
-                     error_msg = f"Tool not found: {exc}\nPlease use an existing tool from the provided list."
+                if isinstance(exc, FunctionCallNotExistsError):
+                    error_msg = f"Tool not found: {exc}\nPlease use an existing tool from the provided list."
 
                 obs = ErrorObservation(content=error_msg)
                 if not error_logged:
                     # Add to event stream so it's recorded in history
                     self._context.event_stream.add_event(obs, EventSource.AGENT)
                     error_logged = True
-                
+
                 # If we have retries left, continue loop to let agent see error and try again
                 if attempt < max_repair_attempts:
-                    # We need to ensure the state is updated with this new observation 
-                    # before the next step. The state tracker updates via event subscription, 
+                    # We need to ensure the state is updated with this new observation
+                    # before the next step. The state tracker updates via event subscription,
                     # but we can also manually ensure it's in the current view if needed.
-                    # Typically, event_stream.add_event triggers the subscribers. 
+                    # Typically, event_stream.add_event triggers the subscribers.
                     # We yield control briefly to allow state update to propagate if async.
                     import asyncio
-                    await asyncio.sleep(0.01) 
+                    await asyncio.sleep(0.01)
                     continue
-                
+
                 # If out of retries, return None (will stop the agent or trigger handle_step_exception)
                 return None
                 

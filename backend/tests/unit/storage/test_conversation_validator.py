@@ -53,7 +53,7 @@ class TestConversationValidatorInit:
         mock_config = MagicMock()
         mock_config.security.validation_mode = "strict"
         with patch(
-            "backend.storage.conversation.conversation_validator.load_FORGE_config",
+            "backend.storage.conversation.conversation_validator.load_forge_config",
             return_value=mock_config,
         ):
             v = ConversationValidator()
@@ -62,7 +62,7 @@ class TestConversationValidatorInit:
     def test_fallback_default_permissive(self, monkeypatch):
         monkeypatch.delenv("FORGE_VALIDATION_MODE", raising=False)
         with patch(
-            "backend.storage.conversation.conversation_validator.load_FORGE_config",
+            "backend.storage.conversation.conversation_validator.load_forge_config",
             side_effect=RuntimeError("no config"),
         ):
             v = ConversationValidator()
@@ -150,7 +150,7 @@ class TestValidateStrictInternal:
 
         with (
             patch(
-                "backend.storage.conversation.conversation_validator.load_FORGE_config",
+                "backend.storage.conversation.conversation_validator.load_forge_config",
                 return_value=mock_config,
             ),
             patch(
@@ -180,7 +180,7 @@ class TestValidateStrictInternal:
 
         with (
             patch(
-                "backend.storage.conversation.conversation_validator.load_FORGE_config",
+                "backend.storage.conversation.conversation_validator.load_forge_config",
                 return_value=mock_config,
             ),
             patch(

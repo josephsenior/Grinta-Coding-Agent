@@ -308,3 +308,31 @@ class TestRetryAsyncDecorator:
             assert await async_fail_once() == "ok"
             assert call_count == 2
             mock_sleep.assert_called_once_with(0.01)
+
+    def test_direct_call_as_wrapper(self):
+        """Test calling retry with func argument (not as decorator)."""
+        def work():
+            return "done"
+        
+        # Line 260: return decorator(func)
+        result = retry(work, max_attempts=3)
+        assert result() == "done"
+
+    def test_sync_non_retryable_log_coverage(self):
+        """Cover except Exception in sync_wrapper."""
+        @retry(allowed_exceptions=(ValueError,))
+        def raises_type_error():
+            raise TypeError("not retryable")
+
+        with pytest.raises(TypeError):
+            raises_type_error()
+
+    @pytest.mark.asyncio
+    async def test_async_non_retryable_log_coverage(self):
+        """Cover except Exception in async_wrapper."""
+        @retry(allowed_exceptions=(ValueError,))
+        async def raises_type_error():
+            raise TypeError("not retryable")
+
+        with pytest.raises(TypeError):
+            await raises_type_error()

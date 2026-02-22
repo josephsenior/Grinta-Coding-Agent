@@ -53,7 +53,10 @@ class LLMSummarizingCondenser(BaseLLMCondenser):
             messages=self.llm.format_messages_for_llm(messages),
             extra_body={"metadata": self.llm_metadata},
         )
-        summary = response.choices[0].message.content
+        choices = getattr(response, "choices", None)
+        if not choices or len(choices) == 0:
+            raise ValueError("LLM summarizing condenser received response with no choices")
+        summary = choices[0].message.content
 
         self._add_response_metadata(response)
         return self._create_condensation_result(forgotten_events, summary)

@@ -289,7 +289,8 @@ class State:
         except Exception as e:
             logger.error("Failed to save state to session: %s", e)
             raise
-        self.conversation_stats = conversation_stats
+        finally:
+            self.conversation_stats = conversation_stats
 
     @staticmethod
     def _checkpoint_dir(sid: str, user_id: str | None) -> str:

@@ -71,6 +71,39 @@ def _validate_and_get_username(
     return username
 
 
+def _validate_env_part(part: object) -> bool:
+    """Validate a single environment/CLI token to reduce injection risk.
+
+    The goal is to reject shell metacharacters and other suspicious
+    characters. This is intentionally conservative.
+    """
+    if not isinstance(part, str):
+        return False
+    if not part:
+        return False
+
+    dangerous_chars = [
+        ";",
+        "&",
+        "|",
+        "`",
+        "$",
+        "(",
+        ")",
+        "<",
+        ">",
+        '"',
+        "'",
+        "\\",
+        " ",
+        "\n",
+        "\t",
+    ]
+    if any(char in part for char in dangerous_chars):
+        return False
+    return True
+
+
 def get_action_execution_server_startup_command(
     server_port: int,
     plugins: list[PluginRequirement],

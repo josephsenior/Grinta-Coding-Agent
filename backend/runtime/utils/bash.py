@@ -850,3 +850,22 @@ class BashSession(BaseShellSession):
             del self._last_detected_server_url
             return server
         return None
+
+    def read_output(self) -> str:
+        """Read pending output from the shell session."""
+        try:
+            return self._get_pane_content()
+        except RuntimeError:
+            return ""
+
+    def write_input(self, data: str, is_control: bool = False) -> None:
+        """Write input to the shell session."""
+        pane = self._require_pane()
+        if is_control:
+            # For control sequences, send them directly (e.g. 'C-c')
+            logger.debug("SENDING CONTROL INPUT: %s", data)
+            pane.send_keys(data, enter=False)
+        else:
+            # For regular input, send as keys
+            logger.debug("SENDING INPUT: %s", data)
+            pane.send_keys(data, enter=True)

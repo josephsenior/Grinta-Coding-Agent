@@ -157,3 +157,15 @@ class SimpleBashSession(BaseShellSession):
         # Process cleanup is handled by cancellation service if registered,
         # but we also attempt a direct kill here for safety.
         return ("", f"Command timed out after {timeout} seconds", 124)
+
+    def read_output(self) -> str:
+        """Read pending output from the shell session."""
+        # Not supported as there is no persistent output buffer in simple bash
+        return ""
+
+    def write_input(self, data: str, is_control: bool = False) -> None:
+        """Write input to the shell session."""
+        # Not supported as commands are executed via subprocess
+        logger.warning(
+            "Terminal input not supported in SimpleBashSession (no tmux)"
+        )

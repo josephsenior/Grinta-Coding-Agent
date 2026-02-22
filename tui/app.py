@@ -41,10 +41,14 @@ class ForgeApp(App[None]):
 
     def __init__(self, client: ForgeClient | None = None) -> None:
         super().__init__()
+        self._client_provided = client is not None
         self.client = client or ForgeClient()
 
     async def on_mount(self) -> None:
         """Push the home screen on startup, or welcome if first run."""
+        if self._client_provided:
+            self._start_main_flow()
+            return
         config_path = Path.cwd() / "config.toml"
         if not config_path.exists():
             self.push_screen(WelcomeScreen(), self._on_welcome_finished)

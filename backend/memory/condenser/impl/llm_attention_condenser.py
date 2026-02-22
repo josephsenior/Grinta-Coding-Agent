@@ -106,8 +106,11 @@ class LLMAttentionCondenser(BaseLLMCondenser):
         )
 
         self.add_metadata("metrics", self.llm.metrics.get())
+        choices = getattr(response, "choices", None)
+        if not choices or len(choices) == 0:
+            raise ValueError("LLM attention condenser received response with no choices")
         return ImportantEventSelection.model_validate_json(
-            response.choices[0].message.content
+            choices[0].message.content
         ).ids
 
     def _filter_head_events(

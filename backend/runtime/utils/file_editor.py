@@ -67,6 +67,8 @@ class FileEditor:
         old_str: str | Sentinel | None = MISSING,
         new_str: str | Sentinel | None = MISSING,
         insert_line: int | None = None,
+        start_line: int | None = None,
+        end_line: int | None = None,
         enable_linting: bool = False,
         dry_run: bool = False,
         **_: Any,
@@ -81,6 +83,8 @@ class FileEditor:
             old_str: Optional string to replace (for edit operations, use MISSING if not provided)
             new_str: Optional replacement string (for edit operations, use MISSING if not provided)
             insert_line: Optional line number to insert at (1-indexed)
+            start_line: Optional start line number for range edit (1-indexed)
+            end_line: Optional end line number for range edit (1-indexed)
             enable_linting: Whether to enable linting (currently not implemented)
             dry_run: If True, compute preview result without writing changes
             **_: Additional keyword arguments (ignored)
@@ -107,6 +111,8 @@ class FileEditor:
                     old_str,
                     new_str,
                     insert_line,
+                    start_line,
+                    end_line,
                     dry_run=dry_run,
                 )
             if command in ("write", "create"):
@@ -258,6 +264,8 @@ class FileEditor:
         old_str: str | Sentinel | None,
         new_str: str | Sentinel | None,
         insert_line: int | None,
+        start_line: int | None,
+        end_line: int | None,
         *,
         dry_run: bool = False,
     ) -> ToolResult:
@@ -274,7 +282,13 @@ class FileEditor:
 
             # Apply edit logic
             new_content = self._apply_edit_logic(
-                old_content_str, file_text_val, old_str_val, new_str_val, insert_line
+                old_content_str,
+                file_text_val,
+                old_str_val,
+                new_str_val,
+                insert_line,
+                start_line,
+                end_line,
             )
             if isinstance(new_content, ToolResult):
                 new_content.old_content = old_content
@@ -325,8 +339,14 @@ class FileEditor:
         old_str_val: str | None,
         new_str_val: str | None,
         insert_line: int | None,
+        start_line: int | None,
+        end_line: int | None,
     ) -> str | ToolResult:
         """Determine new content based on provided parameters."""
+        if start_line is not None and end_line is not None:
+             content_to_insert = new_str_val or file_text_val or ""
+             return self._replace_range(old_content_str, content_to_insert, start_line, end_line)
+
         if insert_line is not None:
             content_to_insert = new_str_val or file_text_val or ""
             return self._insert_at_line(old_content_str, content_to_insert, insert_line)
@@ -508,6 +528,54 @@ class FileEditor:
         result_lines = lines[:line_idx] + new_lines + lines[line_idx:]
         return "".join(result_lines)
 
+    def _replace_range(self, content: str, new_text: str, start_line: int, end_line: int) -> str | ToolResult:
+        """Replace a range of lines with new text."""
+        lines = content.splitlines(keepends=True)
+        # Handle empty file case
+        if not lines:
+            if start_line == 1:
+                return new_text
+            # If requesting to edit range in empty file but not starting at 1, that's ambiguous or error
+            return ToolResult(
+                output="",
+                error=f"Cannot edit range {start_line}-{end_line} in an empty file.",
+                new_content=content
+            )
+            
+        if start_line < 1:
+             return ToolResult(
+                output="",
+                error=f"Start line must be >= 1 (got {start_line})",
+                new_content=content
+            )
+
+        # 1-based to 0-based conversion
+        start_idx = start_line - 1
+        # end_line is inclusive, but slice end is exclusive
+        end_idx = end_line 
+        
+        # Validation
+        if start_idx >= len(lines):
+             return ToolResult(
+                output="",
+                error=f"Start line {start_line} is beyond file length ({len(lines)} lines)",
+                new_content=content
+            )
+
+        # Allow end_line to exceed file length (truncate/replace until end)
+        end_idx = min(end_idx, len(lines))
+        
+        # Prepare replacement
+        new_lines_to_insert = new_text.splitlines(keepends=True)
+        # If input text doesn't end with newline but we are inserting blocks, usually we want consistency
+        # But 'lines' have keepends=True.
+        # If new_text is "foo" and we replace a line "bar\n", we get "foo". 
+        # If there are subsequent lines, they will be attached: "foobaz\n" if next line is "baz\n".
+        # This is expected behavior for raw string replacement.
+        
+        result_lines = lines[:start_idx] + new_lines_to_insert + lines[end_idx:]
+        return "".join(result_lines)
+    
     def _backup_file(self, file_path: Path, content: str | None) -> None:
         """Backup file content for transaction rollback.
 

@@ -255,4 +255,4 @@ def test_performance_overhead():
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s", "-m", "not playwright"])
+    pytest.main([__file__, "-v", "-s"])

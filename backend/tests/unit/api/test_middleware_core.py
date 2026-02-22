@@ -247,12 +247,11 @@ class TestInMemoryRateLimiter(unittest.IsolatedAsyncioTestCase):
         await limiter(mock_request)
         await limiter(mock_request)
 
-        start = datetime.now()
-        result = await limiter(mock_request)
-        elapsed = (datetime.now() - start).total_seconds()
+        with patch("backend.api.middleware_core.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            result = await limiter(mock_request)
 
         self.assertTrue(result)
-        self.assertGreaterEqual(elapsed, 0.1)
+        mock_sleep.assert_awaited_once_with(0.1)
 
     async def test_rejects_when_over_double_limit(self) -> None:
         """Test requests over 2x limit are rejected."""

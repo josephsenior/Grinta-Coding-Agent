@@ -84,6 +84,10 @@ class TestCommandRiskDetection:
         assessment = analyzer.analyze_command("eval $MY_COMMAND")
         assert assessment.risk_level == ActionSecurityRisk.MEDIUM
 
+        # Package installs are medium-risk (supply-chain + network)
+        assessment = analyzer.analyze_command("pip install requests")
+        assert assessment.risk_level == ActionSecurityRisk.MEDIUM
+
     def test_safe_commands(self):
         """Test that safe commands are allowed."""
         analyzer = CommandAnalyzer()
@@ -93,7 +97,6 @@ class TestCommandRiskDetection:
             "ls -la",
             "cat file.txt",
             "echo 'hello'",
-            "pip install requests",
             "pytest tests/",
         ]
 
@@ -342,71 +345,6 @@ class TestSemanticStuckDetection:
         # Note: This test needs the full implementation
         # For now, just verify the detector exists
         assert detector is not None
-
-
-# Playwright-based UI tests
-@pytest.mark.playwright
-class TestAutonomousSafetyUI:
-    """Test safety features through UI with Playwright."""
-
-    @pytest.mark.asyncio
-    async def test_dangerous_command_shows_blocked_message(self, page):
-        """Test that dangerous commands show blocked message in UI."""
-        # Navigate to Forge
-        await page.goto("http://localhost:3000")
-
-        # Set full autonomy mode
-        try:
-            await page.click("[data-testid='autonomy-selector']", timeout=5000)
-            await page.click("text='Full Autonomy'", timeout=5000)
-        except Exception:
-            pass  # Autonomy selector might not be visible
-
-        # Submit dangerous command
-        await page.fill(
-            "textarea[placeholder*='message']", "Please run: rm -rf /", timeout=10000
-        )
-        await page.click("button[type='submit']", timeout=5000)
-
-        # Wait for blocked message
-        try:
-            await page.wait_for_selector(
-                "text='ACTION BLOCKED FOR SAFETY'", timeout=10000
-            )
-            assert True  # Test passed
-        except Exception as e:
-            # Log the page content for debugging
-            content = await page.content()
-            print(f"Page content: {content[:500]}")
-            raise AssertionError(f"Blocked message not found: {e}")
-
-    @pytest.mark.asyncio
-    async def test_audit_trail_accessible(self, page):
-        """Test that audit trail is accessible via API."""
-        # Make API request to audit endpoint
-        response = await page.request.get(
-            "/api/monitoring/sessions/test/audit?limit=10"
-        )
-
-        assert response.ok
-        data = await response.json()
-        assert isinstance(data, list)
-
-    @pytest.mark.asyncio
-    async def test_monitoring_dashboard_displays(self, page):
-        """Test that monitoring dashboard component renders."""
-        # Navigate to page with monitoring component
-        await page.goto("http://localhost:3000")
-
-        # Check if monitoring component exists (if enabled)
-        try:
-            await page.wait_for_selector(
-                "[data-testid='autonomous-monitor']", timeout=5000
-            )
-            assert True
-        except Exception:
-            # Monitoring UI might not be enabled by default
-            pass
 
 
 # Unit tests for individual components

@@ -103,6 +103,13 @@ class RollbackManager:
         # Load existing checkpoints
         self.checkpoints: list[Checkpoint] = self._load_checkpoints()
 
+        # Track the latest checkpoint timestamp to avoid ties on platforms where
+        # time.time() resolution is coarse.
+        self._last_checkpoint_ts: float = max(
+            (cp.timestamp for cp in self.checkpoints),
+            default=0.0,
+        )
+
         # Check if git is available
         self.vcs_available = self._check_git_available()
 
@@ -261,6 +268,11 @@ class RollbackManager:
 
         """
         checkpoint_id = self._generate_checkpoint_id()
+        # Use a monotonic-increasing wall-clock timestamp to make ordering stable.
+        checkpoint_ts = time.time()
+        if checkpoint_ts <= self._last_checkpoint_ts:
+            checkpoint_ts = self._last_checkpoint_ts + 1e-6
+        self._last_checkpoint_ts = checkpoint_ts
 
         logger.info("Creating checkpoint: %s (ID: %s)", description, checkpoint_id)
 
@@ -275,7 +287,7 @@ class RollbackManager:
         # Create checkpoint object
         checkpoint = Checkpoint(
             id=checkpoint_id,
-            timestamp=time.time(),
+            timestamp=checkpoint_ts,
             description=description,
             checkpoint_type=checkpoint_type,
             workspace_path=str(self.workspace_path),

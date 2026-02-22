@@ -35,6 +35,8 @@ def execute_file_editor(
     old_str: str | None = None,
     new_str: str | None = None,
     insert_line: int | str | None = None,
+    start_line: int | None = None,
+    end_line: int | None = None,
     enable_linting: bool = False,
     dry_run: bool = False,
 ) -> tuple[str, tuple[str | None, str | None]]:
@@ -53,6 +55,8 @@ def execute_file_editor(
         old_str,
         new_str,
         insert_line,
+        start_line,
+        end_line,
         enable_linting,
         dry_run,
     )
@@ -88,6 +92,8 @@ def _invoke_editor(
     old_str: str | None,
     new_str: str | None,
     insert_line: int | None,
+    start_line: int | None,
+    end_line: int | None,
     enable_linting: bool,
     dry_run: bool,
 ) -> Any:
@@ -104,6 +110,8 @@ def _invoke_editor(
             old_str=old_str if old_str is not None else MISSING,
             new_str=new_str if new_str is not None else MISSING,
             insert_line=insert_line,
+            start_line=start_line,
+            end_line=end_line,
             enable_linting=enable_linting,
             dry_run=dry_run,
         )

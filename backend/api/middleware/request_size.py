@@ -12,6 +12,9 @@ from fastapi import Request, Response
 
 from backend.core.logger import access_logger
 
+# Back-compat alias used by tests and older code paths.
+ACCESS_logger = access_logger
+
 
 class RequestSizeLoggingMiddleware:
     """ASGI middleware that logs request/response sizes via ACCESS logger.
@@ -105,7 +108,7 @@ class RequestSizeLoggingMiddleware:
         request_id: str | None,
         streaming: bool = False,
     ) -> None:
-        access_logger.info(
+        ACCESS_logger.info(
             "Request sizes",
             extra={
                 "request_id": request_id,

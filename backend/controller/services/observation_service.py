@@ -86,6 +86,11 @@ class ObservationService:
         self._pending_service.set(None)
         await self._run_post_action_verification(pending_action, observation)
 
+        # Inform the hallucination detector that this file operation actually happened.
+        # This feeds the state-based verification layer so it can distinguish real
+        # file edits from hallucinated ones in subsequent turns.
+        self._track_file_op_in_hallucination_detector(pending_action, observation)
+
         # Delegate confirmation state transitions to confirmation service
         confirmation_service = getattr(controller, "confirmation_service", None)
         if confirmation_service:
@@ -145,6 +150,31 @@ class ObservationService:
             ),
             EventSource.ENVIRONMENT,
         )
+
+    def _track_file_op_in_hallucination_detector(self, action, observation: Observation) -> None:
+        """Notify the hallucination detector that a real file operation was executed."""
+        from backend.events.observation import ErrorObservation
+
+        # Only track successful operations
+        if isinstance(observation, ErrorObservation):
+            return
+
+        path = getattr(action, "path", None)
+        if not path:
+            return
+
+        try:
+            from backend.events.action import FileEditAction, FileWriteAction
+
+            if isinstance(action, (FileEditAction, FileWriteAction)):
+                controller = self._context.get_controller()
+                agent = getattr(controller, "agent", None)
+                detector = getattr(agent, "hallucination_detector", None)
+                if detector is not None:
+                    op = "edit" if isinstance(action, FileEditAction) else "write"
+                    detector.track_file_operation(path, op)
+        except Exception:
+            pass  # Non-fatal; never block the main flow
 
     def _get_action_verifier(self):
         """Lazily construct ActionVerifier if runtime supports it."""

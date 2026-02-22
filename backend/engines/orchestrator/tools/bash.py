@@ -88,6 +88,18 @@ def create_cmd_run_tool(use_short_description: bool = False):
                     "If True, the command is an input to the running process. If False, the command is a bash command to be executed in the terminal. Default is False.",
                 ),
             ),
+            "is_background": {
+                "type": "boolean",
+                "description": refine_prompt(
+                    "If True, run the command in a background shell session. Returns immediately with a session ID. Use for long-running processes like servers or build watchers.",
+                ),
+            },
+            "grep_pattern": {
+                "type": "string",
+                "description": refine_prompt(
+                    "Optional regex pattern to filter the command output. Only lines matching this pattern will be included in the response. Use this to reduce noise from large outputs.",
+                ),
+            },
             "timeout": get_timeout_param(
                 "Optional. Sets a hard timeout in seconds for the command execution. If not provided, the command will use the default soft timeout behavior.",
             ),

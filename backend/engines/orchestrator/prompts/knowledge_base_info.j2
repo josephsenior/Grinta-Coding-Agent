@@ -1,8 +1,0 @@
-{% for result in kb_results %}
-<KNOWLEDGE_BASE_INFO>
-The following information was found in your knowledge base (Document: {{ result.filename }}).
-Relevance score: {{ "%.2f"|format(result.relevance_score) }}
-
-{{ result.chunk_content }}
-</KNOWLEDGE_BASE_INFO>
-{% endfor %}

@@ -68,6 +68,8 @@ class ErrorRecoveryStrategy:
         r"connection.*reset",
         r"broken pipe",
         r"runtime.*not.*running",
+        r"container.*crash",
+        r"crashed unexpectedly",
     ]
 
     NETWORK_ERROR_PATTERNS = [
@@ -270,27 +272,93 @@ class ErrorRecoveryStrategy:
 
     @staticmethod
     def _recover_module_not_found(error_str: str) -> list[Action]:
-        """Recover from module not found error by installing the package."""
-        # Extract package name from error message
-        match = re.search(r"No module named ['\"]([^'\"]+)['\"]", error_str)
-        if match:
-            package = match.group(1)
-            # Try to get base package name (e.g., 'requests' from 'requests.auth')
-            base_package = package.split(".")[0]
+        """Recover from module not found error using the correct package manager.
 
+        Detects the runtime context from the error message and routes to the
+        appropriate package manager: pip (Python), npm (Node.js), cargo (Rust),
+        go get (Go), or gem (Ruby).
+        """
+        # --- Python: No module named 'X' ---
+        py_match = re.search(r"No module named ['\"]([^'\"]+)['\"]", error_str)
+        if py_match:
+            package = py_match.group(1)
+            base_package = package.split(".")[0]
             return [
                 AgentThinkAction(
-                    thought=f"Module '{package}' not found. Attempting to install package '{base_package}'...",
+                    thought=f"Python module '{package}' not found. Installing '{base_package}' via pip...",
                 ),
                 CmdRunAction(command=f"pip install {base_package}"),
                 MessageAction(
-                    content=f"Installed missing package '{base_package}'. Retrying the operation...",
+                    content=f"Installed missing Python package '{base_package}'. Retrying...",
                 ),
             ]
 
+        # --- Node.js: Cannot find module 'X' ---
+        node_match = re.search(r"Cannot find module ['\"]([^./'\"][^'\"]*)['\"]\s", error_str)
+        if node_match:
+            package = node_match.group(1)
+            parts = package.split("/")
+            npm_pkg = "/".join(parts[:2]) if parts[0].startswith("@") else parts[0]
+            return [
+                AgentThinkAction(
+                    thought=f"Node.js module '{package}' not found. Installing '{npm_pkg}' via npm...",
+                ),
+                CmdRunAction(command=f"npm install {npm_pkg}"),
+                MessageAction(
+                    content=f"Installed missing npm package '{npm_pkg}'. Retrying...",
+                ),
+            ]
+
+        # --- Rust / Cargo: unresolved import or could not find crate ---
+        if re.search(r"could not find crate|unresolved import|error\[E0432\]|error\[E0433\]", error_str, re.IGNORECASE):
+            return [
+                AgentThinkAction(
+                    thought="Rust crate dependency missing. Running cargo build to identify missing deps...",
+                ),
+                CmdRunAction(command="cargo build 2>&1 | head -20"),
+                MessageAction(
+                    content="Running cargo build to resolve missing crate. Add the dependency to Cargo.toml if prompted.",
+                ),
+            ]
+
+        # --- Go: cannot find package / module ---
+        go_match = re.search(r"cannot find (?:package|module) ['\"]([^'\"]+)['\"]", error_str)
+        if go_match:
+            package = go_match.group(1)
+            return [
+                AgentThinkAction(
+                    thought=f"Go package '{package}' not found. Running go get...",
+                ),
+                CmdRunAction(command=f"go get {package}"),
+                MessageAction(
+                    content=f"Running 'go get {package}' to install the missing dependency.",
+                ),
+            ]
+
+        # --- Ruby: cannot load such file -- X ---
+        ruby_match = re.search(r"cannot load such file\s*--\s*([^\s'\"]+)", error_str)
+        if ruby_match:
+            gem_name = ruby_match.group(1).split("/")[0]
+            return [
+                AgentThinkAction(
+                    thought=f"Ruby gem '{gem_name}' not found. Installing via gem install...",
+                ),
+                CmdRunAction(command=f"gem install {gem_name}"),
+                MessageAction(
+                    content=f"Installed missing Ruby gem '{gem_name}'. Retrying...",
+                ),
+            ]
+
+        # Generic fallback — detect the project type and suggest correct tool
         return [
             AgentThinkAction(
-                thought="Module not found error detected. Will retry after analyzing dependencies...",
+                thought="Module/package not found. Checking project manifests to determine package manager...",
+            ),
+            CmdRunAction(
+                command="ls package.json requirements.txt Cargo.toml go.mod Gemfile 2>/dev/null || echo 'No manifest files found'"
+            ),
+            MessageAction(
+                content="Missing dependency. Checking project manifest files to determine the correct package manager.",
             ),
         ]
 
@@ -417,7 +485,6 @@ class ErrorRecoveryStrategy:
 
         if "missing" in error_str.lower() and "required" in error_str.lower():
             # Extract parameter name if possible
-            import re
             param_match = re.search(r'"(\w+)"', error_str)
             if param_match:
                 hint_parts.append(f"Missing required parameter: {param_match.group(1)}")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
@@ -115,6 +115,29 @@ class TestSetMcpTools:
             agent.set_mcp_tools([{"function": {"name": "x"}}])
         assert not agent.tools
 
+    def test_log_tool_update_start_exception(self):
+        """Line 227-228 coverage for exception in tool name gathering."""
+        cls = _make_concrete_agent()
+        agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
+        
+        # We mock build_tool to return None so it doesn't crash on the non-dict
+        # but _log_tool_update_start will hit its try...except
+        with patch("backend.controller.agent.build_tool", return_value=None):
+            agent.set_mcp_tools([None])
+        assert len(agent.tools) == 0
+
+    def test_skips_duplicate_tool_explicit_coverage(self):
+        """Ensure line 205-207 is covered."""
+        cls = _make_concrete_agent()
+        agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
+        
+        tool = {"function": {"name": "tool", "parameters": {}}}
+        # We use a side_effect to return the same tool twice.
+        # The first time it registers, the second time it's a duplicate.
+        with patch("backend.controller.agent.build_tool", side_effect=[tool, tool]):
+            agent.set_mcp_tools([tool, tool])
+        assert len(agent.tools) == 1
+
 
 # ── get_system_message ───────────────────────────────────────────────
 
@@ -137,3 +160,22 @@ class TestGetSystemMessage:
         # _prompt_manager is None by default, get_system_message should warn and return None
         msg = agent.get_system_message()
         assert msg is None
+
+    def test_prompt_manager_falsy_property(self):
+        """Coverage for potential falsy prompt_manager property (99-103)."""
+        cls = _make_concrete_agent()
+        agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
+        with patch.object(cls, "prompt_manager", new_callable=PropertyMock) as pm:
+            pm.return_value = None
+            msg = agent.get_system_message()
+            assert msg is None
+
+    def test_get_system_message_on_exception(self):
+        """Coverage for lines 140-141 (exception case)."""
+        cls = _make_concrete_agent()
+        agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
+        with patch.object(cls, "prompt_manager", new_callable=PropertyMock) as pm:
+            # Raising Exception should go down to 140-141
+            pm.side_effect = Exception("PM fail")
+            msg = agent.get_system_message()
+            assert msg is None

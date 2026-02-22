@@ -160,7 +160,7 @@ class TestObservationType:
         assert ObservationType.MCP.value == "mcp"
 
     def test_count(self):
-        assert len(ObservationType) == 21
+        assert len(ObservationType) == 23
 
 
 class TestExitReason:

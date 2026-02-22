@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import functools
 import os
+import tomllib  # Python 3.11+
 from pathlib import Path
 from typing import Any
 
 from backend.core.logger import forge_logger as logger
-
-import tomllib  # Python 3.11+
 
 
 class ModelAliasManager:

@@ -68,6 +68,10 @@ from backend.engines.orchestrator.tools.error_patterns import (
     build_error_patterns_action,
     ERROR_PATTERNS_TOOL_NAME,
 )
+from backend.engines.orchestrator.tools.explore_code import (
+    build_explore_tree_structure_action,
+    build_get_entity_contents_action,
+)
 from backend.engines.orchestrator.tools.checkpoint import (
     build_checkpoint_action,
     CHECKPOINT_TOOL_NAME,
@@ -188,7 +192,15 @@ def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
     is_input = raw_is_input is True or (
         isinstance(raw_is_input, str) and raw_is_input.lower() == "true"
     )
-    action = CmdRunAction(command=arguments["command"], is_input=is_input)
+    is_background = arguments.get("is_background", False)
+    grep_pattern = arguments.get("grep_pattern")
+
+    action = CmdRunAction(
+        command=arguments["command"],
+        is_input=is_input,
+        is_background=is_background,
+        grep_pattern=grep_pattern,
+    )
     if "timeout" in arguments:
         try:
             action.set_hard_timeout(float(arguments["timeout"]))
@@ -516,8 +528,14 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
     search_content = content
     if view_range and len(view_range) >= 2:
         lines = content.splitlines(keepends=True)
-        start_idx = max(0, view_range[0] - 1)
-        end_idx = len(lines) if view_range[1] == -1 else min(len(lines), view_range[1])
+        start_val = view_range[0] if view_range[0] is not None else 1
+        end_val = view_range[1]
+        try:
+            start_idx = max(0, int(start_val) - 1)
+            end_idx = len(lines) if end_val in (-1, None) else min(len(lines), int(end_val))
+        except (TypeError, ValueError):
+            start_idx = 0
+            end_idx = len(lines)
         search_content = "".join(lines[start_idx:end_idx])
 
     if old_str not in search_content:
@@ -536,6 +554,9 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
                     + (
                         f" (within lines {view_range[0]}-{view_range[1]})"
                         if view_range
+                        and len(view_range) >= 2
+                        and view_range[0] is not None
+                        and view_range[1] is not None
                         else ""
                     )
                     + ". Use view command to check the actual content."
@@ -752,8 +773,8 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
     try:
         for i, task in enumerate(raw_task_list):
             normalized_task_list.append(normalize_step(task, i + 1))
-    except FunctionCallValidationError as e:
-        raise e
+    except FunctionCallValidationError:
+        raise
     except Exception as e:
         logger.warning("Error normalizing task list: %s", e)
         raise FunctionCallValidationError(f"Invalid task list structure: {e}") from e
@@ -1123,6 +1144,8 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         TERMINAL_OPEN_TOOL_NAME: build_terminal_open_action,
         TERMINAL_INPUT_TOOL_NAME: build_terminal_input_action,
         TERMINAL_READ_TOOL_NAME: build_terminal_read_action,
+        "explore_tree_structure": build_explore_tree_structure_action,
+        "get_entity_contents": build_get_entity_contents_action,
         # Meta-cognition tools
         UNCERTAINTY_TOOL_NAME: _handle_uncertainty_tool,
         CLARIFICATION_TOOL_NAME: _handle_clarification_tool,

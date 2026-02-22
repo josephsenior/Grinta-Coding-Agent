@@ -3,6 +3,11 @@
 This module implements industry-standard techniques used by Devin, Cursor, and other
 leading AI coding tools to detect when an agent claims to perform an action without
 actually executing the corresponding tool.
+
+Two detection strategies:
+1. Text pattern matching — detect claims like "I created file.py" in LLM text
+2. State-based verification — compare CLAIMED file operations against TRACKED actual operations
+   (more reliable; not fooled by creative phrasing or conversational use of past tense)
 """
 
 from __future__ import annotations
@@ -20,13 +25,11 @@ if TYPE_CHECKING:
 class HallucinationDetector:
     """Detects when agent claims actions without executing tools.
 
-    Industry leaders like Devin and Cursor use similar systems to ensure
-    reliability and prevent user frustration from hallucinated actions.
-
-    Detection strategies:
-    1. Text pattern matching - detect claims like "I created file.py"
-    2. Tool execution tracking - verify tools were actually called
-    3. State reconciliation - compare claimed vs actual file system state
+    Two independent detection layers:
+    1. Text pattern matching — catches obvious phrasing like "I created file.py"
+    2. State-based verification — tracks ACTUAL file operations via track_file_operation()
+       and flags claims against paths not yet touched. This layer is immune to creative
+       phrasing and correctly handles conversational past tense.
     """
 
     # Patterns that indicate file creation claims
@@ -56,6 +59,69 @@ class HallucinationDetector:
         """Initialize the hallucination detector."""
         self.detection_enabled = True
         self.false_positive_threshold = 0.7  # Confidence threshold to trigger alert
+
+        # State-based tracking: paths actually touched by tool calls this session.
+        # Populated by track_file_operation(); used in state-based verification.
+        self._actually_written_paths: set[str] = set()
+        self._actually_executed_commands: int = 0
+
+    # ------------------------------------------------------------------ #
+    # State tracking API — called by the safety pipeline after tool execution
+    # ------------------------------------------------------------------ #
+
+    def track_file_operation(self, path: str, operation: str = "write") -> None:
+        """Record that a file operation was actually executed via a tool call.
+
+        Args:
+            path: The file path that was written/created/edited.
+            operation: One of 'write', 'create', 'edit'.
+        """
+        if path:
+            self._actually_written_paths.add(path)
+            logger.debug("HallucinationDetector: tracked file op '%s' on %s", operation, path)
+
+    def track_bash_execution(self) -> None:
+        """Record that a bash command was actually executed."""
+        self._actually_executed_commands += 1
+
+    def _check_state_consistency(
+        self, claimed_paths: list[str], claimed_exec: bool
+    ) -> list[dict]:
+        """Compare claimed operations against state-tracked actual operations.
+
+        Args:
+            claimed_paths: File paths extracted from LLM text claims.
+            claimed_exec: Whether the LLM claimed to run code.
+
+        Returns:
+            List of state-inconsistency findings.
+        """
+        findings = []
+
+        for path in claimed_paths:
+            # Normalize path: strip leading/trailing whitespace and quotes
+            clean = path.strip().strip("\"'")
+            if not clean:
+                continue
+            # A basename match is sufficient (agent may use short names in prose)
+            basename = clean.split("/")[-1].split("\\")[-1]
+            actually_touched = any(
+                clean in p or basename in p
+                for p in self._actually_written_paths
+            )
+            if not actually_touched and self._actually_written_paths is not None:
+                # Only flag if we have SOME tracked operations this session
+                # (avoids false positives at session start before any tools run)
+                if len(self._actually_written_paths) > 0 or self._actually_executed_commands > 0:
+                    findings.append({
+                        "type": "state_mismatch",
+                        "claim": f"claimed operation on '{clean}'",
+                        "confidence": 0.85,
+                        "missing_tools": ["str_replace_editor", "ultimate_editor"],
+                        "detail": f"'{clean}' does not appear in tracked tool operations this session.",
+                    })
+
+        return findings
 
     def detect_text_hallucination(
         self, llm_response_text: str, tools_called: list[str], actions: list[Action]
@@ -101,6 +167,16 @@ class HallucinationDetector:
         )
         if exec_hallucination:
             hallucinations.append(exec_hallucination)
+
+        # --- State-based layer: extract all claimed paths from text ---
+        claimed_paths = self._extract_claimed_paths(llm_response_text)
+        claimed_exec = exec_hallucination is not None
+        state_findings = self._check_state_consistency(claimed_paths, claimed_exec)
+        # Only add state-based findings that aren't already caught by pattern matching
+        existing_claims = {h["claim"] for h in hallucinations}
+        for finding in state_findings:
+            if finding["claim"] not in existing_claims:
+                hallucinations.append(finding)
 
         # Aggregate results
         if not hallucinations:
@@ -193,6 +269,12 @@ class HallucinationDetector:
                     }
 
         return None
+
+    def _extract_claimed_paths(self, text: str) -> list[str]:
+        """Extract file paths referenced in LLM text claims."""
+        # Match patterns like: foo.py, src/bar.ts, ./baz/qux.json
+        path_re = re.compile(r"[\w./\\-]+\.(?:py|ts|js|tsx|jsx|json|yaml|yml|toml|md|sh|rs|go|rb|cpp|c|h|java|swift|kt|txt|html|css)", re.IGNORECASE)
+        return [m.group(0) for m in path_re.finditer(text)]
 
     def _calculate_severity(self, hallucinations: list[dict]) -> str:
         """Calculate overall severity of hallucinations.

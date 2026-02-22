@@ -29,6 +29,8 @@ def validate_response_choices(response: ModelResponse) -> None:
 
 def extract_assistant_message(response: ModelResponse) -> Any:
     """Extract assistant message from model response."""
+    if not getattr(response, "choices", None) or len(response.choices) == 0:
+        raise FunctionCallValidationError("Model response has no choices")
     choice = response.choices[0]
     assistant_msg = getattr(choice, "message", None)
     if assistant_msg is None:
@@ -40,9 +42,10 @@ def extract_assistant_message(response: ModelResponse) -> Any:
 
 def set_response_id_for_actions(actions: list[Action], response: ModelResponse) -> None:
     """Set the response ID for a list of actions."""
+    if not actions:
+        raise FunctionCallValidationError("set_response_id_for_actions requires a non-empty actions list")
     for action in actions:
         action.response_id = response.id
-    assert actions
 
 
 def parse_tool_call_arguments(tool_call: Any) -> dict[str, Any]:

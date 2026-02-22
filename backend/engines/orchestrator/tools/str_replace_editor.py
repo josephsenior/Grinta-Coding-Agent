@@ -115,6 +115,15 @@ def create_str_replace_editor_tool(
                     "Works with str_replace and insert commands. Returns a unified diff preview.",
                 "type": "boolean",
             },
+            "confidence": {
+                "description": "Optional float 0.0–1.0 expressing how certain you are this edit is correct. "
+                    "If below 0.7, the edit will automatically run in preview (dry-run) mode so the "
+                    "result can be verified before the file is mutated. Use 1.0 when certain, 0.5 when "
+                    "unsure about context/indentation, 0.3 when only partially certain.",
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+            },
         },
         required=["command", "path"],
     )

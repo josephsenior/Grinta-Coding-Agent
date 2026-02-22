@@ -29,8 +29,8 @@ class TestCircuitBreakerConfig:
         config = CircuitBreakerConfig()
 
         assert config.enabled is True
-        assert config.max_consecutive_errors == 5
-        assert config.max_high_risk_actions == 10
+        assert config.max_consecutive_errors == 3
+        assert config.max_high_risk_actions == 5
         assert config.max_stuck_detections == 3
         assert config.max_error_rate == 0.5
         assert config.error_rate_window == 10
@@ -52,6 +52,38 @@ class TestCircuitBreakerConfig:
         assert config.max_stuck_detections == 5
         assert config.max_error_rate == 0.75
         assert config.error_rate_window == 15
+
+    def test_scaled_disabled_adaptive(self):
+        """Should return self if adaptive is disabled."""
+        config = CircuitBreakerConfig(adaptive=False)
+        scaled = config.scaled(complexity=10, max_iterations=500)
+        assert scaled is config
+
+    def test_scaled_complexity_levels(self):
+        """Should scale thresholds based on complexity (50-66)."""
+        config = CircuitBreakerConfig(adaptive=True)
+        
+        # Complexity 3 (1.0x)
+        c3 = config.scaled(complexity=3, max_iterations=100)
+        assert c3.max_consecutive_errors == config.max_consecutive_errors
+        
+        # Complexity 6 (1.5x)
+        # 1.5x * 1.0 (itr) = 1.5x
+        c6 = config.scaled(complexity=6, max_iterations=100)
+        assert c6.max_consecutive_errors == int(config.max_consecutive_errors * 1.5)
+        
+        # Complexity 10 (2.0x)
+        c10 = config.scaled(complexity=10, max_iterations=100)
+        assert c10.max_consecutive_errors == config.max_consecutive_errors * 2
+
+    def test_scaled_iteration_multiplier(self):
+        """Should scale thresholds based on iteration budget (58)."""
+        config = CircuitBreakerConfig(adaptive=True)
+        
+        # 500 iterations (max budget shift: 1.0 + (500-100)/400 = 2.0 -> capped at 1.5)
+        # complexity 10 (2.0x) -> total scale 2.0 * 1.5 = 3.0x
+        c500 = config.scaled(complexity=10, max_iterations=500)
+        assert c500.max_consecutive_errors == config.max_consecutive_errors * 3
 
 
 class TestCircuitBreakerResult:
@@ -426,6 +458,29 @@ class TestReset:
         assert not breaker.recent_actions_success
 
 
+class TestCircuitBreakerAdapt:
+    """Test adapt method."""
+
+    def test_adapt_scales_config(self):
+        """adapt should update breaker config with scaled thresholds (216-232)."""
+        config = CircuitBreakerConfig(adaptive=True)
+        breaker = CircuitBreaker(config)
+
+        # Adapt complexity 10 (2x multiplier)
+        breaker.adapt(complexity=10, max_iterations=100)
+        
+        assert breaker.config.max_consecutive_errors == config.max_consecutive_errors * 2
+        assert breaker.config.adaptive is False  # newly scaled config has adaptive=False
+
+    def test_adapt_no_scaling_if_new_config_is_same(self):
+        """Should skip update if config has adaptive=False."""
+        config = CircuitBreakerConfig(adaptive=False)
+        breaker = CircuitBreaker(config)
+
+        breaker.adapt(complexity=10, max_iterations=500)
+        assert breaker.config is config
+
+
 class TestUpdateMetrics:
     """Test _update_metrics method."""
 
@@ -438,15 +493,17 @@ class TestUpdateMetrics:
 
         state = MagicMock()
         # Create error observations in history
-        state.history = [
-            ErrorObservation(content="Error 1"),
-            ErrorObservation(content="Error 2"),
-        ]
+        error1 = ErrorObservation(content="Error 1")
+        error2 = ErrorObservation(content="Error 2")
+        state.history = [error1, error2]
 
+        # Initially consecutive_errors is 0, recent_errors empty (length 0)
+        # error_count will be 2. 2 > 0.
+        # consecutive_errors increases by 2 - 0 = 2.
         breaker._update_metrics(state)
 
         # Should have incremented consecutive errors
-        assert breaker.consecutive_errors >= 0
+        assert breaker.consecutive_errors == 2
 
     def test_update_metrics_with_empty_history(self):
         """_update_metrics should handle empty history."""
@@ -458,3 +515,4 @@ class TestUpdateMetrics:
 
         # Should not raise
         breaker._update_metrics(state)
+        assert breaker.consecutive_errors == 0

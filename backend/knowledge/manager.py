@@ -170,8 +170,7 @@ class KnowledgeBaseManager:
             return False
 
         # Get all documents in the collection before deletion
-        documents = self.list_documents(collection_id)
-        [doc.id for doc in documents]
+        self.list_documents(collection_id)
 
         # Delete from vector store first (before removing from store)
         try:
@@ -321,7 +320,7 @@ class KnowledgeBaseManager:
         unsupported, signalling the caller to fall back.
         """
         try:
-            from backend.engines.orchestrator.tools.treesitter_editor import (
+            from backend.utils.treesitter_editor import (
                 LANGUAGE_EXTENSIONS,
                 TREE_SITTER_AVAILABLE,
                 _get_parser,

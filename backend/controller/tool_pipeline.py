@@ -857,7 +857,7 @@ class AutoCheckMiddleware(ToolInvocationMiddleware):
                 # If stderr is empty, try stdout (sometimes tools print to stdout)
                 if not stderr:
                     stderr = result.stdout.strip()
-                
+
                 observation.content = (
                     current_content
                     + f"\n<SYNTAX_CHECK_FAILED>\n{stderr}\n</SYNTAX_CHECK_FAILED>"
@@ -870,6 +870,6 @@ class AutoCheckMiddleware(ToolInvocationMiddleware):
             # If check tool is missing (e.g. node not found), handle gracefully
             current_content = getattr(observation, "content", "") or ""
             observation.content = (
-                current_content 
+                current_content
                 + f"\n<SYNTAX_CHECK_FAILED>\nMiddleware execution error: {e}\n</SYNTAX_CHECK_FAILED>"
             )

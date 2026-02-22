@@ -198,6 +198,8 @@ def _to_model_response_lite(response: Any) -> ModelResponseLite | None:
 
 
 def _first_choice_message(llm_response: ModelResponseLite) -> Any | None:
+    if not getattr(llm_response, "choices", None) or len(llm_response.choices) == 0:
+        return None
     raw_choice = llm_response.choices[0]
     if not hasattr(raw_choice, "message"):
         return None

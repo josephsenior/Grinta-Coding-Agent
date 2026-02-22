@@ -69,9 +69,14 @@ async def session_exists(
 
 def _warn_unclosed_stream(sid: str) -> None:
     """weakref.finalize callback — fires if a stream is GC'd without close()."""
-    logger.warning(
-        "EventStream '%s' was GC'd without close(); resources may leak.", sid
-    )
+    # At interpreter shutdown (or after pytest capture teardown) logging
+    # handlers may already be closed; best-effort warn without raising.
+    try:
+        logger.warning(
+            "EventStream '%s' was GC'd without close(); resources may leak.", sid
+        )
+    except Exception:
+        pass
 
 
 class EventStream(EventStore):
@@ -240,7 +245,13 @@ class EventStream(EventStore):
             except Exception as exc:  # pragma: no cover - defensive
                 logger.debug("Error shutting down event queue: %s", exc)
         if self._queue_thread.is_alive():
-            self._queue_thread.join()
+            # Never block forever during teardown; the thread is daemonized.
+            self._queue_thread.join(timeout=5)
+            if self._queue_thread.is_alive():
+                logger.debug(
+                    "EventStream '%s' queue thread did not stop within timeout; continuing",
+                    self.sid,
+                )
         self._subscribers.clear()
         self._persist.close()
 
@@ -510,7 +521,9 @@ class EventStream(EventStore):
         if not self._async_queue:
             return
         queue = self._async_queue
-        while should_continue() and not self._stop_flag.is_set():
+        # Keep draining the queue even during shutdown so that
+        # `_initiate_shutdown()` can reliably `await queue.join()`.
+        while should_continue():
             try:
                 event = await queue.get()
             except asyncio.CancelledError:
@@ -519,7 +532,8 @@ class EventStream(EventStore):
                 queue.task_done()
                 break
             try:
-                await self._dispatch_event(cast(Event, event))
+                if not self._stop_flag.is_set():
+                    await self._dispatch_event(cast(Event, event))
             finally:
                 queue.task_done()
                 self._bp.queue_size = queue.qsize()
@@ -584,13 +598,33 @@ class EventStream(EventStore):
         await self._bp.enqueue_event(event, self._async_queue)
 
     async def _initiate_shutdown(self) -> None:
-        """Flush pending events and signal workers to shut down."""
-        if not self._async_queue or not self._stop_event:
+        """Best-effort shutdown of queue loop.
+
+        This method must not block indefinitely: during process shutdown or
+        test teardown, worker tasks may stop consuming (e.g., global shutdown
+        flag), so awaiting `queue.join()` can deadlock.
+        """
+        if not self._stop_event:
             return
-        # Wait for all currently enqueued events to be processed
-        await self._async_queue.join()
-        for _ in range(self._worker_count):
-            await self._async_queue.put(self._stop_sentinel)
+
+        # Cancel workers so they promptly unwind.
+        for worker in list(self._workers):
+            try:
+                worker.cancel()
+            except Exception:
+                pass
+
+        # Drain any remaining queued items to keep internal unfinished-task
+        # counters consistent (in case anyone else awaits join()).
+        if self._async_queue:
+            while True:
+                try:
+                    self._async_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                else:
+                    self._async_queue.task_done()
+
         self._stop_event.set()
 
 

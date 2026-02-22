@@ -248,9 +248,9 @@ class BaseLLMCondenser(RollingCondenser, ABC):
         if keep_first < 0:
             msg = f"keep_first ({keep_first}) cannot be negative"
             raise ValueError(msg)
-        if keep_first >= max_size // 2 and max_size > 1:
+        if keep_first > max_size // 2 and max_size > 1:
             # Only check if max_size is large enough to have a middle
-            msg = f"keep_first ({keep_first}) must be less than half of max_size ({max_size})"
+            msg = f"keep_first ({keep_first}) must be at most half of max_size ({max_size})"
             raise ValueError(msg)
 
         self.llm = llm

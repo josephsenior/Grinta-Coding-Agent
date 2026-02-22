@@ -49,7 +49,7 @@ from backend.api.services.session_init_service import (
     validate_remote_api_request,
     verify_repository_access,
 )
-from backend.api.shared import file_store
+from backend.api.shared import file_store, get_conversation_manager
 from backend.api.types import LLMAuthenticationError, MissingSettingsError
 from backend.api.user_auth import (
     AuthType,
@@ -93,6 +93,30 @@ if "pytest" in sys.modules:
     sub_router = cast(APIRouter, NoOpAPIRouter())
 else:
     sub_router = APIRouter(prefix="/api/v1")
+
+
+# ---------------------------------------------------------------------------
+# Compatibility shims (tests / older call sites)
+# ---------------------------------------------------------------------------
+
+
+async def _resolve_conversation_store(request: Request) -> Any:
+    """Resolve the conversation store for a request.
+
+    Older tests patch this symbol directly; keep it as a thin wrapper around
+    `get_conversation_store`.
+    """
+
+    return await get_conversation_store(request)
+
+
+def _get_conversation_manager_instance() -> Any:
+    """Return the conversation manager instance.
+
+    This is primarily used as a patch point in tests.
+    """
+
+    return get_conversation_manager()
 
 
 # ---------------------------------------------------------------------------

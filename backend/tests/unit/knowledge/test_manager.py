@@ -889,7 +889,8 @@ class TestAdditionalCoveragePaths:
         assert results == []
 
     @patch("backend.knowledge.manager.get_knowledge_base_store")
-    def test_async_add_document(self, mock_get_store):
+    @patch("backend.knowledge.manager.EnhancedVectorStore")
+    def test_async_add_document(self, mock_vector_store_cls, mock_get_store):
         """Test async_add_document."""
         import asyncio
 
@@ -908,6 +909,10 @@ class TestAdditionalCoveragePaths:
         mock_store.get_document_by_hash.return_value = None
         mock_store.add_document.return_value = mock_doc
         mock_get_store.return_value = mock_store
+
+        mock_vector_store = MagicMock()
+        mock_vector_store.add.return_value = None
+        mock_vector_store_cls.return_value = mock_vector_store
 
         manager = KnowledgeBaseManager(user_id="user123")
 

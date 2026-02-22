@@ -387,7 +387,7 @@ class TaskPlaybook(KnowledgePlaybook):
         content = getattr(self, "content", "")
         variables = self.extract_variables(content)
         logger.debug("This playbook requires user input: %s", variables)
-        return variables
+        return bool(variables)
 
     @property
     def inputs(self) -> list[InputMetadata]:

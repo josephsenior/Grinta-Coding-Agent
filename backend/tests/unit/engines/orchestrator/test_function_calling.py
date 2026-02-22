@@ -268,7 +268,8 @@ class TestHandleTaskTrackerTool:
         }
         action = _handle_task_tracker_tool(args)
         assert isinstance(action, TaskTrackingAction)
-        assert action.command == "plan"
+        # Legacy compatibility: "plan" is mapped to "update"
+        assert action.command == "update"
         assert len(action.task_list) == 1
 
     def test_missing_command_raises(self):

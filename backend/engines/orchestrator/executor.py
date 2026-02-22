@@ -5,6 +5,7 @@ import sys
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -111,26 +112,54 @@ class OrchestratorExecutor:
         error_message: str | None = None
         response: ModelResponse | None = None
 
-        # Write-ahead checkpoint before streaming
+        # Write-ahead checkpoint before invoking the model.
+        #
+        # NOTE: Forge's DirectLLMClient implementations intentionally expose
+        # deterministic *non-streaming* completion for all providers. Native
+        # streaming support varies widely across SDKs and tends to be the
+        # source of flakiness. To keep UX responsive without relying on
+        # provider-specific streaming, we always fetch a complete response
+        # and then emit StreamingChunkAction events derived from the final text.
         ckpt_token = self._checkpoint.begin(params)
 
+        tools_for_fallback = None
+        call_params = dict(params)
+
+        # Prompt-based tool calling fallback: if the model doesn't support native
+        # tool calling but the planner provided tools, convert the message stream
+        # into the tag-based function-call format and omit the native `tools=`
+        # payload from the provider request.
+        if self._should_use_tool_call_fallback(call_params):
+            tools_for_fallback = call_params.get("tools")
+            call_params = self._prepare_llm_params_for_tool_call_fallback(call_params)
+
         try:
-            accumulated_content, accumulated_chunks = self._stream_llm_response(
-                params,
-                event_stream,
-            )
-            response = self._build_final_response(
-                accumulated_chunks, accumulated_content
-            )
-            if response is None:
-                logger.warning("Streaming returned None, falling back to non-streaming")
-                response = self._fallback_non_streaming(params)
+            call_params["stream"] = False
+            response = self._llm.completion(**call_params)
         except Exception as exc:  # pragma: no cover - handled by fallback
-            logger.error("Error during streaming: %s", exc)
+            logger.error("Error during LLM completion: %s", exc)
             error_message = str(exc)
             response = self._fallback_non_streaming(params)
 
-        # Commit checkpoint on success
+        # If we used tag-based tool calling, parse the assistant content back into
+        # OpenAI-compatible `tool_calls` so downstream action parsing remains
+        # identical.
+        if response is not None and tools_for_fallback:
+            response = self._apply_tool_call_fallback_to_response(
+                response, tools_for_fallback
+            )
+
+        # Emit synthetic streaming events from the final response text
+        # (post-hoc streaming). This is deterministic and provider-agnostic.
+        try:
+            if response is not None and event_stream is not None:
+                response_text = self._extract_response_text(response)
+                if response_text:
+                    self._emit_streaming_actions(response_text, event_stream)
+        except Exception as exc:  # pragma: no cover - streaming is best-effort
+            logger.debug("Failed to emit streaming actions: %s", exc)
+
+        # Commit checkpoint after a successful completion call.
         self._checkpoint.commit(ckpt_token)
 
         execution_time = time.time() - start_time
@@ -138,66 +167,35 @@ class OrchestratorExecutor:
         return ExecutionResult(actions, response, execution_time, error_message)
 
     # ------------------------------------------------------------------ #
-    # Streaming helpers
+    # Streaming helpers (provider-agnostic post-hoc streaming)
     # ------------------------------------------------------------------ #
-    def _stream_llm_response(
-        self,
-        params: dict,
-        event_stream: EventStream | None,
-    ) -> tuple[str, list]:
+    def _emit_streaming_actions(self, text: str, event_stream: EventStream) -> None:
         from backend.events.action.message import StreamingChunkAction
         from backend.events.event import EventSource
 
-        response_stream = self._llm.completion(**params)
-        accumulated_content = ""
-        accumulated_chunks: list = []
+        # Keep event volume bounded. UI-side coalescing exists, but we still
+        # avoid emitting thousands of tiny events for long responses.
+        chunk_size = 80
+        if not text:
+            return
 
-        for chunk in response_stream:
-            if not chunk.choices:
+        accumulated = ""
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i : i + chunk_size]
+            if not chunk:
                 continue
-            delta = chunk.choices[0].delta
-            token = getattr(delta, "content", None)
-            if not token:
-                continue
-            accumulated_content += token
-            accumulated_chunks.append(chunk)
-
-            streaming_action = StreamingChunkAction(
-                chunk=token,
-                accumulated=accumulated_content,
+            accumulated += chunk
+            ev = StreamingChunkAction(
+                chunk=chunk,
+                accumulated=accumulated,
                 is_final=False,
             )
-            streaming_action.source = EventSource.AGENT
-            if event_stream:
-                event_stream.add_event(streaming_action, EventSource.AGENT)
+            ev.source = EventSource.AGENT
+            event_stream.add_event(ev, EventSource.AGENT)
 
-        if accumulated_content:
-            final_chunk = StreamingChunkAction(
-                chunk="",
-                accumulated=accumulated_content,
-                is_final=True,
-            )
-            final_chunk.source = EventSource.AGENT
-            if event_stream:
-                event_stream.add_event(final_chunk, EventSource.AGENT)
-
-        return accumulated_content, accumulated_chunks
-
-    def _build_final_response(
-        self, accumulated_chunks: list, accumulated_content: str
-    ) -> Any | None:
-        from types import SimpleNamespace
-
-        if not accumulated_chunks:
-            return None
-
-        final_response = accumulated_chunks[-1]
-        final_response.choices[0].delta.content = accumulated_content
-        final_response.choices[0].message = SimpleNamespace(
-            content=accumulated_content,
-            role="assistant",
-        )
-        return final_response
+        final_ev = StreamingChunkAction(chunk="", accumulated=accumulated, is_final=True)
+        final_ev.source = EventSource.AGENT
+        event_stream.add_event(final_ev, EventSource.AGENT)
 
     def _fallback_non_streaming(self, params: dict) -> Any:
         params = dict(params)
@@ -212,8 +210,6 @@ class OrchestratorExecutor:
         # `.choices[0].message.content` structure. Create a minimal synthetic response
         # so downstream parsing and safety logic can proceed deterministically.
         if response is None or not hasattr(response, "choices"):
-            from types import SimpleNamespace
-
             synthetic_message = SimpleNamespace(content="")
             synthetic_choice = SimpleNamespace(
                 message=synthetic_message, delta=SimpleNamespace(content="")
@@ -222,8 +218,6 @@ class OrchestratorExecutor:
             response = SimpleNamespace(id="fallback", choices=[synthetic_choice])
             logger.debug("Created synthetic fallback response with empty content.")
         elif isinstance(response, object) and not getattr(response, "choices", None):
-            from types import SimpleNamespace
-
             synthetic_message = SimpleNamespace(content="")
             synthetic_choice = SimpleNamespace(
                 message=synthetic_message, delta=SimpleNamespace(content="")
@@ -255,6 +249,130 @@ class OrchestratorExecutor:
         if not hasattr(response, "choices") or not response.choices:
             return ""
         choice = response.choices[0]
-        if hasattr(choice, "message") and getattr(choice.message, "content", None):
-            return choice.message.content or ""
+        if hasattr(choice, "message"):
+            content = getattr(choice.message, "content", None)
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                try:
+                    return "".join(
+                        str(item.get("text", ""))
+                        for item in content
+                        if isinstance(item, dict) and item.get("type") == "text"
+                    )
+                except Exception:
+                    return str(content)
+            if content:
+                return str(content)
         return ""
+
+    # ------------------------------------------------------------------ #
+    # Tool-call fallback (models without native function calling)
+    # ------------------------------------------------------------------ #
+    def _should_use_tool_call_fallback(self, params: dict[str, Any]) -> bool:
+        try:
+            tools = params.get("tools")
+            if not tools:
+                return False
+            return not bool(getattr(self._llm, "is_function_calling_active", lambda: True)())
+        except Exception:
+            return False
+
+    def _prepare_llm_params_for_tool_call_fallback(
+        self, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        from backend.llm.fn_call_converter import (
+            STOP_WORDS,
+            convert_fncall_messages_to_non_fncall_messages,
+        )
+
+        call_params = dict(params)
+        messages = call_params.get("messages", [])
+        tools = call_params.get("tools") or []
+
+        try:
+            call_params["messages"] = convert_fncall_messages_to_non_fncall_messages(
+                messages=messages,
+                tools=tools,
+                add_in_context_learning_example=True,
+            )
+        except Exception as exc:
+            logger.debug("Tool-call fallback prompt conversion failed: %s", exc)
+
+        # Native tool calling payloads are not supported by these models.
+        call_params.pop("tools", None)
+        call_params.pop("tool_choice", None)
+
+        # Encourage clean termination after emitting the </function> tag.
+        try:
+            supports_stop = bool(getattr(self._llm.features, "supports_stop_words", True))
+        except Exception:
+            supports_stop = True
+        if supports_stop:
+            existing_stop = call_params.get("stop")
+            if existing_stop is None:
+                call_params["stop"] = list(STOP_WORDS)
+            elif isinstance(existing_stop, list):
+                for w in STOP_WORDS:
+                    if w not in existing_stop:
+                        existing_stop.append(w)
+            else:
+                call_params["stop"] = [existing_stop, *STOP_WORDS]
+
+        return call_params
+
+    def _apply_tool_call_fallback_to_response(
+        self, response: Any, tools: list[dict[str, Any]]
+    ) -> Any:
+        """Parse tag-based tool calls from assistant content and attach tool_calls."""
+
+        from backend.llm.fn_call_converter import convert_non_fncall_messages_to_fncall_messages
+
+        try:
+            if not getattr(response, "choices", None):
+                return response
+            choice = response.choices[0]
+            assistant_msg = getattr(choice, "message", None)
+            if assistant_msg is None:
+                return response
+
+            content = getattr(assistant_msg, "content", "") or ""
+            converted = convert_non_fncall_messages_to_fncall_messages(
+                messages=[{"role": "assistant", "content": content}],
+                tools=tools,
+            )
+            if not converted:
+                return response
+            first = converted[0]
+            tool_calls = first.get("tool_calls")
+            if not tool_calls:
+                return response
+
+            tool_call_objs = []
+            for tc in tool_calls:
+                fn = tc.get("function") or {}
+                fn_obj = SimpleNamespace(
+                    name=fn.get("name"),
+                    arguments=fn.get("arguments", "{}"),
+                )
+                tool_call_objs.append(
+                    SimpleNamespace(
+                        id=tc.get("id"),
+                        type=tc.get("type", "function"),
+                        function=fn_obj,
+                    )
+                )
+
+            try:
+                setattr(assistant_msg, "content", first.get("content", ""))
+                setattr(assistant_msg, "tool_calls", tool_call_objs)
+            except Exception:
+                # If the SDK message is immutable, best-effort: replace it on the choice.
+                choice.message = SimpleNamespace(
+                    content=first.get("content", ""),
+                    tool_calls=tool_call_objs,
+                )
+
+        except Exception as exc:
+            logger.debug("Tool-call fallback parse failed: %s", exc)
+        return response

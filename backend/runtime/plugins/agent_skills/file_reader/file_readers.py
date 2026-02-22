@@ -152,7 +152,8 @@ def parse_image(
             messages=cast(Any, _prepare_image_messages(task, base64_image)),
             max_tokens=_get_max_token(),
         )
-        _ = response.choices[0].message.content
+        if getattr(response, "choices", None) and len(response.choices) > 0:
+            _ = response.choices[0].message.content
     except Exception:
         pass
 
@@ -183,7 +184,8 @@ def parse_video(
                 messages=cast(Any, _prepare_image_messages(task, base64_frame)),
                 max_tokens=_get_max_token(),
             )
-            _ = response.choices[0].message.content
+            if getattr(response, "choices", None) and len(response.choices) > 0:
+                _ = response.choices[0].message.content
         except Exception:
             pass
 

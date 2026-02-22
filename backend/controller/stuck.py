@@ -629,11 +629,21 @@ class StuckDetector:
 
     def _get_prompt_token_history(self, events_with_metrics: list[Event]) -> list[int]:
         """Extract prompt tokens for the last 10 steps."""
-        return [
-            e.llm_metrics.token_usages[0].prompt_tokens
-            for e in events_with_metrics[-10:]
-            if e.llm_metrics and e.llm_metrics.token_usages
-        ]
+        prompt_tokens: list[int] = []
+        for e in events_with_metrics[-10:]:
+            llm_metrics = getattr(e, "llm_metrics", None)
+            token_usages = getattr(llm_metrics, "token_usages", None)
+            if not token_usages:
+                continue
+            try:
+                candidate = token_usages[0].prompt_tokens
+                if isinstance(candidate, bool):
+                    continue
+                prompt_tokens.append(int(candidate))
+            except Exception:
+                # Defensive: ignore unexpected shapes (e.g., MagicMock)
+                continue
+        return prompt_tokens
 
     def compute_repetition_score(self, headless_mode: bool = True) -> float:
         """Compute a 0.0-1.0 score indicating how close the agent is to being stuck.

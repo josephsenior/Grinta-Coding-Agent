@@ -104,12 +104,7 @@ class InMemoryRateLimiter:
         if len(self.history[key]) > self.requests:
             if self.sleep_seconds <= 0:
                 return False
-            try:
-                await asyncio.sleep(self.sleep_seconds)
-            except asyncio.CancelledError:
-                # Gracefully handle cancellation during server shutdown
-                # Re-raise to allow proper shutdown propagation
-                raise
+            await asyncio.sleep(self.sleep_seconds)
             return True
         return True
 

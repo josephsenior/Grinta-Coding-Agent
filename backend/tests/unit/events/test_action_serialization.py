@@ -97,10 +97,12 @@ class TestActionFromDict:
         with pytest.raises(LLMMalformedActionError):
             action_from_dict(d)
 
-    def test_wrong_args_type_error(self):
+    def test_unknown_args_keys_are_ignored(self):
         d = {"action": "message", "args": {"invalid_key_only": True}}
-        with pytest.raises(LLMMalformedActionError, match="wrong arguments"):
-            action_from_dict(d)
+        evt = action_from_dict(d)
+        assert isinstance(evt, MessageAction)
+        assert evt.content == ""
+        assert not hasattr(evt, "invalid_key_only")
 
     def test_with_timeout(self):
         d = {"action": "run", "args": {"command": "ls"}, "timeout": 30}

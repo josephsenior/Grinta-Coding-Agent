@@ -31,7 +31,7 @@ Key features of the `ActionExecutor` class:
 - Initialization of user environment and bash shell
 - Plugin management and initialization
 - Execution of various action types (bash commands, file operations, browsing)
-- Integration with Playwright for web interactions
+- Web interactions via external MCP tools
 
 ## Workflow Description
 

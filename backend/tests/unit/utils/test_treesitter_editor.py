@@ -1,4 +1,4 @@
-"""Comprehensive tests for backend.engines.orchestrator.tools.treesitter_editor."""
+"""Comprehensive tests for backend.utils.treesitter_editor."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import textwrap
 
 import pytest
 
-from backend.engines.orchestrator.tools.treesitter_editor import (
+from backend.utils.treesitter_editor import (
     LANGUAGE_EXTENSIONS,
     TREE_SITTER_AVAILABLE,
     EditResult,
@@ -547,3 +547,120 @@ class TestFindAllSymbolOccurrences:
             tree, file_bytes, "no_such_name_xyz", "python"
         )
         assert occurrences == []
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests
+# ---------------------------------------------------------------------------
+
+
+class TestCoverageGaps:
+    def test_get_name_node_recursion(self, editor, tmp_path):
+        """Test recursive name node extraction (e.g. in C)."""
+        content = "int foo() { return 1; }"
+        f = tmp_path / "test.c"
+        f.write_text(content, encoding="utf-8")
+        # In C, function name is inside a function_declarator
+        loc = editor.find_symbol(str(f), "foo")
+        assert loc is not None
+        assert loc.symbol_name == "foo"
+
+    def test_edit_function_syntax_error(self, editor, py_file):
+        """Test edit_function when result has syntax error."""
+        # Providing invalid python code
+        result = editor.edit_function(py_file, "greet", "    def invalid syntax:")
+        assert result.success is False
+        assert "Syntax error" in result.message
+        assert result.syntax_valid is False
+
+    def test_rename_symbol_syntax_error(self, editor, py_file):
+        """Test rename_symbol when result has syntax error (e.g. renaming to invalid identifier)."""
+        # Renaming to something that breaks syntax
+        result = editor.rename_symbol(py_file, "greet", "123invalid")
+        assert result.success is False
+        assert "Rename created syntax error" in result.message or not result.success
+
+    def test_validate_syntax_exception(self, editor):
+        """Test _validate_syntax when an exception occurs during parsing."""
+        import pytest
+        with pytest.MonkeyPatch.context() as mp:
+            # Mock get_parser to raise an exception
+            def raise_exc(lang):
+                raise Exception("test exception")
+            mp.setattr(editor, "get_parser", raise_exc)
+            is_valid, msg = editor._validate_syntax("code", "f.py", "python")
+            # Should skip validation and return True on exception
+            assert is_valid is True
+            assert "Validation skipped" in msg
+
+    def test_find_method_in_class_node_not_found(self, editor, py_file):
+        """Test method search when method doesn't exist in class."""
+        loc = editor.find_symbol(py_file, "Calculator.nonexistent")
+        assert loc is None
+
+    def test_find_method_in_nonexistent_class(self, editor, py_file):
+        """Test method search when class doesn't exist."""
+        loc = editor.find_symbol(py_file, "NonexistentClass.method")
+        assert loc is None
+
+    def test_search_tree_for_symbol_not_found(self, editor, py_file):
+        """Test generic symbol search when not found."""
+        # Using internal method to ensure we hit the return None
+        result = editor.parse_file(py_file)
+        assert result is not None
+        tree, file_bytes, lang = result
+        loc = editor._search_tree_for_symbol(tree, file_bytes, "notfound", py_file, lang)
+        assert loc is None
+
+    def test_get_function_body_node_not_found(self, editor, py_file):
+        """Test body extraction when no body is found."""
+        # This is hard to trigger with valid code, but we can mock or use weird edge case
+        result = editor.parse_file(py_file)
+        assert result is not None
+        tree, _, lang = result
+        # Find a node that isn't a function but try to get its body
+        node = tree.root_node
+        body = editor._get_function_body_node(node, lang)
+        assert body is None
+
+    def test_get_parser_none_pack(self, editor):
+        """Test get_parser when language pack is missing."""
+        import backend.utils.treesitter_editor as tse
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(tse, "_get_language", None)
+            assert editor.get_parser("python") is None
+
+    def test_parse_file_no_language(self, editor, tmp_path):
+        """Test parse_file when language detection fails."""
+        f = tmp_path / "no_ext"
+        f.write_text("content", encoding="utf-8")
+        assert editor.parse_file(str(f)) is None
+
+    def test_find_symbol_invalid_dot_notation(self, editor, py_file):
+        """Test find_symbol with deep dot notation (unsupported)."""
+        # Only Class.method (2 parts) is supported
+        assert editor.find_symbol(py_file, "A.B.C") is None
+
+    def test_edit_function_parse_failure(self, editor, py_file):
+        """Test edit_function when parsing fails."""
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(editor, "parse_file", lambda *args, **kwargs: None)
+            result = editor.edit_function(py_file, "func", "body")
+            assert result.success is False
+
+    def test_rename_symbol_parse_failure(self, editor, py_file):
+        """Test rename_symbol when parsing fails."""
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(editor, "parse_file", lambda *args, **kwargs: None)
+            result = editor.rename_symbol(py_file, "old", "new")
+            assert result.success is False
+
+    def test_find_function_node_default_types(self, editor, py_file):
+        """Test _find_function_node with an unknown language."""
+        result = editor.parse_file(py_file)
+        assert result is not None
+        tree, file_bytes, _ = result
+        # "unknown" language uses default ["function_definition", "function_declaration"]
+        node = editor._find_function_node(tree, file_bytes, "greet", "unknown")
+        assert node is not None
+        assert node.type == "function_definition"

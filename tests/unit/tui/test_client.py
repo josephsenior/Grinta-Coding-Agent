@@ -326,9 +326,13 @@ class TestForgeClientSocketIO(unittest.IsolatedAsyncioTestCase):
         callback = AsyncMock()
         await self.client.join_conversation("conv_123", on_event=callback)
 
-        # socketio.AsyncClient.connected stays False by default,
-        # so join_conversation calls connect twice (base URL, then with query params)
-        self.assertEqual(mock_connect.call_count, 2)
+        # join_conversation attempts a single connect; it only retries on exception.
+        self.assertEqual(mock_connect.call_count, 1)
+
+        # URL should include the conversation query params.
+        called_url = mock_connect.call_args.args[0]
+        self.assertIn("conversation_id=conv_123", called_url)
+        self.assertIn("latest_event_id=-1", called_url)
 
     @patch("socketio.AsyncClient.disconnect")
     async def test_leave_conversation(self, mock_disconnect: AsyncMock) -> None:

@@ -57,7 +57,8 @@ class MCPClient(BaseModel):
         """Open the persistent session on the current ``self.client``."""
         if self.client is None:
             raise RuntimeError("Client not configured.")
-        await self.client.__aenter__()
+        # Intentional: session lifecycle is open/close across multiple calls, not a single async with
+        await self.client.__aenter__()  # pylint: disable=unnecessary-dunder-call
         self._session_active = True
 
     async def _close_session(self) -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 
+import pytest
 
 from backend.memory.graph_store import EdgeType, GraphMemoryStore, NodeType
 
@@ -276,12 +277,13 @@ class TestPersistence:
         store.load()
         assert store.graph.number_of_nodes() == 0
 
-    def test_load_corrupted_file_survives(self, tmp_path):
+    def test_load_corrupted_file_raises(self, tmp_path):
+        """Loading a corrupted file raises so callers know the graph was not loaded."""
         path = str(tmp_path / "corrupted.json")
         with open(path, "w", encoding="utf-8") as f:
             f.write("{corrupted garbage")
-        store = GraphMemoryStore(persistence_path=path)
-        assert store.graph.number_of_nodes() == 0
+        with pytest.raises(Exception):
+            GraphMemoryStore(persistence_path=path)
 
     def test_auto_save(self, tmp_path):
         path = str(tmp_path / "auto.json")

@@ -161,7 +161,7 @@ class Session:
         )
         if FORGE_mcp_server:
             cfg.mcp.servers.append(FORGE_mcp_server)
-        
+
         if FORGE_mcp_stdio_servers:
             cfg.mcp.servers.extend(FORGE_mcp_stdio_servers)
 

@@ -443,7 +443,7 @@ class TestCollectControllerHealth:
         result = collect_controller_health(mock_controller)
 
         assert result["severity"] == "red"
-        assert "circuit_breaker_unhealthy" in result["warnings"]
+        assert "circuit_breaker_open" in result["warnings"]
 
     def test_handles_missing_attributes_gracefully(self):
         """Test handles missing attributes with defaults."""

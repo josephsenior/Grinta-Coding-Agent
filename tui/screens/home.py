@@ -340,8 +340,9 @@ class HomeScreen(Screen[None]):
         title = (conv.title or "").lower()
         status = conv.status.lower()
         cid = conv.conversation_id.lower()
-        project = conv.project.lower()
-        tags = " ".join(conv.tags)
+        project = (getattr(conv, "project", "") or "").lower()
+        raw_tags = getattr(conv, "tags", None) or []
+        tags = " ".join(str(t) for t in raw_tags).lower()
 
         if query_lower in title:
             return 100.0

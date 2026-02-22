@@ -106,24 +106,6 @@ install-python-dependencies:
 		uv pip install chroma-hnswlib; \
 	fi
 	uv sync
-	@if [ "${INSTALL_PLAYWRIGHT}" != "false" ] && [ "${INSTALL_PLAYWRIGHT}" != "0" ]; then \
-		if [ -f "/etc/manjaro-release" ]; then \
-			echo "$(BLUE)Detected Manjaro Linux. Installing Playwright...$(RESET)"; \
-			uv pip install playwright; \
-			uv run playwright install chromium; \
-		else \
-			if [ ! -f cache/playwright_chromium_is_installed.txt ]; then \
-				echo "Running uv run playwright install --with-deps chromium..."; \
-				uv run playwright install --with-deps chromium; \
-				mkdir -p cache; \
-				touch cache/playwright_chromium_is_installed.txt; \
-			else \
-				echo "Playwright already setup. Skipping."; \
-			fi \
-		fi \
-	else \
-		echo "Skipping Playwright installation (INSTALL_PLAYWRIGHT=${INSTALL_PLAYWRIGHT})."; \
-	fi
 	@echo "$(GREEN)Python dependencies synced successfully.$(RESET)"
 
 install-pre-commit-hooks: check-python check-uv install-python-dependencies

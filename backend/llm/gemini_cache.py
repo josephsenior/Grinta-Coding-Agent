@@ -102,7 +102,7 @@ class GeminiCacheManager:
     def cleanup_old_caches(self):
         """Cleanup expired caches from the provider."""
         try:
-            for cache in caching.CachedContent.list():
+            for _ in caching.CachedContent.list():
                 # Google handles TTL automatically, but we can manually delete
                 # if we have too many or they are redundant.
                 pass

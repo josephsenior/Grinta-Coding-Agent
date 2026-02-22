@@ -36,7 +36,7 @@ class RuntimeCapabilities:
 
     # -- feature flags ------------------------------------------------------
     can_browse: bool = False
-    """True when browser automation is enabled and the package is importable."""
+    """True when browser interactions are enabled for this runtime."""
 
     can_mcp: bool = False
     """True when MCP stdio servers can be spawned (not Windows currently)."""
@@ -67,18 +67,9 @@ def detect_capabilities(
     has_tmux = shutil.which("tmux") is not None
     has_bash = shutil.which("bash") is not None
 
-    # Browser: enabled flag + importable dependency or MCP-based browsing
-    can_browse = False
-    if enable_browser:
-        # Check for legacy playwright first
-        try:
-            import importlib
-            importlib.import_module("playwright")
-            can_browse = True
-        except ImportError:
-            # If playwright is missing, we might still have MCP-based browsing
-            # We'll assume True if enable_browser is set, as the agent can use MCP
-            can_browse = True
+    # Browser interactions are provided via external tooling (e.g., MCP).
+    # Do not depend on any specific browser automation library being installed.
+    can_browse = bool(enable_browser)
 
     # MCP can be supported either via HTTP/SSE servers (cross-platform) or via
     # stdio servers (requires spawning npx/uvx or other commands).
@@ -95,7 +86,9 @@ def detect_capabilities(
     except Exception:
         has_http_mcp = False
 
-    can_mcp = has_http_mcp or (not is_windows or has_npx or has_uvx)
+    # Windows stdio MCP is not currently supported; only allow MCP there when
+    # an HTTP-based MCP server is configured.
+    can_mcp = has_http_mcp or (not is_windows)
 
     # Collect missing tools for diagnostic logging
     expected = {"git": has_git}

@@ -188,7 +188,8 @@ class TestMapOpenAIException:
             )
             result = _map_openai_exception(exc, model="gpt-4")
 
-            assert isinstance(result, APIError)
+            # 5xx APIStatusError is treated as retryable InternalServerError.
+            assert isinstance(result, InternalServerError)
             assert result.model == "gpt-4"
             assert result.llm_provider == "openai"
             assert result.status_code == 500
@@ -386,7 +387,8 @@ class TestMapAnthropicException:
             )
             result = _map_anthropic_exception(exc, model="claude-3")
 
-            assert isinstance(result, APIError)
+            # 5xx APIStatusError is treated as retryable InternalServerError.
+            assert isinstance(result, InternalServerError)
             assert result.model == "claude-3"
             assert result.llm_provider == "anthropic"
             assert result.status_code == 500

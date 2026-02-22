@@ -12,6 +12,7 @@ import asyncio
 import os
 import sys
 import time
+import uuid
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, cast
 
@@ -37,6 +38,7 @@ from backend.events.observation import (
     FileWriteObservation,
     Observation,
 )
+from backend.events.observation.terminal import TerminalObservation
 from backend.events.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
@@ -66,12 +68,11 @@ from backend.runtime.server_routes import (
     register_routes,
 )
 from backend.runtime.utils import find_available_tcp_port
-from backend.runtime.utils.bash import BashSession
+from backend.runtime.utils.unified_shell import UnifiedShellSession
 from backend.runtime.utils.diff import get_diff
 from backend.runtime.utils.file_editor import FileEditor
 from backend.runtime.utils.memory_monitor import MemoryMonitor
 from backend.runtime.utils.process_registry import TaskCancellationService
-from backend.runtime.utils.terminal_manager import TerminalManager
 from backend.utils.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
@@ -117,11 +118,8 @@ class ActionExecutor:
         self.enable_browser = enable_browser
         self.browser: BrowserEnv | None = None
 
-        self.bash_session: BashSession | None = None
+        self.sessions: dict[str, UnifiedShellSession] = {}
         self.cancellation_service = TaskCancellationService(label=f"runtime:{work_dir}")
-        self.terminal_manager = TerminalManager(
-            work_dir=self._initial_cwd, username=username
-        )
         self.lock = asyncio.Lock()
         self.plugins: dict[str, Plugin] = {}
         # We need the file editor for ACI actions (view) even if we use helper functions
@@ -198,11 +196,14 @@ class ActionExecutor:
     async def hard_kill(self) -> None:
         """Best-effort immediate termination of processes started by this runtime."""
         self.cancellation_service.cancel_all()
-        if self.bash_session:
-            self.bash_session.close()
+        for session in self.sessions.values():
+            try:
+                session.close()
+            except Exception:
+                pass
+        self.sessions.clear()
         if self.browser:
             self.browser.close()
-        self.terminal_manager.close_all()
 
     async def ainit(self) -> None:
         """Initialize action execution server asynchronously."""
@@ -215,8 +216,9 @@ class ActionExecutor:
             self.max_memory_gb = max(1, total_mem_gb - 2)
 
             # Step 1: Initialize bash session
-            logger.info("Step 1/5: Initializing bash session...")
-            self.bash_session = self._create_bash_session()
+            logger.info("Step 1/5: Initializing default shell session...")
+            default_session = self._create_bash_session()
+            self.sessions["default"] = default_session
 
             # Step 2: Initialize browser in background if enabled
             if self.enable_browser:
@@ -277,10 +279,11 @@ class ActionExecutor:
 
     def _init_bash_commands(self):
         # We need to set up some aliases and functions in bash for better UX
-        assert self.bash_session is not None
+        bash_session = self.sessions.get("default")
+        assert bash_session is not None
 
         # Init git configuration
-        self.bash_session.execute(
+        bash_session.execute(
             CmdRunAction(
                 command=f'git config --global user.name "{self.username}" && git config --global user.email "{self.username}@example.com"',
             )
@@ -291,7 +294,7 @@ class ActionExecutor:
             init_cmds = plugin.get_init_bash_commands()
             if init_cmds:
                 for cmd in init_cmds:
-                    self.bash_session.execute(CmdRunAction(command=cmd))
+                    bash_session.execute(CmdRunAction(command=cmd))
 
     async def run_action(self, action) -> Observation:
         """Execute any action through action execution server."""
@@ -301,17 +304,54 @@ class ActionExecutor:
 
     async def run(
         self, action: CmdRunAction
-    ) -> CmdOutputObservation | ErrorObservation:
+    ) -> CmdOutputObservation | ErrorObservation | TerminalObservation:
         """Execute bash/shell command."""
         try:
-            bash_session = self.bash_session
+            # Handle background execution: treat as starting a new terminal session
+            if action.is_background:
+                session_id = f"bg-{uuid.uuid4().hex[:8]}"
+                cwd = action.cwd or self.sessions.get("default", self).initial_cwd # fallback
+
+                session = self._create_bash_session(cwd=cwd)
+                self.sessions[session_id] = session
+                
+                # Execute the command in the new session
+                logger.debug("Starting background task in session %s: %s", session_id, action.command)
+                session.write_input(action.command + "\n")
+                
+                # Return initial output and the session ID for later checking
+                time.sleep(0.5)
+                content = session.read_output()
+                return TerminalObservation(
+                    session_id=session_id, 
+                    content=f"Background task started. Session ID: {session_id}\nInitial Output:\n{content}"
+                )
+
+            # Standard foreground execution
+            bash_session = self.sessions.get("default")
             if action.is_static:
                 bash_session = self._create_bash_session(action.cwd)
-            assert bash_session is not None
+            
+            if bash_session is None:
+                return ErrorObservation("Default shell session not initialized")
+
             observation = cast(
                 CmdOutputObservation,
                 await call_sync_from_async(bash_session.execute, action),
             )
+
+            # Apply filtering if grep_pattern is provided
+            if action.grep_pattern and isinstance(observation.content, str):
+                import re
+                try:
+                    pattern = re.compile(action.grep_pattern)
+                    lines = observation.content.splitlines()
+                    filtered_lines = [line for line in lines if pattern.search(line)]
+                    observation.content = "\n".join(filtered_lines)
+                    if not observation.content:
+                        observation.content = f"[Grep: No lines matched pattern '{action.grep_pattern}']"
+                except re.error as e:
+                    observation.content = f"[Grep Error: Invalid regex pattern '{action.grep_pattern}': {e}]\n" + observation.content
 
             # Truncate oversized bash output before it enters the context window.
             # Uses error-aware head+tail strategy so errors are never dropped.
@@ -342,15 +382,72 @@ class ActionExecutor:
 
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start a new interactive terminal session."""
-        return await call_sync_from_async(self.terminal_manager.run, action)
+        try:
+            # Generate a unique session ID
+            session_id = f"term-{uuid.uuid4().hex[:8]}"
+            
+            # Determine working directory
+            # Prefer provided CWD -> default session CWD -> initial CWD
+            default_session = self.sessions.get("default")
+            cwd = action.cwd
+            if not cwd and default_session:
+                cwd = default_session.cwd
+            if not cwd:
+                cwd = self._initial_cwd
+                
+            # Create the new session
+            session = self._create_bash_session(cwd=cwd)
+            self.sessions[session_id] = session
+            
+            if action.command:
+                # Send the initial command if provided
+                logger.debug("Running initial command in terminal %s: %s", session_id, action.command)
+                # Attempt to write input. If underlying session doesn't support input,
+                # it will log a warning but not crash.
+                session.write_input(action.command + "\n")
+            
+            # Return initial output
+            content = session.read_output()
+            return TerminalObservation(session_id=session_id, content=content)
+            
+        except Exception as e:
+            logger.error("Error starting terminal session: %s", e, exc_info=True)
+            return ErrorObservation(f"Failed to start terminal: {e}")
 
     async def terminal_input(self, action: TerminalInputAction) -> Observation:
         """Send input to an interactive terminal session."""
-        return await call_sync_from_async(self.terminal_manager.input, action)
+        session = self.sessions.get(action.session_id)
+        if not session:
+            return ErrorObservation(f"Terminal session {action.session_id} not found.")
+            
+        try:
+            write_content = action.input
+            # Add newline if not a control sequence, unless user explicitly handles it?
+            # TerminalInputAction usually implies raw input.
+            # If user types "ls", they usually mean "ls\n".
+            # Control sequences are separate.
+            
+            session.write_input(write_content, is_control=action.is_control)
+            # Wait briefly for output to appear
+            await call_sync_from_async(time.sleep, 0.2)
+            content = session.read_output()
+            return TerminalObservation(session_id=action.session_id, content=content)
+        except Exception as e:
+            logger.error("Error sending input to terminal %s: %s", action.session_id, e)
+            return ErrorObservation(f"Failed to send input: {e}")
 
     async def terminal_read(self, action: TerminalReadAction) -> Observation:
         """Read the output of an interactive terminal session."""
-        return await call_sync_from_async(self.terminal_manager.read, action)
+        session = self.sessions.get(action.session_id)
+        if not session:
+             return ErrorObservation(f"Terminal session {action.session_id} not found or closed.")
+            
+        try:
+            content = session.read_output()
+            return TerminalObservation(session_id=action.session_id, content=content)
+        except Exception as e:
+            logger.error("Error reading terminal %s: %s", action.session_id, e)
+            return ErrorObservation(f"Failed to read terminal: {e}")
 
     def _resolve_path(self, path: str, working_dir: str) -> str:
         """Resolve a relative or absolute path to an absolute path with security validation."""
@@ -370,7 +467,9 @@ class ActionExecutor:
 
     async def read(self, action: FileReadAction) -> Observation:
         """Read a file and return its content as an observation."""
-        assert self.bash_session is not None
+        bash_session = self.sessions.get("default")
+        if bash_session is None:
+            return ErrorObservation("Default shell session not initialized")
 
         # Check for binary files
         if is_binary(action.path):
@@ -381,7 +480,7 @@ class ActionExecutor:
             return self._handle_aci_file_read(action)
 
         # Resolve file path
-        working_dir = self.bash_session.cwd
+        working_dir = bash_session.cwd
         filepath = resolve_path(action.path, working_dir)
 
         try:
@@ -398,9 +497,11 @@ class ActionExecutor:
 
     async def write(self, action: FileWriteAction) -> Observation:
         """Write a file and return an observation."""
-        assert self.bash_session is not None
+        bash_session = self.sessions.get("default")
+        if bash_session is None:
+            return ErrorObservation("Default shell session not initialized")
 
-        working_dir = self.bash_session.cwd
+        working_dir = bash_session.cwd
         filepath = resolve_path(action.path, working_dir)
 
         try:
@@ -419,8 +520,10 @@ class ActionExecutor:
 
     async def edit(self, action: FileEditAction) -> Observation:
         """Edit a file (FILE_EDITOR or LLM-based) and return an observation."""
-        assert self.bash_session is not None
-        working_dir = self.bash_session.cwd
+        bash_session = self.sessions.get("default")
+        if bash_session is None:
+            return ErrorObservation("Default shell session not initialized")
+        working_dir = bash_session.cwd
         filepath = resolve_path(action.path, working_dir)
 
         # Directory view support
@@ -462,34 +565,57 @@ class ActionExecutor:
 
         # LLM-based range editing: apply by translating into a FileWriteAction
         try:
-            old_text = ""
-            if os.path.exists(filepath) and os.path.isfile(filepath):
-                with open(filepath, encoding="utf-8", errors="replace") as f:
-                    old_text = f.read()
-
-            write_action = FileWriteAction(
+            # New implementation using unified FileEditor
+            command = action.command or "edit"
+            # If it's a range edit, map start/end to edit arguments
+            # Note: FileEditor is smart enough to handle new_str or file_text as replacement
+            
+            result_str, (old_content, new_content) = execute_file_editor(
+                self.file_editor,
+                command=command,
                 path=action.path,
-                content=action.content,
-                start=action.start,
-                end=action.end,
-                thought=action.thought,
+                file_text=action.content, # Use content as the replacement text
+                start_line=action.start,
+                end_line=action.end,
+                enable_linting=bool(
+                    os.environ.get("ENABLE_AUTO_LINT", "").lower()
+                    in {"1", "true", "yes"}
+                ),
             )
-            write_obs = await self.write(write_action)
-            if isinstance(write_obs, ErrorObservation):
-                return write_obs
+            
+            # If execute_file_editor returned an error message string starting with ERROR:
+            if result_str.startswith("ERROR:"):
+                 return ErrorObservation(result_str)
 
-            with open(filepath, encoding="utf-8", errors="replace") as f:
-                new_text = f.read()
-
-            diff = get_diff(old_text, new_text, action.path)
+            # Replicate diff logic if needed, but FileEditor usually returns full content or diff?
+            # FileEditor returns "File updated successfully" or similar.
+            # We want to return a diff observation for LLM edits usually.
+            
+            # The previous implementation calculated a diff.
+            # Let's see what we can do. 
+            # execute_file_editor returns (output_msg, (old, new))
+            
+            if old_content and new_content:
+                diff = get_diff(old_content, new_content, action.path)
+                return FileEditObservation(
+                    content=diff,
+                    path=action.path,
+                    prev_exist=old_content is not None,
+                    old_content=old_content,
+                    new_content=new_content,
+                    impl_source=FileEditSource.LLM_BASED_EDIT,
+                )
+            
+            # Fallback if no content change (e.g. create file)
             return FileEditObservation(
-                content=diff,
+                content=result_str,
                 path=action.path,
-                prev_exist=bool(old_text),
-                old_content=old_text,
-                new_content=new_text,
+                prev_exist=old_content is not None,
+                old_content=old_content,
+                new_content=new_content,
                 impl_source=FileEditSource.LLM_BASED_EDIT,
             )
+
         except Exception as e:
             logger.error("Error editing file %s: %s", action.path, e, exc_info=True)
             return ErrorObservation(f"Failed to edit file {action.path}: {e}")
@@ -517,7 +643,14 @@ class ActionExecutor:
                     ]
                 self._mcp_clients = await create_mcps(servers)
 
-            return await call_tool_mcp(self._mcp_clients, action)  # type: ignore[arg-type]
+            observation = await call_tool_mcp(self._mcp_clients, action)  # type: ignore[arg-type]
+            
+            # Apply truncation to large MCP outputs
+            if hasattr(observation, "content") and isinstance(observation.content, str):
+                max_chars = get_max_edit_observation_chars() # Reuse same limit or similar logic
+                observation.content = truncate_large_text(observation.content, max_chars, label=f"MCP:{action.name}")
+                
+            return observation
         except Exception as e:
             logger.error("MCP call failed for %s: %s", action.name, e, exc_info=True)
             return ErrorObservation(
@@ -537,16 +670,15 @@ class ActionExecutor:
             self.memory_monitor.stop_monitoring()
         except Exception:
             pass
-        if self.bash_session is not None:
+        
+        # Close all active shell sessions (including default)
+        for session_id, session in list(self.sessions.items()):
             try:
-                self.bash_session.close()
+                session.close()
             except Exception:
                 pass
-            self.bash_session = None
-        try:
-            self.terminal_manager.close_all()
-        except Exception:
-            pass
+        self.sessions.clear()
+
         if self.browser is not None:
             try:
                 self.browser.close()

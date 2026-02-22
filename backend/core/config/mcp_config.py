@@ -225,6 +225,47 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     servers: list[MCPServerConfig] = Field(default_factory=list)
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_legacy_server_lists(cls, data):
+        """Support legacy MCP config formats.
+
+        Historically, MCP servers were provided as separate lists like
+        ``stdio_servers`` / ``sse_servers`` / ``shttp_servers``. The current
+        unified format uses a single ``servers`` list. This coercion allows
+        older config sources (including playbook metadata) to be parsed.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        legacy_keys = ("stdio_servers", "sse_servers", "shttp_servers")
+        if not any(k in data for k in legacy_keys):
+            return data
+
+        servers = list(data.get("servers") or [])
+
+        def _extend_from(key: str, server_type: str) -> None:
+            items = data.get(key) or []
+            if isinstance(items, dict):
+                items = list(items.values())
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                srv = dict(item)
+                srv.setdefault("type", server_type)
+                servers.append(srv)
+
+        _extend_from("stdio_servers", "stdio")
+        _extend_from("sse_servers", "sse")
+        _extend_from("shttp_servers", "shttp")
+
+        coerced = dict(data)
+        coerced["servers"] = servers
+        for k in legacy_keys:
+            coerced.pop(k, None)
+        coerced.setdefault("enabled", bool(servers))
+        return coerced
+
     def validate_servers(self) -> None:
         """Validate that server URLs (for remote servers) are unique."""
         urls = [s.url for s in self.servers if s.url]
@@ -274,7 +315,7 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             mcp_json_path = os.path.join("backend", "runtime", "mcp", "config.json")
             if os.path.exists(mcp_json_path):
                 try:
-                    with open(mcp_json_path) as f:
+                    with open(mcp_json_path, encoding="utf-8") as f:
                         mcp_json = json.load(f)
                         if "mcpServers" in mcp_json:
                             existing_names = {s.name for s in servers}

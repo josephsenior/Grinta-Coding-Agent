@@ -499,7 +499,20 @@ Has this task been completed? Respond in JSON format:
 
         try:
             # Extract JSON from response
-            content = response.choices[0].message.content
+            choices = getattr(response, "choices", None)
+            if not choices or len(choices) == 0:
+                return ValidationResult(
+                    passed=False,
+                    reason="LLM evaluation returned no choices",
+                    confidence=0.1,
+                )
+            content = choices[0].message.content
+            if content is None:
+                return ValidationResult(
+                    passed=False,
+                    reason="LLM evaluation choice has no content",
+                    confidence=0.1,
+                )
             data = json.loads(content)
 
             return ValidationResult(

@@ -13,16 +13,17 @@ triggers:
 
 Two complementary memory systems:
 
-## 1. Repository Memory (repo.md)
+## 1. Repository Memory (lessons.md)
 
-**Location:** `.Forge/playbooks/repo.md` in each repo
+**Location:** `.Forge/lessons.md` or `memories/repo/lessons.md`
 
-**Purpose:** Project-specific knowledge (manual, curated)
+**Purpose:** Project-specific knowledge and historical lessons (automated/manual)
 
 **What to store:**
 - Repository structure & architecture
 - Common commands (build, test, deploy)
 - Code style & conventions
+- Past mistakes and their verified fixes
 - Development workflows
 - Setup instructions
 
@@ -32,7 +33,7 @@ Two complementary memory systems:
 - User preferences
 - Secrets
 
-**Auto-loads** when working in repository.
+**Auto-loads** at the start of every session (injected into system prompt).
 
 ## 2. Vector Memory (Automatic)
 
@@ -54,23 +55,23 @@ Two complementary memory systems:
 
 ## When to Use Each
 
-| Scenario | repo.md | Vector Memory |
-|----------|---------|---------------|
+| Scenario | lessons.md | Vector Memory |
+|----------|------------|---------------|
 | Project commands | ✅ | Auto-captured |
 | Code style | ✅ | Auto-captured |
-| Bug we fixed | ❌ | ✅ |
+| Bug we fixed | ✅ (Major) | ✅ |
 | Past conversation | ❌ | ✅ |
 | Team conventions | ✅ | Auto-captured |
 
-**Golden rule:** General project knowledge → repo.md. Everything else → vector memory (automatic).
+**Golden rule:** General project knowledge + historical lessons → lessons.md. Everything else → vector memory (automated).
 
-## Example: Save to repo.md
+## Example: Save to lessons.md
 
 **User:** "/remember the build process"
 
 **You:**
 ```
-I'll save to repo.md:
+I'll save to lessons.md:
 
 1. Build: npm run build
 2. Test: npm test -- --coverage
@@ -80,12 +81,13 @@ I'll save to repo.md:
 Save all or skip any?
 ```
 
-After approval → Update `.Forge/playbooks/repo.md`
+After approval → Update `.Forge/lessons.md` or `memories/repo/lessons.md`.
 
 ## Best Practices
 
-**repo.md:**
+**lessons.md:**
 - Concise (one-liners for commands)
+- Focus on "What NOT to do" (mistakes avoid)
 - Organized sections
 - Current info only
 

@@ -52,6 +52,7 @@ class LLMRegistry:
         config: ForgeConfig,
         agent_cls: str | None = None,
         retry_listener: Callable[[int, int], None] | None = None,
+        require_llm: bool = True,
     ) -> None:
         """Initialize LLM registry with configuration.
 
@@ -67,10 +68,12 @@ class LLMRegistry:
         self.agent_to_llm_config = self.config.get_agent_to_llm_config_map()
         self.service_to_llm: dict[str, LLM] = {}
         self.subscriber: Callable[[Any], None] | None = None
-        selected_agent_cls = agent_cls or self.config.default_agent
-        agent_name = selected_agent_cls if selected_agent_cls is not None else "agent"
-        llm_config = self.config.get_llm_config_from_agent(agent_name)
-        self.active_agent_llm: LLM = self.get_llm("agent", llm_config)
+        self.active_agent_llm: LLM | None = None
+        if require_llm:
+            selected_agent_cls = agent_cls or self.config.default_agent
+            agent_name = selected_agent_cls if selected_agent_cls is not None else "agent"
+            llm_config = self.config.get_llm_config_from_agent(agent_name)
+            self.active_agent_llm = self.get_llm("agent", llm_config)
 
     def _create_new_llm(
         self, service_id: str, config: LLMConfig, with_listener: bool = True
@@ -123,7 +126,14 @@ class LLMRegistry:
             )
         llm = self.service_to_llm[service_id]
         response = llm.completion(messages=messages)
-        return response.choices[0].message.content.strip()
+        choices = getattr(response, "choices", None)
+        if not choices:
+            raise ValueError("LLM completion returned no choices") from None
+        msg = getattr(choices[0], "message", None)
+        content = getattr(msg, "content", None) if msg else None
+        if content is None:
+            raise ValueError("LLM completion choice has no message content") from None
+        return content.strip()
 
     def get_llm_from_agent_config(self, service_id: str, agent_config: AgentConfig):
         """Get or create LLM from agent configuration.
@@ -181,6 +191,8 @@ class LLMRegistry:
             Active LLM instance used by the main agent
 
         """
+        if self.active_agent_llm is None:
+            raise RuntimeError("No active LLM configured for this registry.")
         return self.active_agent_llm
 
     def _set_active_llm(self, service_id) -> None:
@@ -208,11 +220,9 @@ class LLMRegistry:
 
         """
         self.subscriber = callback
-        self.notify(
-            RegistryEvent(
-                llm=self.active_agent_llm, service_id=self.active_agent_llm.service_id
-            )
-        )
+        if self.active_agent_llm is None:
+            return
+        self.notify(RegistryEvent(llm=self.active_agent_llm, service_id=self.active_agent_llm.service_id))
 
     def notify(self, event: RegistryEvent) -> None:
         """Notify subscriber of registry event.

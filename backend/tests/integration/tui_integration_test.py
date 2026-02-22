@@ -86,8 +86,15 @@ class TestHomeScreen(unittest.IsolatedAsyncioTestCase):
     """Tests for the HomeScreen: listing, search, and navigation triggers."""
 
     async def asyncSetUp(self) -> None:
+        self._prev_forge_runtime = os.environ.get("FORGE_RUNTIME")
         os.environ["FORGE_RUNTIME"] = "local"
         self.client = _make_mock_client()
+
+    async def asyncTearDown(self) -> None:
+        if self._prev_forge_runtime is None:
+            os.environ.pop("FORGE_RUNTIME", None)
+        else:
+            os.environ["FORGE_RUNTIME"] = self._prev_forge_runtime
 
     async def test_conversations_load(self) -> None:
         """HomeScreen should display all conversations on mount."""
@@ -100,7 +107,8 @@ class TestHomeScreen(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.screen, HomeScreen)
 
             list_view = app.screen.query_one("#conversation-list-view", ListView)
-            self.assertEqual(len(list_view.children), 3)
+            items = list(list_view.query(ConversationListItem))
+            self.assertEqual(len(items), 3)
 
     async def test_search_filters_conversations(self) -> None:
         """Typing in the search box should filter the conversation list."""
@@ -115,9 +123,10 @@ class TestHomeScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             list_view = app.screen.query_one("#conversation-list-view", ListView)
-            self.assertEqual(len(list_view.children), 1)
+            items = list(list_view.query(ConversationListItem))
+            self.assertEqual(len(items), 1)
 
-            title_label = list_view.children[0].query_one(
+            title_label = items[0].query_one(
                 ".conversation-title", Label
             )
             self.assertIn("Bug", str(title_label.renderable))
@@ -129,6 +138,9 @@ class TestHomeScreen(unittest.IsolatedAsyncioTestCase):
             for _ in range(5):
                 await pilot.pause()
 
+            list_view = app.screen.query_one("#conversation-list-view", ListView)
+            initial_items = list(list_view.query(ConversationListItem))
+
             search = app.screen.query_one("#search-input", Input)
             search.focus()
             await pilot.press(*"Bug")
@@ -136,11 +148,16 @@ class TestHomeScreen(unittest.IsolatedAsyncioTestCase):
 
             # Clear
             search.value = ""
-            await pilot.pause()
+            # UI updates can be async; wait a few ticks for the list to settle.
+            expected = len(initial_items)
+            items: list[ConversationListItem] = []
+            for _ in range(20):
+                await pilot.pause()
+                items = list(list_view.query(ConversationListItem))
+                if len(items) == expected:
+                    break
 
-            list_view = app.screen.query_one("#conversation-list-view", ListView)
-            # After clearing, _apply_filter runs via on_changed → should show all 3
-            self.assertEqual(len(list_view.children), 3)
+            self.assertEqual(len(items), expected)
 
     async def test_empty_state_shown_when_no_conversations(self) -> None:
         """If the backend returns no conversations, show the empty state."""
@@ -161,8 +178,15 @@ class TestNavigation(unittest.IsolatedAsyncioTestCase):
     """Tests for screen transitions: Home→Chat, Home→Settings, F1→Help."""
 
     async def asyncSetUp(self) -> None:
+        self._prev_forge_runtime = os.environ.get("FORGE_RUNTIME")
         os.environ["FORGE_RUNTIME"] = "local"
         self.client = _make_mock_client()
+
+    async def asyncTearDown(self) -> None:
+        if self._prev_forge_runtime is None:
+            os.environ.pop("FORGE_RUNTIME", None)
+        else:
+            os.environ["FORGE_RUNTIME"] = self._prev_forge_runtime
 
     async def test_select_conversation_pushes_chat(self) -> None:
         """Selecting a conversation in the list should push ChatScreen."""
@@ -246,8 +270,15 @@ class TestChatScreen(unittest.IsolatedAsyncioTestCase):
     """Tests for the ChatScreen: model selector, input, messages."""
 
     async def asyncSetUp(self) -> None:
+        self._prev_forge_runtime = os.environ.get("FORGE_RUNTIME")
         os.environ["FORGE_RUNTIME"] = "local"
         self.client = _make_mock_client()
+
+    async def asyncTearDown(self) -> None:
+        if self._prev_forge_runtime is None:
+            os.environ.pop("FORGE_RUNTIME", None)
+        else:
+            os.environ["FORGE_RUNTIME"] = self._prev_forge_runtime
 
     async def test_model_selector_loads(self) -> None:
         """Model selector should populate from the API."""
@@ -291,8 +322,15 @@ class TestSettingsScreen(unittest.IsolatedAsyncioTestCase):
     """Tests for the SettingsScreen: model dropdown, save."""
 
     async def asyncSetUp(self) -> None:
+        self._prev_forge_runtime = os.environ.get("FORGE_RUNTIME")
         os.environ["FORGE_RUNTIME"] = "local"
         self.client = _make_mock_client()
+
+    async def asyncTearDown(self) -> None:
+        if self._prev_forge_runtime is None:
+            os.environ.pop("FORGE_RUNTIME", None)
+        else:
+            os.environ["FORGE_RUNTIME"] = self._prev_forge_runtime
 
     async def test_models_load_in_settings(self) -> None:
         """Settings model dropdown should populate from the API."""
@@ -331,18 +369,25 @@ class TestAuthBypass(unittest.IsolatedAsyncioTestCase):
     """Verify that local runtime mode produces no 401 errors."""
 
     async def test_no_unauthorized_errors(self) -> None:
+        prev = os.environ.get("FORGE_RUNTIME")
         os.environ["FORGE_RUNTIME"] = "local"
         client = _make_mock_client()
-        app = ForgeApp(client)
-        async with app.run_test() as pilot:
-            for _ in range(5):
-                await pilot.pause()
+        try:
+            app = ForgeApp(client)
+            async with app.run_test() as pilot:
+                for _ in range(5):
+                    await pilot.pause()
 
-            all_statics = app.screen.query(Static)
-            for s in all_statics:
-                rendered = str(s.renderable)
-                self.assertNotIn("401", rendered)
-                self.assertNotIn("Unauthorized", rendered)
+                all_statics = app.screen.query(Static)
+                for s in all_statics:
+                    rendered = str(s.renderable)
+                    self.assertNotIn("401", rendered)
+                    self.assertNotIn("Unauthorized", rendered)
+        finally:
+            if prev is None:
+                os.environ.pop("FORGE_RUNTIME", None)
+            else:
+                os.environ["FORGE_RUNTIME"] = prev
 
 
 if __name__ == "__main__":

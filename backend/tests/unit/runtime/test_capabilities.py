@@ -1,6 +1,6 @@
 """Tests for backend.runtime.capabilities — runtime capability detection."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -141,19 +141,10 @@ class TestDetectCapabilities:
 
     @patch("sys.platform", "linux")
     @patch("shutil.which", return_value="/usr/bin/tool")
-    def test_browser_enabled_with_playwright(self, mock_which):
-        """Test browser capability when enabled and playwright available."""
-        with patch("importlib.import_module", return_value=MagicMock()):
-            caps = detect_capabilities(enable_browser=True)
-            assert caps.can_browse is True
-
-    @patch("sys.platform", "linux")
-    @patch("shutil.which", return_value="/usr/bin/tool")
-    def test_browser_enabled_without_playwright(self, mock_which):
-        """Test browser capability when enabled but playwright missing."""
-        with patch("importlib.import_module", side_effect=ImportError):
-            caps = detect_capabilities(enable_browser=True)
-            assert caps.can_browse is False
+    def test_browser_enabled(self, mock_which):
+        """Test browser capability when enabled."""
+        caps = detect_capabilities(enable_browser=True)
+        assert caps.can_browse is True
 
     @patch("sys.platform", "linux")
     @patch("shutil.which", return_value="/usr/bin/tool")
@@ -233,3 +224,42 @@ class TestDetectCapabilities:
         assert caps.platform == "freebsd"
         assert caps.is_windows is False
         assert caps.can_mcp is True
+
+    @patch("sys.platform", "win32")
+    def test_mcp_config_http_on_windows(self):
+        """Test that MCP is enabled on Windows if HTTP/SSE servers are configured."""
+        class MockServer:
+            def __init__(self, t):
+                self.type = t
+        
+        class MockConfig:
+            def __init__(self, svrs):
+                self.servers = svrs
+
+        # SSE server makes it True
+        cfg = MockConfig([MockServer("sse")])
+        caps = detect_capabilities(mcp_config=cfg)
+        assert caps.can_mcp is True
+
+        # stdio server on Windows remains False
+        cfg = MockConfig([MockServer("stdio")])
+        caps = detect_capabilities(mcp_config=cfg)
+        assert caps.can_mcp is False
+
+    @patch("sys.platform", "win32")
+    def test_mcp_config_exception(self):
+        """Test that MCP config exceptions are handled gracefully."""
+        class BadConfig:
+            @property
+            def servers(self):
+                raise Exception("Boom")
+
+        caps = detect_capabilities(mcp_config=BadConfig())
+        # Exception should result in has_http_mcp=False, so on Windows can_mcp=False
+        assert caps.can_mcp is False
+
+    @patch("sys.platform", "linux")
+    def test_mcp_config_none(self):
+        """Test mcp_config=None doesn't crash."""
+        caps = detect_capabilities(mcp_config=None)
+        assert caps.can_mcp is True  # True on Linux anyway

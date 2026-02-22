@@ -1,13 +1,29 @@
-import pytest
-import time
-import re
+import json
 import os
+import re
+import time
 from typing import cast
 from unittest.mock import MagicMock, patch
-from backend.runtime.utils.bash import BashSession, BashCommandStatus
+
+import pytest
+
+from backend.core.constants import CMD_OUTPUT_PS1_BEGIN, CMD_OUTPUT_PS1_END
 from backend.events.action import CmdRunAction
-from backend.events.observation.commands import CmdOutputObservation, CMD_OUTPUT_PS1_END
 from backend.events.observation import ErrorObservation
+from backend.events.observation.commands import CmdOutputObservation
+from backend.runtime.utils.bash import BashCommandStatus, BashSession
+
+
+def _fake_ps1_json_block(*, working_dir: str, exit_code: int = 0) -> str:
+    payload = {
+        "pid": 123,
+        "exit_code": exit_code,
+        "username": "testuser",
+        "hostname": "testhost",
+        "working_dir": working_dir,
+        "py_interpreter_path": "python",
+    }
+    return f"{CMD_OUTPUT_PS1_BEGIN}{json.dumps(payload)}{CMD_OUTPUT_PS1_END}"
 
 class TestBashSession:
     @pytest.fixture
@@ -82,8 +98,7 @@ class TestBashSession:
     @patch("backend.runtime.utils.bash.should_continue")
     def test_execute_command_success(self, mock_should_continue, session, mock_tmux):
         mock_should_continue.return_value = True
-        # format: \x01Forge|0|/tmp\x02
-        ps1_full = f"\x01Forge|0|{session.work_dir}\x02"
+        ps1_full = _fake_ps1_json_block(working_dir=session.work_dir, exit_code=0)
         
         # We need to mock _get_pane_content to exit the loop eventually
         with patch.object(session, "_get_pane_content") as mock_get_content:
@@ -107,26 +122,27 @@ class TestBashSession:
     @patch("time.time")
     def test_execute_no_change_timeout(self, mock_time, mock_should_continue, session, mock_tmux):
         mock_should_continue.return_value = True
-        
         def time_gen():
-            yield 100 # start_time in execute
-            yield 101 # last_change_time in execute
-            yield 102 # _monitor_command_execution initial state
-            yield 103 # loop _start_time
-            yield 104 # loop getting content debug
-            yield 105 # loop PANE CONTENT GOT debug
+            yield 100
             while True:
-                yield 150 # trigger timeout (30s default)
+                yield 150  # trigger no-change timeout
+
         mock_time.side_effect = time_gen()
-        
-        ps1_full = f"\x01Forge|0|{session.work_dir}\x02"
-        mock_tmux["pane"].cmd.return_value.stdout = [ps1_full]
+
+        ps1_full = _fake_ps1_json_block(working_dir=session.work_dir, exit_code=0)
+        running_output = ps1_full + "\nsleep 100\n"
         
         action = CmdRunAction(command="sleep 100")
-        action.set_hard_timeout(200.0)
-        
-        with patch("time.sleep"):
-             result = session.execute(action)
+        action.set_hard_timeout(200.0, blocking=False)
+
+        with patch.object(session, "_get_pane_content") as mock_get_content:
+            mock_get_content.side_effect = [
+                ps1_full,  # initial prompt (ready)
+                running_output,  # command started; no trailing PS1 prompt
+                running_output,  # unchanged output triggers no-change timeout
+            ]
+            with patch("time.sleep"):
+                result = session.execute(action)
         
         assert "no new output" in result.metadata.suffix
         assert session.prev_status == BashCommandStatus.NO_CHANGE_TIMEOUT
@@ -135,26 +151,28 @@ class TestBashSession:
     @patch("time.time")
     def test_execute_hard_timeout(self, mock_time, mock_should_continue, session, mock_tmux):
         mock_should_continue.return_value = True
-        
+
         def time_gen():
-            yield 100 # start_time in execute
-            yield 101 # last_change_time in execute
-            yield 102 # _monitor_command_execution initial state
-            yield 103 # loop _start_time
-            yield 104 # loop getting content debug
-            yield 105 # loop PANE CONTENT GOT debug
+            yield 100
             while True:
-                yield 120 # trigger hard timeout (10s)
+                yield 120  # trigger hard timeout
+
         mock_time.side_effect = time_gen()
-        
-        ps1_full = f"\x01Forge|0|{session.work_dir}\x02"
-        mock_tmux["pane"].cmd.return_value.stdout = [ps1_full]
+
+        ps1_full = _fake_ps1_json_block(working_dir=session.work_dir, exit_code=0)
+        running_output = ps1_full + "\nsleep 100\n"
         
         action = CmdRunAction(command="sleep 100")
         action.set_hard_timeout(10.0)
-        
-        with patch("time.sleep"):
-            result = session.execute(action)
+
+        with patch.object(session, "_get_pane_content") as mock_get_content:
+            mock_get_content.side_effect = [
+                ps1_full,  # initial prompt (ready)
+                running_output,  # command started; no trailing PS1 prompt
+                running_output,  # unchanged output triggers hard timeout
+            ]
+            with patch("time.sleep"):
+                result = session.execute(action)
             
         assert "timed out after 10.0 seconds" in result.metadata.suffix
         assert session.prev_status == BashCommandStatus.HARD_TIMEOUT

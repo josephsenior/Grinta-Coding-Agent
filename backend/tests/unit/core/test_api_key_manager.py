@@ -287,7 +287,7 @@ class TestSetEnvironmentVariables:
             )
             pcm.get_environment_variable.return_value = "OPENAI_API_KEY"
             # No key in environment
-            with patch.dict(os.environ, {}, clear=False):
+            with patch.dict(os.environ, {}, clear=True):
                 # Create a fresh instance with no stored keys
                 fresh_mgr = APIKeyManager()
                 fresh_mgr.set_environment_variables("gpt-4", None)

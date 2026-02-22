@@ -190,8 +190,9 @@ class PythonFileOps:
         if sys.platform == "win32":
             # Windows: check extension
             return file_path.suffix.lower() in (".exe", ".bat", ".cmd", ".ps1")
-        # Unix: check executable bit
+        # Unix: check executable bit (os.access can raise OSError at runtime)
         try:
             return os.access(file_path, os.X_OK)
         except OSError:
-            return False
+            pass
+        return False  # type: ignore[unreachable]

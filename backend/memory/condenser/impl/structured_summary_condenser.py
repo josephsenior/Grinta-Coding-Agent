@@ -260,7 +260,10 @@ class StructuredSummaryCondenser(BaseLLMCondenser):
     def _parse_llm_response(self, response) -> StateSummary:
         """Parse LLM response to extract StateSummary."""
         try:
-            message = response.choices[0].message
+            choices = getattr(response, "choices", None)
+            if not choices or len(choices) == 0:
+                raise ValueError("LLM response has no choices")
+            message = choices[0].message
             if not hasattr(message, "tool_calls") or not message.tool_calls:
                 msg = "No tool calls found in response"
                 raise ValueError(msg)

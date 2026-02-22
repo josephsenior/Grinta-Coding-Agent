@@ -333,3 +333,15 @@ class WindowsPowershellSession(BaseShellSession):
         return ErrorObservation(
             content="PowerShell session is not initialized or has been closed."
         )
+
+    def read_output(self) -> str:
+        """Read pending output from the shell session."""
+        # Not supported in current Windows implementation (subprocess-based)
+        return ""
+
+    def write_input(self, data: str, is_control: bool = False) -> None:
+        """Write input to the shell session."""
+        # Not supported in current Windows implementation (subprocess-based)
+        logger.warning(
+            "Terminal input not supported on Windows subprocess implementation"
+        )

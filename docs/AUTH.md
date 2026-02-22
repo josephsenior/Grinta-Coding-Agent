@@ -5,14 +5,14 @@ Forge OSS uses a single shared **session API key** to authenticate both HTTP req
 This document is the single source of truth for:
 - Which credentials are accepted
 - Where they must be sent (headers vs WebSocket handshake)
-- When (and how) query-string token auth is allowed
 
 ## Source of the session key
 
 The backend resolves the expected key in this priority order:
-1. `SESSION_API_KEY` environment variable
-2. A persisted key in `.env.local` (created by a prior run)
-3. Auto-generated key (written to `.env.local` when possible)
+1. `FORGE_RUNTIME="local"` → Returns `""` (disabled) for zero-config.
+2. `SESSION_API_KEY` environment variable
+3. A persisted key in `.env.local` (created by a prior run)
+4. Auto-generated key (written to `.env.local` when possible)
 
 If the resolved key is non-empty, auth is enforced for protected routes.
 
@@ -24,21 +24,11 @@ Preferred:
 Also accepted:
 - `Authorization: Bearer <SESSION_API_KEY>`
 
-Opt-in (disabled by default; leak-prone):
-- If `FORGE_ALLOW_QUERY_TOKEN_AUTH=true`, the backend will also accept a token in the query string:
-  - `?token=<SESSION_API_KEY>` or `?apiKey=<SESSION_API_KEY>`
-
-Notes:
-- Query-string tokens are discouraged because URLs often end up in logs, browser history, proxies, analytics, and referrers.
-
 ## Socket.IO auth invariants
 
 Preferred:
 - Provide the key in the Socket.IO **handshake auth payload**:
   - `auth: { session_api_key: "<SESSION_API_KEY>" }`
-
-Opt-in (disabled by default; leak-prone):
-- If `FORGE_ALLOW_QUERY_TOKEN_AUTH=true`, the backend will also accept `session_api_key` via the Socket.IO connection query string for legacy clients.
 
 ## Client expectations
 
@@ -50,4 +40,3 @@ The TUI (or any client) stores a per-conversation `session_api_key` value (retur
 
 - 401s on HTTP: ensure the request includes `X-Session-API-Key` matching the backend’s resolved `SESSION_API_KEY`.
 - Socket.IO connect errors (`invalid_session_api_key`): ensure the client passes `auth.session_api_key`.
-- Only enable `FORGE_ALLOW_QUERY_TOKEN_AUTH` for local/dev compatibility, and never for shared deployments.

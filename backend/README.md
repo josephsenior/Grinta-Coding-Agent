@@ -10,9 +10,17 @@ Auth invariants (HTTP headers, Socket.IO handshake auth, and the `FORGE_ALLOW_QU
 
 ```
 backend/
-├── forge/          # Main Python package (imported as `forge`)
-├── tests/          # Test suite
+├── adapters/       # I/O adapters (e.g., JSON)
+├── api/            # FastAPI application and routes
+├── cli/            # Command-line interface
+├── code_quality/   # Code quality checks
+├── controller/     # Agent controller and state management
+├── core/           # Core configurations, schemas, and utilities
+├── engines/        # AI engines (e.g., Orchestrator)
+├── events/         # Event system (Actions, Observations)
+├── runtime/        # Execution runtime and tools
 ├── scripts/        # Backend utility scripts
+├── tests/          # Test suite
 ├── tools/          # Development tools
 └── conftest.py     # Pytest configuration
 ```

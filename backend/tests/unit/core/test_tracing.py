@@ -12,14 +12,14 @@ class _TracingTestBase(unittest.TestCase):
     """Reset module-level globals before each test."""
 
     def setUp(self):
-        tracing_mod._tracing_initialized = False
-        tracing_mod._tracer = None
-        tracing_mod._trace_provider = None
+        tracing_mod._state.initialized = False
+        tracing_mod._state.tracer = None
+        tracing_mod._state.trace_provider = None
 
     def tearDown(self):
-        tracing_mod._tracing_initialized = False
-        tracing_mod._tracer = None
-        tracing_mod._trace_provider = None
+        tracing_mod._state.initialized = False
+        tracing_mod._state.tracer = None
+        tracing_mod._state.trace_provider = None
 
 
 # ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ class TestShouldInitialize(_TracingTestBase):
         self.assertFalse(tracing_mod._should_initialize(enabled=False))
 
     def test_already_initialized(self):
-        tracing_mod._tracing_initialized = True
+        tracing_mod._state.initialized = True
         self.assertFalse(tracing_mod._should_initialize(enabled=True))
 
     def test_enabled_not_initialized(self):
@@ -42,17 +42,17 @@ class TestShouldInitialize(_TracingTestBase):
 # ---------------------------------------------------------------------------
 class TestHelpers(_TracingTestBase):
     def test_set_initialized(self):
-        self.assertFalse(tracing_mod._tracing_initialized)
+        self.assertFalse(tracing_mod._state.initialized)
         tracing_mod._set_initialized()
-        self.assertTrue(tracing_mod._tracing_initialized)
+        self.assertTrue(tracing_mod._state.initialized)
 
     def test_finalize_tracer(self):
         mock_trace = MagicMock()
         mock_provider = MagicMock()
         mock_trace.get_tracer.return_value = "tracer_obj"
         tracing_mod._finalize_tracer(mock_trace, mock_provider, "svc", "1.0")
-        self.assertIs(tracing_mod._trace_provider, mock_provider)
-        self.assertEqual(tracing_mod._tracer, "tracer_obj")
+        self.assertIs(tracing_mod._state.trace_provider, mock_provider)
+        self.assertEqual(tracing_mod._state.tracer, "tracer_obj")
         mock_trace.get_tracer.assert_called_once_with("svc", "1.0")
 
 
@@ -62,13 +62,13 @@ class TestHelpers(_TracingTestBase):
 class TestInitializeTracing(_TracingTestBase):
     def test_disabled_does_nothing(self):
         tracing_mod.initialize_tracing(enabled=False)
-        self.assertFalse(tracing_mod._tracing_initialized)
+        self.assertFalse(tracing_mod._state.initialized)
 
     def test_already_initialized_is_noop(self):
-        tracing_mod._tracing_initialized = True
+        tracing_mod._state.initialized = True
         tracing_mod.initialize_tracing(enabled=True)
         # Still just True, no error
-        self.assertTrue(tracing_mod._tracing_initialized)
+        self.assertTrue(tracing_mod._state.initialized)
 
     @patch("backend.core.tracing._log_tracing_initialized")
     @patch("backend.core.tracing._set_initialized")
@@ -104,14 +104,14 @@ class TestInitializeTracing(_TracingTestBase):
     )
     def test_import_error_disables(self, mock_setup):
         tracing_mod.initialize_tracing(enabled=True)
-        self.assertFalse(tracing_mod._tracing_initialized)
+        self.assertFalse(tracing_mod._state.initialized)
 
     @patch(
         "backend.core.tracing._setup_tracer_provider", side_effect=RuntimeError("bad")
     )
     def test_generic_error_disables(self, mock_setup):
         tracing_mod.initialize_tracing(enabled=True)
-        self.assertFalse(tracing_mod._tracing_initialized)
+        self.assertFalse(tracing_mod._state.initialized)
 
     @patch("backend.core.tracing._log_tracing_initialized")
     @patch("backend.core.tracing._set_initialized")
@@ -164,14 +164,14 @@ class TestConfigureExporter(_TracingTestBase):
 # ---------------------------------------------------------------------------
 class TestGetTracer(_TracingTestBase):
     def test_returns_existing_tracer(self):
-        tracing_mod._tracing_initialized = True
-        tracing_mod._tracer = "my_tracer"
+        tracing_mod._state.initialized = True
+        tracing_mod._state.tracer = "my_tracer"
         self.assertEqual(tracing_mod.get_tracer(), "my_tracer")
 
     @patch("backend.core.tracing.initialize_tracing")
     def test_auto_initializes_when_not_initialized(self, mock_init):
-        tracing_mod._tracing_initialized = False
-        tracing_mod._tracer = "auto_tracer"
+        tracing_mod._state.initialized = False
+        tracing_mod._state.tracer = "auto_tracer"
         result = tracing_mod.get_tracer()
         mock_init.assert_called_once()
         self.assertEqual(result, "auto_tracer")
@@ -183,30 +183,30 @@ class TestGetTracer(_TracingTestBase):
 class TestShutdownTracing(_TracingTestBase):
     def test_shutdown_with_provider(self):
         mock_provider = MagicMock()
-        tracing_mod._trace_provider = mock_provider
-        tracing_mod._tracing_initialized = True
+        tracing_mod._state.trace_provider = mock_provider
+        tracing_mod._state.initialized = True
 
         tracing_mod.shutdown_tracing()
 
         mock_provider.shutdown.assert_called_once()
-        self.assertIsNone(tracing_mod._trace_provider)
-        self.assertFalse(tracing_mod._tracing_initialized)
+        self.assertIsNone(tracing_mod._state.trace_provider)
+        self.assertFalse(tracing_mod._state.initialized)
 
     def test_shutdown_no_provider(self):
-        tracing_mod._trace_provider = None
+        tracing_mod._state.trace_provider = None
         tracing_mod.shutdown_tracing()
-        self.assertFalse(tracing_mod._tracing_initialized)
+        self.assertFalse(tracing_mod._state.initialized)
 
     def test_shutdown_error_still_cleans_up(self):
         mock_provider = MagicMock()
         mock_provider.shutdown.side_effect = RuntimeError("shutdown error")
-        tracing_mod._trace_provider = mock_provider
-        tracing_mod._tracing_initialized = True
+        tracing_mod._state.trace_provider = mock_provider
+        tracing_mod._state.initialized = True
 
         tracing_mod.shutdown_tracing()
 
-        self.assertIsNone(tracing_mod._trace_provider)
-        self.assertFalse(tracing_mod._tracing_initialized)
+        self.assertIsNone(tracing_mod._state.trace_provider)
+        self.assertFalse(tracing_mod._state.initialized)
 
 
 # ---------------------------------------------------------------------------

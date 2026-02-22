@@ -57,8 +57,9 @@ class TestBuildCheckToolStatusAction:
             }
         ]
 
-        monkeypatch.setattr(
-            "backend.engines.orchestrator.tools.check_tool_status._collect_mcp_connection_errors",
+        monkeypatch.setitem(
+            build_check_tool_status_action.__globals__,
+            "_collect_mcp_connection_errors",
             lambda: errors,
         )
 

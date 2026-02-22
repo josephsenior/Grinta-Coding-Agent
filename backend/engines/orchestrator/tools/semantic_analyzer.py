@@ -5,7 +5,7 @@ Used by the project_map tool to provide more accurate results than plain regex.
 
 import sys
 from pathlib import Path
-from backend.engines.orchestrator.tools.treesitter_editor import StructureEditor
+from backend.engines.orchestrator.tools.structure_editor import StructureEditor
 
 
 def main():

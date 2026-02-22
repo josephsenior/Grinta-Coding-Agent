@@ -209,7 +209,7 @@ class TestMainEntryPoints:
     def test_setup_config_from_args_execution(self):
         args = MagicMock()
         args.config_file = "config.toml"
-        with patch("backend.core.config.utils.load_FORGE_config") as mock_load:
+        with patch("backend.core.config.utils.load_forge_config") as mock_load:
             with patch("backend.core.config.utils.apply_llm_config_override"):
                 with patch("backend.core.config.utils.apply_additional_overrides"):
                     setup_config_from_args(args)

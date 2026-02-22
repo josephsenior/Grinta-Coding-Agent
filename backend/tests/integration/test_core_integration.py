@@ -135,7 +135,7 @@ class TestCircuitBreakerDeque:
         cb.record_stuck_detection()
         result = cb.check(state)
         assert result.tripped is True
-        assert result.action == "stop"
+        assert result.action == "switch_context"
 
     def test_high_risk_actions_trip(self):
         config = CircuitBreakerConfig(max_high_risk_actions=3)

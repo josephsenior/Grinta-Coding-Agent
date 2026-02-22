@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 class _TracingState:
     """Internal state container for initialized tracing components."""
 
-    initialized = False
-    tracer = None
-    trace_provider = None
+    initialized: bool = False
+    tracer: Any = None
+    trace_provider: Any = None
 
 
 _state = _TracingState()

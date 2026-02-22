@@ -18,12 +18,17 @@ import pytest
 
 def _get_regression_dir() -> Path | None:
     raw = os.getenv("FORGE_TRAJECTORY_REGRESSION_DIR", "").strip()
-    if not raw:
-        return None
-    path = Path(raw)
-    if not path.exists() or not path.is_dir():
-        return None
-    return path
+    if raw:
+        path = Path(raw)
+        if path.exists() and path.is_dir():
+            return path
+
+    # Default to a minimal baseline directory committed to the repo so this
+    # regression harness runs in CI without extra environment configuration.
+    default_dir = Path(__file__).resolve().parents[1] / "fixtures" / "trajectory_regression"
+    if default_dir.exists() and default_dir.is_dir():
+        return default_dir
+    return None
 
 
 def _iter_json_files(path: Path) -> list[Path]:

@@ -237,3 +237,95 @@ class TestOrchestratorPromptManager:
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=mock_config)
         result = opm.get_system_message()
         assert "cli=True" in result
+
+    def test_build_playbook_info(self, tmp_path):
+        from backend.utils.prompt import PromptManager
+
+        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2", 
+                    "playbook_info.j2", "knowledge_base_info.j2"]:
+            (tmp_path / name).write_text("playbook={{ triggered_agents[0].name }}", encoding="utf-8")
+        
+        pm = PromptManager(prompt_dir=str(tmp_path))
+        mock_agent = MagicMock()
+        mock_agent.name = "test_playbook"
+        result = pm.build_playbook_info([mock_agent])
+        assert "test_playbook" in result
+
+    def test_build_knowledge_base_info(self, tmp_path):
+        from backend.utils.prompt import PromptManager
+
+        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2", 
+                    "playbook_info.j2", "knowledge_base_info.j2"]:
+            (tmp_path / name).write_text("kb={{ kb_results[0].content }}", encoding="utf-8")
+        
+        pm = PromptManager(prompt_dir=str(tmp_path))
+        mock_result = MagicMock()
+        mock_result.content = "kb_content"
+        result = pm.build_knowledge_base_info([mock_result])
+        assert "kb_content" in result
+
+    def test_add_turns_left_reminder(self, tmp_path):
+        from backend.core.message import Message, TextContent
+        from backend.utils.prompt import PromptManager
+
+        # Need valid templates even if we don't render them for this specific test
+        # because __init__ loads them.
+        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2", 
+                    "playbook_info.j2", "knowledge_base_info.j2"]:
+            (tmp_path / name).write_text("x", encoding="utf-8")
+
+        pm = PromptManager(prompt_dir=str(tmp_path))
+        msg = Message(role="user", content=[TextContent(text="Hello")])
+        mock_state = MagicMock()
+        mock_state.iteration_flag.max_value = 10
+        mock_state.iteration_flag.current_value = 2
+        
+        pm.add_turns_left_reminder([msg], mock_state)
+        
+        last_content = msg.content[-1]
+        assert isinstance(last_content, TextContent)
+        assert "8 turns left" in last_content.text
+
+    @patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x)
+    def test_inject_lessons_learned(self, mock_refine, tmp_path):
+        from backend.utils.prompt import OrchestratorPromptManager
+        
+        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2", 
+                    "playbook_info.j2", "knowledge_base_info.j2"]:
+            (tmp_path / name).write_text("body", encoding="utf-8")
+            
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
+        opm.set_prompt_tier("debug")
+        
+        # Test missing lessons file
+        with patch("os.path.exists", return_value=False):
+            result = opm.get_system_message()
+            assert "REPOSITORY_LESSONS_LEARNED" not in result
+            
+        # Test existing lessons file
+        import os
+        lessons_dir = tmp_path / ".Forge"
+        lessons_dir.mkdir(exist_ok=True)
+        lessons_file = lessons_dir / "lessons.md"
+        lessons_file.write_text("Always test your code.", encoding="utf-8")
+        
+        with patch("os.path.exists", side_effect=lambda p: str(lessons_file) in p or ".Forge" in p):
+            with patch("os.path.join", return_value=str(lessons_file)):
+                result = opm.get_system_message()
+                assert "REPOSITORY_LESSONS_LEARNED" in result
+                assert "Always test your code." in result
+
+    @patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x)
+    def test_inject_scratchpad(self, mock_refine, tmp_path):
+        from backend.utils.prompt import OrchestratorPromptManager
+        
+        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2", 
+                    "playbook_info.j2", "knowledge_base_info.j2"]:
+            (tmp_path / name).write_text("body", encoding="utf-8")
+            
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
+        
+        with patch("backend.engines.orchestrator.tools.note._load_notes", return_value={"key": "val"}):
+            result = opm.get_system_message()
+            assert "WORKING_SCRATCHPAD" in result
+            assert "[key]: val" in result

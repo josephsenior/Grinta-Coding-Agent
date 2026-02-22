@@ -56,8 +56,9 @@ class TestEnsureCanStep:
         ctrl.circuit_breaker_service.check.return_value = SimpleNamespace(tripped=False)
         ctrl.stuck_service.is_stuck.return_value = True
         ctrl.circuit_breaker_service.record_stuck_detection = MagicMock()
-        assert await svc.ensure_can_step() is False
-        ctrl._react_to_exception.assert_awaited_once()
+        assert await svc.ensure_can_step() is True
+        ctrl.circuit_breaker_service.record_stuck_detection.assert_called_once()
+        ctrl._react_to_exception.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_no_services(self):

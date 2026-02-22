@@ -85,7 +85,7 @@ class LLMResponse:
         content: str,
         model: str,
         usage: dict[str, int],
-        id: str = "",
+        response_id: str = "",
         finish_reason: str = "stop",
         tool_calls: list[dict[str, Any]] | None = None,
         **kwargs,
@@ -93,7 +93,7 @@ class LLMResponse:
         self.content = content
         self.model = model
         self.usage = usage
-        self.id = kwargs.get("response_id", id)
+        self.id = kwargs.get("response_id", kwargs.get("id", response_id))
         self.finish_reason = finish_reason
         self.tool_calls = tool_calls
 
@@ -213,7 +213,10 @@ class OpenAIClient(DirectLLMClient):
             messages=messages,  # type: ignore[arg-type]
             **kwargs,
         )
-        msg = response.choices[0].message
+        if not getattr(response, "choices", None) or len(response.choices) == 0:
+            raise ValueError("OpenAI completion returned no choices")
+        first = response.choices[0]
+        msg = first.message
         tool_calls = self._extract_openai_tool_calls(msg)
         return LLMResponse(
             content=msg.content or "",
@@ -226,7 +229,7 @@ class OpenAIClient(DirectLLMClient):
                 "total_tokens": response.usage.total_tokens if response.usage else 0,
             },
             id=response.id,
-            finish_reason=response.choices[0].finish_reason,
+            finish_reason=getattr(first, "finish_reason", None),
             tool_calls=tool_calls,
         )
 
@@ -239,7 +242,10 @@ class OpenAIClient(DirectLLMClient):
             messages=messages,  # type: ignore[arg-type]
             **kwargs,
         )
-        msg = response.choices[0].message
+        if not getattr(response, "choices", None) or len(response.choices) == 0:
+            raise ValueError("OpenAI completion returned no choices")
+        first = response.choices[0]
+        msg = first.message
         tool_calls = self._extract_openai_tool_calls(msg)
         return LLMResponse(
             content=msg.content or "",
@@ -252,7 +258,7 @@ class OpenAIClient(DirectLLMClient):
                 "total_tokens": response.usage.total_tokens if response.usage else 0,
             },
             id=response.id,
-            finish_reason=response.choices[0].finish_reason,
+            finish_reason=getattr(first, "finish_reason", None),
             tool_calls=tool_calls,
         )
 
@@ -586,7 +592,7 @@ class GeminiClient(DirectLLMClient):
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
-        model_name, chat, prompt = self._build_gemini_chat(messages, kwargs)
+        _model_name, chat, prompt = self._build_gemini_chat(messages, kwargs)
         response = await chat.send_message_async(prompt, stream=True, **kwargs)
 
         async for chunk in response:

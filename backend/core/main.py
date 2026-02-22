@@ -571,7 +571,10 @@ def load_replay_log(trajectory_path: str) -> tuple[list[Event] | None, Action]:
             raise ValueError(msg)
         with open(path, encoding="utf-8") as file:
             events = ReplayManager.get_replay_events(json.load(file))
-            assert isinstance(events[0], MessageAction)
+            if not events:
+                raise ValueError(f"Trajectory file contains no events: {path}") from None
+            if not isinstance(events[0], MessageAction):
+                raise ValueError(f"Trajectory first event must be MessageAction, got {type(events[0]).__name__}") from None
             return (events[1:], events[0])
     except json.JSONDecodeError as e:
         msg = f"Invalid JSON format in {trajectory_path}: {e}"

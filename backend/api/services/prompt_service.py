@@ -59,15 +59,15 @@ def generate_prompt_template(events: str) -> str:
     """
     from jinja2 import Environment, FileSystemLoader
 
+    backend_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    search_paths = [
+        os.path.join(backend_root, "instruction", "prompts"),
+        os.path.join(backend_root, "playbook_engine", "prompts"),
+    ]
+
     # nosec B701 - Template rendering for prompts (not HTML), autoescape enabled
     env = Environment(
-        loader=FileSystemLoader(
-            os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                "instruction",
-                "prompts",
-            )
-        ),
+        loader=FileSystemLoader(search_paths),
         autoescape=True,
     )
     template = env.get_template("generate_remember_prompt.j2")

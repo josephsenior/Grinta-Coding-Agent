@@ -169,7 +169,9 @@ class ForgeClient:
     @staticmethod
     def _raise_for_status(resp: httpx.Response) -> None:
         """Raise an error with the server's own detail message when possible."""
-        if resp.is_success:
+        status_code = int(getattr(resp, "status_code", 0) or 0)
+        # Mirror httpx.Response.is_success semantics (2xx only)
+        if 200 <= status_code < 300:
             return
         detail: str = ""
         try:
@@ -180,8 +182,8 @@ class ForgeClient:
             if isinstance(detail, list):  # FastAPI validation errors
                 detail = "; ".join(str(e.get("msg", e)) for e in detail)
         except Exception:
-            detail = resp.text or resp.reason_phrase or ""
-        code = resp.status_code
+            detail = getattr(resp, "text", "") or getattr(resp, "reason_phrase", "") or ""
+        code = status_code
         prefix = {
             400: "Bad request",
             401: "Unauthorized",
@@ -191,8 +193,10 @@ class ForgeClient:
             500: "Server error",
             503: "Service unavailable",
         }.get(code, f"HTTP {code}")
-        msg = f"{prefix}: {detail}" if detail else f"HTTP {code} {resp.reason_phrase}"
-        raise httpx.HTTPStatusError(msg, request=resp.request, response=resp)
+        reason_phrase = getattr(resp, "reason_phrase", "")
+        msg = f"{prefix}: {detail}" if detail else f"HTTP {code} {reason_phrase}"
+        request = getattr(resp, "request", None)
+        raise httpx.HTTPStatusError(msg, request=request, response=resp)
 
     # ── conversations ─────────────────────────────────────────────
 

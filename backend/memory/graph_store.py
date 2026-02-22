@@ -142,7 +142,8 @@ class GraphMemoryStore:
         try:
             with open(self.persistence_path, encoding="utf-8") as f:
                 data = json.load(f)
-            self.graph = nx.node_link_graph(data)
+            loaded = nx.node_link_graph(data)
+            self.graph = loaded
             logger.info(
                 "Graph loaded from %s (%s nodes)",
                 self.persistence_path,
@@ -150,6 +151,7 @@ class GraphMemoryStore:
             )
         except Exception as e:
             logger.error("Failed to load graph: %s", e)
+            raise
 
     def _auto_save(self):
         """Save on every write if path is set (for now)."""

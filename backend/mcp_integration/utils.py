@@ -110,11 +110,10 @@ async def _connect_to_server(
     """
     if server.type == "stdio":
         return await _connect_stdio_server(server)
-    elif server.type in ("sse", "shttp"):
+    if server.type in ("sse", "shttp"):
         return await _connect_http_server(server, conversation_id)
-    else:
-        logger.error("Unknown MCP server type: %s", server.type)
-        return None
+    logger.error("Unknown MCP server type: %s", server.type)
+    return None
 
 
 async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
@@ -197,14 +196,14 @@ async def fetch_mcp_tools_from_config(
     mcp_tools = []
     try:
         logger.debug("Creating MCP clients with config: %s", mcp_config)
-        
+
         # Filter servers: only include stdio if use_stdio is True
         servers_to_connect = (
             mcp_config.servers
             if use_stdio
             else [s for s in mcp_config.servers if s.type != "stdio"]
         )
-        
+
         mcps = await create_mcps(servers_to_connect, conversation_id)
         if not mcps:
             logger.warning(
@@ -408,7 +407,7 @@ async def add_mcp_tools_to_agent(
             if server not in extra_servers:
                 extra_servers.append(server)
                 logger.warning("Added playbook MCP server: %s (%s)", server.name, server.type)
-    
+
     updated_mcp_config = runtime.get_mcp_config(extra_servers)
 
     mcp_tools = await fetch_mcp_tools_from_config(

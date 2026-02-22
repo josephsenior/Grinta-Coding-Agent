@@ -65,7 +65,7 @@ class ServerConversation:
                     "LLM config not ready, runtime will start without agent capability: %s",
                     e,
                 )
-                llm_registry = LLMRegistry(self.config)  # Will use defaults
+                llm_registry = LLMRegistry(self.config, require_llm=False)
 
             runtime = _instantiate_runtime(
                 runtime_cls,

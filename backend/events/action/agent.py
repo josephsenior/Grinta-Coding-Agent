@@ -370,10 +370,14 @@ class DelegateTaskAction(Action):
     Attributes:
         task_description (str): What the worker should do.
         files (list[str]): Relevant files for the task.
+        parallel_tasks (list[dict]): If non-empty, spawn multiple workers concurrently.
+            Each item should have 'task_description' and optionally 'files'.
+            When present, task_description/files on the parent action are ignored.
     """
 
     task_description: str = ""
     files: list[str] = field(default_factory=list)
+    parallel_tasks: list[dict] = field(default_factory=list)
     action: ClassVar[str] = ActionType.DELEGATE_TASK
 
     @property

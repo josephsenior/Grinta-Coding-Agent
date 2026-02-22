@@ -99,13 +99,16 @@ class TestAdvancedPatterns:
         assert sd._is_stuck_token_repetition(history) is True
 
     def test_is_stuck_cost_acceleration(self):
-        from backend.telemetry.models import LLMMetrics, TokenUsage
+        from backend.llm.metrics import Metrics, TokenUsage
         
         history = []
         for i in range(10):
             m = _cmd(f"cmd {i}")
             # Rapidly growing prompt tokens
-            m.llm_metrics = LLMMetrics(token_usages=[TokenUsage(prompt_tokens=i*3000, completion_tokens=10)])
+            m.llm_metrics = Metrics()
+            m.llm_metrics.token_usages = [
+                TokenUsage(prompt_tokens=i * 3000, completion_tokens=10)
+            ]
             history.append(m)
             history.append(_cmd_output())
             

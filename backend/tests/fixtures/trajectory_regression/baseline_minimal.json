@@ -1,0 +1,10 @@
+{
+  "trajectory": [
+    {
+      "id": 1,
+      "agent_state": "done",
+      "type": "MessageAction",
+      "content": "baseline trajectory fixture"
+    }
+  ]
+}

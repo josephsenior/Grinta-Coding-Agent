@@ -75,7 +75,7 @@ class TestGetEventRuntimeDefaults:
         """Clear LRU cache after each test."""
         get_event_runtime_defaults.cache_clear()
 
-    @patch("backend.core.config.utils.load_FORGE_config")
+    @patch("backend.core.config.utils.load_forge_config")
     def test_loads_from_forge_config(self, mock_load_config):
         """Test loads configuration from Forge config file."""
         # Mock config with event_stream section
@@ -107,7 +107,7 @@ class TestGetEventRuntimeDefaults:
         assert defaults.coalesce_window_ms == 150.0
         assert defaults.coalesce_max_batch == 30
 
-    @patch("backend.core.config.utils.load_FORGE_config")
+    @patch("backend.core.config.utils.load_forge_config")
     def test_returns_defaults_when_no_event_stream_section(self, mock_load_config):
         """Test returns built-in defaults when config has no event_stream section."""
         mock_config = MagicMock()
@@ -119,7 +119,7 @@ class TestGetEventRuntimeDefaults:
         # Should use environment defaults
         assert defaults.max_queue_size == 2000  # default from env
 
-    @patch("backend.core.config.utils.load_FORGE_config", side_effect=ImportError)
+    @patch("backend.core.config.utils.load_forge_config", side_effect=ImportError)
     def test_falls_back_to_env_on_config_load_error(self, mock_load_config):
         """Test falls back to environment variables on config load error."""
         defaults = get_event_runtime_defaults()
@@ -143,7 +143,7 @@ class TestGetEventRuntimeDefaults:
 
         # Patch config loading to fail so we use env vars
         with patch(
-            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+            "backend.core.config.utils.load_forge_config", side_effect=Exception
         ):
             defaults = get_event_runtime_defaults()
 
@@ -163,7 +163,7 @@ class TestGetEventRuntimeDefaults:
         get_event_runtime_defaults.cache_clear()
 
         with patch(
-            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+            "backend.core.config.utils.load_forge_config", side_effect=Exception
         ):
             # Test "1"
             monkeypatch.setenv("FORGE_EVENT_COALESCE", "1")
@@ -180,7 +180,7 @@ class TestGetEventRuntimeDefaults:
         get_event_runtime_defaults.cache_clear()
 
         with patch(
-            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+            "backend.core.config.utils.load_forge_config", side_effect=Exception
         ):
             # Test "yes"
             monkeypatch.setenv("FORGE_EVENTSTREAM_ASYNC_WRITE", "yes")
@@ -198,7 +198,7 @@ class TestGetEventRuntimeDefaults:
         monkeypatch.setenv("FORGE_EVENTSTREAM_WORKERS", "0")
 
         with patch(
-            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+            "backend.core.config.utils.load_forge_config", side_effect=Exception
         ):
             defaults = get_event_runtime_defaults()
 
@@ -210,7 +210,7 @@ class TestGetEventRuntimeDefaults:
         monkeypatch.setenv("FORGE_EVENT_COALESCE_MAX_BATCH", "-5")
 
         with patch(
-            "backend.core.config.utils.load_FORGE_config", side_effect=Exception
+            "backend.core.config.utils.load_forge_config", side_effect=Exception
         ):
             defaults = get_event_runtime_defaults()
 
@@ -224,7 +224,7 @@ class TestGetEventRuntimeDefaults:
         # Should be same instance due to caching
         assert defaults1 is defaults2
 
-    @patch("backend.core.config.utils.load_FORGE_config")
+    @patch("backend.core.config.utils.load_forge_config")
     def test_uses_getattr_fallbacks_for_missing_attributes(self, mock_load_config):
         """Test uses default values when config attributes are missing."""
         mock_config = MagicMock()

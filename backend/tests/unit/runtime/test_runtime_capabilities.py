@@ -140,26 +140,13 @@ class TestDetectCapabilities:
         cap = detect_capabilities(enable_browser=False)
         assert cap.can_browse is False
 
-    @patch("importlib.import_module")
     @patch("backend.runtime.capabilities.shutil.which")
     @patch("backend.runtime.capabilities.sys")
-    def test_browser_enabled_with_playwright(self, mock_sys, mock_which, mock_import):
+    def test_browser_enabled(self, mock_sys, mock_which):
         mock_sys.platform = "linux"
         mock_which.return_value = "/usr/bin/tool"
-        mock_import.return_value = object()  # playwright importable
         cap = detect_capabilities(enable_browser=True)
         assert cap.can_browse is True
-
-    @patch("importlib.import_module", side_effect=ImportError)
-    @patch("backend.runtime.capabilities.shutil.which")
-    @patch("backend.runtime.capabilities.sys")
-    def test_browser_enabled_but_playwright_missing(
-        self, mock_sys, mock_which, mock_import
-    ):
-        mock_sys.platform = "linux"
-        mock_which.return_value = "/usr/bin/tool"
-        cap = detect_capabilities(enable_browser=True)
-        assert cap.can_browse is False
 
     @patch("backend.runtime.capabilities.shutil.which")
     @patch("backend.runtime.capabilities.sys")

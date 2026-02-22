@@ -123,7 +123,7 @@ jobs:
           python-version: '3.12'
           cache: poetry
       - name: Install Python dependencies using Poetry
-        run: make install-python-dependencies POETRY_GROUP=main INSTALL_PLAYWRIGHT=0
+        run: make install-python-dependencies POETRY_GROUP=main
       - name: Create source distribution and Dockerfile
         run: poetry run python3 Forge/runtime/utils/runtime_build.py --base_image ${{ matrix.base_image.image }} --build_folder containers/runtime --force_rebuild
       - name: Lowercase Repository Owner
@@ -205,7 +205,7 @@ jobs:
           python-version: '3.12'
           cache: poetry
       - name: Install Python dependencies using Poetry
-        run: make install-python-dependencies INSTALL_PLAYWRIGHT=0
+        run: make install-python-dependencies
       - name: Run docker runtime tests
         shell: bash
         run: |
@@ -267,7 +267,7 @@ jobs:
           python-version: '3.12'
           cache: poetry
       - name: Install Python dependencies using Poetry
-        run: make install-python-dependencies POETRY_GROUP=main,test,runtime INSTALL_PLAYWRIGHT=0
+        run: make install-python-dependencies POETRY_GROUP=main,test,runtime
       - name: Run runtime tests
         shell: bash
         run: |

@@ -78,7 +78,6 @@ def get_impl[T](cls: type[T], impl_name: str | None) -> type[T]:
         return impl_class
 
     _raise_invalid_impl(cls, impl_class)
-    return None
 
 
 def _impl_matches_base(cls: type[T], impl_class: type[T]) -> bool:

@@ -210,7 +210,8 @@ class TestGetRecoveryActions:
         actions = ErrorRecoveryStrategy.get_recovery_actions(
             ErrorType.MODULE_NOT_FOUND, err
         )
-        assert len(actions) == 1  # Just the think action
+        assert len(actions) == 3
+        assert hasattr(actions[1], "command")
 
     def test_runtime_crash(self):
         actions = ErrorRecoveryStrategy.get_recovery_actions(

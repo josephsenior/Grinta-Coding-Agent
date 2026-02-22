@@ -199,9 +199,13 @@ class TestBaseLLMCondenser:
         with pytest.raises(ValueError, match="keep_first.*cannot be negative"):
             ConcreteLLMCondenser(llm=None, max_size=10, keep_first=-1)
 
-    def test_keep_first_less_than_half_max(self):
-        with pytest.raises(ValueError, match="keep_first.*less than half"):
-            ConcreteLLMCondenser(llm=None, max_size=10, keep_first=5)
+    def test_keep_first_at_most_half_max_ok(self):
+        # keep_first may be at most half of max_size.
+        ConcreteLLMCondenser(llm=None, max_size=10, keep_first=5)
+
+    def test_keep_first_greater_than_half_max_raises(self):
+        with pytest.raises(ValueError, match="keep_first.*half"):
+            ConcreteLLMCondenser(llm=None, max_size=10, keep_first=6)
 
     def test_should_condense(self):
         c = ConcreteLLMCondenser(llm=None, max_size=5, keep_first=1)

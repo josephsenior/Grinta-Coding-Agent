@@ -48,6 +48,14 @@ class UnifiedShellSession(ABC):
     def get_detected_server(self):
         """Get and clear the last detected server."""
 
+    @abstractmethod
+    def read_output(self) -> str:
+        """Read pending output from the shell session."""
+
+    @abstractmethod
+    def write_input(self, data: str, is_control: bool = False) -> None:
+        """Write input to the shell session."""
+
 
 class BaseShellSession(UnifiedShellSession, ABC):
     """Base class for shell sessions with common functionality.

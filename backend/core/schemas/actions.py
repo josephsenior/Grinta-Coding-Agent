@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Union
+from typing import Any, Literal, Union
 
 from pydantic import Field, field_validator
 
@@ -246,6 +246,235 @@ class TerminalReadActionSchema(ActionSchemaV1):
     session_id: str = Field(..., min_length=1, description="Terminal session ID")
 
 
+class BrowseInteractiveActionSchema(ActionSchemaV1):
+    """Schema for BrowseInteractiveAction.
+
+    Action to perform interactive browser operations.
+    This is a higher-level browsing action that can encode one or more
+    browser interactions (clicks, typing, navigation) for an external
+    browser tool/runtime.
+    """
+
+    action_type: Literal["browse_interactive"] = Field(
+        ActionType.BROWSE_INTERACTIVE.value, frozen=True
+    )
+    runnable: bool = Field(True, frozen=True)
+    browser_actions: str = Field(
+        default="", description="Browser actions to execute (clicks, typing, navigation)"
+    )
+
+
+class AgentThinkActionSchema(ActionSchemaV1):
+    """Schema for AgentThinkAction.
+
+    An action where the agent logs a thought.
+    """
+
+    action_type: Literal["think"] = Field(ActionType.THINK.value, frozen=True)
+    runnable: bool = Field(False, frozen=True)
+
+
+class ClarificationRequestActionSchema(ActionSchemaV1):
+    """Schema for ClarificationRequestAction.
+
+    An action where the agent asks for clarification before proceeding.
+    This enables the LLM to proactively request clarification rather than
+    making assumptions that may lead to errors.
+    """
+
+    action_type: Literal["clarification"] = Field(
+        ActionType.CLARIFICATION.value, frozen=True
+    )
+    runnable: bool = Field(False, frozen=True)
+    question: str = Field(..., description="The clarification question")
+    options: list[str] = Field(
+        default_factory=list, description="Optional multiple choice options"
+    )
+    context: str = Field(default="", description="Why clarification is needed")
+
+
+class EscalateToHumanActionSchema(ActionSchemaV1):
+    """Schema for EscalateToHumanAction.
+
+    An action where the agent requests escalation to human assistance.
+    This enables the LLM to explicitly request help when it's stuck,
+    has tried multiple approaches without success, or needs human intervention.
+    """
+
+    action_type: Literal["escalate"] = Field(ActionType.ESCALATE.value, frozen=True)
+    runnable: bool = Field(False, frozen=True)
+    reason: str = Field(..., description="Why escalation is being requested")
+    attempts_made: list[str] = Field(
+        default_factory=list, description="Summary of approaches already tried"
+    )
+    specific_help_needed: str = Field(
+        default="", description="What kind of help is needed"
+    )
+
+
+class MCPActionSchema(ActionSchemaV1):
+    """Schema for MCPAction.
+
+    Action to call an MCP (Model Context Protocol) tool.
+    """
+
+    action_type: Literal["call_tool_mcp"] = Field(ActionType.MCP.value, frozen=True)
+    runnable: bool = Field(True, frozen=True)
+    name: str = Field(..., description="Name of the MCP tool to call")
+    arguments: dict[str, Any] = Field(
+        default_factory=dict, description="Arguments to pass to the tool"
+    )
+
+
+class ProposalActionSchema(ActionSchemaV1):
+    """Schema for ProposalAction.
+
+    An action where the agent proposes options before committing to a path.
+    This enables the LLM to suggest different approaches and get user feedback
+    before executing potentially risky or irreversible actions.
+    """
+
+    action_type: Literal["proposal"] = Field(ActionType.PROPOSAL.value, frozen=True)
+    runnable: bool = Field(False, frozen=True)
+    options: list[dict[str, Any]] = Field(
+        default_factory=list, description="List of proposed options"
+    )
+    recommended: int = Field(default=0, description="Index of the recommended option")
+    rationale: str = Field(
+        default="", description="Why these options are being proposed"
+    )
+
+
+class RecallActionSchema(ActionSchemaV1):
+    """Schema for RecallAction.
+
+    This action is used for retrieving content, e.g., from the global directory or user workspace.
+    """
+
+    action_type: Literal["recall"] = Field(ActionType.RECALL.value, frozen=True)
+    runnable: bool = Field(False, frozen=True)
+    recall_type: str = Field(default="workspace_context", description="Type of recall")
+    query: str = Field(..., description="Recall query")
+
+
+class StreamingChunkActionSchema(ActionSchemaV1):
+    """Schema for StreamingChunkAction.
+
+    Streaming chunk from LLM for real-time token display.
+    Emitted during LLM streaming to show tokens as they arrive,
+    providing instant feedback.
+    """
+
+    action_type: Literal["streaming_chunk"] = Field(
+        ActionType.STREAMING_CHUNK.value, frozen=True
+    )
+    runnable: bool = Field(False, frozen=True)
+    chunk: str = Field(..., description="The new token/chunk text")
+    accumulated: str = Field(default="", description="All text accumulated so far")
+    is_final: bool = Field(default=False, description="True when streaming is complete")
+
+
+class TaskTrackingActionSchema(ActionSchemaV1):
+    """Schema for TaskTrackingAction.
+
+    An action where the agent writes or updates a task list for task management.
+    """
+
+    action_type: Literal["task_tracking"] = Field(
+        ActionType.TASK_TRACKING.value, frozen=True
+    )
+    runnable: bool = Field(False, frozen=True)
+    command: str = Field(default="view", description="Task tracking command")
+    task_list: list[dict[str, Any]] = Field(
+        default_factory=list, description="List of task items"
+    )
+
+
+class UncertaintyActionSchema(ActionSchemaV1):
+    """Schema for UncertaintyAction.
+
+    An action where the agent expresses uncertainty about its current understanding or observations.
+    This enables the LLM to explicitly flag doubt rather than guessing or hallucinating.
+    The system can then provide clarification, additional context, or switch strategy.
+    """
+
+    action_type: Literal["uncertainty"] = Field(
+        ActionType.UNCERTAINTY.value, frozen=True
+    )
+    runnable: bool = Field(False, frozen=True)
+    uncertainty_level: float = Field(default=0.5, description="Confidence level 0.0-1.0")
+    specific_concerns: list[str] = Field(
+        default_factory=list, description="Specific things the agent is uncertain about"
+    )
+    requested_information: str = Field(
+        default="", description="What information would help resolve uncertainty"
+    )
+
+
+class DelegateTaskActionSchema(ActionSchemaV1):
+    """Schema for DelegateTaskAction.
+
+    An action where the orchestrator delegates a subtask to a worker agent.
+    """
+
+    action_type: Literal["delegate_task"] = Field(
+        ActionType.DELEGATE_TASK.value, frozen=True
+    )
+    runnable: bool = Field(True, frozen=True)
+    task_description: str = Field(
+        default="", description="Description of the delegated task"
+    )
+    files: list[str] = Field(
+        default_factory=list, description="Relevant files for the task"
+    )
+    parallel_tasks: list[dict[str, Any]] = Field(
+        default_factory=list, description="Parallel tasks to spawn"
+    )
+
+
+class CondensationActionSchema(ActionSchemaV1):
+    """Schema for CondensationAction.
+
+    This action indicates a condensation of the conversation history is happening.
+    There are two ways to specify the events to be forgotten:
+    1. By providing a list of event IDs.
+    2. By providing the start and end IDs of a range of events.
+    In the second case, we assume that event IDs are monotonically increasing, and that _all_ events between the start and end IDs are to be forgotten.
+    """
+
+    action_type: Literal["condensation"] = Field(
+        ActionType.CONDENSATION.value, frozen=True
+    )
+    runnable: bool = Field(False, frozen=True)
+    forgotten_event_ids: list[int] | None = Field(
+        default=None, description="List of event IDs to forget"
+    )
+    forgotten_events_start_id: int | None = Field(
+        default=None, description="Start ID of range to forget"
+    )
+    forgotten_events_end_id: int | None = Field(
+        default=None, description="End ID of range to forget"
+    )
+    summary: str | None = Field(
+        default=None, description="Summary of forgotten events"
+    )
+    summary_offset: int | None = Field(
+        default=None, description="Offset for summary insertion"
+    )
+
+
+class CondensationRequestActionSchema(ActionSchemaV1):
+    """Schema for CondensationRequestAction.
+
+    This action is used to request a condensation of the conversation history.
+    """
+
+    action_type: Literal["condensation_request"] = Field(
+        ActionType.CONDENSATION_REQUEST.value, frozen=True
+    )
+    runnable: bool = Field(False, frozen=True)
+
+
 # Union type for all action schemas
 ActionSchemaUnion = Union[
     FileReadActionSchema,
@@ -254,6 +483,7 @@ ActionSchemaUnion = Union[
     CmdRunActionSchema,
     MessageActionSchema,
     SystemMessageActionSchema,
+    BrowseInteractiveActionSchema,
     PlaybookFinishActionSchema,
     AgentRejectActionSchema,
     ChangeAgentStateActionSchema,
@@ -261,4 +491,16 @@ ActionSchemaUnion = Union[
     TerminalRunActionSchema,
     TerminalInputActionSchema,
     TerminalReadActionSchema,
+    AgentThinkActionSchema,
+    ClarificationRequestActionSchema,
+    EscalateToHumanActionSchema,
+    MCPActionSchema,
+    ProposalActionSchema,
+    RecallActionSchema,
+    StreamingChunkActionSchema,
+    TaskTrackingActionSchema,
+    UncertaintyActionSchema,
+    DelegateTaskActionSchema,
+    CondensationActionSchema,
+    CondensationRequestActionSchema,
 ]

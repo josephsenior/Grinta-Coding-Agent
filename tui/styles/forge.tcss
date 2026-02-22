@@ -451,7 +451,6 @@ WelcomeScreen {
 .help-text {
     color: #555555;
     text-style: italic;
-    font-size: small;
 }
 
 #welcome-actions {

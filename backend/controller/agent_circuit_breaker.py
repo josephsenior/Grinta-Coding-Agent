@@ -26,8 +26,8 @@ class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
 
     enabled: bool = True
-    max_consecutive_errors: int = 5
-    max_high_risk_actions: int = 10
+    max_consecutive_errors: int = 3  # Reduced from 5 — 3 consecutive errors is already a bad loop
+    max_high_risk_actions: int = 5   # Reduced from 10 — 5 high-risk actions warrants intervention
     max_stuck_detections: int = 3
     max_error_rate: float = 0.5  # 50% of last N actions
     error_rate_window: int = 10  # Look at last 10 actions
@@ -80,8 +80,9 @@ class CircuitBreakerResult:
 
     tripped: bool
     reason: str
-    action: str  # 'pause' or 'stop'
+    action: str  # 'pause', 'stop', or 'switch_context'
     recommendation: str = ""
+    system_message: str | None = None
 
 
 class CircuitBreaker:
@@ -114,9 +115,10 @@ class CircuitBreaker:
 
         logger.info(
             "CircuitBreaker initialized: max_consecutive_errors=%s, "
-            "max_high_risk_actions=%s",
+            "max_high_risk_actions=%s (adaptive=%s)",
             config.max_consecutive_errors,
             config.max_high_risk_actions,
+            config.adaptive,
         )
 
     def check(self, state: State) -> CircuitBreakerResult:
@@ -167,6 +169,23 @@ class CircuitBreaker:
 
         # 3. Stuck detections
         if self.stuck_detection_count >= self.config.max_stuck_detections:
+            # Instead of stopping, try to force a context switch first if not maxed out
+            if self.stuck_detection_count < self.config.max_stuck_detections + 2:
+                return CircuitBreakerResult(
+                    tripped=True,
+                    reason=f"Stuck loop detected ({self.stuck_detection_count})",
+                    action="switch_context",
+                    recommendation=(
+                        "You are stuck in a loop. You are no longer allowed to use edit tools. "
+                        "You MUST use the escalate tool to ask the user for help, or the project_map tool "
+                        "to re-evaluate the architecture."
+                    ),
+                    system_message=(
+                        "SYSTEM INTERVENTION: You are stuck in a loop. Stop repeating the same actions. "
+                        "Switch context immediately: use escalate() or project_map()."
+                    )
+                )
+
             return CircuitBreakerResult(
                 tripped=True,
                 reason=f"Multiple stuck loop detections ({self.stuck_detection_count})",
