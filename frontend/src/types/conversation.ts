@@ -30,7 +30,7 @@ export interface ConversationListResponse {
 
 /** Payload for creating a new conversation. */
 export interface CreateConversationRequest {
-  initial_message?: string;
-  selected_repository?: string;
+  initial_user_msg?: string;
+  repository?: string;
   selected_branch?: string;
 }

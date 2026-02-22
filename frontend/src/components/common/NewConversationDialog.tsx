@@ -33,8 +33,8 @@ export function NewConversationDialog({
     e.preventDefault();
     createMutation.mutate(
       {
-        initial_message: message || undefined,
-        selected_repository: repository || undefined,
+        initial_user_msg: message || undefined,
+        repository: repository || undefined,
       },
       {
         onSuccess: (conv) => {
