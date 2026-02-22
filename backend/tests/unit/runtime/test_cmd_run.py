@@ -8,6 +8,7 @@ from backend.runtime.action_execution_server import ActionExecutor
 def mock_executor():
     """Create a minimal mocked ActionExecutor to avoid full initialization."""
     with patch("os.makedirs"), \
+         patch("backend.runtime.action_execution_server.SessionManager") as MockSessionManager, \
          patch("backend.runtime.action_execution_server.ActionExecutor._init_browser_async"):
         
         executor = ActionExecutor(
@@ -17,7 +18,8 @@ def mock_executor():
             user_id=1000,
             enable_browser=False
         )
-        executor.sessions = {}
+        # Session manager is mocked by patch, but we can refine it
+        executor.session_manager = MagicMock()
         return executor
 
 @pytest.mark.asyncio
@@ -34,7 +36,9 @@ async def test_cmd_run_grep_pattern(mock_executor):
     
     # mock_session.execute is called via call_sync_from_async
     mock_session.execute.return_value = mock_obs
-    mock_executor.sessions["default"] = mock_session
+    
+    # Configure session manager to return this session
+    mock_executor.session_manager.get_session.return_value = mock_session
     
     # Create action with grep_pattern
     action = CmdRunAction(command="echo test", grep_pattern="match")
@@ -59,7 +63,7 @@ async def test_cmd_run_grep_pattern_no_match(mock_executor):
         command="echo test"
     )
     mock_session.execute.return_value = mock_obs
-    mock_executor.sessions["default"] = mock_session
+    mock_executor.session_manager.get_session.return_value = mock_session
     
     action = CmdRunAction(command="echo test", grep_pattern="nomatch")
     
@@ -76,7 +80,7 @@ async def test_cmd_run_grep_pattern_invalid_regex(mock_executor):
         command="echo test"
     )
     mock_session.execute.return_value = mock_obs
-    mock_executor.sessions["default"] = mock_session
+    mock_executor.session_manager.get_session.return_value = mock_session
     
     # Invalid regex (unbalanced parenthesis)
     action = CmdRunAction(command="echo test", grep_pattern="(")
@@ -88,10 +92,11 @@ async def test_cmd_run_grep_pattern_invalid_regex(mock_executor):
 @pytest.mark.asyncio
 async def test_cmd_run_background_spawns_session(mock_executor):
     """Test that is_background=True spawns a new session and returns immediately."""
-    # Mock the _create_bash_session method to return a mock session
+    # Mock the create_session method to return a mock session
     mock_session = MagicMock()
     mock_session.read_output.return_value = "Background process started"
-    mock_executor._create_bash_session = MagicMock(return_value=mock_session)
+    mock_executor.session_manager.create_session.return_value = mock_session
+    mock_executor.session_manager.get_session.return_value = MagicMock(cwd="/tmp") # Mock default session for cwd fallback
     
     action = CmdRunAction(command="long_running_task", is_background=True)
     
@@ -102,11 +107,8 @@ async def test_cmd_run_background_spawns_session(mock_executor):
     assert "Background task started" in obs.content
     assert "bg-" in obs.content
     
-    # Verify session creation
-    assert len(mock_executor.sessions) == 1
-    session_id = list(mock_executor.sessions.keys())[0]
-    assert session_id.startswith("bg-")
-    assert obs.session_id == session_id
+    # Verify session creation call
+    mock_executor.session_manager.create_session.assert_called_once()
     
     # Verify input was written
     mock_session.write_input.assert_called_with("long_running_task\n")

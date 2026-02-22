@@ -72,6 +72,7 @@ from backend.runtime.utils.unified_shell import UnifiedShellSession
 from backend.runtime.utils.diff import get_diff
 from backend.runtime.utils.file_editor import FileEditor
 from backend.runtime.utils.memory_monitor import MemoryMonitor
+from backend.runtime.utils.session_manager import SessionManager
 from backend.runtime.utils.process_registry import TaskCancellationService
 from backend.utils.async_utils import call_sync_from_async
 
@@ -118,8 +119,21 @@ class ActionExecutor:
         self.enable_browser = enable_browser
         self.browser: BrowserEnv | None = None
 
-        self.sessions: dict[str, UnifiedShellSession] = {}
-        self.cancellation_service = TaskCancellationService(label=f"runtime:{work_dir}")
+        self.tool_registry = tool_registry
+        
+        # Initialize SessionManager
+        # We pass None for cancellation_service so it creates its own scoped to sessions
+        self.session_manager = SessionManager(
+            work_dir=work_dir,
+            username=username,
+            tool_registry=tool_registry,
+            max_memory_gb=None, # Will be updated in ainit
+        )
+        
+        # Keep a separate cancellation service for non-session tasks if needed, 
+        # or just rely on session manager for shell tasks.
+        # But ActionExecutor might have other tasks? For now, let's keep it minimal.
+        
         self.lock = asyncio.Lock()
         self.plugins: dict[str, Plugin] = {}
         # We need the file editor for ACI actions (view) even if we use helper functions
@@ -127,7 +141,6 @@ class ActionExecutor:
         self.plugins_to_load = plugins_to_load
         self._initialized = False
         self.memory_monitor = MemoryMonitor()
-        self.tool_registry = tool_registry
         self.start_time = time.time()
         self.last_execution_time = time.time()
         self.downloaded_files: list[str] = []
@@ -167,41 +180,12 @@ class ActionExecutor:
 
     def _create_bash_session(self, cwd: str | None = None):
         """Create a shell session appropriate for the current platform."""
-        from backend.runtime.utils.unified_shell import create_shell_session
-
-        if self.tool_registry is None:
-            # Create a default tool registry if none provided
-            # This is a fallback and shouldn't typically happen in production flow
-            try:
-                from backend.runtime.tools import ToolRegistry
-
-                self.tool_registry = ToolRegistry()
-            except ImportError:
-                pass
-
-        shell_session = create_shell_session(
-            work_dir=cwd or self._initial_cwd,
-            tools=self.tool_registry,
-            username=self.username,
-            no_change_timeout_seconds=int(
-                os.environ.get("NO_CHANGE_TIMEOUT_SECONDS", 10)
-            ),
-            max_memory_mb=self.max_memory_gb * 1024 if self.max_memory_gb else None,
-            cancellation_service=self.cancellation_service,
-        )
-        shell_session.initialize()
-        logger.info("Shell session initialized successfully")
-        return shell_session
+        # Delegated to SessionManager
+        return self.session_manager.create_session(cwd=cwd)
 
     async def hard_kill(self) -> None:
         """Best-effort immediate termination of processes started by this runtime."""
-        self.cancellation_service.cancel_all()
-        for session in self.sessions.values():
-            try:
-                session.close()
-            except Exception:
-                pass
-        self.sessions.clear()
+        self.session_manager.close_all()
         if self.browser:
             self.browser.close()
 
@@ -214,11 +198,13 @@ class ActionExecutor:
             total_mem_gb = int(_psutil.virtual_memory().total / (1024**3))
             # Reserve 2GB for system/other processes
             self.max_memory_gb = max(1, total_mem_gb - 2)
+            
+            # Update session manager with memory limit
+            self.session_manager.max_memory_gb = self.max_memory_gb
 
             # Step 1: Initialize bash session
             logger.info("Step 1/5: Initializing default shell session...")
-            default_session = self._create_bash_session()
-            self.sessions["default"] = default_session
+            self.session_manager.create_session(session_id="default")
 
             # Step 2: Initialize browser in background if enabled
             if self.enable_browser:
@@ -279,7 +265,7 @@ class ActionExecutor:
 
     def _init_bash_commands(self):
         # We need to set up some aliases and functions in bash for better UX
-        bash_session = self.sessions.get("default")
+        bash_session = self.session_manager.get_session("default")
         assert bash_session is not None
 
         # Init git configuration
@@ -310,10 +296,15 @@ class ActionExecutor:
             # Handle background execution: treat as starting a new terminal session
             if action.is_background:
                 session_id = f"bg-{uuid.uuid4().hex[:8]}"
-                cwd = action.cwd or self.sessions.get("default", self).initial_cwd # fallback
+                # Fallback to default session's CWD or initial CWD
+                default_session = self.session_manager.get_session("default")
+                cwd = action.cwd
+                if not cwd and default_session:
+                    cwd = default_session.cwd
+                if not cwd:
+                    cwd = self._initial_cwd
 
-                session = self._create_bash_session(cwd=cwd)
-                self.sessions[session_id] = session
+                session = self.session_manager.create_session(session_id=session_id, cwd=cwd)
                 
                 # Execute the command in the new session
                 logger.debug("Starting background task in session %s: %s", session_id, action.command)
@@ -328,17 +319,40 @@ class ActionExecutor:
                 )
 
             # Standard foreground execution
-            bash_session = self.sessions.get("default")
+            bash_session = self.session_manager.get_session("default")
             if action.is_static:
-                bash_session = self._create_bash_session(action.cwd)
+                # Create a temporary session for static execution
+                # We don't store it in self.sessions because it's transient?
+                # Or we do and close it immediately?
+                # Or create_bash_session used to return a session that wasn't stored in self.sessions?
+                # Looking at original code: `bash_session = self._create_bash_session(action.cwd)`
+                # And `_create_bash_session` didn't add to `self.sessions`.
+                # So we should use `self.session_manager.create_session` but not assume it persists?
+                # The `create_session` method in SessionManager ADDS to self.sessions.
+                # I should probably change that or handle cleanup.
+                # Let's use a temp ID and close it.
+                temp_id = f"static-{uuid.uuid4().hex[:8]}"
+                bash_session = self.session_manager.create_session(session_id=temp_id, cwd=action.cwd)
+                try:
+                     # Execute and return
+                     if bash_session is None: # Should not happen
+                        return ErrorObservation("Failed to create static session")
+                     observation = cast(
+                        CmdOutputObservation,
+                        await call_sync_from_async(bash_session.execute, action),
+                    )
+                finally:
+                    self.session_manager.close_session(temp_id)
             
-            if bash_session is None:
-                return ErrorObservation("Default shell session not initialized")
+            else:
+                 # Normal default session
+                 if bash_session is None:
+                    return ErrorObservation("Default shell session not initialized")
 
-            observation = cast(
-                CmdOutputObservation,
-                await call_sync_from_async(bash_session.execute, action),
-            )
+                 observation = cast(
+                    CmdOutputObservation,
+                    await call_sync_from_async(bash_session.execute, action),
+                )
 
             # Apply filtering if grep_pattern is provided
             if action.grep_pattern and isinstance(observation.content, str):
@@ -359,21 +373,26 @@ class ActionExecutor:
                 observation.content = truncate_cmd_output(observation.content)
 
             # Check for detected servers and add to observation extras
-            detected_server = cast(Any, bash_session.get_detected_server())
-            if detected_server:
-                logger.info(
-                    "🚀 Adding detected server to observation extras: %s",
-                    detected_server.url,
-                )
-                # Add server info to observation extras for client processing
-                if not hasattr(observation, "extras"):
-                    observation.extras = {}  # type: ignore[attr-defined]
-                observation.extras["server_ready"] = {  # type: ignore[attr-defined]
-                    "port": detected_server.port,
-                    "url": detected_server.url,
-                    "protocol": detected_server.protocol,
-                    "health_status": detected_server.health_status,
-                }
+            # Only checking on default or static session used above
+            # But bash_session might be closed (static).
+            # If static, we closed it.
+            # If default, we can check.
+            if not action.is_static and bash_session:
+                detected_server = cast(Any, bash_session.get_detected_server())
+                if detected_server:
+                    logger.info(
+                        "🚀 Adding detected server to observation extras: %s",
+                        detected_server.url,
+                    )
+                    # Add server info to observation extras for client processing
+                    if not hasattr(observation, "extras"):
+                        observation.extras = {}  # type: ignore[attr-defined]
+                    observation.extras["server_ready"] = {  # type: ignore[attr-defined]
+                        "port": detected_server.port,
+                        "url": detected_server.url,
+                        "protocol": detected_server.protocol,
+                        "health_status": detected_server.health_status,
+                    }
 
             return observation
         except Exception as e:
@@ -388,16 +407,15 @@ class ActionExecutor:
             
             # Determine working directory
             # Prefer provided CWD -> default session CWD -> initial CWD
-            default_session = self.sessions.get("default")
+            default_session = self.session_manager.get_session("default")
             cwd = action.cwd
             if not cwd and default_session:
                 cwd = default_session.cwd
             if not cwd:
                 cwd = self._initial_cwd
                 
-            # Create the new session
-            session = self._create_bash_session(cwd=cwd)
-            self.sessions[session_id] = session
+            # Create the new session via manager
+            session = self.session_manager.create_session(session_id=session_id, cwd=cwd)
             
             if action.command:
                 # Send the initial command if provided
@@ -416,7 +434,7 @@ class ActionExecutor:
 
     async def terminal_input(self, action: TerminalInputAction) -> Observation:
         """Send input to an interactive terminal session."""
-        session = self.sessions.get(action.session_id)
+        session = self.session_manager.get_session(action.session_id)
         if not session:
             return ErrorObservation(f"Terminal session {action.session_id} not found.")
             
@@ -438,7 +456,7 @@ class ActionExecutor:
 
     async def terminal_read(self, action: TerminalReadAction) -> Observation:
         """Read the output of an interactive terminal session."""
-        session = self.sessions.get(action.session_id)
+        session = self.session_manager.get_session(action.session_id)
         if not session:
              return ErrorObservation(f"Terminal session {action.session_id} not found or closed.")
             
@@ -467,7 +485,7 @@ class ActionExecutor:
 
     async def read(self, action: FileReadAction) -> Observation:
         """Read a file and return its content as an observation."""
-        bash_session = self.sessions.get("default")
+        bash_session = self.session_manager.get_session("default")
         if bash_session is None:
             return ErrorObservation("Default shell session not initialized")
 
@@ -497,7 +515,7 @@ class ActionExecutor:
 
     async def write(self, action: FileWriteAction) -> Observation:
         """Write a file and return an observation."""
-        bash_session = self.sessions.get("default")
+        bash_session = self.session_manager.get_session("default")
         if bash_session is None:
             return ErrorObservation("Default shell session not initialized")
 
@@ -520,7 +538,7 @@ class ActionExecutor:
 
     async def edit(self, action: FileEditAction) -> Observation:
         """Edit a file (FILE_EDITOR or LLM-based) and return an observation."""
-        bash_session = self.sessions.get("default")
+        bash_session = self.session_manager.get_session("default")
         if bash_session is None:
             return ErrorObservation("Default shell session not initialized")
         working_dir = bash_session.cwd
@@ -663,7 +681,7 @@ class ActionExecutor:
     def close(self) -> None:
         """Clean up resources owned by the in-process executor."""
         try:
-            self.cancellation_service.cancel_all()
+            self.session_manager.close_all()
         except Exception:
             pass
         try:
@@ -671,14 +689,6 @@ class ActionExecutor:
         except Exception:
             pass
         
-        # Close all active shell sessions (including default)
-        for session_id, session in list(self.sessions.items()):
-            try:
-                session.close()
-            except Exception:
-                pass
-        self.sessions.clear()
-
         if self.browser is not None:
             try:
                 self.browser.close()
