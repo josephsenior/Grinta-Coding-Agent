@@ -7,7 +7,6 @@ import {
   Search,
   Activity,
   BookOpen,
-  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +22,6 @@ import { CommandMenu } from "@/components/common/CommandMenu";
 const navItems = [
   { to: "/", icon: Hammer, label: "Home" },
   { to: "/knowledge", icon: BookOpen, label: "Knowledge" },
-  { to: "/memory", icon: Brain, label: "Memory" },
   { to: "/monitoring", icon: Activity, label: "Monitoring" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
