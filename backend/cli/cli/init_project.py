@@ -10,7 +10,7 @@ description: "A Forge agent."
 version: "0.1.0"
 
 agent:
-  name: "CodeAct"
+  name: "Orchestrator"
   config:
     max_steps: 30
 

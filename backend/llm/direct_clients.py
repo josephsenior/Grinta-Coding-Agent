@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
 import httpx
 from anthropic import Anthropic, AsyncAnthropic
 from openai import AsyncOpenAI, OpenAI
@@ -418,8 +418,8 @@ class GeminiClient(DirectLLMClient):
 
     def __init__(self, model_name: str, api_key: str):
         self._model_name = model_name
-        genai.configure(api_key=api_key)
         self.api_key = api_key
+        self.client = genai.Client(api_key=api_key)
 
     def _convert_messages(
         self, messages: list[dict[str, Any]]
@@ -451,7 +451,8 @@ class GeminiClient(DirectLLMClient):
                 system_instruction = content
                 continue
 
-            role = "user" if m["role"] == "user" else "model"
+            role_name = m.get("role", "user")
+            role = "model" if role_name == "assistant" else "user"
             gemini_messages.append({"role": role, "parts": [content]})
 
         return system_instruction, gemini_messages, caching_requested
@@ -474,28 +475,244 @@ class GeminiClient(DirectLLMClient):
         ]:
             if src in kwargs:
                 gen_cfg[dst] = kwargs.pop(src)
+        # Native Gemini SDK (ChatSession.send_message) does not support tool_choice.
+        kwargs.pop("tool_choice", None)
+        # Strip OpenAI/liteLLM-style passthrough fields unsupported by Gemini SDK.
+        for unsupported_key in (
+            "extra_body",
+            "extra_headers",
+            "response_format",
+            "frequency_penalty",
+            "presence_penalty",
+            "logit_bias",
+            "seed",
+            "user",
+            "reasoning_effort",
+            "reasoning",
+            "parallel_tool_calls",
+            "metadata",
+        ):
+            kwargs.pop(unsupported_key, None)
         return model_name, gen_cfg
+
+    @staticmethod
+    def _gemini_response_to_dict(response: Any) -> dict[str, Any] | None:
+        """Best-effort conversion of Gemini SDK response to dict for stable parsing."""
+        if isinstance(response, dict):
+            return response
+
+        to_dict = getattr(response, "to_dict", None)
+        if callable(to_dict):
+            try:
+                result = to_dict()
+                return result if isinstance(result, dict) else None
+            except Exception:
+                return None
+        return None
+
+    @staticmethod
+    def _iter_gemini_candidate_parts(response: Any) -> list[Any]:
+        """Return all candidate parts from a Gemini response across SDK shapes."""
+        parts: list[Any] = []
+
+        response_dict = GeminiClient._gemini_response_to_dict(response)
+        if response_dict:
+            for candidate in response_dict.get("candidates", []) or []:
+                if not isinstance(candidate, dict):
+                    continue
+                content = candidate.get("content", {})
+                if not isinstance(content, dict):
+                    continue
+                candidate_parts = content.get("parts")
+                if candidate_parts:
+                    parts.extend(candidate_parts)
+
+        if parts:
+            return parts
+
+        for candidate in getattr(response, "candidates", []) or []:
+            content = getattr(candidate, "content", None)
+            if content is None and isinstance(candidate, dict):
+                content = candidate.get("content")
+
+            candidate_parts = None
+            if isinstance(content, dict):
+                candidate_parts = content.get("parts")
+            elif content is not None:
+                candidate_parts = getattr(content, "parts", None)
+
+            if candidate_parts:
+                parts.extend(candidate_parts)
+        return parts
+
+    @staticmethod
+    def _coerce_gemini_fc_name_and_args(function_call: Any) -> tuple[str | None, Any]:
+        """Extract function-call name and args from object/dict Gemini shapes."""
+        if function_call is None:
+            return None, None
+
+        if isinstance(function_call, dict):
+            return function_call.get("name"), function_call.get("args")
+
+        return getattr(function_call, "name", None), getattr(function_call, "args", None)
 
     @staticmethod
     def _extract_gemini_tool_calls(response: Any) -> list[dict[str, Any]] | None:
         """Extract function call parts from a Gemini response."""
         tool_calls: list[dict[str, Any]] = []
-        for candidate in getattr(response, "candidates", []):
-            for part in getattr(candidate, "content", {}).get("parts", []):
-                fc = getattr(part, "function_call", None)
-                if fc is None:
-                    continue
-                tool_calls.append(
-                    {
-                        "id": f"gemini-{len(tool_calls)}",
-                        "type": "function",
-                        "function": {
-                            "name": fc.name,
-                            "arguments": json.dumps(dict(fc.args)) if fc.args else "{}",
-                        },
-                    }
-                )
+        for part in GeminiClient._iter_gemini_candidate_parts(response):
+            fc = getattr(part, "function_call", None)
+            if fc is None and isinstance(part, dict):
+                fc = part.get("function_call") or part.get("functionCall")
+
+            name, args = GeminiClient._coerce_gemini_fc_name_and_args(fc)
+            if not name:
+                continue
+
+            args_dict: dict[str, Any]
+            if args is None:
+                args_dict = {}
+            elif isinstance(args, dict):
+                args_dict = args
+            else:
+                try:
+                    args_dict = dict(args)
+                except Exception:
+                    args_dict = {}
+
+            tool_calls.append(
+                {
+                    "id": f"gemini-{len(tool_calls)}",
+                    "type": "function",
+                    "function": {
+                        "name": name,
+                        "arguments": json.dumps(args_dict),
+                    },
+                }
+            )
         return tool_calls or None
+
+    @staticmethod
+    def _extract_gemini_text(response: Any) -> str:
+        """Extract assistant text from Gemini response across SDK shapes."""
+        text_parts: list[str] = []
+        for part in GeminiClient._iter_gemini_candidate_parts(response):
+            text = getattr(part, "text", None)
+            if text is None and isinstance(part, dict):
+                text = part.get("text")
+            if isinstance(text, str):
+                if text.strip():
+                    text_parts.append(text)
+
+        if text_parts:
+            return "\n".join(text_parts)
+
+        response_text = getattr(response, "text", "")
+        return response_text if isinstance(response_text, str) else str(response_text or "")
+
+    @staticmethod
+    def _extract_gemini_finish_reason(response: Any) -> str:
+        response_dict = GeminiClient._gemini_response_to_dict(response)
+        if isinstance(response_dict, dict):
+            candidates = response_dict.get("candidates") or []
+            if candidates and isinstance(candidates[0], dict):
+                reason = candidates[0].get("finishReason")
+                if isinstance(reason, str) and reason:
+                    return reason
+
+        for candidate in getattr(response, "candidates", []) or []:
+            reason = getattr(candidate, "finish_reason", None)
+            if isinstance(reason, str) and reason:
+                return reason
+            if isinstance(candidate, dict):
+                reason = candidate.get("finish_reason") or candidate.get("finishReason")
+                if isinstance(reason, str) and reason:
+                    return reason
+        return ""
+
+    @staticmethod
+    def _extract_gemini_block_reason(response: Any) -> str:
+        response_dict = GeminiClient._gemini_response_to_dict(response)
+        if isinstance(response_dict, dict):
+            prompt_feedback = response_dict.get("promptFeedback") or response_dict.get(
+                "prompt_feedback"
+            )
+            if isinstance(prompt_feedback, dict):
+                reason = prompt_feedback.get("blockReason") or prompt_feedback.get(
+                    "block_reason"
+                )
+                if isinstance(reason, str) and reason:
+                    return reason
+
+        feedback = getattr(response, "prompt_feedback", None)
+        if feedback is None:
+            feedback = getattr(response, "promptFeedback", None)
+        reason = getattr(feedback, "block_reason", None)
+        if reason is None:
+            reason = getattr(feedback, "blockReason", None)
+        return reason if isinstance(reason, str) else ""
+
+    @staticmethod
+    def _log_gemini_response_shape(
+        response: Any,
+        content: str,
+        tool_calls: list[dict[str, Any]] | None,
+    ) -> None:
+        parts = GeminiClient._iter_gemini_candidate_parts(response)
+        finish_reason = GeminiClient._extract_gemini_finish_reason(response)
+        block_reason = GeminiClient._extract_gemini_block_reason(response)
+        candidates = getattr(response, "candidates", None)
+        if not isinstance(candidates, list):
+            response_dict = GeminiClient._gemini_response_to_dict(response) or {}
+            candidates = response_dict.get("candidates") or []
+
+        payload = (
+            "Gemini response shape: candidates=%s parts=%s text_len=%s "
+            "tool_calls=%s finish_reason=%s block_reason=%s"
+        )
+        args = (
+            len(candidates),
+            len(parts),
+            len(content.strip()),
+            len(tool_calls or []),
+            finish_reason or "none",
+            block_reason or "none",
+        )
+        if not content.strip() and not tool_calls:
+            logger.warning(payload, *args)
+        else:
+            logger.debug(payload, *args)
+
+    @staticmethod
+    def _synthesize_empty_gemini_text(response: Any) -> str:
+        block_reason = GeminiClient._extract_gemini_block_reason(response)
+        if block_reason:
+            return (
+                "I couldn’t provide a response because this request was blocked by safety "
+                "filters. Please rephrase and try again."
+            )
+
+        finish_reason = GeminiClient._extract_gemini_finish_reason(response).upper()
+        if finish_reason in {"SAFETY", "RECITATION", "BLOCKLIST"}:
+            return (
+                "I couldn’t provide a response for this request. Please try a clearer "
+                "or safer phrasing and I’ll help."
+            )
+
+        return (
+            "I couldn’t generate a complete response this turn. Please resend your "
+            "request and I’ll answer directly."
+        )
+
+    @staticmethod
+    def _ensure_non_empty_gemini_content(
+        response: Any,
+        content: str,
+        tool_calls: list[dict[str, Any]] | None,
+    ) -> str:
+        if content.strip() or tool_calls:
+            return content
+        return GeminiClient._synthesize_empty_gemini_text(response)
 
     @staticmethod
     def _gemini_usage(response: Any) -> dict[str, int]:
@@ -512,93 +729,175 @@ class GeminiClient(DirectLLMClient):
             else 0,
         }
 
+    def _resolve_gemini_model_name(self, model_name: str | None) -> str:
+        """Normalize model name for Gemini API."""
+        name = model_name or self.model_name
+        return name.split("/")[-1] if "/" in name else name
+
+    def _get_gemini_cache_name(
+        self,
+        caching_requested: bool,
+        model_name: str,
+        system_instruction: str | None,
+        gemini_messages: list,
+    ) -> str | None:
+        """Get cache name if caching requested and there is content to cache."""
+        if not caching_requested:
+            return None
+        from backend.llm.gemini_cache import gemini_cache_manager
+
+        history_to_cache = gemini_messages[:-1] if len(gemini_messages) > 1 else []
+        if not history_to_cache and not system_instruction:
+            return None
+        return gemini_cache_manager.get_or_create_cache(
+            client=self.client,
+            model=model_name,
+            system_instruction=system_instruction,
+            messages=history_to_cache,
+        )
+
+    def _build_gemini_with_cache(
+        self,
+        model_name: str,
+        gen_cfg: Any,
+        gemini_messages: list,
+        cache_name: str,
+        kwargs: dict[str, Any],
+    ):
+        """Build Gemini chat when context caching is used."""
+        prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
+        return model_name, cache_name, prompt
+
+    def _build_gemini_without_cache(
+        self,
+        model_name: str,
+        gen_cfg: Any,
+        system_instruction: str | None,
+        gemini_messages: list,
+    ):
+        """Build Gemini chat without context caching."""
+        prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
+        history = gemini_messages[:-1] if gemini_messages else []
+        return model_name, gen_cfg, system_instruction, history, prompt
+
     def _build_gemini_chat(
         self, messages: list[dict[str, Any]], kwargs: dict[str, Any]
     ):
         """Shared setup for Gemini completion / acompletion / astream."""
-        model_name, gen_cfg = self._extract_gemini_generation_config(kwargs)
-        model_name = model_name or self.model_name
-        if "/" in model_name:
-            model_name = model_name.split("/")[-1]
+        model_name_raw, gen_cfg = self._extract_gemini_generation_config(kwargs)
+        model_name = self._resolve_gemini_model_name(model_name_raw)
 
         system_instruction, gemini_messages, caching_requested = self._convert_messages(
             messages
         )
 
-        # Handle Context Caching if supported and requested
-        from backend.llm.gemini_cache import gemini_cache_manager
-
-        cache_name = None
-        if caching_requested:
-            # We cache everything up to the penultimate message (the history)
-            # if history is substantial. For now, let's cache the whole history.
-            history_to_cache = gemini_messages[:-1] if len(gemini_messages) > 1 else []
-            if history_to_cache or system_instruction:
-                cache_name = gemini_cache_manager.get_or_create_cache(
-                    model=model_name,
-                    system_instruction=system_instruction,
-                    messages=history_to_cache,
-                )
-
-        model_kwargs: dict[str, Any] = {"generation_config": gen_cfg} if gen_cfg else {}
+        cache_name = self._get_gemini_cache_name(
+            caching_requested, model_name, system_instruction, gemini_messages
+        )
 
         if cache_name:
-            # When using a cache, the model is initialized with the cache name
-            # and we ONLY send the remaining messages.
-            model = genai.GenerativeModel(model_name, **model_kwargs)
-            # Note: The SDK's start_chat doesn't directly take cache_name yet in all versions
-            # so we use history for the non-cached part.
-            prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
-            # If we cached the history, the history for start_chat is empty.
-            chat = model.start_chat(history=[])
-            # Inject cached_content into kwargs for the final send_message call
-            kwargs["cached_content"] = cache_name
-        else:
-            if system_instruction:
-                model_kwargs["system_instruction"] = system_instruction
-            model = genai.GenerativeModel(model_name, **model_kwargs)
-            prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
-            history = gemini_messages[:-1] if gemini_messages else []
-            chat = model.start_chat(history=history)
-
-        return model_name, chat, prompt
+            return self._build_gemini_with_cache(
+                model_name, gen_cfg, gemini_messages, cache_name, kwargs
+            )
+        return self._build_gemini_without_cache(
+            model_name, gen_cfg, system_instruction, gemini_messages
+        )
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
-        model_name, chat, prompt = self._build_gemini_chat(messages, kwargs)
+        model_name, gen_cfg, system_instruction, history, prompt = self._build_gemini_chat(messages, kwargs)
+        
+        chat = self.client.chats.create(
+            model=model_name,
+            config={
+                "generation_config": gen_cfg,
+                "system_instruction": system_instruction,
+            },
+            history=history,
+        )
         response = chat.send_message(prompt, **kwargs)
+        tool_calls = self._extract_gemini_tool_calls(response)
+        content = self._extract_gemini_text(response)
+        self._log_gemini_response_shape(response, content, tool_calls)
+        content = self._ensure_non_empty_gemini_content(response, content, tool_calls)
         return LLMResponse(
-            content=response.text,
+            content=content,
             model=model_name,
             usage=self._gemini_usage(response),
             id="",
             finish_reason="stop",
-            tool_calls=self._extract_gemini_tool_calls(response),
+            tool_calls=tool_calls,
         )
 
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
-        model_name, chat, prompt = self._build_gemini_chat(messages, kwargs)
-        response = await chat.send_message_async(prompt, **kwargs)
+        result = self._build_gemini_chat(messages, kwargs)
+        
+        if len(result) == 3: # Cache case
+            model_name, cache_name, prompt = result
+            chat = self.client.aio.chats.create(
+                model=model_name,
+                config={
+                    "cached_content": cache_name,
+                }
+            )
+        else:
+            model_name, gen_cfg, system_instruction, history, prompt = result
+            chat = self.client.aio.chats.create(
+                model=model_name,
+                config={
+                    "generation_config": gen_cfg,
+                    "system_instruction": system_instruction,
+                },
+                history=history,
+            )
+            
+        response = await chat.send_message(prompt, **kwargs)
+        tool_calls = self._extract_gemini_tool_calls(response)
+        content = self._extract_gemini_text(response)
+        self._log_gemini_response_shape(response, content, tool_calls)
+        content = self._ensure_non_empty_gemini_content(response, content, tool_calls)
         return LLMResponse(
-            content=response.text,
+            content=content,
             model=model_name,
             usage=self._gemini_usage(response),
             id="",
             finish_reason="stop",
-            tool_calls=self._extract_gemini_tool_calls(response),
+            tool_calls=tool_calls,
         )
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
-        _model_name, chat, prompt = self._build_gemini_chat(messages, kwargs)
-        response = await chat.send_message_async(prompt, stream=True, **kwargs)
+        result = self._build_gemini_chat(messages, kwargs)
+        
+        if len(result) == 3: # Cache case
+            model_name, cache_name, prompt = result
+            chat = self.client.aio.chats.create(
+                model=model_name,
+                config={
+                    "cached_content": cache_name,
+                }
+            )
+        else:
+            model_name, gen_cfg, system_instruction, history, prompt = result
+            chat = self.client.aio.chats.create(
+                model=model_name,
+                config={
+                    "generation_config": gen_cfg,
+                    "system_instruction": system_instruction,
+                },
+                history=history,
+            )
+            
+        stream = await chat.send_message_stream(prompt, **kwargs)
 
-        async for chunk in response:
-            yield {
-                "choices": [{"delta": {"content": chunk.text}, "finish_reason": None}]
-            }
+        async for chunk in stream:
+            text = chunk.text or ""
+            if text:
+                yield {
+                    "choices": [{"delta": {"content": text}, "finish_reason": None}]
+                }
         yield {"choices": [{"delta": {}, "finish_reason": "stop"}]}
 
 

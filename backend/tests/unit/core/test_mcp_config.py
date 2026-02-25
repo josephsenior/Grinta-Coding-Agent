@@ -39,6 +39,10 @@ class TestValidateMcpUrl:
         with pytest.raises(ValueError):
             _validate_mcp_url("http://")
 
+    def test_none_hostname_raises(self):
+        with pytest.raises(ValueError):
+            _validate_mcp_url("http://None/mcp/mcp")
+
     def test_invalid_scheme_raises(self):
         with pytest.raises(ValueError, match="scheme must be"):
             _validate_mcp_url("ftp://example.com")
@@ -426,5 +430,17 @@ class TestForgeMCPConfig:
         )
         assert shttp is not None
         assert shttp.url == "http://localhost:3000/mcp/mcp"
+        assert isinstance(stdio, list)
+        assert not stdio
+
+    def test_create_default_mcp_server_config_skips_invalid_host(self):
+        from backend.core.config.forge_config import ForgeConfig
+        from backend.core.config.mcp_config import ForgeMCPConfig
+
+        config = ForgeConfig()
+        shttp, stdio = ForgeMCPConfig.create_default_mcp_server_config(
+            None, config, "user123"
+        )
+        assert shttp is None
         assert isinstance(stdio, list)
         assert not stdio

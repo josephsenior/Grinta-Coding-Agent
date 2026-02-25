@@ -4,6 +4,7 @@ import {
   getConversation,
   createConversation,
   deleteConversation,
+  deleteAllConversations,
   updateConversationTitle,
 } from "@/api/conversations";
 import type { CreateConversationRequest } from "@/types/conversation";
@@ -38,6 +39,16 @@ export function useDeleteConversation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteConversation(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+}
+
+export function useDeleteAllConversations() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => deleteAllConversations(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },

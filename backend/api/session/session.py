@@ -11,7 +11,7 @@ from backend.controller.agent import Agent
 if TYPE_CHECKING:
     pass
 from backend.core.config.mcp_config import ForgeMCPConfig
-from backend.core.exceptions import PlaybookValidationError
+from backend.core.exceptions import AgentNotRegisteredError, PlaybookValidationError
 from backend.core.logger import ForgeLoggerAdapter
 from backend.core.schemas import AgentState
 from backend.events.action import MessageAction, NullAction
@@ -301,6 +301,12 @@ class Session:
 
         # Get agent class
         agent_cls = settings.agent or self.config.default_agent
+        legacy_agent_aliases = {
+            "CodeActAgent": "Orchestrator",
+            "CodeAct": "Orchestrator",
+            "codact": "Orchestrator",
+        }
+        agent_cls = legacy_agent_aliases.get(agent_cls, agent_cls)
 
         # Apply all settings in one shot
         self._apply_settings(settings)
@@ -320,7 +326,24 @@ class Session:
         self._apply_condenser(settings, agent_config, llm_config)
 
         # Create agent
-        agent = Agent.get_cls(agent_cls)(agent_config, self.llm_registry)
+        try:
+            agent_type = Agent.get_cls(agent_cls)
+        except AgentNotRegisteredError:
+            fallback_agent = self.config.default_agent
+            self.logger.warning(
+                "Agent '%s' is not registered; falling back to default '%s'",
+                agent_cls,
+                fallback_agent,
+            )
+            agent_cls = fallback_agent
+            settings.agent = fallback_agent
+            agent_config = self.config.get_agent_config(agent_cls)
+            agent_name = agent_cls if agent_cls is not None else "agent"
+            llm_config = self.config.get_llm_config_from_agent(agent_name)
+            self._apply_condenser(settings, agent_config, llm_config)
+            agent_type = Agent.get_cls(agent_cls)
+
+        agent = agent_type(agent_config, self.llm_registry)
         self.llm_registry.retry_listner = self._notify_on_llm_retry
 
         # Extract conversation data

@@ -324,6 +324,45 @@ class AtomicRefactor:
         elif edit.operation == "rename":
             self._apply_rename(edit)
 
+    def _write_edit_content(self, edit: RefactorEdit) -> None:
+        """Write file content for modify/create."""
+        os.makedirs(os.path.dirname(edit.file_path), exist_ok=True)
+        with open(edit.file_path, "w", encoding="utf-8") as f:
+            f.write(edit.new_content or "")
+
+    def _apply_modify_create_impl(self, edit: RefactorEdit) -> None:
+        """Apply modify/create: write content to file."""
+        self._write_edit_content(edit)
+
+    def _apply_delete_impl(self, edit: RefactorEdit) -> None:
+        """Apply delete: remove file if exists."""
+        if os.path.exists(edit.file_path):
+            os.remove(edit.file_path)
+
+    def _apply_rename_impl(self, edit: RefactorEdit) -> None:
+        """Apply rename: move file to new path."""
+        if edit.new_path and os.path.exists(edit.file_path):
+            os.makedirs(os.path.dirname(edit.new_path), exist_ok=True)
+            shutil.move(edit.file_path, edit.new_path)
+
+    def _apply_single_edit(
+        self,
+        edit: RefactorEdit,
+        validate: bool,
+        validator: Callable[[str, str], bool] | None,
+    ) -> None:
+        """Execute one edit (modify/create/delete/rename). Raises on failure."""
+        if edit.operation in ("modify", "create"):
+            self._apply_modify_create_impl(edit)
+        elif edit.operation == "delete":
+            self._apply_delete_impl(edit)
+        elif edit.operation == "rename":
+            self._apply_rename_impl(edit)
+
+        if validate and validator and edit.operation in ("modify", "create"):
+            if not validator(edit.file_path, edit.new_content or ""):
+                raise ValueError(f"Validation failed for {edit.file_path}")
+
     def _apply_all_edits(
         self,
         transaction: RefactorTransaction,
@@ -343,42 +382,21 @@ class AtomicRefactor:
         """
         applied_edits = []
         errors = []
+        total = len(transaction.edits)
 
-        logger.info("✏️  Applying %s edits...", len(transaction.edits))
+        logger.info("✏️  Applying %s edits...", total)
         for i, edit in enumerate(transaction.edits):
             try:
-                # Apply the edit first (write/delete/rename)
-                # Don't validate yet - validation happens after adding to applied_edits
-                if edit.operation in ("modify", "create"):
-                    os.makedirs(os.path.dirname(edit.file_path), exist_ok=True)
-                    with open(edit.file_path, "w", encoding="utf-8") as f:
-                        f.write(edit.new_content or "")
-                elif edit.operation == "delete":
-                    if os.path.exists(edit.file_path):
-                        os.remove(edit.file_path)
-                elif edit.operation == "rename":
-                    if os.path.exists(edit.file_path) and edit.new_path:
-                        os.makedirs(os.path.dirname(edit.new_path), exist_ok=True)
-                        shutil.move(edit.file_path, edit.new_path)
-
-                # Add to applied_edits immediately after write (before validation)
-                # This ensures rollback works if validation fails
+                self._apply_single_edit(edit, validate, validator)
                 applied_edits.append(edit)
-
-                # Now validate if needed
-                if validate and validator and edit.operation in ("modify", "create"):
-                    if not validator(edit.file_path, edit.new_content or ""):
-                        raise ValueError(f"Validation failed for {edit.file_path}")
-
             except Exception as e:
-                error_msg = f"Failed to apply edit {i + 1}/{len(transaction.edits)} ({edit.operation} {edit.file_path}): {e}"
+                error_msg = (
+                    f"Failed to apply edit {i + 1}/{total} "
+                    f"({edit.operation} {edit.file_path}): {e}"
+                )
                 errors.append(error_msg)
                 logger.error(error_msg)
-
-                # Rollback on failure
-                logger.warning(
-                    "⚠️  Rolling back %s edits due to failure", len(applied_edits)
-                )
+                logger.warning("⚠️  Rolling back %s edits due to failure", len(applied_edits))
                 self._rollback_edits(applied_edits, transaction)
                 break
 

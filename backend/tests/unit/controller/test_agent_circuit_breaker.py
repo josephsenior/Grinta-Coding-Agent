@@ -217,8 +217,8 @@ class TestCheckMethod:
         result = breaker.check(state)
 
         assert result.tripped is True
-        assert "stuck loop detections" in result.reason.lower()
-        assert result.action == "stop"  # Stuck detections trigger 'stop' not 'pause'
+        assert "stuck loop detected" in result.reason.lower()
+        assert result.action == "switch_context"
 
     def test_check_error_rate_trips(self):
         """Should trip when error rate exceeds threshold."""

@@ -175,81 +175,80 @@ async def is_system_stuck() -> bool:
     return False
 
 
+def _collect_state_snapshot(state_obj: Any) -> dict[str, Any]:
+    """Extract state fields for health snapshot."""
+    iteration_flag = getattr(state_obj, "iteration_flag", None)
+    budget_flag = getattr(state_obj, "budget_flag", None)
+    metrics = getattr(state_obj, "metrics", None)
+    return {
+        "agent_state": getattr(getattr(state_obj, "agent_state", None), "value", "unknown"),
+        "iteration": {
+            "current": getattr(iteration_flag, "current_value", None),
+            "max": getattr(iteration_flag, "max_value", None),
+        },
+        "budget": {
+            "current": getattr(budget_flag, "current_value", None),
+            "max": getattr(budget_flag, "max_value", None),
+        },
+        "accumulated_cost": getattr(metrics, "accumulated_cost", None),
+    }
+
+
+def _add_circuit_breaker_warnings(
+    warnings: list[str], cb_service: Any
+) -> str | None:
+    """Add circuit breaker warnings. Returns cb_state_name for severity."""
+    cb_state = getattr(cb_service, "state", None)
+    cb_state_name = getattr(cb_state, "name", str(cb_state) if cb_state else None)
+    cb_failures = max(
+        x if isinstance(x, (int, float)) else 0
+        for x in (
+            getattr(cb_service, "failure_count", None),
+            getattr(cb_service, "consecutive_errors", None),
+        )
+    )
+    cb_consecutive = getattr(cb_service, "consecutive_errors", None)
+    cb_consecutive = cb_consecutive if isinstance(cb_consecutive, (int, float)) else 0
+    cb_max = getattr(getattr(cb_service, "config", None), "max_consecutive_errors", None)
+    max_int = int(cb_max) if isinstance(cb_max, (int, float)) else None
+
+    if cb_state_name == "OPEN":
+        warnings.append("circuit_breaker_open")
+    elif max_int is not None and cb_consecutive >= max_int:
+        warnings.append("circuit_breaker_consecutive_errors")
+    elif cb_failures >= 5:
+        warnings.append("circuit_breaker_unhealthy")
+    return cb_state_name
+
+
+def _collect_health_warnings(controller: Any) -> tuple[list[str], str]:
+    """Collect warnings and severity. Returns (warnings, severity)."""
+    warnings: list[str] = []
+    cb_service = getattr(controller, "circuit_breaker_service", None)
+    if cb_service:
+        cb_state_name = _add_circuit_breaker_warnings(warnings, cb_service)
+    else:
+        cb_state_name = None
+
+    if getattr(getattr(controller, "retry_service", None), "pending_retry", False):
+        warnings.append("retry_pending")
+
+    severity = "red" if cb_state_name == "OPEN" else ("yellow" if warnings else "green")
+    return (warnings, severity)
+
+
 def collect_controller_health(controller: Any) -> dict[str, Any]:
     """Collect a lightweight, dependency-safe health snapshot for a controller.
 
     The snapshot is used by monitoring endpoints and integration tests.
     """
-    now = datetime.now(UTC).isoformat()
-
     state_obj = getattr(controller, "state", None)
-    agent_state = getattr(getattr(state_obj, "agent_state", None), "value", "unknown")
-
-    iteration_flag = getattr(state_obj, "iteration_flag", None)
-    iteration_current = getattr(iteration_flag, "current_value", None)
-    iteration_max = getattr(iteration_flag, "max_value", None)
-
-    budget_flag = getattr(state_obj, "budget_flag", None)
-    budget_current = getattr(budget_flag, "current_value", None)
-    budget_max = getattr(budget_flag, "max_value", None)
-
-    metrics = getattr(state_obj, "metrics", None)
-    accumulated_cost = getattr(metrics, "accumulated_cost", None)
-
-    warnings: list[str] = []
-    severity = "green"
-
-    cb_service = getattr(controller, "circuit_breaker_service", None)
-    cb_state = getattr(cb_service, "state", None)
-    cb_state_name = getattr(cb_state, "name", str(cb_state) if cb_state else None)
-
-    cb_failures_raw = getattr(cb_service, "failure_count", None)
-    cb_consecutive_raw = getattr(cb_service, "consecutive_errors", None)
-
-    cb_failures = cb_failures_raw if isinstance(cb_failures_raw, (int, float)) else 0
-    cb_consecutive = (
-        cb_consecutive_raw if isinstance(cb_consecutive_raw, (int, float)) else 0
-    )
-    cb_failures = max(cb_failures, cb_consecutive)
-
-    cb_max_consecutive = getattr(getattr(cb_service, "config", None), "max_consecutive_errors", None)
-    max_consecutive_int = (
-        int(cb_max_consecutive)
-        if isinstance(cb_max_consecutive, (int, float))
-        else None
-    )
-
-    if cb_state_name == "OPEN":
-        warnings.append("circuit_breaker_open")
-    elif max_consecutive_int is not None and cb_consecutive >= max_consecutive_int:
-        warnings.append("circuit_breaker_consecutive_errors")
-    elif cb_failures >= 5:
-        warnings.append("circuit_breaker_unhealthy")
-
-    retry_service = getattr(controller, "retry_service", None)
-    if getattr(retry_service, "pending_retry", False):
-        warnings.append("retry_pending")
-
-    if warnings:
-        severity = "yellow"
-    if cb_state_name == "OPEN":
-        severity = "red"
-
+    warnings, severity = _collect_health_warnings(controller)
+    state_snapshot = _collect_state_snapshot(state_obj)
     return {
-        "timestamp": now,
+        "timestamp": datetime.now(UTC).isoformat(),
         "controller_id": getattr(controller, "sid", "unknown"),
         "severity": severity,
         "warnings": warnings,
-        "state": {
-            "agent_state": agent_state,
-            "iteration": {
-                "current": iteration_current,
-                "max": iteration_max,
-            },
-            "budget": {
-                "current": budget_current,
-                "max": budget_max,
-            },
-            "accumulated_cost": accumulated_cost,
-        },
+        "state": state_snapshot,
     }

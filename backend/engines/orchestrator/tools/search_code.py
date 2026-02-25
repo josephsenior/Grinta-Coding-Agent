@@ -1,4 +1,4 @@
-"""Fast code search tool for the CodeAct agent.
+"""Fast code search tool for the Orchestrator agent.
 
 Eliminates the grep→parse→regrep cycle by providing a single
 structured search interface that tries ripgrep first, then falls

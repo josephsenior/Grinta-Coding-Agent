@@ -147,7 +147,7 @@ class EventStore(EventStoreABC):
         start_id: int = 0,
         end_id: int | None = None,
         reverse: bool = False,
-        event_filter: EventFilter | None = None,
+        filter: EventFilter | None = None,
         limit: int | None = None,
     ) -> Iterable[Event]:
         """Retrieve events from the event stream, optionally filtering out events of a given type.
@@ -158,13 +158,14 @@ class EventStore(EventStoreABC):
             start_id: The ID of the first event to retrieve. Defaults to 0.
             end_id: The ID of the last event to retrieve. Defaults to the last event in the stream.
             reverse: Whether to retrieve events in reverse order. Defaults to False.
-            event_filter: EventFilter to use
+            filter: EventFilter to use
             limit: Maximum number of events to retrieve. Defaults to None (no limit).
 
         Yields:
             Events from the stream that match the criteria.
 
         """
+        event_filter = filter
         start_id, end_id = self._normalize_search_range(start_id, end_id)
         start_id, end_id, step = self._setup_reverse_search(start_id, end_id, reverse)
 

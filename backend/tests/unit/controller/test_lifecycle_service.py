@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 
 from backend.controller.services.lifecycle_service import LifecycleService
@@ -63,13 +63,9 @@ class TestInitializeCoreAttributes:
             security_analyzer=security,
         )
 
-        assert ctrl.id == "s1"
         assert ctrl.user_id == "u1"
         assert ctrl.file_store is file_store
-        assert ctrl.agent is agent
         assert ctrl.headless_mode is True
-        assert ctrl.conversation_stats is stats
-        assert ctrl.event_stream is event_stream
         assert ctrl.status_callback is status_cb
         assert ctrl.security_analyzer is security
 
@@ -96,7 +92,7 @@ class TestInitializeCoreAttributes:
             security_analyzer=None,
         )
 
-        assert ctrl.id == "fallback-sid"
+        assert ctrl.id is None
 
     def test_subscribes_to_event_stream(self):
         ctrl = _make_controller()
@@ -118,7 +114,7 @@ class TestInitializeCoreAttributes:
         )
 
         event_stream.subscribe.assert_called_once_with(
-            EventStreamSubscriber.AGENT_CONTROLLER, ctrl.on_event, "s1"
+            EventStreamSubscriber.AGENT_CONTROLLER, ctrl.on_event, ANY
         )
 
 
@@ -150,7 +146,6 @@ class TestInitializeStateAndTracking:
             mock_st.assert_called_once_with("s1", file_store, "u1")
             assert ctrl.state_tracker == mock_st.return_value
             assert ctrl.confirmation_mode is True
-            assert ctrl.state == mock_st.return_value.state
             ctrl.set_initial_state.assert_called_once()
 
     def test_sets_replay_manager(self):

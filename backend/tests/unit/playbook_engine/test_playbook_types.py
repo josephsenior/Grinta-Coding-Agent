@@ -66,7 +66,7 @@ class TestPlaybookMetadata:
             name="debug",
             type=PlaybookType.TASK,
             version="2.0.0",
-            agent="CodeAct",
+            agent="Orchestrator",
             triggers=["/debug"],
             inputs=[InputMetadata(name="file", description="File path")],
         )

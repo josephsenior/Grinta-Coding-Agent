@@ -183,13 +183,4 @@ class TestDataclass:
             sid="abc",
             user_id="user1",
         )
-        assert store.session_api_key is None
-
-    def test_with_api_key(self):
-        store = NestedEventStore(
-            base_url="http://localhost:3000",
-            sid="abc",
-            user_id="user1",
-            session_api_key="key123",
-        )
-        assert store.session_api_key == "key123"
+        assert store.user_id == "user1"

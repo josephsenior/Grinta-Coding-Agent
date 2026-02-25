@@ -20,7 +20,7 @@ from backend.core.errors import (
     SessionError,
     SessionInvariantError,
     SessionStartupError,
-    SocketAuthError,
+    SocketConnectionError,
     ToolExecutionError,
     UserActionRequiredError,
     classify_error,
@@ -130,8 +130,8 @@ class TestErrorHierarchy:
     def test_replay_is_session(self):
         assert issubclass(ReplayError, SessionError)
 
-    def test_socket_auth_is_forge(self):
-        assert issubclass(SocketAuthError, ForgeError)
+    def test_socket_connection_is_forge(self):
+        assert issubclass(SocketConnectionError, ForgeError)
 
     def test_event_stream_is_forge(self):
         assert issubclass(EventStreamError, ForgeError)

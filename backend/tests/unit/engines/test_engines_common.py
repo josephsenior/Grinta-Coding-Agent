@@ -83,6 +83,19 @@ class TestExtractThoughtFromMessage:
         msg = SimpleNamespace(content=[])
         assert extract_thought_from_message(msg) == ""
 
+    def test_output_text_variant_is_supported(self):
+        msg = SimpleNamespace(
+            content=[
+                {"type": "output_text", "text": "Hello"},
+                {"type": "text", "text": " world"},
+            ]
+        )
+        assert extract_thought_from_message(msg) == "Hello world"
+
+    def test_list_of_strings_is_supported(self):
+        msg = SimpleNamespace(content=["Part A", " + Part B"])
+        assert extract_thought_from_message(msg) == "Part A + Part B"
+
 
 # ── parse_tool_call_arguments ────────────────────────────────────────
 

@@ -31,7 +31,7 @@ from backend.storage.data_models.user_secrets import UserSecrets
 from backend.utils.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AgentConfig, ForgeConfig
     from backend.events.event import Event
     from backend.playbook_engine.playbook import BasePlaybook
     from backend.core.provider_types import (
@@ -46,6 +46,40 @@ if TYPE_CHECKING:
 def _instantiate_runtime(runtime_cls: type[object], **kwargs: Any) -> Runtime:
     """Instantiate a runtime class and return it as Runtime protocol type."""
     return cast("Runtime", runtime_cls(**kwargs))
+
+
+def _resolve_agent_config(
+    agent: Agent | None,
+    config: ForgeConfig | None,
+    agent_cls_name: str | None,
+) -> AgentConfig | None:
+    """Resolve AgentConfig from agent or config + agent_cls_name."""
+    if agent is not None:
+        return getattr(agent, "config", None)
+    if config is not None and agent_cls_name:
+        try:
+            return config.get_agent_config(agent_cls_name)
+        except Exception:
+            pass
+    return None
+
+
+def _apply_agent_disabled_plugins(
+    filtered: list[PluginRequirement], agent_config: AgentConfig | None
+) -> list[PluginRequirement]:
+    """Apply agent config disabled_plugins denylist."""
+    if agent_config is None:
+        return filtered
+    disabled = set(getattr(agent_config, "disabled_plugins", None) or [])
+    if not disabled:
+        return filtered
+    result = [p for p in filtered if p.name not in disabled]
+    if len(result) < len(filtered):
+        logger.info(
+            "Plugins disabled by agent config: %s",
+            ", ".join(sorted(disabled)),
+        )
+    return result
 
 
 def filter_plugins_by_config(
@@ -73,35 +107,13 @@ def filter_plugins_by_config(
     Returns:
         Filtered list of plugin requirements.
     """
-    # --- Layer 1: env-var allowlist ---
     from backend.runtime.plugins import (
         filter_plugins_by_config as _env_filter,
     )
 
     filtered = _env_filter(plugins)
-
-    # --- Layer 2: per-agent disabled list ---
-    agent_config = None
-    if agent is not None:
-        agent_config = getattr(agent, "config", None)
-    elif config is not None and agent_cls_name:
-        try:
-            agent_config = config.get_agent_config(agent_cls_name)
-        except Exception:
-            pass
-
-    if agent_config is not None:
-        disabled: set[str] = set(getattr(agent_config, "disabled_plugins", None) or [])
-        if disabled:
-            before = len(filtered)
-            filtered = [p for p in filtered if p.name not in disabled]
-            if len(filtered) < before:
-                logger.info(
-                    "Plugins disabled by agent config: %s",
-                    ", ".join(sorted(disabled)),
-                )
-
-    return filtered
+    agent_config = _resolve_agent_config(agent, config, agent_cls_name)
+    return _apply_agent_disabled_plugins(filtered, agent_config)
 
 
 def create_runtime(

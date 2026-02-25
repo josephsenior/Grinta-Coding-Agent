@@ -64,29 +64,15 @@ def check_route_file(file_path: Path) -> dict:
     }
 
 
-def main():
-    """Main verification function."""
-    print(f"{BLUE}Verifying API Versioning Support{RESET}\n")
-
-    routes_dir = project_root / "forge" / "server" / "routes"
-    if not routes_dir.exists():
-        print(f"{RED}❌ Routes directory not found: {routes_dir}{RESET}")
-        return 1
-
-    route_files = list(routes_dir.glob("*.py"))
-    route_files = [f for f in route_files if f.name != "__init__.py"]
-
-    print(f"Found {len(route_files)} route files\n")
-
-    results = []
+def _process_route_results(
+    route_files: list[Path], results: list[dict]
+) -> tuple[int, int, list[dict]]:
+    """Process results and print per-file status. Returns (versioned, non_versioned, needs_update)."""
     versioned_count = 0
     non_versioned_count = 0
-    needs_update = []
+    needs_update: list[dict] = []
 
-    for route_file in sorted(route_files):
-        result = check_route_file(route_file)
-        results.append(result)
-
+    for route_file, result in zip(route_files, results, strict=True):
         if "error" in result:
             print(f"{RED}❌ {route_file.name}: {result['error']}{RESET}")
             continue
@@ -112,25 +98,56 @@ def main():
                 for prefix in result["prefixes"]:
                     print(f"   └─ Prefix: {prefix}")
 
+    return versioned_count, non_versioned_count, needs_update
+
+
+def _print_summary(
+    versioned_count: int, non_versioned_count: int, route_count: int
+) -> None:
+    """Print verification summary."""
     print(f"\n{BLUE}{'=' * 60}{RESET}")
     print(f"{BLUE}Summary{RESET}")
     print(f"{BLUE}{'=' * 60}{RESET}")
     print(f"{GREEN}✅ Versioned routes: {versioned_count}{RESET}")
     print(f"{YELLOW}⚠️  Non-versioned routes: {non_versioned_count}{RESET}")
-    print(f"{BLUE}📁 Total route files: {len(route_files)}{RESET}")
+    print(f"{BLUE}📁 Total route files: {route_count}{RESET}")
+
+
+def _print_needs_update(needs_update: list[dict]) -> None:
+    """Print routes that need versioning and recommendation."""
+    print(f"\n{YELLOW}⚠️  Routes that need versioning update:{RESET}")
+    for result in needs_update:
+        print(f"  - {Path(result['file']).name}")
+        if result["prefixes"]:
+            for prefix in result["prefixes"]:
+                suggested = prefix.replace("/api/", "/api/v1/", 1)
+                print(f"    {prefix} → {suggested}")
+    print(f"\n{YELLOW}Recommendation:{RESET}")
+    print("  Update routes to use create_versioned_router() or /api/v1/ prefix")
+    print("  Add explicit redirects during beta")
+
+
+def main():
+    """Main verification function."""
+    print(f"{BLUE}Verifying API Versioning Support{RESET}\n")
+
+    routes_dir = project_root / "forge" / "server" / "routes"
+    if not routes_dir.exists():
+        print(f"{RED}❌ Routes directory not found: {routes_dir}{RESET}")
+        return 1
+
+    route_files = [f for f in routes_dir.glob("*.py") if f.name != "__init__.py"]
+    print(f"Found {len(route_files)} route files\n")
+
+    results = [check_route_file(f) for f in sorted(route_files)]
+    versioned_count, non_versioned_count, needs_update = _process_route_results(
+        sorted(route_files), results
+    )
+
+    _print_summary(versioned_count, non_versioned_count, len(route_files))
 
     if needs_update:
-        print(f"\n{YELLOW}⚠️  Routes that need versioning update:{RESET}")
-        for result in needs_update:
-            print(f"  - {Path(result['file']).name}")
-            if result["prefixes"]:
-                for prefix in result["prefixes"]:
-                    suggested = prefix.replace("/api/", "/api/v1/", 1)
-                    print(f"    {prefix} → {suggested}")
-
-        print(f"\n{YELLOW}Recommendation:{RESET}")
-        print("  Update routes to use create_versioned_router() or /api/v1/ prefix")
-        print("  Add explicit redirects during beta")
+        _print_needs_update(needs_update)
         return 1
     print(f"\n{GREEN}✅ All routes support versioning!{RESET}")
     return 0

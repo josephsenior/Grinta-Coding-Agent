@@ -9,7 +9,7 @@ task types. The **Orchestrator** is the default and handles most coding tasks.
 
 | Engine | Purpose | Best For |
 |--------|---------|----------|
-| **Orchestrator** | Full-featured CodeAct agent | Coding, debugging, refactoring |
+| **Orchestrator** | Full-featured autonomous coding agent | Coding, debugging, refactoring |
 | **MCP Browser** | Remote web browsing via MCP | Web interaction, research |
 | **Locator** | Code navigation via graph | Finding files, symbols, dependencies |
 | **Auditor** | Code review engine | Code quality analysis |
@@ -17,7 +17,7 @@ task types. The **Orchestrator** is the default and handles most coding tasks.
 
 ---
 
-## 1. Orchestrator (CodeAct)
+## 1. Orchestrator
 
 **Default engine.** The Orchestrator uses a ReAct (Reasoning + Acting) loop
 to solve coding tasks through iterative observation and action cycles.

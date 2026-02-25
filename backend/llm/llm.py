@@ -45,44 +45,51 @@ if TYPE_CHECKING:
     from backend.core.config import LLMConfig
 
 
+def _map_api_status_error(
+    exc: Exception, model: str, provider: str
+) -> Exception:
+    """Map APIStatusError by status code."""
+    status = getattr(exc, "status_code", None)
+    if status == 408:
+        return Timeout(str(exc), model=model, llm_provider=provider)
+    if status == 503:
+        return ServiceUnavailableError(str(exc), model=model, llm_provider=provider)
+    if isinstance(status, int) and 500 <= status <= 599:
+        return InternalServerError(
+            str(exc), model=model, llm_provider=provider, status_code=status
+        )
+    return APIError(str(exc), model=model, llm_provider=provider, status_code=status)
+
+
+def _map_bad_request_with_context_check(
+    exc: Exception, model: str, provider: str
+) -> Exception:
+    """Map BadRequestError, checking for context window overflow."""
+    if is_context_window_error(str(exc).lower(), exc):
+        return ContextWindowExceededError(str(exc), model=model, llm_provider=provider)
+    return BadRequestError(str(exc), model=model, llm_provider=provider)
+
+
 def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
     """Map OpenAI SDK exceptions."""
     try:
         import openai as _oai
 
-        if isinstance(exc, _oai.AuthenticationError):
-            return AuthenticationError(str(exc), model=model, llm_provider="openai")
-        if isinstance(exc, _oai.RateLimitError):
-            return RateLimitError(str(exc), model=model, llm_provider="openai")
-        # Check APITimeoutError before APIConnectionError (subclass relationship)
-        if isinstance(exc, _oai.APITimeoutError):
-            return Timeout(str(exc), model=model, llm_provider="openai")
-        if isinstance(exc, _oai.APIConnectionError):
-            return APIConnectionError(str(exc), model=model, llm_provider="openai")
+        simple_map: list[tuple[type, type, str]] = [
+            (_oai.AuthenticationError, AuthenticationError, "openai"),
+            (_oai.RateLimitError, RateLimitError, "openai"),
+            (_oai.APITimeoutError, Timeout, "openai"),
+            (_oai.APIConnectionError, APIConnectionError, "openai"),
+            (_oai.InternalServerError, InternalServerError, "openai"),
+        ]
+        for sdk_cls, our_cls, prov in simple_map:
+            if isinstance(exc, sdk_cls):
+                return our_cls(str(exc), model=model, llm_provider=prov)
+
         if isinstance(exc, _oai.BadRequestError):
-            if is_context_window_error(str(exc).lower(), exc):
-                return ContextWindowExceededError(
-                    str(exc), model=model, llm_provider="openai"
-                )
-            return BadRequestError(str(exc), model=model, llm_provider="openai")
-        if isinstance(exc, _oai.InternalServerError):
-            return InternalServerError(str(exc), model=model, llm_provider="openai")
+            return _map_bad_request_with_context_check(exc, model, "openai")
         if isinstance(exc, _oai.APIStatusError):
-            status = getattr(exc, "status_code", None)
-            # Treat transient transport / server errors as retryable.
-            if status == 408:
-                return Timeout(str(exc), model=model, llm_provider="openai")
-            if status == 503:
-                return ServiceUnavailableError(
-                    str(exc), model=model, llm_provider="openai"
-                )
-            if isinstance(status, int) and 500 <= status <= 599:
-                return InternalServerError(
-                    str(exc), model=model, llm_provider="openai", status_code=status
-                )
-            return APIError(
-                str(exc), model=model, llm_provider="openai", status_code=status
-            )
+            return _map_api_status_error(exc, model, "openai")
     except ImportError:
         pass
     return None
@@ -93,40 +100,47 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
     try:
         import anthropic as _anth
 
-        if isinstance(exc, _anth.AuthenticationError):
-            return AuthenticationError(str(exc), model=model, llm_provider="anthropic")
-        if isinstance(exc, _anth.RateLimitError):
-            return RateLimitError(str(exc), model=model, llm_provider="anthropic")
-        # Check APITimeoutError before APIConnectionError (subclass relationship)
-        if isinstance(exc, _anth.APITimeoutError):
-            return Timeout(str(exc), model=model, llm_provider="anthropic")
-        if isinstance(exc, _anth.APIConnectionError):
-            return APIConnectionError(str(exc), model=model, llm_provider="anthropic")
+        simple_map: list[tuple[type, type, str]] = [
+            (_anth.AuthenticationError, AuthenticationError, "anthropic"),
+            (_anth.RateLimitError, RateLimitError, "anthropic"),
+            (_anth.APITimeoutError, Timeout, "anthropic"),
+            (_anth.APIConnectionError, APIConnectionError, "anthropic"),
+            (_anth.InternalServerError, InternalServerError, "anthropic"),
+        ]
+        for sdk_cls, our_cls, prov in simple_map:
+            if isinstance(exc, sdk_cls):
+                return our_cls(str(exc), model=model, llm_provider=prov)
+
         if isinstance(exc, _anth.BadRequestError):
-            if is_context_window_error(str(exc).lower(), exc):
-                return ContextWindowExceededError(
-                    str(exc), model=model, llm_provider="anthropic"
-                )
-            return BadRequestError(str(exc), model=model, llm_provider="anthropic")
-        if isinstance(exc, _anth.InternalServerError):
-            return InternalServerError(str(exc), model=model, llm_provider="anthropic")
+            return _map_bad_request_with_context_check(exc, model, "anthropic")
         if isinstance(exc, _anth.APIStatusError):
-            status = getattr(exc, "status_code", None)
-            if status == 408:
-                return Timeout(str(exc), model=model, llm_provider="anthropic")
-            if status == 503:
-                return ServiceUnavailableError(
-                    str(exc), model=model, llm_provider="anthropic"
-                )
-            if isinstance(status, int) and 500 <= status <= 599:
-                return InternalServerError(
-                    str(exc), model=model, llm_provider="anthropic", status_code=status
-                )
-            return APIError(
-                str(exc), model=model, llm_provider="anthropic", status_code=status
-            )
+            return _map_api_status_error(exc, model, "anthropic")
     except ImportError:
         pass
+    return None
+
+
+def _try_google_exception_mapping(
+    exc: Exception, model: str, exc_name: str, exc_str: str
+) -> Exception | None:
+    """Map Google/Generative AI exceptions. Returns None if not applicable."""
+    if "google" not in exc_name and "generativeai" not in exc_name:
+        return None
+    if is_context_window_error(exc_str, exc):
+        return ContextWindowExceededError(str(exc), model=model, llm_provider="google")
+    if "quota" in exc_str or "rate" in exc_str:
+        return RateLimitError(str(exc), model=model, llm_provider="google")
+    return APIError(str(exc), model=model, llm_provider="google")
+
+
+def _try_heuristic_exception_mapping(
+    exc: Exception, model: str, exc_str: str
+) -> Exception | None:
+    """Map by heuristic string checks. Returns None if no match."""
+    if "content_filter" in exc_str or "content policy" in exc_str or "safety" in exc_str:
+        return ContentPolicyViolationError(str(exc), model=model)
+    if is_context_window_error(exc_str, exc):
+        return ContextWindowExceededError(str(exc), model=model)
     return None
 
 
@@ -139,7 +153,6 @@ def _map_provider_exception(exc: Exception, model: str) -> Exception:
     if isinstance(exc, LLMError):
         return exc
 
-    # Attempt provider-specific mapping
     for mapper in [_map_openai_exception, _map_anthropic_exception]:
         mapped = mapper(exc, model)
         if mapped:
@@ -148,29 +161,14 @@ def _map_provider_exception(exc: Exception, model: str) -> Exception:
     exc_name = type(exc).__name__.lower()
     exc_str = str(exc).lower()
 
-    # Google Generative AI exceptions
-    if "google" in exc_name or "generativeai" in exc_name:
-        if is_context_window_error(exc_str, exc):
-            return ContextWindowExceededError(
-                str(exc), model=model, llm_provider="google"
-            )
-        if "quota" in exc_str or "rate" in exc_str:
-            return RateLimitError(str(exc), model=model, llm_provider="google")
-        return APIError(str(exc), model=model, llm_provider="google")
+    google_mapped = _try_google_exception_mapping(exc, model, exc_name, exc_str)
+    if google_mapped:
+        return google_mapped
 
-    # Content-policy / safety-filter heuristics
-    if (
-        "content_filter" in exc_str
-        or "content policy" in exc_str
-        or "safety" in exc_str
-    ):
-        return ContentPolicyViolationError(str(exc), model=model)
+    heuristic_mapped = _try_heuristic_exception_mapping(exc, model, exc_str)
+    if heuristic_mapped:
+        return heuristic_mapped
 
-    # Context-window overflow heuristic (catches providers we don't explicitly know)
-    if is_context_window_error(exc_str, exc):
-        return ContextWindowExceededError(str(exc), model=model)
-
-    # Fallback — wrap in generic APIError so callers always get LLMError subtypes
     return APIError(str(exc), model=model)
 
 
@@ -185,6 +183,103 @@ LLM_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     LLMNoResponseError,
 )
 
+
+def _apply_model_alias_resolution(config: Any) -> None:
+    """Resolve model aliases and update config.model if changed."""
+    from backend.llm.model_aliases import get_alias_manager
+
+    alias_manager = get_alias_manager()
+    original = config.model
+    resolved = alias_manager.resolve_alias(original)
+    if resolved != original:
+        logger.info("Model alias resolved: %s -> %s", original, resolved)
+        config.model = resolved
+
+
+def _get_provider_resolver() -> Any:
+    """Return the provider resolver instance."""
+    from backend.llm.provider_resolver import get_resolver
+
+    return get_resolver()
+
+
+def _apply_base_url_discovery(config: Any, resolver: Any) -> None:
+    """Discover and set base_url if not configured."""
+    if not config.base_url:
+        discovered = resolver.resolve_base_url(config.model)
+        if discovered:
+            logger.info(
+                "Auto-discovered base_url for %s: %s", config.model, discovered
+            )
+            config.base_url = discovered
+
+
+def _is_local_model(config: Any, resolver: Any) -> bool:
+    """Check if model is local (no API key required)."""
+    if resolver.is_local_model(config.model):
+        return True
+    base = config.base_url or ""
+    return any(h in base for h in ("localhost", "127.0.0.1", "0.0.0.0"))
+
+
+def _validate_api_key_or_local(
+    api_key_value: str | None, config: Any, resolver: Any
+) -> None:
+    """Raise AuthenticationError if API key missing and model is not local."""
+    if api_key_value or _is_local_model(config, resolver):
+        return
+    logger.error("No API key available for model: %s", config.model)
+    raise AuthenticationError(
+        f"No API key provided for model '{config.model}'. "
+        "Please set it in Settings -> Models -> API Keys.",
+        model=config.model,
+    )
+
+
+def _resolve_function_calling_config(
+    native_tool_calling: bool | None, model: str
+) -> bool:
+    """Determine whether function calling is active."""
+    try:
+        features = get_features(model)
+        return (
+            native_tool_calling
+            if native_tool_calling is not None
+            else features.supports_function_calling
+        )
+    except (KeyError, ValueError) as exc:
+        logger.warning(
+            "Could not detect function-calling support for model %s: %s  "
+            "— defaulting to disabled. If this model supports tools, "
+            "set native_tool_calling=true in the LLM config.",
+            model,
+            exc,
+        )
+        return native_tool_calling or False
+
+
+def _load_cached_features(model: str) -> ModelFeatures:
+    """Load model features for caching. Fall back to empty defaults on error."""
+    try:
+        return get_features(model)
+    except (KeyError, ValueError) as exc:
+        logger.warning(
+            "Model feature lookup failed for %s: %s  "
+            "— using empty defaults. Token limits, vision, and "
+            "other capabilities may be inaccurate.",
+            model,
+            exc,
+        )
+        return ModelFeatures()
+
+
+def _apply_custom_tokenizer(config: Any) -> None:
+    """Replace config.custom_tokenizer with created tokenizer if configured."""
+    if not config.custom_tokenizer:
+        return
+    tokenizer = create_pretrained_tokenizer(config.custom_tokenizer)
+    if tokenizer is not None:
+        config.custom_tokenizer = tokenizer
 
 class LLM(RetryMixin, DebugMixin):
     """Language Model abstraction layer with direct SDK client support.
@@ -202,7 +297,6 @@ class LLM(RetryMixin, DebugMixin):
         metrics: Metrics | None = None,
         retry_listener: Callable[[int, int], None] | None = None,
     ) -> None:
-        # Initialize DebugMixin (sets `self.debug`, default False) via MRO.
         super().__init__()
         self.config: LLMConfig = copy.deepcopy(config)
         self.service_id = service_id
@@ -212,53 +306,12 @@ class LLM(RetryMixin, DebugMixin):
         self.retry_listener = retry_listener
         self._function_calling_active: bool = False
 
-        # Resolve model aliases before processing
-        from backend.llm.model_aliases import get_alias_manager
+        _apply_model_alias_resolution(self.config)
+        resolver = _get_provider_resolver()
+        _apply_base_url_discovery(self.config, resolver)
 
-        alias_manager = get_alias_manager()
-        original_model = self.config.model
-        resolved_model = alias_manager.resolve_alias(original_model)
-
-        if resolved_model != original_model:
-            logger.info(
-                "Model alias resolved: %s -> %s", original_model, resolved_model
-            )
-            self.config.model = resolved_model
-
-        # Use resolver for local endpoint discovery and provider detection
-        from backend.llm.provider_resolver import get_resolver
-
-        resolver = get_resolver()
-
-        # Resolve base_url using the resolver (handles local discovery)
-        if not self.config.base_url:
-            discovered_url = resolver.resolve_base_url(self.config.model)
-            if discovered_url:
-                logger.info(
-                    "Auto-discovered base_url for %s: %s",
-                    self.config.model,
-                    discovered_url,
-                )
-                self.config.base_url = discovered_url
-
-        # Initialize client
         api_key_value = self._extract_api_key()
-
-        # Check if this is a local model
-        _is_local = resolver.is_local_model(self.config.model) or (
-            self.config.base_url
-            and any(
-                h in self.config.base_url for h in ("localhost", "127.0.0.1", "0.0.0.0")
-            )
-        )
-
-        if not api_key_value and not _is_local:
-            logger.error("No API key available for model: %s", self.config.model)
-            raise AuthenticationError(
-                f"No API key provided for model '{self.config.model}'. "
-                "Please set it in Settings -> Models -> API Keys.",
-                model=self.config.model,
-            )
+        _validate_api_key_or_local(api_key_value, self.config, resolver)
 
         self.client = get_direct_client(
             model=self.config.model,
@@ -266,45 +319,13 @@ class LLM(RetryMixin, DebugMixin):
             base_url=self.config.base_url,
         )
 
-        # Configure capabilities
-        try:
-            features = get_features(self.config.model)
-            self._function_calling_active = (
-                self.config.native_tool_calling
-                if self.config.native_tool_calling is not None
-                else features.supports_function_calling
-            )
-        except (KeyError, ValueError) as exc:
-            logger.warning(
-                "Could not detect function-calling support for model %s: %s  "
-                "— defaulting to disabled. If this model supports tools, "
-                "set native_tool_calling=true in the LLM config.",
-                self.config.model,
-                exc,
-            )
-            self._function_calling_active = self.config.native_tool_calling or False
-
-        # Initialize model info (limits, etc)
+        self._function_calling_active = _resolve_function_calling_config(
+            self.config.native_tool_calling, self.config.model
+        )
         self.init_model_info()
+        self._cached_features = _load_cached_features(self.config.model)
+        _apply_custom_tokenizer(self.config)
 
-        # Cache model features for easy access
-        try:
-            self._cached_features = get_features(self.config.model)
-        except (KeyError, ValueError) as exc:
-            logger.warning(
-                "Model feature lookup failed for %s: %s  "
-                "— using empty defaults. Token limits, vision, and "
-                "other capabilities may be inaccurate.",
-                self.config.model,
-                exc,
-            )
-            self._cached_features = ModelFeatures()
-
-        # Handle custom tokenizer
-        if self.config.custom_tokenizer:
-            tokenizer = create_pretrained_tokenizer(self.config.custom_tokenizer)
-            if tokenizer is not None:
-                self.config.custom_tokenizer = tokenizer
 
     @property
     def features(self) -> ModelFeatures:
@@ -349,21 +370,12 @@ class LLM(RetryMixin, DebugMixin):
     def _get_call_kwargs(self, **kwargs) -> dict:
         """Merge default config with call-specific kwargs and handle model-specific parameters.
 
-        Model-specific parameter overrides are now driven by catalog.toml
-        via ``apply_model_param_overrides()``, replacing the previous if-elif chain.
-        The old branches are kept as inline fallback for models not yet in the catalog.
+        Model-specific parameter overrides are driven by catalog.toml
+        via ``apply_model_param_overrides()``.
         """
         is_stream = kwargs.pop("is_stream", False)
 
-        # Filter out compatibility parameters that are not used by direct SDKs
-        compatibility_params = [
-            "drop_params",
-            "force_timeout",
-            "metadata",
-            "api_base",
-            "caching",
-        ]
-        for param in compatibility_params:
+        for param in ("drop_params", "force_timeout", "metadata", "api_base", "caching"):
             kwargs.pop(param, None)
 
         call_kwargs = {
@@ -377,56 +389,22 @@ class LLM(RetryMixin, DebugMixin):
         if self.config.top_k is not None:
             call_kwargs["top_k"] = self.config.top_k
 
-        # Data-driven model-specific overrides from catalog.toml
-        from backend.llm.catalog_loader import apply_model_param_overrides, lookup
+        from backend.llm.catalog_loader import (
+            apply_model_param_overrides,
+            sanitize_call_kwargs_for_provider,
+        )
 
-        entry = lookup(self.config.model)
-        if entry and (entry.thinking_mode or entry.strip_reasoning_effort or entry.strip_top_p or entry.strip_temperature):
-            # Use catalog-driven param overrides
-            call_kwargs = apply_model_param_overrides(
-                self.config.model,
-                call_kwargs,
-                reasoning_effort=self.config.reasoning_effort,
-                is_stream=is_stream,
-            )
-        else:
-            # Legacy fallback for models not yet annotated in catalog.toml
-            model_lower = self.config.model.lower()
-            provider_lower = (self.config.custom_llm_provider or "").lower()
-            is_gemini = "gemini" in model_lower or "gemini" in provider_lower
-
-            if is_gemini:
-                if self.config.reasoning_effort in [None, "low"]:
-                    if not is_stream:
-                        call_kwargs["thinking"] = {"budget_tokens": 128}
-                    call_kwargs.pop("reasoning_effort", None)
-                    if not is_stream:
-                        call_kwargs.pop("temperature", None)
-                        call_kwargs.pop("top_p", None)
-                elif self.config.reasoning_effort == "medium":
-                    call_kwargs["reasoning_effort"] = "medium"
-                    call_kwargs.pop("thinking", None)
-                elif self.config.reasoning_effort == "high":
-                    call_kwargs["reasoning_effort"] = "high"
-                    call_kwargs.pop("thinking", None)
-            elif "opus-4-1" in model_lower:
-                call_kwargs["thinking"] = {"type": "disabled"}
-                call_kwargs.pop("top_p", None)
-            elif "claude" in model_lower:
-                call_kwargs.pop("reasoning_effort", None)
-                if "claude-3-7" in model_lower or "claude-3.7" in model_lower:
-                    if self.config.reasoning_effort == "low":
-                        call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 1024}
-                    elif self.config.reasoning_effort in ["medium", "high"]:
-                        call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 4096}
-            else:
-                if self.config.reasoning_effort is not None:
-                    call_kwargs["reasoning_effort"] = self.config.reasoning_effort
+        call_kwargs = apply_model_param_overrides(
+            self.config.model,
+            call_kwargs,
+            reasoning_effort=self.config.reasoning_effort,
+            is_stream=is_stream,
+        )
 
         if self.config.seed is not None:
             call_kwargs["seed"] = self.config.seed
 
-        return call_kwargs
+        return sanitize_call_kwargs_for_provider(self.config.model, call_kwargs)
 
     def _record_response_metrics(self, response: Any, latency: float) -> None:
         """Record latency, cost, and token usage from an LLM response.
@@ -586,6 +564,19 @@ class LLM(RetryMixin, DebugMixin):
 
         return await _acompletion_with_retry(**call_kwargs)
 
+    def _get_astream_retry_params(self) -> tuple[int, float, float]:
+        """Return (max_attempts, retry_min_wait, retry_max_wait)."""
+        max_a = getattr(self.config, "num_retries", None) or 3
+        min_w = getattr(self.config, "retry_min_wait", None) or 1
+        max_w = getattr(self.config, "retry_max_wait", None) or 10
+        return max_a, min_w, max_w
+
+    def _should_retry_astream(
+        self, is_retryable: bool, is_last: bool, yielded_any: bool
+    ) -> bool:
+        """Return True if we should sleep and retry (not re-raise)."""
+        return is_retryable and not is_last and not yielded_any
+
     async def astream(self, *args, **kwargs) -> AsyncIterator[dict[str, Any]]:
         """Asynchronous streaming call with cancellation support and retry.
 
@@ -598,59 +589,39 @@ class LLM(RetryMixin, DebugMixin):
         import asyncio as _asyncio
 
         messages = self._extract_messages(args, kwargs)
-
-        # Merge default kwargs
         call_kwargs = self._get_call_kwargs(is_stream=True, **kwargs)
-
-        max_attempts = self.config.num_retries if hasattr(self.config, "num_retries") else 3
-        retry_min = self.config.retry_min_wait if hasattr(self.config, "retry_min_wait") else 1
-        retry_max = self.config.retry_max_wait if hasattr(self.config, "retry_max_wait") else 10
+        max_attempts, retry_min, retry_max = self._get_astream_retry_params()
 
         for attempt in range(1, max_attempts + 1):
             yielded_any = False
             try:
-                # Log prompt on each attempt
                 self.log_prompt(messages)
-
                 stream_iter = self.client.astream(messages=messages, **call_kwargs)
                 async for chunk in stream_iter:  # type: ignore[attr-defined]
-                    # Check for cancellation during stream
                     if await self._check_cancelled():
                         logger.debug("LLM stream cancelled by user.")
                         return
-
-                    # Log chunk content if available
                     if chunk.get("choices") and chunk["choices"][0].get("delta"):
                         content = chunk["choices"][0]["delta"].get("content", "")
                         if content:
                             self.log_response(content)
-
                     yield chunk
                     yielded_any = True
-
-                # Completed successfully — exit retry loop
                 return
 
             except Exception as e:
                 is_retryable = isinstance(e, LLM_RETRY_EXCEPTIONS)
                 is_last = attempt >= max_attempts
-
-                if not is_retryable or is_last or yielded_any:
-                    # Don't retry if we already yielded chunks to the caller
-                    # (partial results can't be replayed), or non-retryable
+                if not self._should_retry_astream(is_retryable, is_last, yielded_any):
                     logger.error("LLM astream error: %s", e)
                     mapped = _map_provider_exception(e, self.config.model)
                     if mapped is not e:
                         raise mapped from e
                     raise
-
                 wait = min(retry_max, retry_min * (2 ** (attempt - 1)))
                 logger.warning(
                     "LLM astream transient error (attempt %d/%d): %s — retrying in %.1fs",
-                    attempt,
-                    max_attempts,
-                    e,
-                    wait,
+                    attempt, max_attempts, e, wait,
                 )
                 await _asyncio.sleep(wait)
 

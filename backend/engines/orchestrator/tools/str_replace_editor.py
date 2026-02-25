@@ -1,4 +1,4 @@
-"""Configuration for the string-replace editor tool used by CodeAct."""
+"""Configuration for the string-replace editor tool used by Orchestrator."""
 
 from backend.engines.orchestrator.tools.common import (
     create_tool_definition,

@@ -31,6 +31,7 @@ from backend.api.services.conversation_mutation_service import (
     update_conversation_title,
 )
 from backend.api.services.conversation_query_service import (
+    delete_all_conversations,
     delete_conversation_entry,
     get_conversation_details,
 )
@@ -52,8 +53,6 @@ from backend.api.services.session_init_service import (
 from backend.api.shared import file_store, get_conversation_manager
 from backend.api.types import LLMAuthenticationError, MissingSettingsError
 from backend.api.user_auth import (
-    AuthType,
-    get_auth_type,
     get_provider_tokens,
     get_user_id,
     get_user_secrets,
@@ -223,7 +222,6 @@ async def new_conversation(
         ProviderTokenType | None, Depends(get_provider_tokens)
     ] = None,
     user_secrets: Annotated[UserSecrets | None, Depends(get_user_secrets)] = None,
-    auth_type: Annotated[AuthType | None, Depends(get_auth_type)] = None,
     settings: Annotated[Settings | None, Depends(get_user_settings)] = None,
 ) -> Any:
     """Initialize a new session or join an existing one."""
@@ -266,7 +264,7 @@ async def new_conversation(
     ) = extract_request_data(data)
 
     conversation_trigger, override_repo, override_git_provider = (
-        determine_conversation_trigger(suggested_task, create_playbook, auth_type)
+        determine_conversation_trigger(suggested_task, create_playbook)
     )
 
     repository, vcs_provider, initial_user_msg = apply_conversation_overrides(
@@ -278,9 +276,7 @@ async def new_conversation(
         initial_user_msg,
     )
 
-    if error_response := validate_remote_api_request(
-        conversation_trigger, initial_user_msg or ""
-    ):
+    if error_response := validate_remote_api_request(initial_user_msg or ""):
         return error_response
 
     user_id, provider_tokens, user_secrets = prepare_conversation_params(
@@ -415,6 +411,16 @@ async def _delete_conversation_route(
     user_id = get_user_id(request)
     conversation_store = await get_conversation_store(request)
     return await delete_conversation_entry(conversation_id, user_id, conversation_store)
+
+
+@sub_router.delete("/conversations")
+async def _delete_all_conversations_route(
+    request: Request,
+) -> bool:
+    """Delete all conversations for the user."""
+    user_id = get_user_id(request)
+    conversation_store = await get_conversation_store(request)
+    return await delete_all_conversations(user_id, conversation_store)
 
 
 @sub_router.get("/conversations/{conversation_id}/remember-prompt")

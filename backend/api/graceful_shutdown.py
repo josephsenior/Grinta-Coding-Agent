@@ -66,14 +66,18 @@ def setup_signal_handlers() -> None:
         """Handle shutdown signals."""
         logger.info("Received signal %s, initiating graceful shutdown...", signum)
         # Run graceful shutdown in event loop
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
             # Create task and let event loop handle it - don't exit immediately
-            task = asyncio.create_task(graceful_shutdown())
-            # Wait for shutdown to complete
-            loop.run_until_complete(task)
+            asyncio.create_task(graceful_shutdown())
         else:
             # Run shutdown directly if loop is not running
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             loop.run_until_complete(graceful_shutdown())
         sys.exit(0)
 

@@ -1,4 +1,4 @@
-"""Tool definitions used by the CodeAct agent."""
+"""Tool definitions used by the Orchestrator agent."""
 
 from .apply_patch import create_apply_patch_tool
 from .bash import create_cmd_run_tool

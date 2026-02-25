@@ -49,6 +49,10 @@ class ConversationStore(ABC):
         """Delete conversation metadata."""
 
     @abstractmethod
+    async def delete_all_metadata(self) -> None:
+        """Delete all conversation metadata."""
+
+    @abstractmethod
     async def exists(self, conversation_id: str) -> bool:
         """Check if conversation exists."""
 

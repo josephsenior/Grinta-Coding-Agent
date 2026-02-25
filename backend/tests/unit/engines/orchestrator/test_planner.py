@@ -134,7 +134,7 @@ class TestShouldUseShortToolDescriptions:
         assert p._should_use_short_tool_descriptions() is True
 
     def test_o1_uses_short(self):
-        p = _make_planner(llm=_make_llm("o1-preview"))
+        p = _make_planner(llm=_make_llm("o1"))
         assert p._should_use_short_tool_descriptions() is True
 
     def test_o4_uses_short(self):
@@ -160,21 +160,21 @@ class TestLlmSupportsToolChoice:
     @pytest.mark.parametrize(
         "model",
         [
+            "gpt-4o",
             "gpt-4-turbo",
-            "gpt-3.5-turbo",
-            "claude-3-opus",
-            "claude-sonnet-3-5",
             "claude-opus-4",
-            "claude-haiku",
-            "gemini-pro",
-            "mistral-7b",
-            "command-r-plus",
-            "deepseek-coder",
+            "claude-4-sonnet",
+            "o3-mini",
+            "o4-mini",
         ],
     )
     def test_supported_models(self, model):
         p = _make_planner(llm=_make_llm(model))
         assert p._llm_supports_tool_choice() is True
+
+    def test_gemini_not_supported_for_tool_choice(self):
+        p = _make_planner(llm=_make_llm("google/gemini-3-flash"))
+        assert p._llm_supports_tool_choice() is False
 
     def test_unknown_model_not_supported(self):
         p = _make_planner(llm=_make_llm("some-obscure-model"))
@@ -307,6 +307,11 @@ class TestDetermineToolChoice:
         p = _make_planner()
         messages = [{"role": "user", "content": "create a file"}]
         assert p._determine_tool_choice(messages, self.state) == "required"
+
+    def test_plain_chat_returns_none(self):
+        p = _make_planner()
+        messages = [{"role": "user", "content": "say hello back please"}]
+        assert p._determine_tool_choice(messages, self.state) == "none"
 
     def test_unknown_message_delegates_to_safety(self):
         safety = _make_safety()
@@ -517,6 +522,17 @@ class TestBuildLlmParams:
             params = p.build_llm_params(messages, state, [])
         assert "tool_choice" in params
         assert params["tool_choice"] == "required"
+
+    def test_plain_chat_disables_tools_for_turn(self):
+        p = _make_planner(llm=_make_llm("google/gemini-3-flash"))
+        state = _make_state()
+        messages = [{"role": "user", "content": "say hello back please"}]
+        tools = [{"type": "function", "function": {"name": "think"}}]
+
+        with patch("backend.engines.orchestrator.planner.check_tools", return_value=[]):
+            params = p.build_llm_params(messages, state, tools)
+
+        assert params["tools"] == []
 
 
 # ---------------------------------------------------------------------------

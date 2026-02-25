@@ -82,60 +82,15 @@ def check_route_file_imports(file_path: Path) -> tuple[bool, list[str]]:
         Tuple of (is_valid, list_of_issues)
     """
     issues = []
-
-    # Check syntax first
     is_valid, error = check_syntax(file_path)
     if not is_valid:
         issues.append(f"Syntax error: {error}")
         return False, issues
 
-    # Try to parse AST to check for common issues
     try:
         with open(file_path, encoding="utf-8") as f:
             source = f.read()
-        tree = ast.parse(source, filename=str(file_path))
-
-        # Check for router definition
-        has_router = False
-        has_routes = False
-
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        if "router" in target.id.lower() or "app" in target.id.lower():
-                            has_router = True
-            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-                # Check for route decorators
-                for decorator in node.decorator_list:
-                    if isinstance(decorator, ast.Attribute):
-                        if decorator.attr in (
-                            "get",
-                            "post",
-                            "put",
-                            "delete",
-                            "patch",
-                            "head",
-                            "options",
-                        ):
-                            has_routes = True
-                    elif isinstance(decorator, ast.Call):
-                        if isinstance(decorator.func, ast.Attribute):
-                            if decorator.func.attr in (
-                                "get",
-                                "post",
-                                "put",
-                                "delete",
-                                "patch",
-                                "head",
-                                "options",
-                            ):
-                                has_routes = True
-
-        if not has_router and not has_routes:
-            # This might be a utility file, not a route file - skip
-            pass
-
+        ast.parse(source, filename=str(file_path))
     except Exception as e:
         issues.append(f"AST parsing error: {str(e)}")
 
@@ -246,54 +201,63 @@ def main():
     print()
 
     all_passed = True
+    all_passed &= _run_route_files_check()
+    all_passed &= _run_router_imports_check()
+    all_passed &= _run_app_registration_check()
+    all_passed &= _run_final_import_check()
 
-    # 1. Check route file syntax
+    print("=" * 80)
+    print("✅ ALL CHECKS PASSED - API routes are healthy!" if all_passed
+          else "❌ SOME CHECKS FAILED - Please review the issues above")
+    print("=" * 80)
+    return 0 if all_passed else 1
+
+
+def _run_route_files_check() -> bool:
+    """Check route file syntax; return True if all passed."""
     print("1. Checking route file syntax...")
     print("-" * 80)
     route_files = check_all_route_files()
-
-    route_issues = 0
+    route_issues = sum(1 for v, _ in route_files.values() if not v)
     for file_name, (is_valid, issues) in route_files.items():
         if not is_valid:
-            all_passed = False
-            route_issues += 1
             print(f"  ❌ {file_name}:")
             for issue in issues:
                 print(f"     - {issue}")
         else:
             print(f"  ✅ {file_name}")
-
     if route_issues == 0:
         print(f"  ✅ All {len(route_files)} route files passed syntax check")
     else:
         print(f"  ❌ {route_issues} route file(s) have issues")
     print()
+    return route_issues == 0
 
-    # 2. Verify router imports
+
+def _run_router_imports_check() -> bool:
+    """Verify router imports; return True if all passed."""
     print("2. Verifying router imports...")
     print("-" * 80)
     router_results = verify_router_imports()
-
-    import_issues = 0
+    import_issues = sum(1 for v, _ in router_results.values() if not v)
     for router_name, (is_valid, message) in router_results.items():
         if not is_valid:
-            all_passed = False
-            import_issues += 1
             print(f"  ❌ {router_name}: {message}")
         else:
             print(f"  ✅ {router_name}")
-
     if import_issues == 0:
         print(f"  ✅ All {len(router_results)} routers can be imported")
     else:
         print(f"  ❌ {import_issues} router(s) have import issues")
     print()
+    return import_issues == 0
 
-    # 3. Verify app.py registration
+
+def _run_app_registration_check() -> bool:
+    """Verify app.py router registration; return True if valid."""
     print("3. Verifying app.py router registration...")
     print("-" * 80)
     app_valid, app_issues = verify_app_registration()
-
     if app_valid:
         print("  ✅ app.py syntax is valid")
         if app_issues:
@@ -303,51 +267,35 @@ def main():
         else:
             print("  ✅ All routers appear to be registered")
     else:
-        all_passed = False
         print("  ❌ app.py has issues:")
         for issue in app_issues:
             print(f"     - {issue}")
     print()
+    return app_valid
 
-    # 4. Try to import the app (final check)
+
+def _run_final_import_check() -> bool:
+    """Try importing FastAPI app; return True if successful."""
     print("4. Final check: Importing FastAPI app...")
     print("-" * 80)
     try:
-        # This is a more comprehensive check - it will catch import-time errors
         from backend.api.app import app
-
-        # Check if app has routes
         route_count = len(app.routes)
         print("  ✅ FastAPI app imported successfully")
         print(f"  ✅ App has {route_count} registered routes")
-
-        # Check for health endpoints
-        health_routes = [
-            r for r in app.routes if hasattr(r, "path") and "health" in r.path.lower()
-        ]
+        health_routes = [r for r in app.routes if hasattr(r, "path") and "health" in r.path.lower()]
         if health_routes:
             print(f"  ✅ Found {len(health_routes)} health endpoint(s)")
         else:
             print("  ⚠️  No health endpoints found (may be registered differently)")
-
     except Exception as e:
-        all_passed = False
         print("  ❌ Failed to import FastAPI app:")
         print(f"     {str(e)}")
-        print()
-        print("  Full traceback:")
+        print("\n  Full traceback:")
         traceback.print_exc()
+        return False
     print()
-
-    # Summary
-    print("=" * 80)
-    if all_passed:
-        print("✅ ALL CHECKS PASSED - API routes are healthy!")
-        print("=" * 80)
-        return 0
-    print("❌ SOME CHECKS FAILED - Please review the issues above")
-    print("=" * 80)
-    return 1
+    return True
 
 
 if __name__ == "__main__":

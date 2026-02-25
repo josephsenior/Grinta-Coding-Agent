@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 from backend.llm.llm_utils import check_tools
+from backend.llm.catalog_loader import prefers_short_tool_descriptions, supports_tool_choice
 
 ChatCompletionToolParam = Any
 
@@ -24,6 +25,14 @@ QUESTION_PATTERNS = [
     r"\bcan you explain\b",
 ]
 
+PLAIN_CHAT_PATTERNS = [
+    r"^\s*(hi|hello|hey)\b",
+    r"\b(say|reply with)\s+(hello|hi|hey)\b",
+    r"\b(thanks|thank you)\b",
+    r"\bhow are you\b",
+    r"\bwho are you\b",
+]
+
 ACTION_PATTERNS = [
     r"\bcreate\b",
     r"\bmake\b",
@@ -43,8 +52,25 @@ ACTION_PATTERNS = [
 ]
 
 
+def _get_last_user_text_from_messages(messages: list) -> str:
+    """Extract text from the last user message."""
+    for msg in reversed(messages):
+        if not isinstance(msg, dict) or msg.get("role") != "user":
+            continue
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return " ".join(
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and item.get("type") == "text"
+            )
+    return ""
+
+
 class OrchestratorPlanner:
-    """Assembles tools, messages, and LLM request payloads for CodeAct."""
+    """Assembles tools, messages, and LLM request payloads for Orchestrator."""
 
     def __init__(
         self,
@@ -82,58 +108,24 @@ class OrchestratorPlanner:
     def _should_use_short_tool_descriptions(self) -> bool:
         if not self._llm:
             return False
-        model = self._llm.config.model
-        return any(substr in model for substr in ("gpt-4", "o3", "o1", "o4"))
+        try:
+            return prefers_short_tool_descriptions(self._llm.config.model)
+        except Exception:
+            return False
 
     def _add_core_tools(self, tools: list, use_short_tool_desc: bool) -> None:
+        self._add_basic_tools(tools, use_short_tool_desc)
+        self._add_edit_and_search_tools(tools)
+        self._add_terminal_and_special_tools(tools)
+
+    def _add_basic_tools(self, tools: list, use_short_tool_desc: bool) -> None:
+        """Add cmd, think, finish, condensation_request, note, recall, run_tests tools."""
         from backend.engines.orchestrator.tools.bash import create_cmd_run_tool
-        from backend.engines.orchestrator.tools.condensation_request import (
-            create_condensation_request_tool,
-        )
+        from backend.engines.orchestrator.tools.condensation_request import create_condensation_request_tool
         from backend.engines.orchestrator.tools.finish import create_finish_tool
         from backend.engines.orchestrator.tools.think import create_think_tool
-        from backend.engines.orchestrator.tools.note import (
-            create_note_tool,
-            create_recall_tool,
-            create_semantic_recall_tool,
-        )
+        from backend.engines.orchestrator.tools.note import create_note_tool, create_recall_tool, create_semantic_recall_tool
         from backend.engines.orchestrator.tools.run_tests import create_run_tests_tool
-        from backend.engines.orchestrator.tools.apply_patch import (
-            create_apply_patch_tool,
-        )
-        from backend.engines.orchestrator.tools.batch_edit import (
-            create_batch_edit_tool,
-        )
-        from backend.engines.orchestrator.tools.task_tracker import (
-            create_task_tracker_tool,
-        )
-        from backend.engines.orchestrator.tools.search_code import (
-            create_search_code_tool,
-        )
-        from backend.engines.orchestrator.tools.explore_code import (
-            create_explore_tree_structure_tool,
-            create_get_entity_contents_tool,
-        )
-        from backend.engines.orchestrator.tools.check_tool_status import (
-            create_check_tool_status_tool,
-        )
-        from backend.engines.orchestrator.tools.delegate_task import (
-            create_delegate_task_tool,
-        )
-        from backend.engines.orchestrator.tools.revert_to_safe_state import (
-            create_revert_to_safe_state_tool,
-        )
-        from backend.engines.orchestrator.tools.terminal import (
-            create_terminal_open_tool,
-            create_terminal_input_tool,
-            create_terminal_read_tool,
-        )
-        from backend.engines.orchestrator.tools.meta_cognition import (
-            create_uncertainty_tool,
-            create_clarification_tool,
-            create_escalate_tool,
-            create_proposal_tool,
-        )
 
         if getattr(self._config, "enable_cmd", True):
             tools.append(create_cmd_run_tool(use_short_description=use_short_tool_desc))
@@ -149,6 +141,15 @@ class OrchestratorPlanner:
             tools.append(create_semantic_recall_tool())
         if getattr(self._config, "enable_run_tests", True):
             tools.append(create_run_tests_tool())
+
+    def _add_edit_and_search_tools(self, tools: list) -> None:
+        """Add apply_patch, batch_edit, task_tracker, search_code, explore_code tools."""
+        from backend.engines.orchestrator.tools.apply_patch import create_apply_patch_tool
+        from backend.engines.orchestrator.tools.batch_edit import create_batch_edit_tool
+        from backend.engines.orchestrator.tools.task_tracker import create_task_tracker_tool
+        from backend.engines.orchestrator.tools.search_code import create_search_code_tool
+        from backend.engines.orchestrator.tools.explore_code import create_explore_tree_structure_tool, create_get_entity_contents_tool
+
         if getattr(self._config, "enable_apply_patch", True):
             tools.append(create_apply_patch_tool())
             tools.append(create_batch_edit_tool())
@@ -158,65 +159,72 @@ class OrchestratorPlanner:
             tools.append(create_search_code_tool())
             tools.append(create_explore_tree_structure_tool())
             tools.append(create_get_entity_contents_tool())
+
+    def _add_terminal_and_special_tools(self, tools: list) -> None:
+        """Add terminal, optional feature tools (web search, delegate, etc.), and meta-cognition tools."""
+        self._add_terminal_tools(tools)
+        self._add_optional_feature_tools(tools)
+        self._add_meta_cognition_tools(tools)
+
+    def _add_terminal_tools(self, tools: list) -> None:
+        """Add terminal open/input/read tools when terminal support is enabled."""
         if getattr(self._config, "enable_terminal", True):
+            from backend.engines.orchestrator.tools.terminal import (
+                create_terminal_open_tool, create_terminal_input_tool, create_terminal_read_tool,
+            )
             tools.append(create_terminal_open_tool())
             tools.append(create_terminal_input_tool())
             tools.append(create_terminal_read_tool())
+
+    def _add_optional_feature_tools(self, tools: list) -> None:
+        """Add check_tool_status, web_search, delegate, rollback, workspace_status, etc."""
+        from backend.engines.orchestrator.tools.check_tool_status import create_check_tool_status_tool
+        from backend.engines.orchestrator.tools.delegate_task import create_delegate_task_tool
+        from backend.engines.orchestrator.tools.revert_to_safe_state import create_revert_to_safe_state_tool
+
         if getattr(self._config, "enable_check_tool_status", True):
             tools.append(create_check_tool_status_tool())
         if getattr(self._config, "enable_web_search", False):
-            from backend.engines.orchestrator.tools.web_search import (
-                create_web_search_tool,
-            )
-
+            from backend.engines.orchestrator.tools.web_search import create_web_search_tool
             tools.append(create_web_search_tool())
         if getattr(self._config, "enable_swarming", True):
             tools.append(create_delegate_task_tool())
         if getattr(self._config, "enable_rollback", True):
             tools.append(create_revert_to_safe_state_tool())
-        if getattr(self._config, "enable_workspace_status", True):
-            from backend.engines.orchestrator.tools.workspace_status import (
-                create_workspace_status_tool,
-            )
+        self._add_lazy_import_tools(
+            tools,
+            [
+                ("enable_workspace_status", True, "workspace_status", "create_workspace_status_tool"),
+                ("enable_error_patterns", True, "error_patterns", "create_error_patterns_tool"),
+                ("enable_checkpoints", True, "checkpoint", "create_checkpoint_tool"),
+                ("enable_project_map", True, "project_map", "create_project_map_tool"),
+                ("enable_session_diff", True, "session_diff", "create_session_diff_tool"),
+                ("enable_working_memory", True, "working_memory", "create_working_memory_tool"),
+                ("enable_verify_state", True, "verify_state", "create_verify_state_tool"),
+            ],
+        )
 
-            tools.append(create_workspace_status_tool())
-        if getattr(self._config, "enable_error_patterns", True):
-            from backend.engines.orchestrator.tools.error_patterns import (
-                create_error_patterns_tool,
-            )
+    def _add_lazy_import_tools(
+        self, tools: list, specs: list[tuple[str, bool, str, str]]
+    ) -> None:
+        """Add tools from module/factory pairs when config enables them.
 
-            tools.append(create_error_patterns_tool())
-        if getattr(self._config, "enable_checkpoints", True):
-            from backend.engines.orchestrator.tools.checkpoint import (
-                create_checkpoint_tool,
-            )
+        specs: list of (config_key, default, module_name, factory_name).
+        """
+        for config_key, default, module_name, factory_name in specs:
+            if getattr(self._config, config_key, default):
+                mod = __import__(
+                    f"backend.engines.orchestrator.tools.{module_name}",
+                    fromlist=[factory_name],
+                )
+                tools.append(getattr(mod, factory_name)())
 
-            tools.append(create_checkpoint_tool())
-        if getattr(self._config, "enable_project_map", True):
-            from backend.engines.orchestrator.tools.project_map import (
-                create_project_map_tool,
-            )
-
-            tools.append(create_project_map_tool())
-        if getattr(self._config, "enable_session_diff", True):
-            from backend.engines.orchestrator.tools.session_diff import (
-                create_session_diff_tool,
-            )
-
-            tools.append(create_session_diff_tool())
-        if getattr(self._config, "enable_working_memory", True):
-            from backend.engines.orchestrator.tools.working_memory import (
-                create_working_memory_tool,
-            )
-
-            tools.append(create_working_memory_tool())
-        if getattr(self._config, "enable_verify_state", True):
-            from backend.engines.orchestrator.tools.verify_state import (
-                create_verify_state_tool,
-            )
-
-            tools.append(create_verify_state_tool())
+    def _add_meta_cognition_tools(self, tools: list) -> None:
+        """Add uncertainty, clarification, escalate, proposal tools when meta-cognition is enabled."""
         if getattr(self._config, "enable_meta_cognition", True):
+            from backend.engines.orchestrator.tools.meta_cognition import (
+                create_uncertainty_tool, create_clarification_tool, create_escalate_tool, create_proposal_tool,
+            )
             tools.append(create_uncertainty_tool())
             tools.append(create_clarification_tool())
             tools.append(create_escalate_tool())
@@ -260,13 +268,17 @@ class OrchestratorPlanner:
         state: State,
         tools: list[ChatCompletionToolParam],
     ) -> dict:
+        last_user_msg = self._get_last_user_message(messages) or ""
         tool_choice = self._determine_tool_choice(messages, state)
+        disable_tools_for_turn = self._is_plain_chat_request(last_user_msg)
 
         # NOTE: We inject control/status messages *after* tool selection so
         # tool selection heuristics see the original user/assistant content.
 
         # Progressive tool disclosure: filter tools based on context
-        if getattr(self._config, "enable_progressive_tools", True):
+        if disable_tools_for_turn:
+            tools = []
+        elif getattr(self._config, "enable_progressive_tools", True):
             tools = self._tool_selector.select_tools(tools, state, messages)
 
         # Apply three-tier tool descriptions
@@ -569,57 +581,41 @@ class OrchestratorPlanner:
 
     def _get_tool_hints(self, messages: list) -> str:
         """Generate context-specific tool suggestions based on keywords AND agent behavior."""
-        # Extract the last user message text
-        text = ""
-        for msg in reversed(messages):
-            if isinstance(msg, dict) and msg.get("role") == "user":
-                content = msg.get("content", "")
-                if isinstance(content, str):
-                    text = content
-                elif isinstance(content, list):
-                    text = " ".join(
-                        item.get("text", "")
-                        for item in content
-                        if isinstance(item, dict) and item.get("type") == "text"
-                    )
-                break
-
+        text = _get_last_user_text_from_messages(messages)
         if not text:
             return ""
 
         text_lower = text.lower()
-        hints: list[str] = []
-        for keywords, hint in self._TOOL_HINT_MAP:
-            if any(kw in text_lower for kw in keywords):
-                hints.append(hint)
-
-        # Behavioral hints — analyze recent agent actions in the conversation
+        hints = [hint for keywords, hint in self._TOOL_HINT_MAP if any(kw in text_lower for kw in keywords)]
         behavioral = self._get_behavioral_hints(messages)
         if behavioral:
             hints.extend(behavioral)
-
         return " ".join(hints) if hints else ""
 
     def _get_behavioral_hints(self, messages: list) -> list[str]:
-        """Analyze recent agent messages to detect behavioral patterns and generate hints.
+        """Analyze recent agent messages to detect behavioral patterns and generate hints."""
+        recent = self._collect_recent_assistant_messages(messages, max_messages=15)
+        if len(recent) < 3:
+            return []
 
-        Looks at the last N assistant messages to detect:
-        - Repeated edits to the same file (potential confusion)
-        - Rising error count (suggest changing strategy)
-        - Missing test runs after edits
-        """
-        hints: list[str] = []
-        recent_assistant = []
+        edited_files, error_count, has_test_run = self._extract_tool_patterns(recent)
+        return self._build_behavioral_hints(edited_files, error_count, has_test_run)
+
+    def _collect_recent_assistant_messages(self, messages: list, max_messages: int = 15) -> list:
+        """Collect last N assistant messages in chronological order."""
+        recent: list = []
         for msg in reversed(messages):
             if isinstance(msg, dict) and msg.get("role") == "assistant":
-                recent_assistant.append(msg)
-                if len(recent_assistant) >= 15:
+                recent.append(msg)
+                if len(recent) >= max_messages:
                     break
+        recent.reverse()
+        return recent
 
-        if len(recent_assistant) < 3:
-            return hints
-
-        # Analyze tool call patterns from recent messages
+    def _extract_tool_patterns(
+        self, recent_assistant: list
+    ) -> tuple[dict[str, int], int, bool]:
+        """Extract edit counts, error count, and test-run flag from assistant messages."""
         edited_files: dict[str, int] = {}
         error_count = 0
         has_test_run = False
@@ -636,28 +632,39 @@ class OrchestratorPlanner:
                 args_raw = fn.get("arguments", "{}")
 
                 if name in ("str_replace_editor", "edit_file", "structure_editor"):
-                    try:
-                        import json as _json
-
-                        args = (
-                            _json.loads(args_raw)
-                            if isinstance(args_raw, str)
-                            else args_raw
-                        )
-                        path = args.get("path", args.get("file_path", ""))
-                        if path and args.get("command") != "view":
-                            edited_files[path] = edited_files.get(path, 0) + 1
-                    except Exception:
-                        pass
-
-                if name == "run_tests":
+                    path = self._extract_edit_path(args_raw)
+                    if path:
+                        edited_files[path] = edited_files.get(path, 0) + 1
+                elif name == "run_tests":
                     has_test_run = True
 
             content = str(msg.get("content", ""))
             if "error" in content.lower() or "failed" in content.lower():
                 error_count += 1
 
-        # Pattern: editing the same file many times
+        return edited_files, error_count, has_test_run
+
+    def _extract_edit_path(self, args_raw: str | dict) -> str | None:
+        """Extract file path from tool call args if it's an edit (not view)."""
+        try:
+            import json as _json
+
+            args = _json.loads(args_raw) if isinstance(args_raw, str) else args_raw
+            path = args.get("path", args.get("file_path", ""))
+            return path if path and args.get("command") != "view" else None
+        except Exception:
+            return None
+
+    def _build_behavioral_hints(
+        self, edited_files: dict[str, int], error_count: int, has_test_run: bool
+    ) -> list[str]:
+        """Build hint strings from detected patterns.
+
+        Includes: repeated edits to same file, many edits without tests,
+        multiple errors suggesting strategy change.
+        """
+        hints: list[str] = []
+
         for path, count in edited_files.items():
             if count >= 3:
                 hints.append(
@@ -666,14 +673,12 @@ class OrchestratorPlanner:
                 )
                 break
 
-        # Pattern: many edits without running tests
         total_edits = sum(edited_files.values())
         if total_edits >= 4 and not has_test_run:
             hints.append(
                 "Multiple file edits without running tests — consider run_tests to verify changes."
             )
 
-        # Pattern: rising errors suggest strategy change
         if error_count >= 3:
             hints.append(
                 "Multiple errors detected — consider working_memory(update, hypothesis) "
@@ -686,6 +691,9 @@ class OrchestratorPlanner:
         last_user_msg = self._get_last_user_message(messages)
         if not last_user_msg:
             return "auto"
+
+        if self._is_plain_chat_request(last_user_msg):
+            return "none"
 
         # Force think on the first turn of a complex task
         iter_flag = getattr(state, "iteration_flag", None)
@@ -718,20 +726,10 @@ class OrchestratorPlanner:
         return action_count >= 3 or conjunction_count >= 2 or len(message) > 500
 
     def _llm_supports_tool_choice(self) -> bool:
-        model_lower = self._llm.config.model.lower()
-        supported = [
-            "gpt-4",
-            "gpt-3.5",
-            "claude-3",
-            "claude-sonnet",
-            "claude-opus",
-            "claude-haiku",
-            "gemini",
-            "mistral",
-            "command",
-            "deepseek",
-        ]
-        return any(substr in model_lower for substr in supported)
+        try:
+            return supports_tool_choice(self._llm.config.model)
+        except Exception:
+            return False
 
     def _get_last_user_message(self, messages: list) -> str | None:
         for message in reversed(messages):
@@ -744,3 +742,11 @@ class OrchestratorPlanner:
 
     def _is_action(self, message: str) -> bool:
         return any(re.search(pattern, message.lower()) for pattern in ACTION_PATTERNS)
+
+    def _is_plain_chat_request(self, message: str) -> bool:
+        text = (message or "").strip().lower()
+        if not text or len(text) > 120:
+            return False
+        if any(re.search(pattern, text) for pattern in PLAIN_CHAT_PATTERNS):
+            return True
+        return False

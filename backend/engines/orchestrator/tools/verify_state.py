@@ -55,34 +55,8 @@ def create_verify_state_tool() -> ChatCompletionToolParam:
     )
 
 
-def build_verify_state_action(arguments: dict) -> AgentThinkAction:
-    """Execute verify_state and return a think action with pass/fail results."""
-    path = arguments.get("path", "")
-    line_checks = arguments.get("line_checks", "")
-
-    if not path:
-        return AgentThinkAction(
-            thought="[VERIFY_STATE] 'path' is required."
-        )
-    if not line_checks:
-        return AgentThinkAction(
-            thought="[VERIFY_STATE] 'line_checks' is required (format: 'line:substring|line:substring')."
-        )
-
-    if not os.path.isfile(path):
-        return AgentThinkAction(
-            thought=f"[VERIFY_STATE] FAIL — file not found: {path}"
-        )
-
-    try:
-        with open(path, encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-    except OSError as exc:
-        return AgentThinkAction(
-            thought=f"[VERIFY_STATE] FAIL — cannot read {path}: {exc}"
-        )
-
-    # Parse assertions
+def _parse_verify_assertions(line_checks: str) -> list[tuple[int, str]]:
+    """Parse line_checks into [(line_num, expected), ...]. Returns empty list on parse failure."""
     assertions = []
     for check in line_checks.split("|"):
         check = check.strip()
@@ -90,35 +64,55 @@ def build_verify_state_action(arguments: dict) -> AgentThinkAction:
             continue
         parts = check.split(":", 1)
         try:
-            line_num = int(parts[0].strip())
-            expected = parts[1].strip()
-            assertions.append((line_num, expected))
+            assertions.append((int(parts[0].strip()), parts[1].strip()))
         except (ValueError, IndexError):
             continue
+    return assertions
 
-    if not assertions:
-        return AgentThinkAction(
-            thought="[VERIFY_STATE] No valid assertions parsed. Format: 'line_num:expected_text|line_num:expected_text'"
-        )
 
-    # Run assertions
+def _run_verify_assertions(lines: list[str], assertions: list[tuple[int, str]]) -> tuple[list[str], bool]:
+    """Run assertions. Returns (results, all_passed)."""
     results: list[str] = []
     all_passed = True
     for line_num, expected in assertions:
         if line_num < 1 or line_num > len(lines):
             results.append(f"  FAIL line {line_num}: out of range (file has {len(lines)} lines)")
             all_passed = False
-            continue
-
-        actual_line = lines[line_num - 1].rstrip("\n\r")
-        if expected in actual_line:
+        elif expected in lines[line_num - 1].rstrip("\n\r"):
             results.append(f"  PASS line {line_num}: contains '{expected}'")
         else:
-            # Show what the line actually contains
-            actual_preview = actual_line[:120]
-            results.append(f"  FAIL line {line_num}: expected '{expected}' but got: '{actual_preview}'")
+            results.append(f"  FAIL line {line_num}: expected '{expected}' but got: '{lines[line_num - 1][:120]}'")
             all_passed = False
+    return (results, all_passed)
 
+
+def build_verify_state_action(arguments: dict) -> AgentThinkAction:
+    """Execute verify_state and return a think action with pass/fail results."""
+    path = arguments.get("path", "")
+    line_checks = arguments.get("line_checks", "")
+
+    if not path:
+        return AgentThinkAction(thought="[VERIFY_STATE] 'path' is required.")
+    if not line_checks:
+        return AgentThinkAction(
+            thought="[VERIFY_STATE] 'line_checks' is required (format: 'line:substring|line:substring')."
+        )
+    if not os.path.isfile(path):
+        return AgentThinkAction(thought=f"[VERIFY_STATE] FAIL — file not found: {path}")
+
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+    except OSError as exc:
+        return AgentThinkAction(thought=f"[VERIFY_STATE] FAIL — cannot read {path}: {exc}")
+
+    assertions = _parse_verify_assertions(line_checks)
+    if not assertions:
+        return AgentThinkAction(
+            thought="[VERIFY_STATE] No valid assertions parsed. Format: 'line_num:expected_text|line_num:expected_text'"
+        )
+
+    results, all_passed = _run_verify_assertions(lines, assertions)
     status = "ALL PASSED" if all_passed else "SOME FAILED"
     header = f"[VERIFY_STATE] {path} — {status} ({len(assertions)} checks)"
     return AgentThinkAction(thought=f"{header}\n" + "\n".join(results))

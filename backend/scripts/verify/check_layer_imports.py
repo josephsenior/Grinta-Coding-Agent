@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import ast
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 # ── Rule definitions ──────────────────────────────────────────────────────────
@@ -59,6 +60,43 @@ EXEMPTIONS: dict[str, str] = {
 BACKEND_ROOT = Path(__file__).resolve().parents[2]  # backend/
 
 
+def _find_type_checking_ranges(tree: ast.AST) -> list[tuple[int, int]]:
+    """Find (start, end) line ranges for TYPE_CHECKING blocks."""
+    ranges: list[tuple[int, int]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If):
+            continue
+        test = node.test
+        is_tc = (
+            isinstance(test, ast.Name) and test.id == "TYPE_CHECKING"
+            or isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
+        )
+        if not is_tc:
+            continue
+        start = node.lineno
+        end = max(
+            getattr(n, "end_lineno", n.lineno)
+            for n in ast.walk(node)
+            if hasattr(n, "lineno")
+        )
+        ranges.append((start, end))
+    return ranges
+
+
+def _collect_imports_from_tree(
+    tree: ast.AST, in_type_checking: Callable[[int], bool]
+) -> list[tuple[int, str, bool]]:
+    """Collect (line, module, is_type_checking_only) for all imports."""
+    results: list[tuple[int, str, bool]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                results.append((node.lineno, alias.name, in_type_checking(node.lineno)))
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            results.append((node.lineno, node.module, in_type_checking(node.lineno)))
+    return results
+
+
 def _extract_imports(filepath: Path) -> list[tuple[int, str, bool]]:
     """Return (line, dotted_module, is_type_checking_only) for every import."""
     source = filepath.read_text(encoding="utf-8", errors="replace")
@@ -67,47 +105,12 @@ def _extract_imports(filepath: Path) -> list[tuple[int, str, bool]]:
     except SyntaxError:
         return []
 
-    results: list[tuple[int, str, bool]] = []
-    type_checking_ranges: list[tuple[int, int]] = []
-
-    # Find TYPE_CHECKING blocks
-    for node in ast.walk(tree):
-        if isinstance(node, ast.If):
-            test = node.test
-            # if TYPE_CHECKING:  or  if typing.TYPE_CHECKING:
-            is_tc = False
-            if (
-                isinstance(test, ast.Name)
-                and test.id == "TYPE_CHECKING"
-                or isinstance(test, ast.Attribute)
-                and test.attr == "TYPE_CHECKING"
-            ):
-                is_tc = True
-            if is_tc:
-                start = node.lineno
-                end = max(
-                    getattr(n, "end_lineno", n.lineno)
-                    for n in ast.walk(node)
-                    if hasattr(n, "lineno")
-                )
-                type_checking_ranges.append((start, end))
+    tc_ranges = _find_type_checking_ranges(tree)
 
     def _in_type_checking(lineno: int) -> bool:
-        return any(s <= lineno <= e for s, e in type_checking_ranges)
+        return any(s <= lineno <= e for s, e in tc_ranges)
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                results.append(
-                    (node.lineno, alias.name, _in_type_checking(node.lineno))
-                )
-        elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                results.append(
-                    (node.lineno, node.module, _in_type_checking(node.lineno))
-                )
-
-    return results
+    return _collect_imports_from_tree(tree, _in_type_checking)
 
 
 def check() -> list[str]:

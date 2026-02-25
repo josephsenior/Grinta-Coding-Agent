@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import shutil
@@ -28,6 +29,16 @@ from backend.mcp_integration.client import MCPClient
 from backend.mcp_integration.error_collector import mcp_error_collector
 from backend.mcp_integration.wrappers import WRAPPER_TOOL_REGISTRY, wrapper_tool_params
 from backend.runtime import LocalRuntimeInProcess
+
+
+def _get_mcp_connect_timeout_sec() -> float:
+    """Return MCP server connect timeout in seconds."""
+    raw = os.getenv("FORGE_MCP_CONNECT_TIMEOUT_SEC", "8")
+    try:
+        timeout = float(raw)
+        return timeout if timeout > 0 else 8.0
+    except (TypeError, ValueError):
+        return 8.0
 
 
 def _is_windows_stdio_mcp_disabled() -> bool:
@@ -91,13 +102,11 @@ async def create_mcps(
     if not servers:
         return []
 
-    # Connect to each server using appropriate handler
-    mcps = []
-    for server in servers:
-        if client := await _connect_to_server(server, conversation_id):
-            mcps.append(client)
-
-    return mcps
+    # Connect to servers in parallel so one slow server does not stall
+    # overall MCP bootstrap for the conversation.
+    connect_tasks = [_connect_to_server(server, conversation_id) for server in servers]
+    results = await asyncio.gather(*connect_tasks)
+    return [client for client in results if client is not None]
 
 
 async def _connect_to_server(
@@ -131,11 +140,19 @@ async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
 
     logger.info("Initializing MCP agent for %s with stdio connection...", server.name)
     client = MCPClient()
+    timeout_sec = _get_mcp_connect_timeout_sec()
 
     try:
-        await client.connect_stdio(server)
+        await asyncio.wait_for(client.connect_stdio(server), timeout=timeout_sec)
         _log_successful_connection(client, server.name, "STDIO")
         return client
+    except TimeoutError:
+        logger.warning(
+            "Timed out connecting to stdio MCP server '%s' after %.1fs; skipping.",
+            server.name,
+            timeout_sec,
+        )
+        return None
     except Exception as e:
         logger.error("Failed to connect to %s: %s", server.name, str(e), exc_info=True)
         return None
@@ -152,11 +169,23 @@ async def _connect_http_server(
         "Initializing MCP agent for %s with %s connection...", server.name, connection_type
     )
     client = MCPClient()
+    timeout_sec = _get_mcp_connect_timeout_sec()
 
     try:
-        await client.connect_http(server, conversation_id=conversation_id)
+        await asyncio.wait_for(
+            client.connect_http(server, conversation_id=conversation_id),
+            timeout=timeout_sec,
+        )
         _log_successful_connection(client, server.url, connection_type)
         return client
+    except TimeoutError:
+        logger.warning(
+            "Timed out connecting to %s MCP server '%s' after %.1fs; skipping.",
+            connection_type,
+            server.name,
+            timeout_sec,
+        )
+        return None
     except Exception as e:
         logger.error("Failed to connect to %s: %s", server.url, str(e), exc_info=True)
         return None

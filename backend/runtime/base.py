@@ -775,11 +775,6 @@ class Runtime(
         self.git_handler.set_cwd(git_cwd)
         return self.git_handler.get_current_branch()
 
-    @property
-    def session_api_key(self) -> str | None:
-        """Return a session API key if configured for the runtime (default: None)."""
-        return None
-
     def _execute_shell_fn_git_handler(
         self, command: str, cwd: str | None
     ) -> CommandResult:

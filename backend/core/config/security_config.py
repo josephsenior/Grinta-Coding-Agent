@@ -45,7 +45,7 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "'strict' enforces conversation ownership and rejects anonymous access."
         ),
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     @classmethod
     def from_toml_section(cls, data: dict) -> dict[str, SecurityConfig]:

@@ -30,11 +30,6 @@ If you discover a security vulnerability in Forge, please report it responsibly.
 
 ## Security Architecture
 
-### Authentication
-- Single `X-Session-API-Key` header for all API and WebSocket requests
-- Auto-generated key on first startup (stored in `.env.local`)
-- Constant-time comparison via `secrets.compare_digest()`
-
 ### Transport
 - CORS restricted to localhost by default
 - CSRF protection available (opt-in via `FORGE_CSRF_ENABLED`)

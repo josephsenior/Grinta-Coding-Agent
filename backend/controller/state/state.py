@@ -42,6 +42,137 @@ STATE_SCHEMA_VERSION = 2
 MAX_STATE_CHECKPOINTS = 3
 
 
+def _serialize_metrics_like(obj: Any) -> Any:
+    """Serialize metrics or parent_metrics_snapshot to dict."""
+    return obj.get() if obj is not None and hasattr(obj, "get") else None
+
+
+def _serialize_state_scalars(data: dict) -> dict[str, Any]:
+    """Extract scalar and enum fields into doc."""
+    doc: dict[str, Any] = {"_schema_version": STATE_SCHEMA_VERSION}
+    for key in (
+        "session_id", "user_id", "confirmation_mode", "delegate_level",
+        "start_id", "end_id", "parent_iteration", "last_error",
+    ):
+        if key in data:
+            doc[key] = data[key]
+    for key in ("agent_state", "resume_state"):
+        val = data.get(key)
+        doc[key] = val.value if isinstance(val, Enum) else val
+    for key in ("inputs", "outputs", "extra_data"):
+        doc[key] = data.get(key, {})
+    return doc
+
+
+def _serialize_state_typed_fields(data: dict) -> dict[str, Any]:
+    """Extract dataclass/dataclass-like and metrics fields."""
+    doc: dict[str, Any] = {}
+    ts = data.get("turn_signals")
+    doc["turn_signals"] = asdict(ts) if ts else None
+    for key in ("iteration_flag", "budget_flag"):
+        flag = data.get(key)
+        doc[key] = asdict(flag) if flag else None
+    doc["metrics"] = _serialize_metrics_like(data.get("metrics"))
+    doc["parent_metrics_snapshot"] = _serialize_metrics_like(data.get("parent_metrics_snapshot"))
+    plan = data.get("plan")
+    doc["plan"] = asdict(plan) if plan and hasattr(plan, "steps") else None
+    return doc
+
+
+def _build_state_serialization_doc(data: dict[str, Any]) -> dict[str, Any]:
+    """Build a JSON-serializable dict from state __getstate__ data."""
+    doc = _serialize_state_scalars(data)
+    doc.update(_serialize_state_typed_fields(data))
+    return doc
+
+
+def _apply_state_scalars(state: State, doc: dict) -> None:
+    """Apply simple scalar fields from doc to state."""
+    scalar_keys = (
+        "session_id", "user_id", "confirmation_mode", "delegate_level",
+        "start_id", "end_id", "parent_iteration", "last_error",
+    )
+    for key in scalar_keys:
+        if key in doc:
+            setattr(state, key, doc[key])
+
+
+def _apply_state_enums_and_dicts(state: State, doc: dict) -> None:
+    """Apply enum and dict fields from doc to state."""
+    agent_state_val = doc.get("agent_state")
+    if agent_state_val is not None:
+        state.set_agent_state(AgentState(agent_state_val), source="State._from_json_str")
+    r = doc.get("resume_state")
+    state.resume_state = AgentState(r) if r else None
+    state.inputs = doc.get("inputs", {})
+    state.outputs = doc.get("outputs", {})
+    state.extra_data = doc.get("extra_data", {})
+
+
+def _apply_state_turn_signals(state: State, doc: dict) -> None:
+    """Apply turn_signals from doc to state."""
+    ts = doc.get("turn_signals")
+    if isinstance(ts, dict):
+        state.turn_signals = TurnSignals(
+            planning_directive=ts.get("planning_directive"),
+            memory_pressure=ts.get("memory_pressure"),
+        )
+
+
+def _apply_state_control_flags(state: State, doc: dict) -> None:
+    """Apply iteration_flag and budget_flag from doc to state."""
+    iflag = doc.get("iteration_flag")
+    if isinstance(iflag, dict):
+        state.iteration_flag = IterationControlFlag(
+            limit_increase_amount=iflag.get("limit_increase_amount", 100),
+            current_value=iflag.get("current_value", 0),
+            max_value=iflag.get("max_value", 100),
+            headless_mode=iflag.get("headless_mode", False),
+        )
+    bflag = doc.get("budget_flag")
+    if isinstance(bflag, dict):
+        state.budget_flag = BudgetControlFlag(
+            limit_increase_amount=bflag.get("limit_increase_amount", 0.0),
+            current_value=bflag.get("current_value", 0.0),
+            max_value=bflag.get("max_value", 0.0),
+            headless_mode=bflag.get("headless_mode", False),
+        )
+
+
+def _apply_state_metrics(state: State, doc: dict) -> None:
+    """Apply metrics and parent_metrics_snapshot from doc to state."""
+    for key, attr in [("metrics", "metrics"), ("parent_metrics_snapshot", "parent_metrics_snapshot")]:
+        d = doc.get(key)
+        if isinstance(d, dict):
+            m = Metrics()
+            m.__setstate__(d)
+            setattr(state, attr, m)
+
+
+def _build_plan_step(d: dict) -> PlanStep:
+    """Recursively rebuild a PlanStep from dict."""
+    return PlanStep(
+        id=d["id"],
+        description=d["description"],
+        status=d.get("status", "pending"),
+        result=d.get("result"),
+        subtasks=[_build_plan_step(s) for s in d.get("subtasks", [])],
+        tags=d.get("tags", []),
+    )
+
+
+def _apply_state_plan(state: State, doc: dict) -> None:
+    """Apply plan from doc to state."""
+    plan_dict = doc.get("plan")
+    if not isinstance(plan_dict, dict):
+        return
+    try:
+        steps = [_build_plan_step(s) for s in plan_dict.get("steps", [])]
+        state.plan = ActivePlan(steps=steps, title=plan_dict.get("title", "Current Plan"))
+    except Exception as e:
+        logger.warning("Failed to restore plan from state: %s", e)
+
+
 @dataclass
 class TurnSignals:
     """First-class, turn-scoped control signals for agents.
@@ -432,58 +563,7 @@ class State:
     def _to_json_str(self) -> str:
         """Serialize state to a versioned JSON string."""
         data = self.__getstate__()  # strips history, transient fields
-        doc: dict[str, Any] = {"_schema_version": STATE_SCHEMA_VERSION}
-
-        # Simple scalar fields
-        for key in (
-            "session_id",
-            "user_id",
-            "confirmation_mode",
-            "delegate_level",
-            "start_id",
-            "end_id",
-            "parent_iteration",
-            "last_error",
-        ):
-            if key in data:
-                doc[key] = data[key]
-
-        # Enum fields
-        for key in ("agent_state", "resume_state"):
-            val = data.get(key)
-            doc[key] = val.value if isinstance(val, Enum) else val
-
-        # Dict fields (inputs, outputs, extra_data)
-        for key in ("inputs", "outputs", "extra_data"):
-            doc[key] = data.get(key, {})
-
-        # Turn signals (typed)
-        ts = data.get("turn_signals")
-        doc["turn_signals"] = asdict(ts) if ts else None
-
-        # ControlFlag dataclasses
-        flag = data.get("iteration_flag")
-        doc["iteration_flag"] = asdict(flag) if flag else None
-
-        bflag = data.get("budget_flag")
-        doc["budget_flag"] = asdict(bflag) if bflag else None
-
-        # Metrics — use its own .get() → dict
-        metrics = data.get("metrics")
-        doc["metrics"] = (
-            metrics.get() if metrics is not None and hasattr(metrics, "get") else None
-        )
-
-        pms = data.get("parent_metrics_snapshot")
-        doc["parent_metrics_snapshot"] = (
-            pms.get() if pms is not None and hasattr(pms, "get") else None
-        )
-
-        plan = data.get("plan")
-        doc["plan"] = (
-            asdict(plan) if plan and hasattr(plan, "steps") else None
-        )
-
+        doc = _build_state_serialization_doc(data)
         return json.dumps(doc, separators=(",", ":"))
 
     @staticmethod
@@ -508,103 +588,15 @@ class State:
         doc = json.loads(raw)
         version = doc.get("_schema_version", 0)
         if version < 1:
-            msg = f"Unknown state schema version: {version}"
-            raise ValueError(msg)
+            raise ValueError(f"Unknown state schema version: {version}")
 
         state = State()
-
-        # Simple scalars
-        for key in (
-            "session_id",
-            "user_id",
-            "confirmation_mode",
-            "delegate_level",
-            "start_id",
-            "end_id",
-            "parent_iteration",
-            "last_error",
-        ):
-            if key in doc:
-                setattr(state, key, doc[key])
-
-        # Enum fields
-        agent_state_val = doc.get("agent_state")
-        if agent_state_val is not None:
-            state.set_agent_state(
-                AgentState(agent_state_val),
-                source="State._from_json_str",
-            )
-
-        resume_state_val = doc.get("resume_state")
-        state.resume_state = AgentState(resume_state_val) if resume_state_val else None
-
-        # Dict fields
-        state.inputs = doc.get("inputs", {})
-        state.outputs = doc.get("outputs", {})
-        state.extra_data = doc.get("extra_data", {})
-
-        # Turn signals
-        ts = doc.get("turn_signals")
-        if isinstance(ts, dict):
-            state.turn_signals = TurnSignals(
-                planning_directive=ts.get("planning_directive"),
-                memory_pressure=ts.get("memory_pressure"),
-            )
-
-        # ControlFlags
-        iflag = doc.get("iteration_flag")
-        if isinstance(iflag, dict):
-            state.iteration_flag = IterationControlFlag(
-                limit_increase_amount=iflag.get("limit_increase_amount", 100),
-                current_value=iflag.get("current_value", 0),
-                max_value=iflag.get("max_value", 100),
-                headless_mode=iflag.get("headless_mode", False),
-            )
-
-        bflag = doc.get("budget_flag")
-        if isinstance(bflag, dict):
-            state.budget_flag = BudgetControlFlag(
-                limit_increase_amount=bflag.get("limit_increase_amount", 0.0),
-                current_value=bflag.get("current_value", 0.0),
-                max_value=bflag.get("max_value", 0.0),
-                headless_mode=bflag.get("headless_mode", False),
-            )
-
-        # Metrics
-        metrics_dict = doc.get("metrics")
-        if isinstance(metrics_dict, dict):
-            m = Metrics()
-            m.__setstate__(metrics_dict)
-            state.metrics = m
-
-        pms_dict = doc.get("parent_metrics_snapshot")
-        if isinstance(pms_dict, dict):
-            pms = Metrics()
-            pms.__setstate__(pms_dict)
-            state.parent_metrics_snapshot = pms
-
-        plan_dict = doc.get("plan")
-        if isinstance(plan_dict, dict):
-            try:
-                # Helper to recursively rebuild PlanSteps
-                def _build_step(d: dict) -> PlanStep:
-                    return PlanStep(
-                        id=d["id"],
-                        description=d["description"],
-                        status=d.get("status", "pending"),
-                        result=d.get("result"),
-                        subtasks=[_build_step(s) for s in d.get("subtasks", [])],
-                        tags=d.get("tags", []),
-                    )
-                
-                steps = [_build_step(s) for s in plan_dict.get("steps", [])]
-                state.plan = ActivePlan(
-                    steps=steps,
-                    title=plan_dict.get("title", "Current Plan"),
-                )
-            except Exception as e:
-                logger.warning("Failed to restore plan from state: %s", e)
-
+        _apply_state_scalars(state, doc)
+        _apply_state_enums_and_dicts(state, doc)
+        _apply_state_turn_signals(state, doc)
+        _apply_state_control_flags(state, doc)
+        _apply_state_metrics(state, doc)
+        _apply_state_plan(state, doc)
         return state
 
     def __getstate__(self) -> dict:

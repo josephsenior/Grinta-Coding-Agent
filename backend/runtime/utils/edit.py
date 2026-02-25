@@ -483,7 +483,7 @@ class FileEditRuntimeMixin(ABC):
             Corrected observation or original error if correction fails
 
         """
-        import backend.engines.orchestrator.function_calling as codeact_function_calling
+        import backend.engines.orchestrator.function_calling as orchestrator_function_calling
         from backend.engines.orchestrator.tools import create_llm_based_edit_tool
         from backend.llm.llm_utils import check_tools
 
@@ -504,7 +504,7 @@ class FileEditRuntimeMixin(ABC):
         params: dict = {"messages": messages, "tools": tools}
         try:
             response = draft_llm.completion(**params)
-            actions = codeact_function_calling.response_to_actions(response)
+            actions = orchestrator_function_calling.response_to_actions(response)
             if len(actions) != 1:
                 return error_obs
             for action in actions:

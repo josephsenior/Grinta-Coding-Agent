@@ -138,6 +138,53 @@ def truncate_large_text(value: str, max_chars: int, *, label: str) -> str:
 # Default max chars for bash command output (configurable via env var).
 _DEFAULT_MAX_CMD_OUTPUT_CHARS = 40_000
 
+_ERROR_KEYWORDS = (
+    "error", "traceback", "exception", "fatal", "fail", "panic",
+    "abort", "critical", "stderr", "assert", "warning",
+)
+
+
+def _get_max_cmd_output_chars(max_chars: int | None) -> int:
+    """Resolve max_chars from arg or env."""
+    if max_chars is not None:
+        return max_chars
+    raw = os.environ.get("FORGE_MAX_CMD_OUTPUT_CHARS", "")
+    try:
+        return int(raw) if raw else _DEFAULT_MAX_CMD_OUTPUT_CHARS
+    except (ValueError, TypeError):
+        return _DEFAULT_MAX_CMD_OUTPUT_CHARS
+
+
+def _extract_truncation_lines(
+    lines: list[str], head_budget: int, tail_budget: int, error_budget: int
+) -> tuple[list[str], list[str], list[str]]:
+    """Extract head, tail, and error lines within budgets."""
+    head_lines: list[str] = []
+    head_chars = 0
+    for line in lines:
+        if head_chars + len(line) > head_budget:
+            break
+        head_lines.append(line)
+        head_chars += len(line)
+
+    tail_lines: list[str] = []
+    tail_chars = 0
+    for line in reversed(lines):
+        if tail_chars + len(line) > tail_budget:
+            break
+        tail_lines.insert(0, line)
+        tail_chars += len(line)
+
+    error_lines: list[str] = []
+    error_chars = 0
+    for line in lines:
+        if any(kw in line.lower() for kw in _ERROR_KEYWORDS):
+            if error_chars + len(line) <= error_budget:
+                error_lines.append(line)
+                error_chars += len(line)
+
+    return head_lines, tail_lines, error_lines
+
 
 def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     """Truncate bash command output with error-aware head+tail strategy.
@@ -157,87 +204,35 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     Returns:
         Possibly-truncated output string with a clear [TRUNCATED] notice.
     """
-    if max_chars is None:
-        raw = os.environ.get("FORGE_MAX_CMD_OUTPUT_CHARS", "")
-        try:
-            max_chars = int(raw) if raw else _DEFAULT_MAX_CMD_OUTPUT_CHARS
-        except (ValueError, TypeError):
-            max_chars = _DEFAULT_MAX_CMD_OUTPUT_CHARS
-
+    max_chars = _get_max_cmd_output_chars(max_chars)
     if max_chars <= 0 or len(output) <= max_chars:
         return output
 
     lines = output.splitlines(keepends=True)
     total_lines = len(lines)
-
-    # Keep first 20% of max_chars budget for head, 60% for tail, 20% for errors
     head_budget = int(max_chars * 0.20)
     tail_budget = int(max_chars * 0.60)
     error_budget = max_chars - head_budget - tail_budget
 
-    # --- Extract error/traceback lines (prioritise what the LLM most needs) ---
-    ERROR_KEYWORDS = (
-        "error",
-        "traceback",
-        "exception",
-        "fatal",
-        "fail",
-        "panic",
-        "abort",
-        "critical",
-        "stderr",
-        "assert",
-        "warning",
+    head_lines, tail_lines, error_lines = _extract_truncation_lines(
+        lines, head_budget, tail_budget, error_budget
     )
-    error_lines: list[str] = []
-    error_chars = 0
-    for line in lines:
-        if any(kw in line.lower() for kw in ERROR_KEYWORDS):
-            if error_chars + len(line) <= error_budget:
-                error_lines.append(line)
-                error_chars += len(line)
-
-    # --- Head: first portion for context ---
-    head_lines: list[str] = []
-    head_chars = 0
-    for line in lines:
-        if head_chars + len(line) > head_budget:
-            break
-        head_lines.append(line)
-        head_chars += len(line)
-
-    # --- Tail: last portion for final status ---
-    tail_lines: list[str] = []
-    tail_chars = 0
-    for line in reversed(lines):
-        if tail_chars + len(line) > tail_budget:
-            break
-        tail_lines.insert(0, line)
-        tail_chars += len(line)
 
     skipped = total_lines - len(head_lines) - len(tail_lines)
-    truncation_notice = (
+    notice = (
         f"\n[FORGE: Output truncated — {skipped} lines hidden. "
         f"Showing first {len(head_lines)} lines, last {len(tail_lines)} lines"
     )
-    if error_lines:
-        truncation_notice += (
-            f", plus {len(error_lines)} error/warning lines extracted]\n"
-            + "".join(error_lines)
-        )
-    else:
-        truncation_notice += "]\n"
+    notice += (
+        f", plus {len(error_lines)} error/warning lines extracted]\n" + "".join(error_lines)
+        if error_lines else "]\n"
+    )
 
     logger.warning(
         "Truncated bash output from %d lines (%d chars) → head=%d tail=%d errors=%d",
-        total_lines,
-        len(output),
-        len(head_lines),
-        len(tail_lines),
-        len(error_lines),
+        total_lines, len(output), len(head_lines), len(tail_lines), len(error_lines),
     )
-
-    return "".join(head_lines) + truncation_notice + "".join(tail_lines)
+    return "".join(head_lines) + notice + "".join(tail_lines)
 
 
 def get_max_edit_observation_chars() -> int:

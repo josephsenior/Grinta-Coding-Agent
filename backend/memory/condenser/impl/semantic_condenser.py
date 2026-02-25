@@ -22,6 +22,14 @@ from backend.memory.view import View
 if TYPE_CHECKING:
     from backend.events.event import Event
 
+# (keywords, attr, score, reason) for _score_action_event
+_ACTION_SCORE_RULES: list[tuple[tuple[str, ...], str, float, str]] = [
+    (("file",), "action", 0.4, "file_operation"),
+    (("delegate",), "action", 0.4, "delegation"),
+    (("finish", "complete"), "action", 0.4, "completion"),
+    (("install", "pip", "npm", "yarn", "poetry", "conda"), "command", 0.3, "setup_command"),
+]
+
 
 @dataclass
 class EventImportance:
@@ -68,24 +76,15 @@ class SemanticCondenser(BaseLLMCondenser):
     def _score_action_event(self, event: Action) -> tuple[float, list[str]]:
         score = 0.0
         reasons: list[str] = []
-
         action_name = str(getattr(event, "action", "") or "").lower()
         command = str(getattr(event, "command", "") or "").lower()
+        text_by_attr: dict[str, str] = {"action": action_name, "command": command}
 
-        if action_name and "file" in action_name:
-            score += 0.4
-            reasons.append("file_operation")
-        if action_name and "delegate" in action_name:
-            score += 0.4
-            reasons.append("delegation")
-        if action_name and ("finish" in action_name or "complete" in action_name):
-            score += 0.4
-            reasons.append("completion")
-
-        if command and any(tok in command for tok in ("install", "pip", "npm", "yarn", "poetry", "conda")):
-            score += 0.3
-            reasons.append("setup_command")
-
+        for keywords, attr, inc, reason in _ACTION_SCORE_RULES:
+            text = text_by_attr.get(attr, "")
+            if text and any(kw in text for kw in keywords):
+                score += inc
+                reasons.append(reason)
         return score, reasons
 
     def _score_observation_event(self, event: Observation) -> tuple[float, list[str]]:
@@ -182,30 +181,34 @@ class SemanticCondenser(BaseLLMCondenser):
             return keep
 
         events = [ei.event for ei in scored]
-        protected: set[int] = set()
-        for evt in events[: self.keep_first]:
-            protected.add(int(getattr(evt, "id")))
-        recent_window = min(5, len(events))
-        for evt in events[-recent_window:]:
-            protected.add(int(getattr(evt, "id")))
+        protected = self._build_protected_ids(events)
 
-        # If protected already exceeds max_size, fall back to keeping first + last.
         if len(protected) > self.max_size:
-            # Always keep keep_first, then fill remainder from the end.
-            keep_ids: list[int] = [int(getattr(e, "id")) for e in events[: self.keep_first]]
-            remaining = max(0, self.max_size - len(keep_ids))
-            tail = [int(getattr(e, "id")) for e in events[-remaining:]] if remaining else []
-            return set(keep_ids + tail)
+            return self._fallback_first_and_last(events)
 
-        # Rank droppable kept events by ascending importance, drop the lowest.
         importance_by_id = {int(getattr(ei.event, "id")): ei.importance_score for ei in scored}
-        droppable = [eid for eid in keep if eid not in protected]
-        droppable.sort(key=lambda eid: importance_by_id.get(eid, 0.0))
-
+        droppable = sorted(
+            (eid for eid in keep if eid not in protected),
+            key=lambda eid: importance_by_id.get(eid, 0.0),
+        )
         to_drop = len(keep) - self.max_size
         for eid in droppable[:to_drop]:
             keep.discard(eid)
         return keep
+
+    def _build_protected_ids(self, events: list[Event]) -> set[int]:
+        protected: set[int] = set()
+        for evt in events[: self.keep_first]:
+            protected.add(int(getattr(evt, "id")))
+        for evt in events[-min(5, len(events)) :]:
+            protected.add(int(getattr(evt, "id")))
+        return protected
+
+    def _fallback_first_and_last(self, events: list[Event]) -> set[int]:
+        keep_ids = [int(getattr(e, "id")) for e in events[: self.keep_first]]
+        remaining = max(0, self.max_size - len(keep_ids))
+        tail = [int(getattr(e, "id")) for e in events[-remaining:]] if remaining else []
+        return set(keep_ids + tail)
 
     def _ensure_coherence(self, events: list[Event], keep_ids: set[int]) -> set[int]:
         """Ensure action→observation pairs stay together when possible."""

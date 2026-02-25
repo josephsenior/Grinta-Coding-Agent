@@ -336,21 +336,7 @@ class DefaultLinter:
         warnings: list[LintError] = []
 
         try:
-            # Build ruff command
-            cmd = [
-                "ruff",
-                "check",
-                file_path,
-                "--select",
-                "E,F,W",  # Errors, pyflakes, warnings
-                "--format",
-                "json",
-            ]
-
-            # Add config if specified
-            if self.config_path:
-                cmd.extend(["--config", self.config_path])
-
+            cmd = self._build_ruff_cmd(file_path)
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -363,34 +349,9 @@ class DefaultLinter:
                 logger.warning("Ruff linting failed: %s", result.stderr)
                 return LintResult(errors=[], warnings=[])
 
-            # Parse JSON output
-            try:
-                ruff_output = json.loads(result.stdout)
-                for violation in ruff_output:
-                    line = violation.get("location", {}).get("row", 1)
-                    column = violation.get("location", {}).get("column", None)
-                    code = violation.get("code", None)
-                    message = violation.get("message", "")
-                    severity = (
-                        "error" if code and code.startswith(("E", "F")) else "warning"
-                    )
-
-                    lint_error = LintError(
-                        line=line,
-                        column=column,
-                        message=message,
-                        code=code,
-                        severity=severity,
-                        file_path=file_path,
-                    )
-
-                    if severity == "error":
-                        errors.append(lint_error)
-                    else:
-                        warnings.append(lint_error)
-            except json.JSONDecodeError:
-                logger.error("Failed to parse ruff JSON output: %s", result.stdout)
-
+            errs, warns = self._parse_ruff_output(result.stdout, file_path)
+            errors.extend(errs)
+            warnings.extend(warns)
         except subprocess.TimeoutExpired:
             logger.error("Ruff linting timed out")
         except FileNotFoundError:
@@ -399,6 +360,49 @@ class DefaultLinter:
             logger.error("Error running ruff: %s", e)
 
         return LintResult(errors=errors, warnings=warnings)
+
+    def _build_ruff_cmd(self, file_path: str) -> list[str]:
+        """Build ruff check command."""
+        cmd = [
+            "ruff", "check", file_path,
+            "--select", "E,F,W",
+            "--format", "json",
+        ]
+        if self.config_path:
+            cmd.extend(["--config", self.config_path])
+        return cmd
+
+    def _parse_ruff_output(
+        self, stdout: str, file_path: str
+    ) -> tuple[list[LintError], list[LintError]]:
+        """Parse ruff JSON output into errors and warnings."""
+        errors: list[LintError] = []
+        warnings: list[LintError] = []
+        try:
+            ruff_output = json.loads(stdout)
+        except json.JSONDecodeError:
+            logger.error("Failed to parse ruff JSON output: %s", stdout)
+            return (errors, warnings)
+        for violation in ruff_output:
+            loc = violation.get("location", {})
+            line = loc.get("row", 1)
+            column = loc.get("column")
+            code = violation.get("code")
+            message = violation.get("message", "")
+            severity = "error" if code and code.startswith(("E", "F")) else "warning"
+            lint_error = LintError(
+                line=line,
+                column=column,
+                message=message,
+                code=code,
+                severity=severity,
+                file_path=file_path,
+            )
+            if severity == "error":
+                errors.append(lint_error)
+            else:
+                warnings.append(lint_error)
+        return (errors, warnings)
 
     def _lint_with_pylint(self, file_path: str) -> LintResult:
         """Lint using pylint backend (fallback)."""

@@ -25,7 +25,6 @@ from backend.core.provider_types import (
 from backend.core.enums import RuntimeStatus
 from backend.api.services.conversation_service import create_new_conversation
 from backend.api.types import LLMAuthenticationError, MissingSettingsError
-from backend.api.user_auth import AuthType
 from backend.api.utils.error_formatter import format_error_for_user
 from backend.api.utils.responses import error
 from backend.storage.data_models.conversation_metadata import ConversationTrigger
@@ -80,7 +79,6 @@ def extract_request_data(
 def determine_conversation_trigger(
     suggested_task: SuggestedTask | None,
     create_playbook: CreatePlaybook | None,
-    auth_type: AuthType | None,
 ) -> tuple[ConversationTrigger, str | None, ProviderType | None]:
     """Determine conversation trigger type and override repository/provider if needed."""
     conversation_trigger = ConversationTrigger.GUI
@@ -96,26 +94,15 @@ def determine_conversation_trigger(
         if create_playbook.vcs_provider:
             vcs_provider = create_playbook.vcs_provider
 
-    if auth_type == AuthType.BEARER:
-        conversation_trigger = ConversationTrigger.REMOTE_API_KEY
-
     return conversation_trigger, repository, vcs_provider
 
 
 def validate_remote_api_request(
-    conversation_trigger: ConversationTrigger,
     initial_user_msg: str,
 ) -> JSONResponse | None:
-    """Validate remote API requests have required parameters."""
-    if (
-        conversation_trigger == ConversationTrigger.REMOTE_API_KEY
-        and not initial_user_msg
-    ):
-        return error(
-            message="Missing initial user message",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            error_code="CONFIGURATION$MISSING_USER_MESSAGE",
-        )
+    """Validate conversation-init requests have required parameters."""
+    if not initial_user_msg:
+        return None
     return None
 
 

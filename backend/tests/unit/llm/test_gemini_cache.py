@@ -14,6 +14,7 @@ class TestGeminiCacheManager(unittest.TestCase):
         GeminiCacheManager._instance = None
         self.manager = GeminiCacheManager()
         self.manager._caches = {}
+        self.mock_client = MagicMock()
 
     def tearDown(self) -> None:
         GeminiCacheManager._instance = None
@@ -52,35 +53,36 @@ class TestGeminiCacheManager(unittest.TestCase):
 
     # -- get_or_create_cache (cache hit) ------------------------------------
 
-    @patch("backend.llm.gemini_cache.caching")
-    def test_cache_hit_returns_name(self, mock_caching):
+    def test_cache_hit_returns_name(self):
         """If hash already in _caches and Google confirms it, return name."""
         self.manager._caches["somehash"] = "cache/abc"
         # Patch _get_hash to return our known hash
         self.manager._get_hash = MagicMock(return_value="somehash")
-        mock_caching.CachedContent.get.return_value = MagicMock()
+        self.mock_client.caches.get.return_value = MagicMock()
 
         result = self.manager.get_or_create_cache(
+            client=self.mock_client,
             model="gemini-1.5-pro",
             system_instruction="sys",
             messages=[],
         )
         self.assertEqual(result, "cache/abc")
+        self.mock_client.caches.get.assert_called_once_with(name="cache/abc")
 
     @patch("backend.llm.gemini_cache.time")
-    @patch("backend.llm.gemini_cache.caching")
-    def test_cache_hit_expired_recreates(self, mock_caching, mock_time):
+    def test_cache_hit_expired_recreates(self, mock_time):
         """If cached name is gone from Google, delete and create new."""
         mock_time.time.return_value = 1000000
         self.manager._caches["somehash"] = "cache/old"
         self.manager._get_hash = MagicMock(return_value="somehash")
-        mock_caching.CachedContent.get.side_effect = Exception("not found")
+        self.mock_client.caches.get.side_effect = Exception("not found")
 
         mock_cache_obj = MagicMock()
         mock_cache_obj.name = "cache/new"
-        mock_caching.CachedContent.create.return_value = mock_cache_obj
+        self.mock_client.caches.create.return_value = mock_cache_obj
 
         result = self.manager.get_or_create_cache(
+            client=self.mock_client,
             model="gemini-1.5-pro",
             system_instruction="sys",
             messages=[{"role": "user", "content": "hi"}],
@@ -91,29 +93,33 @@ class TestGeminiCacheManager(unittest.TestCase):
     # -- get_or_create_cache (cache miss) -----------------------------------
 
     @patch("backend.llm.gemini_cache.time")
-    @patch("backend.llm.gemini_cache.caching")
-    def test_cache_miss_creates_new(self, mock_caching, mock_time):
+    def test_cache_miss_creates_new(self, mock_time):
         """No existing cache → creates new one."""
         mock_time.time.return_value = 1000000
         mock_cache_obj = MagicMock()
         mock_cache_obj.name = "cache/fresh"
-        mock_caching.CachedContent.create.return_value = mock_cache_obj
+        self.mock_client.caches.create.return_value = mock_cache_obj
 
         result = self.manager.get_or_create_cache(
+            client=self.mock_client,
             model="gemini-1.5-pro",
             system_instruction="hello",
             messages=[{"role": "user", "content": "test"}],
             ttl_minutes=30,
         )
         self.assertEqual(result, "cache/fresh")
-        mock_caching.CachedContent.create.assert_called_once()
+        self.mock_client.caches.create.assert_called_once()
+        # Verify the call shape for new SDK
+        call_kwargs = self.mock_client.caches.create.call_args.kwargs
+        self.assertEqual(call_kwargs["config"]["ttl"], "1800s")
+        self.assertEqual(call_kwargs["config"]["system_instruction"], "hello")
 
-    @patch("backend.llm.gemini_cache.caching")
-    def test_create_failure_returns_none(self, mock_caching):
+    def test_create_failure_returns_none(self):
         """If creation fails, return None."""
-        mock_caching.CachedContent.create.side_effect = RuntimeError("fail")
+        self.mock_client.caches.create.side_effect = RuntimeError("fail")
 
         result = self.manager.get_or_create_cache(
+            client=self.mock_client,
             model="gemini-1.5-pro",
             system_instruction=None,
             messages=[],
@@ -123,13 +129,12 @@ class TestGeminiCacheManager(unittest.TestCase):
     # -- message role mapping -----------------------------------------------
 
     @patch("backend.llm.gemini_cache.time")
-    @patch("backend.llm.gemini_cache.caching")
-    def test_role_mapping(self, mock_caching, mock_time):
+    def test_role_mapping(self, mock_time):
         """user stays user, non-user becomes model."""
         mock_time.time.return_value = 1000000
         mock_cache_obj = MagicMock()
         mock_cache_obj.name = "cache/role"
-        mock_caching.CachedContent.create.return_value = mock_cache_obj
+        self.mock_client.caches.create.return_value = mock_cache_obj
 
         messages = [
             {"role": "user", "content": "q"},
@@ -137,40 +142,39 @@ class TestGeminiCacheManager(unittest.TestCase):
             {"role": "system", "content": "s"},
         ]
         self.manager.get_or_create_cache(
+            client=self.mock_client,
             model="gemini-1.5-pro",
             system_instruction="sys",
             messages=messages,
         )
-        call_kwargs = mock_caching.CachedContent.create.call_args
-        contents = call_kwargs.kwargs.get("contents") or call_kwargs[1].get("contents")
+        call_kwargs = self.mock_client.caches.create.call_args.kwargs
+        contents = call_kwargs.get("contents")
         roles = [c["role"] for c in contents]
         self.assertEqual(roles, ["user", "model", "model"])
 
     # -- cleanup_old_caches -------------------------------------------------
 
-    @patch("backend.llm.gemini_cache.caching")
-    def test_cleanup_lists_caches(self, mock_caching):
-        mock_caching.CachedContent.list.return_value = []
-        self.manager.cleanup_old_caches()
-        mock_caching.CachedContent.list.assert_called_once()
+    def test_cleanup_lists_caches(self):
+        self.mock_client.caches.list.return_value = [MagicMock(), MagicMock()]
+        self.manager.cleanup_old_caches(self.mock_client)
+        self.mock_client.caches.list.assert_called_once()
 
-    @patch("backend.llm.gemini_cache.caching")
-    def test_cleanup_handles_error(self, mock_caching):
-        mock_caching.CachedContent.list.side_effect = Exception("network")
+    def test_cleanup_handles_error(self):
+        self.mock_client.caches.list.side_effect = Exception("network")
         # Should not raise
-        self.manager.cleanup_old_caches()
+        self.manager.cleanup_old_caches(self.mock_client)
 
     # -- cache stores hash correctly ----------------------------------------
 
     @patch("backend.llm.gemini_cache.time")
-    @patch("backend.llm.gemini_cache.caching")
-    def test_cache_stores_hash(self, mock_caching, mock_time):
+    def test_cache_stores_hash(self, mock_time):
         mock_time.time.return_value = 1000000
         mock_cache_obj = MagicMock()
         mock_cache_obj.name = "cache/stored"
-        mock_caching.CachedContent.create.return_value = mock_cache_obj
+        self.mock_client.caches.create.return_value = mock_cache_obj
 
         self.manager.get_or_create_cache(
+            client=self.mock_client,
             model="gemini-1.5-pro",
             system_instruction="test",
             messages=[],
@@ -179,21 +183,20 @@ class TestGeminiCacheManager(unittest.TestCase):
         self.assertEqual(self.manager._caches[h], "cache/stored")
 
     @patch("backend.llm.gemini_cache.time")
-    @patch("backend.llm.gemini_cache.caching")
-    def test_default_ttl(self, mock_caching, mock_time):
+    def test_default_ttl(self, mock_time):
         mock_time.time.return_value = 1000000
         mock_cache_obj = MagicMock()
         mock_cache_obj.name = "cache/ttl"
-        mock_caching.CachedContent.create.return_value = mock_cache_obj
+        self.mock_client.caches.create.return_value = mock_cache_obj
 
         self.manager.get_or_create_cache(
+            client=self.mock_client,
             model="gemini-1.5-pro",
             system_instruction=None,
             messages=[],
         )
         # default ttl_minutes=60
-        # ttl should be set via time.timedelta
-        self.assertTrue(mock_caching.CachedContent.create.called)
+        self.assertTrue(self.mock_client.caches.create.called)
 
 
 if __name__ == "__main__":

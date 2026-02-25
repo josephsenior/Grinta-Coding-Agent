@@ -211,6 +211,99 @@ def _get_runtime_timeout_error():
     )
 
 
+def _validate_list_files_path(
+    path: str | None, workspace_root: str
+) -> tuple[str | None, Any | None]:
+    """Validate path for list_files. Returns (validated_path_str, error_response).
+
+    If validation fails, returns (path, error_response). If path is None, returns (None, None).
+    """
+    if path is None:
+        return None, None
+    try:
+        from backend.core.type_safety.path_validation import (
+            PathValidationError,
+            SafePath,
+        )
+
+        safe_path = SafePath.validate(
+            str(path), workspace_root=workspace_root, must_be_relative=True
+        )
+        return safe_path.relative_to_workspace(), None
+    except PathValidationError as e:
+        logger.warning("Invalid path provided to list_files: %s - %s", path, e.message)
+        return path, error(
+            message=f"Invalid path: {e.message}",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error_code="INVALID_PATH",
+        )
+
+
+async def _fetch_file_list_from_runtime(
+    runtime: Any, path: str | None
+) -> tuple[list[str] | None, Any | None]:
+    """Call runtime.list_files and handle errors. Returns (file_list, error_response)."""
+    try:
+        file_list = await call_sync_from_async(runtime.list_files, path)
+        return file_list, None
+    except (httpx.ConnectError, ConnectionRefusedError) as e:
+        logger.error("Runtime unavailable when listing files: %s", e, exc_info=True)
+        container_status = "unknown"
+        if hasattr(runtime, "container") and runtime.container is not None:
+            with contextlib.suppress(Exception):
+                runtime.container.reload()
+                container_status = runtime.container.status
+        if container_status == "running":
+            return None, _get_runtime_connection_error()
+        return None, _get_runtime_unavailable_error()
+    except httpx.TimeoutException as e:
+        logger.error("Timeout listing files: %s", e, exc_info=True)
+        return None, _get_runtime_timeout_error()
+    except Exception as e:
+        logger.error(
+            "Unexpected error listing files: %s (type: %s)",
+            e,
+            type(e).__name__,
+            exc_info=True,
+        )
+        if isinstance(e, AgentRuntimeUnavailableError):
+            return None, error(
+                message=(
+                    "❌ Workspace error\n\n"
+                    f"An error occurred while listing files: {e}\n\n"
+                    "**What you can do:**\n"
+                    "• Try again in a moment\n"
+                    "• Start a new conversation if the problem persists\n"
+                    "• Check the workspace status\n\n"
+                    "**Technical details:** Runtime unavailable"
+                ),
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                error_code="LIST_FILES_ERROR",
+            )
+        return None, error(
+            message=(
+                "❌ Workspace unavailable\n\n"
+                "Unable to connect to the workspace. The container may have stopped or crashed.\n\n"
+                "**What you can do:**\n"
+                "• Start a new conversation to create a fresh workspace\n"
+                "• Wait a moment and refresh the page\n"
+                "• Check if the workspace is still initializing\n\n"
+                "**Note:** Your conversation data is saved."
+            ),
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            error_code="RUNTIME_UNAVAILABLE",
+        )
+
+
+def _apply_path_prefix_and_filter(
+    file_list: list[str], path: str | None
+) -> list[str]:
+    """Prefix files with path if provided, then filter out ignored files."""
+    if path is not None:
+        file_list = [os.path.join(str(path), f) for f in file_list]
+    return [f for f in file_list if f not in FILES_TO_IGNORE]
+
+
 @sub_router.get(
     "/list-files",
     response_model=None,
@@ -231,29 +324,11 @@ async def list_files(
     runtime = cast("RuntimeFileOps", conversation.runtime)
     workspace_root = runtime.config.workspace_mount_path_in_runtime
 
-    # Validate path using SafePath if provided
-    if path is not None:
-        try:
-            from backend.core.type_safety.path_validation import (
-                PathValidationError,
-                SafePath,
-            )
+    validated_path, path_error = _validate_list_files_path(path, workspace_root)
+    if path_error is not None:
+        return path_error
+    path = validated_path
 
-            safe_path = SafePath.validate(
-                str(path), workspace_root=workspace_root, must_be_relative=True
-            )
-            path = safe_path.relative_to_workspace()
-        except PathValidationError as e:
-            logger.warning(
-                "Invalid path provided to list_files: %s - %s", path, e.message
-            )
-            return error(
-                message=f"Invalid path: {e.message}",
-                status_code=status.HTTP_400_BAD_REQUEST,
-                error_code="INVALID_PATH",
-            )
-
-    # Check if runtime is actually connected/alive
     try:
         if hasattr(runtime, "check_if_alive"):
             await call_sync_from_async(runtime.check_if_alive)
@@ -262,63 +337,11 @@ async def list_files(
             "Runtime health check failed before listing files: %s", health_check_error
         )
 
-    try:
-        file_list = await call_sync_from_async(runtime.list_files, path)
-    except (httpx.ConnectError, ConnectionRefusedError) as e:
-        logger.error("Runtime unavailable when listing files: %s", e, exc_info=True)
-        container_status = "unknown"
-        if hasattr(runtime, "container") and runtime.container is not None:
-            with contextlib.suppress(Exception):
-                runtime.container.reload()
-                container_status = runtime.container.status
+    file_list, fetch_error = await _fetch_file_list_from_runtime(runtime, path)
+    if fetch_error is not None:
+        return fetch_error
 
-        if container_status == "running":
-            return _get_runtime_connection_error()
-        return _get_runtime_unavailable_error()
-    except httpx.TimeoutException as e:
-        logger.error("Timeout listing files: %s", e, exc_info=True)
-        return _get_runtime_timeout_error()
-    except Exception as e:
-        # Catch any other exceptions that might occur
-        logger.error(
-            "Unexpected error listing files: %s (type: %s)",
-            e,
-            type(e).__name__,
-            exc_info=True,
-        )
-        if isinstance(e, AgentRuntimeUnavailableError):
-            return error(
-                message=(
-                    "❌ Workspace error\n\n"
-                    f"An error occurred while listing files: {e}\n\n"
-                    "**What you can do:**\n"
-                    "• Try again in a moment\n"
-                    "• Start a new conversation if the problem persists\n"
-                    "• Check the workspace status\n\n"
-                    "**Technical details:** Runtime unavailable"
-                ),
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                error_code="LIST_FILES_ERROR",
-            )
-        # For other exceptions, return 503 as well
-        return error(
-            message=(
-                "❌ Workspace unavailable\n\n"
-                "Unable to connect to the workspace. The container may have stopped or crashed.\n\n"
-                "**What you can do:**\n"
-                "• Start a new conversation to create a fresh workspace\n"
-                "• Wait a moment and refresh the page\n"
-                "• Check if the workspace is still initializing\n\n"
-                "**Note:** Your conversation data is saved."
-            ),
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            error_code="RUNTIME_UNAVAILABLE",
-        )
-    # Only prefix with path if it was explicitly provided
-    if path is not None:
-        # Type narrowing: path is str here
-        file_list = [os.path.join(str(path), f) for f in file_list]
-    return [f for f in file_list if f not in FILES_TO_IGNORE]
+    return _apply_path_prefix_and_filter(file_list, path)
 
 
 @sub_router.get(

@@ -44,6 +44,10 @@ def _validate_mcp_url(url: str) -> str:
         if not parsed.netloc:
             msg = "URL must include a valid domain/host"
             raise ValueError(msg)
+        hostname = (parsed.hostname or "").strip().lower()
+        if not hostname or hostname in {"none", "null"}:
+            msg = "URL must include a valid domain/host"
+            raise ValueError(msg)
         if parsed.scheme not in ["http", "https", "ws", "wss"]:
             msg = "URL scheme must be http, https, ws, or wss"
             raise ValueError(msg)
@@ -290,84 +294,34 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         Returns:
             dict[str, MCPConfig]: A mapping where key "mcp" contains the config
-
         """
-        import platform
-        import json
-
         _known_keys = {"enabled", "servers"}
         unknown = set(data) - _known_keys
         if unknown:
             msg = f"Invalid MCP configuration: unknown keys: {', '.join(sorted(unknown))}"
             raise ValueError(msg)
 
-        mcp_mapping: dict[str, MCPConfig] = {}
         try:
             enabled = data.get("enabled", False)
             servers_data = data.get("servers", [])
             if isinstance(servers_data, dict):
-                # Handle case where single server is a dict
                 servers_data = [servers_data]
-
             servers = [MCPServerConfig(**s) for s in servers_data]
-
-            # Load additional servers from backend/runtime/mcp/config.json if it exists
-            mcp_json_path = os.path.join("backend", "runtime", "mcp", "config.json")
-            if os.path.exists(mcp_json_path):
-                try:
-                    with open(mcp_json_path, encoding="utf-8") as f:
-                        mcp_json = json.load(f)
-                        if "mcpServers" in mcp_json:
-                            existing_names = {s.name for s in servers}
-                            for name, srv_data in mcp_json["mcpServers"].items():
-                                if name == "default":
-                                    continue
-                                if name not in existing_names:
-                                    servers.append(MCPServerConfig.from_dict(name, srv_data))
-                                    # Use print instead of logger to avoid circular import issues during config load
-                                    print(f"Loaded MCP server '{name}' from {mcp_json_path}")
-                except Exception as e:
-                    print(f"Failed to load MCP servers from {mcp_json_path}: {e}")
-
-            # Filter out stdio servers on Windows unless explicitly enabled
-            if (
-                platform.system() == "Windows"
-                and not os.getenv("FORGE_ENABLE_WINDOWS_MCP")
-            ):
-                original_count = len(servers)
-                # Allow npx/uvx-based servers even on Windows
-                servers = [s for s in servers if s.type != "stdio" or s.name in ("browser-use", "context7", "shadcn", "github", "fetch", "duckduckgo", "magic", "rigour")]
-                skipped = original_count - len(servers)
-                if skipped > 0:
-                    logger.info(
-                        "Windows stdlib MCP disabled by default: filtered out %s stdio server(s); HTTP/SSE MCP remains enabled.",
-                        skipped,
-                    )
-
+            servers = _load_servers_from_config_json(servers)
+            servers = _filter_windows_stdio_servers(servers)
             mcp_config = cls(enabled=enabled, servers=servers)
             mcp_config.validate_servers()
-            mcp_mapping["mcp"] = mcp_config
+            return {"mcp": mcp_config}
         except ValidationError as e:
-            msg = f"Invalid MCP configuration: {e}"
-            raise ValueError(msg) from e
-        return mcp_mapping
+            raise ValueError(f"Invalid MCP configuration: {e}") from e
 
     def merge(self, other: MCPConfig) -> MCPConfig:
-        """Merge this config with another MCP config.
-
-        Args:
-            other: MCP config to merge
-
-        Returns:
-            New merged MCPConfig
-
-        """
+        """Merge this config with another MCP config."""
         return MCPConfig(
             enabled=self.enabled or other.enabled,
             servers=self.servers + other.servers,
         )
 
-    # Backward compatibility: support old three-list format
     @property
     def sse_servers(self) -> list:
         """Backward compat: return SSE servers from unified list."""
@@ -384,12 +338,52 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         return [s for s in self.servers if s.type == "shttp"]
 
 
+def _load_servers_from_config_json(servers: list) -> list:
+    """Load additional MCP servers from backend/runtime/mcp/config.json if it exists."""
+    import json
+
+    mcp_json_path = os.path.join("backend", "runtime", "mcp", "config.json")
+    if not os.path.exists(mcp_json_path):
+        return servers
+    try:
+        with open(mcp_json_path, encoding="utf-8") as f:
+            mcp_json = json.load(f)
+        if "mcpServers" not in mcp_json:
+            return servers
+        existing_names = {s.name for s in servers}
+        for name, srv_data in mcp_json["mcpServers"].items():
+            if name == "default" or name in existing_names:
+                continue
+            servers.append(MCPServerConfig.from_dict(name, srv_data))
+            print(f"Loaded MCP server '{name}' from {mcp_json_path}")
+    except Exception as e:
+        print(f"Failed to load MCP servers from {mcp_json_path}: {e}")
+    return servers
+
+
+def _filter_windows_stdio_servers(servers: list) -> list:
+    """Filter out stdio servers on Windows unless FORGE_ENABLE_WINDOWS_MCP is set."""
+    import platform
+
+    if platform.system() != "Windows" or os.getenv("FORGE_ENABLE_WINDOWS_MCP"):
+        return servers
+    allowed_stdio = ("browser-use", "context7", "shadcn", "github", "fetch", "duckduckgo", "magic", "rigour")
+    filtered = [s for s in servers if s.type != "stdio" or s.name in allowed_stdio]
+    skipped = len(servers) - len(filtered)
+    if skipped > 0:
+        logger.info(
+            "Windows stdlib MCP disabled by default: filtered out %s stdio server(s); HTTP/SSE MCP remains enabled.",
+            skipped,
+        )
+    return filtered
+
+
 class ForgeMCPConfig:
     """Utility class for creating default Forge MCP configurations."""
 
     @staticmethod
     def create_default_mcp_server_config(
-        host: str,
+        host: str | None,
         config: ForgeConfig,
         user_id: str | None = None,
     ) -> tuple[MCPServerConfig | None, list[MCPServerConfig]]:
@@ -406,8 +400,19 @@ class ForgeMCPConfig:
 
         """
         stdio_servers: list[MCPServerConfig] = []
+
+        normalized_host = (host or "").strip()
+        if not normalized_host or normalized_host.lower() in {"none", "null"}:
+            logger.warning(
+                "Skipping default Forge MCP server: invalid mcp_host=%r", host
+            )
+            return (None, stdio_servers)
+
         shttp_servers = MCPServerConfig(
-            name="forge-mcp", type="shttp", url=f"http://{host}/mcp/mcp", api_key=None
+            name="forge-mcp",
+            type="shttp",
+            url=f"http://{normalized_host}/mcp/mcp",
+            api_key=None,
         )
         return (shttp_servers, stdio_servers)
 

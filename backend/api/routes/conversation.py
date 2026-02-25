@@ -38,16 +38,15 @@ from backend.api.shared import file_store
 from backend.api.user_auth import get_user_id, get_user_settings_store
 from backend.api.utils import (
     get_conversation,
-    get_conversation_metadata,
     get_conversation_store,
 )
 from backend.api.utils.responses import error
+from backend.utils.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
     from backend.memory.agent_memory import Memory
     from backend.runtime.base import Runtime
     from backend.api.session.conversation import ServerConversation
-    from backend.storage.data_models.conversation_metadata import ConversationMetadata
 
 
 sub_router: APIRouter
@@ -166,6 +165,37 @@ async def get_hosts(
         )
 
 
+def _validate_search_events_params(
+    limit: int, start_id: int, end_id: int | None
+) -> None:
+    """Validate search_events parameters. Raises SessionInvariantError on failure."""
+    if limit < 1 or limit > 100:
+        raise SessionInvariantError("limit must be between 1 and 100")
+    if start_id < 0:
+        raise SessionInvariantError("start_id must be non-negative")
+    if end_id is not None and end_id < start_id:
+        raise SessionInvariantError("end_id must be >= start_id")
+
+
+def _parse_event_filter(filter_json: str | None) -> EventFilter | None:
+    """Parse JSON filter string into EventFilter. Raises SessionInvariantError on bad JSON."""
+    if not filter_json:
+        return None
+    try:
+        filter_payload = json.loads(filter_json)
+        if not isinstance(filter_payload, dict):
+            return None
+        return EventFilter(
+            exclude_hidden=bool(filter_payload.get("exclude_hidden", False)),
+            query=filter_payload.get("query"),
+            source=filter_payload.get("source"),
+            start_date=filter_payload.get("start_date"),
+            end_date=filter_payload.get("end_date"),
+        )
+    except JSONDecodeError as exc:
+        raise SessionInvariantError("filter must be valid JSON") from exc
+
+
 @sub_router.get("/events")
 async def search_events(
     conversation_id: str,
@@ -178,7 +208,6 @@ async def search_events(
         description="Optional JSON-encoded EventFilter fields",
     ),
     limit: int = 20,
-    metadata: ConversationMetadata = Depends(get_conversation_metadata),
     user_id: str | None = Depends(get_user_id),
 ):
     """Search through the event stream with filtering and pagination.
@@ -190,7 +219,6 @@ async def search_events(
         reverse: Whether to retrieve events in reverse order. Defaults to False.
         filter: Filter for events
         limit: Maximum number of events to return. Must be between 1 and 100. Defaults to 20
-        metadata: Conversation metadata (injected by dependency)
         user_id: User ID (injected by dependency)
 
     Returns:
@@ -202,44 +230,51 @@ async def search_events(
         ValueError: If limit is less than 1 or greater than 100
 
     """
-    if limit < 1 or limit > 100:
-        raise SessionInvariantError("limit must be between 1 and 100")
-    if start_id < 0:
-        raise SessionInvariantError("start_id must be non-negative")
-    if end_id is not None and end_id < start_id:
-        raise SessionInvariantError("end_id must be >= start_id")
-    event_filter: EventFilter | None = None
-    if filter_json:
-        try:
-            filter_payload = json.loads(filter_json)
-            if isinstance(filter_payload, dict):
-                event_filter = EventFilter(
-                    exclude_hidden=bool(filter_payload.get("exclude_hidden", False)),
-                    query=filter_payload.get("query"),
-                    source=filter_payload.get("source"),
-                    start_date=filter_payload.get("start_date"),
-                    end_date=filter_payload.get("end_date"),
-                )
-        except JSONDecodeError as exc:
-            raise SessionInvariantError("filter must be valid JSON") from exc
+    _validate_search_events_params(limit, start_id, end_id)
+    event_filter = _parse_event_filter(filter_json)
 
-    event_store = EventStore(
-        sid=conversation_id, file_store=file_store, user_id=user_id
+    events = await call_sync_from_async(
+        _search_events_sync,
+        conversation_id,
+        user_id,
+        start_id,
+        end_id,
+        reverse,
+        event_filter,
+        limit + 1,
     )
-    events = list(
-        event_store.search_events(
-            start_id=start_id,
-            end_id=end_id,
-            reverse=reverse,
-            filter=event_filter,
-            limit=limit + 1,
-        ),
-    )
+
     has_more = len(events) > limit
     if has_more:
         events = events[:limit]
     events_json = [event_to_dict(event) for event in events]
     return {"events": events_json, "has_more": has_more}
+
+
+def _search_events_sync(
+    conversation_id: str,
+    user_id: str | None,
+    start_id: int,
+    end_id: int | None,
+    reverse: bool,
+    event_filter: EventFilter | None,
+    limit: int,
+) -> list:
+    """Run EventStore.search_events synchronously for threadpool execution."""
+    event_store = EventStore(
+        sid=conversation_id,
+        file_store=file_store,
+        user_id=user_id,
+    )
+    return list(
+        event_store.search_events(
+            start_id=start_id,
+            end_id=end_id,
+            reverse=reverse,
+            filter=event_filter,
+            limit=limit,
+        )
+    )
 
 
 @sub_router.post("/events")
@@ -484,6 +519,76 @@ class CodeCompletionResponse(BaseModel):
     stopReason: str | None = None
 
 
+async def _load_completion_llm_config(
+    request: Request, user_id: str | None
+) -> tuple[LLMConfig | None, JSONResponse | None]:
+    """Load LLM config from user settings. Returns (config, error_response)."""
+    from backend.core.cache.async_smart_cache import AsyncSmartCache
+
+    cache = AsyncSmartCache()
+    user_settings_store = get_user_settings_store(request)
+    if not user_settings_store:
+        return None, JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": "User settings store not available."},
+        )
+    settings = await cache.get_user_settings(
+        user_id or "anonymous", user_settings_store
+    )
+    if not settings or not settings.llm_model:
+        settings = await user_settings_store.load()
+    if not settings or not settings.llm_model:
+        return None, JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={
+                "error": "LLM settings not configured. Please configure your LLM settings first."
+            },
+        )
+    llm_config = LLMConfig(
+        model=settings.llm_model or "",
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+    )
+    return llm_config, None
+
+
+def _build_completion_success_content(result: CompletionResult) -> dict[str, Any]:
+    """Build content dict for successful completion response."""
+    content: dict[str, Any] = {
+        "completion": result.completion,
+        "stopReason": result.stop_reason,
+    }
+    if result.error:
+        content["error"] = result.error
+    if result.error_type:
+        content["errorType"] = result.error_type
+    if result.warning:
+        content["warning"] = result.warning
+    if result.security_risk:
+        content["securityRisk"] = result.security_risk
+    return content
+
+
+def _build_completion_error_response(exc: Exception) -> JSONResponse:
+    """Build JSONResponse for completion exception."""
+    error_type = ErrorRecoveryStrategy.classify_error(exc)
+    logger.error("Completion error (%s): %s", error_type.value, exc, exc_info=True)
+    status_map = {
+        ErrorType.NETWORK_ERROR: status.HTTP_503_SERVICE_UNAVAILABLE,
+        ErrorType.TIMEOUT_ERROR: status.HTTP_504_GATEWAY_TIMEOUT,
+        ErrorType.PERMISSION_ERROR: status.HTTP_403_FORBIDDEN,
+    }
+    return JSONResponse(
+        status_code=status_map.get(error_type, status.HTTP_500_INTERNAL_SERVER_ERROR),
+        content={
+            "error": format_error_message(exc, error_type),
+            "errorType": error_type.value,
+            "completion": "",
+            "stopReason": "error",
+        },
+    )
+
+
 @sub_router.post("/completions", response_model=CodeCompletionResponse)
 async def get_code_completion(
     request: Request,
@@ -496,89 +601,37 @@ async def get_code_completion(
     Delegates all resilience logic (circuit breaker, retry, budget, security,
     anti-hallucination) to ``CompletionService``.
     """
-    from backend.core.cache.async_smart_cache import AsyncSmartCache
     from backend.engines.orchestrator.file_verification_guard import (
         FileVerificationGuard,
     )
 
+    llm_config, config_error = await _load_completion_llm_config(request, user_id)
+    if config_error is not None:
+        return config_error
+
     anti_hallucination = FileVerificationGuard()
-
-    # Load LLM config from user settings
-    cache = AsyncSmartCache()
-    user_settings_store = get_user_settings_store(request)
-    if not user_settings_store:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"error": "User settings store not available."},
-        )
-    settings = await cache.get_user_settings(
-        user_id or "anonymous", user_settings_store
-    )
-    if not settings or not settings.llm_model:
-        settings = await user_settings_store.load()
-        if not settings or not settings.llm_model:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={
-                    "error": "LLM settings not configured. Please configure your LLM settings first."
-                },
-            )
-
-    llm_config = LLMConfig(
-        model=settings.llm_model or "",
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
-    )
-
     manager = require_conversation_manager()
+    req = CompletionRequest(
+        file_path=request_body.filePath,
+        file_content=request_body.fileContent,
+        language=request_body.language,
+        position=request_body.position,
+        prefix=request_body.prefix,
+        suffix=request_body.suffix,
+    )
 
     try:
         result: CompletionResult = await _run_completion(
-            req=CompletionRequest(
-                file_path=request_body.filePath,
-                file_content=request_body.fileContent,
-                language=request_body.language,
-                position=request_body.position,
-                prefix=request_body.prefix,
-                suffix=request_body.suffix,
-            ),
+            req=req,
             conversation_sid=conversation.sid,
             user_id=user_id,
             llm_config=llm_config,
             manager=manager,
             anti_hallucination=anti_hallucination,
         )
-        content: dict[str, Any] = {
-            "completion": result.completion,
-            "stopReason": result.stop_reason,
-        }
-        if result.error:
-            content["error"] = result.error
-        if result.error_type:
-            content["errorType"] = result.error_type
-        if result.warning:
-            content["warning"] = result.warning
-        if result.security_risk:
-            content["securityRisk"] = result.security_risk
+        content = _build_completion_success_content(result)
         return JSONResponse(status_code=result.status_code, content=content)
     except HTTPException:
         raise
     except Exception as e:
-        error_type = ErrorRecoveryStrategy.classify_error(e)
-        logger.error("Completion error (%s): %s", error_type.value, e, exc_info=True)
-        status_map = {
-            ErrorType.NETWORK_ERROR: status.HTTP_503_SERVICE_UNAVAILABLE,
-            ErrorType.TIMEOUT_ERROR: status.HTTP_504_GATEWAY_TIMEOUT,
-            ErrorType.PERMISSION_ERROR: status.HTTP_403_FORBIDDEN,
-        }
-        return JSONResponse(
-            status_code=status_map.get(
-                error_type, status.HTTP_500_INTERNAL_SERVER_ERROR
-            ),
-            content={
-                "error": format_error_message(e, error_type),
-                "errorType": error_type.value,
-                "completion": "",
-                "stopReason": "error",
-            },
-        )
+        return _build_completion_error_response(e)

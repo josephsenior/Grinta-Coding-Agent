@@ -3,6 +3,7 @@ import importlib.util
 import os
 import random
 import shutil
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -43,7 +44,6 @@ from backend.api.routes.mcp import mcp_server
 from backend.api.shared import config as _forge_config
 from backend.api.shared import (
     get_conversation_manager,
-    server_config,
 )
 from backend.api.versioning import version_middleware
 from backend.api.otel_config import (
@@ -69,8 +69,35 @@ def combine_lifespans(*lifespans):
     async def combined_lifespan(fastapi_app):
         """Execute each provided lifespan sequentially within a single ExitStack."""
         async with contextlib.AsyncExitStack() as stack:
-            for lifespan in lifespans:
-                await stack.enter_async_context(lifespan(fastapi_app))
+            optional_startup_timeout = float(
+                os.getenv("FORGE_OPTIONAL_LIFESPAN_TIMEOUT_SEC", "20")
+            )
+            for index, lifespan in enumerate(lifespans):
+                lifespan_name = getattr(lifespan, "__name__", str(lifespan))
+                # First lifespan is core app startup and should fail fast if broken.
+                if index == 0:
+                    await stack.enter_async_context(lifespan(fastapi_app))
+                    continue
+
+                # Additional lifespans (e.g., optional integrations) should not
+                # block the entire API startup indefinitely.
+                try:
+                    await asyncio.wait_for(
+                        stack.enter_async_context(lifespan(fastapi_app)),
+                        timeout=optional_startup_timeout,
+                    )
+                except TimeoutError:
+                    logger.warning(
+                        "Optional lifespan '%s' timed out after %.1fs; continuing startup.",
+                        lifespan_name,
+                        optional_startup_timeout,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Optional lifespan '%s' failed during startup (%s); continuing.",
+                        lifespan_name,
+                        exc,
+                    )
             yield
 
     return combined_lifespan
@@ -124,19 +151,13 @@ def _collect_validation_issues(strict: bool) -> tuple[list[str], list[str]]:
     warnings: list[str] = []
     errors: list[str] = []
 
-    _check_api_key_security(warnings, errors, strict)
     _check_budget_sanity(warnings)
     _check_database_availability(warnings)
     _check_system_dependencies(warnings)
     _check_config_file_existence(warnings)
+    _check_mcp_host_config(warnings)
 
     return warnings, errors
-
-
-def _check_api_key_security(
-    warnings: list[str], errors: list[str], strict: bool
-) -> None:
-    pass  # auth removed
 
 
 def _check_budget_sanity(warnings: list[str]) -> None:
@@ -178,6 +199,16 @@ def _check_config_file_existence(warnings: list[str]) -> None:
             "No config.toml found. Copy config.template.toml → config.toml and set your LLM API key."
         )
 
+def _check_mcp_host_config(warnings: list[str]) -> None:
+    """Warn on missing mcp_host configuration."""
+    mcp_host = getattr(_forge_config, "mcp_host", None)
+    if not mcp_host:
+        warnings.append(
+            "mcp_host is not set in config.toml. The internal Forge MCP server "
+            "will be disabled. AI agents will not have access to built-in "
+            "workspace tools like search and file reading. Set mcp_host=\"localhost:8000\" "
+            "(or your server's host:port) to enable internal tools."
+        )
 
 @asynccontextmanager
 async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:

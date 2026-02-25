@@ -332,6 +332,24 @@ class FileEditor:
         )
         return file_text_val, old_str_val, new_str_val
 
+    def _apply_str_replace(
+        self, old_content: str, old_str: str, new_str: str
+    ) -> str | ToolResult:
+        """Apply old_str -> new_str replace. Returns content or fuzzy-match error."""
+        return (
+            old_content.replace(old_str, new_str)
+            if old_str in old_content
+            else self._fuzzy_match_error(old_content, old_str)
+        )
+
+    def _resolve_edit_content(
+        self,
+        file_text_val: str | None,
+        new_str_val: str | None,
+    ) -> str:
+        """Resolve content from file_text or new_str. Empty string if neither."""
+        return new_str_val or file_text_val or ""
+
     def _apply_edit_logic(
         self,
         old_content_str: str,
@@ -344,24 +362,23 @@ class FileEditor:
     ) -> str | ToolResult:
         """Determine new content based on provided parameters."""
         if start_line is not None and end_line is not None:
-             content_to_insert = new_str_val or file_text_val or ""
-             return self._replace_range(old_content_str, content_to_insert, start_line, end_line)
-
+            return self._replace_range(
+                old_content_str,
+                self._resolve_edit_content(file_text_val, new_str_val),
+                start_line, end_line,
+            )
         if insert_line is not None:
-            content_to_insert = new_str_val or file_text_val or ""
-            return self._insert_at_line(old_content_str, content_to_insert, insert_line)
-
+            return self._insert_at_line(
+                old_content_str,
+                self._resolve_edit_content(file_text_val, new_str_val),
+                insert_line,
+            )
         if old_str_val and new_str_val:
-            if old_str_val in old_content_str:
-                return old_content_str.replace(old_str_val, new_str_val)
-            return self._fuzzy_match_error(old_content_str, old_str_val)
-
+            return self._apply_str_replace(old_content_str, old_str_val, new_str_val)
         if file_text_val:
             return file_text_val
-
         if new_str_val:
             return old_content_str + new_str_val
-
         return ToolResult(
             output="",
             error="No content provided for edit operation",

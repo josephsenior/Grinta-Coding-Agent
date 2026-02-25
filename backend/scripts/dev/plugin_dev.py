@@ -156,6 +156,39 @@ def cmd_test(args: argparse.Namespace) -> None:
     asyncio.run(_run_tests())
 
 
+def _detect_changed_files(
+    watch_dir: Path, last_mtimes: dict[str, float]
+) -> bool:
+    """Detect changed .py files. Returns True if any changed."""
+    changed = False
+    for py_file in watch_dir.rglob("*.py"):
+        mtime = py_file.stat().st_mtime
+        key = str(py_file)
+        if key not in last_mtimes:
+            last_mtimes[key] = mtime
+        elif last_mtimes[key] != mtime:
+            last_mtimes[key] = mtime
+            changed = True
+            print(f"\n  Changed: {py_file.name}")
+    return changed
+
+
+def _reload_plugins() -> None:
+    """Reload plugin discovery and validate. Prints status."""
+    from backend.core import plugin as plugin_mod
+
+    importlib.reload(plugin_mod)
+    registry = plugin_mod.get_plugin_registry()
+    print(f"  ✓ {len(registry.plugins)} plugin(s) loaded")
+    errors = registry.validate_all()
+    if errors:
+        for name, errs in errors.items():
+            for e in errs:
+                print(f"    ✗ {name}: {e}")
+    else:
+        print("  ✓ All plugins valid")
+
+
 def cmd_watch(args: argparse.Namespace) -> None:
     """Watch a directory for plugin file changes and reload."""
     watch_dir = Path(args.dir).resolve()
@@ -168,36 +201,12 @@ def cmd_watch(args: argparse.Namespace) -> None:
 
     try:
         while True:
-            changed = False
-            for py_file in watch_dir.rglob("*.py"):
-                mtime = py_file.stat().st_mtime
-                key = str(py_file)
-                if key not in last_mtimes:
-                    last_mtimes[key] = mtime
-                elif last_mtimes[key] != mtime:
-                    last_mtimes[key] = mtime
-                    changed = True
-                    print(f"\n  Changed: {py_file.name}")
-
-            if changed:
+            if _detect_changed_files(watch_dir, last_mtimes):
                 print("  Reloading plugins...")
                 try:
-                    # Re-import plugin discovery
-                    from backend.core import plugin as plugin_mod
-
-                    importlib.reload(plugin_mod)
-                    registry = plugin_mod.get_plugin_registry()
-                    print(f"  ✓ {len(registry.plugins)} plugin(s) loaded")
-                    errors = registry.validate_all()
-                    if errors:
-                        for name, errs in errors.items():
-                            for e in errs:
-                                print(f"    ✗ {name}: {e}")
-                    else:
-                        print("  ✓ All plugins valid")
+                    _reload_plugins()
                 except Exception as e:
                     print(f"  ✗ Reload error: {e}")
-
             time.sleep(1)
     except KeyboardInterrupt:
         print("\nStopped.")

@@ -1,4 +1,4 @@
-"""Definition of the CodeAct finish tool for signalling task completion."""
+"""Definition of the Orchestrator finish tool for signalling task completion."""
 
 from backend.engines.orchestrator.tools.common import create_tool_definition
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
@@ -18,7 +18,7 @@ _FINISH_DESCRIPTION = (
 
 
 def create_finish_tool() -> ChatCompletionToolParam:
-    """Create the finish tool for the CodeAct agent."""
+    """Create the finish tool for the Orchestrator agent."""
     return create_tool_definition(
         name=FINISH_TOOL_NAME,
         description=_FINISH_DESCRIPTION,

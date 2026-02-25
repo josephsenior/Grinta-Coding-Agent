@@ -1,4 +1,4 @@
-"""Database tools for CodeAct agent."""
+"""Database tools for Orchestrator agent."""
 
 from backend.engines.orchestrator.tools.common import create_tool_definition
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
@@ -107,7 +107,7 @@ Returns query results with execution time and row count.""",
 
 
 def get_database_tools() -> list[ChatCompletionToolParam]:
-    """Get all database tools for the CodeAct agent."""
+    """Get all database tools for the Orchestrator agent."""
     return [
         create_database_connect_tool(),
         create_database_schema_tool(),

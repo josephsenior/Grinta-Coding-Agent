@@ -17,13 +17,14 @@ import os
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
-import backend.engines.orchestrator.function_calling as codeact_function_calling
+import backend.engines.orchestrator.function_calling as orchestrator_function_calling
 from backend.controller.agent import Agent
 from backend.controller.state.state import State
 from backend.core.config import AgentConfig
 from backend.core.errors import (
     AgentRuntimeError,
     ContextLimitError,
+    ModelProviderError,
     ToolExecutionError,
 )
 from backend.core.logger import forge_logger as logger
@@ -52,6 +53,97 @@ from .safety import OrchestratorSafetyManager
 if TYPE_CHECKING:
     from backend.events.action import Action
     from backend.events.stream import EventStream
+
+
+def _build_full_file_read_command(path: str, is_windows: bool) -> str:
+    """Build command to read entire file."""
+    if is_windows:
+        return f'Write-Output "=== FILE: {path} ===" ; Get-Content "{path}"'
+    return f'echo "=== FILE: {path} ===" && cat "{path}"'
+
+
+def _build_partial_file_read_command(
+    path: str, start: int, end: int, is_windows: bool
+) -> str:
+    """Build command to read file lines [start, end). end=-1 means to end."""
+    header = f'lines {start + 1}-{end}' if end != -1 else f'lines {start + 1}+'
+    if is_windows:
+        win_header = f'Write-Output "=== FILE: {path} ({header}) ===" ; '
+        if end == -1:
+            return win_header + f'Get-Content "{path}" | Select-Object -Skip {start}'
+        count = end - start
+        return win_header + f'Get-Content "{path}" | Select-Object -Skip {start} -First {count}'
+    unix_header = f'echo "=== FILE: {path} ({header}) ===" && '
+    if end == -1:
+        return unix_header + f'tail -n +{start + 1} "{path}"'
+    return unix_header + f'sed -n "{start + 1},{end}p" "{path}"'
+
+
+def _build_file_read_command(fr: FileReadAction, is_windows: bool) -> str:
+    """Build a shell command for one file read (full or partial, Windows or Unix)."""
+    path = fr.path
+    start, end = fr.start, fr.end
+    if fr.view_range:
+        start = fr.view_range[0] - 1 if len(fr.view_range) > 0 else 0
+        end = fr.view_range[1] if len(fr.view_range) > 1 else -1
+
+    if start == 0 and end == -1 and not fr.view_range:
+        return _build_full_file_read_command(path, is_windows)
+    return _build_partial_file_read_command(path, start, end, is_windows)
+
+
+def _format_reflection_progress(state: State) -> str:
+    """Format progress line from iteration_flag."""
+    iter_flag = getattr(state, "iteration_flag", None)
+    current = getattr(iter_flag, "current_value", 0) if iter_flag else 0
+    max_val = getattr(iter_flag, "max_value", 0) if iter_flag else 0
+    if not current:
+        return ""
+    progress = f"Turn {current}"
+    if max_val:
+        progress += f"/{max_val} ({int(current / max_val * 100)}% of budget)"
+    return f"  • Progress: {progress}"
+
+
+def _format_reflection_metrics(state: State) -> list[str]:
+    """Format context usage and cost lines from metrics."""
+    parts: list[str] = []
+    metrics = getattr(state, "metrics", None)
+    if not metrics:
+        return parts
+    atu = getattr(metrics, "accumulated_token_usage", None)
+    if atu:
+        prompt_tok = getattr(atu, "prompt_tokens", 0)
+        ctx_window = getattr(atu, "context_window", 0)
+        if prompt_tok and ctx_window:
+            pct = int(prompt_tok / ctx_window * 100)
+            parts.append(f"  • Context usage: {pct}% ({prompt_tok}/{ctx_window} tokens)")
+    cost = getattr(metrics, "accumulated_cost", 0.0)
+    if cost > 0:
+        parts.append(f"  • Cost so far: ${cost:.4f}")
+    return parts
+
+
+def _format_reflection_modified_files(modified_files: list[str]) -> str:
+    """Format modified files line."""
+    if not modified_files:
+        return ""
+    files_str = ", ".join(modified_files[-5:])
+    if len(modified_files) > 5:
+        files_str += f" (+{len(modified_files) - 5} more)"
+    return f"  • Files modified: {files_str}"
+
+
+def _format_reflection_initial_request(
+    memory_manager: Any, history: list
+) -> str:
+    """Format original request line from initial user message."""
+    try:
+        initial_msg = memory_manager.get_initial_user_message(history)
+        task_text = getattr(initial_msg, "content", "")[:200]
+        return f'  • Original request: "{task_text}"' if task_text else ""
+    except Exception:
+        return ""
 
 
 class Orchestrator(Agent):
@@ -99,7 +191,7 @@ class Orchestrator(Agent):
         self.memory_manager: MemoryManagerProtocol = self._memory_manager_impl
 
         # Register vector-memory callback for the semantic_recall tool
-        codeact_function_calling.register_semantic_recall(
+        orchestrator_function_calling.register_semantic_recall(
             self.conversation_memory.recall_from_memory
         )
 
@@ -217,46 +309,53 @@ class Orchestrator(Agent):
                 thought=f"I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.",
             )
 
+        except ModelProviderError:
+            raise
+
         except Exception as e:
             logger.error("Critical Failure in Orchestrator.step: %s", e, exc_info=True)
             # Wrap generic exceptions in AgentRuntimeError for standardized handling upstream
             raise AgentRuntimeError(f"Critical agent failure: {str(e)}") from e
 
+    def _handle_pending_action_from_condensation(
+        self, state: State, condensed: Any
+    ) -> Action | None:
+        """If condensed has pending_action, queue recovery and return it. Else None."""
+        if not condensed.pending_action:
+            return None
+        task_text = ""
+        try:
+            initial_msg = self.memory_manager.get_initial_user_message(state.history)
+            task_text = (getattr(initial_msg, "content", "") or "")[:200]
+        except Exception:
+            pass
+        self._queue_post_condensation_recovery(task_text=task_text)
+        return condensed.pending_action
+
+    def _set_prompt_tier_from_recent_history(self, state: State) -> None:
+        """Escalate to debug tier when recent errors or file ops exist."""
+        try:
+            from backend.events.observation import ErrorObservation
+            from backend.events.action import FileEditAction, FileWriteAction
+            recent = state.history[-12:] if len(state.history) > 12 else state.history
+            tier = "debug" if (
+                any(isinstance(e, ErrorObservation) for e in recent)
+                or any(isinstance(e, (FileEditAction, FileWriteAction)) for e in recent)
+            ) else "base"
+            self.prompt_manager.set_prompt_tier(tier)
+        except Exception:
+            pass
+
     def _execute_llm_step(self, state: State, condensed: Any) -> Action:
         """Core logic to prepare messages, call LLM, and return the first action."""
-        if condensed.pending_action:
-            # Extract initial task text for semantic recall during recovery
-            try:
-                initial_msg = self.memory_manager.get_initial_user_message(
-                    state.history
-                )
-                task_text = (
-                    getattr(initial_msg, "content", "")[:200] if initial_msg else ""
-                )
-            except Exception:
-                task_text = ""
-            self._queue_post_condensation_recovery(task_text=task_text)
-            return condensed.pending_action
+        pending = self._handle_pending_action_from_condensation(state, condensed)
+        if pending is not None:
+            return pending
 
         initial_user_message = self.memory_manager.get_initial_user_message(
             state.history
         )
-
-        # Prompt tiers: avoid injecting large, rarely-needed blocks every turn.
-        # Escalate to "debug" when we recently touched files or saw tool errors.
-        try:
-            from backend.events.observation import ErrorObservation
-            from backend.events.action import FileEditAction, FileWriteAction
-
-            recent = state.history[-12:] if len(state.history) > 12 else state.history
-            has_recent_error = any(isinstance(e, ErrorObservation) for e in recent)
-            has_recent_file_op = any(
-                isinstance(e, (FileEditAction, FileWriteAction)) for e in recent
-            )
-            tier = "debug" if (has_recent_error or has_recent_file_op) else "base"
-            self.prompt_manager.set_prompt_tier(tier)
-        except Exception:
-            pass
+        self._set_prompt_tier_from_recent_history(state)
 
         messages = self.memory_manager.build_messages(
             condensed_history=condensed.events,
@@ -269,27 +368,21 @@ class Orchestrator(Agent):
 
         result = self.executor.execute(params, self.event_stream)
 
-        # Ack turn-scoped directives only after a successful LLM call.
-        # This makes retries (context-limit, transient tool errors, etc.)
-        # deterministic: signals persist until an actual successful model response.
         try:
             if hasattr(state, "ack_planning_directive"):
                 state.ack_planning_directive(source="Orchestrator")
             if hasattr(state, "ack_memory_pressure"):
                 state.ack_memory_pressure(source="Orchestrator")
         finally:
-            # Backward-compatible cleanup
             with contextlib.suppress(Exception):
                 state.extra_data.pop("planning_directive", None)
                 state.extra_data.pop("memory_pressure", None)
 
-        # Track LLM latency for adaptive rate governing
         self._last_llm_latency = result.execution_time
 
         actions = result.actions or []
         if not actions:
             return self._build_fallback_action(result)
-
         self._queue_additional_actions(actions[1:])
         return actions[0]
 
@@ -377,15 +470,11 @@ class Orchestrator(Agent):
                 pass
 
     def _build_fallback_action(self, result) -> Action:
-        """Create a fallback action when the LLM produces no tool calls.
+        """Create a message action when the LLM returns no tool calls.
 
         This typically means the LLM returned pure-text (e.g. a final answer
-        or a refusal).  We surface it as a ``MessageAction`` so the
-        controller can decide whether to continue or stop.
-
-        If the LLM returned an entirely empty response we inject a
-        diagnostic ``AgentThinkAction`` so the loop doesn't silently
-        stall.
+        or a refusal). We surface it as a ``MessageAction`` so the controller
+        can decide whether to continue or stop.
         """
         message_text = ""
         if result.response and getattr(result.response, "choices", None):
@@ -395,15 +484,7 @@ class Orchestrator(Agent):
                 message_text = getattr(message, "content", "") or ""
 
         if not message_text.strip():
-            logger.warning(
-                "LLM returned an empty response with no tool calls — injecting diagnostic think action"
-            )
-            return AgentThinkAction(
-                thought=(
-                    "The LLM returned an empty response with no actions. "
-                    "I will re-evaluate the current state and try again."
-                )
-            )
+            raise ModelProviderError("LLM returned an empty response with no tool calls")
 
         fallback = MessageAction(content=message_text)
         fallback.source = EventSource.AGENT
@@ -421,80 +502,82 @@ class Orchestrator(Agent):
         them into a single command that processes all requested operations,
         cutting round-trips.
         """
-        if len(self.pending_actions) < 2:
+        import os
+        from backend.events.action.commands import CmdRunAction
+
+        batch = self._collect_file_read_batch()
+        if len(batch) < 2:
             return None
 
-        # Collect the leading run of FileReadAction entries
+        for _ in batch:
+            self.pending_actions.popleft()
+
+        is_windows = os.name == "nt"
+        parts = [_build_file_read_command(fr, is_windows) for fr in batch]
+        sep = " ; " if is_windows else " && "
+        return CmdRunAction(command=sep.join(parts), thought="Batched parallel file reads")
+
+    def _collect_file_read_batch(self) -> list[FileReadAction]:
+        """Collect leading run of FileReadAction from pending_actions."""
         batch: list[FileReadAction] = []
         for action in self.pending_actions:
             if isinstance(action, FileReadAction):
                 batch.append(action)
             else:
                 break
+        return batch
 
-        if len(batch) < 2:
-            return None
+    def _build_semantic_recall_block(self, task_text: str) -> str:
+        """Build semantic recall block from task text. Returns empty on failure."""
+        if not task_text:
+            return ""
+        recall_fn = orchestrator_function_calling.get_semantic_recall_fn()
+        if not recall_fn:
+            return ""
+        try:
+            results = recall_fn(task_text, 3)
+            if not results:
+                return ""
+            parts = ["\n\n<SEMANTIC_RECALL_RECOVERY>"]
+            for i, item in enumerate(results, 1):
+                content = item.get("content_text", item.get("content", ""))
+                parts.append(f"  [{i}] {content[:300]}")
+            parts.append("</SEMANTIC_RECALL_RECOVERY>")
+            return "\n".join(parts)
+        except Exception:
+            return ""
 
-        # Pop them from the queue
-        for _ in batch:
-            self.pending_actions.popleft()
+    def _build_lessons_block(self) -> str:
+        """Load lessons.md content for recovery. Returns empty on failure."""
+        try:
+            import os as _os
+            lessons_path = "/memories/repo/lessons.md"
+            if not _os.path.exists(lessons_path):
+                return ""
+            with open(lessons_path, encoding="utf-8") as _f:
+                content = _f.read(2000)
+            return f"\n\n<LESSONS_MD_RECOVERY>\n{content}\n</LESSONS_MD_RECOVERY>" if content.strip() else ""
+        except Exception:
+            return ""
 
-        import os
-        from backend.events.action.commands import CmdRunAction
-
-        is_windows = os.name == "nt"
-
-        # Build a single command that prints each file with a clear header
-        parts: list[str] = []
-        for fr in batch:
-            path = fr.path
-            if fr.start == 0 and fr.end == -1 and not fr.view_range:
-                # Full file read
-                if is_windows:
-                    parts.append(
-                        f'Write-Output "=== FILE: {path} ===" ; Get-Content "{path}"'
-                    )
-                else:
-                    parts.append(
-                        f'echo "=== FILE: {path} ===" && cat "{path}"'
-                    )
-            else:
-                # Partial read with line range
-                start = fr.start
-                end = fr.end
-                if fr.view_range:
-                    start = fr.view_range[0] - 1 if len(fr.view_range) > 0 else 0
-                    end = fr.view_range[1] if len(fr.view_range) > 1 else -1
-                if is_windows:
-                    if end == -1:
-                        parts.append(
-                            f'Write-Output "=== FILE: {path} (lines {start + 1}+) ===" ; '
-                            f'Get-Content "{path}" | Select-Object -Skip {start}'
-                        )
-                    else:
-                        count = end - start
-                        parts.append(
-                            f'Write-Output "=== FILE: {path} (lines {start + 1}-{end}) ===" ; '
-                            f'Get-Content "{path}" | Select-Object -Skip {start} -First {count}'
-                        )
-                else:
-                    if end == -1:
-                        parts.append(
-                            f'echo "=== FILE: {path} (lines {start + 1}+) ===" && '
-                            f'tail -n +{start + 1} "{path}"'
-                        )
-                    else:
-                        count = end - start
-                        parts.append(
-                            f'echo "=== FILE: {path} (lines {start + 1}-{end}) ===" && '
-                            f'sed -n "{start + 1},{end}p" "{path}"'
-                        )
-
-        if is_windows:
-            combined_cmd = " ; ".join(parts)
-        else:
-            combined_cmd = " && ".join(parts)
-        return CmdRunAction(command=combined_cmd, thought="Batched parallel file reads")
+    def _build_task_tracker_block(self) -> str:
+        """Build task tracker state block. Returns empty on failure."""
+        try:
+            from backend.engines.orchestrator.tools.task_tracker import TaskTracker
+            tracker = TaskTracker()
+            tasks = tracker.load_from_file()
+            if not tasks:
+                return ""
+            status_icons = {"completed": "✓", "in_progress": "O", "failed": "X"}
+            lines = ["<TASK_TRACKER_RECOVERY>"]
+            for t in tasks:
+                icon = status_icons.get(t.get("status", ""), "-")
+                desc = t.get("description", t.get("title", ""))
+                lines.append(f"  [{icon}] {t.get('id', '?')} — {desc} ({t.get('status', 'pending')})")
+            lines.append("</TASK_TRACKER_RECOVERY>")
+            return "\n\n" + "\n".join(lines)
+        except Exception:
+            return ""
 
     def _queue_post_condensation_recovery(self, task_text: str = "") -> None:
         """Inject recovery actions after condensation so the agent re-orients.
@@ -510,169 +593,40 @@ class Orchestrator(Agent):
         6. Inject lessons.md content if available
         """
         from backend.engines.orchestrator.tools.note import build_recall_action
-        from backend.engines.orchestrator.tools.working_memory import (
-            get_full_working_memory,
-        )
-        from backend.engines.orchestrator.tools.task_tracker import TaskTracker
+        from backend.engines.orchestrator.tools.working_memory import get_full_working_memory
 
-        # Load the auto-extracted context snapshot
         restored = self._memory_manager_impl.get_restored_context()
         restored_block = f"\n\n{restored}" if restored else ""
-
-        # Load structured working memory
         wm = get_full_working_memory()
         wm_block = f"\n\n{wm}" if wm else ""
 
-        # Auto semantic recall — query vector memory with the task description
-        semantic_block = ""
-        if task_text:
-            recall_fn = codeact_function_calling.get_semantic_recall_fn()
-            if recall_fn:
-                try:
-                    results = recall_fn(task_text, 3)
-                    if results:
-                        parts = ["\n\n<SEMANTIC_RECALL_RECOVERY>"]
-                        for i, item in enumerate(results, 1):
-                            content = item.get("content_text", item.get("content", ""))
-                            parts.append(f"  [{i}] {content[:300]}")
-                        parts.append("</SEMANTIC_RECALL_RECOVERY>")
-                        semantic_block = "\n".join(parts)
-                except Exception:
-                    pass  # Non-critical — don't block recovery on recall failure
-
-        # Auto-inject lessons.md (cross-session learning) — system-enforced read
-        lessons_block = ""
-        try:
-            lessons_path = "/memories/repo/lessons.md"
-            import os as _os
-            if _os.path.exists(lessons_path):
-                with open(lessons_path, encoding="utf-8") as _f:
-                    lessons_content = _f.read(2000)  # Cap at 2000 chars
-                if lessons_content.strip():
-                    lessons_block = f"\n\n<LESSONS_MD_RECOVERY>\n{lessons_content}\n</LESSONS_MD_RECOVERY>"
-        except Exception:
-            pass  # Non-critical
-
-        # Auto-inject task tracker state — system-enforced, reads plan file directly
-        task_tracker_block = ""
-        try:
-            tracker = TaskTracker()
-            tasks = tracker.load_from_file()
-            if tasks:
-                task_lines = ["<TASK_TRACKER_RECOVERY>"]
-                for t in tasks:
-                    status_icon = {"completed": "✓", "in_progress": "O", "failed": "X"}.get(
-                        t.get("status", ""), "-"
-                    )
-                    task_lines.append(
-                        f"  [{status_icon}] {t.get('id', '?')} — {t.get('description', t.get('title', ''))}"
-                        f" ({t.get('status', 'pending')})"
-                    )
-                task_lines.append("</TASK_TRACKER_RECOVERY>")
-                task_tracker_block = "\n\n" + "\n".join(task_lines)
-        except Exception:
-            pass  # Non-critical
+        semantic_block = self._build_semantic_recall_block(task_text)
+        lessons_block = self._build_lessons_block()
+        task_tracker_block = self._build_task_tracker_block()
 
         recovery_think = AgentThinkAction(
             thought=(
                 "⚡ CONTEXT CONDENSED — mandatory recovery sequence complete (system-enforced). "
                 "The following context has been automatically restored:"
-                f"{restored_block}"
-                f"{wm_block}"
-                f"{semantic_block}"
-                f"{lessons_block}"
-                f"{task_tracker_block}"
+                f"{restored_block}{wm_block}{semantic_block}{lessons_block}{task_tracker_block}"
             )
         )
-        recall_action = build_recall_action({"key": "all"})
-
         self.pending_actions.append(recovery_think)
-        self.pending_actions.append(recall_action)
+        self.pending_actions.append(build_recall_action({"key": "all"}))
 
     def _maybe_inject_reflection(self, state: State | None = None) -> Action | None:
         """Inject a structured self-reflection think action every N steps.
 
-        Unlike the previous version which asked vague questions, this version
-        provides concrete session metrics for the LLM to reflect on:
-        - Turn count and remaining budget
-        - Files modified this session
-        - Error count from recent history
-        - Token usage percentage
-        - The original user request (re-injected for goal alignment)
+        Provides concrete session metrics: turn progress, token usage,
+        files modified, error count, and original user request.
 
         Returns an AgentThinkAction if the interval has elapsed, else None.
-        The counter resets after each reflection.
         """
-        if self._reflection_interval <= 0:
-            return None
-        if self._steps_since_reflection < self._reflection_interval:
+        if self._reflection_interval <= 0 or self._steps_since_reflection < self._reflection_interval:
             return None
 
         self._steps_since_reflection = 0
-
-        # Build structured reflection data
-        data_parts: list[str] = []
-
-        if state is not None:
-            # Turn progress
-            iter_flag = getattr(state, "iteration_flag", None)
-            current = getattr(iter_flag, "current_value", 0) if iter_flag else 0
-            max_val = getattr(iter_flag, "max_value", 0) if iter_flag else 0
-            if current:
-                progress = f"Turn {current}"
-                if max_val:
-                    progress += (
-                        f"/{max_val} ({int(current / max_val * 100)}% of budget)"
-                    )
-                data_parts.append(f"  • Progress: {progress}")
-
-            # Token usage
-            metrics = getattr(state, "metrics", None)
-            if metrics:
-                atu = getattr(metrics, "accumulated_token_usage", None)
-                if atu:
-                    prompt_tok = getattr(atu, "prompt_tokens", 0)
-                    ctx_window = getattr(atu, "context_window", 0)
-                    if prompt_tok and ctx_window:
-                        pct = int(prompt_tok / ctx_window * 100)
-                        data_parts.append(
-                            f"  • Context usage: {pct}% ({prompt_tok}/{ctx_window} tokens)"
-                        )
-
-                cost = getattr(metrics, "accumulated_cost", 0.0)
-                if cost > 0:
-                    data_parts.append(f"  • Cost so far: ${cost:.4f}")
-
-            # Files modified (from file verification guard)
-            modified_files = list(self.anti_hallucination._file_modified_turns.keys())
-            if modified_files:
-                files_str = ", ".join(modified_files[-5:])  # last 5
-                if len(modified_files) > 5:
-                    files_str += f" (+{len(modified_files) - 5} more)"
-                data_parts.append(f"  • Files modified: {files_str}")
-
-            # Error count
-            error_count = 0
-            for event in reversed(list(getattr(state, "history", []))):
-                cls_name = type(event).__name__
-                if cls_name == "ErrorObservation":
-                    error_count += 1
-                if error_count >= 20:
-                    break
-            if error_count:
-                data_parts.append(f"  • Errors encountered: {error_count}")
-
-            # Original user request
-            try:
-                initial_msg = self.memory_manager.get_initial_user_message(
-                    state.history
-                )
-                task_text = getattr(initial_msg, "content", "")[:200]
-                if task_text:
-                    data_parts.append(f'  • Original request: "{task_text}"')
-            except Exception:
-                pass
-
+        data_parts = self._build_reflection_data_parts(state) if state else []
         data_block = "\n".join(data_parts) if data_parts else "  (no metrics available)"
 
         return AgentThinkAction(
@@ -687,6 +641,45 @@ class Orchestrator(Agent):
             )
         )
 
+    def _build_reflection_data_parts(self, state: State) -> list[str]:
+        """Build structured reflection data parts from state."""
+        parts: list[str] = []
+
+        progress = _format_reflection_progress(state)
+        if progress:
+            parts.append(progress)
+
+        metrics_parts = _format_reflection_metrics(state)
+        parts.extend(metrics_parts)
+
+        files_part = _format_reflection_modified_files(
+            list(self.anti_hallucination._file_modified_turns.keys())
+        )
+        if files_part:
+            parts.append(files_part)
+
+        error_count = self._count_recent_errors(state)
+        if error_count:
+            parts.append(f"  • Errors encountered: {error_count}")
+
+        request_part = _format_reflection_initial_request(
+            self.memory_manager, state.history
+        )
+        if request_part:
+            parts.append(request_part)
+
+        return parts
+
+    def _count_recent_errors(self, state: State) -> int:
+        """Count ErrorObservations in recent history, capped at 20."""
+        count = 0
+        for event in reversed(list(getattr(state, "history", []))):
+            if type(event).__name__ == "ErrorObservation":
+                count += 1
+                if count >= 20:
+                    break
+        return count
+
     # ------------------------------------------------------------------ #
     # Convenience helpers
     # ------------------------------------------------------------------ #
@@ -698,7 +691,7 @@ class Orchestrator(Agent):
 
     def response_to_actions(self, response) -> list[Action]:
         """Convert an LLM response into executable actions."""
-        return codeact_function_calling.response_to_actions(
+        return orchestrator_function_calling.response_to_actions(
             response, 
             mcp_tool_names=list(self.mcp_tools.keys()),
             mcp_tools=self.mcp_tools

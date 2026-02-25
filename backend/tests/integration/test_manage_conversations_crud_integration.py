@@ -89,7 +89,6 @@ async def test_create_conversation_handler_success() -> None:
             user_id="user-1",
             provider_tokens={},
             user_secrets=None,
-            auth_type=None,
             settings=MagicMock(),
         )
 

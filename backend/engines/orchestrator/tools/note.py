@@ -1,4 +1,4 @@
-"""Persistent scratchpad tools — note(), recall(), semantic_recall() — for the CodeAct agent.
+"""Persistent scratchpad tools — note(), recall(), semantic_recall() — for the Orchestrator agent.
 
 Notes are stored in ``.forge/agent_notes.json`` inside the workspace root and
 survive context condensation.  The LLM can store arbitrary key→value pairs

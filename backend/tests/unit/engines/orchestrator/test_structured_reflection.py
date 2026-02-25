@@ -77,6 +77,8 @@ class TestStructuredReflection:
                 self.memory_manager = MagicMock()
 
             _maybe_inject_reflection = Orchestrator._maybe_inject_reflection
+            _build_reflection_data_parts = Orchestrator._build_reflection_data_parts
+            _count_recent_errors = Orchestrator._count_recent_errors
 
         return MockOrchestrator()
 

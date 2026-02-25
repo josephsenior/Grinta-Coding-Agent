@@ -20,7 +20,7 @@ def build_tool_call_metadata(
 
     Builds a lightweight stable representation of the model response.
 
-    All callers (CodeAct, ReadOnly, Loc agents) should use this to ensure
+    All callers (Orchestrator, ReadOnly, Loc agents) should use this to ensure
     consistent metadata shape and avoid divergence in test expectations.
     """
     return ToolCallMetadata.from_sdk(

@@ -81,7 +81,7 @@ class TestInitProject(TestCase):
         self.assertIn('name: "test-project"', content)
         self.assertIn('description: "A Forge agent."', content)
         self.assertIn('version: "0.1.0"', content)
-        self.assertIn('name: "CodeAct"', content)
+        self.assertIn('name: "Orchestrator"', content)
         self.assertIn("max_steps: 30", content)
         self.assertIn('model: "gpt-4o"', content)
         self.assertIn("temperature: 0.0", content)

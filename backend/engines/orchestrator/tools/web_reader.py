@@ -1,4 +1,4 @@
-"""Web reader tool for the CodeAct agent.
+"""Web reader tool for the Orchestrator agent.
 
 Provides a simple interface for reading the content of a webpage
 using requests and html2text. Safe for Windows.

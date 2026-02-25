@@ -108,8 +108,8 @@ class ReplayError(SessionError):
     """Raised when trajectory replay/export fails."""
 
 
-class SocketAuthError(ForgeError):
-    """Raised when Socket.IO auth validation fails."""
+class SocketConnectionError(ForgeError):
+    """Raised when Socket.IO connection validation fails."""
 
 
 class EventStreamError(ForgeError):
@@ -135,6 +135,6 @@ __all__ = [
     "SessionInvariantError",
     "PersistenceError",
     "ReplayError",
-    "SocketAuthError",
+    "SocketConnectionError",
     "EventStreamError",
 ]

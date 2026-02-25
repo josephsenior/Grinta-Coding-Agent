@@ -1,4 +1,4 @@
-"""LLM-assisted file editing tool configuration for CodeAct."""
+"""LLM-assisted file editing tool configuration for Orchestrator."""
 
 from backend.engines.orchestrator.tools.common import (
     create_tool_definition,
@@ -123,7 +123,7 @@ print(MyClass().y)
 
 
 def create_llm_based_edit_tool() -> ChatCompletionToolParam:
-    """Create the LLM-based file editing tool for the CodeAct agent."""
+    """Create the LLM-based file editing tool for the Orchestrator agent."""
     return create_tool_definition(
         name="edit_file",
         description=_FILE_EDIT_DESCRIPTION,

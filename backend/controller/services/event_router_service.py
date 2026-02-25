@@ -148,47 +148,43 @@ class EventRouterService:
     async def _handle_message_action(self, action: MessageAction) -> None:
         """Handle message actions from users or agents."""
         if action.source == EventSource.USER:
-            log_level = (
-                "info" if os.getenv("LOG_ALL_EVENTS") in ("true", "1") else "debug"
-            )
-            self._ctrl.log(
-                log_level,
-                str(action),
-                extra={"msg_type": "ACTION", "event_source": EventSource.USER},
-            )
-            first_user_message = next(
-                (
-                    e
-                    for e in self._ctrl.event_stream.search_events(
-                        start_id=self._ctrl.state.start_id
-                    )
-                    if isinstance(e, MessageAction) and e.source == EventSource.USER
-                ),
-                None,
-            )
-            is_first_user_message = (
-                action.id == first_user_message.id if first_user_message else False
-            )
-            recall_type = (
-                RecallType.WORKSPACE_CONTEXT
-                if is_first_user_message
-                else RecallType.KNOWLEDGE
-            )
-            recall_action = RecallAction(query=action.content, recall_type=recall_type)
-
-            pending_service = getattr(self._ctrl, "pending_action_service", None)
-            if pending_service is not None:
-                pending_service.set(recall_action)
-            else:
-                action_service = getattr(self._ctrl, "action_service", None)
-                if action_service is not None:
-                    action_service.set_pending_action(recall_action)
-            self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
-            if self._ctrl.get_agent_state() != AgentState.RUNNING:
-                await self._ctrl.set_agent_state_to(AgentState.RUNNING)
+            await self._handle_user_message(action)
         elif action.source == EventSource.AGENT:
             if action.wait_for_response:
                 await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+
+    async def _handle_user_message(self, action: MessageAction) -> None:
+        """Handle user message: log, create recall, set pending, start agent."""
+        log_level = "info" if os.getenv("LOG_ALL_EVENTS") in ("true", "1") else "debug"
+        self._ctrl.log(
+            log_level,
+            str(action),
+            extra={"msg_type": "ACTION", "event_source": EventSource.USER},
+        )
+        first_user_message = next(
+            (
+                e
+                for e in self._ctrl.event_stream.search_events(
+                    start_id=self._ctrl.state.start_id
+                )
+                if isinstance(e, MessageAction) and e.source == EventSource.USER
+            ),
+            None,
+        )
+        is_first = action.id == first_user_message.id if first_user_message else False
+        recall_type = RecallType.WORKSPACE_CONTEXT if is_first else RecallType.KNOWLEDGE
+        recall_action = RecallAction(query=action.content, recall_type=recall_type)
+
+        pending_service = getattr(self._ctrl, "pending_action_service", None)
+        if pending_service is not None:
+            pending_service.set(recall_action)
+        else:
+            action_service = getattr(self._ctrl, "action_service", None)
+            if action_service is not None:
+                action_service.set_pending_action(recall_action)
+        self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
+        if self._ctrl.get_agent_state() != AgentState.RUNNING:
+            await self._ctrl.set_agent_state_to(AgentState.RUNNING)
 
     async def _handle_delegate_task_action(self, action: DelegateTaskAction) -> None:
         """Handle delegating a subtask to a worker agent."""

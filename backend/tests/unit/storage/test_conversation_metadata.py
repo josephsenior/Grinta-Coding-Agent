@@ -22,14 +22,13 @@ class TestConversationTrigger:
             "suggested_task",
             "playbook_management",
             "external_api",
-            "remote_api_key",
             "unknown",
         }
         actual = {t.value for t in ConversationTrigger}
         assert actual == expected
 
     def test_member_count(self):
-        assert len(ConversationTrigger) == 6
+        assert len(ConversationTrigger) == 5
 
 
 # ── ConversationMetadata defaults ────────────────────────────────────

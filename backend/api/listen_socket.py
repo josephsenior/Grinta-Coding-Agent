@@ -4,8 +4,8 @@ Responsibilities:
 - Socket.IO lifecycle events (``connect``, ``disconnect``)
 - Event routing (``forge_user_action``, ``forge_action``)
 
-Authentication / validation and event-stream replay logic have been
-extracted into :mod:`backend.api.socket_auth` and
+Connection-parameter validation and event-stream replay logic have been
+extracted into :mod:`backend.api.socket_params` and
 :mod:`backend.api.socket_replay` respectively.
 """
 
@@ -28,12 +28,13 @@ from backend.api.shared import (
     get_conversation_manager,
     sio,
 )
-from backend.api.socket_auth import (
+from backend.api.socket_params import (
     parse_latest_event_id,
     parse_providers_set,
     validate_connection_params,
 )
 from backend.api.socket_replay import replay_event_stream
+from backend.api.types import MissingSettingsError
 from backend.storage.conversation.conversation_validator import (
     create_conversation_validator,
 )
@@ -45,6 +46,89 @@ def _get_conversation_manager_instance():
         return get_conversation_manager()
     except Exception:
         return None
+
+
+async def _register_and_deliver(
+    connection_id: str, user_id: str | None, conversation_id: str | None
+) -> None:
+    """Register connection and deliver queued messages."""
+    conn_manager = get_connection_manager()
+    try:
+        conn_manager.register_connection(
+            sid=connection_id, user_id=user_id, conversation_id=conversation_id
+        )
+        logger.info("Connection registered: %s", connection_id)
+    except ValueError as e:
+        logger.warning("Connection limit exceeded: %s", e)
+        raise SocketIOConnectionRefusedError(str(e)) from e
+    try:
+        delivered = await conn_manager.deliver_queued_messages(connection_id, sio)
+        if delivered > 0:
+            logger.info("Delivered %s queued messages to %s", delivered, connection_id)
+    except Exception as e:
+        logger.error("Error delivering queued messages: %s", e)
+
+
+async def _create_event_store_and_replay(
+    connection_id: str,
+    conversation_id: str | None,
+    user_id: str | None,
+    latest_event_id: str | None,
+) -> None:
+    """Create EventStore and replay events. Raises SocketIOConnectionRefusedError on failure."""
+    manager = _get_conversation_manager_instance()
+    if manager is None:
+        raise SocketIOConnectionRefusedError("Conversation manager is not initialized")
+    try:
+        event_store = EventStore(conversation_id, manager.file_store, user_id)
+    except FileNotFoundError as e:
+        logger.error(
+            "Failed to create EventStore for conversation %s: %s", conversation_id, e
+        )
+        raise SocketIOConnectionRefusedError(
+            f"Failed to access conversation events: {e}"
+        ) from e
+    await replay_event_stream(
+        event_store, latest_event_id, connection_id, conversation_id
+    )
+
+
+async def _setup_and_join(
+    connection_id: str,
+    conversation_id: str | None,
+    user_id: str | None,
+    providers_set: set[str] | None,
+) -> bool:
+    """Setup conversation and join. Returns False if MissingSettingsError (allow connect); raises on other failure."""
+    manager = _get_conversation_manager_instance()
+    if manager is None:
+        raise SocketIOConnectionRefusedError("Conversation manager is not initialized")
+    try:
+        conversation_init_data = await setup_init_conversation_settings(
+            user_id, conversation_id, providers_set
+        )
+    except MissingSettingsError as e:
+        logger.warning(
+            "No settings for conversation %s (user_id: %s) — "
+            "socket stays connected but agent will not start: %s",
+            conversation_id, user_id, e,
+        )
+        return False
+    except Exception as e:
+        logger.error(
+            "Failed to setup conversation settings for conversation %s (user_id: %s): %s",
+            conversation_id, user_id, e,
+            exc_info=True,
+        )
+        raise SocketIOConnectionRefusedError(
+            f"Failed to setup conversation settings: {e}"
+        ) from e
+    agent_loop_info = await manager.join_conversation(
+        conversation_id, connection_id, conversation_init_data, user_id
+    )
+    if agent_loop_info is None:
+        raise SocketIOConnectionRefusedError("Failed to join conversation")
+    return True
 
 
 @sio.event
@@ -68,7 +152,6 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
         )
         logger.info("sio:connect: %s", connection_id)
         query_params = parse_qs(environ.get("QUERY_STRING", ""))
-        auth = args[0] if args else {}
 
         # Parse parameters
         latest_event_id = parse_latest_event_id(query_params)
@@ -82,7 +165,7 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
         )
 
         # Validate connection
-        validate_connection_params(conversation_id, query_params, auth)
+        validate_connection_params(conversation_id)
 
         # Authenticate user
         cookies_str = environ.get("HTTP_COOKIE", "")
@@ -95,77 +178,15 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
             "User %s is allowed to connect to conversation %s", user_id, conversation_id
         )
 
-        # Register connection with connection manager
-        conn_manager = get_connection_manager()
-        try:
-            conn_manager.register_connection(
-                sid=connection_id,
-                user_id=user_id,
-                conversation_id=conversation_id,
-            )
-            logger.info("Connection registered: %s", connection_id)
-        except ValueError as e:
-            logger.warning("Connection limit exceeded: %s", e)
-            raise SocketIOConnectionRefusedError(str(e)) from e
-
-        # Deliver any queued messages
-        try:
-            delivered = await conn_manager.deliver_queued_messages(connection_id, sio)
-            if delivered > 0:
-                logger.info(
-                    "Delivered %s queued messages to %s", delivered, connection_id
-                )
-        except Exception as e:
-            logger.error("Error delivering queued messages: %s", e)
-
-        # Create event store
-        manager = _get_conversation_manager_instance()
-        if manager is None:
-            msg = "Conversation manager is not initialized"
-            raise SocketIOConnectionRefusedError(msg)
-        try:
-            event_store = EventStore(conversation_id, manager.file_store, user_id)
-        except FileNotFoundError as e:
-            logger.error(
-                "Failed to create EventStore for conversation %s: %s",
-                conversation_id,
-                e,
-            )
-            msg = f"Failed to access conversation events: {e}"
-            raise SocketIOConnectionRefusedError(msg) from e
-
-        # Replay events
-        await replay_event_stream(
-            event_store, latest_event_id, connection_id, conversation_id
+        await _register_and_deliver(connection_id, user_id, conversation_id)
+        await _create_event_store_and_replay(
+            connection_id, conversation_id, user_id, latest_event_id
         )
-
-        # Join conversation
-        try:
-            conversation_init_data = await setup_init_conversation_settings(
-                user_id, conversation_id, providers_set
-            )
-        except Exception as e:
-            logger.error(
-                "Failed to setup conversation settings for conversation %s (user_id: %s): %s",
-                conversation_id,
-                user_id,
-                e,
-                exc_info=True,
-            )
-            raise SocketIOConnectionRefusedError(
-                f"Failed to setup conversation settings: {e}"
-            ) from e
-
-        agent_loop_info = await manager.join_conversation(
-            conversation_id,
-            connection_id,
-            conversation_init_data,
-            user_id,
+        joined = await _setup_and_join(
+            connection_id, conversation_id, user_id, providers_set
         )
-        if agent_loop_info is None:
-            msg = "Failed to join conversation"
-            raise SocketIOConnectionRefusedError(msg)
-
+        if not joined:
+            return
         logger.info(
             "Successfully joined conversation %s with connection_id %s",
             conversation_id,

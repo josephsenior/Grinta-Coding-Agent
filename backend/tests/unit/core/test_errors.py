@@ -19,7 +19,7 @@ from backend.core.errors import (
     SessionError,
     SessionInvariantError,
     SessionStartupError,
-    SocketAuthError,
+    SocketConnectionError,
     ToolExecutionError,
     UserActionRequiredError,
     classify_error,
@@ -339,17 +339,17 @@ class TestReplayError:
         assert "replay" in str(error)
 
 
-class TestSocketAuthError:
-    """Tests for SocketAuthError."""
+class TestSocketConnectionError:
+    """Tests for SocketConnectionError."""
 
     def test_inherits_from_forge_error(self):
-        """Test SocketAuthError inherits from ForgeError."""
-        assert issubclass(SocketAuthError, ForgeError)
+        """Test SocketConnectionError inherits from ForgeError."""
+        assert issubclass(SocketConnectionError, ForgeError)
 
-    def test_create_socket_auth_error(self):
-        """Test creating SocketAuthError."""
-        error = SocketAuthError("Authentication failed")
-        assert "Authentication" in str(error)
+    def test_create_socket_connection_error(self):
+        """Test creating SocketConnectionError."""
+        error = SocketConnectionError("Connection failed")
+        assert "Connection" in str(error)
 
 
 class TestEventStreamError:
@@ -404,7 +404,7 @@ class TestErrorHierarchy:
             InvariantBrokenError,
             AgentRuntimeError,
             SessionError,
-            SocketAuthError,
+            SocketConnectionError,
             EventStreamError,
         ]
         for error_cls in errors:

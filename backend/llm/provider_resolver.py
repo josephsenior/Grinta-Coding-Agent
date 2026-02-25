@@ -15,6 +15,32 @@ import httpx
 from backend.core.logger import forge_logger as logger
 from backend.llm.catalog_loader import lookup
 
+# (keywords, provider) for heuristic fallback when model not in catalog
+_PROVIDER_KEYWORDS: list[tuple[list[str], str]] = [
+    (["claude", "anthropic"], "anthropic"),
+    (["gemini", "google"], "google"),
+    (["grok", "xai"], "xai"),
+    (["ollama"], "ollama"),
+    (["deepseek"], "deepseek"),
+    (["mistral", "codestral"], "mistral"),
+]
+
+_PROVIDER_DEFAULT_URLS: dict[str, str] = {
+    "xai": "https://api.x.ai/v1",
+    "deepseek": "https://api.deepseek.com/v1",
+}
+
+
+def _resolve_ollama_env_url() -> str | None:
+    """Return OLLAMA_HOST or OLLAMA_BASE_URL if set, with /v1 suffix if missing."""
+    import os
+
+    env_url = os.getenv("OLLAMA_HOST") or os.getenv("OLLAMA_BASE_URL")
+    if not env_url:
+        return None
+    return env_url if "/v1" in env_url else f"{env_url}/v1"
+
+
 # Common local provider endpoints
 LOCAL_ENDPOINTS = {
     "ollama": ["http://localhost:11434", "http://127.0.0.1:11434"],
@@ -40,28 +66,14 @@ class ProviderResolver:
         Returns:
             Provider name (e.g., "openai", "anthropic", "ollama")
         """
-        # Check catalog first
         entry = lookup(model_name)
         if entry:
             return entry.provider
 
-        # Heuristic fallback for unknown models
         model_lower = model_name.lower()
-
-        if "claude" in model_lower or "anthropic" in model_lower:
-            return "anthropic"
-        if "gemini" in model_lower or "google" in model_lower:
-            return "google"
-        if "grok" in model_lower or "xai" in model_lower:
-            return "xai"
-        if "ollama" in model_lower:
-            return "ollama"
-        if "deepseek" in model_lower:
-            return "deepseek"
-        if "mistral" in model_lower or "codestral" in model_lower:
-            return "mistral"
-
-        # Default to OpenAI-compatible
+        for keywords, provider in _PROVIDER_KEYWORDS:
+            if any(kw in model_lower for kw in keywords):
+                return provider
         return "openai"
 
     def is_local_model(self, model_name: str) -> bool:
@@ -102,33 +114,15 @@ class ProviderResolver:
 
         provider = self.resolve_provider(model_name)
 
-        # Check environment variables
-        import os
+        if provider == "ollama" and (url := _resolve_ollama_env_url()):
+            return url
 
-        if provider == "ollama":
-            env_url = os.getenv("OLLAMA_HOST") or os.getenv("OLLAMA_BASE_URL")
-            if env_url:
-                # Ensure it has /v1 suffix for OpenAI compatibility
-                return env_url if "/v1" in env_url else f"{env_url}/v1"
-
-        # Auto-discover local endpoints if not already done
-        if self.is_local_model(model_name) or provider in [
-            "ollama",
-            "lm_studio",
-            "vllm",
-        ]:
+        if self.is_local_model(model_name) or provider in ("ollama", "lm_studio", "vllm"):
             discovered = self.discover_local_endpoint(provider)
             if discovered:
                 return discovered
 
-        # Provider-specific defaults
-        if provider == "xai":
-            return "https://api.x.ai/v1"
-        if provider == "deepseek":
-            return "https://api.deepseek.com/v1"
-
-        # Cloud providers use default endpoints (None)
-        return None
+        return _PROVIDER_DEFAULT_URLS.get(provider)
 
     def discover_local_endpoint(self, provider: str) -> str | None:
         """Discover a local endpoint for a provider.

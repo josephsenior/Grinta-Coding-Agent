@@ -189,7 +189,6 @@ class TestGetConversationInfo:
         loop_info.runtime_status = None
         loop_info.agent_state = None
         loop_info.url = None
-        loop_info.session_api_key = None
         info = await get_conversation_info(meta, num_connections=1, agent_loop_info=loop_info)
         assert info.status == ConversationStatus.RUNNING
 
@@ -201,7 +200,6 @@ class TestGetConversationInfo:
         loop_info.runtime_status = None
         loop_info.agent_state = None
         loop_info.url = "https://example.com/runtime"
-        loop_info.session_api_key = None
         info = await get_conversation_info(meta, num_connections=1, agent_loop_info=loop_info)
         assert info.url == "https://example.com/runtime"
 

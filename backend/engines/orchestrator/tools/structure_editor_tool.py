@@ -1,4 +1,4 @@
-"""Ultimate Editor tool providing structure-aware editing for the CodeAct agent."""
+"""Ultimate Editor tool providing structure-aware editing for the Orchestrator agent."""
 
 from backend.engines.orchestrator.tools.common import (
     create_tool_definition,
@@ -87,7 +87,7 @@ Commands: edit_function, rename_symbol, find_symbol, replace_range, normalize_in
 def create_structure_editor_tool(
     use_short_description: bool = False,
 ) -> ChatCompletionToolParam:
-    """Create the Ultimate Editor tool for the CodeAct agent.
+    """Create the Ultimate Editor tool for the Orchestrator agent.
 
     Args:
         use_short_description: Whether to use short or detailed description

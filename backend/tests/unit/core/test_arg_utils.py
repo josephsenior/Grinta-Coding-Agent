@@ -89,8 +89,8 @@ class TestAddCommonArguments:
 
     def test_agent_config(self):
         p = self._make_parser()
-        args = p.parse_args(["--agent-config", "CodeAct"])
-        assert args.agent_config == "CodeAct"
+        args = p.parse_args(["--agent-config", "Orchestrator"])
+        assert args.agent_config == "Orchestrator"
 
 
 # ── add_headless_specific_arguments ──────────────────────────────────

@@ -100,6 +100,11 @@ class ObservationService:
         else:
             await transition_agent_state_logic(controller, ctx, observation)
 
+        # Trigger the next agent step now that the pending action is resolved.
+        # Without this, the server path has no mechanism to drive the agent loop
+        # forward after a tool/recall observation clears the pending action.
+        self._context.trigger_step()
+
     async def _run_post_action_verification(
         self,
         action,

@@ -103,24 +103,20 @@ app.get('/users/:id', (req, res) => {
 
 ### Middleware
 ```typescript
-// Auth middleware
-const requireAuth = (req, res, next) => {
-  const token = req.headers.authorization;
+// Request validation middleware
+const requireWorkspace = (req, res, next) => {
+  const workspaceId = req.headers['x-workspace-id'];
 
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (!workspaceId) {
+    return res.status(400).json({ error: 'Missing workspace id' });
   }
 
-  try {
-    req.user = verifyToken(token);
-    next();
-  } catch {
-    res.status(403).json({ error: 'Invalid token' });
-  }
+  req.workspaceId = workspaceId;
+  next();
 };
 
-app.get('/protected', requireAuth, (req, res) => {
-  res.json({ data: 'secret' });
+app.get('/workspace', requireWorkspace, (req, res) => {
+  res.json({ workspaceId: req.workspaceId });
 });
 ```
 

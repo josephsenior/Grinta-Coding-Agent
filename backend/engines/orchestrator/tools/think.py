@@ -1,4 +1,4 @@
-"""Definition of the lightweight reasoning tool for CodeAct agents."""
+"""Definition of the lightweight reasoning tool for Orchestrator agents."""
 
 from backend.engines.orchestrator.tools.common import create_tool_definition
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
@@ -16,7 +16,7 @@ _THINK_DESCRIPTION = (
 
 
 def create_think_tool() -> ChatCompletionToolParam:
-    """Create the think tool for the CodeAct agent."""
+    """Create the think tool for the Orchestrator agent."""
     return create_tool_definition(
         name="think",
         description=_THINK_DESCRIPTION,

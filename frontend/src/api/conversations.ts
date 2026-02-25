@@ -33,6 +33,10 @@ export async function deleteConversation(id: string): Promise<void> {
   await apiClient.delete(`/conversations/${id}`);
 }
 
+export async function deleteAllConversations(): Promise<void> {
+  await apiClient.delete("/conversations");
+}
+
 export async function updateConversationTitle(
   id: string,
   title: string,

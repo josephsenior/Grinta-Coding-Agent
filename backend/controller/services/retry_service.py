@@ -81,11 +81,8 @@ class RetryService:
     def retry_pending(self) -> bool:
         return self._retry_pending
 
-    async def schedule_retry_after_failure(self, exc: Exception) -> bool:
-        """Schedule an automatic retry for transient failures."""
-        from backend.controller.tool_telemetry import ToolTelemetry
-        from backend.events import EventSource
-        from backend.events.observation import AgentThinkObservation
+    def _is_retryable_exception(self, exc: Exception) -> bool:
+        """Return True if the exception is retryable."""
         from backend.llm.exceptions import (
             APIConnectionError,
             APIError,
@@ -95,23 +92,44 @@ class RetryService:
             Timeout,
         )
 
+        return isinstance(
+            exc,
+            (
+                APIConnectionError,
+                APIError,
+                RateLimitError,
+                ServiceUnavailableError,
+                Timeout,
+                InternalServerError,
+            ),
+        )
+
+    def _compute_initial_delay(self, exc: Exception, queue: RetryQueue) -> float:
+        """Compute initial retry delay, accounting for RateLimitError and circuit breaker."""
+        from backend.llm.exceptions import RateLimitError
+
+        delay = queue.base_delay
+        if isinstance(exc, RateLimitError):
+            delay = max(delay, queue.base_delay * 2)
+        circuit_breaker = getattr(
+            self.controller.circuit_breaker_service, "circuit_breaker", None
+        )
+        if circuit_breaker:
+            consecutive = max(1, getattr(circuit_breaker, "consecutive_errors", 1))
+            delay = min(queue.max_delay, delay * consecutive)
+        return delay
+
+    async def schedule_retry_after_failure(self, exc: Exception) -> bool:
+        """Schedule an automatic retry for transient failures."""
+        from backend.controller.tool_telemetry import ToolTelemetry
+        from backend.events import EventSource
+        from backend.events.observation import AgentThinkObservation
+
         queue = self._retry_queue or get_retry_queue()
-        if not queue:
+        if not queue or not self._is_retryable_exception(exc):
             return False
 
         controller = self.controller
-
-        retryable_types = (
-            APIConnectionError,
-            APIError,
-            RateLimitError,
-            ServiceUnavailableError,
-            Timeout,
-            InternalServerError,
-        )
-        if not isinstance(exc, retryable_types):
-            return False
-
         if self._retry_pending:
             logger.debug("Retry already pending for controller %s", controller.id)
             return True
@@ -121,19 +139,11 @@ class RetryService:
             self.initialize()
 
         metadata: dict[str, Any] = {"error": str(exc)}
-        pending_action = controller._pending_action
-        if pending_action is not None:
-            metadata["pending_action"] = ToolTelemetry.action_to_dict(pending_action)
-
-        initial_delay = queue.base_delay
-        if isinstance(exc, RateLimitError):
-            initial_delay = max(initial_delay, queue.base_delay * 2)
-        circuit_breaker = getattr(
-            controller.circuit_breaker_service, "circuit_breaker", None
-        )
-        if circuit_breaker:
-            consecutive = max(1, getattr(circuit_breaker, "consecutive_errors", 1))
-            initial_delay = min(queue.max_delay, initial_delay * consecutive)
+        if controller._pending_action is not None:
+            metadata["pending_action"] = ToolTelemetry.action_to_dict(
+                controller._pending_action
+            )
+        initial_delay = self._compute_initial_delay(exc, queue)
 
         task = await queue.schedule(
             controller_id=controller.id or "",

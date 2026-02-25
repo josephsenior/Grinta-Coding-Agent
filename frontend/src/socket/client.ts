@@ -15,15 +15,10 @@ export function connectSocket(opts: ConnectOptions): Socket {
     socket.disconnect();
   }
 
-  const apiKey = localStorage.getItem("forge_session_api_key") ?? "";
-
   socket = io(WS_URL, {
     query: {
       conversation_id: opts.conversationId,
       latest_event_id: opts.latestEventId ?? -1,
-    },
-    auth: {
-      session_api_key: apiKey,
     },
     transports: ["websocket", "polling"],
     reconnection: true,
@@ -35,9 +30,11 @@ export function connectSocket(opts: ConnectOptions): Socket {
   return socket;
 }
 
-/** Send a user action to the backend. */
-export function sendUserAction(action: UserAction): void {
-  socket?.emit("forge_user_action", action);
+/** Send a user action to the backend. Returns false if the socket is not connected. */
+export function sendUserAction(action: UserAction): boolean {
+  if (!socket?.connected) return false;
+  socket.emit("forge_user_action", action);
+  return true;
 }
 
 /** Get the current socket instance. */

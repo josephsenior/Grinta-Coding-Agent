@@ -109,9 +109,11 @@ def process_security_section(
                 summary.record("security", "invalid", str(e))
         except ValueError as exc:
             if summary:
-                summary.record("security", "error", str(exc))
-            msg = "Error in [security] section in config.toml"
-            raise ValueError(msg) from exc
+                summary.record("security", "warning", str(exc))
+            logger.warning(
+                "Cannot parse [security] config from toml, values have not been applied.\nError: %s",
+                exc,
+            )
 
 
 def process_runtime_section(

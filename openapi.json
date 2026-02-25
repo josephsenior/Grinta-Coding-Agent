@@ -1,3 +1,5 @@
+{"asctime": "2026-02-23 19:19:50,468", "message": "Using config class None", "level": "INFO", "timestamp": "2026-02-23T18:19:50.468167+00:00"}
+{"asctime": "2026-02-23 19:19:51,747", "message": "Rate limiting configured: 1000 req/hour, 100 burst", "level": "INFO", "timestamp": "2026-02-23T18:19:51.747494+00:00"}
 {
   "openapi": "3.1.0",
   "info": {
@@ -6,15 +8,15 @@
     "version": "0.55.0"
   },
   "paths": {
-    "/api/options/models": {
+    "/api/v1/options/models": {
       "get": {
         "tags": [
           "v1",
           "public"
         ],
-        "summary": "List Supported Models",
-        "description": "List model identifiers available on this server based on configured providers.",
-        "operationId": "get_models_api_options_models_get",
+        "summary": "Get Models",
+        "description": "Get all language models supported by the system.\n\nRetrieves a comprehensive list of available LLM models from supported\nproviders (OpenAI, Anthropic, Gemini, Grok). Results are deduplicated\nand sorted alphabetically.\n\nReturns:\n    list[str]: A sorted list of unique model identifiers (e.g.,\n        [\"gpt-4o\", \"claude-3-5-sonnet\", \"gemini-1.5-pro\"]).\n\nExamples:\n    >>> curl http://localhost:3000/api/options/models\n    [\"claude-3-5-sonnet\", \"gemini-1.5-pro\", \"gpt-4o\", ...]\n\nNotes:\n    - Results are cached and deduplicated\n    - Focuses on famous, well-supported models",
+        "operationId": "get_models_api_v1_options_models_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -25,28 +27,23 @@
                     "type": "string"
                   },
                   "type": "array",
-                  "title": "Response Get Models Api Options Models Get"
+                  "title": "Response Get Models Api V1 Options Models Get"
                 }
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/api/options/agents": {
+    "/api/v1/options/agents": {
       "get": {
         "tags": [
           "v1",
           "public"
         ],
-        "summary": "List Agents",
-        "description": "List available agent types supported by this server.",
-        "operationId": "get_agents_api_options_agents_get",
+        "summary": "Get Agents",
+        "description": "Get all available AI agents supported by the system.\n\nRetrieves a list of all registered agent implementations. Agents are\nautomatically discovered and registered via the engines module import.\n\nReturns:\n    list[str]: A sorted list of agent names available for selection\n        (e.g., [\"gpt-4-agent\", \"codebase-agent\", \"research-agent\"]).\n\nExamples:\n    >>> curl http://localhost:3000/api/options/agents\n    [\"agent-1\", \"agent-2\", \"code-analyzer-agent\", ...]\n\nNotes:\n    - Agents are auto-registered from backend.engines module\n    - List includes both default and custom agents",
+        "operationId": "get_agents_api_v1_options_agents_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -57,28 +54,23 @@
                     "type": "string"
                   },
                   "type": "array",
-                  "title": "Response Get Agents Api Options Agents Get"
+                  "title": "Response Get Agents Api V1 Options Agents Get"
                 }
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/api/options/security-analyzers": {
+    "/api/v1/options/security-analyzers": {
       "get": {
         "tags": [
           "v1",
           "public"
         ],
-        "summary": "List Security Analyzers",
-        "description": "List supported security analyzers.",
-        "operationId": "get_security_analyzers_api_options_security_analyzers_get",
+        "summary": "Get Security Analyzers",
+        "description": "Get all supported security analyzers.\n\nRetrieves a list of all security analysis tools available for analyzing\ncode security issues, vulnerabilities, and compliance concerns.\n\nReturns:\n    list[str]: A sorted list of security analyzer names (e.g.,\n        [\"semgrep\", \"bandit\", \"sonarqube\"]).\n\nExamples:\n    >>> curl http://localhost:3000/api/options/security-analyzers\n    [\"bandit\", \"semgrep\", \"sonarqube\", ...]\n\nNotes:\n    - Security analyzers must be initialized per-conversation\n    - Availability depends on system configuration",
+        "operationId": "get_security_analyzers_api_v1_options_security_analyzers_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -89,28 +81,23 @@
                     "type": "string"
                   },
                   "type": "array",
-                  "title": "Response Get Security Analyzers Api Options Security Analyzers Get"
+                  "title": "Response Get Security Analyzers Api V1 Options Security Analyzers Get"
                 }
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/api/options/config": {
+    "/api/v1/options/config": {
       "get": {
         "tags": [
           "v1",
           "public"
         ],
         "summary": "Get Config",
-        "description": "Get current server configuration and settings.\n\nRetrieves the complete active server configuration including deployment\nmode, feature flags, API settings, and other runtime parameters.",
-        "operationId": "get_config_api_options_config_get",
+        "description": "Get current server configuration and settings.\n\nRetrieves the complete active server configuration including deployment\nmode, feature flags, API settings, and other runtime parameters.\n\nReturns:\n    dict[str, Any]: Dictionary containing all active configuration parameters\n        with structure depending on server_config implementation:\n        - app_mode: Application mode (\"SAAS\", \"STANDALONE\", etc.)\n        - api_base_url: Base URL for API endpoints\n        - workspace_base: Base path for workspace directory\n        - feature_flags: Enabled features\n        - Other server-specific settings\n\nExamples:\n    >>> curl http://localhost:3000/api/options/config\n    {\n        \"app_mode\": \"SAAS\",\n        \"api_base_url\": \"https://api.example.com\",\n        \"workspace_base\": \"/data/workspace\",\n        ...\n    }\n\nNotes:\n    - This is a public endpoint; sensitive credentials are not included\n    - Configuration is cached in server_config singleton",
+        "operationId": "get_config_api_v1_options_config_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -119,17 +106,12 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Get Config Api Options Config Get"
+                  "title": "Response Get Config Api V1 Options Config Get"
                 }
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/features": {
@@ -139,7 +121,7 @@
           "features"
         ],
         "summary": "Get Features",
-        "description": "Get feature flags status for clients.\nExample response:\n    {\n        \"security_risk_assessment\": {\n            \"enabled\": false,\n            \"coming_soon\": true,\n            \"tier\": \"pro\",\n            \"description\": \"Security risk assessment for agent actions\"\n        }\n    }",
+        "description": "Get feature flags status for clients.\n\nReturns:\n    JSONResponse with feature flags information including enabled status\n    and \"coming_soon\" indicators for UI display\n\nExample response:\n    {\n        \"security_risk_assessment\": {\n            \"enabled\": false,\n            \"coming_soon\": true,\n            \"tier\": \"pro\",\n            \"description\": \"Security risk assessment for agent actions\"\n        }\n    }",
         "operationId": "get_features_api_v1_features_get",
         "responses": {
           "200": {
@@ -153,7 +135,7 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/files/list-files": {
+    "/api/v1/conversations/{conversation_id}/files/list-files": {
       "get": {
         "tags": [
           "v1",
@@ -161,12 +143,7 @@
         ],
         "summary": "List Files",
         "description": "List files in the specified path.",
-        "operationId": "list_files_api_conversations__conversation_id__files_list_files_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "list_files_api_v1_conversations__conversation_id__files_list_files_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -196,19 +173,17 @@
             "description": "Optional path to list files from"
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -240,20 +215,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/files/select-file": {
+    "/api/v1/conversations/{conversation_id}/files/select-file": {
       "get": {
         "tags": [
           "v1",
           "files"
         ],
         "summary": "Select File",
-        "description": "Retrieve the content of a specified file.\n\nTo select a file:",
-        "operationId": "select_file_api_conversations__conversation_id__files_select_file_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Retrieve the content of a specified file.\n\nTo select a file:\n```sh\ncurl http://localhost:3000/api/conversations/{conversation_id}select-file?file=<file_path>\n```\n\nArgs:\n    file (str): The path of the file to be retrieved.\n        Expect path to be absolute inside the runtime.\n    conversation (ServerConversation): The conversation object containing runtime information.\n\nReturns:\n    dict: A dictionary containing the file content.\n\nRaises:\n    HTTPException: If there's an error opening the file.",
+        "operationId": "select_file_api_v1_conversations__conversation_id__files_select_file_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -276,19 +246,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -302,7 +270,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response 200 Select File Api Conversations  Conversation Id  Files Select File Get"
+                  "title": "Response 200 Select File Api V1 Conversations  Conversation Id  Files Select File Get"
                 }
               }
             }
@@ -314,7 +282,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 500 Select File Api Conversations  Conversation Id  Files Select File Get"
+                  "title": "Response 500 Select File Api V1 Conversations  Conversation Id  Files Select File Get"
                 }
               }
             }
@@ -326,7 +294,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 415 Select File Api Conversations  Conversation Id  Files Select File Get"
+                  "title": "Response 415 Select File Api V1 Conversations  Conversation Id  Files Select File Get"
                 }
               }
             }
@@ -344,20 +312,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/files/zip-directory": {
+    "/api/v1/conversations/{conversation_id}/files/zip-directory": {
       "get": {
         "tags": [
           "v1",
           "files"
         ],
         "summary": "Zip Current Workspace",
-        "description": "Zip the current workspace and return it as a downloadable file.",
-        "operationId": "zip_current_workspace_api_conversations__conversation_id__files_zip_directory_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Zip the current workspace and return it as a downloadable file.\n\nArgs:\n    conversation (ServerConversation): The conversation object containing runtime information.\n\nReturns:\n    FileResponse: A file response containing the zipped workspace.\n    JSONResponse: An error response if zipping fails.",
+        "operationId": "zip_current_workspace_api_v1_conversations__conversation_id__files_zip_directory_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -369,19 +332,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -401,7 +362,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 500 Zip Current Workspace Api Conversations  Conversation Id  Files Zip Directory Get"
+                  "title": "Response 500 Zip Current Workspace Api V1 Conversations  Conversation Id  Files Zip Directory Get"
                 }
               }
             }
@@ -419,20 +380,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/files/git/changes": {
+    "/api/v1/conversations/{conversation_id}/files/git/changes": {
       "get": {
         "tags": [
           "v1",
           "files"
         ],
         "summary": "Git Changes",
-        "description": "Get list of git-tracked file changes in the workspace.\n\nRetrieves the conversation's runtime and queries it for modified files\ncompared to the git repository. Returns empty list if not a git repository\nor if git is unavailable in the runtime container.",
-        "operationId": "git_changes_api_conversations__conversation_id__files_git_changes_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Get list of git-tracked file changes in the workspace.\n\nRetrieves the conversation's runtime and queries it for modified files\ncompared to the git repository. Returns empty list if not a git repository\nor if git is unavailable in the runtime container.\n\nArgs:\n    conversation_id: Conversation identifier to query runtime\n\nReturns:\n    list[dict[str, str]]: List of changed file dictionaries with metadata, or\n    JSONResponse with error details if operation fails\n\nRaises:\n    HTTPException: If runtime is unavailable or operation fails\n\nExample:\n    GET /api/conversations/{conversation_id}/files/git/changes\n    Response: [{\"path\": \"src/main.py\", \"status\": \"modified\"}, ...]",
+        "operationId": "git_changes_api_v1_conversations__conversation_id__files_git_changes_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -472,20 +428,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/files/git/diff": {
+    "/api/v1/conversations/{conversation_id}/files/git/diff": {
       "get": {
         "tags": [
           "v1",
           "files"
         ],
         "summary": "Git Diff",
-        "description": "Get git diff for a specific path in the workspace.",
-        "operationId": "git_diff_api_conversations__conversation_id__files_git_diff_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Get git diff for a specific path in the workspace.\n\nArgs:\n    path (str): The path to get the git diff for.\n    conversation_store (Any): The conversation store for persistence.\n    conversation (ServerConversation): The conversation object containing runtime information.\n\nReturns:\n    dict[str, Any]: A dictionary containing the git diff information.\n    JSONResponse: An error response if git operations fail.",
+        "operationId": "git_diff_api_v1_conversations__conversation_id__files_git_diff_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -508,19 +459,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -549,20 +498,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/files/upload-files": {
+    "/api/v1/conversations/{conversation_id}/files/upload-files": {
       "post": {
         "tags": [
           "v1",
           "files"
         ],
         "summary": "Upload Files",
-        "description": "Upload files to the workspace.",
-        "operationId": "upload_files_api_conversations__conversation_id__files_upload_files_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Upload files to the workspace.\n\nArgs:\n    files (list[UploadFile]): The list of files to upload.\n    conversation (ServerConversation): The conversation object containing runtime information.\n\nReturns:\n    JSONResponse: A response containing lists of uploaded and skipped files.",
+        "operationId": "upload_files_api_v1_conversations__conversation_id__files_upload_files_post",
         "parameters": [
           {
             "name": "conversation_id",
@@ -574,19 +518,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -595,7 +537,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_files_api_conversations__conversation_id__files_upload_files_post"
+                "$ref": "#/components/schemas/Body_upload_files_api_v1_conversations__conversation_id__files_upload_files_post"
               }
             }
           }
@@ -624,20 +566,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/feedback/submit-feedback": {
+    "/api/v1/conversations/{conversation_id}/feedback/submit-feedback": {
       "post": {
         "tags": [
           "v1",
           "feedback"
         ],
         "summary": "Submit Feedback",
-        "description": "Submit user feedback with conversation trajectory.\n\nCaptures user feedback about a conversation session, including email,\nsystem version, permission preferences, sentiment polarity, and the\ncomplete conversation trajectory for analysis.",
-        "operationId": "submit_feedback_api_conversations__conversation_id__feedback_submit_feedback_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Submit user feedback with conversation trajectory.\n\nCaptures user feedback about a conversation session, including email,\nsystem version, permission preferences, sentiment polarity, and the\ncomplete conversation trajectory for analysis.\n\nArgs:\n    request: HTTP request containing JSON body with:\n        - email (str): User email address\n        - version (str): Application version being used\n        - permissions (str): Feedback sharing permission level (default: \"private\")\n        - polarity (str): Sentiment polarity (\"positive\", \"negative\", \"neutral\")\n        - feedback (str): Feedback text content\n    conversation: Server conversation dependency containing the event stream\n        for the current conversation session.\n\nReturns:\n    JSONResponse: Status 200 with stored feedback data on success:\n        {\n            \"email\": str,\n            \"version\": str,\n            \"permissions\": str,\n            \"polarity\": str,\n            \"feedback\": str,\n            \"trajectory\": list[dict],\n            \"created_at\": str (ISO format)\n        }\n\nRaises:\n    HTTPException: 500 Internal Server Error if feedback storage fails\n        or trajectory retrieval encounters an error.\n    JSONDecodeError: If request body is not valid JSON.\n\nExamples:\n    >>> curl -X POST http://localhost:3000/api/conversations/abc123/feedback/submit-feedback \\\\\n    ...     -H \"Content-Type: application/json\" \\\\\n    ...     -d '{\"email\": \"user@example.com\", \"version\": \"1.0.0\", \"polarity\": \"positive\"}'",
+        "operationId": "submit_feedback_api_v1_conversations__conversation_id__feedback_submit_feedback_post",
         "parameters": [
           {
             "name": "conversation_id",
@@ -649,19 +586,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -687,7 +622,7 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/simple-test": {
+    "/api/v1/conversations/{conversation_id}/simple-test": {
       "get": {
         "tags": [
           "v1",
@@ -695,7 +630,7 @@
         ],
         "summary": "Simple Test Endpoint",
         "description": "Simple test endpoint without any parameters.",
-        "operationId": "simple_test_endpoint_api_conversations__conversation_id__simple_test_get",
+        "operationId": "simple_test_endpoint_api_v1_conversations__conversation_id__simple_test_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -705,28 +640,18 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
-    "/api/conversations/{conversation_id}/config": {
+    "/api/v1/conversations/{conversation_id}/config": {
       "get": {
         "tags": [
           "v1",
           "conversations"
         ],
-        "summary": "Get Remote Runtime Config",
+        "summary": "Get Runtime Config",
         "description": "Retrieve the runtime configuration.\n\nCurrently, this is the session ID and runtime ID (if available).",
-        "operationId": "get_remote_runtime_config_api_conversations__conversation_id__config_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "get_runtime_config_api_v1_conversations__conversation_id__config_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -760,20 +685,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/git/changes": {
+    "/api/v1/conversations/{conversation_id}/web-hosts": {
       "get": {
         "tags": [
           "v1",
           "conversations"
         ],
-        "summary": "Get Git Changes",
-        "description": "Get git changes in the workspace.\n\nReturns the list of modified, added, and deleted files by running\n``git status --porcelain`` inside the conversation workspace.",
-        "operationId": "get_git_changes_api_conversations__conversation_id__git_changes_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "summary": "Get Hosts",
+        "description": "Get the hosts used by the runtime.\n\nThis endpoint allows getting the hosts used by the runtime.\n\nArgs:\n    request: The FastAPI request object.\n    conversation_id: The conversation ID.\n\nReturns:\n    JSONResponse: A JSON response indicating the success of the operation.",
+        "operationId": "get_hosts_api_v1_conversations__conversation_id__web_hosts_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -807,79 +727,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/git/diff": {
-      "get": {
-        "tags": [
-          "v1",
-          "conversations"
-        ],
-        "summary": "Get Git Diff",
-        "description": "Get git diff for a specific file.\n\nRuns ``git diff`` for the given file path inside the conversation workspace.",
-        "operationId": "get_git_diff_api_conversations__conversation_id__git_diff_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "conversation_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Conversation Id"
-            }
-          },
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "File path to get diff for",
-              "title": "Path"
-            },
-            "description": "File path to get diff for"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/conversations/{conversation_id}/events": {
+    "/api/v1/conversations/{conversation_id}/events": {
       "get": {
         "tags": [
           "v1",
           "conversations"
         ],
         "summary": "Search Events",
-        "description": "Search through the event stream with filtering and pagination.",
-        "operationId": "search_events_api_conversations__conversation_id__events_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Search through the event stream with filtering and pagination.\n\nArgs:\n    conversation_id: The conversation ID\n    start_id: Starting ID in the event stream. Defaults to 0\n    end_id: Ending ID in the event stream\n    reverse: Whether to retrieve events in reverse order. Defaults to False.\n    filter: Filter for events\n    limit: Maximum number of events to return. Must be between 1 and 100. Defaults to 20\n    metadata: Conversation metadata (injected by dependency)\n    user_id: User ID (injected by dependency)\n\nReturns:\n    dict: Dictionary containing:\n        - events: List of matching events\n        - has_more: Whether there are more matching events after this batch\nRaises:\n    HTTPException: If conversation is not found or access is denied\n    ValueError: If limit is less than 1 or greater than 100",
+        "operationId": "search_events_api_v1_conversations__conversation_id__events_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -955,19 +811,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -998,13 +852,8 @@
           "conversations"
         ],
         "summary": "Add Event",
-        "description": "Add an event to a conversation.",
-        "operationId": "add_event_api_conversations__conversation_id__events_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Add an event to a conversation.\n\nArgs:\n    request: The HTTP request containing event data.\n    conversation: The conversation to add the event to.\n\nReturns:\n    JSONResponse: Success response or error details.",
+        "operationId": "add_event_api_v1_conversations__conversation_id__events_post",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1016,19 +865,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1054,20 +901,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/events/raw": {
+    "/api/v1/conversations/{conversation_id}/events/raw": {
       "post": {
         "tags": [
           "v1",
           "conversations"
         ],
         "summary": "Add Event Raw",
-        "description": "Accept raw text/plain POSTs and forward them as a MessageAction.\n\nThis is a developer convenience so tools that have trouble building\n\nconversation. The raw body becomes the action args.content.",
-        "operationId": "add_event_raw_api_conversations__conversation_id__events_raw_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Accept raw text/plain POSTs and forward them as a MessageAction.\n\nThis is a developer convenience so tools that have trouble building\nJSON bodies (PowerShell curl, etc.) can still send messages to the\nconversation. The raw body becomes the action args.content.",
+        "operationId": "add_event_raw_api_v1_conversations__conversation_id__events_raw_post",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1096,19 +938,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1134,20 +974,15 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/playbooks": {
+    "/api/v1/conversations/{conversation_id}/playbooks": {
       "get": {
         "tags": [
           "v1",
           "conversations"
         ],
         "summary": "Get Playbooks",
-        "description": "Get all playbooks associated with the conversation.\n\nThis endpoint returns all repository and knowledge playbooks that are loaded for the conversation.",
-        "operationId": "get_playbooks_api_conversations__conversation_id__playbooks_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Get all playbooks associated with the conversation.\n\nThis endpoint returns all repository and knowledge playbooks that are loaded for the conversation.\n\nArgs:\n    conversation: Server conversation dependency\n\nReturns:\n    JSON response containing the list of playbooks",
+        "operationId": "get_playbooks_api_v1_conversations__conversation_id__playbooks_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1159,19 +994,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1197,7 +1030,7 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/completions": {
+    "/api/v1/conversations/{conversation_id}/completions": {
       "post": {
         "tags": [
           "v1",
@@ -1205,12 +1038,7 @@
         ],
         "summary": "Get Code Completion",
         "description": "Get code completion suggestions for the current position in a file.\n\nDelegates all resilience logic (circuit breaker, retry, budget, security,\nanti-hallucination) to ``CompletionService``.",
-        "operationId": "get_code_completion_api_conversations__conversation_id__completions_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "get_code_completion_api_v1_conversations__conversation_id__completions_post",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1222,19 +1050,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1272,7 +1098,7 @@
         }
       }
     },
-    "/api/conversations": {
+    "/api/v1/conversations": {
       "post": {
         "tags": [
           "v1",
@@ -1280,22 +1106,20 @@
         ],
         "summary": "New Conversation",
         "description": "Initialize a new session or join an existing one.",
-        "operationId": "new_conversation_api_conversations_post",
+        "operationId": "new_conversation_api_v1_conversations_post",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1337,7 +1161,7 @@
         ],
         "summary": "Search Conversations Route",
         "description": "HTTP endpoint to paginate conversation metadata with optional filters.",
-        "operationId": "search_conversations_route_api_conversations_get",
+        "operationId": "search_conversations_route_api_v1_conversations_get",
         "parameters": [
           {
             "name": "page_id",
@@ -1428,9 +1252,31 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "v1",
+          "conversations"
+        ],
+        "summary": " Delete All Conversations Route",
+        "description": "Delete all conversations for the user.",
+        "operationId": "_delete_all_conversations_route_api_v1_conversations_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean",
+                  "title": "Response  Delete All Conversations Route Api V1 Conversations Delete"
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "/api/conversations/test": {
+    "/api/v1/conversations/test": {
       "get": {
         "tags": [
           "v1",
@@ -1438,7 +1284,7 @@
         ],
         "summary": "Test Conversations Endpoint",
         "description": "Test endpoint to verify routing is working.",
-        "operationId": "test_conversations_endpoint_api_conversations_test_get",
+        "operationId": "test_conversations_endpoint_api_v1_conversations_test_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1451,7 +1297,7 @@
         }
       }
     },
-    "/api/conversations/simple": {
+    "/api/v1/conversations/simple": {
       "get": {
         "tags": [
           "v1",
@@ -1459,7 +1305,7 @@
         ],
         "summary": "Simple Conversations Endpoint",
         "description": "Simple endpoint without dependencies to test routing.",
-        "operationId": "simple_conversations_endpoint_api_conversations_simple_get",
+        "operationId": "simple_conversations_endpoint_api_v1_conversations_simple_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1468,7 +1314,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Simple Conversations Endpoint Api Conversations Simple Get"
+                  "title": "Response Simple Conversations Endpoint Api V1 Conversations Simple Get"
                 }
               }
             }
@@ -1476,14 +1322,14 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}": {
+    "/api/v1/conversations/{conversation_id}": {
       "get": {
         "tags": [
           "v1",
           "conversations"
         ],
         "summary": " Get Conversation Route",
-        "operationId": "_get_conversation_route_api_conversations__conversation_id__get",
+        "operationId": "_get_conversation_route_api_v1_conversations__conversation_id__get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1522,7 +1368,7 @@
           "conversations"
         ],
         "summary": " Delete Conversation Route",
-        "operationId": "_delete_conversation_route_api_conversations__conversation_id__delete",
+        "operationId": "_delete_conversation_route_api_v1_conversations__conversation_id__delete",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1541,7 +1387,7 @@
               "application/json": {
                 "schema": {
                   "type": "boolean",
-                  "title": "Response  Delete Conversation Route Api Conversations  Conversation Id  Delete"
+                  "title": "Response  Delete Conversation Route Api V1 Conversations  Conversation Id  Delete"
                 }
               }
             }
@@ -1565,7 +1411,7 @@
         ],
         "summary": "Update Conversation",
         "description": "Update conversation metadata (title).",
-        "operationId": "update_conversation_api_conversations__conversation_id__patch",
+        "operationId": "update_conversation_api_v1_conversations__conversation_id__patch",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1577,19 +1423,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1610,7 +1454,7 @@
               "application/json": {
                 "schema": {
                   "type": "boolean",
-                  "title": "Response Update Conversation Api Conversations  Conversation Id  Patch"
+                  "title": "Response Update Conversation Api V1 Conversations  Conversation Id  Patch"
                 }
               }
             }
@@ -1628,7 +1472,7 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/remember-prompt": {
+    "/api/v1/conversations/{conversation_id}/remember-prompt": {
       "get": {
         "tags": [
           "v1",
@@ -1636,7 +1480,7 @@
         ],
         "summary": "Get Prompt",
         "description": "Generate a prompt for remembering conversation context at specific event.",
-        "operationId": "get_prompt_api_conversations__conversation_id__remember_prompt_get",
+        "operationId": "get_prompt_api_v1_conversations__conversation_id__remember_prompt_get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1657,19 +1501,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1695,7 +1537,7 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/start": {
+    "/api/v1/conversations/{conversation_id}/start": {
       "post": {
         "tags": [
           "v1",
@@ -1703,7 +1545,7 @@
         ],
         "summary": "Start Conversation",
         "description": "Start an agent loop for a conversation.",
-        "operationId": "start_conversation_api_conversations__conversation_id__start_post",
+        "operationId": "start_conversation_api_v1_conversations__conversation_id__start_post",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1715,19 +1557,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1763,7 +1603,7 @@
         }
       }
     },
-    "/api/conversations/{conversation_id}/stop": {
+    "/api/v1/conversations/{conversation_id}/stop": {
       "post": {
         "tags": [
           "v1",
@@ -1771,7 +1611,7 @@
         ],
         "summary": "Stop Conversation",
         "description": "Stop an agent loop for a conversation.",
-        "operationId": "stop_conversation_api_conversations__conversation_id__stop_post",
+        "operationId": "stop_conversation_api_v1_conversations__conversation_id__stop_post",
         "parameters": [
           {
             "name": "conversation_id",
@@ -1783,19 +1623,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1821,7 +1659,7 @@
         }
       }
     },
-    "/api/playbook-management/conversations": {
+    "/api/v1/playbook-management/conversations": {
       "get": {
         "tags": [
           "v1",
@@ -1829,7 +1667,7 @@
         ],
         "summary": "Get Playbook Management Conversations",
         "description": "Get conversations for the playbook management page with pagination.",
-        "operationId": "get_playbook_management_conversations_api_playbook_management_conversations_get",
+        "operationId": "get_playbook_management_conversations_api_v1_playbook_management_conversations_get",
         "parameters": [
           {
             "name": "selected_repository",
@@ -1865,22 +1703,6 @@
               "default": 20,
               "title": "Limit"
             }
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
           }
         ],
         "responses": {
@@ -1888,7 +1710,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Playbook Management Conversations Api V1 Playbook Management Conversations Get"
+                }
               }
             }
           },
@@ -1905,35 +1729,28 @@
         }
       }
     },
-    "/api/settings": {
+    "/api/v1/settings": {
       "get": {
         "tags": [
           "v1",
           "settings"
         ],
         "summary": "Load Settings",
-        "description": "Load user settings with token status information.\n\n\ud83d\ude80 PERFORMANCE OPTIMIZED: 60s cache with proper per-user key for 2-3x improvement.\n   - Increased TTL from 30s to 60s\n   - Fixed cache key to use user_id instead of settings_hash\n   - Expected: 1,295ms \u2192 ~300-500ms for 10 concurrent users",
-        "operationId": "load_settings_api_settings_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Load user settings with token status information.\n\n\ud83d\ude80 PERFORMANCE OPTIMIZED: 60s cache with proper per-user key for 2-3x improvement.\n   - Increased TTL from 30s to 60s\n   - Fixed cache key to use user_id instead of settings_hash\n   - Expected: 1,295ms \u2192 ~300-500ms for 10 concurrent users\n\nArgs:\n    provider_tokens: Provider tokens dependency\n    settings_store: Settings store dependency\n    settings: User settings dependency\n    secrets_store: Secrets store dependency\n    user_id: User ID (None for single-tenant, defaults to 'default')\n\nReturns:\n    Settings model or error response",
+        "operationId": "load_settings_api_v1_settings_get",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -1985,28 +1802,21 @@
           "settings"
         ],
         "summary": "Store Settings",
-        "description": "Store user settings with clean, secure API key handling.\n\nUses the new APIKeyManager for secure, provider-aware API key validation and storage.",
-        "operationId": "store_settings_api_settings_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Store user settings with clean, secure API key handling.\n\nUses the new APIKeyManager for secure, provider-aware API key validation and storage.\n\nArgs:\n    settings: Settings to store\n    settings_store: Settings storage dependency\n\nReturns:\n    JSON response with success/error message",
+        "operationId": "store_settings_api_v1_settings_post",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2028,7 +1838,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 200 Store Settings Api Settings Post"
+                  "title": "Response 200 Store Settings Api V1 Settings Post"
                 }
               }
             }
@@ -2040,180 +1850,8 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response 500 Store Settings Api Settings Post"
+                  "title": "Response 500 Store Settings Api V1 Settings Post"
                 }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/add-git-providers": {
-      "post": {
-        "tags": [
-          "v1",
-          "secrets"
-        ],
-        "summary": "Store Provider Tokens",
-        "description": "Store or update git provider authentication tokens.\n\nValidates and stores provider tokens (GitHub).",
-        "operationId": "store_provider_tokens_api_add_git_providers_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/POSTProviderModel"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/unset-provider-tokens": {
-      "post": {
-        "tags": [
-          "v1",
-          "secrets"
-        ],
-        "summary": "Unset Provider Tokens",
-        "description": "Remove all git provider authentication tokens.",
-        "operationId": "unset_provider_tokens_api_unset_provider_tokens_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/secrets": {
-      "get": {
-        "tags": [
-          "v1",
-          "secrets"
-        ],
-        "summary": "Load Custom Secrets Names",
-        "description": "Get list of custom secret names and descriptions (without values).",
-        "operationId": "load_custom_secrets_names_api_secrets_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
               }
             }
           },
@@ -2229,34 +1867,27 @@
           }
         }
       },
-      "post": {
+      "patch": {
         "tags": [
           "v1",
-          "secrets"
+          "settings"
         ],
-        "summary": "Create Custom Secret",
-        "description": "Create a new custom secret.",
-        "operationId": "create_custom_secret_api_secrets_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "summary": "Store Settings",
+        "description": "Store user settings with clean, secure API key handling.\n\nUses the new APIKeyManager for secure, provider-aware API key validation and storage.\n\nArgs:\n    settings: Settings to store\n    settings_store: Settings storage dependency\n\nReturns:\n    JSON response with success/error message",
+        "operationId": "store_settings_api_v1_settings_patch",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2265,10 +1896,67 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CustomSecretModel"
+                "$ref": "#/components/schemas/Settings"
               }
             }
           }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings patched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response 200 Store Settings Api V1 Settings Patch"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error patching settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response 500 Store Settings Api V1 Settings Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/add-git-providers": {
+      "post": {
+        "tags": [
+          "v1",
+          "secrets"
+        ],
+        "summary": "Store Provider Tokens",
+        "description": "Store or update git provider authentication tokens.\n\nValidates and stores provider tokens (GitHub).\n\nArgs:\n    provider_info: Provider information and tokens to store\n    secrets_store: Secrets storage dependency\n    provider_tokens: Existing provider tokens\n\nReturns:\n    JSON response with success/error message",
+        "operationId": "store_provider_tokens_api_v1_add_git_providers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/POSTProviderModel"
+              }
+            }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -2292,20 +1980,96 @@
         }
       }
     },
-    "/api/secrets/{secret_id}": {
+    "/api/v1/unset-provider-tokens": {
+      "post": {
+        "tags": [
+          "v1",
+          "secrets"
+        ],
+        "summary": "Unset Provider Tokens",
+        "description": "Remove all git provider authentication tokens.\n\nArgs:\n    secrets_store: Secrets storage dependency\n\nReturns:\n    JSON response with success/error message",
+        "operationId": "unset_provider_tokens_api_v1_unset_provider_tokens_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/secrets": {
+      "get": {
+        "tags": [
+          "v1",
+          "secrets"
+        ],
+        "summary": "Load Custom Secrets Names",
+        "description": "Get list of custom secret names and descriptions (without values).\n\nArgs:\n    user_secrets: User secrets dependency\n\nReturns:\n    List of custom secrets metadata or error response",
+        "operationId": "load_custom_secrets_names_api_v1_secrets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "v1",
+          "secrets"
+        ],
+        "summary": "Create Custom Secret",
+        "description": "Create a new custom secret.\n\nArgs:\n    incoming_secret: Secret data (name, value, description)\n    secrets_store: Secrets storage dependency\n\nReturns:\n    JSON response with success/error message",
+        "operationId": "create_custom_secret_api_v1_secrets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomSecretModel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/secrets/{secret_id}": {
       "put": {
         "tags": [
           "v1",
           "secrets"
         ],
         "summary": "Update Custom Secret",
-        "description": "Update an existing custom secret's name and/or description.\n\nSecret value is preserved. Allows renaming if new name doesn't conflict.",
-        "operationId": "update_custom_secret_api_secrets__secret_id__put",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Update an existing custom secret's name and/or description.\n\nSecret value is preserved. Allows renaming if new name doesn't conflict.\n\nArgs:\n    secret_id: ID of secret to update\n    incoming_secret: Updated name and description\n    secrets_store: Secrets storage dependency\n\nReturns:\n    JSON response with success/error message",
+        "operationId": "update_custom_secret_api_v1_secrets__secret_id__put",
         "parameters": [
           {
             "name": "secret_id",
@@ -2318,22 +2082,6 @@
               "title": "Secret Id"
             },
             "description": "Secret ID"
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
           }
         ],
         "requestBody": {
@@ -2373,13 +2121,8 @@
           "secrets"
         ],
         "summary": "Delete Custom Secret",
-        "description": "Delete a custom secret by ID.",
-        "operationId": "delete_custom_secret_api_secrets__secret_id__delete",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "description": "Delete a custom secret by ID.\n\nArgs:\n    secret_id: ID of secret to delete\n    secrets_store: Secrets storage dependency\n\nReturns:\n    JSON response with success/error message",
+        "operationId": "delete_custom_secret_api_v1_secrets__secret_id__delete",
         "parameters": [
           {
             "name": "secret_id",
@@ -2392,22 +2135,6 @@
               "title": "Secret Id"
             },
             "description": "Secret ID"
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
           }
         ],
         "responses": {
@@ -2432,7 +2159,7 @@
         }
       }
     },
-    "/api/memory/": {
+    "/api/v1/memory/": {
       "get": {
         "tags": [
           "v1",
@@ -2440,22 +2167,20 @@
         ],
         "summary": "List Memories",
         "description": "List all memories for the current user.",
-        "operationId": "list_memories_api_memory__get",
+        "operationId": "list_memories_api_v1_memory__get",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2470,7 +2195,7 @@
                     "type": "object",
                     "additionalProperties": true
                   },
-                  "title": "Response List Memories Api Memory  Get"
+                  "title": "Response List Memories Api V1 Memory  Get"
                 }
               }
             }
@@ -2494,22 +2219,20 @@
         ],
         "summary": "Create Memory",
         "description": "Create a new memory.",
-        "operationId": "create_memory_api_memory__post",
+        "operationId": "create_memory_api_v1_memory__post",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2531,7 +2254,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Create Memory Api Memory  Post"
+                  "title": "Response Create Memory Api V1 Memory  Post"
                 }
               }
             }
@@ -2549,7 +2272,7 @@
         }
       }
     },
-    "/api/memory/search": {
+    "/api/v1/memory/search": {
       "post": {
         "tags": [
           "v1",
@@ -2557,22 +2280,20 @@
         ],
         "summary": "Search Memories",
         "description": "Search memories based on criteria.",
-        "operationId": "search_memories_api_memory_search_post",
+        "operationId": "search_memories_api_v1_memory_search_post",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2597,7 +2318,7 @@
                     "type": "object",
                     "additionalProperties": true
                   },
-                  "title": "Response Search Memories Api Memory Search Post"
+                  "title": "Response Search Memories Api V1 Memory Search Post"
                 }
               }
             }
@@ -2615,7 +2336,7 @@
         }
       }
     },
-    "/api/memory/stats": {
+    "/api/v1/memory/stats": {
       "get": {
         "tags": [
           "v1",
@@ -2623,22 +2344,20 @@
         ],
         "summary": "Get Memory Stats",
         "description": "Get memory statistics.",
-        "operationId": "get_memory_stats_api_memory_stats_get",
+        "operationId": "get_memory_stats_api_v1_memory_stats_get",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2666,7 +2385,7 @@
         }
       }
     },
-    "/api/memory/{memory_id}/track-usage": {
+    "/api/v1/memory/{memory_id}/track-usage": {
       "post": {
         "tags": [
           "v1",
@@ -2674,7 +2393,7 @@
         ],
         "summary": "Track Memory Usage",
         "description": "Track memory usage (increment usage count and update last used).",
-        "operationId": "track_memory_usage_api_memory__memory_id__track_usage_post",
+        "operationId": "track_memory_usage_api_v1_memory__memory_id__track_usage_post",
         "parameters": [
           {
             "name": "memory_id",
@@ -2686,19 +2405,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2710,7 +2427,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Track Memory Usage Api Memory  Memory Id  Track Usage Post"
+                  "title": "Response Track Memory Usage Api V1 Memory  Memory Id  Track Usage Post"
                 }
               }
             }
@@ -2728,7 +2445,7 @@
         }
       }
     },
-    "/api/memory/export": {
+    "/api/v1/memory/export": {
       "get": {
         "tags": [
           "v1",
@@ -2736,22 +2453,20 @@
         ],
         "summary": "Export Memories",
         "description": "Export all memories to JSON.",
-        "operationId": "export_memories_api_memory_export_get",
+        "operationId": "export_memories_api_v1_memory_export_get",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2763,7 +2478,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Export Memories Api Memory Export Get"
+                  "title": "Response Export Memories Api V1 Memory Export Get"
                 }
               }
             }
@@ -2781,7 +2496,7 @@
         }
       }
     },
-    "/api/memory/import": {
+    "/api/v1/memory/import": {
       "post": {
         "tags": [
           "v1",
@@ -2789,7 +2504,7 @@
         ],
         "summary": "Import Memories",
         "description": "Import memories from JSON file.",
-        "operationId": "import_memories_api_memory_import_post",
+        "operationId": "import_memories_api_v1_memory_import_post",
         "parameters": [
           {
             "name": "merge",
@@ -2802,19 +2517,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2838,7 +2551,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Import Memories Api Memory Import Post"
+                  "title": "Response Import Memories Api V1 Memory Import Post"
                 }
               }
             }
@@ -2856,7 +2569,7 @@
         }
       }
     },
-    "/api/memory/{memory_id}": {
+    "/api/v1/memory/{memory_id}": {
       "get": {
         "tags": [
           "v1",
@@ -2864,7 +2577,7 @@
         ],
         "summary": "Get Memory",
         "description": "Get a single memory by ID.",
-        "operationId": "get_memory_api_memory__memory_id__get",
+        "operationId": "get_memory_api_v1_memory__memory_id__get",
         "parameters": [
           {
             "name": "memory_id",
@@ -2879,19 +2592,17 @@
             "description": "Memory ID"
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2903,7 +2614,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Get Memory Api Memory  Memory Id  Get"
+                  "title": "Response Get Memory Api V1 Memory  Memory Id  Get"
                 }
               }
             }
@@ -2926,8 +2637,8 @@
           "memory"
         ],
         "summary": "Update Memory",
-        "description": "Update an existing memory.",
-        "operationId": "update_memory_api_memory__memory_id__patch",
+        "description": "Update an existing memory.\n\nArgs:\n    memory_id: Memory ID to update\n    updates: Update request\n    settings_store: Settings store dependency\n\nReturns:\n    Success status dict",
+        "operationId": "update_memory_api_v1_memory__memory_id__patch",
         "parameters": [
           {
             "name": "memory_id",
@@ -2942,19 +2653,17 @@
             "description": "Memory ID"
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -2976,7 +2685,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Update Memory Api Memory  Memory Id  Patch"
+                  "title": "Response Update Memory Api V1 Memory  Memory Id  Patch"
                 }
               }
             }
@@ -3000,7 +2709,7 @@
         ],
         "summary": "Delete Memory",
         "description": "Delete a memory.",
-        "operationId": "delete_memory_api_memory__memory_id__delete",
+        "operationId": "delete_memory_api_v1_memory__memory_id__delete",
         "parameters": [
           {
             "name": "memory_id",
@@ -3015,19 +2724,17 @@
             "description": "Memory ID"
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -3039,7 +2746,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Delete Memory Api Memory  Memory Id  Delete"
+                  "title": "Response Delete Memory Api V1 Memory  Memory Id  Delete"
                 }
               }
             }
@@ -3057,7 +2764,7 @@
         }
       }
     },
-    "/api/monitoring/health": {
+    "/api/v1/monitoring/health": {
       "get": {
         "tags": [
           "v1",
@@ -3065,7 +2772,7 @@
         ],
         "summary": "Get Health",
         "description": "Detailed health check for all system components.",
-        "operationId": "get_health_api_monitoring_health_get",
+        "operationId": "get_health_api_v1_monitoring_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3078,7 +2785,7 @@
         }
       }
     },
-    "/api/monitoring/metrics": {
+    "/api/v1/monitoring/metrics": {
       "get": {
         "tags": [
           "v1",
@@ -3086,7 +2793,7 @@
         ],
         "summary": "Get Metrics",
         "description": "JSON-formatted system and agent metrics.",
-        "operationId": "get_metrics_api_monitoring_metrics_get",
+        "operationId": "get_metrics_api_v1_monitoring_metrics_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3101,7 +2808,7 @@
         }
       }
     },
-    "/api/monitoring/cost-summary": {
+    "/api/v1/monitoring/cost-summary": {
       "get": {
         "tags": [
           "v1",
@@ -3109,7 +2816,7 @@
         ],
         "summary": "Get Cost Summary",
         "description": "Per-session cost and budget summary for all active conversations.\n\nReturns accumulated cost, budget limit, percentage used, and a\nlist of per-session cost breakdowns.  Useful for dashboards and\npreventing surprise bills.",
-        "operationId": "get_cost_summary_api_monitoring_cost_summary_get",
+        "operationId": "get_cost_summary_api_v1_monitoring_cost_summary_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3122,7 +2829,7 @@
         }
       }
     },
-    "/api/monitoring/metrics-prom": {
+    "/api/v1/monitoring/metrics-prom": {
       "get": {
         "tags": [
           "v1",
@@ -3130,7 +2837,7 @@
         ],
         "summary": "Get Prometheus Metrics",
         "description": "Prometheus-compatible metrics endpoint.",
-        "operationId": "get_prometheus_metrics_api_monitoring_metrics_prom_get",
+        "operationId": "get_prometheus_metrics_api_v1_monitoring_metrics_prom_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3145,7 +2852,7 @@
         }
       }
     },
-    "/api/monitoring/cache/stats": {
+    "/api/v1/monitoring/cache/stats": {
       "get": {
         "tags": [
           "v1",
@@ -3153,7 +2860,7 @@
         ],
         "summary": "Get Cache Stats",
         "description": "Statistics for internal caches.",
-        "operationId": "get_cache_stats_api_monitoring_cache_stats_get",
+        "operationId": "get_cache_stats_api_v1_monitoring_cache_stats_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3166,7 +2873,7 @@
         }
       }
     },
-    "/api/monitoring/failures/taxonomy": {
+    "/api/v1/monitoring/failures/taxonomy": {
       "get": {
         "tags": [
           "v1",
@@ -3174,7 +2881,7 @@
         ],
         "summary": "Get Failure Taxonomy",
         "description": "Distribution of failure types encountered by agents.",
-        "operationId": "get_failure_taxonomy_api_monitoring_failures_taxonomy_get",
+        "operationId": "get_failure_taxonomy_api_v1_monitoring_failures_taxonomy_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3187,7 +2894,7 @@
         }
       }
     },
-    "/api/monitoring/parallel/stats": {
+    "/api/v1/monitoring/parallel/stats": {
       "get": {
         "tags": [
           "v1",
@@ -3195,7 +2902,7 @@
         ],
         "summary": "Get Parallel Stats",
         "description": "Statistics for parallel execution features.",
-        "operationId": "get_parallel_stats_api_monitoring_parallel_stats_get",
+        "operationId": "get_parallel_stats_api_v1_monitoring_parallel_stats_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3208,7 +2915,7 @@
         }
       }
     },
-    "/api/monitoring/controller/{sid}/health": {
+    "/api/v1/monitoring/controller/{sid}/health": {
       "get": {
         "tags": [
           "v1",
@@ -3216,7 +2923,7 @@
         ],
         "summary": "Controller Health",
         "description": "Health status of a specific agent controller.",
-        "operationId": "controller_health_api_monitoring_controller__sid__health_get",
+        "operationId": "controller_health_api_v1_monitoring_controller__sid__health_get",
         "parameters": [
           {
             "name": "sid",
@@ -3250,7 +2957,7 @@
         }
       }
     },
-    "/api/monitoring/processes/health": {
+    "/api/v1/monitoring/processes/health": {
       "get": {
         "tags": [
           "v1",
@@ -3258,7 +2965,7 @@
         ],
         "summary": "Process Manager Health",
         "description": "Health status of the process manager.",
-        "operationId": "process_manager_health_api_monitoring_processes_health_get",
+        "operationId": "process_manager_health_api_v1_monitoring_processes_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3271,7 +2978,7 @@
         }
       }
     },
-    "/api/monitoring/event-stream/health": {
+    "/api/v1/monitoring/event-stream/health": {
       "get": {
         "tags": [
           "v1",
@@ -3279,7 +2986,7 @@
         ],
         "summary": "Event Stream Health",
         "description": "Aggregate EventStream backpressure and durability health across sessions.",
-        "operationId": "event_stream_health_api_monitoring_event_stream_health_get",
+        "operationId": "event_stream_health_api_v1_monitoring_event_stream_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3292,7 +2999,28 @@
         }
       }
     },
-    "/api/knowledge-base/collections": {
+    "/api/v1/monitoring/agent-metrics": {
+      "get": {
+        "tags": [
+          "v1",
+          "monitoring"
+        ],
+        "summary": "Get Agent Metrics",
+        "description": "Aggregate agent performance metrics across all active sessions.",
+        "operationId": "get_agent_metrics_api_v1_monitoring_agent_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge-base/collections": {
       "post": {
         "tags": [
           "v1",
@@ -3301,7 +3029,7 @@
         ],
         "summary": "Create Collection",
         "description": "Create a new knowledge base collection.",
-        "operationId": "create_collection_api_knowledge_base_collections_post",
+        "operationId": "create_collection_api_v1_knowledge_base_collections_post",
         "parameters": [
           {
             "name": "user_id",
@@ -3355,7 +3083,7 @@
         ],
         "summary": "List Collections",
         "description": "List all collections for the user.",
-        "operationId": "list_collections_api_knowledge_base_collections_get",
+        "operationId": "list_collections_api_v1_knowledge_base_collections_get",
         "parameters": [
           {
             "name": "user_id",
@@ -3378,7 +3106,7 @@
                   "items": {
                     "$ref": "#/components/schemas/CollectionResponse"
                   },
-                  "title": "Response List Collections Api Knowledge Base Collections Get"
+                  "title": "Response List Collections Api V1 Knowledge Base Collections Get"
                 }
               }
             }
@@ -3396,7 +3124,7 @@
         }
       }
     },
-    "/api/knowledge-base/collections/{collection_id}": {
+    "/api/v1/knowledge-base/collections/{collection_id}": {
       "get": {
         "tags": [
           "v1",
@@ -3405,7 +3133,7 @@
         ],
         "summary": "Get Collection",
         "description": "Get a collection by ID.",
-        "operationId": "get_collection_api_knowledge_base_collections__collection_id__get",
+        "operationId": "get_collection_api_v1_knowledge_base_collections__collection_id__get",
         "parameters": [
           {
             "name": "collection_id",
@@ -3458,7 +3186,7 @@
         ],
         "summary": "Update Collection",
         "description": "Update a collection.",
-        "operationId": "update_collection_api_knowledge_base_collections__collection_id__patch",
+        "operationId": "update_collection_api_v1_knowledge_base_collections__collection_id__patch",
         "parameters": [
           {
             "name": "collection_id",
@@ -3521,7 +3249,7 @@
         ],
         "summary": "Delete Collection",
         "description": "Delete a collection and all its documents.",
-        "operationId": "delete_collection_api_knowledge_base_collections__collection_id__delete",
+        "operationId": "delete_collection_api_v1_knowledge_base_collections__collection_id__delete",
         "parameters": [
           {
             "name": "collection_id",
@@ -3560,7 +3288,7 @@
         }
       }
     },
-    "/api/knowledge-base/collections/{collection_id}/documents": {
+    "/api/v1/knowledge-base/collections/{collection_id}/documents": {
       "post": {
         "tags": [
           "v1",
@@ -3569,7 +3297,7 @@
         ],
         "summary": "Upload Document",
         "description": "Upload a document to a collection.",
-        "operationId": "upload_document_api_knowledge_base_collections__collection_id__documents_post",
+        "operationId": "upload_document_api_v1_knowledge_base_collections__collection_id__documents_post",
         "parameters": [
           {
             "name": "collection_id",
@@ -3596,7 +3324,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_document_api_knowledge_base_collections__collection_id__documents_post"
+                "$ref": "#/components/schemas/Body_upload_document_api_v1_knowledge_base_collections__collection_id__documents_post"
               }
             }
           }
@@ -3632,7 +3360,7 @@
         ],
         "summary": "List Documents",
         "description": "List all documents in a collection.",
-        "operationId": "list_documents_api_knowledge_base_collections__collection_id__documents_get",
+        "operationId": "list_documents_api_v1_knowledge_base_collections__collection_id__documents_get",
         "parameters": [
           {
             "name": "collection_id",
@@ -3664,7 +3392,7 @@
                   "items": {
                     "$ref": "#/components/schemas/DocumentResponse"
                   },
-                  "title": "Response List Documents Api Knowledge Base Collections  Collection Id  Documents Get"
+                  "title": "Response List Documents Api V1 Knowledge Base Collections  Collection Id  Documents Get"
                 }
               }
             }
@@ -3682,7 +3410,7 @@
         }
       }
     },
-    "/api/knowledge-base/documents/{document_id}": {
+    "/api/v1/knowledge-base/documents/{document_id}": {
       "get": {
         "tags": [
           "v1",
@@ -3691,7 +3419,7 @@
         ],
         "summary": "Get Document",
         "description": "Get a document by ID.",
-        "operationId": "get_document_api_knowledge_base_documents__document_id__get",
+        "operationId": "get_document_api_v1_knowledge_base_documents__document_id__get",
         "parameters": [
           {
             "name": "document_id",
@@ -3744,7 +3472,7 @@
         ],
         "summary": "Delete Document",
         "description": "Delete a document.",
-        "operationId": "delete_document_api_knowledge_base_documents__document_id__delete",
+        "operationId": "delete_document_api_v1_knowledge_base_documents__document_id__delete",
         "parameters": [
           {
             "name": "document_id",
@@ -3783,7 +3511,7 @@
         }
       }
     },
-    "/api/knowledge-base/search": {
+    "/api/v1/knowledge-base/search": {
       "post": {
         "tags": [
           "v1",
@@ -3792,7 +3520,7 @@
         ],
         "summary": "Search Knowledge Base",
         "description": "Search the knowledge base.",
-        "operationId": "search_knowledge_base_api_knowledge_base_search_post",
+        "operationId": "search_knowledge_base_api_v1_knowledge_base_search_post",
         "parameters": [
           {
             "name": "user_id",
@@ -3825,7 +3553,7 @@
                   "items": {
                     "$ref": "#/components/schemas/SearchResultResponse"
                   },
-                  "title": "Response Search Knowledge Base Api Knowledge Base Search Post"
+                  "title": "Response Search Knowledge Base Api V1 Knowledge Base Search Post"
                 }
               }
             }
@@ -3843,7 +3571,7 @@
         }
       }
     },
-    "/api/knowledge-base/stats": {
+    "/api/v1/knowledge-base/stats": {
       "get": {
         "tags": [
           "v1",
@@ -3852,7 +3580,7 @@
         ],
         "summary": "Get Stats",
         "description": "Get knowledge base statistics.",
-        "operationId": "get_stats_api_knowledge_base_stats_get",
+        "operationId": "get_stats_api_v1_knowledge_base_stats_get",
         "parameters": [
           {
             "name": "user_id",
@@ -3873,7 +3601,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Get Stats Api Knowledge Base Stats Get"
+                  "title": "Response Get Stats Api V1 Knowledge Base Stats Get"
                 }
               }
             }
@@ -3891,7 +3619,7 @@
         }
       }
     },
-    "/api/knowledge-base/collections/{collection_id}/documents/bulk": {
+    "/api/v1/knowledge-base/collections/{collection_id}/documents/bulk": {
       "post": {
         "tags": [
           "v1",
@@ -3899,8 +3627,8 @@
           "knowledge-base"
         ],
         "summary": "Bulk Upload Documents",
-        "description": "Upload multiple documents to a collection in parallel.\n\nProcesses documents concurrently with bounded parallelism to improve\nthroughput while avoiding resource exhaustion. Returns detailed results\nfor each document including success/failure status.",
-        "operationId": "bulk_upload_documents_api_knowledge_base_collections__collection_id__documents_bulk_post",
+        "description": "Upload multiple documents to a collection in parallel.\n\nProcesses documents concurrently with bounded parallelism to improve\nthroughput while avoiding resource exhaustion. Returns detailed results\nfor each document including success/failure status.\n\nArgs:\n    collection_id: Target collection ID\n    files: List of files to upload\n    user_id: User identifier (default: \"default\")\n    max_concurrent: Maximum concurrent uploads (default: 5)\n\nReturns:\n    Standardized response with bulk upload results\n\nExample:\n    POST /api/knowledge-base/collections/{id}/documents/bulk\n    Files: [file1.txt, file2.md, file3.py]\n    Response: {\n        \"status\": \"ok\",\n        \"data\": {\n            \"total\": 3,\n            \"successful\": 2,\n            \"failed\": 1,\n            \"results\": [...]\n        }\n    }",
+        "operationId": "bulk_upload_documents_api_v1_knowledge_base_collections__collection_id__documents_bulk_post",
         "parameters": [
           {
             "name": "collection_id",
@@ -3937,7 +3665,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_bulk_upload_documents_api_knowledge_base_collections__collection_id__documents_bulk_post"
+                "$ref": "#/components/schemas/Body_bulk_upload_documents_api_v1_knowledge_base_collections__collection_id__documents_bulk_post"
               }
             }
           }
@@ -3948,7 +3676,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Bulk Upload Documents Api Knowledge Base Collections  Collection Id  Documents Bulk Post"
+                  "title": "Response Bulk Upload Documents Api V1 Knowledge Base Collections  Collection Id  Documents Bulk Post"
                 }
               }
             }
@@ -3966,7 +3694,7 @@
         }
       }
     },
-    "/api/templates/": {
+    "/api/v1/templates/": {
       "get": {
         "tags": [
           "v1",
@@ -3974,7 +3702,7 @@
         ],
         "summary": "List Templates",
         "description": "List all templates.",
-        "operationId": "list_templates_api_templates__get",
+        "operationId": "list_templates_api_v1_templates__get",
         "parameters": [
           {
             "name": "category",
@@ -4019,7 +3747,7 @@
                   "items": {
                     "$ref": "#/components/schemas/ConversationTemplate"
                   },
-                  "title": "Response List Templates Api Templates  Get"
+                  "title": "Response List Templates Api V1 Templates  Get"
                 }
               }
             }
@@ -4043,7 +3771,7 @@
         ],
         "summary": "Create Template",
         "description": "Create a new template.",
-        "operationId": "create_template_api_templates__post",
+        "operationId": "create_template_api_v1_templates__post",
         "requestBody": {
           "required": true,
           "content": {
@@ -4078,7 +3806,7 @@
         }
       }
     },
-    "/api/templates/{template_id}": {
+    "/api/v1/templates/{template_id}": {
       "get": {
         "tags": [
           "v1",
@@ -4086,7 +3814,7 @@
         ],
         "summary": "Get Template",
         "description": "Get a template.",
-        "operationId": "get_template_api_templates__template_id__get",
+        "operationId": "get_template_api_v1_templates__template_id__get",
         "parameters": [
           {
             "name": "template_id",
@@ -4131,7 +3859,7 @@
         ],
         "summary": "Update Template",
         "description": "Update a template.",
-        "operationId": "update_template_api_templates__template_id__patch",
+        "operationId": "update_template_api_v1_templates__template_id__patch",
         "parameters": [
           {
             "name": "template_id",
@@ -4186,7 +3914,7 @@
         ],
         "summary": "Delete Template",
         "description": "Delete a template.",
-        "operationId": "delete_template_api_templates__template_id__delete",
+        "operationId": "delete_template_api_v1_templates__template_id__delete",
         "parameters": [
           {
             "name": "template_id",
@@ -4218,7 +3946,7 @@
         }
       }
     },
-    "/api/templates/{template_id}/use": {
+    "/api/v1/templates/{template_id}/use": {
       "post": {
         "tags": [
           "v1",
@@ -4226,7 +3954,7 @@
         ],
         "summary": "Track Template Usage",
         "description": "Track template usage.",
-        "operationId": "track_template_usage_api_templates__template_id__use_post",
+        "operationId": "track_template_usage_api_v1_templates__template_id__use_post",
         "parameters": [
           {
             "name": "template_id",
@@ -4265,15 +3993,15 @@
         }
       }
     },
-    "/api/global-export/": {
+    "/api/v1/global-export/": {
       "get": {
         "tags": [
           "v1",
           "export"
         ],
         "summary": "Export All Data",
-        "description": "Export all user data as a downloadable JSON backup file.\n\nAggregates all memories, templates, and settings\ninto a single GlobalExportData structure and returns it as an HTTP\nattachment with timestamped filename for download.",
-        "operationId": "export_all_data_api_global_export__get",
+        "description": "Export all user data as a downloadable JSON backup file.\n\nAggregates all memories, templates, and settings\ninto a single GlobalExportData structure and returns it as an HTTP\nattachment with timestamped filename for download.\n\nReturns:\n    JSONResponse: Status 200 OK with:\n        - Content-Type: application/json\n        - Headers: Content-Disposition with timestamped filename\n        - Body: GlobalExportData model serialized to JSON\n\nRaises:\n    HTTPException: 500 Internal Server Error if data loading or\n        JSON serialization fails. Error detail included in response.\n\nExamples:\n    >>> curl -X GET http://localhost:3000/api/global-export/ \\\\\n    ...     -o forge_backup_20250106_143022.json",
+        "operationId": "export_all_data_api_v1_global_export__get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4291,8 +4019,8 @@
           "export"
         ],
         "summary": "Import All Data",
-        "description": "Import all user data from a backup file.\n\nRestores user data from a previously exported GlobalExportData structure.\nProcesses memories and templates in sequence,\ncreating new files or updating existing ones.",
-        "operationId": "import_all_data_api_global_export__post",
+        "description": "Import all user data from a backup file.\n\nRestores user data from a previously exported GlobalExportData structure.\nProcesses memories and templates in sequence,\ncreating new files or updating existing ones.\n\nArgs:\n    data: GlobalExportData containing collections of:\n        - memories (list[dict]): Memory entries\n        - templates (list[dict]): Document templates\n\nReturns:\n    dict[str, dict[str, int]]: Import results organized by category:\n    {\n        \"memories\": {\"imported\": int, \"updated\": int},\n        \"templates\": {\"imported\": int, \"updated\": int}\n    }\n\nRaises:\n    HTTPException: 500 Internal Server Error if import/save operations fail.\n\nExamples:\n    >>> curl -X POST http://localhost:3000/api/global-export/ \\\\\n    ...     -H \"Content-Type: application/json\" \\\\\n    ...     -d @forge_backup_20250106_143022.json",
+        "operationId": "import_all_data_api_v1_global_export__post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4316,7 +4044,7 @@
                     "type": "object"
                   },
                   "type": "object",
-                  "title": "Response Import All Data Api Global Export  Post"
+                  "title": "Response Import All Data Api V1 Global Export  Post"
                 }
               }
             }
@@ -4334,841 +4062,7 @@
         }
       }
     },
-    "/api/user/installations": {
-      "get": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Get User Installations",
-        "description": "Get user's installations/workspaces for the specified provider.",
-        "operationId": "get_user_installations_api_user_installations_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "provider",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/ProviderType"
-            }
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "title": "Response Get User Installations Api User Installations Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/user/repositories": {
-      "get": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Get User Repositories",
-        "description": "Get user's repositories from git provider.",
-        "operationId": "get_user_repositories_api_user_repositories_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "sort",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "pushed",
-              "title": "Sort"
-            }
-          },
-          {
-            "name": "selected_provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ProviderType"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Selected Provider"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Page"
-            }
-          },
-          {
-            "name": "per_page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Per Page"
-            }
-          },
-          {
-            "name": "installation_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Installation Id"
-            }
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Repository"
-                  },
-                  "title": "Response Get User Repositories Api User Repositories Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/user/info": {
-      "get": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Get User",
-        "description": "Get authenticated user information from git provider.",
-        "operationId": "get_user_api_user_info_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/user/search/repositories": {
-      "get": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Search Repositories",
-        "description": "Search repositories from GitHub.",
-        "operationId": "search_repositories_api_user_search_repositories_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "query",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Search query",
-              "title": "Query"
-            },
-            "description": "Search query"
-          },
-          {
-            "name": "per_page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 5,
-              "title": "Per Page"
-            }
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "stars",
-              "title": "Sort"
-            }
-          },
-          {
-            "name": "order",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "desc",
-              "title": "Order"
-            }
-          },
-          {
-            "name": "selected_provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ProviderType"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Selected Provider"
-            }
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Repository"
-                  },
-                  "title": "Response Search Repositories Api User Search Repositories Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/user/search/branches": {
-      "get": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Search Branches",
-        "description": "Search branches in a repository.",
-        "operationId": "search_branches_api_user_search_branches_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "repository",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Repository name (owner/repo)",
-              "title": "Repository"
-            },
-            "description": "Repository name (owner/repo)"
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Branch search query",
-              "title": "Query"
-            },
-            "description": "Branch search query"
-          },
-          {
-            "name": "per_page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 30,
-              "title": "Per Page"
-            }
-          },
-          {
-            "name": "selected_provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ProviderType"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Selected Provider"
-            }
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Branch"
-                  },
-                  "title": "Response Search Branches Api User Search Branches Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/user/suggested-tasks": {
-      "get": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Get Suggested Tasks",
-        "description": "Get suggested tasks for the authenticated user from their GitHub repositories.",
-        "operationId": "get_suggested_tasks_api_user_suggested_tasks_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SuggestedTask"
-                  },
-                  "title": "Response Get Suggested Tasks Api User Suggested Tasks Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/user/repository/branches": {
-      "get": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Get Repository Branches",
-        "description": "Get branches for a repository.",
-        "operationId": "get_repository_branches_api_user_repository_branches_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "repository",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Repository name (owner/repo)",
-              "title": "Repository"
-            },
-            "description": "Repository name (owner/repo)"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 1,
-              "title": "Page"
-            }
-          },
-          {
-            "name": "per_page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 30,
-              "title": "Per Page"
-            }
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaginatedBranchesResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/user/repository/{repository_name}/playbooks": {
-      "get": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Get Repository Playbooks",
-        "description": "Scan the playbooks directory of a repository and return the list of playbooks.\n\nThe playbooks directory location depends on the actual repository name:\n- If actual repository name is \".Forge\": scans \"playbooks\" folder\n- Otherwise: scans \".Forge/playbooks\" folder",
-        "operationId": "get_repository_playbooks_api_user_repository__repository_name__playbooks_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "repository_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Repository name (owner/repo)",
-              "title": "Repository Name"
-            },
-            "description": "Repository name (owner/repo)"
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PlaybookResponse"
-                  },
-                  "title": "Response Get Repository Playbooks Api User Repository  Repository Name  Playbooks Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/user/repository/{repository_name}/playbooks/content": {
-      "get": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Get Repository Playbook Content",
-        "description": "Fetch the content of a specific playbook file from a repository.",
-        "operationId": "get_repository_playbook_content_api_user_repository__repository_name__playbooks_content_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "repository_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Repository name (owner/repo)",
-              "title": "Repository Name"
-            },
-            "description": "Repository name (owner/repo)"
-          },
-          {
-            "name": "file_path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Path to the playbook file within the repository",
-              "title": "File Path"
-            },
-            "description": "Path to the playbook file within the repository"
-          },
-          {
-            "name": "args",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlaybookContentResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/user/git/summarize_repository": {
-      "post": {
-        "tags": [
-          "v1",
-          "git"
-        ],
-        "summary": "Summarize Repository",
-        "description": "Generate summary of repository contents invoked via API request.",
-        "operationId": "summarize_repository_api_user_git_summarize_repository_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "summarize_request",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Summarize Request"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "title": "Response Summarize Repository Api User Git Summarize Repository Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/conversations/{conversation_id}/trajectory/": {
+    "/api/v1/conversations/{conversation_id}/trajectory/": {
       "get": {
         "tags": [
           "v1",
@@ -5176,12 +4070,7 @@
         ],
         "summary": "Get Trajectory",
         "description": "Get trajectory history for a conversation.\n\nSupports optional pagination via ``since_id`` (for reconnection-based\ndelta fetches) and ``limit`` (cap returned events).\n\nEvents are read from the conversation's file-backed event stream.",
-        "operationId": "get_trajectory_api_conversations__conversation_id__trajectory__get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
+        "operationId": "get_trajectory_api_v1_conversations__conversation_id__trajectory__get",
         "parameters": [
           {
             "name": "conversation_id",
@@ -5231,19 +4120,17 @@
             "description": "Max events to return"
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -5269,7 +4156,7 @@
         }
       }
     },
-    "/api/notifications": {
+    "/api/v1/notifications": {
       "get": {
         "tags": [
           "v1",
@@ -5277,8 +4164,8 @@
           "notifications"
         ],
         "summary": "List Notifications",
-        "description": "List notifications for the current user.",
-        "operationId": "list_notifications_api_notifications_get",
+        "description": "List notifications for the current user.\n\nArgs:\n    request: FastAPI request\n    user_id: User identifier (from dependency)\n    read: Filter by read status (None for all)\n    page: Page number\n    limit: Items per page\n\nReturns:\n    Paginated list of notifications",
+        "operationId": "list_notifications_api_v1_notifications_get",
         "parameters": [
           {
             "name": "read",
@@ -5322,19 +4209,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -5360,7 +4245,7 @@
         }
       }
     },
-    "/api/notifications/unread-count": {
+    "/api/v1/notifications/unread-count": {
       "get": {
         "tags": [
           "v1",
@@ -5368,23 +4253,21 @@
           "notifications"
         ],
         "summary": "Get Unread Count",
-        "description": "Get unread notification count.",
-        "operationId": "get_unread_count_api_notifications_unread_count_get",
+        "description": "Get unread notification count.\n\nArgs:\n    request: FastAPI request\n    user_id: User identifier (from dependency)\n\nReturns:\n    Unread notification count",
+        "operationId": "get_unread_count_api_v1_notifications_unread_count_get",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -5410,7 +4293,7 @@
         }
       }
     },
-    "/api/notifications/{notification_id}": {
+    "/api/v1/notifications/{notification_id}": {
       "get": {
         "tags": [
           "v1",
@@ -5418,8 +4301,8 @@
           "notifications"
         ],
         "summary": "Get Notification",
-        "description": "Get a specific notification.",
-        "operationId": "get_notification_api_notifications__notification_id__get",
+        "description": "Get a specific notification.\n\nArgs:\n    request: FastAPI request\n    notification_id: Notification ID\n    user_id: User identifier (from dependency)\n\nReturns:\n    Notification details",
+        "operationId": "get_notification_api_v1_notifications__notification_id__get",
         "parameters": [
           {
             "name": "notification_id",
@@ -5431,19 +4314,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -5475,8 +4356,8 @@
           "notifications"
         ],
         "summary": "Delete Notification",
-        "description": "Delete a notification.",
-        "operationId": "delete_notification_api_notifications__notification_id__delete",
+        "description": "Delete a notification.\n\nArgs:\n    request: FastAPI request\n    notification_id: Notification ID\n    user_id: User identifier (from dependency)\n\nReturns:\n    Success message",
+        "operationId": "delete_notification_api_v1_notifications__notification_id__delete",
         "parameters": [
           {
             "name": "notification_id",
@@ -5491,19 +4372,17 @@
             "description": "Notification ID"
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -5529,7 +4408,7 @@
         }
       }
     },
-    "/api/notifications/{notification_id}/read": {
+    "/api/v1/notifications/{notification_id}/read": {
       "patch": {
         "tags": [
           "v1",
@@ -5537,8 +4416,8 @@
           "notifications"
         ],
         "summary": "Mark Notification As Read",
-        "description": "Mark a notification as read.",
-        "operationId": "mark_notification_as_read_api_notifications__notification_id__read_patch",
+        "description": "Mark a notification as read.\n\nArgs:\n    request: FastAPI request\n    notification_id: Notification ID\n    user_id: User identifier (from dependency)\n\nReturns:\n    Success message",
+        "operationId": "mark_notification_as_read_api_v1_notifications__notification_id__read_patch",
         "parameters": [
           {
             "name": "notification_id",
@@ -5550,19 +4429,17 @@
             }
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -5588,7 +4465,7 @@
         }
       }
     },
-    "/api/notifications/read-all": {
+    "/api/v1/notifications/read-all": {
       "patch": {
         "tags": [
           "v1",
@@ -5596,23 +4473,21 @@
           "notifications"
         ],
         "summary": "Mark All As Read",
-        "description": "Mark all notifications as read.",
-        "operationId": "mark_all_as_read_api_notifications_read_all_patch",
+        "description": "Mark all notifications as read.\n\nArgs:\n    request: FastAPI request\n    user_id: User identifier (from dependency)\n\nReturns:\n    Success message with count",
+        "operationId": "mark_all_as_read_api_v1_notifications_read_all_patch",
         "parameters": [
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -5638,7 +4513,7 @@
         }
       }
     },
-    "/api/search": {
+    "/api/v1/search": {
       "get": {
         "tags": [
           "v1",
@@ -5646,8 +4521,8 @@
           "search"
         ],
         "summary": "Global Search",
-        "description": "Global search across all resources.",
-        "operationId": "global_search_api_search_get",
+        "description": "Global search across all resources.\n\nArgs:\n    request: FastAPI request\n    q: Search query\n    type: Type of resources to search (conversations, files, all)\n    limit: Maximum results per type\n    user_id: User identifier (from dependency)\n    conversation_store: Conversation store (from dependency)\n\nReturns:\n    Search results",
+        "operationId": "global_search_api_v1_search_get",
         "parameters": [
           {
             "name": "q",
@@ -5688,19 +4563,17 @@
             "description": "Maximum results per type"
           },
           {
-            "name": "args",
+            "name": "request",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "Args"
-            }
-          },
-          {
-            "name": "kwargs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Kwargs"
+              "anyOf": [
+                {},
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request"
             }
           }
         ],
@@ -5777,14 +4650,31 @@
         }
       }
     },
-    "/api/debug/session/{session_id}": {
+    "/server_info": {
+      "get": {
+        "summary": "Get Server Info",
+        "description": "Expose system metrics gathered from runtime utilities.",
+        "operationId": "get_server_info_server_info_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/debug/session/{session_id}": {
       "get": {
         "tags": [
           "debug"
         ],
         "summary": "Session Debug",
         "description": "Return a diagnostic snapshot of a live session.",
-        "operationId": "session_debug_api_debug_session__session_id__get",
+        "operationId": "session_debug_api_v1_debug_session__session_id__get",
         "parameters": [
           {
             "name": "session_id",
@@ -5818,14 +4708,14 @@
         }
       }
     },
-    "/api/debug/sessions": {
+    "/api/v1/debug/sessions": {
       "get": {
         "tags": [
           "debug"
         ],
         "summary": "List Debug Sessions",
         "description": "List all active session IDs (debug only).",
-        "operationId": "list_debug_sessions_api_debug_sessions_get",
+        "operationId": "list_debug_sessions_api_v1_debug_sessions_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5869,7 +4759,7 @@
         ],
         "title": "AgentMetrics"
       },
-      "Body_bulk_upload_documents_api_knowledge_base_collections__collection_id__documents_bulk_post": {
+      "Body_bulk_upload_documents_api_v1_knowledge_base_collections__collection_id__documents_bulk_post": {
         "properties": {
           "files": {
             "items": {
@@ -5884,9 +4774,9 @@
         "required": [
           "files"
         ],
-        "title": "Body_bulk_upload_documents_api_knowledge_base_collections__collection_id__documents_bulk_post"
+        "title": "Body_bulk_upload_documents_api_v1_knowledge_base_collections__collection_id__documents_bulk_post"
       },
-      "Body_upload_document_api_knowledge_base_collections__collection_id__documents_post": {
+      "Body_upload_document_api_v1_knowledge_base_collections__collection_id__documents_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -5898,9 +4788,9 @@
         "required": [
           "file"
         ],
-        "title": "Body_upload_document_api_knowledge_base_collections__collection_id__documents_post"
+        "title": "Body_upload_document_api_v1_knowledge_base_collections__collection_id__documents_post"
       },
-      "Body_upload_files_api_conversations__conversation_id__files_upload_files_post": {
+      "Body_upload_files_api_v1_conversations__conversation_id__files_upload_files_post": {
         "properties": {
           "files": {
             "items": {
@@ -5915,47 +4805,7 @@
         "required": [
           "files"
         ],
-        "title": "Body_upload_files_api_conversations__conversation_id__files_upload_files_post"
-      },
-      "Branch": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Name",
-            "description": "Branch name"
-          },
-          "commit_sha": {
-            "type": "string",
-            "title": "Commit Sha",
-            "description": "SHA of the latest commit on this branch"
-          },
-          "protected": {
-            "type": "boolean",
-            "title": "Protected",
-            "description": "Whether the branch is protected"
-          },
-          "last_push_date": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Push Date",
-            "description": "ISO timestamp of the last push to this branch"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "commit_sha",
-          "protected"
-        ],
-        "title": "Branch",
-        "description": "Model representing a git branch."
+        "title": "Body_upload_files_api_v1_conversations__conversation_id__files_upload_files_post"
       },
       "CodeCompletionRequest": {
         "properties": {
@@ -6179,7 +5029,6 @@
           "suggested_task",
           "playbook_management",
           "external_api",
-          "remote_api_key",
           "unknown"
         ],
         "title": "ConversationTrigger",
@@ -6849,7 +5698,7 @@
                 "type": "null"
               }
             ],
-            "title": "Git User Name"
+            "title": "Vcs User Name"
           },
           "vcs_user_email": {
             "anyOf": [
@@ -6860,7 +5709,7 @@
                 "type": "null"
               }
             ],
-            "title": "Git User Email"
+            "title": "Vcs User Email"
           },
           "provider_tokens_set": {
             "anyOf": [
@@ -7102,40 +5951,40 @@
       },
       "MCPConfig": {
         "properties": {
-          "sse_servers": {
-            "items": {
-              "$ref": "#/components/schemas/MCPRemoteServerConfig"
-            },
-            "type": "array",
-            "title": "Sse Servers"
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
           },
-          "stdio_servers": {
+          "servers": {
             "items": {
-              "$ref": "#/components/schemas/MCPStdioServerConfig"
+              "$ref": "#/components/schemas/MCPServerConfig"
             },
             "type": "array",
-            "title": "Stdio Servers"
-          },
-          "shttp_servers": {
-            "items": {
-              "$ref": "#/components/schemas/MCPRemoteServerConfig"
-            },
-            "type": "array",
-            "title": "Shttp Servers"
+            "title": "Servers"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "MCPConfig",
-        "description": "Configuration for MCP (Message Control Protocol) settings.\n\nAttributes:\n    sse_servers: List of MCP SSE server configs\n    stdio_servers: List of MCP stdio server configs. These servers will be added to the MCP Router running inside runtime container.\n    shttp_servers: List of MCP HTTP server configs."
+        "description": "Configuration for MCP (Message Control Protocol) settings.\n\nAttributes:\n    enabled: Whether MCP is enabled\n    servers: List of MCP server configurations"
       },
-      "MCPRemoteServerConfig": {
+      "MCPServerConfig": {
         "properties": {
-          "url": {
+          "name": {
             "type": "string",
-            "title": "Url"
+            "title": "Name"
           },
-          "api_key": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "sse",
+              "shttp"
+            ],
+            "title": "Type"
+          },
+          "command": {
             "anyOf": [
               {
                 "type": "string"
@@ -7144,29 +5993,6 @@
                 "type": "null"
               }
             ],
-            "title": "Api Key"
-          },
-          "transport": {
-            "type": "string",
-            "title": "Transport",
-            "default": "sse"
-          }
-        },
-        "type": "object",
-        "required": [
-          "url"
-        ],
-        "title": "MCPRemoteServerConfig",
-        "description": "Configuration for remote MCP servers (SSE or HTTP).\n\nAttributes:\n    url: The server URL\n    api_key: Optional API key for authentication\n    transport: Transport type (sse or shttp)"
-      },
-      "MCPStdioServerConfig": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "command": {
-            "type": "string",
             "title": "Command"
           },
           "args": {
@@ -7182,15 +6008,46 @@
             },
             "type": "object",
             "title": "Env"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "sse",
+              "shttp"
+            ],
+            "title": "Transport",
+            "default": "sse"
           }
         },
         "type": "object",
         "required": [
           "name",
-          "command"
+          "type"
         ],
-        "title": "MCPStdioServerConfig",
-        "description": "Configuration for a MCP server that uses stdio.\n\nAttributes:\n    name: The name of the server\n    command: The command to run the server\n    args: The arguments to pass to the server\n    env: The environment variables to set for the server"
+        "title": "MCPServerConfig",
+        "description": "Unified configuration for MCP servers (stdio, SSE, or sHTTP).\n\nAttributes:\n    name: The server name (required for stdio, optional for remote)\n    type: Server type - stdio, sse, or shttp\n    command: Command to run (stdio only)\n    args: Arguments to pass to command (stdio only)\n    env: Environment variables (stdio only)\n    url: Server URL (sse and shttp only)\n    api_key: Optional API key (sse and shttp only)\n    transport: Transport protocol for shttp (sse or shttp, defaults to sse)"
       },
       "MemoryCategory": {
         "type": "string",
@@ -7278,15 +6135,6 @@
         ],
         "title": "MetricsResponse"
       },
-      "OwnerType": {
-        "type": "string",
-        "enum": [
-          "user",
-          "organization"
-        ],
-        "title": "OwnerType",
-        "description": "Owner type enumeration for repositories."
-      },
       "POSTProviderModel": {
         "properties": {
           "mcp_config": {
@@ -7335,120 +6183,6 @@
         ],
         "title": "POSTUploadFilesModel",
         "description": "Upload files response model."
-      },
-      "PaginatedBranchesResponse": {
-        "properties": {
-          "branches": {
-            "items": {
-              "$ref": "#/components/schemas/Branch"
-            },
-            "type": "array",
-            "title": "Branches",
-            "description": "List of branches in this page"
-          },
-          "has_next_page": {
-            "type": "boolean",
-            "title": "Has Next Page",
-            "description": "Whether there are more pages available"
-          },
-          "current_page": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Current Page",
-            "description": "Current page number (1-indexed)"
-          },
-          "per_page": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Per Page",
-            "description": "Number of items per page"
-          },
-          "total_count": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Total Count",
-            "description": "Total number of branches (if available)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "branches",
-          "has_next_page",
-          "current_page",
-          "per_page"
-        ],
-        "title": "PaginatedBranchesResponse",
-        "description": "Response model for paginated branch list."
-      },
-      "PlaybookContentResponse": {
-        "properties": {
-          "content": {
-            "type": "string",
-            "title": "Content"
-          },
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "triggers": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Triggers",
-            "default": []
-          },
-          "vcs_provider": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Git Provider"
-          }
-        },
-        "type": "object",
-        "required": [
-          "content",
-          "path"
-        ],
-        "title": "PlaybookContentResponse",
-        "description": "Response model for individual playbook content endpoint."
-      },
-      "PlaybookResponse": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "path",
-          "created_at"
-        ],
-        "title": "PlaybookResponse",
-        "description": "Response model for playbooks endpoint.\n\nNote: This model only includes basic metadata that can be determined\nwithout parsing playbook content. Use the separate content API\nto get detailed playbook information."
       },
       "ProviderToken": {
         "properties": {
@@ -7501,7 +6235,7 @@
           "enterprise_sso"
         ],
         "title": "ProviderType",
-        "description": "Git provider type enumeration."
+        "description": "Git provider type enumeration.\n\nKept as a single-member enum so that existing serialization round-trips\nand dictionary keys continue to work without code changes."
       },
       "ProvidersSetModel": {
         "properties": {
@@ -7523,100 +6257,6 @@
         "type": "object",
         "title": "ProvidersSetModel",
         "description": "Wrapper for optional provider list supplied when starting a conversation."
-      },
-      "Repository": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Id",
-            "description": "Repository ID"
-          },
-          "full_name": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Full Name",
-            "description": "Full repository name in format 'owner/repo'"
-          },
-          "vcs_provider": {
-            "$ref": "#/components/schemas/ProviderType",
-            "description": "Git provider type (GitHub)"
-          },
-          "is_public": {
-            "type": "boolean",
-            "title": "Is Public",
-            "description": "Whether the repository is public"
-          },
-          "stargazers_count": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stargazers Count",
-            "description": "Number of stars (if available)"
-          },
-          "link_header": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Link Header",
-            "description": "Link header for pagination (if available)"
-          },
-          "pushed_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pushed At",
-            "description": "ISO timestamp of last push (if available)"
-          },
-          "owner_type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OwnerType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Type of repository owner (user or organization)"
-          },
-          "main_branch": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Main Branch",
-            "description": "Name of the main/default branch"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "full_name",
-          "vcs_provider",
-          "is_public"
-        ],
-        "title": "Repository",
-        "description": "Model representing a git repository."
       },
       "SearchMemoriesRequest": {
         "properties": {
@@ -8107,7 +6747,7 @@
                 "type": "null"
               }
             ],
-            "title": "Git User Name"
+            "title": "Vcs User Name"
           },
           "vcs_user_email": {
             "anyOf": [
@@ -8118,7 +6758,7 @@
                 "type": "null"
               }
             ],
-            "title": "Git User Email"
+            "title": "Vcs User Email"
           }
         },
         "type": "object",
@@ -8163,7 +6803,7 @@
           "title"
         ],
         "title": "SuggestedTask",
-        "description": "Model representing a suggested task from a git provider."
+        "description": "Model representing a suggested task from a git provider.\n\nRetained for API compatibility. The ``get_prompt_for_task`` method returns\na simple string description since the Jinja2 templates were removed with\nthe GitHub integration layer."
       },
       "SystemMetrics": {
         "properties": {
@@ -8437,72 +7077,6 @@
         "title": "UpdateTemplateRequest",
         "description": "Request to update a template."
       },
-      "User": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Id",
-            "description": "User ID"
-          },
-          "login": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Login",
-            "description": "Username/login"
-          },
-          "avatar_url": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Avatar Url",
-            "description": "URL to user's avatar image"
-          },
-          "company": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Company",
-            "description": "User's company name"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name",
-            "description": "User's display name"
-          },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Email",
-            "description": "User's email address"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "login",
-          "avatar_url"
-        ],
-        "title": "User",
-        "description": "Model representing a user from a git provider."
-      },
       "UserSecrets-Input": {
         "properties": {
           "provider_tokens": {
@@ -8593,13 +7167,6 @@
         ],
         "title": "ValidationError"
       }
-    },
-    "securitySchemes": {
-      "APIKeyHeader": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-Session-API-Key"
-      }
     }
   },
   "tags": [
@@ -8622,16 +7189,6 @@
     {
       "name": "monitoring",
       "description": "Metrics and system health"
-    }
-  ],
-  "servers": [
-    {
-      "url": "https://api.forge.dev",
-      "description": "Production server"
-    },
-    {
-      "url": "http://localhost:3000",
-      "description": "Local server"
     }
   ]
 }

@@ -1,8 +1,4 @@
-"""Socket.IO authentication and connection-parameter validation.
-
-Extracted from ``listen_socket.py`` to keep each module focused on a
-single concern.
-"""
+"""Socket.IO connection-parameter parsing and validation helpers."""
 
 from __future__ import annotations
 
@@ -17,11 +13,7 @@ from backend.core.provider_types import ProviderType
 
 
 def parse_latest_event_id(query_params: dict[str, Any]) -> int:
-    """Parse ``latest_event_id`` from query parameters.
-
-    Handles ``"undefined"`` string from client, non-integer values,
-    and missing keys.
-    """
+    """Parse ``latest_event_id`` from query parameters."""
     latest_event_id_str = query_params.get("latest_event_id", [-1])[0]
     if latest_event_id_str == "undefined":
         return -1
@@ -45,19 +37,8 @@ def parse_providers_set(query_params: dict[str, Any]) -> list[ProviderType]:
     return [ProviderType(p) for p in providers_list]
 
 
-def validate_connection_params(
-    conversation_id: str | None,
-    query_params: dict[str, Any],
-    auth: dict[str, Any] | None = None,
-) -> None:
-    """Validate mandatory connection params.
-
-    Raises:
-        SocketIOConnectionRefusedError: on invalid / missing params.
-    """
+def validate_connection_params(conversation_id: str | None) -> None:
+    """Validate mandatory connection parameters."""
     if not conversation_id:
         logger.error("No conversation_id in query params")
         raise SocketIOConnectionRefusedError("No conversation_id in query params")
-
-
-

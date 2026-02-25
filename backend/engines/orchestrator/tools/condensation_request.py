@@ -1,4 +1,4 @@
-"""Tool for requesting conversation condensation within the CodeAct agent."""
+"""Tool for requesting conversation condensation within the Orchestrator agent."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ _CONDENSATION_REQUEST_DESCRIPTION = "Request a condensation of the conversation 
 
 
 def create_condensation_request_tool() -> ChatCompletionToolParam:
-    """Create the condensation request tool for the CodeAct agent."""
+    """Create the condensation request tool for the Orchestrator agent."""
     return create_tool_definition(
         name="request_condensation",
         description=_CONDENSATION_REQUEST_DESCRIPTION,

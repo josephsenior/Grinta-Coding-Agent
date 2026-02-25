@@ -20,7 +20,6 @@ class ConversationTrigger(str, Enum):
     SUGGESTED_TASK = "suggested_task"
     PLAYBOOK_MANAGEMENT = "playbook_management"
     EXTERNAL_API = "external_api"
-    REMOTE_API_KEY = "remote_api_key"
     UNKNOWN = "unknown"
 
 

@@ -223,33 +223,11 @@ class CommandAnalyzer:
 
         cmd = command.strip()
 
-        # Fast-path: explicit blocklist / allowlist
-        for cregex, raw in self._blocked_regex:
-            if cregex.search(cmd):
-                return (
-                    RiskCategory.CRITICAL,
-                    f"Custom blocked pattern: {raw}",
-                    ["This command matched a custom blocked pattern."],
-                )
+        blocked = _check_blocklist_allowlist(cmd, self._blocked_regex, self._blocked, self._allowed)
+        if blocked is not None:
+            return blocked
 
-        for prefix in self._blocked:
-            if cmd.startswith(prefix):
-                return (
-                    RiskCategory.CRITICAL,
-                    f"blocked by policy: {prefix}",
-                    ["This command is explicitly blocked by security policy."],
-                )
-        for prefix in self._allowed:
-            if cmd.startswith(prefix):
-                return RiskCategory.LOW, f"Whitelisted: {prefix}", []
-
-        # Detect command chaining / subshells — bump risk one tier.
-        # Be careful: plain "$VAR" expansions are common and should not
-        # automatically escalate risk.
         has_chaining = bool(re.search(r"(?:;|&&|\|\||\||&|`|\$\()", cmd))
-
-        # Walk tiers
-
         risk, reason, recs = self._match_tier(
             cmd, self._extra_critical + _CRITICAL_PATTERNS, RiskCategory.CRITICAL
         )
@@ -258,27 +236,20 @@ class CommandAnalyzer:
 
         risk, reason, recs = self._match_tier(cmd, _HIGH_PATTERNS, RiskCategory.HIGH)
         if risk == RiskCategory.HIGH:
-            if has_chaining:
-                return (
-                    RiskCategory.CRITICAL,
-                    f"{reason} (escalated: command chaining detected)",
-                    recs + ["Command chaining with high-risk operations is critical."],
-                )
-            return risk, reason, recs
+            return _escalate_if_chaining(
+                risk, reason, recs, has_chaining,
+                RiskCategory.CRITICAL,
+                "Command chaining with high-risk operations is critical.",
+            )
 
-        risk, reason, recs = self._match_tier(
-            cmd, _MEDIUM_PATTERNS, RiskCategory.MEDIUM
-        )
+        risk, reason, recs = self._match_tier(cmd, _MEDIUM_PATTERNS, RiskCategory.MEDIUM)
         if risk == RiskCategory.MEDIUM:
-            if has_chaining:
-                return (
-                    RiskCategory.HIGH,
-                    f"{reason} (escalated: command chaining detected)",
-                    recs + ["Review chained commands for unintended side-effects."],
-                )
-            return risk, reason, recs
+            return _escalate_if_chaining(
+                risk, reason, recs, has_chaining,
+                RiskCategory.HIGH,
+                "Review chained commands for unintended side-effects.",
+            )
 
-        # Default — LOW
         return RiskCategory.LOW, "no risk: no known risk patterns", []
 
     def analyze_command(self, command: str) -> CommandAssessment:
@@ -288,40 +259,14 @@ class CommandAnalyzer:
         convenience flags expected by integration tests.
         """
         risk, reason, recs = self.analyze(command)
-
         cmd = (command or "").strip()
         is_network = bool(
             re.search(r"\bcurl\b|\bwget\b|\bnc\b|\bscp\b|\brsync\b", cmd, re.I)
         )
         is_encoded = bool(re.search(r"\bbase64\b|\bxxd\b|\b\\x[0-9a-f]", cmd, re.I))
 
-        # Multi-layer heuristics: encoded/obfuscated commands are high risk even
-        # when they don't match a specific execution pattern.
-        if is_encoded and risk not in (RiskCategory.CRITICAL, RiskCategory.HIGH):
-            risk = RiskCategory.HIGH
-            if not reason:
-                reason = "encoded payload"
-
-        # Ensure the reason includes keywords used by integration tests.
-        reason_parts: list[str] = []
-        is_custom_block_reason = reason.startswith("Custom blocked pattern")
-        if risk == RiskCategory.CRITICAL:
-            if not is_custom_block_reason:
-                reason_parts.append("critical")
-        elif risk == RiskCategory.HIGH:
-            reason_parts.append("high-risk")
-        elif risk in (RiskCategory.LOW, RiskCategory.NONE):
-            # Keep consistent phrasing for safe commands
-            if "no risk" not in reason.lower():
-                reason_parts.append("no risk")
-
-        if is_network and "network" not in reason.lower():
-            reason_parts.append("network")
-        if is_encoded and "obfuscated" not in reason.lower():
-            reason_parts.append("obfuscated")
-
-        if reason_parts:
-            reason = f"{', '.join(reason_parts)}: {reason}" if reason else ", ".join(reason_parts)
+        risk, reason = _escalate_encoded_risk(risk, reason, is_encoded)
+        reason = _enrich_reason_with_keywords(risk, reason, is_network, is_encoded)
 
         return CommandAssessment(
             risk_category=risk,
@@ -330,10 +275,6 @@ class CommandAnalyzer:
             is_network_operation=is_network,
             is_encoded=is_encoded,
         )
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _match_tier(
@@ -347,6 +288,77 @@ class CommandAnalyzer:
                 recs = _RECOMMENDATIONS.get(tier, [])
                 return tier, description, recs
         return RiskCategory.NONE, "", []
+
+
+def _check_blocklist_allowlist(
+    cmd: str,
+    blocked_regex: list,
+    blocked: list,
+    allowed: list,
+) -> tuple[RiskCategory, str, list[str]] | None:
+    """Return (risk, reason, recs) if blocked/allowed, else None."""
+    for cregex, raw in blocked_regex:
+        if cregex.search(cmd):
+            return (
+                RiskCategory.CRITICAL,
+                f"Custom blocked pattern: {raw}",
+                ["This command matched a custom blocked pattern."],
+            )
+    for prefix in blocked:
+        if cmd.startswith(prefix):
+            return (
+                RiskCategory.CRITICAL,
+                f"blocked by policy: {prefix}",
+                ["This command is explicitly blocked by security policy."],
+            )
+    for prefix in allowed:
+        if cmd.startswith(prefix):
+            return RiskCategory.LOW, f"Whitelisted: {prefix}", []
+    return None
+
+
+def _escalate_if_chaining(
+    risk: RiskCategory,
+    reason: str,
+    recs: list[str],
+    has_chaining: bool,
+    escalated_tier: RiskCategory,
+    extra_rec: str,
+) -> tuple[RiskCategory, str, list[str]]:
+    """Escalate risk if chaining detected, else return unchanged."""
+    if not has_chaining:
+        return risk, reason, recs
+    return (
+        escalated_tier,
+        f"{reason} (escalated: command chaining detected)",
+        recs + [extra_rec],
+    )
+
+
+def _escalate_encoded_risk(
+    risk: RiskCategory, reason: str, is_encoded: bool
+) -> tuple[RiskCategory, str]:
+    """Escalate risk to HIGH if encoded and not already CRITICAL/HIGH."""
+    if not is_encoded or risk in (RiskCategory.CRITICAL, RiskCategory.HIGH):
+        return risk, reason
+    return RiskCategory.HIGH, reason or "encoded payload"
+
+
+def _enrich_reason_with_keywords(
+    risk: RiskCategory, reason: str, is_network: bool, is_encoded: bool
+) -> str:
+    """Prepend integration-test keywords. Simplified with rule list."""
+    rules: list[tuple[bool, str]] = [
+        (risk == RiskCategory.CRITICAL and not reason.startswith("Custom blocked pattern"), "critical"),
+        (risk == RiskCategory.HIGH, "high-risk"),
+        (risk in (RiskCategory.LOW, RiskCategory.NONE) and "no risk" not in reason.lower(), "no risk"),
+        (is_network and "network" not in reason.lower(), "network"),
+        (is_encoded and "obfuscated" not in reason.lower(), "obfuscated"),
+    ]
+    parts = [kw for cond, kw in rules if cond]
+    if not parts:
+        return reason
+    return f"{', '.join(parts)}: {reason}" if reason else ", ".join(parts)
 
 
 # ---------------------------------------------------------------------------

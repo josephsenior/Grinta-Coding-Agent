@@ -52,39 +52,45 @@ class TaskSignals:
     avg_observation_length: float = 0.0
 
 
+def _update_signals_from_event(sig: TaskSignals, ev: Event) -> tuple[int, int]:
+    """Update counts for one event. Returns (total_obs_len_delta, obs_count_delta)."""
+    from backend.events.action import CmdRunAction, MessageAction
+    from backend.events.action.agent import CondensationAction
+    from backend.events.event import EventSource
+    from backend.events.observation import ErrorObservation, Observation
+
+    obs_delta = 0
+    len_delta = 0
+    if isinstance(ev, ErrorObservation):
+        sig.error_count += 1
+    if isinstance(ev, MessageAction) and ev.source == EventSource.USER:
+        sig.user_message_count += 1
+    if isinstance(ev, CmdRunAction):
+        sig.cmd_run_count += 1
+    if isinstance(ev, CondensationAction):
+        sig.condensation_count += 1
+    if type(ev).__name__ == "FileEditAction":
+        sig.code_edit_count += 1
+    if isinstance(ev, Observation):
+        len_delta = len(ev.content)
+        obs_delta = 1
+    return (len_delta, obs_delta)
+
+
 def compute_signals(events: list[Event]) -> TaskSignals:
     """Compute :class:`TaskSignals` from a list of events.
 
     Import-safe: only uses ``isinstance`` against classes that are always
     available at this layer.
     """
-    from backend.events.action import CmdRunAction, MessageAction
-    from backend.events.action.agent import CondensationAction
-    from backend.events.event import EventSource
-    from backend.events.observation import ErrorObservation, Observation
-
     sig = TaskSignals(total_events=len(events))
     total_obs_len = 0
     obs_count = 0
 
     for ev in events:
-        if isinstance(ev, ErrorObservation):
-            sig.error_count += 1
-        if isinstance(ev, MessageAction) and ev.source == EventSource.USER:
-            sig.user_message_count += 1
-        if isinstance(ev, CmdRunAction):
-            sig.cmd_run_count += 1
-        if isinstance(ev, CondensationAction):
-            sig.condensation_count += 1
-
-        # FileEditAction may not always be importable — use duck typing
-        cls_name = type(ev).__name__
-        if cls_name == "FileEditAction":
-            sig.code_edit_count += 1
-
-        if isinstance(ev, Observation):
-            total_obs_len += len(ev.content)
-            obs_count += 1
+        len_d, obs_d = _update_signals_from_event(sig, ev)
+        total_obs_len += len_d
+        obs_count += obs_d
 
     if sig.total_events > 0:
         sig.error_ratio = sig.error_count / sig.total_events

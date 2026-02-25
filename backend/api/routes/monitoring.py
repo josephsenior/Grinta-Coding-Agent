@@ -5,6 +5,7 @@ import contextlib
 import os
 import time
 from datetime import datetime
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -197,6 +198,41 @@ async def get_metrics():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+def _extract_cost_from_session(sid: str, session: Any) -> tuple[dict[str, Any], float] | None:
+    """Extract cost summary from session. Returns (entry, raw_cost) or None."""
+    controller = getattr(session, "controller", None)
+    if controller is None:
+        return None
+    state = getattr(controller, "state", None)
+    metrics = getattr(state, "metrics", None) if state else None
+    if metrics is None:
+        return None
+    cost = getattr(metrics, "accumulated_cost", 0.0)
+    budget = getattr(metrics, "max_budget_per_task", None)
+    pct = round(cost / budget, 4) if budget and budget > 0 else None
+    entry = {
+        "session_id": sid,
+        "accumulated_cost_usd": round(cost, 6),
+        "budget_limit_usd": budget,
+        "pct_used": pct,
+    }
+    return entry, cost
+
+
+def _collect_cost_sessions(manager: Any) -> tuple[list[dict[str, Any]], float]:
+    """Collect cost data from all sessions. Returns (sessions, total_cost)."""
+    convos = _get_conversation_sessions(manager) if manager else {}
+    sessions: list[dict[str, Any]] = []
+    total_cost = 0.0
+    for sid, session in convos.items():
+        result = _extract_cost_from_session(sid, session)
+        if result:
+            entry, cost = result
+            total_cost += cost
+            sessions.append(entry)
+    return sessions, total_cost
+
+
 @router.get("/cost-summary")
 async def get_cost_summary():
     """Per-session cost and budget summary for all active conversations.
@@ -207,37 +243,7 @@ async def get_cost_summary():
     """
     try:
         manager = _get_manager()
-        sessions: list[dict[str, Any]] = []
-        total_cost = 0.0
-
-        if manager:
-            convos: dict[str, Any] = {}
-            if hasattr(manager, "_active_conversations"):
-                convos = dict(getattr(manager, "_active_conversations", {}))
-            elif hasattr(manager, "sessions"):
-                convos = dict(getattr(manager, "sessions", {}))
-
-            for sid, session in convos.items():
-                controller = getattr(session, "controller", None)
-                if controller is None:
-                    continue
-                state = getattr(controller, "state", None)
-                metrics = getattr(state, "metrics", None) if state else None
-                if metrics is None:
-                    continue
-                cost = getattr(metrics, "accumulated_cost", 0.0)
-                budget = getattr(metrics, "max_budget_per_task", None)
-                pct = round(cost / budget, 4) if budget and budget > 0 else None
-                total_cost += cost
-                sessions.append(
-                    {
-                        "session_id": sid,
-                        "accumulated_cost_usd": round(cost, 6),
-                        "budget_limit_usd": budget,
-                        "pct_used": pct,
-                    }
-                )
-
+        sessions, total_cost = _collect_cost_sessions(manager)
         return {
             "total_cost_usd": round(total_cost, 6),
             "active_sessions": len(sessions),
@@ -249,22 +255,16 @@ async def get_cost_summary():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/metrics-prom", response_class=PlainTextResponse)
-async def get_prometheus_metrics():
-    """Prometheus-compatible metrics endpoint."""
-    metrics = await get_metrics()
-    active_sessions = metrics.system.active_conversations
-
-    # Request metrics are collected by RequestMetricsMiddleware into an in-process
-    # registry. If the middleware isn't installed, these will remain at defaults.
+def _get_request_metrics_snapshot_safe() -> dict[str, Any]:
+    """Get request metrics from middleware, or defaults if unavailable."""
     try:
         from backend.api.middleware.request_metrics import (
             get_request_metrics_snapshot,
         )
 
-        req = get_request_metrics_snapshot()
+        return get_request_metrics_snapshot()
     except Exception:
-        req = {
+        return {
             "request_count_total": 0,
             "request_exceptions_total": 0,
             "hist_buckets": {"le_inf": 0},
@@ -272,6 +272,9 @@ async def get_prometheus_metrics():
             "hist_count": 0,
         }
 
+
+def _build_prom_base_lines(req: dict[str, Any], active_sessions: int) -> list[str]:
+    """Build base Prometheus lines (build info, request counters, runtime gauges)."""
     request_total = int(req.get("request_count_total", 0) or 0)
     request_exceptions_total = int(req.get("request_exceptions_total", 0) or 0)
     hist_sum = float(req.get("hist_sum", 0.0) or 0.0)
@@ -292,33 +295,7 @@ async def get_prometheus_metrics():
         "# TYPE forge_request_duration_ms_histogram",
     ]
 
-    # Histogram bucket lines (kept stable and Prometheus-compatible)
-    try:
-        # Prefer numeric buckets in ascending order, then +Inf
-        numeric = []
-        for key, value in hist_buckets.items():
-            if isinstance(key, str) and key.startswith("le_") and key != "le_inf":
-                with contextlib.suppress(Exception):
-                    numeric.append((int(key.split("_", 1)[1]), int(value)))
-        for bucket, value in sorted(numeric, key=lambda x: x[0]):
-            lines.append(f'forge_request_duration_ms_bucket{{le="{bucket}"}} {value}')
-        lines.append(
-            f'forge_request_duration_ms_bucket{{le="+Inf"}} {int(hist_buckets.get("le_inf", 0) or 0)}'
-        )
-    except Exception:
-        # Fall back to a minimal set if something goes wrong
-        lines.extend(
-            [
-                'forge_request_duration_ms_bucket{le="+Inf"} 0',
-            ]
-        )
-
-    lines.extend(
-        [
-            f"forge_request_duration_ms_sum {hist_sum}",
-            f"forge_request_duration_ms_count {hist_count}",
-        ]
-    )
+    lines.extend(_build_prom_histogram_lines(hist_buckets, hist_sum, hist_count))
 
     lines.extend(
         [
@@ -330,61 +307,121 @@ async def get_prometheus_metrics():
             "forge_runtime_warm_pool_total 0",
         ]
     )
+    return lines
 
-    # Add runtime orchestrator lines if possible
+
+def _build_prom_histogram_lines(
+    hist_buckets: dict, hist_sum: float, hist_count: float
+) -> list[str]:
+    """Build Prometheus histogram bucket lines."""
+    lines: list[str] = []
+    try:
+        numeric = []
+        for key, value in hist_buckets.items():
+            if isinstance(key, str) and key.startswith("le_") and key != "le_inf":
+                with contextlib.suppress(Exception):
+                    numeric.append((int(key.split("_", 1)[1]), int(value)))
+        for bucket, value in sorted(numeric, key=lambda x: x[0]):
+            lines.append(f'forge_request_duration_ms_bucket{{le="{bucket}"}} {value}')
+        lines.append(
+            f'forge_request_duration_ms_bucket{{le="+Inf"}} {int(hist_buckets.get("le_inf", 0) or 0)}'
+        )
+    except Exception:
+        lines.append('forge_request_duration_ms_bucket{le="+Inf"} 0')
+
+    lines.append(f"forge_request_duration_ms_sum {hist_sum}")
+    lines.append(f"forge_request_duration_ms_count {hist_count}")
+    return lines
+
+
+def _append_optional_prom_sections(lines: list[str]) -> None:
+    """Append runtime orchestrator and config schema lines if available."""
     try:
         lines.extend(_runtime_orchestrator_prom_lines())
     except Exception:
         logger.debug("Failed to collect runtime orchestrator metrics", exc_info=True)
-
-    # Add config schema lines if possible
     try:
         lines.extend(_config_schema_prom_lines())
     except Exception:
         logger.debug("Failed to collect config schema metrics", exc_info=True)
+
+
+@router.get("/metrics-prom", response_class=PlainTextResponse)
+async def get_prometheus_metrics():
+    """Prometheus-compatible metrics endpoint."""
+    metrics = await get_metrics()
+    active_sessions = metrics.system.active_conversations
+
+    req = _get_request_metrics_snapshot_safe()
+    lines = _build_prom_base_lines(req, active_sessions)
+    _append_optional_prom_sections(lines)
 
     return "\n".join(lines) + "\n"
 
 
 def _extract_telemetry_prom_lines(stats: dict[str, Any]) -> list[str]:
     """Extract prometheus lines from telemetry stats."""
-    lines = []
+    lines: list[str] = []
     for k, v in stats.items():
-        if k == "acquire":
-            total = sum(v.values()) if isinstance(v, dict) else v
-            lines.append(f"forge_runtime_acquire_total {total}")
-        elif k == "release":
-            total = sum(v.values()) if isinstance(v, dict) else v
-            lines.append(f"forge_runtime_release_total {total}")
-        elif k == "reuse":
-            if isinstance(v, dict):
-                for kind, count in v.items():
-                    lines.append(f'forge_runtime_reuse{{kind="{kind}"}} {count}')
-        elif k == "watchdog":
-            total = 0
-            if isinstance(v, dict):
-                for key, count in v.items():
-                    total += count
-                    if "|" in key:
-                        kind, reason = key.split("|", 1)
-                        lines.append(
-                            f'forge_runtime_watchdog_terminations{{kind="{kind}",reason="{reason}"}} {count}'
-                        )
-            lines.append(f"forge_runtime_watchdog_terminations_total {total}")
-        elif k == "scaling":
-            if isinstance(v, dict):
-                for key, count in v.items():
-                    if "|" in key:
-                        signal, kind = key.split("|", 1)
-                        lines.append(
-                            f'forge_runtime_scaling_signals{{kind="{kind}",signal="{signal}"}} {count}'
-                        )
-        else:
-            if isinstance(v, dict):
-                for label, val in v.items():
-                    lines.append(f'forge_runtime_{k}{{type="{label}"}} {val}')
-            else:
-                lines.append(f"forge_runtime_{k} {v}")
+        lines.extend(_format_telemetry_key(k, v))
+    return lines
+
+
+def _format_acquire_release(k: str, v: Any) -> list[str]:
+    """Format acquire/release telemetry (single total)."""
+    total = sum(v.values()) if isinstance(v, dict) else v
+    return [f"forge_runtime_{k}_total {total}"]
+
+
+def _format_reuse(v: Any) -> list[str]:
+    """Format reuse telemetry (per-kind labels)."""
+    items = v.items() if isinstance(v, dict) else []
+    return [f'forge_runtime_reuse{{kind="{kind}"}} {count}' for kind, count in items]
+
+
+def _format_telemetry_key(k: str, v: Any) -> list[str]:
+    """Format a single telemetry key/value into prometheus lines."""
+    handlers: dict[str, Callable[[Any], list[str]]] = {
+        "acquire": lambda x: _format_acquire_release("acquire", x),
+        "release": lambda x: _format_acquire_release("release", x),
+        "reuse": _format_reuse,
+        "watchdog": _format_watchdog_lines,
+        "scaling": _format_scaling_lines,
+    }
+    if k in handlers:
+        return handlers[k](v)
+    if isinstance(v, dict):
+        return [f'forge_runtime_{k}{{type="{label}"}} {val}' for label, val in v.items()]
+    return [f"forge_runtime_{k} {v}"]
+
+
+def _format_watchdog_lines(v: Any) -> list[str]:
+    """Format watchdog telemetry into prometheus lines."""
+    lines: list[str] = []
+    if isinstance(v, dict):
+        total = 0
+        for key, count in v.items():
+            total += count
+            if "|" in key:
+                kind, reason = key.split("|", 1)
+                lines.append(
+                    f'forge_runtime_watchdog_terminations{{kind="{kind}",reason="{reason}"}} {count}'
+                )
+        lines.append(f"forge_runtime_watchdog_terminations_total {total}")
+    return lines
+
+
+def _format_scaling_lines(v: Any) -> list[str]:
+    """Format scaling telemetry into prometheus lines."""
+    if not isinstance(v, dict):
+        return []
+    lines: list[str] = []
+    for key, count in v.items():
+        if "|" in key:
+            signal, kind = key.split("|", 1)
+            lines.append(
+                f'forge_runtime_scaling_signals{{kind="{kind}",signal="{signal}"}} {count}'
+            )
     return lines
 
 
@@ -449,35 +486,51 @@ def _runtime_orchestrator_prom_lines() -> list[str]:
     return lines
 
 
+def _format_schema_missing(v: Any) -> list[str]:
+    return [f"forge_agent_config_schema_missing_total {v}"]
+
+
+def _format_schema_mismatch(v: Any) -> list[str]:
+    return [
+        f'forge_agent_config_schema_mismatch{{version="{ver}"}} {count}'
+        for ver, count in (v.items() if isinstance(v, dict) else [])
+    ]
+
+
+def _format_invalid_agents(v: Any) -> list[str]:
+    return [
+        f'forge_agent_config_invalid_section{{agent="{agent}"}} {count}'
+        for agent, count in (v.items() if isinstance(v, dict) else [])
+    ]
+
+
+def _format_config_schema_key(k: str, v: Any) -> list[str]:
+    """Format a single config schema stats key into prometheus lines."""
+    handlers: dict[str, Callable[[Any], list[str]]] = {
+        "schema_missing": _format_schema_missing,
+        "schema_mismatch": _format_schema_mismatch,
+        "invalid_agents": _format_invalid_agents,
+    }
+    if k in handlers:
+        return handlers[k](v)
+    if k == "invalid_base":
+        return [f"forge_agent_config_invalid_base_total {v}"]
+    if isinstance(v, dict):
+        return [
+            f'forge_agent_config_{k}_total{{version="{label}"}} {val}'
+            for label, val in v.items()
+        ]
+    return [f"forge_agent_config_{k}_total {v}"]
+
+
 def _config_schema_prom_lines() -> list[str]:
     """Helper for prometheus config metrics."""
-    lines = []
+    lines: list[str] = []
     try:
         if config_telemetry:
             stats = config_telemetry.snapshot()
             for k, v in stats.items():
-                if k == "schema_missing":
-                    lines.append(f"forge_agent_config_schema_missing_total {v}")
-                elif k == "schema_mismatch":
-                    for ver, count in v.items():
-                        lines.append(
-                            f'forge_agent_config_schema_mismatch{{version="{ver}"}} {count}'
-                        )
-                elif k == "invalid_agents":
-                    for agent, count in v.items():
-                        lines.append(
-                            f'forge_agent_config_invalid_section{{agent="{agent}"}} {count}'
-                        )
-                elif k == "invalid_base":
-                    lines.append(f"forge_agent_config_invalid_base_total {v}")
-                else:
-                    if isinstance(v, dict):
-                        for label, val in v.items():
-                            lines.append(
-                                f'forge_agent_config_{k}_total{{version="{label}"}} {val}'
-                            )
-                    else:
-                        lines.append(f"forge_agent_config_{k}_total {v}")
+                lines.extend(_format_config_schema_key(k, v))
     except Exception:
         logger.debug("Failed to collect config schema prom lines", exc_info=True)
     return lines
@@ -639,20 +692,32 @@ def _collect_event_stream_warnings(
     stats: dict[str, Any], thresholds: dict[str, int]
 ) -> list[str]:
     """Collect warnings based on event stream stats and thresholds."""
-    warnings: list[str] = []
-    if int(stats.get("dropped_oldest", 0) or 0) > 0:
-        warnings.append("event_stream_dropped_oldest")
-    if int(stats.get("dropped_newest", 0) or 0) > 0:
-        warnings.append("event_stream_dropped_newest")
-    if int(stats.get("persist_failures", 0) or 0) > 0:
-        warnings.append("event_stream_persist_failures")
-    if int(stats.get("durable_writer_errors", 0) or 0) > 0:
-        warnings.append("event_stream_durable_writer_errors")
-    if int(stats.get("durable_enqueue_failures", 0) or 0) > 0:
-        warnings.append("event_stream_durable_enqueue_failures")
-    if int(stats.get("critical_queue_blocked", 0) or 0) > 0:
-        warnings.append("event_stream_critical_blocked")
+    warnings = _check_count_warnings(stats)
+    warnings.extend(_check_threshold_warnings(stats, thresholds))
+    return warnings
 
+
+def _check_count_warnings(stats: dict[str, Any]) -> list[str]:
+    """Check stats that trigger a warning if > 0."""
+    count_keys = [
+        ("dropped_oldest", "event_stream_dropped_oldest"),
+        ("dropped_newest", "event_stream_dropped_newest"),
+        ("persist_failures", "event_stream_persist_failures"),
+        ("durable_writer_errors", "event_stream_durable_writer_errors"),
+        ("durable_enqueue_failures", "event_stream_durable_enqueue_failures"),
+        ("critical_queue_blocked", "event_stream_critical_blocked"),
+    ]
+    return [
+        w for k, w in count_keys
+        if int(stats.get(k, 0) or 0) > 0
+    ]
+
+
+def _check_threshold_warnings(
+    stats: dict[str, Any], thresholds: dict[str, int]
+) -> list[str]:
+    """Check drops_per_minute and queue_utilization against thresholds."""
+    warnings: list[str] = []
     dpm = int(stats.get("drops_per_minute", 0) or 0)
     if dpm >= int(thresholds["drops_per_minute_yellow"]):
         warnings.append("event_stream_drops_rate_elevated")
@@ -664,7 +729,6 @@ def _collect_event_stream_warnings(
         warnings.append("event_stream_queue_utilization_elevated")
     if util >= int(thresholds["queue_utilization_red"]):
         warnings.append("event_stream_queue_utilization_high")
-
     return warnings
 
 
@@ -691,6 +755,78 @@ async def event_stream_health():
     }
 
 
+def _get_conversation_sessions(manager: Any) -> dict:
+    """Extract conversation sessions dict from manager."""
+    if hasattr(manager, "_active_conversations"):
+        return dict(getattr(manager, "_active_conversations", {}))
+    if hasattr(manager, "sessions"):
+        return dict(getattr(manager, "sessions", {}))
+    return {}
+
+
+def _collect_session_metrics(
+    convos: dict,
+) -> tuple[list[dict[str, Any]], int]:
+    """Collect metrics from all sessions. Returns (all_metrics, active_sessions)."""
+    all_metrics: list[dict[str, Any]] = []
+    active_sessions = 0
+
+    for session in convos.values():
+        controller = getattr(session, "controller", None)
+        if controller is None:
+            continue
+        services = getattr(controller, "services", None)
+        if services is None:
+            continue
+        metrics_service = getattr(services, "metrics", None)
+        if metrics_service is None:
+            continue
+
+        active_sessions += 1
+        aggregate = metrics_service.get_aggregate_metrics()
+        if aggregate:
+            all_metrics.append(
+                {
+                    "total_tasks": len(aggregate.tasks),
+                    "success_rate": aggregate.success_rate,
+                    "average_duration": aggregate.average_duration,
+                    "average_cost": aggregate.average_cost,
+                }
+            )
+
+    return all_metrics, active_sessions
+
+
+def _aggregate_agent_metrics(
+    all_metrics: list[dict[str, Any]], active_sessions: int
+) -> dict[str, Any]:
+    """Compute overall aggregates from per-session metrics."""
+    if not all_metrics:
+        return {
+            "total_tasks": 0,
+            "success_rate": 0.0,
+            "average_duration_seconds": 0.0,
+            "average_cost_usd": 0.0,
+            "active_sessions": active_sessions,
+        }
+
+    total_tasks = sum(m["total_tasks"] for m in all_metrics)
+    weighted_success = sum(
+        m["success_rate"] * m["total_tasks"] for m in all_metrics
+    )
+    avg_success_rate = weighted_success / total_tasks if total_tasks > 0 else 0.0
+    avg_duration = sum(m["average_duration"] for m in all_metrics) / len(all_metrics)
+    avg_cost = sum(m["average_cost"] for m in all_metrics) / len(all_metrics)
+
+    return {
+        "total_tasks": total_tasks,
+        "success_rate": round(avg_success_rate, 4),
+        "average_duration_seconds": round(avg_duration, 2),
+        "average_cost_usd": round(avg_cost, 6),
+        "active_sessions": active_sessions,
+    }
+
+
 @router.get("/agent-metrics")
 async def get_agent_metrics():
     """Aggregate agent performance metrics across all active sessions."""
@@ -705,70 +841,9 @@ async def get_agent_metrics():
                 "active_sessions": 0,
             }
 
-        all_metrics: list[dict[str, Any]] = []
-        active_sessions = 0
-
-        if hasattr(manager, "_active_conversations"):
-            convos = dict(getattr(manager, "_active_conversations", {}))
-        elif hasattr(manager, "sessions"):
-            convos = dict(getattr(manager, "sessions", {}))
-        else:
-            convos = {}
-
-        for session in convos.values():
-            controller = getattr(session, "controller", None)
-            if controller is None:
-                continue
-
-            services = getattr(controller, "services", None)
-            if services is None:
-                continue
-
-            metrics_service = getattr(services, "metrics", None)
-            if metrics_service is None:
-                continue
-
-            active_sessions += 1
-            aggregate = metrics_service.get_aggregate_metrics()
-            if aggregate:
-                all_metrics.append(
-                    {
-                        "total_tasks": len(aggregate.tasks),
-                        "success_rate": aggregate.success_rate,
-                        "average_duration": aggregate.average_duration,
-                        "average_cost": aggregate.average_cost,
-                    }
-                )
-
-        # Compute overall aggregates
-        if not all_metrics:
-            return {
-                "total_tasks": 0,
-                "success_rate": 0.0,
-                "average_duration_seconds": 0.0,
-                "average_cost_usd": 0.0,
-                "active_sessions": active_sessions,
-            }
-
-        total_tasks = sum(m["total_tasks"] for m in all_metrics)
-        # Weighted average by number of tasks
-        weighted_success = sum(
-            m["success_rate"] * m["total_tasks"] for m in all_metrics
-        )
-        avg_success_rate = weighted_success / total_tasks if total_tasks > 0 else 0.0
-
-        avg_duration = sum(m["average_duration"] for m in all_metrics) / len(
-            all_metrics
-        )
-        avg_cost = sum(m["average_cost"] for m in all_metrics) / len(all_metrics)
-
-        return {
-            "total_tasks": total_tasks,
-            "success_rate": round(avg_success_rate, 4),
-            "average_duration_seconds": round(avg_duration, 2),
-            "average_cost_usd": round(avg_cost, 6),
-            "active_sessions": active_sessions,
-        }
+        convos = _get_conversation_sessions(manager)
+        all_metrics, active_sessions = _collect_session_metrics(convos)
+        return _aggregate_agent_metrics(all_metrics, active_sessions)
     except Exception as e:
         logger.error("Failed to collect agent metrics", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e

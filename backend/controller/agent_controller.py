@@ -359,50 +359,69 @@ class AgentController:
     async def _on_event(self, event: Event) -> None:
         """Handle incoming events from the event stream."""
         await self.event_router.route_event(event)
+        # Drive the agent loop forward for events that should trigger a step.
+        # This is necessary in the server (event-driven) path because there is
+        # no external polling loop like run_agent_until_done in CLI/headless mode.
+        # Examples: ThinkObservation, most tool observations (after pending is
+        # cleared by observation_service.trigger_step), etc.
+        if self.should_step(event):
+            self.step()
 
     def _reset(self) -> None:
         """Resets the agent controller."""
+        self._clear_action_contexts()
+        self._emit_pending_action_error_if_unmatched()
+        self._emit_dropped_agent_actions()
+        self._pending_action = None
+        self.agent.reset()
+
+    def _clear_action_contexts(self) -> None:
+        """Clear action context caches."""
         if hasattr(self, "_action_contexts_by_object"):
             self._action_contexts_by_object.clear()
         if hasattr(self, "_action_contexts_by_event_id"):
             self._action_contexts_by_event_id.clear()
-        if self._pending_action and hasattr(self._pending_action, "tool_call_metadata"):
-            found_observation = any(
-                isinstance(event, Observation)
-                and event.tool_call_metadata == self._pending_action.tool_call_metadata
-                for event in self.state.history
-            )
-            if not found_observation:
-                if self.state.agent_state == AgentState.STOPPED:
-                    error_content = ERROR_ACTION_NOT_EXECUTED_STOPPED
-                    error_id = ERROR_ACTION_NOT_EXECUTED_STOPPED_ID
-                else:
-                    error_content = ERROR_ACTION_NOT_EXECUTED_ERROR
-                    error_id = ERROR_ACTION_NOT_EXECUTED_ERROR_ID
-                obs = ErrorObservation(content=error_content, error_id=error_id)
-                if meta := getattr(self._pending_action, "tool_call_metadata", None):
-                    obs.tool_call_metadata = meta
-                obs.cause = getattr(self._pending_action, "id", None)
-                self.event_stream.add_event(obs, EventSource.AGENT)
-        # Emit ErrorObservations for any agent-queued actions that will be dropped
-        # so the LLM history stays coherent — unmatched tool calls are explained
-        # rather than silently pruned by filter_unmatched_tool_calls.
+
+    def _emit_pending_action_error_if_unmatched(self) -> None:
+        """Emit ErrorObservation if pending action has no matching observation."""
+        if not self._pending_action or not hasattr(self._pending_action, "tool_call_metadata"):
+            return
+        meta = self._pending_action.tool_call_metadata
+        found = any(
+            isinstance(e, Observation) and e.tool_call_metadata == meta
+            for e in self.state.history
+        )
+        if found:
+            return
+        content, err_id = (
+            (ERROR_ACTION_NOT_EXECUTED_STOPPED, ERROR_ACTION_NOT_EXECUTED_STOPPED_ID)
+            if self.state.agent_state == AgentState.STOPPED
+            else (ERROR_ACTION_NOT_EXECUTED_ERROR, ERROR_ACTION_NOT_EXECUTED_ERROR_ID)
+        )
+        obs = ErrorObservation(content=content, error_id=err_id)
+        obs.tool_call_metadata = meta
+        obs.cause = getattr(self._pending_action, "id", None)
+        self.event_stream.add_event(obs, EventSource.AGENT)
+
+    def _emit_dropped_agent_actions(self) -> None:
+        """Emit ErrorObservations for agent-queued actions dropped by reset."""
         agent_pending = getattr(self.agent, "pending_actions", None)
-        if agent_pending:
-            for dropped_action in list(agent_pending):
-                if meta := getattr(dropped_action, "tool_call_metadata", None):
-                    obs = ErrorObservation(
-                        content=(
-                            "Action dropped: agent was reset before this tool call "
-                            "could execute. Re-run this action if still needed."
-                        ),
-                        error_id=ERROR_ACTION_NOT_EXECUTED_ERROR_ID,
-                    )
-                    obs.tool_call_metadata = meta
-                    obs.cause = getattr(dropped_action, "id", None)
-                    self.event_stream.add_event(obs, EventSource.AGENT)
-        self._pending_action = None
-        self.agent.reset()
+        if not agent_pending:
+            return
+        for dropped in list(agent_pending):
+            meta = getattr(dropped, "tool_call_metadata", None)
+            if not meta:
+                continue
+            obs = ErrorObservation(
+                content=(
+                    "Action dropped: agent was reset before this tool call "
+                    "could execute. Re-run this action if still needed."
+                ),
+                error_id=ERROR_ACTION_NOT_EXECUTED_ERROR_ID,
+            )
+            obs.tool_call_metadata = meta
+            obs.cause = getattr(dropped, "id", None)
+            self.event_stream.add_event(obs, EventSource.AGENT)
 
     async def stop(self) -> None:
         """Stop the agent and perform a hard kill on running processes."""

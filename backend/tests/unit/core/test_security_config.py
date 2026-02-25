@@ -18,9 +18,10 @@ class TestSecurityConfigDefaults:
 
 
 class TestSecurityConfigValidation:
-    def test_extra_field_rejected(self):
-        with pytest.raises(Exception):
-            SecurityConfig(unknown_field="x")
+    def test_extra_field_ignored(self):
+        cfg = SecurityConfig(unknown_field="x")
+        assert isinstance(cfg, SecurityConfig)
+        assert not hasattr(cfg, "unknown_field")
 
     def test_invalid_validation_mode(self):
         with pytest.raises(Exception):
@@ -59,6 +60,7 @@ class TestSecurityConfigFromToml:
         # All defaults
         assert cfg.confirmation_mode is False
 
-    def test_invalid_data_raises(self):
-        with pytest.raises(ValueError, match="Invalid security configuration"):
-            SecurityConfig.from_toml_section({"unknown_field": "bad"})
+    def test_invalid_data_uses_defaults(self):
+        mapping = SecurityConfig.from_toml_section({"unknown_field": "bad"})
+        cfg = mapping["security"]
+        assert cfg.confirmation_mode is False

@@ -2,10 +2,6 @@
 
 This folder contains all backend-related code and resources for the Forge project.
 
-## Authentication
-
-Auth invariants (HTTP headers, Socket.IO handshake auth, and the `FORGE_ALLOW_QUERY_TOKEN_AUTH` opt-in) are documented in one place: [docs/AUTH.md](../docs/AUTH.md).
-
 ## Structure
 
 ```

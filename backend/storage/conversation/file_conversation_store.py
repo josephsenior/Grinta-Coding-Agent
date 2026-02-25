@@ -100,9 +100,6 @@ class FileConversationStore(ConversationStore):
             if not create_if_missing:
                 raise
             # If metadata is corrupted or missing, create a new one
-            from backend.storage.data_models.conversation_metadata import (
-                ConversationMetadata,
-            )
             from datetime import datetime
 
             metadata = ConversationMetadata(
@@ -124,6 +121,21 @@ class FileConversationStore(ConversationStore):
         """
         conversation_dir = get_conversation_dir(conversation_id, self.user_id)
         await call_sync_from_async(self.file_store.delete, conversation_dir)
+
+    async def delete_all_metadata(self) -> None:
+        """Delete all conversation metadata and associated files."""
+        metadata_dir = self.get_conversation_metadata_dir()
+        try:
+            conversation_ids = [
+                Path(path).name
+                for path in self.file_store.list(metadata_dir)
+                if not Path(path).name.startswith(".")
+            ]
+        except FileNotFoundError:
+            return
+
+        for conversation_id in conversation_ids:
+            await self.delete_metadata(conversation_id)
 
     async def exists(self, conversation_id: str) -> bool:
         """Check if conversation metadata exists.

@@ -30,15 +30,23 @@ class TestSettingsDefaults:
     def test_custom_fields(self):
         s = Settings(
             language="en",
-            agent="CodeAct",
+            agent="Orchestrator",
             max_iterations=50,
             llm_model="gpt-4",
             llm_api_key=SecretStr("sk-test"),
         )
         assert s.language == "en"
-        assert s.agent == "CodeAct"
+        assert s.agent == "Orchestrator"
         assert s.llm_model == "gpt-4"
         assert s.llm_api_key.get_secret_value() == "sk-test"
+
+    @pytest.mark.parametrize(
+        "legacy_name",
+        ["CodeActAgent", "CodeAct", "codact", "orchestrator"],
+    )
+    def test_legacy_agent_names_are_normalized(self, legacy_name: str):
+        s = Settings(agent=legacy_name)
+        assert s.agent == "Orchestrator"
 
 
 class TestCondenserMaxSize:

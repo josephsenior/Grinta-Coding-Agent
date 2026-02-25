@@ -808,6 +808,35 @@ class EditVerifyMiddleware(ToolInvocationMiddleware):
         )
 
 
+def _get_syntax_check_cmd(path: str) -> list[str] | None:
+    """Return syntax check command for path, or None if unsupported."""
+    _, ext = os.path.splitext(path)
+    ext = ext.lower()
+    if ext == ".py":
+        return ["python", "-m", "py_compile", path]
+    if ext in (".js", ".ts"):
+        return ["node", "--check", path]
+    return None
+
+
+def _append_syntax_check_result(
+    observation: Observation,
+    result: subprocess.CompletedProcess[Any] | None,
+    exc: BaseException | None,
+) -> None:
+    """Append syntax check result to observation content."""
+    current = getattr(observation, "content", "") or ""
+    if exc is not None:
+        observation.content = current + (
+            f"\n<SYNTAX_CHECK_FAILED>\nMiddleware execution error: {exc}\n</SYNTAX_CHECK_FAILED>"
+        )
+    elif result is not None and result.returncode != 0:
+        stderr = (result.stderr or "").strip() or (result.stdout or "").strip()
+        observation.content = current + f"\n<SYNTAX_CHECK_FAILED>\n{stderr}\n</SYNTAX_CHECK_FAILED>"
+    else:
+        observation.content = current + "\n<SYNTAX_CHECK_PASSED />"
+
+
 class AutoCheckMiddleware(ToolInvocationMiddleware):
     """Automatically checks syntax of files after editing."""
 
@@ -816,60 +845,22 @@ class AutoCheckMiddleware(ToolInvocationMiddleware):
     ) -> None:
         if observation is None:
             return
-
         from backend.events.action import FileEditAction, FileWriteAction
         from backend.events.observation import ErrorObservation
 
-        # Check if success (not ErrorObservation)
         if isinstance(observation, ErrorObservation):
             return
-
-        # Check action type
         if not isinstance(ctx.action, (FileEditAction, FileWriteAction)):
             return
-
         path = getattr(ctx.action, "path", None)
         if not path:
             return
-
-        _, ext = os.path.splitext(path)
-        ext = ext.lower()
-
-        cmd = None
-        if ext == ".py":
-            cmd = ["python", "-m", "py_compile", path]
-        elif ext in (".js", ".ts"):
-            cmd = ["node", "--check", path]
-
+        cmd = _get_syntax_check_cmd(path)
         if not cmd:
             return
 
         try:
-            # Run check
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, check=False
-            )
-
-            current_content = getattr(observation, "content", "") or ""
-
-            if result.returncode != 0:
-                stderr = result.stderr.strip()
-                # If stderr is empty, try stdout (sometimes tools print to stdout)
-                if not stderr:
-                    stderr = result.stdout.strip()
-
-                observation.content = (
-                    current_content
-                    + f"\n<SYNTAX_CHECK_FAILED>\n{stderr}\n</SYNTAX_CHECK_FAILED>"
-                )
-            else:
-                observation.content = (
-                    current_content + "\n<SYNTAX_CHECK_PASSED />"
-                )
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            _append_syntax_check_result(observation, result, None)
         except Exception as e:
-            # If check tool is missing (e.g. node not found), handle gracefully
-            current_content = getattr(observation, "content", "") or ""
-            observation.content = (
-                current_content
-                + f"\n<SYNTAX_CHECK_FAILED>\nMiddleware execution error: {e}\n</SYNTAX_CHECK_FAILED>"
-            )
+            _append_syntax_check_result(observation, None, e)

@@ -32,6 +32,36 @@ from backend.llm.exceptions import AuthenticationError
 
 logger = logging.getLogger(__name__)
 
+_AUTH_INDICATORS = (
+    "authentication",
+    "api key",
+    "unauthorized",
+    "invalid credentials",
+    "authenticate",
+)
+
+
+def _is_auth_related_tool_error(error_str: str) -> bool:
+    """Return True if error appears authentication-related."""
+    lower = error_str.lower()
+    return any(ind in lower for ind in _AUTH_INDICATORS)
+
+
+def _build_tool_call_recovery_hint(error_str: str) -> str:
+    """Build recovery hint from tool call error string."""
+    lower = error_str.lower()
+    parts = []
+    if "missing" in lower and "required" in lower:
+        param_match = re.search(r'"(\w+)"', error_str)
+        if param_match:
+            parts.append(f"Missing required parameter: {param_match.group(1)}")
+        parts.append("Check the tool schema and include all required arguments.")
+    if "invalid" in lower or "unexpected" in lower:
+        parts.append("A parameter name or value was invalid. Check tool schema for correct names/types.")
+    if "not registered" in lower or "not exists" in lower:
+        parts.append("The tool name was not found. Use an existing tool name from your available tools.")
+    return " ".join(parts) if parts else "Review the error and retry with corrected parameters."
+
 
 class ErrorType(str, Enum):
     """Types of non-LLM errors that can be recovered."""
@@ -456,52 +486,22 @@ class ErrorRecoveryStrategy:
     @staticmethod
     def _recover_tool_call_error(error_str: str) -> list[Action]:
         """Recover from tool call/parameter errors with structured feedback."""
-        # Check if error might be related to authentication issues
-        auth_indicators = [
-            "authentication",
-            "api key",
-            "unauthorized",
-            "invalid credentials",
-            "authenticate",
-        ]
-        if any(indicator in error_str.lower() for indicator in auth_indicators):
+        if _is_auth_related_tool_error(error_str):
             logger.info(
                 "Tool call error appears to be authentication-related, skipping recovery actions that require LLM calls"
             )
             return []
 
-        # Extract structured error info for the LLM to self-correct
         logger.error(
             "Tool call parameter error: %s%s",
             error_str[:200],
             "..." if len(error_str) > 200 else "",
         )
-
-        # Build a diagnostic message the LLM can use to fix its call
-        # This is returned as a single AgentThinkAction which doesn't trigger
-        # another LLM tool call — it just injects context into history.
-        error_summary = error_str[:300]
-        hint_parts = []
-
-        if "missing" in error_str.lower() and "required" in error_str.lower():
-            # Extract parameter name if possible
-            param_match = re.search(r'"(\w+)"', error_str)
-            if param_match:
-                hint_parts.append(f"Missing required parameter: {param_match.group(1)}")
-            hint_parts.append("Check the tool schema and include all required arguments.")
-
-        if "invalid" in error_str.lower() or "unexpected" in error_str.lower():
-            hint_parts.append("A parameter name or value was invalid. Check tool schema for correct names/types.")
-
-        if "not registered" in error_str.lower() or "not exists" in error_str.lower():
-            hint_parts.append("The tool name was not found. Use an existing tool name from your available tools.")
-
-        hint = " ".join(hint_parts) if hint_parts else "Review the error and retry with corrected parameters."
-
+        hint = _build_tool_call_recovery_hint(error_str)
         return [
             AgentThinkAction(
                 thought=(
-                    f"Tool call error: {error_summary}\n"
+                    f"Tool call error: {error_str[:300]}\n"
                     f"Recovery hint: {hint}\n"
                     "I will fix the tool call parameters and retry."
                 ),

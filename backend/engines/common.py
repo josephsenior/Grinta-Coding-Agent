@@ -79,12 +79,37 @@ def build_tool_call_metadata(
 def extract_thought_from_message(assistant_msg: Any) -> str:
     """Extract thought text from assistant message content."""
     content = getattr(assistant_msg, "content", None)
+    return _coerce_message_content_text(content)
+
+
+def _coerce_message_content_text(content: Any) -> str:
+    """Coerce provider-specific message content shapes into plain text.
+
+    Supports:
+    - ``str``
+    - ``list[str]``
+    - ``list[dict]`` with ``{"text": ...}`` (any ``type``)
+    - ``dict`` with ``{"text": ...}``
+    """
     if content is None:
         return ""
     if isinstance(content, str):
         return content
+    if isinstance(content, dict):
+        text = content.get("text")
+        return text if isinstance(text, str) else ""
     if isinstance(content, list):
-        return "".join(msg["text"] for msg in content if msg.get("type") == "text")
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                if item:
+                    parts.append(item)
+                continue
+            if isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str) and text:
+                    parts.append(text)
+        return "".join(parts)
     return ""
 
 
@@ -146,7 +171,7 @@ def common_response_to_actions(
         )
     else:
         content = getattr(assistant_msg, "content", None)
-        text_content = str(content) if content else ""
+        text_content = _coerce_message_content_text(content)
         from backend.events.action import MessageAction
 
         actions = [MessageAction(content=text_content, wait_for_response=True)]

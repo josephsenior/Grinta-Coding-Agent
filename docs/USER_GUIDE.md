@@ -88,11 +88,6 @@ Configuration loads with this precedence (highest wins):
 ### Essential Settings
 
 ```toml
-[security]
-# Auto-generated on first startup if left empty.
-# Set explicitly for shared environments.
-# session_api_key = "your-secure-key"
-
 [core]
 # Maximum LLM spend per task (USD). Default $5.
 max_budget_per_task = 5.0
@@ -122,7 +117,6 @@ section-prefixed name in uppercase:
 | `llm.model` | `LLM_MODEL` |
 | `core.max_budget_per_task` | `CORE_MAX_BUDGET_PER_TASK` |
 | `agent.enable_browsing` | `AGENT_ENABLE_BROWSING` |
-| `security.session_api_key` | `SECURITY_SESSION_API_KEY` |
 
 ---
 
@@ -217,18 +211,15 @@ Forge exposes a REST + Socket.IO API on port 3000.
 
 ```bash
 # List conversations
-curl http://localhost:3000/api/conversations \
-  -H "X-Session-API-Key: your-key"
+curl http://localhost:3000/api/conversations
 
 # Create conversation
 curl -X POST http://localhost:3000/api/conversations \
-  -H "X-Session-API-Key: your-key" \
   -H "Content-Type: application/json" \
   -d '{"task": "Fix the bug in main.py"}'
 
 # Get conversation events
-curl http://localhost:3000/api/conversations/{id}/events \
-  -H "X-Session-API-Key: your-key"
+curl http://localhost:3000/api/conversations/{id}/events
 ```
 
 ### Socket.IO (Real-Time)
@@ -237,9 +228,7 @@ curl http://localhost:3000/api/conversations/{id}/events \
 import socketio
 
 sio = socketio.Client()
-sio.connect("http://localhost:3000", headers={
-    "X-Session-API-Key": "your-key"
-})
+sio.connect("http://localhost:3000")
 
 @sio.on("agent_action")
 def on_action(data):
@@ -468,15 +457,6 @@ timeout = 120                        # Command timeout (seconds)
 enable_auto_lint = false             # Auto-lint after edits
 runtime_startup_env_vars = {}        # Inject env vars into runtime
 ```
-
-### Security
-
-```toml
-[security]
-session_api_key = "your-secure-key"  # Auth key for API access
-```
-
-See [docs/AUTH.md](AUTH.md) for the full authentication model.
 
 ### Agent Customization
 

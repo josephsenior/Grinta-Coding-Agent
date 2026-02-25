@@ -1,6 +1,6 @@
 """This file contains the function calling implementation for different actions.
 
-This is similar to the functionality of `CodeActResponseParser`.
+This is similar to the functionality of `OrchestratorResponseParser`.
 """
 
 from __future__ import annotations
@@ -490,6 +490,43 @@ def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
     return orig_pos
 
 
+def _extract_view_replace_params(kwargs: dict) -> tuple[str, str, Any, bool]:
+    """Extract old_str, new_str, view_range, normalize_ws from kwargs."""
+    old_str = kwargs.get("old_str", "")
+    new_str = kwargs.get("new_str", "")
+    view_range = kwargs.get("view_range")
+    normalize_ws = kwargs.get("normalize_ws", False)
+    if isinstance(normalize_ws, str):
+        normalize_ws = normalize_ws.lower() == "true"
+    return old_str, new_str, view_range, normalize_ws
+
+
+def _get_search_content_by_range(content: str, view_range: Any) -> str:
+    """Slice content to the given line range. Returns full content if range invalid."""
+    if not view_range or len(view_range) < 2:
+        return content
+    lines = content.splitlines(keepends=True)
+    start_val = view_range[0] if view_range[0] is not None else 1
+    end_val = view_range[1]
+    try:
+        start_idx = max(0, int(start_val) - 1)
+        end_idx = len(lines) if end_val in (-1, None) else min(len(lines), int(end_val))
+    except (TypeError, ValueError):
+        start_idx, end_idx = 0, len(lines)
+    return "".join(lines[start_idx:end_idx])
+
+
+def _old_str_not_found_action(path: str, view_range: Any) -> AgentThinkAction:
+    """Build AgentThinkAction for 'old_str not found' error."""
+    range_suffix = ""
+    if view_range and len(view_range) >= 2 and view_range[0] is not None and view_range[1] is not None:
+        range_suffix = f" (within lines {view_range[0]}-{view_range[1]})"
+    return AgentThinkAction(
+        thought=f"[VIEW_AND_REPLACE] old_str not found in {path}{range_suffix}. "
+        "Use view command to check the actual content."
+    )
+
+
 def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
     """Handle the compound view_and_replace command.
 
@@ -498,12 +535,7 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
     """
     import os
 
-    old_str = kwargs.get("old_str", "")
-    new_str = kwargs.get("new_str", "")
-    view_range = kwargs.get("view_range")
-    normalize_ws = kwargs.get("normalize_ws", False)
-    if isinstance(normalize_ws, str):
-        normalize_ws = normalize_ws.lower() == "true"
+    old_str, new_str, view_range, normalize_ws = _extract_view_replace_params(kwargs)
 
     if not os.path.isfile(path):
         return [AgentThinkAction(thought=f"[VIEW_AND_REPLACE] File not found: {path}")]
@@ -525,22 +557,11 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
             AgentThinkAction(thought=f"[VIEW_AND_REPLACE] Cannot read {path}: {exc}")
         ]
 
-    search_content = content
-    if view_range and len(view_range) >= 2:
-        lines = content.splitlines(keepends=True)
-        start_val = view_range[0] if view_range[0] is not None else 1
-        end_val = view_range[1]
-        try:
-            start_idx = max(0, int(start_val) - 1)
-            end_idx = len(lines) if end_val in (-1, None) else min(len(lines), int(end_val))
-        except (TypeError, ValueError):
-            start_idx = 0
-            end_idx = len(lines)
-        search_content = "".join(lines[start_idx:end_idx])
+    search_content = _get_search_content_by_range(content, view_range)
 
     if old_str not in search_content:
         if normalize_ws:
-            new_content, err = _ws_tolerant_replace(search_content, old_str, new_str)
+            _, err = _ws_tolerant_replace(search_content, old_str, new_str)
             if err:
                 return [
                     AgentThinkAction(
@@ -548,37 +569,25 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
                     )
                 ]
         else:
-            return [
-                AgentThinkAction(
-                    thought=f"[VIEW_AND_REPLACE] old_str not found in {path}"
-                    + (
-                        f" (within lines {view_range[0]}-{view_range[1]})"
-                        if view_range
-                        and len(view_range) >= 2
-                        and view_range[0] is not None
-                        and view_range[1] is not None
-                        else ""
-                    )
-                    + ". Use view command to check the actual content."
-                )
-            ]
+            return [_old_str_not_found_action(path, view_range)]
 
-    edit_kwargs = {"old_str": old_str, "new_str": new_str}
+    edit_kwargs: dict = {"old_str": old_str, "new_str": new_str}
     if normalize_ws:
         edit_kwargs["normalize_ws"] = True
 
-    read_action = FileReadAction(
-        path=path,
-        impl_source=FileReadSource.FILE_EDITOR,
-        view_range=view_range,
-    )
-    edit_action = FileEditAction(
-        path=path,
-        command="str_replace",
-        impl_source=FileEditSource.FILE_EDITOR,
-        **edit_kwargs,
-    )
-    return [read_action, edit_action]
+    return [
+        FileReadAction(
+            path=path,
+            impl_source=FileReadSource.FILE_EDITOR,
+            view_range=view_range,
+        ),
+        FileEditAction(
+            path=path,
+            command="str_replace",
+            impl_source=FileEditSource.FILE_EDITOR,
+            **edit_kwargs,
+        ),
+    ]
 
 
 def _preview_str_replace_edit(
@@ -635,37 +644,43 @@ def _preview_str_replace_edit(
     return AgentThinkAction(thought=f"[PREVIEW] Dry-run diff for {path}:\n{diff_text}")
 
 
+def _apply_confidence_preview_override(kwargs: dict, path: str) -> None:
+    """If confidence < 0.7, force preview mode. Mutates kwargs."""
+    confidence = kwargs.pop("confidence", None)
+    if confidence is None or not isinstance(confidence, (int, float)):
+        return
+    if float(confidence) >= 0.7:
+        return
+    logger.info(
+        "[confidence] Low confidence (%.2f) on %s — switching to preview mode",
+        confidence,
+        path,
+    )
+    kwargs.setdefault("preview", True)
+
+
+def _is_preview_enabled(raw: Any) -> bool:
+    """Parse preview flag from tool arguments."""
+    return raw is True or (
+        isinstance(raw, str) and raw.lower() == "true"
+    )
+
+
 def _handle_str_replace_editor_tool(arguments: dict) -> Action | list[Action]:
     """Handle str_replace_editor tool call."""
     path, command = _validate_str_replace_editor_args(arguments)
     other_kwargs = {k: v for k, v in arguments.items() if k not in ["command", "path"]}
 
-    # Handle confidence-based auto-preview: low confidence forces preview mode
-    confidence = other_kwargs.pop("confidence", None)
-    if confidence is not None and isinstance(confidence, (int, float)) and float(confidence) < 0.7:
-        logger.info(
-            "[confidence] Low confidence (%.2f) on %s — switching to preview mode",
-            confidence,
-            path,
-        )
-        other_kwargs.setdefault("preview", True)
+    _apply_confidence_preview_override(other_kwargs, path)
 
-    # Handle preview/dry-run mode — show what the edit would produce
     raw_preview = other_kwargs.pop("preview", False)
-    preview = raw_preview is True or (
-        isinstance(raw_preview, str) and raw_preview.lower() == "true"
-    )
-    if preview and command in ("str_replace", "insert"):
+    if _is_preview_enabled(raw_preview) and command in ("str_replace", "insert"):
         return _preview_str_replace_edit(path, command, other_kwargs)
 
-    # Handle compound view_and_replace command
     if command == "view_and_replace":
         actions = _handle_view_and_replace(path, other_kwargs)
-        if len(actions) == 1:
-            return actions[0]
         return actions[0]
 
-    # Handle view command separately
     if command == "view":
         return FileReadAction(
             path=path,
@@ -673,22 +688,16 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action | list[Action]:
             view_range=other_kwargs.get("view_range"),
         )
 
-    # Remove view_range for standard edit commands (unless it's str_replace with view_range for scoping)
     view_range = other_kwargs.pop("view_range", None)
-
-    # Filter valid editor kwargs
-    valid_kwargs_for_editor = _filter_valid_editor_kwargs(other_kwargs)
-
-    # For str_replace with view_range, pass it along for line-range scoping
+    valid_kwargs = _filter_valid_editor_kwargs(other_kwargs)
     if command == "str_replace" and view_range is not None:
-        valid_kwargs_for_editor["view_range"] = view_range
+        valid_kwargs["view_range"] = view_range
 
-    # Create and configure action
     action = FileEditAction(
         path=path,
         command=command,
         impl_source=FileEditSource.FILE_EDITOR,
-        **valid_kwargs_for_editor,
+        **valid_kwargs,
     )
     set_security_risk(action, arguments)
     return action
@@ -716,70 +725,66 @@ def _handle_condensation_request_tool(arguments: dict) -> CondensationRequestAct
     return CondensationRequestAction()
 
 
-def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
-    """Handle TASK_TRACKER_TOOL tool call."""
-    if "command" not in arguments:
-        msg = (
-            f'Missing required argument "command" in tool call {TASK_TRACKER_TOOL_NAME}'
-        )
-        raise FunctionCallValidationError(msg)
-
-    command = arguments["command"]
-
-    # Legacy command support
-    if command == "plan":
-        command = "update"
-
-    if command == "update" and "task_list" not in arguments:
-        msg = f'Missing required argument "task_list" for "update" command in tool call {TASK_TRACKER_TOOL_NAME}'
+def _normalize_task_tracker_step(s: dict, idx: int) -> dict:
+    """Normalize a single task step dict. Raises FunctionCallValidationError on invalid input."""
+    if not isinstance(s, dict):
         raise FunctionCallValidationError(
-            msg,
+            f"Task item must be a dictionary, got {type(s)}"
         )
+    return {
+        "id": s.get("id", f"step-{idx}"),
+        "description": s.get("description", s.get("title", "Untitled step")),
+        "status": s.get("status", "pending"),
+        "result": s.get("result", s.get("notes", None)),
+        "tags": s.get("tags", []),
+        "subtasks": [
+            _normalize_task_tracker_step(sub, i)
+            for i, sub in enumerate(s.get("subtasks", []))
+        ],
+    }
 
-    tracker = TaskTracker()
 
-    # Validation/Normalization logic
-    def normalize_step(s: dict, idx: int) -> dict:
-        if not isinstance(s, dict):
-            raise FunctionCallValidationError(
-                f"Task item must be a dictionary, got {type(s)}"
-            )
-
-        # Support both old and new keys for backward compatibility during migration
-        return {
-            "id": s.get("id", f"step-{idx}"),
-            "description": s.get("description", s.get("title", "Untitled step")),
-            "status": s.get("status", "pending"),
-            "result": s.get("result", s.get("notes", None)),
-            "tags": s.get("tags", []),
-            "subtasks": [
-                normalize_step(sub, i) for i, sub in enumerate(s.get("subtasks", []))
-            ],
-        }
-
-    normalized_task_list = []
-
-    if command == "view":
-        # Load from disk if viewing
-        raw_task_list = tracker.load_from_file()
-    else:
-        # Use provided list if updating
-        raw_task_list = arguments.get("task_list", [])
-
-    if not isinstance(raw_task_list, list):
-        msg = f'Invalid format for "task_list". Expected a list but got {type(raw_task_list)}.'
-        raise FunctionCallValidationError(msg)
-
+def _normalize_task_tracker_list(raw_list: list) -> list[dict]:
+    """Normalize task list. Raises FunctionCallValidationError on invalid structure."""
     try:
-        for i, task in enumerate(raw_task_list):
-            normalized_task_list.append(normalize_step(task, i + 1))
+        return [_normalize_task_tracker_step(task, i + 1) for i, task in enumerate(raw_list)]
     except FunctionCallValidationError:
         raise
     except Exception as e:
         logger.warning("Error normalizing task list: %s", e)
         raise FunctionCallValidationError(f"Invalid task list structure: {e}") from e
 
-    # Persist to disk if updating
+
+def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
+    """Handle TASK_TRACKER_TOOL tool call."""
+    if "command" not in arguments:
+        raise FunctionCallValidationError(
+            f'Missing required argument "command" in tool call {TASK_TRACKER_TOOL_NAME}'
+        )
+
+    command = arguments["command"]
+    if command == "plan":
+        command = "update"
+
+    if command == "update" and "task_list" not in arguments:
+        raise FunctionCallValidationError(
+            f'Missing required argument "task_list" for "update" command in tool call {TASK_TRACKER_TOOL_NAME}'
+        )
+
+    tracker = TaskTracker()
+
+    if command == "view":
+        raw_task_list = tracker.load_from_file()
+    else:
+        raw_task_list = arguments.get("task_list", [])
+
+    if not isinstance(raw_task_list, list):
+        raise FunctionCallValidationError(
+            f'Invalid format for "task_list". Expected a list but got {type(raw_task_list)}.'
+        )
+
+    normalized_task_list = _normalize_task_tracker_list(raw_task_list)
+
     if command == "update":
         tracker.save_to_file(normalized_task_list)
 

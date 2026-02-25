@@ -132,6 +132,22 @@ class BaseShellSession(UnifiedShellSession, ABC):
         """
         return
 
+    def read_output(self) -> str:
+        """Read pending output from the shell session.
+
+        Subclasses with interactive shell support should override this.
+        """
+        msg = f"{self.__class__.__name__} does not implement read_output()"
+        raise NotImplementedError(msg)
+
+    def write_input(self, data: str, is_control: bool = False) -> None:
+        """Write input to the shell session.
+
+        Subclasses with interactive shell support should override this.
+        """
+        msg = f"{self.__class__.__name__} does not implement write_input()"
+        raise NotImplementedError(msg)
+
     def close(self) -> None:
         """Close the shell session and clean up resources."""
         self._closed = True

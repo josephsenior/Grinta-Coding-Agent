@@ -236,6 +236,8 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         """Validate URL fields if provided."""
         if v is not None:
             v = v.strip()
+            if not v:
+                return None
             from backend.core.type_safety.type_safety import validate_non_empty_string
 
             validate_non_empty_string(v, name="url")

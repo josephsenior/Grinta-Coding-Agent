@@ -38,7 +38,6 @@ from backend.api.services.session_init_service import (
     validate_remote_api_request,
 )
 from backend.api.types import LLMAuthenticationError, MissingSettingsError
-from backend.api.user_auth import AuthType
 from backend.storage.data_models.conversation_metadata import ConversationTrigger
 from backend.storage.data_models.user_secrets import UserSecrets
 
@@ -164,7 +163,7 @@ class TestExtractRequestData:
 class TestDetermineConversationTrigger:
     def test_default_is_gui(self):
         trigger, repo, provider = determine_conversation_trigger(
-            suggested_task=None, create_playbook=None, auth_type=None
+            suggested_task=None, create_playbook=None
         )
         assert trigger == ConversationTrigger.GUI
         assert repo is None
@@ -173,7 +172,7 @@ class TestDetermineConversationTrigger:
     def test_suggested_task_sets_trigger(self):
         task = _make_suggested_task()
         trigger, repo, provider = determine_conversation_trigger(
-            suggested_task=task, create_playbook=None, auth_type=None
+            suggested_task=task, create_playbook=None
         )
         assert trigger == ConversationTrigger.SUGGESTED_TASK
         assert repo is None
@@ -185,7 +184,7 @@ class TestDetermineConversationTrigger:
             vcs_provider=ProviderType.ENTERPRISE_SSO,
         )
         trigger, repo, provider = determine_conversation_trigger(
-            suggested_task=None, create_playbook=playbook, auth_type=None
+            suggested_task=None, create_playbook=playbook
         )
         assert trigger == ConversationTrigger.PLAYBOOK_MANAGEMENT
         assert repo == "myorg/myrepo"
@@ -194,37 +193,11 @@ class TestDetermineConversationTrigger:
     def test_create_playbook_without_provider(self):
         playbook = _make_create_playbook(repo="myorg/repoX", vcs_provider=None)
         trigger, repo, provider = determine_conversation_trigger(
-            suggested_task=None, create_playbook=playbook, auth_type=None
+            suggested_task=None, create_playbook=playbook
         )
         assert trigger == ConversationTrigger.PLAYBOOK_MANAGEMENT
         assert repo == "myorg/repoX"
         assert provider is None
-
-    def test_bearer_auth_overrides_gui_default(self):
-        trigger, repo, provider = determine_conversation_trigger(
-            suggested_task=None, create_playbook=None, auth_type=AuthType.BEARER
-        )
-        assert trigger == ConversationTrigger.REMOTE_API_KEY
-
-    def test_bearer_auth_overrides_suggested_task(self):
-        task = _make_suggested_task()
-        trigger, repo, provider = determine_conversation_trigger(
-            suggested_task=task, create_playbook=None, auth_type=AuthType.BEARER
-        )
-        assert trigger == ConversationTrigger.REMOTE_API_KEY
-
-    def test_bearer_auth_overrides_playbook_management(self):
-        playbook = _make_create_playbook()
-        trigger, repo, provider = determine_conversation_trigger(
-            suggested_task=None, create_playbook=playbook, auth_type=AuthType.BEARER
-        )
-        assert trigger == ConversationTrigger.REMOTE_API_KEY
-
-    def test_non_bearer_auth_type_does_not_change_trigger(self):
-        trigger, _, _ = determine_conversation_trigger(
-            suggested_task=None, create_playbook=None, auth_type=None
-        )
-        assert trigger == ConversationTrigger.GUI
 
 
 # ---------------------------------------------------------------------------
@@ -233,48 +206,20 @@ class TestDetermineConversationTrigger:
 
 
 class TestValidateRemoteApiRequest:
-    def test_remote_api_key_with_no_message_returns_400(self):
-        response = validate_remote_api_request(
-            ConversationTrigger.REMOTE_API_KEY, ""
-        )
-        assert isinstance(response, JSONResponse)
-        assert response.status_code == 400
-
-    def test_remote_api_key_with_none_message_returns_400(self):
-        response = validate_remote_api_request(
-            ConversationTrigger.REMOTE_API_KEY, None
-        )
-        assert isinstance(response, JSONResponse)
-        assert response.status_code == 400
-
-    def test_remote_api_key_with_message_returns_none(self):
-        response = validate_remote_api_request(
-            ConversationTrigger.REMOTE_API_KEY, "Fix the bug"
-        )
-        assert response is None
-
     def test_gui_trigger_with_no_message_returns_none(self):
-        response = validate_remote_api_request(
-            ConversationTrigger.GUI, ""
-        )
+        response = validate_remote_api_request("")
         assert response is None
 
     def test_gui_trigger_with_message_returns_none(self):
-        response = validate_remote_api_request(
-            ConversationTrigger.GUI, "Do something"
-        )
+        response = validate_remote_api_request("Do something")
         assert response is None
 
     def test_suggested_task_trigger_no_message_returns_none(self):
-        response = validate_remote_api_request(
-            ConversationTrigger.SUGGESTED_TASK, ""
-        )
+        response = validate_remote_api_request("")
         assert response is None
 
     def test_playbook_trigger_no_message_returns_none(self):
-        response = validate_remote_api_request(
-            ConversationTrigger.PLAYBOOK_MANAGEMENT, ""
-        )
+        response = validate_remote_api_request("")
         assert response is None
 
 

@@ -61,7 +61,7 @@ class TestFileSettingsStoreLoad:
         fs = MagicMock()
         store = FileSettingsStore(file_store=fs)
 
-        data = json.dumps({"language": "python", "agent": "CodeActAgent"})
+        data = json.dumps({"language": "python", "agent": "Orchestrator"})
 
         with patch(
             "backend.storage.settings.file_settings_store.call_sync_from_async",

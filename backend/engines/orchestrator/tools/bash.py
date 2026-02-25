@@ -1,4 +1,4 @@
-"""Bash execution tool used by the CodeAct agent."""
+"""Bash execution tool used by the Orchestrator agent."""
 
 from __future__ import annotations
 

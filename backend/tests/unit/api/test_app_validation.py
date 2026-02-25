@@ -8,46 +8,12 @@ from unittest.mock import MagicMock, patch
 
 # We test the individual validation functions, not the full app startup.
 from backend.api.app import (
-    _check_api_key_security,
     _check_budget_sanity,
     _check_config_file_existence,
     _check_database_availability,
     _check_system_dependencies,
     _collect_validation_issues,
 )
-
-
-# ── _check_api_key_security ──────────────────────────────────────────
-
-
-class TestCheckApiKeySecurity:
-    def test_insecure_key_warns(self):
-        warnings: list[str] = []
-        errors: list[str] = []
-        with patch("backend.api.app.server_config") as mock_cfg:
-            mock_cfg.session_api_key = "forge_dev_key"
-            _check_api_key_security(warnings, errors, strict=False)
-        assert len(warnings) == 1
-        assert "insecure" in warnings[0].lower()
-        assert not errors
-
-    def test_insecure_key_errors_in_strict(self):
-        warnings: list[str] = []
-        errors: list[str] = []
-        with patch("backend.api.app.server_config") as mock_cfg:
-            mock_cfg.session_api_key = "forge_dev_key"
-            _check_api_key_security(warnings, errors, strict=True)
-        assert len(errors) == 1
-        assert not warnings
-
-    def test_secure_key_no_warnings(self):
-        warnings: list[str] = []
-        errors: list[str] = []
-        with patch("backend.api.app.server_config") as mock_cfg:
-            mock_cfg.session_api_key = "a-real-secure-key-12345"
-            _check_api_key_security(warnings, errors, strict=False)
-        assert not warnings
-        assert not errors
 
 
 # ── _check_budget_sanity ─────────────────────────────────────────────
@@ -152,7 +118,6 @@ class TestCheckConfigFileExistence:
 class TestCollectValidationIssues:
     def test_returns_tuple_of_lists(self):
         with (
-            patch("backend.api.app._check_api_key_security"),
             patch("backend.api.app._check_budget_sanity"),
             patch("backend.api.app._check_database_availability"),
             patch("backend.api.app._check_system_dependencies"),

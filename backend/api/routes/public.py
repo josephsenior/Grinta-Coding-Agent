@@ -5,6 +5,8 @@ from typing import Any
 from fastapi import APIRouter
 
 # Import engines to register all agents
+import backend.engines.orchestrator  # noqa: F401 - registers Orchestrator agent
+import backend.engines.echo  # noqa: F401 - registers Echo agent
 from backend.controller.agent import Agent
 from backend.llm.model_catalog import get_supported_llm_models
 from backend.security.options import SecurityAnalyzers

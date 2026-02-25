@@ -123,6 +123,39 @@ class HallucinationDetector:
 
         return findings
 
+    def _collect_hallucination_findings(
+        self,
+        llm_response_text: str,
+        tools_called: list[str],
+        actions: list[Action],
+    ) -> list[dict]:
+        """Run all hallucination detectors and collect findings."""
+        findings = []
+        creation_h = self._detect_file_creation_hallucination(
+            llm_response_text, tools_called, actions
+        )
+        if creation_h:
+            findings.append(creation_h)
+        edit_h = self._detect_file_edit_hallucination(
+            llm_response_text, tools_called, actions
+        )
+        if edit_h:
+            findings.append(edit_h)
+        exec_h = self._detect_code_exec_hallucination(
+            llm_response_text, tools_called, actions
+        )
+        if exec_h:
+            findings.append(exec_h)
+        claimed_paths = self._extract_claimed_paths(llm_response_text)
+        state_findings = self._check_state_consistency(
+            claimed_paths, exec_h is not None
+        )
+        existing = {f["claim"] for f in findings}
+        for f in state_findings:
+            if f["claim"] not in existing:
+                findings.append(f)
+        return findings
+
     def detect_text_hallucination(
         self, llm_response_text: str, tools_called: list[str], actions: list[Action]
     ) -> dict:
@@ -145,54 +178,18 @@ class HallucinationDetector:
         if not self.detection_enabled:
             return {"hallucinated": False}
 
-        hallucinations = []
-
-        # Check for file creation claims
-        creation_hallucination = self._detect_file_creation_hallucination(
+        hallucinations = self._collect_hallucination_findings(
             llm_response_text, tools_called, actions
         )
-        if creation_hallucination:
-            hallucinations.append(creation_hallucination)
-
-        # Check for file edit claims
-        edit_hallucination = self._detect_file_edit_hallucination(
-            llm_response_text, tools_called, actions
-        )
-        if edit_hallucination:
-            hallucinations.append(edit_hallucination)
-
-        # Check for code execution claims
-        exec_hallucination = self._detect_code_exec_hallucination(
-            llm_response_text, tools_called, actions
-        )
-        if exec_hallucination:
-            hallucinations.append(exec_hallucination)
-
-        # --- State-based layer: extract all claimed paths from text ---
-        claimed_paths = self._extract_claimed_paths(llm_response_text)
-        claimed_exec = exec_hallucination is not None
-        state_findings = self._check_state_consistency(claimed_paths, claimed_exec)
-        # Only add state-based findings that aren't already caught by pattern matching
-        existing_claims = {h["claim"] for h in hallucinations}
-        for finding in state_findings:
-            if finding["claim"] not in existing_claims:
-                hallucinations.append(finding)
-
-        # Aggregate results
         if not hallucinations:
             return {"hallucinated": False}
-
-        # Determine severity based on number and type of hallucinations
-        severity = self._calculate_severity(hallucinations)
 
         return {
             "hallucinated": True,
             "confidence": max(h["confidence"] for h in hallucinations),
             "claimed_operations": [h["claim"] for h in hallucinations],
-            "missing_tools": list(
-                {tool for h in hallucinations for tool in h["missing_tools"]}
-            ),
-            "severity": severity,
+            "missing_tools": list({t for h in hallucinations for t in h["missing_tools"]}),
+            "severity": self._calculate_severity(hallucinations),
             "details": hallucinations,
         }
 

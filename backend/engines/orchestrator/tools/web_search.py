@@ -1,4 +1,4 @@
-"""Web search tool for the CodeAct agent.
+"""Web search tool for the Orchestrator agent.
 
 Provides a structured interface for searching the web via available
 search providers. Tries (in order):

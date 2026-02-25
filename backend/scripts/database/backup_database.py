@@ -223,98 +223,68 @@ async def create_backup():
         sys.exit(1)
 
 
+def _build_restore_env() -> dict[str, str]:
+    """Build environment for restore with DB credentials."""
+    env = os.environ.copy()
+    env["PGPASSWORD"] = os.getenv("DB_PASSWORD", "")
+    return env
+
+
+def _build_restore_cmd(
+    backup_path: Path,
+    pg_restore_exe: str | None,
+    psql_exe: str | None,
+) -> list[str]:
+    """Build restore command (pg_restore or psql) based on backup format."""
+    host = os.getenv("DB_HOST", "localhost")
+    port = os.getenv("DB_PORT", "5432")
+    user = os.getenv("DB_USER", "postgres")
+    db_name = os.getenv("DB_NAME", "forge")
+    is_custom = backup_path.suffix == ".sql" and backup_path.stat().st_size < 1000
+    if is_custom or backup_path.suffix == ".dump":
+        return [
+            pg_restore_exe, "-h", host, "-p", port, "-U", user,
+            "-d", db_name, "--clean", "--if-exists", str(backup_path),
+        ]
+    return [
+        psql_exe, "-h", host, "-p", port, "-U", user,
+        "-d", db_name, "-f", str(backup_path),
+    ]
+
+
 async def restore_backup(backup_file: str):
     """Restore database from backup file."""
     backup_path = Path(backup_file)
-
     if not backup_path.exists():
         print(f"ERROR: Backup file not found: {backup_file}")
         sys.exit(1)
 
     print("WARNING: This will overwrite the current database!")
     print(f"Backup file: {backup_file}")
-    response = input("Are you sure you want to continue? (yes/no): ")
-
-    if response.lower() != "yes":
+    if input("Are you sure you want to continue? (yes/no): ").lower() != "yes":
         print("Restore cancelled.")
         return
 
     try:
-        host = os.getenv("DB_HOST", "localhost")
-        port = os.getenv("DB_PORT", "5432")
-        user = os.getenv("DB_USER", "postgres")
-        password = os.getenv("DB_PASSWORD", "")
-        db_name = os.getenv("DB_NAME", "forge")
-
-        env = os.environ.copy()
-        env["PGPASSWORD"] = password
-
-        # Determine backup format
-        is_custom_format = (
-            backup_path.suffix == ".sql" and backup_path.stat().st_size < 1000
-        )  # Heuristic
-
-        # Find PostgreSQL tools
         pg_restore_exe = find_pg_tool("pg_restore")
         psql_exe = find_pg_tool("psql")
-
         if not pg_restore_exe or not psql_exe:
-            print(
-                "ERROR: pg_restore/psql not found. Please install PostgreSQL client tools."
-            )
-            print(
-                "  Or set POSTGRES_BIN environment variable to PostgreSQL bin directory"
-            )
+            print("ERROR: pg_restore/psql not found. Please install PostgreSQL client tools.")
+            print("  Or set POSTGRES_BIN environment variable to PostgreSQL bin directory")
             sys.exit(1)
 
-        if is_custom_format or backup_path.suffix == ".dump":
-            # Custom format backup
-            cmd = [
-                pg_restore_exe,
-                "-h",
-                host,
-                "-p",
-                port,
-                "-U",
-                user,
-                "-d",
-                db_name,
-                "--clean",  # Clean (drop) database objects before recreating
-                "--if-exists",  # Don't error if object doesn't exist
-                str(backup_path),
-            ]
-        else:
-            # Plain SQL backup
-            cmd = [
-                psql_exe,
-                "-h",
-                host,
-                "-p",
-                port,
-                "-U",
-                user,
-                "-d",
-                db_name,
-                "-f",
-                str(backup_path),
-            ]
-
+        cmd = _build_restore_cmd(backup_path, pg_restore_exe, psql_exe)
+        env = _build_restore_env()
         print("Restoring backup...")
-        result = subprocess.run(
-            cmd, check=False, env=env, capture_output=True, text=True
-        )
+        result = subprocess.run(cmd, check=False, env=env, capture_output=True, text=True)
 
         if result.returncode != 0:
             print("ERROR: Restore failed")
             print(f"stderr: {result.stderr}")
             sys.exit(1)
-
         print(f"✓ Database restored successfully from {backup_file}")
-
     except FileNotFoundError:
-        print(
-            "ERROR: pg_restore/psql not found. Please install PostgreSQL client tools."
-        )
+        print("ERROR: pg_restore/psql not found. Please install PostgreSQL client tools.")
         sys.exit(1)
     except Exception as e:
         print(f"ERROR: Restore failed: {e}")

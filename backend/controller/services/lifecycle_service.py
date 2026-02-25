@@ -36,13 +36,9 @@ class LifecycleService:
     ) -> None:
         """Initialize identifiers, event subscriptions, and shared references."""
         controller = self._controller
-        controller.id = sid or event_stream.sid  # type: ignore[misc]
         controller.user_id = user_id
         controller.file_store = file_store
-        controller.agent = agent  # type: ignore[misc]
         controller.headless_mode = headless_mode
-        controller.conversation_stats = conversation_stats  # type: ignore[misc]
-        controller.event_stream = event_stream  # type: ignore[misc]
         controller.status_callback = status_callback
         controller.security_analyzer = security_analyzer
 
@@ -76,7 +72,6 @@ class LifecycleService:
             max_budget_per_task=budget_per_task_delta,
             confirmation_mode=confirmation_mode,
         )
-        controller.state = controller.state_tracker.state  # type: ignore[misc]
         controller.confirmation_mode = confirmation_mode
         controller._replay_manager = ReplayManager(replay_events)
 

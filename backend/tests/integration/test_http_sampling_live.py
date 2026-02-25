@@ -41,10 +41,6 @@ class _TestTracer:
 @contextmanager
 def build_client(env: dict, tracer_store: list[_TestSpan] | None = None):
     # Apply environment overrides for this test scope.
-    # Disable session API key enforcement for this in-process TestClient.
-    # Auth is normally enabled by default (auto-generated key), but these
-    # OTEL sampling tests only care about span creation, not auth.
-    env = {"SESSION_API_KEY": "", **env}
 
     # OTEL config prefers TRACING_ENABLED over OTEL_ENABLED.
     # Mirror the setting so test behavior is stable regardless of outer env.

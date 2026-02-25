@@ -207,6 +207,52 @@ class PathValidator:
         )
 
 
+def _validate_path_string(path: str) -> str:
+    """Validate path string: empty check, URL decode, null bytes, length, dangerous chars, traversal."""
+    if not path or not isinstance(path, str):
+        raise PathValidationError("Path must be a non-empty string", path)
+    try:
+        path = unquote(path)
+    except Exception as e:
+        raise PathValidationError(f"Invalid URL encoding: {e}", path) from e
+    if "\x00" in path:
+        raise PathValidationError("Path contains null bytes", path)
+    if len(path) > MAX_PATH_LENGTH:
+        raise PathValidationError(f"Path too long (max {MAX_PATH_LENGTH}): {len(path)}", path)
+    for char in DANGEROUS_CHARS:
+        if char in path:
+            raise PathValidationError(f"Path contains dangerous character: {repr(char)}", path)
+    normalized_input = path.replace("\\", "/")
+    for pattern in PATH_TRAVERSAL_PATTERNS:
+        if pattern in normalized_input:
+            raise PathValidationError(f"Path traversal detected: {pattern}", path)
+    return path
+
+
+def _resolve_path(
+    path: str, workspace_root: str | Path | None, must_be_relative: bool
+) -> Path:
+    """Resolve path to absolute Path, enforcing workspace boundary if must_be_relative."""
+    try:
+        if must_be_relative:
+            if workspace_root is None:
+                raise PathValidationError("workspace_root required for relative paths", path)
+            workspace = Path(workspace_root).resolve()
+            normalized = posixpath.normpath(path.lstrip("/"))
+            full_path = (workspace / normalized).resolve()
+            try:
+                full_path.relative_to(workspace)
+            except ValueError:
+                raise PathValidationError(f"Path outside workspace boundary: {path}", path) from None
+            depth = len(full_path.relative_to(workspace).parts)
+            if depth > 100:
+                raise PathValidationError(f"Path depth too great (max 100): {depth}", path)
+            return full_path
+        return Path(path).resolve()
+    except (OSError, ValueError) as e:
+        raise PathValidationError(f"Invalid path: {e}", path) from e
+
+
 def validate_and_sanitize_path(
     path: str,
     workspace_root: str | Path | None = None,
@@ -215,104 +261,11 @@ def validate_and_sanitize_path(
 ) -> Path:
     """Validate and sanitize a file path with security checks.
 
-    This is the core validation function that:
-    - Prevents directory traversal attacks
-    - Validates path length
-    - Removes dangerous characters
-    - Enforces workspace boundaries
-    - Normalizes paths safely
-
-    Args:
-        path: Path string to validate
-        workspace_root: Workspace root directory (required if must_be_relative)
-        must_exist: Whether path must exist
-        must_be_relative: Whether path must be relative to workspace
-
-    Returns:
-        Validated Path object
-
-    Raises:
-        PathValidationError: If validation fails
-
-    Example:
-        >>> validate_and_sanitize_path("app.py", workspace_root="/workspace")
-        PosixPath('/workspace/app.py')
-        >>> validate_and_sanitize_path("../etc/passwd", workspace_root="/workspace")
-        PathValidationError: Path traversal detected
+    Prevents directory traversal, validates length, removes dangerous chars,
+    enforces workspace boundaries, normalizes paths.
     """
-    if not path or not isinstance(path, str):
-        raise PathValidationError("Path must be a non-empty string", path)
-
-    # Decode URL encoding
-    try:
-        path = unquote(path)
-    except Exception as e:
-        raise PathValidationError(f"Invalid URL encoding: {e}", path) from e
-
-    # Check for null bytes (security risk)
-    if "\x00" in path:
-        raise PathValidationError("Path contains null bytes", path)
-
-    # Check path length
-    if len(path) > MAX_PATH_LENGTH:
-        raise PathValidationError(
-            f"Path too long (max {MAX_PATH_LENGTH}): {len(path)}", path
-        )
-
-    # Check for dangerous characters
-    for char in DANGEROUS_CHARS:
-        if char in path:
-            raise PathValidationError(
-                f"Path contains dangerous character: {repr(char)}", path
-            )
-
-    # Check for path traversal patterns
-    normalized_input = path.replace("\\", "/")  # Normalize separators
-    for pattern in PATH_TRAVERSAL_PATTERNS:
-        if pattern in normalized_input:
-            raise PathValidationError(f"Path traversal detected: {pattern}", path)
-
-    # Normalize path
-    try:
-        if must_be_relative:
-            if workspace_root is None:
-                raise PathValidationError(
-                    "workspace_root required for relative paths", path
-                )
-
-            # Resolve relative to workspace
-            workspace = Path(workspace_root).resolve()
-            normalized = posixpath.normpath(path.lstrip("/"))
-
-            # Build full path
-            full_path = (workspace / normalized).resolve()
-
-            # Security check: ensure path is within workspace
-            try:
-                full_path.relative_to(workspace)
-            except ValueError:
-                raise PathValidationError(
-                    f"Path outside workspace boundary: {path}", path
-                ) from None
-
-            # Check depth (prevent deep nesting attacks)
-            depth = len(full_path.relative_to(workspace).parts)
-            if depth > 100:  # Reasonable limit
-                raise PathValidationError(
-                    f"Path depth too great (max 100): {depth}", path
-                )
-
-            validated_path = full_path
-
-        else:
-            # Absolute path (use with caution)
-            validated_path = Path(path).resolve()
-
-    except (OSError, ValueError) as e:
-        raise PathValidationError(f"Invalid path: {e}", path) from e
-
-    # Check if path must exist
+    sanitized = _validate_path_string(path)
+    validated_path = _resolve_path(sanitized, workspace_root, must_be_relative)
     if must_exist and not validated_path.exists():
         raise PathValidationError(f"Path does not exist: {path}", path)
-
     return validated_path

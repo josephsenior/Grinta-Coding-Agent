@@ -7,16 +7,9 @@
 ##############################################################################
 
 ################################ Security ####################################
-# Authentication and authorization settings (OSS Mode)
+# Security-related settings
 ##############################################################################
 [security]
-# Unique key for session management (replaces password login)
-# If not set, the server will log a warning and use a default 'dev' key
-# Provide this key in the 'X-Session-API-Key' header
-# IMPORTANT: Change this key before deploying to any shared/public environment.
-# If left empty or removed, the server will auto-generate a secure random key
-# and persist it to .env.local on first startup.
-# session_api_key = ""
 
 #################################### Core ####################################
 # General core configurations
@@ -74,7 +67,7 @@ max_budget_per_task = 5.0
 # Name of the default agent
 #default_agent = "Orchestrator"
 
-# JWT secret for authentication
+# JWT secret
 #jwt_secret = ""
 
 # Restrict file types for file uploads
@@ -224,7 +217,7 @@ model = "gpt-4o-mini"
 #   - Auto-detect the Ollama provider
 #   - Strip the "ollama/" prefix before sending to Ollama's API
 #   - Default base_url to http://localhost:11434/v1
-#   - Skip API key validation (Ollama doesn't require auth)
+#   - Skip API key validation (Ollama doesn't require credentials)
 #
 # Setup:
 #   1. Install Ollama from https://ollama.ai

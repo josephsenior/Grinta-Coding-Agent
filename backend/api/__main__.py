@@ -20,7 +20,7 @@ def main() -> None:
 
     Production Deployment:
         For production with multiple workers, use gunicorn:
-        gunicorn forge.server.listen:app \
+        gunicorn backend.api.listen:app \
             --workers 4 \
             --worker-class uvicorn.workers.UvicornWorker \
             --bind 0.0.0.0:3000 \
@@ -77,7 +77,7 @@ def main() -> None:
         },
     }
     uvicorn.run(
-        "forge.server.listen:app",
+        "backend.api.listen:app",
         host=host,  # nosec B104 - Safe: web server intentionally accessible on all interfaces
         port=port,
         log_config=log_config,

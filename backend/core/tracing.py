@@ -101,57 +101,52 @@ def _configure_exporter(exporter: str, endpoint: str | None) -> tuple[Any | None
     return exporter_instance, exporter_type
 
 
+def _try_jaeger_otlp(endpoint: str | None) -> Any | None:
+    """Try OTLP exporter for Jaeger. Returns exporter or None on ImportError."""
+    try:
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
+        )
+    except ImportError:
+        logger.warning("OTLP exporter not available, falling back to Thrift")
+        return None
+    otlp = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or endpoint or "http://localhost:4318/v1/traces"
+    if not otlp.endswith("/v1/traces"):
+        otlp = otlp.rstrip("/") + "/v1/traces"
+    logger.info("Jaeger OTLP exporter configured: %s", otlp)
+    return OTLPSpanExporter(endpoint=otlp)
+
+
+def _try_jaeger_thrift(endpoint: str | None) -> Any | None:
+    """Try Jaeger Thrift exporter. Returns exporter or None on ImportError."""
+    try:
+        from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+    except ImportError:
+        logger.warning("Jaeger Thrift exporter not available, falling back to console")
+        return None
+    ep = endpoint or os.getenv("JAEGER_ENDPOINT", "http://localhost:14268/api/traces")
+    exporter = JaegerExporter(
+        agent_host_name=os.getenv("JAEGER_AGENT_HOST", "localhost"),
+        agent_port=int(os.getenv("JAEGER_AGENT_PORT", "6831")),
+        endpoint=ep,
+    )
+    logger.info("Jaeger Thrift exporter configured: %s", ep)
+    return exporter
+
+
 def _configure_jaeger(endpoint: str | None):
     """Configure Jaeger exporter with support for both OTLP and Thrift protocols."""
     try:
-        # Check if OTLP endpoint is explicitly configured
-        otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-        use_otlp = otlp_endpoint is not None or (
+        otlp_env = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+        use_otlp = otlp_env is not None or (
             endpoint and ("4318" in endpoint or "/v1/traces" in endpoint)
         )
-
         if use_otlp:
-            # Try OTLP exporter (recommended for Jaeger all-in-one with OTLP support)
-            try:
-                from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-                    OTLPSpanExporter,
-                )
-
-                otlp_endpoint = (
-                    otlp_endpoint or endpoint or "http://localhost:4318/v1/traces"
-                )
-
-                # Ensure endpoint ends with /v1/traces
-                if not otlp_endpoint.endswith("/v1/traces"):
-                    if otlp_endpoint.endswith("/"):
-                        otlp_endpoint = otlp_endpoint.rstrip("/")
-                    otlp_endpoint = f"{otlp_endpoint}/v1/traces"
-
-                exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
-                logger.info("Jaeger OTLP exporter configured: %s", otlp_endpoint)
+            exporter = _try_jaeger_otlp(otlp_env or endpoint)
+            if exporter is not None:
                 return exporter
-            except ImportError:
-                logger.warning("OTLP exporter not available, falling back to Thrift")
-
-        # Use Jaeger Thrift exporter (default)
-        try:
-            from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-
-            endpoint = endpoint or os.getenv(
-                "JAEGER_ENDPOINT", "http://localhost:14268/api/traces"
-            )
-            exporter = JaegerExporter(
-                agent_host_name=os.getenv("JAEGER_AGENT_HOST", "localhost"),
-                agent_port=int(os.getenv("JAEGER_AGENT_PORT", "6831")),
-                endpoint=endpoint,
-            )
-            logger.info("Jaeger Thrift exporter configured: %s", endpoint)
-            return exporter
-        except ImportError:
-            logger.warning(
-                "Jaeger Thrift exporter not available, falling back to console"
-            )
-            return _configure_console()
+        exporter = _try_jaeger_thrift(endpoint)
+        return exporter if exporter is not None else _configure_console()
     except Exception as e:
         logger.error("Failed to configure Jaeger exporter: %s", e, exc_info=True)
         return _configure_console()

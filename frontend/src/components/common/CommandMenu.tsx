@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "cmdk";
 import { Hammer, Settings, BookOpen, Activity, MessageSquare, Plus } from "lucide-react";
 import { useConversations } from "@/hooks/use-conversations";
-import { useAppStore } from "@/stores/app-store";
+import { useNewConversation } from "@/hooks/use-new-conversation";
 import { cn } from "@/lib/utils";
 
 interface CommandMenuProps {
@@ -14,7 +14,7 @@ interface CommandMenuProps {
 export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
   const navigate = useNavigate();
   const { data } = useConversations();
-  const setNewConvOpen = useAppStore((s) => s.setNewConvOpen);
+  const { create: handleCreate } = useNewConversation();
 
   // Keyboard shortcut: Ctrl+K
   const handleKeyDown = useCallback(
@@ -48,7 +48,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
         <CommandEmpty>No results found.</CommandEmpty>
 
         <CommandGroup heading="Actions">
-          <CommandItem onSelect={() => runCommand(() => setNewConvOpen(true))}>
+          <CommandItem onSelect={() => runCommand(handleCreate)}>
             <Plus className="mr-2 h-4 w-4" />
             New Conversation
             <span className="ml-auto text-xs text-muted-foreground">Ctrl+N</span>

@@ -133,6 +133,10 @@ def _extract_observation_data(observation: dict) -> tuple[str, dict, dict]:
         else:
             extras.pop(field, None)
 
+    # Remove transient runtime-only fields that are set as attributes after
+    # construction and must not be passed back to __init__ on deserialization.
+    observation.pop("tool_result", None)
+
     # Remaining keys (e.g., command, metadata) should be treated as extras/kwargs
     if observation:
         extras.update(observation)

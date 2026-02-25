@@ -22,6 +22,8 @@ from backend.events.observation import ErrorObservation, Observation
 from backend.memory.condenser.condenser import BaseLLMCondenser, Condensation
 from backend.memory.view import View
 
+_CRITICAL_ERROR_KEYWORDS = ("critical", "crash", "fatal", "stuck")
+
 
 class SmartCondenser(BaseLLMCondenser):
     """LLM-assisted condenser that preserves critical information.
@@ -124,99 +126,83 @@ class SmartCondenser(BaseLLMCondenser):
 
         """
         essential = set()
-
-        # Keep first N events
         for event in events[: self.keep_first]:
             essential.add(event.id)
 
-        # Keep first user message
-        first_user_msg = next(
-            (
-                e
-                for e in events
-                if isinstance(e, MessageAction) and e.source == EventSource.USER
-            ),
+        first_user = next(
+            (e for e in events if isinstance(e, MessageAction) and e.source == EventSource.USER),
             None,
         )
-        if first_user_msg:
-            essential.add(first_user_msg.id)
+        if first_user:
+            essential.add(first_user.id)
 
-        # --- Task tracker anchors ------------------------------------------------
-        # TaskTrackingAction events represent explicit human/agent goals; losing them
-        # during condensation causes the agent to lose track of what it was doing.
-        # We keep ALL task-tracker events regardless of their age.
         for event in events:
             if isinstance(event, TaskTrackingAction):
                 essential.add(event.id)
 
-        # Also load the active plan and keep the most recent task-tracker event
-        # that corresponds to any in-progress task (belt-and-suspenders anchor).
         self._anchor_active_plan_events(events, essential)
-        # -------------------------------------------------------------------------
-
-        # Keep critical errors (recent ones)
-        recent_events = events[-50:]
-        for event in recent_events:
-            if isinstance(event, ErrorObservation):
-                error_content = event.content.lower()
-                # Keep critical errors
-                if any(
-                    keyword in error_content
-                    for keyword in ["critical", "crash", "fatal", "stuck"]
-                ):
-                    essential.add(event.id)
-
+        self._add_critical_error_ids(events[-50:], essential)
         return essential
+
+    def _add_critical_error_ids(self, events: list[Event], essential: set[int]) -> None:
+        """Add IDs of ErrorObservation events with critical keywords to essential."""
+        for event in events:
+            if isinstance(event, ErrorObservation) and any(
+                kw in event.content.lower() for kw in _CRITICAL_ERROR_KEYWORDS
+            ):
+                essential.add(event.id)
 
     def _anchor_active_plan_events(self, events: list[Event], essential: set[int]) -> None:
         """Load .forge/active_plan.json and mark the most recent TaskTrackingAction
         event as essential. This creates a hard condensation anchor so the LLM
         always wakes up after condensation knowing exactly which task it was on.
-
-        Args:
-            events: All events in the current view.
-            essential: The set to add essential event IDs into (mutated in place).
         """
-        workspace_root = os.environ.get("FORGE_WORKSPACE_DIR", ".")
-        plan_path = Path(workspace_root) / ".forge" / "active_plan.json"
+        in_progress_task_ids = self._load_in_progress_task_ids()
+        if in_progress_task_ids:
+            self._anchor_by_task_ids(events, essential, in_progress_task_ids)
+        else:
+            self._anchor_last_task_tracker(events, essential)
+
+    def _load_in_progress_task_ids(self) -> set[str]:
+        """Load in-progress task IDs from .forge/active_plan.json, or empty set."""
+        plan_path = Path(os.environ.get("FORGE_WORKSPACE_DIR", ".")) / ".forge" / "active_plan.json"
+        tasks = self._parse_tasks_from_plan(plan_path)
+        return self._extract_in_progress_ids(tasks)
+
+    def _parse_tasks_from_plan(self, plan_path: Path) -> list[Any]:
+        """Parse tasks from plan JSON. Returns empty list on failure."""
         if not plan_path.exists():
-            return
+            return []
         try:
             plan = json.loads(plan_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
-            return
-
-        # Find in-progress task IDs from the plan.
-        # The plan file schema has evolved; tolerate either:
-        #  - {"tasks": [...]} (preferred)
-        #  - [...]            (legacy / simplified)
-        in_progress_task_ids: set[str] = set()
+            return []
         if isinstance(plan, dict):
-            tasks = plan.get("tasks", [])
-        elif isinstance(plan, list):
-            tasks = plan
-        else:
-            return
+            return plan.get("tasks", [])
+        return plan if isinstance(plan, list) else []
+
+    def _extract_in_progress_ids(self, tasks: list[Any]) -> set[str]:
+        """Extract IDs of tasks with status 'in_progress'."""
+        ids: set[str] = set()
         for task in tasks:
-            if not isinstance(task, dict):
-                continue
-            if task.get("status") == "in_progress":
+            if isinstance(task, dict) and task.get("status") == "in_progress":
                 tid = task.get("id") or task.get("title") or ""
                 if tid:
-                    in_progress_task_ids.add(str(tid))
+                    ids.add(str(tid))
+        return ids
 
-        if not in_progress_task_ids:
-            # No in-progress tasks — anchor the last task-tracker event
-            for event in reversed(events):
-                if isinstance(event, TaskTrackingAction):
-                    essential.add(event.id)
-                    logger.debug(
-                        "SmartCondenser: anchored last TaskTrackingAction id=%s", event.id
-                    )
-                    break
-            return
+    def _anchor_last_task_tracker(self, events: list[Event], essential: set[int]) -> None:
+        """Anchor the last TaskTrackingAction when no in-progress tasks exist."""
+        for event in reversed(events):
+            if isinstance(event, TaskTrackingAction):
+                essential.add(event.id)
+                logger.debug("SmartCondenser: anchored last TaskTrackingAction id=%s", event.id)
+                break
 
-        # Anchor the most recent TaskTrackingAction that references an in-progress task
+    def _anchor_by_task_ids(
+        self, events: list[Event], essential: set[int], in_progress_task_ids: set[str]
+    ) -> None:
+        """Anchor the most recent TaskTrackingAction that references an in-progress task."""
         for event in reversed(events):
             if isinstance(event, TaskTrackingAction):
                 content = getattr(event, "content", "") or ""
@@ -225,13 +211,8 @@ class SmartCondenser(BaseLLMCondenser):
                     logger.debug(
                         "SmartCondenser: anchored in-progress TaskTrackingAction id=%s", event.id
                     )
-                    break
-        else:
-            # Fallback: anchor last TaskTrackingAction regardless
-            for event in reversed(events):
-                if isinstance(event, TaskTrackingAction):
-                    essential.add(event.id)
-                    break
+                    return
+        self._anchor_last_task_tracker(events, essential)
 
     def _score_event_importance(
         self,
@@ -280,35 +261,23 @@ class SmartCondenser(BaseLLMCondenser):
 
         """
         scores: dict[int, float] = {}
-
         for event in events:
-            score = 0.5  # Default medium importance
-
-            # User messages are important
-            if isinstance(event, MessageAction) and event.source == EventSource.USER:
-                score = 0.9
-
-            # Task tracker updates are critical anchors — never drop them
-            elif isinstance(event, TaskTrackingAction):
-                score = 1.0
-
-            # Errors are important
-            elif isinstance(event, ErrorObservation):
-                score = 0.8
-
-            # Actions that modify state are important
-            elif isinstance(event, Action):
-                if hasattr(event, "runnable") and event.runnable:
-                    score = 0.7
-
-            # Observations with long content might be important
-            elif isinstance(event, Observation):
-                if len(event.content) > 500:
-                    score = 0.6
-
-            scores[event.id] = score
-
+            scores[event.id] = self._heuristic_score_single(event)
         return scores
+
+    def _heuristic_score_single(self, event: Event) -> float:
+        """Return heuristic importance score for a single event."""
+        if isinstance(event, MessageAction) and event.source == EventSource.USER:
+            return 0.9
+        if isinstance(event, TaskTrackingAction):
+            return 1.0
+        if isinstance(event, ErrorObservation):
+            return 0.8
+        if isinstance(event, Action) and getattr(event, "runnable", False):
+            return 0.7
+        if isinstance(event, Observation) and len(event.content) > 500:
+            return 0.6
+        return 0.5
 
     def _score_event_batch_with_llm(self, events: list[Event]) -> dict[int, float]:
         """Score a batch of events using LLM.

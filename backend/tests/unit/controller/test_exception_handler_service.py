@@ -10,6 +10,7 @@ from backend.controller.services.exception_handler_service import (
     ExceptionHandlerService,
     _PASSTHROUGH_EXCEPTIONS,
 )
+from backend.core.errors import ModelProviderError
 from backend.llm.exceptions import RateLimitError, Timeout
 
 
@@ -61,3 +62,9 @@ class TestExceptionHandlerService:
         await svc.handle_step_exception(exc)
         reported = ctrl.recovery_service.react_to_exception.call_args[0][0]
         assert isinstance(reported, RateLimitError)
+
+    async def test_model_provider_error_passthrough(self, svc, ctrl):
+        exc = ModelProviderError("LLM returned no response")
+        await svc.handle_step_exception(exc)
+        reported = ctrl.recovery_service.react_to_exception.call_args[0][0]
+        assert reported is exc

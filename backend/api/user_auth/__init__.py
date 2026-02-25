@@ -35,7 +35,7 @@ def get_secrets_store() -> FileSecretsStore:
     return get_user_secret_store()
 
 
-def get_access_token() -> str | None:
+def get_access_token(request: Any | None = None) -> str | None:
     return None
 
 
@@ -53,17 +53,6 @@ async def get_user_secrets() -> UserSecrets | None:
     """Load secrets from the local file store."""
     store = get_user_secret_store()
     return await store.load()
-
-
-class AuthType:
-    NONE = "none"
-    TOKEN = "token"
-    BEARER = "bearer"
-    OAUTH = "oauth"  # Keep for compatibility
-
-
-def get_auth_type() -> str:
-    return AuthType.TOKEN
 
 
 def get_current_user_id() -> str:

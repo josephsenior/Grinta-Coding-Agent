@@ -218,16 +218,16 @@ class TestProcessLLMSection:
 
 
 class TestProcessSecuritySection:
-    def test_value_error_is_raised(self):
+    def test_value_error_is_recorded_as_warning(self):
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
             "backend.core.config.config_sections.SecurityConfig.from_toml_section",
             side_effect=ValueError("bad"),
         ):
-            with pytest.raises(ValueError):
-                process_security_section({"security": {"bad": True}}, cfg, summary)
+            process_security_section({"security": {"bad": True}}, cfg, summary)
         assert summary.records
+        assert summary.records[0][1] == "warning"
 
     def test_valid_security_section(self):
         """Test valid security section sets config."""

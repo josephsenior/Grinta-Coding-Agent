@@ -185,6 +185,33 @@ def is_openai_compatible(model: str) -> bool:
     )
 
 
+def supports_tool_choice(model: str) -> bool:
+    """Return whether model/provider supports explicit ``tool_choice`` parameter.
+
+    ``tool_choice`` is safe for OpenAI-compatible providers and Anthropic,
+    but not for native Google Gemini SDK calls.
+    """
+    entry = lookup(model)
+    if entry is None:
+        return False
+    if not entry.supports_function_calling:
+        return False
+    return entry.provider != "google"
+
+
+def prefers_short_tool_descriptions(model: str) -> bool:
+    """Return whether planner should use compact tool descriptions for *model*."""
+    entry = lookup(model)
+    if entry is None:
+        return False
+    normalized = entry.name.lower()
+    if entry.provider not in {"openai", "deepseek", "mistral", "xai"}:
+        return False
+    if normalized in {"o1", "o3", "o4"}:
+        return True
+    return normalized.startswith(("gpt-", "o1-", "o3-", "o4-", "codex"))
+
+
 def get_provider_info(model: str) -> dict[str, Any]:
     """Get provider information for a model.
 
@@ -211,6 +238,68 @@ def get_provider_info(model: str) -> dict[str, Any]:
         "max_input_tokens": None,
         "max_output_tokens": None,
     }
+
+
+def _resolve_provider_for_sanitization(model: str) -> str:
+    """Resolve provider name for parameter sanitization."""
+    entry = lookup(model)
+    if entry:
+        return entry.provider
+
+    model_lower = model.lower()
+    if any(x in model_lower for x in ("gemini", "google/")):
+        return "google"
+    if "claude" in model_lower or "anthropic" in model_lower:
+        return "anthropic"
+    return "openai"
+
+
+def sanitize_call_kwargs_for_provider(model: str, call_kwargs: dict) -> dict:
+    """Remove provider-incompatible kwargs from ``call_kwargs``.
+
+    This function is the canonical sanitization layer used before SDK calls.
+    It keeps planner/executor behavior stable while preventing provider-specific
+    transport errors from unsupported OpenAI-style parameters.
+    """
+
+    sanitized = dict(call_kwargs)
+    provider = _resolve_provider_for_sanitization(model)
+
+    # Google Gemini native SDK accepts a narrower send_message() surface.
+    if provider == "google":
+        for key in (
+            "tool_choice",
+            "extra_body",
+            "extra_headers",
+            "response_format",
+            "frequency_penalty",
+            "presence_penalty",
+            "logit_bias",
+            "seed",
+            "user",
+            "reasoning_effort",
+            "reasoning",
+            "parallel_tool_calls",
+            "metadata",
+        ):
+            sanitized.pop(key, None)
+        return sanitized
+
+    # Anthropic SDK is not OpenAI-chat API compatible for several optional fields.
+    if provider == "anthropic":
+        for key in (
+            "tool_choice",
+            "response_format",
+            "frequency_penalty",
+            "presence_penalty",
+            "logit_bias",
+            "parallel_tool_calls",
+            "extra_body",
+            "extra_headers",
+        ):
+            sanitized.pop(key, None)
+
+    return sanitized
 
 
 def apply_model_param_overrides(
@@ -260,6 +349,35 @@ def apply_model_param_overrides(
     return call_kwargs
 
 
+def _apply_thinking_disabled(call_kwargs: dict) -> None:
+    call_kwargs["thinking"] = {"type": "disabled"}
+    call_kwargs.pop("reasoning_effort", None)
+
+
+def _apply_thinking_budget(
+    call_kwargs: dict, mode: str, entry: ModelEntry, is_stream: bool
+) -> None:
+    tokens = int(mode.split(":")[1])
+    if not is_stream:
+        call_kwargs["thinking"] = {"budget_tokens": tokens}
+        if entry.strip_temperature:
+            call_kwargs.pop("temperature", None)
+        if entry.strip_top_p:
+            call_kwargs.pop("top_p", None)
+    call_kwargs.pop("reasoning_effort", None)
+
+
+def _apply_thinking_enabled(
+    call_kwargs: dict, mode: str, reasoning_effort: str | None
+) -> None:
+    parts = mode.split(":")
+    low = int(parts[1]) if len(parts) > 1 else 1024
+    high = int(parts[2]) if len(parts) > 2 else 4096
+    budget = low if reasoning_effort in ("low", None) else high
+    call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
+    call_kwargs.pop("reasoning_effort", None)
+
+
 def _apply_thinking_mode(
     call_kwargs: dict,
     entry: ModelEntry,
@@ -275,23 +393,8 @@ def _apply_thinking_mode(
     """
     mode = entry.thinking_mode
     if mode == "disabled":
-        call_kwargs["thinking"] = {"type": "disabled"}
-        call_kwargs.pop("reasoning_effort", None)
+        _apply_thinking_disabled(call_kwargs)
     elif mode and mode.startswith("budget:"):
-        tokens = int(mode.split(":")[1])
-        if not is_stream:
-            call_kwargs["thinking"] = {"budget_tokens": tokens}
-            if entry.strip_temperature:
-                call_kwargs.pop("temperature", None)
-            if entry.strip_top_p:
-                call_kwargs.pop("top_p", None)
-        call_kwargs.pop("reasoning_effort", None)
+        _apply_thinking_budget(call_kwargs, mode, entry, is_stream)
     elif mode and mode.startswith("enabled:"):
-        parts = mode.split(":")
-        low_budget = int(parts[1]) if len(parts) > 1 else 1024
-        high_budget = int(parts[2]) if len(parts) > 2 else 4096
-        if reasoning_effort in ("low", None):
-            call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": low_budget}
-        elif reasoning_effort in ("medium", "high"):
-            call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": high_budget}
-        call_kwargs.pop("reasoning_effort", None)
+        _apply_thinking_enabled(call_kwargs, mode, reasoning_effort)

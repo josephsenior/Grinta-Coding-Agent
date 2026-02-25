@@ -173,10 +173,7 @@ class BackpressureManager:
         if is_critical:
             self.stats["critical_events"] += 1
 
-        if (
-            self.max_queue_size > 0
-            and queue.qsize() / self.max_queue_size >= self.hwm_ratio
-        ):
+        if self._is_above_high_watermark(queue):
             self.stats["high_watermark_hits"] += 1
             logger.debug(
                 "EventStream queue high-watermark: size=%s max=%s policy=%s",
@@ -185,54 +182,75 @@ class BackpressureManager:
                 self.drop_policy,
             )
 
-        # Critical events are never dropped.
         if is_critical:
-            if queue.full():
-                self.stats["critical_queue_blocked"] += 1
-            await queue.put(event)
-            self.stats["enqueued"] += 1
-            self._record_recent(self._recent_enqueued)
-            self.queue_size = queue.qsize()
+            await self._enqueue_critical(event, queue)
             return
 
         if queue.full():
-            if self.drop_policy == "drop_oldest":
-                try:
-                    _ = queue.get_nowait()
-                    queue.task_done()
-                    self.stats["dropped_oldest"] += 1
-                    self._record_recent(self._recent_drops)
-                except asyncio.QueueEmpty:
-                    self.stats["dropped_newest"] += 1
-                    self._record_recent(self._recent_drops)
-                    logger.warning("EventStream full; dropped newest (empty on get)")
-                    return
-                queue.put_nowait(event)
-                self.stats["enqueued"] += 1
-                self._record_recent(self._recent_enqueued)
-                self.queue_size = queue.qsize()
-                return
-            if self.drop_policy == "block":
-                try:
-                    await asyncio.wait_for(queue.put(event), timeout=self.block_timeout)
-                    self.stats["enqueued"] += 1
-                    self._record_recent(self._recent_enqueued)
-                    self.queue_size = queue.qsize()
-                    return
-                except TimeoutError:
-                    self.stats["dropped_newest"] += 1
-                    self._record_recent(self._recent_drops)
-                    logger.warning(
-                        "EventStream full after blocking %.3fs; dropped newest",
-                        self.block_timeout,
-                    )
-                    return
-            self.stats["dropped_newest"] += 1
-            self._record_recent(self._recent_drops)
-            logger.warning("EventStream full; dropped newest")
+            await self._handle_full_queue(event, queue)
             return
 
-        queue.put_nowait(event)
+        await queue.put(event)
         self.stats["enqueued"] += 1
         self._record_recent(self._recent_enqueued)
+        self.queue_size = queue.qsize()
+
+    def _is_above_high_watermark(self, queue: asyncio.Queue[Any]) -> bool:
+        return (
+            self.max_queue_size > 0
+            and queue.qsize() / self.max_queue_size >= self.hwm_ratio
+        )
+
+    async def _enqueue_critical(self, event: Event, queue: asyncio.Queue[Any]) -> None:
+        if queue.full():
+            self.stats["critical_queue_blocked"] += 1
+        await queue.put(event)
+        self.stats["enqueued"] += 1
+        self._record_recent(self._recent_enqueued)
+        self.queue_size = queue.qsize()
+
+    async def _handle_full_queue(
+        self, event: Event, queue: asyncio.Queue[Any]
+    ) -> None:
+        if self.drop_policy == "drop_oldest":
+            self._try_drop_oldest_and_put(event, queue)
+            return
+        if self.drop_policy == "block":
+            await self._try_block_and_put(event, queue)
+            return
+        self.stats["dropped_newest"] += 1
+        self._record_recent(self._recent_drops)
+        logger.warning("EventStream full; dropped newest")
+
+    def _try_drop_oldest_and_put(
+        self, event: Event, queue: asyncio.Queue[Any]
+    ) -> None:
+        try:
+            _ = queue.get_nowait()
+            queue.task_done()
+            self.stats["dropped_oldest"] += 1
+            self._record_recent(self._recent_drops)
+            queue.put_nowait(event)
+            self.stats["enqueued"] += 1
+            self._record_recent(self._recent_enqueued)
+        except asyncio.QueueEmpty:
+            self.stats["dropped_newest"] += 1
+            self._record_recent(self._recent_drops)
+            logger.warning("EventStream full; dropped newest (empty on get)")
+        self.queue_size = queue.qsize()
+
+    async def _try_block_and_put(
+        self, event: Event, queue: asyncio.Queue[Any]
+    ) -> None:
+        try:
+            await asyncio.wait_for(queue.put(event), timeout=self.block_timeout)
+            self.stats["enqueued"] += 1
+            self._record_recent(self._recent_enqueued)
+        except TimeoutError:
+            self.stats["dropped_newest"] += 1
+            self._record_recent(self._recent_drops)
+            logger.warning(
+                "EventStream full after blocking %.3fs; dropped newest",
+                self.block_timeout,
+            )
         self.queue_size = queue.qsize()

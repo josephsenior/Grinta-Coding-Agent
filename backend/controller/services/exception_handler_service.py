@@ -10,6 +10,7 @@ import traceback
 from typing import TYPE_CHECKING
 
 from backend.core.exceptions import LLMContextWindowExceedError
+from backend.core.errors import AgentRuntimeError
 from backend.core.logger import forge_logger as logger
 from backend.llm.exceptions import (
     APIConnectionError,
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
 
 # Exceptions that are forwarded to recovery as-is (known LLM errors)
 _PASSTHROUGH_EXCEPTIONS = (
+    AgentRuntimeError,
     Timeout,
     APIError,
     APIConnectionError,

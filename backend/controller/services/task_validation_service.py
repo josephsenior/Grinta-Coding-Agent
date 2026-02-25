@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+
+@dataclass
+class _TestCoverageResult:
+    has_file_edits: bool
+    has_test_run: bool
+    has_passing_test_run: bool
 
 from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
@@ -94,17 +102,40 @@ class TaskValidationService:
 
         controller = self._context.get_controller()
         history = getattr(controller.state, "history", [])
-        if not isinstance(history, list | tuple) or not history:
+        if not isinstance(history, (list, tuple)) or not history:
             return True
 
         tail = list(history)[-80:]
+        coverage = self._analyze_test_coverage(tail)
+
+        if coverage.has_file_edits and not coverage.has_test_run:
+            logger.info("Finish blocked: file edits detected without recent test run")
+            return await self._emit_finish_block(
+                "⚠️ FINISH BLOCKED: You made file edits but haven't run tests in this session.\n"
+                "Please run tests with run_tests() to verify your changes before finishing.\n"
+                "If tests are genuinely not applicable, provide outputs.tests_not_applicable=true and "
+                "outputs.tests_not_applicable_reason, then try finish again.",
+                error_id="TESTS_NOT_RUN",
+            )
+
+        if coverage.has_file_edits and coverage.has_test_run and not coverage.has_passing_test_run:
+            logger.info("Finish blocked: tests were run but no passing result detected")
+            return await self._emit_finish_block(
+                "⚠️ FINISH BLOCKED: Tests were run but no successful test result was detected.\n"
+                "Fix failing tests (or run relevant tests successfully) before finishing.",
+                error_id="TESTS_NOT_PASSING",
+            )
+
+        return True
+
+    def _analyze_test_coverage(self, tail: list) -> _TestCoverageResult:
+        """Analyze recent history for file edits and test execution."""
+        from backend.events.action import CmdRunAction, FileEditAction, FileWriteAction
+        from backend.events.observation import CmdOutputObservation
 
         has_file_edits = False
         has_test_run = False
         has_passing_test_run = False
-
-        from backend.events.action import CmdRunAction, FileEditAction, FileWriteAction
-        from backend.events.observation import CmdOutputObservation
 
         for idx, event in enumerate(tail):
             if isinstance(event, (FileEditAction, FileWriteAction)):
@@ -112,45 +143,32 @@ class TaskValidationService:
                     has_file_edits = True
 
             if isinstance(event, CmdRunAction):
-                cmd = (getattr(event, "command", "") or "").lower()
-                if any(token in cmd for token in ("pytest", "run_tests", "unittest")):
+                if self._is_test_command(event):
                     has_test_run = True
-                    for next_event in tail[idx + 1 : idx + 6]:
-                        if isinstance(next_event, CmdOutputObservation):
-                            if getattr(next_event, "exit_code", None) == 0:
-                                has_passing_test_run = True
-                            break
+                    has_passing_test_run |= self._has_passing_output_after(tail, idx)
+                if self._is_run_tests_tool(event):
+                    has_test_run = True
 
-            # Also detect via tool_call_metadata
-            meta = getattr(event, "tool_call_metadata", None)
-            if meta and getattr(meta, "function_name", "") == "run_tests":
-                has_test_run = True
+        return _TestCoverageResult(has_file_edits, has_test_run, has_passing_test_run)
 
-        if has_file_edits and not has_test_run:
-            logger.info("Finish blocked: file edits detected without recent test run")
-            warning = (
-                "⚠️ FINISH BLOCKED: You made file edits but haven't run tests in this session.\n"
-                "Please run tests with run_tests() to verify your changes before finishing.\n"
-                "If tests are genuinely not applicable, provide outputs.tests_not_applicable=true and "
-                "outputs.tests_not_applicable_reason, then try finish again."
-            )
-            return await self._emit_finish_block(
-                warning,
-                error_id="TESTS_NOT_RUN",
-            )
+    def _is_test_command(self, event: Any) -> bool:
+        """Return True if the command appears to run tests (pytest, run_tests, unittest)."""
+        cmd = (getattr(event, "command", "") or "").lower()
+        return any(tok in cmd for tok in ("pytest", "run_tests", "unittest"))
 
-        if has_file_edits and has_test_run and not has_passing_test_run:
-            logger.info("Finish blocked: tests were run but no passing result detected")
-            warning = (
-                "⚠️ FINISH BLOCKED: Tests were run but no successful test result was detected.\n"
-                "Fix failing tests (or run relevant tests successfully) before finishing."
-            )
-            return await self._emit_finish_block(
-                warning,
-                error_id="TESTS_NOT_PASSING",
-            )
+    def _has_passing_output_after(self, tail: list, idx: int) -> bool:
+        """Return True if the next CmdOutputObservation (within 5 events) has exit_code 0."""
+        from backend.events.observation import CmdOutputObservation
 
-        return True
+        for next_event in tail[idx + 1 : idx + 6]:
+            if isinstance(next_event, CmdOutputObservation):
+                return getattr(next_event, "exit_code", None) == 0
+        return False
+
+    def _is_run_tests_tool(self, event: Any) -> bool:
+        """Return True if event's tool_call_metadata indicates run_tests was invoked."""
+        meta = getattr(event, "tool_call_metadata", None)
+        return bool(meta and getattr(meta, "function_name", "") == "run_tests")
 
     def _has_explicit_test_skip(self, action: PlaybookFinishAction) -> bool:
         outputs = getattr(action, "outputs", {})

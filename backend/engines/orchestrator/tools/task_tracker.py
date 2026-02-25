@@ -1,4 +1,4 @@
-"""Structured task tracking tool definition for CodeAct runs."""
+"""Structured task tracking tool definition for Orchestrator runs."""
 
 import json
 import os
@@ -46,7 +46,7 @@ class TaskTracker:
 
 
 def create_task_tracker_tool() -> ChatCompletionToolParam:
-    """Create the task tracker tool for the CodeAct agent."""
+    """Create the task tracker tool for the Orchestrator agent."""
     return create_tool_definition(
         name=TASK_TRACKER_TOOL_NAME,
         description=_TASK_TRACKER_DESCRIPTION,

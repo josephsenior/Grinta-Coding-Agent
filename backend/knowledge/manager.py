@@ -319,6 +319,29 @@ class KnowledgeBaseManager:
         Returns None if tree-sitter is unavailable or the language is
         unsupported, signalling the caller to fall back.
         """
+        boundaries = self._collect_ast_boundaries(content, filename)
+        if boundaries is None:
+            return None
+
+        chunks = self._merge_boundaries_into_chunks(
+            content, document_id, metadata, boundaries
+        )
+        if not chunks:
+            return None
+
+        for c in chunks:
+            c.metadata.pop("_byte_start", None)
+        return chunks
+
+    def _collect_ast_boundaries(
+        self, content: str, filename: str
+    ) -> list[tuple[int, int]] | None:
+        """Parse content with tree-sitter and return symbol boundaries, or None.
+
+        Looks up language by file extension, parses with tree-sitter, and collects
+        (start_byte, end_byte) for top-level function/class/module nodes.
+        Returns None if tree-sitter is unavailable or the language is unsupported.
+        """
         try:
             from backend.utils.treesitter_editor import (
                 LANGUAGE_EXTENSIONS,
@@ -344,87 +367,109 @@ class KnowledgeBaseManager:
         except Exception:
             return None
 
-        # Collect top-level definitions
-        root = tree.root_node
-        boundaries: list[tuple[int, int]] = []  # (byte_start, byte_end)
+        keywords = (
+            "function", "method", "class", "module", "interface",
+            "struct", "enum", "impl", "trait", "declaration", "definition",
+        )
+        boundaries = [
+            (child.start_byte, child.end_byte)
+            for child in tree.root_node.children
+            if any(kw in child.type for kw in keywords)
+        ]
+        return boundaries if boundaries else None
 
-        # Walk only the immediate children of root for top-level symbols
-        for child in root.children:
-            node_type = child.type
-            # Accept definitions, declarations, classes, modules etc.
-            if any(
-                keyword in node_type
-                for keyword in (
-                    "function",
-                    "method",
-                    "class",
-                    "module",
-                    "interface",
-                    "struct",
-                    "enum",
-                    "impl",
-                    "trait",
-                    "declaration",
-                    "definition",
-                )
-            ):
-                boundaries.append((child.start_byte, child.end_byte))
+    def _merge_handle_oversized_segment(
+        self,
+        segment: str,
+        document_id: str,
+        metadata: dict[str, Any] | None,
+        max_chunk_bytes: int,
+        chunk_index: int,
+    ) -> tuple[list[DocumentChunk], int]:
+        """Split oversized segment via sliding window. Returns (new_chunks, new_index)."""
+        sub_chunks = self._sliding_window_chunk(
+            segment, document_id, metadata,
+            chunk_size=max_chunk_bytes, start_index=chunk_index
+        )
+        return sub_chunks, chunk_index + len(sub_chunks)
 
-        if not boundaries:
-            # No meaningful symbols found — fall back
-            return None
-
-        # Merge symbols into chunks that respect a max size
-        max_chunk_bytes = 1500
-        overlap_bytes = 200
-        chunks: list[DocumentChunk] = []
-        chunk_index = 0
-
-        current_start = 0
-        for sym_start, sym_end in boundaries:
-            # Include any inter-symbol text (imports, comments) before this symbol
-            segment_end = sym_end
-            segment = content[current_start:segment_end]
-
-            if len(segment.encode("utf-8")) > max_chunk_bytes and chunks:
-                # This symbol alone is too big — split it with sliding window
-                sub_chunks = self._sliding_window_chunk(
-                    segment, document_id, metadata, chunk_size=max_chunk_bytes, start_index=chunk_index
-                )
-                chunks.extend(sub_chunks)
-                chunk_index += len(sub_chunks)
-                current_start = segment_end
-                continue
-
-            # Try to accumulate with previous if small
-            if chunks and len((content[chunks[-1].metadata.get("_byte_start", 0):segment_end]).encode("utf-8")) <= max_chunk_bytes:
-                # Merge into last chunk
+    def _merge_append_or_extend_chunk(
+        self,
+        chunks: list[DocumentChunk],
+        content: str,
+        document_id: str,
+        metadata: dict[str, Any] | None,
+        max_chunk_bytes: int,
+        overlap_bytes: int,
+        chunk_index: int,
+        last_start: int,
+        current_start: int,
+        sym_end: int,
+    ) -> int:
+        """Append new chunk or extend last. Returns updated chunk_index."""
+        if chunks:
+            merged_bytes = len((content[last_start:sym_end]).encode("utf-8"))
+            if merged_bytes <= max_chunk_bytes:
                 last = chunks[-1]
-                merged = content[last.metadata.get("_byte_start", 0):segment_end]
+                merged = content[last_start:sym_end]
                 chunks[-1] = DocumentChunk(
                     document_id=document_id,
                     chunk_index=last.chunk_index,
                     content=merged,
-                    metadata={**(metadata or {}), "_byte_start": last.metadata.get("_byte_start", 0)},
+                    metadata={**(metadata or {}), "_byte_start": last_start},
                 )
-                current_start = segment_end
-            else:
-                # Start a new chunk, including a small overlap from previous
-                overlap_start = max(0, current_start - overlap_bytes) if chunk_index > 0 else current_start
-                chunk_text = content[overlap_start:segment_end]
-                if chunk_text.strip():
-                    chunks.append(
-                        DocumentChunk(
-                            document_id=document_id,
-                            chunk_index=chunk_index,
-                            content=chunk_text,
-                            metadata={**(metadata or {}), "_byte_start": overlap_start},
-                        )
-                    )
-                    chunk_index += 1
-                current_start = segment_end
+                return chunk_index
+        overlap_start = max(0, current_start - overlap_bytes) if chunk_index > 0 else current_start
+        chunk_text = content[overlap_start:sym_end]
+        if chunk_text.strip():
+            chunks.append(
+                DocumentChunk(
+                    document_id=document_id,
+                    chunk_index=chunk_index,
+                    content=chunk_text,
+                    metadata={**(metadata or {}), "_byte_start": overlap_start},
+                )
+            )
+            return chunk_index + 1
+        return chunk_index
 
-        # Capture any trailing content after the last symbol
+    def _merge_boundaries_into_chunks(
+        self,
+        content: str,
+        document_id: str,
+        metadata: dict[str, Any] | None,
+        boundaries: list[tuple[int, int]],
+    ) -> list[DocumentChunk]:
+        """Merge symbol boundaries into chunks respecting max size.
+
+        Each boundary is (byte_start, byte_end). Segments exceeding max_chunk_bytes
+        are split via sliding window. Small adjacent segments are merged with overlap.
+        """
+        max_chunk_bytes = 1500
+        overlap_bytes = 200
+        chunks: list[DocumentChunk] = []
+        chunk_index = 0
+        current_start = 0
+
+        for sym_start, sym_end in boundaries:
+            segment = content[current_start:sym_end]
+            segment_bytes = len(segment.encode("utf-8"))
+
+            if segment_bytes > max_chunk_bytes and chunks:
+                sub_chunks, chunk_index = self._merge_handle_oversized_segment(
+                    segment, document_id, metadata, max_chunk_bytes, chunk_index
+                )
+                chunks.extend(sub_chunks)
+                current_start = sym_end
+                continue
+
+            last_start = chunks[-1].metadata.get("_byte_start", 0) if chunks else 0
+            chunk_index = self._merge_append_or_extend_chunk(
+                chunks, content, document_id, metadata,
+                max_chunk_bytes, overlap_bytes, chunk_index, last_start, current_start, sym_end,
+            )
+            current_start = sym_end
+
         if current_start < len(content):
             trailing = content[current_start:]
             if trailing.strip():
@@ -436,12 +481,7 @@ class KnowledgeBaseManager:
                         metadata=metadata or {},
                     )
                 )
-
-        # Strip internal bookkeeping from metadata
-        for c in chunks:
-            c.metadata.pop("_byte_start", None)
-
-        return chunks if chunks else None
+        return chunks
 
     def _sliding_window_chunk(
         self,

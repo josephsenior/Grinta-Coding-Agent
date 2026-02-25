@@ -1,8 +1,8 @@
-# CodeAct Agent
+# Orchestrator Agent
 
 ## Overview
 
-CodeAct is Forge' flagship autonomous coding agent, optimized for the beta launch. It uses a **ReAct (Reasoning + Acting)** approach to solve coding tasks through iterative observation and action cycles.
+Orchestrator is Forge's flagship autonomous coding agent, optimized for the beta launch. It uses a **ReAct (Reasoning + Acting)** approach to solve coding tasks through iterative observation and action cycles.
 
 ## Key Features
 
@@ -129,7 +129,7 @@ max_output_tokens = 8000
 ### Advanced Options
 
 ```toml
-[agent.codeact]
+[agent.orchestrator]
 # Confirmation mode
 confirmation_mode = true  # Ask before destructive actions
 
@@ -148,7 +148,7 @@ retry_max_wait = 64
 
 ### System Prompt Structure
 
-The CodeAct agent uses a carefully crafted prompt:
+The Orchestrator agent uses a carefully crafted prompt:
 
 ```
 1. Role definition ("You are a senior software engineer...")
@@ -261,7 +261,7 @@ tail -f logs/Forge.log | grep "Orchestrator"
 - Verify local runtime process is healthy
 - Check backend logs for runtime startup errors
 
-## Extending CodeAct
+## Extending the Orchestrator
 
 ### Add Custom Tools
 
@@ -292,7 +292,7 @@ You are a specialized agent for...
 
 ## Comparison to Other Agents
 
-| Feature | CodeAct | PlannerAgent | BrowseAgent |
+| Feature | Orchestrator | PlannerAgent | BrowseAgent |
 |---------|---------|--------------|-------------|
 | **Code editing** | ✅ Excellent | ⚠️ Basic | ❌ No |
 | **Planning** | ⚠️ Implicit | ✅ Explicit | ❌ No |
@@ -352,7 +352,7 @@ Small iterations = better results
 
 ### With MCP Servers
 
-CodeAct can use MCP tools:
+The Orchestrator can use MCP tools:
 
 ```
 # Available by default:
@@ -367,7 +367,7 @@ and save it to data.json"
 
 ### With Memory System
 
-CodeAct remembers context across conversations:
+The Orchestrator remembers context across conversations:
 
 ```
 Conversation 1: "Build a todo app with React"
@@ -377,13 +377,13 @@ Conversation 2: "Add user authentication to the todo app"
 
 ## Metrics
 
-**CodeAct-specific metrics:**
+**Orchestrator-specific metrics:**
 
 ```
-codeact_actions_executed{type="FileEditAction"}  # File edits
-codeact_actions_executed{type="CmdRunAction"}    # Commands run
-codeact_success_rate                             # Success percentage
-codeact_avg_iterations                           # Iterations per task
+orchestrator_actions_executed{type="FileEditAction"}  # File edits
+orchestrator_actions_executed{type="CmdRunAction"}    # Commands run
+orchestrator_success_rate                             # Success percentage
+orchestrator_avg_iterations                           # Iterations per task
 ```
 
 ## References

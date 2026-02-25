@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
-import { Hammer, Settings, Sun, Moon, Search, BookOpen } from "lucide-react";
+import { Hammer, Settings, Sun, Moon, Search, BookOpen, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { CommandMenu } from "@/components/common/CommandMenu";
 import { useBackendHealth } from "@/hooks/use-backend-health";
-import { useAppStore } from "@/stores/app-store";
+import { useNewConversation } from "@/hooks/use-new-conversation";
 
 const navItems = [
   { to: "/", icon: Hammer, label: "Home" },
@@ -28,19 +29,19 @@ export function TopBar() {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [commandOpen, setCommandOpen] = useState(false);
-  const setNewConvOpen = useAppStore((s) => s.setNewConvOpen);
   const { connected, uptime_seconds } = useBackendHealth();
+  const { create: handleCreate, isPending: isCreating } = useNewConversation();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
-        setNewConvOpen(true);
+        handleCreate();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [setNewConvOpen]);
+  }, [handleCreate]);
 
   return (
     <>
@@ -75,6 +76,28 @@ export function TopBar() {
                 <TooltipContent>{label}</TooltipContent>
               </Tooltip>
             ))}
+
+            <Separator orientation="vertical" className="mx-1 h-6 shrink-0" />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCreate}
+                  disabled={isCreating}
+                  className="h-8 gap-1.5 px-3 text-primary hover:text-primary"
+                >
+                  {isCreating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  <span className="hidden sm:inline">New</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>New Conversation (Ctrl+N)</TooltipContent>
+            </Tooltip>
           </nav>
         </div>
 
@@ -135,13 +158,14 @@ export function TopBar() {
               <Link
                 to="/settings"
                 className={cn(
-                  "inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 transition-colors hover:bg-accent hover:text-accent-foreground",
                   location.pathname.startsWith("/settings")
                     ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground",
                 )}
               >
                 <Settings className="h-4 w-4" />
+                <span className="hidden md:inline text-sm font-medium">Settings</span>
               </Link>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>

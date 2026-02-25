@@ -65,8 +65,8 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> None:
         type=str,
         help=(
             "Replace default Agent ([agent] section in config.toml) config "
-            "with the specified Agent config, e.g. 'CodeAct' for "
-            "[agent.CodeAct] section in config.toml"
+            "with the specified Agent config, e.g. 'Orchestrator' for "
+            "[agent.Orchestrator] section in config.toml"
         ),
     )
     parser.add_argument(

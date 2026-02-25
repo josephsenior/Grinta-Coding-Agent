@@ -1,5 +1,6 @@
 """Comprehensive tests for backend.llm.llm - LLM integration and exception mapping."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -711,3 +712,82 @@ class TestLLMProperties:
             llm = LLM(mock_config, "test-service")
 
         assert llm.features is mock_feature
+
+
+class TestGetCallKwargs:
+    """Regression tests for catalog-first call kwargs behavior."""
+
+    def _make_llm_stub(self, model: str = "gpt-4o") -> LLM:
+        llm = LLM.__new__(LLM)
+        llm.config = SimpleNamespace(
+            model=model,
+            temperature=0.2,
+            max_output_tokens=1024,
+            top_p=0.9,
+            top_k=40,
+            reasoning_effort="medium",
+            seed=123,
+        )
+        return llm
+
+    @patch("backend.llm.catalog_loader.sanitize_call_kwargs_for_provider")
+    @patch("backend.llm.catalog_loader.apply_model_param_overrides")
+    def test_catalog_overrides_invoked_before_sanitization(
+        self, mock_apply_overrides, mock_sanitize
+    ):
+        llm = self._make_llm_stub("google/gemini-2.5-pro")
+
+        mock_apply_overrides.return_value = {
+            "model": "google/gemini-2.5-pro",
+            "temperature": 0.2,
+            "max_tokens": 1024,
+            "top_p": 0.9,
+            "top_k": 40,
+            "tools": [{"type": "function", "function": {"name": "x"}}],
+            "tool_choice": "none",
+            "reasoning_effort": "medium",
+        }
+        mock_sanitize.return_value = {
+            "model": "google/gemini-2.5-pro",
+            "temperature": 0.2,
+            "max_tokens": 1024,
+            "top_p": 0.9,
+            "top_k": 40,
+            "tools": [{"type": "function", "function": {"name": "x"}}],
+        }
+
+        result = llm._get_call_kwargs(
+            is_stream=True,
+            tools=[{"type": "function", "function": {"name": "x"}}],
+            tool_choice="none",
+        )
+
+        assert result["model"] == "google/gemini-2.5-pro"
+        assert "tool_choice" not in result
+
+        mock_apply_overrides.assert_called_once_with(
+            "google/gemini-2.5-pro",
+            {
+                "model": "google/gemini-2.5-pro",
+                "temperature": 0.2,
+                "max_tokens": 1024,
+                "tools": [{"type": "function", "function": {"name": "x"}}],
+                "tool_choice": "none",
+                "top_p": 0.9,
+                "top_k": 40,
+            },
+            reasoning_effort="medium",
+            is_stream=True,
+        )
+        mock_sanitize.assert_called_once_with(
+            "google/gemini-2.5-pro", mock_apply_overrides.return_value
+        )
+
+    def test_seed_is_added_after_overrides_and_kept_when_supported(self):
+        llm = self._make_llm_stub("gpt-4o")
+
+        result = llm._get_call_kwargs(is_stream=False, tool_choice="none")
+
+        assert result["model"] == "gpt-4o"
+        assert result["seed"] == 123
+        assert result["tool_choice"] == "none"

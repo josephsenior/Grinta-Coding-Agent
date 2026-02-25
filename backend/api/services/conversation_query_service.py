@@ -60,6 +60,31 @@ async def resolve_conversation_store(
 # ---------------------------------------------------------------------------
 
 
+def _apply_search_filters(
+    conversations: list[ConversationMetadata],
+    *,
+    selected_repository: str | None | Sentinel = MISSING,
+    conversation_trigger: ConversationTrigger | None | Sentinel = MISSING,
+) -> list[ConversationMetadata]:
+    """Apply repository and trigger filters to conversations."""
+    result: list[ConversationMetadata] = []
+    for conv in conversations:
+        if (
+            not is_missing(selected_repository)
+            and selected_repository is not None
+            and conv.selected_repository != selected_repository
+        ):
+            continue
+        if (
+            not is_missing(conversation_trigger)
+            and conversation_trigger is not None
+            and conv.trigger != conversation_trigger
+        ):
+            continue
+        result.append(conv)
+    return result
+
+
 def filter_conversations_by_age(
     conversations: list[ConversationMetadata], max_age_seconds: int
 ) -> list[ConversationMetadata]:
@@ -194,21 +219,11 @@ async def search_conversations(
         conversation_metadata_result_set.results,
         config.conversation_max_age_seconds,
     )
-    final_filtered_results: list[ConversationMetadata] = []
-    for conversation in filtered_results:
-        if (
-            not is_missing(selected_repository)
-            and selected_repository is not None
-            and conversation.selected_repository != selected_repository
-        ):
-            continue
-        if (
-            not is_missing(conversation_trigger)
-            and conversation_trigger is not None
-            and conversation.trigger != conversation_trigger
-        ):
-            continue
-        final_filtered_results.append(conversation)
+    final_filtered_results = _apply_search_filters(
+        filtered_results,
+        selected_repository=selected_repository,
+        conversation_trigger=conversation_trigger,
+    )
     return await build_conversation_result_set(
         final_filtered_results, conversation_metadata_result_set.next_page_id
     )
@@ -263,4 +278,43 @@ async def delete_conversation_entry(
     runtime_cls = get_runtime_cls(config.runtime)
     await runtime_cls.delete(conversation_id)
     await store.delete_metadata(conversation_id)
+    return True
+
+
+async def delete_all_conversations(
+    user_id: str | None = None,
+    conversation_store: Any | None = None,
+) -> bool:
+    """Delete all conversations for the given user."""
+    store = await resolve_conversation_store(conversation_store, user_id)
+    if store is None:
+        return False
+
+    manager = _require_conversation_manager()
+
+    # Search for all conversations to close active sessions
+    # Note: We might want to just tell the store to delete all, but we also
+    # need to cleanup runtimes and active agent loops.
+    # To be safe and thorough, we'll iterate through them.
+    # However, if there are thousands, this might be slow.
+    # For now, let's use the search to get the IDs.
+
+    # Actually, let's just use the store's delete_all_metadata if possible,
+    # but we MUST close all active sessions first.
+
+    # TODO: In a production environment with many conversations, this should be a background task.
+    search_result = await search_conversations(
+        limit=1000, conversation_store=store, user_id=user_id
+    )
+
+    for conv in search_result.results:
+        if await manager.is_agent_loop_running(conv.conversation_id):
+            await manager.close_session(conv.conversation_id)
+        try:
+            runtime_cls = get_runtime_cls(config.runtime)
+            await runtime_cls.delete(conv.conversation_id)
+        except Exception as e:
+            logger.warning("Failed to delete runtime for %s: %s", conv.conversation_id, e)
+
+    await store.delete_all_metadata()
     return True

@@ -317,6 +317,46 @@ class ConversationMemory:
             f"Unknown event type without text content: {type(event).__name__}"
         )
 
+    def _track_user_message_as_anchor(self, event: MessageAction) -> bool:
+        """Track user message as requirement anchor if substantive. Returns True if handled."""
+        user_text = (event.content or "").strip()
+        if len(user_text) < 24:
+            return False
+        self._add_anchor_if_new(
+            content=user_text[:600],
+            category="requirement",
+            importance=0.95,
+        )
+        return True
+
+    def _track_error_as_anchor(self, event: Any) -> bool:
+        """Track error observation as anchor if substantive. Returns True if handled."""
+        from backend.events.observation import ErrorObservation
+
+        if not isinstance(event, ErrorObservation):
+            return False
+        error_text = (event.content or "").strip()
+        if len(error_text) < 12:
+            return False
+        self._add_anchor_if_new(
+            content=error_text[:500],
+            category="error",
+            importance=0.9,
+        )
+        return True
+
+    def _track_agent_think_as_decision(self, event: Any) -> None:
+        """Track agent think action as decision if planning-related keywords present."""
+        if type(event).__name__ != "AgentThinkAction":
+            return
+        thought = (getattr(event, "thought", "") or "").strip()
+        if not thought:
+            return
+        lower = thought.lower()
+        keywords = ("plan", "strategy", "approach", "decide", "next steps")
+        if any(kw in lower for kw in keywords):
+            self._track_decision_if_new(thought)
+
     def _auto_track_event_context(self, event: Event) -> None:
         """Automatically capture durable context signals from events.
 
@@ -326,38 +366,14 @@ class ConversationMemory:
         - explicit agent planning/decision language as decisions
         """
         try:
-            from backend.events.observation import ErrorObservation
-
             if isinstance(event, MessageAction) and event.source == EventSource.USER:
-                user_text = (event.content or "").strip()
-                if len(user_text) >= 24:
-                    self._add_anchor_if_new(
-                        content=user_text[:600],
-                        category="requirement",
-                        importance=0.95,
-                    )
-                return
-
-            if isinstance(event, ErrorObservation):
-                error_text = (event.content or "").strip()
-                if len(error_text) >= 12:
-                    self._add_anchor_if_new(
-                        content=error_text[:500],
-                        category="error",
-                        importance=0.9,
-                    )
-                return
-
-            if type(event).__name__ == "AgentThinkAction":
-                thought = (getattr(event, "thought", "") or "").strip()
-                if not thought:
+                if self._track_user_message_as_anchor(event):
                     return
-                lower = thought.lower()
-                if any(
-                    keyword in lower
-                    for keyword in ("plan", "strategy", "approach", "decide", "next steps")
-                ):
-                    self._track_decision_if_new(thought)
+
+            if self._track_error_as_anchor(event):
+                return
+
+            self._track_agent_think_as_decision(event)
         except Exception:
             logger.debug("Auto context tracking skipped for event", exc_info=True)
 
@@ -391,15 +407,12 @@ class ConversationMemory:
         """Release pending tool-call responses once all tool outputs arrive."""
         return flush_resolved_tool_calls(tool_state)
 
-    def _normalize_system_messages(self, messages: list[Message]) -> list[Message]:
-        """Ensure a single leading system prompt and drop duplicates."""
-        if not messages:
-            return messages
-
-        first_system_index = next(
-            (i for i, message in enumerate(messages) if message.role == "system"), -1
+    def _ensure_leading_system_message(self, messages: list[Message]) -> list[Message]:
+        """Ensure messages have a single leading system prompt. Mutates list in place."""
+        first_idx = next(
+            (i for i, m in enumerate(messages) if m.role == "system"), -1
         )
-        if first_system_index == -1:
+        if first_idx == -1:
             try:
                 system_prompt = self.prompt_manager.get_system_message(
                     cli_mode=self.agent_config.cli_mode,
@@ -408,26 +421,36 @@ class ConversationMemory:
             except Exception:
                 system_prompt = "You are Forge agent."
             messages.insert(0, message_with_text("system", system_prompt))
-            first_system_index = 0
-        elif first_system_index != 0:
-            sys_msg = messages.pop(first_system_index)
-            messages.insert(0, sys_msg)
+        elif first_idx != 0:
+            messages.insert(0, messages.pop(first_idx))
+        return messages
 
-        # Inject Context Summary into System Prompt if available
+    def _inject_context_summary_into_system(self, messages: list[Message]) -> None:
+        """Append context summary to leading system message if available."""
         context_summary = self.get_context_summary()
-        if context_summary and messages:
-            # Append to the system prompt
-            sys_msg = messages[0]
-            if sys_msg.role == "system":
-                # Iterate to find text content
-                for content in sys_msg.content:
-                    if is_text_content(content):
-                        content.text += f"\n\n{context_summary}"
-                        break
+        if not context_summary or not messages:
+            return
+        sys_msg = messages[0]
+        if sys_msg.role != "system":
+            return
+        for content in sys_msg.content:
+            if is_text_content(content):
+                content.text += f"\n\n{context_summary}"
+                break
 
-        deduped: list[Message] = [messages[0]]
-        deduped.extend(message for message in messages[1:] if message.role != "system")
-        return deduped
+    def _dedupe_system_messages(self, messages: list[Message]) -> list[Message]:
+        """Return list with leading message plus non-system messages only."""
+        if not messages:
+            return messages
+        return [messages[0]] + [m for m in messages[1:] if m.role != "system"]
+
+    def _normalize_system_messages(self, messages: list[Message]) -> list[Message]:
+        """Ensure a single leading system prompt and drop duplicates."""
+        if not messages:
+            return messages
+        self._ensure_leading_system_message(messages)
+        self._inject_context_summary_into_system(messages)
+        return self._dedupe_system_messages(messages)
 
     def _process_action(
         self,

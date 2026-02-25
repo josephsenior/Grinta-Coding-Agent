@@ -147,6 +147,61 @@ def _get_user_message_text(messages: list) -> str:
     return ""
 
 
+def _compute_allowed_tools(
+    *,
+    turn: int,
+    error_count: int,
+    edit_count: int,
+    token_pct: float,
+    user_text: str,
+    post_condensation: bool,
+    is_complex_task: bool,
+) -> set[str]:
+    """Compute the set of tool names to include based on context."""
+    allowed: set[str] = set(_CORE_TOOLS)
+    allowed.add("browser")
+
+    unlocks: list[tuple[bool, list[str]]] = [
+        (turn >= 3 or is_complex_task, ["working_memory"]),
+        (error_count >= 2, ["error_patterns"]),
+        (turn >= 5, ["checkpoint"]),
+        (edit_count >= 3, ["session_diff"]),
+        (turn <= 1 or post_condensation, ["workspace_status"]),
+        (token_pct > 0.5, ["condensation_request"]),
+        (bool(_MULTI_FILE_KEYWORDS.search(user_text)), ["apply_patch"]),
+        (
+            bool(_RESEARCH_KEYWORDS.search(user_text)),
+            ["web_search", "web_reader"],
+        ),
+    ]
+    for condition, names in unlocks:
+        if condition:
+            allowed.update(names)
+
+    return allowed
+
+
+def _filter_tools_by_allowed(
+    all_tools: list[dict[str, Any]], allowed: set[str]
+) -> list[dict[str, Any]]:
+    """Filter tools to only those in allowed set (or with unknown name)."""
+    selected = []
+    excluded_names = []
+    for tool in all_tools:
+        name = _get_tool_name(tool)
+        if name is None or name in allowed:
+            selected.append(tool)
+        else:
+            excluded_names.append(name)
+    if excluded_names:
+        logger.debug(
+            "ToolSelector: excluded %d contextual tools: %s",
+            len(excluded_names),
+            excluded_names,
+        )
+    return selected
+
+
 class ToolSelector:
     """Dynamically filter tools based on task context.
 
@@ -184,66 +239,19 @@ class ToolSelector:
         token_pct = _get_token_usage_pct(state)
         user_text = _get_user_message_text(messages or [])
 
-        # Build the set of tool names to include
-        allowed: set[str] = set(_CORE_TOOLS)
-
-        # --- Contextual unlocks ---
-
-        # Working memory: unlock after 3+ turns or on complex tasks
-        if turn >= 3 or self._is_complex_task(user_text):
-            allowed.add("working_memory")
-
-        # Error patterns: unlock after 2+ errors
-        if error_count >= 2:
-            allowed.add("error_patterns")
-
-        # Checkpoint: unlock after 5+ turns
-        if turn >= 5:
-            allowed.add("checkpoint")
-
-        # Session diff: unlock after 3+ file edits
-        if edit_count >= 3:
-            allowed.add("session_diff")
-
-        # Workspace status: unlock on first turn or after condensation
+        allowed = _compute_allowed_tools(
+            turn=turn,
+            error_count=error_count,
+            edit_count=edit_count,
+            token_pct=token_pct,
+            user_text=user_text,
+            post_condensation=self._post_condensation,
+            is_complex_task=self._is_complex_task(user_text),
+        )
         if turn <= 1 or self._post_condensation:
-            allowed.add("workspace_status")
             self._post_condensation = False
 
-        # Condensation request: unlock when token budget is >50% (early access prevents surprise condensation)
-        if token_pct > 0.5:
-            allowed.add("condensation_request")
-
-        # Apply patch: unlock on multi-file edit tasks
-        if _MULTI_FILE_KEYWORDS.search(user_text):
-            allowed.add("apply_patch")
-
-        # Web tools: unlock when task has research keywords
-        if _RESEARCH_KEYWORDS.search(user_text):
-            allowed.add("web_search")
-            allowed.add("web_reader")
-
-        # Always unlock browsing tool if the full toolset has it
-        allowed.add("browser")
-
-        # --- Filter the actual tool list ---
-        selected = []
-        excluded_names = []
-        for tool in all_tools:
-            name = _get_tool_name(tool)
-            if name is None or name in allowed:
-                selected.append(tool)
-            else:
-                excluded_names.append(name)
-
-        if excluded_names:
-            logger.debug(
-                "ToolSelector: excluded %d contextual tools: %s",
-                len(excluded_names),
-                excluded_names,
-            )
-
-        return selected
+        return _filter_tools_by_allowed(all_tools, allowed)
 
     @staticmethod
     def _is_complex_task(text: str) -> bool:

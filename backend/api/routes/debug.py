@@ -60,6 +60,40 @@ def _collect_event_stream_debug(event_stream: Any) -> dict[str, Any]:
     return info
 
 
+def _collect_session_snapshot(controller: Any, session_id: str) -> dict[str, Any]:
+    """Build diagnostic snapshot from controller."""
+    snapshot: dict[str, Any] = {"session_id": session_id, "status": "active"}
+    snapshot.update(_collect_controller_snapshot(controller))
+
+    rate_gov = getattr(controller, "rate_governor", None)
+    if rate_gov and hasattr(rate_gov, "snapshot"):
+        snapshot["rate_governor"] = rate_gov.snapshot()
+
+    mem_pressure = getattr(controller, "memory_pressure", None)
+    if mem_pressure and hasattr(mem_pressure, "snapshot"):
+        snapshot["memory_pressure"] = mem_pressure.snapshot()
+
+    with contextlib.suppress(Exception):
+        from backend.utils.circuit_breaker import get_circuit_breaker_metrics_snapshot
+        snapshot["circuit_breaker"] = get_circuit_breaker_metrics_snapshot()
+
+    replay = getattr(controller, "_replay_manager", None)
+    if replay and hasattr(replay, "snapshot"):
+        snapshot["replay"] = replay.snapshot()
+
+    event_stream = getattr(controller, "event_stream", None)
+    if event_stream:
+        snapshot["event_stream"] = _collect_event_stream_debug(event_stream)
+
+    agent = getattr(controller, "agent", None)
+    if agent:
+        llm_lat = getattr(agent, "_last_llm_latency", None)
+        if llm_lat:
+            snapshot["last_llm_latency_s"] = round(llm_lat, 3)
+
+    return snapshot
+
+
 @router.get("/session/{session_id}")
 async def session_debug(session_id: str) -> JSONResponse:
     """Return a diagnostic snapshot of a live session."""
@@ -82,49 +116,7 @@ async def session_debug(session_id: str) -> JSONResponse:
         if controller is None:
             return JSONResponse({"session_id": session_id, "status": "no_controller"})
 
-        snapshot: dict[str, Any] = {
-            "session_id": session_id,
-            "status": "active",
-        }
-
-        # Controller state and token usage
-        snapshot.update(_collect_controller_snapshot(controller))
-
-        # Rate governor
-        rate_gov = getattr(controller, "rate_governor", None)
-        if rate_gov and hasattr(rate_gov, "snapshot"):
-            snapshot["rate_governor"] = rate_gov.snapshot()
-
-        # Memory pressure
-        mem_pressure = getattr(controller, "memory_pressure", None)
-        if mem_pressure and hasattr(mem_pressure, "snapshot"):
-            snapshot["memory_pressure"] = mem_pressure.snapshot()
-
-        # Circuit breaker
-        with contextlib.suppress(Exception):
-            from backend.utils.circuit_breaker import (
-                get_circuit_breaker_metrics_snapshot,
-            )
-
-            snapshot["circuit_breaker"] = get_circuit_breaker_metrics_snapshot()
-
-        # Replay manager
-        replay = getattr(controller, "_replay_manager", None)
-        if replay and hasattr(replay, "snapshot"):
-            snapshot["replay"] = replay.snapshot()
-
-        # Event stream stats
-        event_stream = getattr(controller, "event_stream", None)
-        if event_stream:
-            snapshot["event_stream"] = _collect_event_stream_debug(event_stream)
-
-        # LLM latency
-        agent = getattr(controller, "agent", None)
-        if agent:
-            llm_lat = getattr(agent, "_last_llm_latency", None)
-            if llm_lat:
-                snapshot["last_llm_latency_s"] = round(llm_lat, 3)
-
+        snapshot = _collect_session_snapshot(controller, session_id)
         return JSONResponse(snapshot)
 
     except HTTPException:

@@ -39,7 +39,10 @@ class AppState:
 
         # Eagerly loaded (cheap, no I/O)
         self.server_config: ServerConfig = server_config or load_server_config()
-        self.config: ForgeConfig = ForgeConfig()
+        
+        from backend.core.config.utils import load_forge_config
+        self.config: ForgeConfig = load_forge_config()
+        
         workspace_base = os.path.expanduser(self.config.file_store_path)
         self.file_store: FileStore = LocalFileStore(workspace_base)
 
@@ -60,9 +63,13 @@ class AppState:
         # Socket.IO (created once)
         import socketio  # type: ignore[import-untyped]
 
-        _default_cors = "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"
-        _cors_str = os.environ.get("FORGE_CORS_ORIGINS", _default_cors)
-        _allowed = [o.strip() for o in _cors_str.split(",") if o.strip()]
+        # Default: allow all origins for local development. In production override
+        # FORGE_CORS_ORIGINS with an explicit comma-separated list.
+        _default_cors = os.environ.get("FORGE_CORS_ORIGINS", "*")
+        if _default_cors == "*":
+            _allowed: list[str] | str = "*"
+        else:
+            _allowed = [o.strip() for o in _default_cors.split(",") if o.strip()]
         self.sio = socketio.AsyncServer(
             cors_allowed_origins=_allowed, async_mode="asgi"
         )

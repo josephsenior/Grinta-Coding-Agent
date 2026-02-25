@@ -1,4 +1,4 @@
-"""Structured test-runner tool for the CodeAct agent.
+"""Structured test-runner tool for the Orchestrator agent.
 
 Instead of having the agent parse thousands of lines of raw pytest output,
 this tool runs the test suite and returns a compact JSON summary of

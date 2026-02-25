@@ -7,13 +7,11 @@ export interface AppState {
   theme: Theme;
   sidebarOpen: boolean;
   contextPanelOpen: boolean;
-  newConvOpen: boolean;
 
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   setSidebarOpen: (open: boolean) => void;
   setContextPanelOpen: (open: boolean) => void;
-  setNewConvOpen: (open: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -22,7 +20,6 @@ export const useAppStore = create<AppState>()(
       theme: "dark",
       sidebarOpen: true,
       contextPanelOpen: true,
-      newConvOpen: false,
 
       setTheme: (theme) => {
         document.documentElement.classList.toggle("dark", theme === "dark");
@@ -38,7 +35,6 @@ export const useAppStore = create<AppState>()(
 
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       setContextPanelOpen: (open) => set({ contextPanelOpen: open }),
-      setNewConvOpen: (open) => set({ newConvOpen: open }),
     }),
     {
       name: "forge-app-store",

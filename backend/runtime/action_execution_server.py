@@ -290,113 +290,134 @@ class ActionExecutor:
     async def run(
         self, action: CmdRunAction
     ) -> CmdOutputObservation | ErrorObservation | TerminalObservation:
-        """Execute bash/shell command."""
+        """Execute bash/shell command.
+
+        Handles background execution (new session), static execution (temporary
+        session), and foreground execution (default session). Applies grep filtering
+        if requested, truncates output, and attaches detected server info to
+        observation extras when relevant.
+        """
         try:
-            # Handle background execution: treat as starting a new terminal session
             if action.is_background:
-                session_id = f"bg-{uuid.uuid4().hex[:8]}"
-                # Fallback to default session's CWD or initial CWD
-                default_session = self.session_manager.get_session("default")
-                cwd = action.cwd
-                if not cwd and default_session:
-                    cwd = default_session.cwd
-                if not cwd:
-                    cwd = self._initial_cwd
+                return self._run_background_cmd(action)
 
-                session = self.session_manager.create_session(session_id=session_id, cwd=cwd)
-                
-                # Execute the command in the new session
-                logger.debug("Starting background task in session %s: %s", session_id, action.command)
-                session.write_input(action.command + "\n")
-                
-                # Return initial output and the session ID for later checking
-                time.sleep(0.5)
-                content = session.read_output()
-                return TerminalObservation(
-                    session_id=session_id, 
-                    content=f"Background task started. Session ID: {session_id}\nInitial Output:\n{content}"
-                )
+            observation = await self._run_foreground_cmd(action)
+            if isinstance(observation, ErrorObservation):
+                return observation
 
-            # Standard foreground execution
-            bash_session = self.session_manager.get_session("default")
-            if action.is_static:
-                # Create a temporary session for static execution
-                # We don't store it in self.sessions because it's transient?
-                # Or we do and close it immediately?
-                # Or create_bash_session used to return a session that wasn't stored in self.sessions?
-                # Looking at original code: `bash_session = self._create_bash_session(action.cwd)`
-                # And `_create_bash_session` didn't add to `self.sessions`.
-                # So we should use `self.session_manager.create_session` but not assume it persists?
-                # The `create_session` method in SessionManager ADDS to self.sessions.
-                # I should probably change that or handle cleanup.
-                # Let's use a temp ID and close it.
-                temp_id = f"static-{uuid.uuid4().hex[:8]}"
-                bash_session = self.session_manager.create_session(session_id=temp_id, cwd=action.cwd)
-                try:
-                     # Execute and return
-                     if bash_session is None: # Should not happen
-                        return ErrorObservation("Failed to create static session")
-                     observation = cast(
-                        CmdOutputObservation,
-                        await call_sync_from_async(bash_session.execute, action),
-                    )
-                finally:
-                    self.session_manager.close_session(temp_id)
-            
-            else:
-                 # Normal default session
-                 if bash_session is None:
-                    return ErrorObservation("Default shell session not initialized")
-
-                 observation = cast(
-                    CmdOutputObservation,
-                    await call_sync_from_async(bash_session.execute, action),
-                )
-
-            # Apply filtering if grep_pattern is provided
             if action.grep_pattern and isinstance(observation.content, str):
-                import re
-                try:
-                    pattern = re.compile(action.grep_pattern)
-                    lines = observation.content.splitlines()
-                    filtered_lines = [line for line in lines if pattern.search(line)]
-                    observation.content = "\n".join(filtered_lines)
-                    if not observation.content:
-                        observation.content = f"[Grep: No lines matched pattern '{action.grep_pattern}']"
-                except re.error as e:
-                    observation.content = f"[Grep Error: Invalid regex pattern '{action.grep_pattern}': {e}]\n" + observation.content
-
-            # Truncate oversized bash output before it enters the context window.
-            # Uses error-aware head+tail strategy so errors are never dropped.
+                observation.content = self._apply_grep_filter(
+                    observation.content, action.grep_pattern
+                )
             if isinstance(observation.content, str):
                 observation.content = truncate_cmd_output(observation.content)
 
-            # Check for detected servers and add to observation extras
-            # Only checking on default or static session used above
-            # But bash_session might be closed (static).
-            # If static, we closed it.
-            # If default, we can check.
-            if not action.is_static and bash_session:
-                detected_server = cast(Any, bash_session.get_detected_server())
-                if detected_server:
-                    logger.info(
-                        "🚀 Adding detected server to observation extras: %s",
-                        detected_server.url,
-                    )
-                    # Add server info to observation extras for client processing
-                    if not hasattr(observation, "extras"):
-                        observation.extras = {}  # type: ignore[attr-defined]
-                    observation.extras["server_ready"] = {  # type: ignore[attr-defined]
-                        "port": detected_server.port,
-                        "url": detected_server.url,
-                        "protocol": detected_server.protocol,
-                        "health_status": detected_server.health_status,
-                    }
+            if not action.is_static:
+                self._attach_detected_server(observation, self.session_manager.get_session("default"))
 
             return observation
         except Exception as e:
             logger.error("Error running command: %s", e)
             return ErrorObservation(str(e))
+
+    def _run_background_cmd(self, action: CmdRunAction) -> TerminalObservation:
+        """Start a background command in a new session.
+
+        Creates a dedicated session, writes the command, waits briefly for
+        initial output, and returns a TerminalObservation with the session ID
+        for later checking.
+        """
+        session_id = f"bg-{uuid.uuid4().hex[:8]}"
+        default_session = self.session_manager.get_session("default")
+        cwd = action.cwd or (default_session.cwd if default_session else None) or self._initial_cwd
+        session = self.session_manager.create_session(session_id=session_id, cwd=cwd)
+        logger.debug("Starting background task in session %s: %s", session_id, action.command)
+        session.write_input(action.command + "\n")
+        time.sleep(0.5)
+        content = session.read_output()
+        return TerminalObservation(
+            session_id=session_id,
+            content=f"Background task started. Session ID: {session_id}\nInitial Output:\n{content}",
+        )
+
+    async def _run_foreground_cmd(
+        self, action: CmdRunAction
+    ) -> CmdOutputObservation | ErrorObservation:
+        """Execute command in foreground (static or default session).
+
+        Routes to _run_static_cmd for isolated execution, or uses the default
+        session for normal foreground commands.
+        """
+        if action.is_static:
+            return await self._run_static_cmd(action)
+        bash_session = self.session_manager.get_session("default")
+        if bash_session is None:
+            return ErrorObservation("Default shell session not initialized")
+        return cast(
+            CmdOutputObservation,
+            await call_sync_from_async(bash_session.execute, action),
+        )
+
+    async def _run_static_cmd(
+        self, action: CmdRunAction
+    ) -> CmdOutputObservation | ErrorObservation:
+        """Execute in a temporary static session.
+
+        Creates a short-lived session, runs the command, and closes the
+        session immediately. Used for isolated/one-off executions.
+        """
+        temp_id = f"static-{uuid.uuid4().hex[:8]}"
+        bash_session = self.session_manager.create_session(session_id=temp_id, cwd=action.cwd)
+        try:
+            if bash_session is None:
+                return ErrorObservation("Failed to create static session")
+            return cast(
+                CmdOutputObservation,
+                await call_sync_from_async(bash_session.execute, action),
+            )
+        finally:
+            self.session_manager.close_session(temp_id)
+
+    def _apply_grep_filter(self, content: str, pattern_str: str) -> str:
+        """Filter content lines by grep pattern.
+
+        Returns only lines matching the regex. On invalid pattern, prepends
+        an error message to the content.
+        """
+        import re
+
+        try:
+            pattern = re.compile(pattern_str)
+            lines = content.splitlines()
+            filtered = [line for line in lines if pattern.search(line)]
+            result = "\n".join(filtered)
+            return result or f"[Grep: No lines matched pattern '{pattern_str}']"
+        except re.error as e:
+            return f"[Grep Error: Invalid regex pattern '{pattern_str}': {e}]\n{content}"
+
+    def _attach_detected_server(
+        self, observation: CmdOutputObservation, bash_session: Any
+    ) -> None:
+        """Attach detected server info to observation extras if present.
+
+        When the bash session detected a running server (e.g. dev server),
+        adds port, url, protocol, and health_status to observation.extras
+        for client processing.
+        """
+        if bash_session is None:
+            return
+        detected = cast(Any, bash_session.get_detected_server())
+        if not detected:
+            return
+        logger.info("🚀 Adding detected server to observation extras: %s", detected.url)
+        if not hasattr(observation, "extras"):
+            observation.extras = {}  # type: ignore[attr-defined]
+        observation.extras["server_ready"] = {  # type: ignore[attr-defined]
+            "port": detected.port,
+            "url": detected.url,
+            "protocol": detected.protocol,
+            "health_status": detected.health_status,
+        }
 
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start a new interactive terminal session."""
@@ -535,6 +556,87 @@ class ActionExecutor:
             logger.error("Error writing file %s: %s", action.path, e, exc_info=True)
             return ErrorObservation(f"Failed to write file {action.path}: {e}")
 
+    def _edit_try_directory_view(
+        self, filepath: str, path_for_obs: str, action: FileEditAction
+    ) -> Observation | None:
+        """Return directory view observation if path is dir and viewable; else None."""
+        try:
+            if os.path.isdir(filepath) and (
+                action.command == "view" or not action.command
+            ):
+                return handle_directory_view(filepath, path_for_obs)
+        except Exception:
+            pass
+        return None
+
+    def _edit_via_file_editor(
+        self, action: FileEditAction
+    ) -> Observation:
+        """Execute FILE_EDITOR-style edit and return observation."""
+        command = action.command or "write"
+        enable_lint = bool(
+            os.environ.get("ENABLE_AUTO_LINT", "").lower()
+            in {"1", "true", "yes"}
+        )
+        result_str, (old_content, new_content) = execute_file_editor(
+            self.file_editor,
+            command=command,
+            path=action.path,
+            file_text=action.file_text,
+            view_range=action.view_range,
+            old_str=action.old_str,
+            new_str=action.new_str,
+            insert_line=action.insert_line,
+            enable_linting=enable_lint,
+        )
+        max_chars = get_max_edit_observation_chars()
+        result_str = truncate_large_text(result_str, max_chars, label="edit")
+        return FileEditObservation(
+            content=result_str,
+            path=action.path,
+            prev_exist=old_content is not None,
+            old_content=old_content,
+            new_content=new_content,
+            impl_source=FileEditSource.FILE_EDITOR,
+        )
+
+    def _edit_via_llm(self, action: FileEditAction) -> Observation:
+        """Execute LLM-based range edit and return observation."""
+        command = action.command or "edit"
+        enable_lint = bool(
+            os.environ.get("ENABLE_AUTO_LINT", "").lower()
+            in {"1", "true", "yes"}
+        )
+        result_str, (old_content, new_content) = execute_file_editor(
+            self.file_editor,
+            command=command,
+            path=action.path,
+            file_text=action.content,
+            start_line=action.start,
+            end_line=action.end,
+            enable_linting=enable_lint,
+        )
+        if result_str.startswith("ERROR:"):
+            return ErrorObservation(result_str)
+        if old_content and new_content:
+            diff = get_diff(old_content, new_content, action.path)
+            return FileEditObservation(
+                content=diff,
+                path=action.path,
+                prev_exist=old_content is not None,
+                old_content=old_content,
+                new_content=new_content,
+                impl_source=FileEditSource.LLM_BASED_EDIT,
+            )
+        return FileEditObservation(
+            content=result_str,
+            path=action.path,
+            prev_exist=old_content is not None,
+            old_content=old_content,
+            new_content=new_content,
+            impl_source=FileEditSource.LLM_BASED_EDIT,
+        )
+
     async def edit(self, action: FileEditAction) -> Observation:
         """Edit a file (FILE_EDITOR or LLM-based) and return an observation."""
         bash_session = self.session_manager.get_session("default")
@@ -543,96 +645,15 @@ class ActionExecutor:
         working_dir = bash_session.cwd
         filepath = resolve_path(action.path, working_dir)
 
-        # Directory view support
-        try:
-            if os.path.isdir(filepath) and (
-                action.command == "view" or not action.command
-            ):
-                return handle_directory_view(filepath, action.path)
-        except Exception:
-            pass
+        dir_view = self._edit_try_directory_view(filepath, action.path, action)
+        if dir_view is not None:
+            return dir_view
 
-        # FILE_EDITOR mode (default)
         if action.impl_source == FileEditSource.FILE_EDITOR or action.command:
-            command = action.command or "write"
-            result_str, (old_content, new_content) = execute_file_editor(
-                self.file_editor,
-                command=command,
-                path=action.path,
-                file_text=action.file_text,
-                view_range=action.view_range,
-                old_str=action.old_str,
-                new_str=action.new_str,
-                insert_line=action.insert_line,
-                enable_linting=bool(
-                    os.environ.get("ENABLE_AUTO_LINT", "").lower()
-                    in {"1", "true", "yes"}
-                ),
-            )
-            max_chars = get_max_edit_observation_chars()
-            result_str = truncate_large_text(result_str, max_chars, label="edit")
-            return FileEditObservation(
-                content=result_str,
-                path=action.path,
-                prev_exist=old_content is not None,
-                old_content=old_content,
-                new_content=new_content,
-                impl_source=FileEditSource.FILE_EDITOR,
-            )
+            return self._edit_via_file_editor(action)
 
-        # LLM-based range editing: apply by translating into a FileWriteAction
         try:
-            # New implementation using unified FileEditor
-            command = action.command or "edit"
-            # If it's a range edit, map start/end to edit arguments
-            # Note: FileEditor is smart enough to handle new_str or file_text as replacement
-            
-            result_str, (old_content, new_content) = execute_file_editor(
-                self.file_editor,
-                command=command,
-                path=action.path,
-                file_text=action.content, # Use content as the replacement text
-                start_line=action.start,
-                end_line=action.end,
-                enable_linting=bool(
-                    os.environ.get("ENABLE_AUTO_LINT", "").lower()
-                    in {"1", "true", "yes"}
-                ),
-            )
-            
-            # If execute_file_editor returned an error message string starting with ERROR:
-            if result_str.startswith("ERROR:"):
-                 return ErrorObservation(result_str)
-
-            # Replicate diff logic if needed, but FileEditor usually returns full content or diff?
-            # FileEditor returns "File updated successfully" or similar.
-            # We want to return a diff observation for LLM edits usually.
-            
-            # The previous implementation calculated a diff.
-            # Let's see what we can do. 
-            # execute_file_editor returns (output_msg, (old, new))
-            
-            if old_content and new_content:
-                diff = get_diff(old_content, new_content, action.path)
-                return FileEditObservation(
-                    content=diff,
-                    path=action.path,
-                    prev_exist=old_content is not None,
-                    old_content=old_content,
-                    new_content=new_content,
-                    impl_source=FileEditSource.LLM_BASED_EDIT,
-                )
-            
-            # Fallback if no content change (e.g. create file)
-            return FileEditObservation(
-                content=result_str,
-                path=action.path,
-                prev_exist=old_content is not None,
-                old_content=old_content,
-                new_content=new_content,
-                impl_source=FileEditSource.LLM_BASED_EDIT,
-            )
-
+            return self._edit_via_llm(action)
         except Exception as e:
             logger.error("Error editing file %s: %s", action.path, e, exc_info=True)
             return ErrorObservation(f"Failed to edit file {action.path}: {e}")

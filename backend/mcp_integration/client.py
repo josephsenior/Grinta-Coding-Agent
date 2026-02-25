@@ -166,7 +166,6 @@ class MCPClient(BaseModel):
                 {
                     "Authorization": f"Bearer {api_key}",
                     "s": api_key,
-                    "X-Session-API-Key": api_key,
                 },
             )
         if conversation_id:

@@ -43,7 +43,7 @@ graph TB
     end
 
     subgraph Engine["Agent Engine"]
-        ORCH[Orchestrator / CodeAct]
+        ORCH[Orchestrator]
         Tools[23 Tools]
     end
 

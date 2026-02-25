@@ -75,31 +75,45 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
     return snapshot
 
 
+def _extract_edit_file_info(event: Event, files: dict) -> None:
+    """Extract file path from FileEdit* events."""
+    path = getattr(event, "path", "")
+    if path:
+        command = getattr(event, "command", "edit")
+        files[path] = {"action": command, "type": "edit"}
+
+
+def _extract_read_file_info(event: Event, files: dict) -> None:
+    """Extract file path from FileRead* events."""
+    path = getattr(event, "path", "")
+    if path and path not in files:
+        files[path] = {"action": "read", "type": "read"}
+
+
+def _extract_cmd_run_file_paths(event: Event, files: dict) -> None:
+    """Extract file paths from CmdRunAction (cat/head/tail)."""
+    cmd = getattr(event, "command", "")
+    if "cat " not in cmd and "head " not in cmd and "tail " not in cmd:
+        return
+    parts = cmd.split()
+    for i, part in enumerate(parts):
+        if part in ("cat", "head", "tail") and i + 1 < len(parts):
+            path = parts[i + 1].strip("'\"")
+            if path and path not in files:
+                files[path] = {"action": "read_via_cmd", "type": "read"}
+
+
 def _extract_file_info(event: Event, snapshot: dict) -> None:
     """Extract file paths and actions from file-related events."""
     cls_name = type(event).__name__
     files = snapshot["files_touched"]
 
     if cls_name in ("FileEditAction", "FileEditObservation"):
-        path = getattr(event, "path", "")
-        if path:
-            command = getattr(event, "command", "edit")
-            files[path] = {"action": command, "type": "edit"}
+        _extract_edit_file_info(event, files)
     elif cls_name in ("FileReadAction", "FileReadObservation"):
-        path = getattr(event, "path", "")
-        if path and path not in files:
-            files[path] = {"action": "read", "type": "read"}
+        _extract_read_file_info(event, files)
     elif cls_name == "CmdRunAction":
-        cmd = getattr(event, "command", "")
-        # Detect file operations in commands
-        if "cat " in cmd or "head " in cmd or "tail " in cmd:
-            # Best-effort path extraction
-            parts = cmd.split()
-            for i, part in enumerate(parts):
-                if part in ("cat", "head", "tail") and i + 1 < len(parts):
-                    path = parts[i + 1].strip("'\"")
-                    if path and path not in files:
-                        files[path] = {"action": "read_via_cmd", "type": "read"}
+        _extract_cmd_run_file_paths(event, files)
 
 
 def _extract_errors(event: Event, snapshot: dict) -> None:
@@ -174,50 +188,86 @@ def _extract_attempted_approaches(events: list[Event], snapshot: dict) -> None:
         return
 
     pending_action: dict[str, Any] | None = None
-
     for event in events:
-        cls_name = type(event).__name__
+        pending_action = _process_event_for_approaches(event, approaches, pending_action)
 
-        if cls_name == "FileEditAction":
-            path = getattr(event, "path", "")
-            command = getattr(event, "command", "edit")
-            old_str = str(getattr(event, "old_str", ""))[:80] if hasattr(event, "old_str") else ""
-            pending_action = {
-                "type": "file_edit",
-                "detail": f"{command} on {path}" + (f" (old_str: {old_str!r}...)" if old_str else ""),
-            }
-        elif cls_name == "CmdRunAction":
-            cmd = str(getattr(event, "command", ""))[:150]
-            pending_action = {"type": "command", "detail": cmd}
-        elif cls_name in ("ErrorObservation",) and pending_action:
-            content = str(getattr(event, "content", ""))[:150]
-            pending_action["outcome"] = f"FAILED: {content}"
-            if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
-                approaches.append(pending_action)
-            pending_action = None
-        elif cls_name == "CmdOutputObservation" and pending_action:
-            exit_code = getattr(event, "exit_code", 0)
-            if exit_code != 0:
-                content = str(getattr(event, "content", ""))
-                lines = content.strip().split("\n")
-                tail = lines[-1][:150] if lines else ""
-                pending_action["outcome"] = f"FAILED (exit={exit_code}): {tail}"
-                if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
-                    approaches.append(pending_action)
-            else:
-                pending_action["outcome"] = "SUCCESS"
-                if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
-                    approaches.append(pending_action)
-            pending_action = None
-        elif cls_name == "FileEditObservation" and pending_action:
-            content = str(getattr(event, "content", ""))
-            if "error" in content.lower() or "failed" in content.lower():
-                pending_action["outcome"] = f"FAILED: {content[:150]}"
-            else:
-                pending_action["outcome"] = "SUCCESS"
-            if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
-                approaches.append(pending_action)
-            pending_action = None
+
+def _process_event_for_approaches(
+    event: Event,
+    approaches: list,
+    pending: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Process one event for attempted-approaches extraction.
+
+    Dispatches on event type: FileEditAction/CmdRunAction start a pending action;
+    ErrorObservation/CmdOutputObservation/FileEditObservation resolve it and append
+    to approaches. Returns the new pending action (or None if resolved).
+    """
+    cls_name = type(event).__name__
+    if cls_name == "FileEditAction":
+        return _make_file_edit_action(event)
+    if cls_name == "CmdRunAction":
+        return _make_cmd_run_action(event)
+    if cls_name == "ErrorObservation" and pending:
+        _append_with_outcome(approaches, pending, f"FAILED: {str(getattr(event, 'content', ''))[:150]}")
+        return None
+    if cls_name == "CmdOutputObservation" and pending:
+        _handle_cmd_output(approaches, pending, event)
+        return None
+    if cls_name == "FileEditObservation" and pending:
+        _handle_file_edit_observation(approaches, pending, event)
+        return None
+    return pending
+
+
+def _make_file_edit_action(event: Event) -> dict[str, Any]:
+    """Build a file_edit pending action dict from a FileEditAction event."""
+    path = getattr(event, "path", "")
+    command = getattr(event, "command", "edit")
+    old_str = str(getattr(event, "old_str", ""))[:80] if hasattr(event, "old_str") else ""
+    detail = f"{command} on {path}"
+    if old_str:
+        detail += f" (old_str: {old_str!r}...)"
+    return {"type": "file_edit", "detail": detail}
+
+
+def _make_cmd_run_action(event: Event) -> dict[str, Any]:
+    """Build a command pending action dict from a CmdRunAction event."""
+    cmd = str(getattr(event, "command", ""))[:150]
+    return {"type": "command", "detail": cmd}
+
+
+def _append_with_outcome(approaches: list, action: dict, outcome: str) -> None:
+    """Append action with outcome to approaches if under the max limit."""
+    if len(approaches) < _MAX_ATTEMPTED_APPROACHES:
+        action["outcome"] = outcome
+        approaches.append(action)
+
+
+def _handle_cmd_output(
+    approaches: list, pending: dict[str, Any], event: Event
+) -> dict[str, Any] | None:
+    """Resolve pending action with CmdOutputObservation result (SUCCESS or FAILED)."""
+    exit_code = getattr(event, "exit_code", 0)
+    if exit_code != 0:
+        content = str(getattr(event, "content", ""))
+        lines = content.strip().split("\n")
+        tail = lines[-1][:150] if lines else ""
+        outcome = f"FAILED (exit={exit_code}): {tail}"
+    else:
+        outcome = "SUCCESS"
+    _append_with_outcome(approaches, pending, outcome)
+    return None
+
+
+def _handle_file_edit_observation(
+    approaches: list, pending: dict[str, Any], event: Event
+) -> dict[str, Any] | None:
+    """Resolve pending action with FileEditObservation result (SUCCESS or FAILED)."""
+    content = str(getattr(event, "content", ""))
+    outcome = f"FAILED: {content[:150]}" if "error" in content.lower() or "failed" in content.lower() else "SUCCESS"
+    _append_with_outcome(approaches, pending, outcome)
+    return None
 
 
 def save_snapshot(snapshot: dict[str, Any]) -> None:
@@ -250,52 +300,73 @@ def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     """
     parts = ["<RESTORED_CONTEXT>"]
     parts.append(f"Events condensed: {snapshot.get('events_condensed', '?')}")
-
-    # Files
-    files = snapshot.get("files_touched", {})
-    if files:
-        parts.append("\nFiles touched before condensation:")
-        for path, info in list(files.items())[:30]:
-            parts.append(f"  {info.get('action', '?')}: {path}")
-
-    # Recent errors
-    errors = snapshot.get("recent_errors", [])
-    if errors:
-        parts.append(f"\nRecent errors ({len(errors)}):")
-        for err in errors[-5:]:  # Show last 5
-            parts.append(f"  • {err[:200]}")
-
-    # Decisions
-    decisions = snapshot.get("decisions", [])
-    if decisions:
-        parts.append(f"\nKey reasoning/decisions ({len(decisions)}):")
-        for dec in decisions[-8:]:  # Show last 8
-            parts.append(f"  • {dec[:200]}")
-
-    # Recent commands
-    commands = snapshot.get("recent_commands", [])
-    if commands:
-        parts.append(f"\nRecent commands ({len(commands)}):")
-        for cmd_info in commands[-5:]:
-            cmd = cmd_info.get("command", "")[:150]
-            parts.append(f"  $ {cmd}")
-            if "output" in cmd_info:
-                parts.append(f"    → {cmd_info['output'][:150]}")
-
-    # Attempted approaches — what was tried and whether it worked
-    approaches = snapshot.get("attempted_approaches", [])
-    if approaches:
-        failed = [a for a in approaches if "FAILED" in a.get("outcome", "")]
-        succeeded = [a for a in approaches if a.get("outcome") == "SUCCESS"]
-        parts.append(f"\nAttempted approaches ({len(approaches)} total, {len(failed)} failed, {len(succeeded)} succeeded):")
-        parts.append("FAILED approaches (DO NOT retry these):")
-        for a in failed[-10:]:
-            parts.append(f"  ✗ [{a.get('type', '?')}] {a.get('detail', '')[:200]}")
-            parts.append(f"    → {a.get('outcome', '')[:200]}")
-        if succeeded:
-            parts.append("Succeeded approaches:")
-            for a in succeeded[-5:]:
-                parts.append(f"  ✓ [{a.get('type', '?')}] {a.get('detail', '')[:200]}")
-
+    parts.extend(_format_files_section(snapshot.get("files_touched", {})))
+    parts.extend(_format_errors_section(snapshot.get("recent_errors", [])))
+    parts.extend(_format_decisions_section(snapshot.get("decisions", [])))
+    parts.extend(_format_commands_section(snapshot.get("recent_commands", [])))
+    parts.extend(_format_approaches_section(snapshot.get("attempted_approaches", [])))
     parts.append("</RESTORED_CONTEXT>")
     return "\n".join(parts)
+
+
+def _format_files_section(files: dict) -> list[str]:
+    """Format files touched section."""
+    if not files:
+        return []
+    lines = ["\nFiles touched before condensation:"]
+    for path, info in list(files.items())[:30]:
+        lines.append(f"  {info.get('action', '?')}: {path}")
+    return lines
+
+
+def _format_errors_section(errors: list) -> list[str]:
+    """Format recent errors section."""
+    if not errors:
+        return []
+    lines = [f"\nRecent errors ({len(errors)}):"]
+    for err in errors[-5:]:
+        lines.append(f"  • {err[:200]}")
+    return lines
+
+
+def _format_decisions_section(decisions: list) -> list[str]:
+    """Format key reasoning/decisions section."""
+    if not decisions:
+        return []
+    lines = [f"\nKey reasoning/decisions ({len(decisions)}):"]
+    for dec in decisions[-8:]:
+        lines.append(f"  • {dec[:200]}")
+    return lines
+
+
+def _format_commands_section(commands: list) -> list[str]:
+    """Format recent commands section."""
+    if not commands:
+        return []
+    lines = [f"\nRecent commands ({len(commands)}):"]
+    for cmd_info in commands[-5:]:
+        cmd = cmd_info.get("command", "")[:150]
+        lines.append(f"  $ {cmd}")
+        if "output" in cmd_info:
+            lines.append(f"    → {cmd_info['output'][:150]}")
+    return lines
+
+
+def _format_approaches_section(approaches: list) -> list[str]:
+    """Format attempted approaches (failed/succeeded) section."""
+    if not approaches:
+        return []
+    failed = [a for a in approaches if "FAILED" in a.get("outcome", "")]
+    succeeded = [a for a in approaches if a.get("outcome") == "SUCCESS"]
+    lines = [
+        f"\nAttempted approaches ({len(approaches)} total, {len(failed)} failed, {len(succeeded)} succeeded):",
+        "FAILED approaches (DO NOT retry these):",
+    ]
+    for a in failed[-10:]:
+        lines.append(f"  ✗ [{a.get('type', '?')}] {a.get('detail', '')[:200]}")
+        lines.append(f"    → {a.get('outcome', '')[:200]}")
+    if succeeded:
+        lines.append("Succeeded approaches:")
+        for a in succeeded[-5:]:
+            lines.append(f"  ✓ [{a.get('type', '?')}] {a.get('detail', '')[:200]}")
+    return lines

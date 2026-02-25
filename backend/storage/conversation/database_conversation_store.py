@@ -153,6 +153,11 @@ class DatabaseConversationStore(ConversationStore):
                 conversation_id,
             )
 
+    async def delete_all_metadata(self) -> None:
+        """Delete all conversation metadata."""
+        async with self._pool.acquire() as conn:
+            await conn.execute("DELETE FROM conversation_metadata")
+
     async def exists(self, conversation_id: str) -> bool:
         """Check if conversation exists."""
         async with self._pool.acquire() as conn:

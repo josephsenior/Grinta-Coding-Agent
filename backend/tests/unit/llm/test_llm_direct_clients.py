@@ -332,6 +332,64 @@ class TestGeminiClientHelpers:
         resp = MagicMock(candidates=[candidate])
         assert GeminiClient._extract_gemini_tool_calls(resp) is None
 
+    def test_extract_gemini_finish_reason_from_dict_shape(self):
+        from backend.llm.direct_clients import GeminiClient
+
+        response = {
+            "candidates": [
+                {
+                    "finishReason": "SAFETY",
+                    "content": {"parts": []},
+                }
+            ]
+        }
+        assert GeminiClient._extract_gemini_finish_reason(response) == "SAFETY"
+
+    def test_extract_gemini_block_reason_from_prompt_feedback(self):
+        from backend.llm.direct_clients import GeminiClient
+
+        response = {
+            "promptFeedback": {
+                "blockReason": "SAFETY",
+            }
+        }
+        assert GeminiClient._extract_gemini_block_reason(response) == "SAFETY"
+
+    def test_ensure_non_empty_gemini_content_synthesizes_for_empty_response(self):
+        from backend.llm.direct_clients import GeminiClient
+
+        response = {
+            "candidates": [{"finishReason": "SAFETY", "content": {"parts": []}}],
+            "promptFeedback": {"blockReason": "SAFETY"},
+        }
+        content = GeminiClient._ensure_non_empty_gemini_content(
+            response,
+            content="",
+            tool_calls=None,
+        )
+
+        assert "blocked by safety" in content.lower()
+
+    def test_ensure_non_empty_gemini_content_keeps_text_when_present(self):
+        from backend.llm.direct_clients import GeminiClient
+
+        content = GeminiClient._ensure_non_empty_gemini_content(
+            response={},
+            content="hello",
+            tool_calls=None,
+        )
+        assert content == "hello"
+
+    def test_ensure_non_empty_gemini_content_keeps_empty_for_tool_calls(self):
+        from backend.llm.direct_clients import GeminiClient
+
+        content = GeminiClient._ensure_non_empty_gemini_content(
+            response={},
+            content="",
+            tool_calls=[{"id": "tc1", "type": "function", "function": {"name": "x", "arguments": "{}"}}],
+        )
+        assert content == ""
+
 
 # ---------------------------------------------------------------------------
 # DirectLLMClient.model_name property

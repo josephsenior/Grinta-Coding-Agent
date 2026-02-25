@@ -49,8 +49,7 @@ class NestedEventStore(EventStoreABC):
         """Make API request and return parsed response."""
         search_str = urlencode(search_params)
         url = f"{self.base_url}/events?{search_str}"
-        headers: dict[str, str] = {}
-        response = httpx.get(url, headers=headers)
+        response = httpx.get(url)
         if response.status_code == status.HTTP_404_NOT_FOUND:
             return None
         return response.json()

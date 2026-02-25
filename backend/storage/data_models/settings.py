@@ -166,6 +166,25 @@ class Settings(BaseModel):
             raise ValueError(msg)
         return v
 
+    @field_validator("agent", mode="before")
+    @classmethod
+    def normalize_legacy_agent_names(cls, v: str | None) -> str | None:
+        """Map deprecated/legacy agent names to current registry names."""
+        if not isinstance(v, str):
+            return v
+
+        normalized = v.strip()
+        if not normalized:
+            return None
+
+        legacy_map = {
+            "codeactagent": "Orchestrator",
+            "codeact": "Orchestrator",
+            "codact": "Orchestrator",
+            "orchestrator": "Orchestrator",
+        }
+        return legacy_map.get(normalized.lower(), normalized)
+
     @field_serializer("secrets_store")
     def secrets_store_serializer(self, secrets: UserSecrets, info: SerializationInfo):
         """Serialize the secrets store while forcing cache invalidation."""

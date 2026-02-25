@@ -7,16 +7,9 @@
 ##############################################################################
 
 ################################ Security ####################################
-# Authentication and authorization settings (OSS Mode)
+# Security-related settings
 ##############################################################################
 [security]
-# Unique key for session management (replaces password login)
-# If not set, the server will log a warning and use a default 'dev' key
-# Provide this key in the 'X-Session-API-Key' header
-# IMPORTANT: Change this key before deploying to any shared/public environment.
-# If left empty or removed, the server will auto-generate a secure random key
-# and persist it to .env.local on first startup.
-session_api_key = ""
 
 #################################### Core ####################################
 # General core configurations
@@ -85,8 +78,8 @@ max_budget_per_task = 5.0
 # Name of the default agent
 default_agent = "Orchestrator"
 
-# JWT secret for authentication
-#jwt_secret = ""
+# MCP host address
+mcp_host = "localhost:3000"
 
 # Restrict file types for file uploads
 #file_uploads_restrict_file_types = false
@@ -110,17 +103,8 @@ default_agent = "Orchestrator"
 # use 'llm' for the default LLM config
 ##############################################################################
 [llm]
-# AWS access key ID
-#aws_access_key_id = ""
-
-# AWS region name
-#aws_region_name = ""
-
-# AWS secret access key
-#aws_secret_access_key = ""
-
 # API key to use (For Headless / CLI only -  In Web this is overridden by Session Init)
-api_key = ""
+api_key = "AIzaSyAM_SJaVTacapIW9FtZcVoIzQY_igKiE5Q"
 
 # API base URL (For Headless / CLI only -  In Web this is overridden by Session Init)
 #base_url = ""
@@ -138,7 +122,7 @@ api_key = ""
 #output_cost_per_token = 0.0
 
 # Custom LLM provider
-#custom_llm_provider = ""
+#custom_llm_provider = "gemini"
 
 # Maximum number of characters in an observation's content
 #max_message_chars = 10000
@@ -150,7 +134,7 @@ api_key = ""
 #max_output_tokens = 0
 
 # Model to use. (For Headless / CLI only -  In Web this is overridden by Session Init)
-model = "claude-sonnet-4-20250514"
+model = "gemini-2.0-flash"
 
 # Number of retries to attempt when an operation fails with the LLM.
 # Increase this value to allow more attempts before giving up
@@ -226,16 +210,13 @@ model = "claude-sonnet-4-20250514"
 # The number of times llm_editor tries to fix an error when editing.
 correct_num = 5
 
-[llm.gpt4o-mini]
-api_key = ""
-model = "gpt-4o-mini"
 
 ################################ Ollama Local Models ##########################
 # Forge has native Ollama support. Use the "ollama/" prefix and Forge will:
 #   - Auto-detect the Ollama provider
 #   - Strip the "ollama/" prefix before sending to Ollama's API
 #   - Default base_url to http://localhost:11434/v1
-#   - Skip API key validation (Ollama doesn't require auth)
+#   - Skip API key validation (Ollama doesn't require credentials)
 #
 # Setup:
 #   1. Install Ollama from https://ollama.ai
@@ -273,19 +254,6 @@ model = "gpt-4o-mini"
 #temperature = 0.1
 #max_output_tokens = 2048  # Smaller context for speed
 
-# Usage examples:
-# 1. Set as default model in [llm] section:
-#    model = "ollama/llama3.2"
-#    base_url = "http://localhost:11434"
-#
-# 2. Use specific model for specific agent:
-#    [agent.CodeReviewAgent]
-#    llm_config = "ollama-coder"
-#
-# 3. Use cheaper model for condensing:
-#    [condenser]
-#    type = "llm"
-#    llm_config = "ollama-fast"
 
 # Performance tips for Ollama:
 # - GPU: Install NVIDIA/AMD drivers for 10-100x speedup

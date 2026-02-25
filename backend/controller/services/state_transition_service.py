@@ -19,6 +19,7 @@ VALID_TRANSITIONS: dict[AgentState, frozenset[AgentState]] = {
     AgentState.LOADING: frozenset(
         {
             AgentState.RUNNING,
+            AgentState.AWAITING_USER_INPUT,
             AgentState.ERROR,
             AgentState.STOPPED,
         }

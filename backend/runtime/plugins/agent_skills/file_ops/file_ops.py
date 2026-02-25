@@ -249,6 +249,16 @@ def _cur_file_header(current_file: str | None, total_lines: int) -> str:
     return f"[File: {os.path.abspath(current_file)} ({total_lines} lines total)]\n"
 
 
+def _validate_line_number(
+    line_number: int | None, total_lines: int
+) -> bool:
+    """Validate line_number for open_file. Returns False and outputs error if invalid."""
+    if not isinstance(line_number, int) or line_number < 1 or line_number > total_lines:
+        _output_error(f"Line number must be between 1 and {total_lines}.")
+        return False
+    return True
+
+
 def open_file(
     path: str, line_number: int | None = 1, context_lines: int | None = None
 ) -> None:
@@ -267,20 +277,17 @@ def open_file(
 
     """
     global CURRENT_FILE, CURRENT_LINE, WINDOW
-    if context_lines is None:
-        context_lines = WINDOW
+    context_lines = context_lines if context_lines is not None and context_lines >= 1 else WINDOW
+    abs_path = os.path.abspath(path)
     if not os.path.isfile(path):
         _output_error(f"File {path} not found.")
         return
-    CURRENT_FILE = os.path.abspath(path)
-    with open(CURRENT_FILE, encoding="utf-8") as file:
+    with open(abs_path, encoding="utf-8") as file:
         total_lines = max(1, sum(1 for _ in file))
-    if not isinstance(line_number, int) or line_number < 1 or line_number > total_lines:
-        _output_error(f"Line number must be between 1 and {total_lines}.")
+    if not _validate_line_number(line_number, total_lines):
         return
+    CURRENT_FILE = abs_path
     CURRENT_LINE = line_number
-    if context_lines is None or context_lines < 1:
-        context_lines = WINDOW
     output = _cur_file_header(CURRENT_FILE, total_lines)
     output += _print_window(
         CURRENT_FILE,

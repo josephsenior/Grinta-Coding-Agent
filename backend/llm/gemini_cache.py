@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import time
-from datetime import timedelta
+from typing import TYPE_CHECKING
 
-from google.generativeai import caching
+if TYPE_CHECKING:
+    from google import genai
 
 from backend.core.logger import forge_logger as logger
 
@@ -35,6 +36,7 @@ class GeminiCacheManager:
 
     def get_or_create_cache(
         self,
+        client: genai.Client,
         model: str,
         system_instruction: str | None,
         messages: list[dict],
@@ -43,6 +45,7 @@ class GeminiCacheManager:
         """Get an existing cache name or create a new one for the given context.
 
         Args:
+            client: The genai.Client instance
             model: Model name (e.g. 'gemini-1.5-pro')
             system_instruction: The system prompt
             messages: The list of messages (history)
@@ -62,7 +65,7 @@ class GeminiCacheManager:
             cache_name = self._caches[content_hash]
             try:
                 # Verify it still exists in Google's end
-                caching.CachedContent.get(cache_name)
+                client.caches.get(name=cache_name)
                 logger.debug("Reusing Gemini context cache: %s", cache_name)
                 return cache_name
             except Exception:
@@ -81,12 +84,14 @@ class GeminiCacheManager:
                     {"role": role, "parts": [{"text": m.get("content", "")}]}
                 )
 
-            cache = caching.CachedContent.create(
+            cache = client.caches.create(
                 model=model,
-                display_name=f"forge_cache_{int(time.time())}",
-                system_instruction=system_instruction,
+                config={
+                    "display_name": f"forge_cache_{int(time.time())}",
+                    "system_instruction": system_instruction,
+                    "ttl": f"{ttl_minutes * 60}s",
+                },
                 contents=contents,
-                ttl=timedelta(minutes=ttl_minutes),
             )
 
             logger.info(
@@ -99,10 +104,10 @@ class GeminiCacheManager:
             logger.warning("Failed to create Gemini context cache: %s", e)
             return None
 
-    def cleanup_old_caches(self):
+    def cleanup_old_caches(self, client: genai.Client):
         """Cleanup expired caches from the provider."""
         try:
-            for _ in caching.CachedContent.list():
+            for _ in client.caches.list():
                 # Google handles TTL automatically, but we can manually delete
                 # if we have too many or they are redundant.
                 pass

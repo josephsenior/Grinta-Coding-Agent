@@ -2,13 +2,32 @@
 """Start the Forge backend server with correct Python path."""
 
 import os
+import socket
 import sys
 from pathlib import Path
+
+# Force UTF-8 output so emoji don't crash on Windows cp1252 terminals
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[attr-defined]
 
 # Add project root to Python path
 project_root = Path(__file__).parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
+
+
+def _find_available_port(host: str, preferred_port: int, max_offset: int = 20) -> int:
+    """Return preferred_port if free, otherwise next available port within range."""
+    for offset in range(max_offset + 1):
+        candidate = preferred_port + offset
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                probe.bind((host, candidate))
+                return candidate
+            except OSError:
+                continue
+    return preferred_port
 
 
 def _load_dotenv_local() -> None:
@@ -37,10 +56,17 @@ os.environ.setdefault('PORT', '3000')
 import uvicorn  # noqa: E402
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', '3000'))
     host = os.environ.get('FORGE_HOST', os.environ.get('HOST', '127.0.0.1'))
+    requested_port = int(os.environ.get('PORT', '3000'))
+    port = _find_available_port(host, requested_port)
+    if port != requested_port:
+        print(
+            f'Port {requested_port} is in use; automatically switching to {port}.'
+        )
+        os.environ['PORT'] = str(port)
+
     reload_enabled = os.environ.get('FORGE_ENV', 'development') != 'production'
-    print(f'🚀 Starting Forge server on http://{host}:{port}')
+    print(f'Starting Forge server on http://{host}:{port}')
     print('Press Ctrl+C to stop the server.\n')
 
     uvicorn.run(

@@ -163,58 +163,71 @@ class CmdOutputObservation(Observation):
         if len(content) <= max_size:
             return content
 
-        original_length = len(content)
         head_budget = max_size * 15 // 100
         tail_budget = max_size * 35 // 100
         middle_budget = max_size - head_budget - tail_budget
-
         head = content[:head_budget]
         tail = content[-tail_budget:]
-
         middle = content[head_budget:-tail_budget] if tail_budget > 0 else content[head_budget:]
         middle_lines = middle.splitlines(keepends=True)
 
-        error_line_indices: set[int] = set()
+        error_line_indices = cls._find_error_line_indices(middle_lines)
+        middle_preserved = cls._build_middle_preserved(middle_lines, error_line_indices, middle_budget)
+
+        truncated = cls._build_truncated_output(
+            head, tail, middle_preserved, len(content), error_line_indices
+        )
+        logger.debug(
+            "Smart-truncated command output: %s -> %s chars (%d error lines kept)",
+            len(content),
+            len(truncated),
+            len(error_line_indices),
+        )
+        return truncated
+
+    @classmethod
+    def _find_error_line_indices(cls, middle_lines: list[str]) -> set[int]:
+        """Find indices of lines matching error patterns, plus 2-line context."""
+        indices: set[int] = set()
         for i, line in enumerate(middle_lines):
             if cls._ERROR_LINE_PATTERNS.search(line):
                 for ctx in range(max(0, i - 2), min(len(middle_lines), i + 3)):
-                    error_line_indices.add(ctx)
+                    indices.add(ctx)
+        return indices
 
-        if error_line_indices:
-            kept_lines = []
-            sorted_indices = sorted(error_line_indices)
-            prev_idx = -2
-            current_size = 0
-            for idx in sorted_indices:
-                if current_size >= middle_budget:
-                    break
-                if idx > prev_idx + 1:
-                    kept_lines.append("  [...]\n")
-                    current_size += 8
-                line = middle_lines[idx]
-                kept_lines.append(line)
-                current_size += len(line)
-                prev_idx = idx
-            middle_preserved = "".join(kept_lines)
-        else:
-            middle_preserved = ""
+    @classmethod
+    def _build_middle_preserved(
+        cls, middle_lines: list[str], error_indices: set[int], middle_budget: int
+    ) -> str:
+        """Build preserved middle section from error-relevant lines within budget."""
+        if not error_indices:
+            return ""
+        kept: list[str] = []
+        prev_idx = -2
+        current_size = 0
+        for idx in sorted(error_indices):
+            if current_size >= middle_budget:
+                break
+            if idx > prev_idx + 1:
+                kept.append("  [...]\n")
+                current_size += 8
+            kept.append(middle_lines[idx])
+            current_size += len(middle_lines[idx])
+            prev_idx = idx
+        return "".join(kept)
 
+    @classmethod
+    def _build_truncated_output(
+        cls, head: str, tail: str, middle_preserved: str, original_length: int, error_indices: set[int]
+    ) -> str:
+        """Assemble truncated output with markers."""
         retained = len(head) + len(middle_preserved) + len(tail)
         pct = round(retained / original_length * 100) if original_length else 100
-        n_error_lines = len(error_line_indices)
         marker = (
             f"\n[... Observation truncated: {original_length} chars → ~{retained} chars "
-            f"({pct}% retained, {n_error_lines} error-relevant lines preserved from middle) ...]\n"
+            f"({pct}% retained, {len(error_indices)} error-relevant lines preserved from middle) ...]\n"
         )
-        truncated = head + marker + middle_preserved + marker + tail
-
-        logger.debug(
-            "Smart-truncated command output: %s -> %s chars (%d error lines kept)",
-            original_length,
-            len(truncated),
-            n_error_lines,
-        )
-        return truncated
+        return head + marker + middle_preserved + marker + tail
 
     @property
     def command_id(self) -> int:

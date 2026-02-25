@@ -33,7 +33,7 @@ backend/
 ├── core/              # Config, logging, exceptions
 │   └── config/        # Layered TOML + env config loading
 ├── engines/           # LLM prompt engines
-│   └── orchestrator/  # Main CodeAct engine with 23 tools
+│   └── orchestrator/  # Main Orchestrator engine with 23 tools
 ├── events/            # Event-sourced event system
 │   ├── action/        # Agent actions (commands, edits, messages)
 │   ├── observation/   # Action results (output, errors, diffs)

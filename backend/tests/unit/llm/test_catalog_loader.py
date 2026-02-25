@@ -14,6 +14,9 @@ from backend.llm.catalog_loader import (
     get_featured_models,
     get_verified_models,
     get_all_model_names,
+    supports_tool_choice,
+    prefers_short_tool_descriptions,
+    sanitize_call_kwargs_for_provider,
 )
 
 
@@ -329,6 +332,92 @@ class TestGetVerifiedModels:
         """Test filtering by provider with no verified models."""
         verified = get_verified_models(provider="nonexistent-provider")
         assert verified == []
+
+
+class TestSanitizeCallKwargsForProvider:
+    """Tests for provider-aware kwargs sanitization."""
+
+    def test_google_sanitizes_openai_only_keys(self):
+        kwargs = {
+            "model": "google/gemini-3-flash",
+            "temperature": 0.2,
+            "top_p": 0.9,
+            "tool_choice": "none",
+            "extra_body": {"x": 1},
+            "reasoning_effort": "medium",
+            "seed": 123,
+            "parallel_tool_calls": True,
+            "metadata": {"trace": "1"},
+        }
+
+        out = sanitize_call_kwargs_for_provider("google/gemini-3-flash", kwargs)
+
+        assert out["model"] == "google/gemini-3-flash"
+        assert out["temperature"] == 0.2
+        assert out["top_p"] == 0.9
+        assert "tool_choice" not in out
+        assert "extra_body" not in out
+        assert "reasoning_effort" not in out
+        assert "seed" not in out
+        assert "parallel_tool_calls" not in out
+        assert "metadata" not in out
+
+    def test_anthropic_sanitizes_unsupported_keys(self):
+        kwargs = {
+            "model": "anthropic/claude-sonnet-4",
+            "temperature": 0.1,
+            "tool_choice": "auto",
+            "response_format": {"type": "json_object"},
+            "parallel_tool_calls": True,
+            "extra_headers": {"x": "1"},
+        }
+
+        out = sanitize_call_kwargs_for_provider("anthropic/claude-sonnet-4", kwargs)
+
+        assert out["model"] == "anthropic/claude-sonnet-4"
+        assert out["temperature"] == 0.1
+        assert "tool_choice" not in out
+        assert "response_format" not in out
+        assert "parallel_tool_calls" not in out
+        assert "extra_headers" not in out
+
+    def test_openai_keeps_optional_keys(self):
+        kwargs = {
+            "model": "gpt-4o",
+            "temperature": 0.3,
+            "seed": 42,
+            "response_format": {"type": "json_object"},
+            "tool_choice": "none",
+        }
+
+        out = sanitize_call_kwargs_for_provider("gpt-4o", kwargs)
+
+        assert out == kwargs
+
+
+class TestPrefersShortToolDescriptions:
+    def test_gpt_family_prefers_short(self):
+        assert prefers_short_tool_descriptions("gpt-4o") is True
+
+    def test_o_family_prefers_short(self):
+        assert prefers_short_tool_descriptions("o3-mini") is True
+
+    def test_claude_does_not_prefer_short(self):
+        assert prefers_short_tool_descriptions("claude-3-opus") is False
+
+    def test_unknown_model_defaults_false(self):
+        assert prefers_short_tool_descriptions("some-obscure-model") is False
+
+
+class TestSupportsToolChoice:
+    def test_known_openai_model_supports(self):
+        assert supports_tool_choice("gpt-4o") is True
+
+    def test_known_google_model_does_not_support(self):
+        assert supports_tool_choice("google/gemini-3-flash") is False
+
+    def test_unknown_model_defaults_false(self):
+        assert supports_tool_choice("some-obscure-model") is False
 
 
 class TestGetAllModelNames:

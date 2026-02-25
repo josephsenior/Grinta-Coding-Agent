@@ -199,6 +199,37 @@ class EventPersistence:
         cache_filename = self._get_filename_for_cache(start, end)
         return cache_filename, contents
 
+    def _process_pending_file(
+        self, pending_path: str, event_path: str, events_dir: str
+    ) -> tuple[int, int]:
+        """Process one .pending file. Returns (recovered_delta, cleaned_delta)."""
+        try:
+            self.file_store.read(event_path)
+            try:
+                self.file_store.delete(pending_path)
+                return (0, 1)
+            except Exception as exc:
+                logger.debug(
+                    "WAL cleanup: could not delete stale .pending file %s: %s",
+                    pending_path, exc,
+                )
+                return (0, 0)
+        except FileNotFoundError:
+            try:
+                event_json = self.file_store.read(pending_path)
+                self.file_store.write(event_path, event_json)
+                self.file_store.delete(pending_path)
+                return (1, 0)
+            except Exception as exc:
+                logger.warning(
+                    "WAL replay: failed to recover %s for session %s: %s",
+                    pending_path, self.sid, exc,
+                )
+                return (0, 0)
+        except Exception:
+            logger.debug("WAL replay: skipping %s (read error)", pending_path, exc_info=True)
+            return (0, 0)
+
     def replay_pending_events(self) -> None:
         """Scan the events directory for ``.pending`` WAL markers.
 
@@ -211,57 +242,20 @@ class EventPersistence:
         except FileNotFoundError:
             return
         except Exception:
-            logger.debug(
-                "WAL replay: could not list events dir for %s",
-                self.sid,
-                exc_info=True,
-            )
+            logger.debug("WAL replay: could not list events dir for %s", self.sid, exc_info=True)
             return
 
         pending_files = [f for f in all_files if f.endswith(".pending")]
         if not pending_files:
             return
 
-        recovered = 0
-        cleaned = 0
+        recovered, cleaned = 0, 0
         for pending_name in pending_files:
-            # Canonical path: file_store.list() may return paths that
-            # already include the events_dir prefix — normalize to
-            # avoid double-prefixing.
             pending_path = self._normalize_event_path(pending_name, events_dir)
             event_path = pending_path.removesuffix(".pending")
-
-            try:
-                self.file_store.read(event_path)
-                # Event exists — stale marker
-                try:
-                    self.file_store.delete(pending_path)
-                    cleaned += 1
-                except Exception as exc:
-                    logger.debug(
-                        "WAL cleanup: could not delete stale .pending file %s: %s",
-                        pending_path,
-                        exc,
-                    )
-            except FileNotFoundError:
-                try:
-                    event_json = self.file_store.read(pending_path)
-                    self.file_store.write(event_path, event_json)
-                    self.file_store.delete(pending_path)
-                    recovered += 1
-                except Exception as exc:
-                    logger.warning(
-                        "WAL replay: failed to recover %s for session %s: %s",
-                        pending_path,
-                        self.sid,
-                        exc,
-                    )
-            except Exception:
-                logger.debug(
-                    "WAL replay: skipping %s (read error)",
-                    pending_path,
-                    exc_info=True,
-                )
+            r, c = self._process_pending_file(pending_path, event_path, events_dir)
+            recovered += r
+            cleaned += c
 
         if recovered or cleaned:
             logger.info(

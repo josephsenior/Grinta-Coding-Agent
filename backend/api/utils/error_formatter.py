@@ -820,40 +820,41 @@ def format_generic_error(
     )
 
 
+def _format_time_until_reset(reset_at: float | None) -> str:
+    """Format human-readable time until quota reset."""
+    if not reset_at:
+        return "soon"
+    try:
+        reset_dt = datetime.fromtimestamp(reset_at)
+        delta = reset_dt - datetime.now(UTC)
+        secs = delta.total_seconds()
+        if secs <= 0:
+            return "soon"
+        hours = int(secs / 3600)
+        minutes = int((secs % 3600) / 60)
+        if hours > 0:
+            return f"{hours} hour{'s' if hours != 1 else ''}"
+        if minutes > 0:
+            return f"{minutes} minute{'s' if minutes != 1 else ''}"
+        return "a few moments"
+    except Exception:
+        return "soon"
+
+
 def format_quota_exceeded_error(
     quota_info: dict[str, Any] | None = None,
 ) -> UserFriendlyError:
     """Format quota exceeded errors with user-friendly messages."""
-    if not quota_info:
-        quota_info = {}
-
+    quota_info = quota_info or {}
     plan = quota_info.get("quota_plan", "free")
     limit_type = quota_info.get("limit_type", "daily")
     limit = quota_info.get("limit", 1.0)
     spent = quota_info.get("spent", limit)
     reset_at = quota_info.get("reset_at")
 
-    # Calculate time until reset
-    time_until_reset = "soon"
-    if reset_at:
-        try:
-            reset_dt = datetime.fromtimestamp(reset_at)
-            delta = reset_dt - datetime.now(UTC)
-            if delta.total_seconds() > 0:
-                hours = int(delta.total_seconds() / 3600)
-                minutes = int((delta.total_seconds() % 3600) / 60)
-                if hours > 0:
-                    time_until_reset = f"{hours} hour{'s' if hours != 1 else ''}"
-                elif minutes > 0:
-                    time_until_reset = f"{minutes} minute{'s' if minutes != 1 else ''}"
-                else:
-                    time_until_reset = "a few moments"
-        except Exception:
-            pass
-
+    time_until_reset = _format_time_until_reset(reset_at)
     limit_display = f"${limit:.2f}" if limit != float("inf") else "unlimited"
     spent_display = f"${spent:.2f}"
-
     plan_name = plan.replace("_", " ").title()
     period_name = "today" if limit_type == "daily" else "this month"
 
