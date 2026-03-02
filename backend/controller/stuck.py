@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from backend.core.logger import forge_logger as logger
 from backend.events.action.action import Action
@@ -60,7 +60,7 @@ class StuckDetector:
         )
         return self.state.history[last_user_msg_idx + 1 :]
 
-    def _filter_relevant_history(self, history: list[Event]) -> list[Event]:
+    def _filter_relevant_history(self, history: Sequence[Event]) -> list[Event]:
         """Filter history to remove irrelevant events."""
         return [
             event

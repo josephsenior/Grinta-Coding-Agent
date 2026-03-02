@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -31,7 +32,7 @@ class TestSecurityHeadersInit:
         assert mw.csp_profile == "strict"
 
     def test_none_profile_defaults_to_permissive(self):
-        mw = SecurityHeadersMiddleware(csp_profile=None)
+        mw = SecurityHeadersMiddleware(csp_profile=cast(str, None))
         assert mw.csp_profile == "permissive"
 
 

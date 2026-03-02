@@ -56,18 +56,14 @@ jobs:
       - name: Install Python dependencies using Poetry
         run: poetry install --with dev,test,runtime,evaluation
 
-      - name: Configure config.toml for testing with Haiku
+      - name: Configure settings.json for testing with Haiku
         env:
           LLM_MODEL: "litellm_proxy/claude-3-5-haiku-20241022"
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 10
         run: |
-          echo "[llm.eval]" > config.toml
-          echo "model = \"$LLM_MODEL\"" >> config.toml
-          echo "api_key = \"$LLM_API_KEY\"" >> config.toml
-          echo "base_url = \"$LLM_BASE_URL\"" >> config.toml
-          echo "temperature = 0.0" >> config.toml
+          echo '{"llm":{"eval":{"model":"'$LLM_MODEL'","api_key":"'$LLM_API_KEY'","base_url":"'$LLM_BASE_URL'","temperature":0}}}' > settings.json
 
       - name: Build environment
         run: make build
@@ -89,18 +85,14 @@ jobs:
       - name: Wait a little bit
         run: sleep 10
 
-      - name: Configure config.toml for testing with DeepSeek
+      - name: Configure settings.json for testing with DeepSeek
         env:
           LLM_MODEL: "litellm_proxy/deepseek-chat"
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 10
         run: |
-          echo "[llm.eval]" > config.toml
-          echo "model = \"$LLM_MODEL\"" >> config.toml
-          echo "api_key = \"$LLM_API_KEY\"" >> config.toml
-          echo "base_url = \"$LLM_BASE_URL\"" >> config.toml
-          echo "temperature = 0.0" >> config.toml
+          echo '{"llm":{"eval":{"model":"'$LLM_MODEL'","api_key":"'$LLM_API_KEY'","base_url":"'$LLM_BASE_URL'","temperature":0}}}' > settings.json
 
       - name: Run integration test evaluation for DeepSeek
         env:
@@ -121,18 +113,14 @@ jobs:
       - name: Wait a little bit (again)
         run: sleep 5
 
-      - name: Configure config.toml for testing VisualNavigator (DeepSeek)
+      - name: Configure settings.json for testing VisualNavigator (DeepSeek)
         env:
           LLM_MODEL: "litellm_proxy/deepseek-chat"
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 15
         run: |
-          echo "[llm.eval]" > config.toml
-          echo "model = \"$LLM_MODEL\"" >> config.toml
-          echo "api_key = \"$LLM_API_KEY\"" >> config.toml
-          echo "base_url = \"$LLM_BASE_URL\"" >> config.toml
-          echo "temperature = 0.0" >> config.toml
+          echo '{"llm":{"eval":{"model":"'$LLM_MODEL'","api_key":"'$LLM_API_KEY'","base_url":"'$LLM_BASE_URL'","temperature":0}}}' > settings.json
       - name: Run integration test evaluation for VisualNavigator (DeepSeek)
         env:
           RUNTIME_FORCE_REBUILD: True

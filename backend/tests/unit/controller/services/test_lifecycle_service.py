@@ -2,6 +2,10 @@
 
 import unittest
 from unittest.mock import MagicMock, patch
+from typing import cast
+
+from backend.core.config import AgentConfig, LLMConfig
+from backend.events import Event
 
 from backend.controller.services.lifecycle_service import LifecycleService
 
@@ -98,7 +102,7 @@ class TestLifecycleService(unittest.TestCase):
         mock_file_store = MagicMock()
         mock_conversation_stats = MagicMock()
         mock_initial_state = MagicMock()
-        mock_replay_events = [MagicMock(), MagicMock()]
+        mock_replay_events = cast(list[Event], [MagicMock(), MagicMock()])
 
         mock_state_tracker = MagicMock()
         mock_state_tracker.state = MagicMock()
@@ -174,14 +178,12 @@ class TestLifecycleService(unittest.TestCase):
 
     def test_initialize_agent_configs_with_configs(self):
         """Test initialize_agent_configs stores config dictionaries."""
-        mock_agent_to_llm_config = {
-            "agent1": MagicMock(),
-            "agent2": MagicMock(),
-        }
-        mock_agent_configs = {
-            "agent1": MagicMock(),
-            "agent2": MagicMock(),
-        }
+        mock_agent_to_llm_config = cast(
+            dict[str, LLMConfig], {"agent1": MagicMock(), "agent2": MagicMock()}
+        )
+        mock_agent_configs = cast(
+            dict[str, AgentConfig], {"agent1": MagicMock(), "agent2": MagicMock()}
+        )
 
         self.service.initialize_agent_configs(
             agent_to_llm_config=mock_agent_to_llm_config,

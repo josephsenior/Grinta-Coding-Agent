@@ -26,7 +26,6 @@ from backend.core.enums import RuntimeStatus
 from backend.api.services.conversation_service import create_new_conversation
 from backend.api.types import LLMAuthenticationError, MissingSettingsError
 from backend.api.utils.error_formatter import format_error_for_user
-from backend.api.utils.responses import error
 from backend.storage.data_models.conversation_metadata import ConversationTrigger
 from backend.storage.data_models.user_secrets import UserSecrets
 

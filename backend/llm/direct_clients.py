@@ -6,11 +6,10 @@ offering a lightweight and stable alternative to multi-provider abstraction libr
 
 from __future__ import annotations
 
-import json
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 
 from google import genai
 import httpx
@@ -98,15 +97,48 @@ class LLMResponse:
         self.tool_calls = tool_calls
 
         # Build nested structure for attribute-style access
+        class ToolCallFunction:
+            def __init__(self, name: str, arguments: str):
+                self.name = name
+                self.arguments = arguments
+            
+            def model_dump(self):
+                return {"name": self.name, "arguments": self.arguments}
+
+        class ToolCall:
+            def __init__(self, tc_dict: dict[str, Any]):
+                self.id = tc_dict.get("id")
+                self.type = tc_dict.get("type")
+                func_dict = tc_dict.get("function", {})
+                self.function = ToolCallFunction(
+                    name=func_dict.get("name", ""),
+                    arguments=func_dict.get("arguments", "{}"),
+                )
+                # Support any other fields via setattr to be safe
+                for k, v in tc_dict.items():
+                    if k not in ["id", "type", "function"]:
+                        setattr(self, k, v)
+            
+            def model_dump(self):
+                return {
+                    "id": self.id,
+                    "type": self.type,
+                    "function": self.function.model_dump()
+                }
+
         class Message:
-            def __init__(self, content, role, tool_calls=None):
+            def __init__(self, content, role, tool_calls_dict=None):
                 self.content = content
                 self.role = role
-                self.tool_calls = tool_calls
+                self.tool_calls = (
+                    [ToolCall(tc) for tc in tool_calls_dict]
+                    if tool_calls_dict
+                    else None
+                )
 
         class Choice:
-            def __init__(self, content, role, finish_reason, tool_calls=None):
-                self.message = Message(content, role, tool_calls)
+            def __init__(self, content, role, finish_reason, tool_calls_dict=None):
+                self.message = Message(content, role, tool_calls_dict)
                 self.finish_reason = finish_reason
 
         self.choices = [Choice(content, "assistant", finish_reason, tool_calls)]
@@ -144,9 +176,9 @@ class DirectLLMClient(ABC):
         pass
 
     @abstractmethod
-    async def astream(
+    def astream(
         self, messages: list[dict[str, Any]], **kwargs
-    ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
+    ) -> AsyncIterator[dict[str, Any]]:
         """Stream responses asynchronously. Returns an async iterator."""
 
     def __init_subclass__(cls, **kwargs):
@@ -189,22 +221,9 @@ class OpenAIClient(DirectLLMClient):
 
     @staticmethod
     def _extract_openai_tool_calls(message: Any) -> list[dict[str, Any]] | None:
-        """Extract tool_calls from an OpenAI ChatCompletionMessage."""
-        raw = getattr(message, "tool_calls", None)
-        if not raw:
-            return None
-        result: list[dict[str, Any]] = []
-        for tc in raw:
-            entry: dict[str, Any] = {
-                "id": tc.id,
-                "type": tc.type,
-                "function": {
-                    "name": tc.function.name,
-                    "arguments": tc.function.arguments,
-                },
-            }
-            result.append(entry)
-        return result or None
+        from backend.llm.mappers.openai import extract_tool_calls
+
+        return extract_tool_calls(message)
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
         if "model" not in kwargs:
@@ -229,7 +248,7 @@ class OpenAIClient(DirectLLMClient):
                 "total_tokens": response.usage.total_tokens if response.usage else 0,
             },
             id=response.id,
-            finish_reason=getattr(first, "finish_reason", None),
+            finish_reason=getattr(first, "finish_reason", None) or "",
             tool_calls=tool_calls,
         )
 
@@ -258,13 +277,13 @@ class OpenAIClient(DirectLLMClient):
                 "total_tokens": response.usage.total_tokens if response.usage else 0,
             },
             id=response.id,
-            finish_reason=getattr(first, "finish_reason", None),
+            finish_reason=getattr(first, "finish_reason", None) or "",
             tool_calls=tool_calls,
         )
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
-    ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
+    ) -> AsyncIterator[dict[str, Any]]:
         kwargs["stream"] = True
         model = kwargs.pop("model", self.model_name)
         stream = await self.async_client.chat.completions.create(
@@ -294,45 +313,16 @@ class AnthropicClient(DirectLLMClient):
     def _extract_anthropic_tool_calls(
         content_blocks: list,
     ) -> tuple[str, list[dict[str, Any]] | None]:
-        """Extract text and tool_use blocks from Anthropic response content.
+        from backend.llm.mappers.anthropic import extract_tool_calls
 
-        Returns:
-            (text_content, tool_calls_or_None)
-        """
-        text_parts: list[str] = []
-        tool_calls: list[dict[str, Any]] = []
-        for block in content_blocks:
-            block_type = getattr(block, "type", None)
-            if block_type == "text":
-                text_parts.append(block.text)
-            elif block_type == "tool_use":
-                tool_calls.append(
-                    {
-                        "id": block.id,
-                        "type": "function",
-                        "function": {
-                            "name": block.name,
-                            "arguments": json.dumps(block.input)
-                            if isinstance(block.input, dict)
-                            else str(block.input),
-                        },
-                    }
-                )
-        return "\n".join(text_parts), tool_calls or None
+        return extract_tool_calls(content_blocks)
 
     def _prepare_anthropic_kwargs(
         self, messages: list[dict[str, Any]], kwargs: dict[str, Any]
     ) -> tuple[list, dict[str, Any]]:
-        """Extract system message and set model for Anthropic calls."""
-        system_msg = next(
-            (m["content"] for m in messages if m["role"] == "system"), None
-        )
-        filtered = [m for m in messages if m["role"] != "system"]
-        if "model" not in kwargs:
-            kwargs["model"] = self.model_name
-        if system_msg is not None:
-            kwargs["system"] = system_msg
-        return filtered, kwargs
+        from backend.llm.mappers.anthropic import prepare_kwargs
+
+        return prepare_kwargs(messages, kwargs, self.model_name)
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
         filtered, kwargs = self._prepare_anthropic_kwargs(messages, kwargs)
@@ -384,7 +374,7 @@ class AnthropicClient(DirectLLMClient):
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
-    ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
+    ) -> AsyncIterator[dict[str, Any]]:
         system_msg = next(
             (m["content"] for m in messages if m["role"] == "system"), None
         )
@@ -421,314 +411,6 @@ class GeminiClient(DirectLLMClient):
         self.api_key = api_key
         self.client = genai.Client(api_key=api_key)
 
-    def _convert_messages(
-        self, messages: list[dict[str, Any]]
-    ) -> tuple[str | None, list[dict[str, Any]], bool]:
-        """Convert messages to Gemini format, extracting system instruction.
-
-        Returns:
-            (system_instruction_or_None, gemini_history_messages, caching_requested)
-        """
-        system_instruction: str | None = None
-        gemini_messages: list[dict[str, Any]] = []
-        caching_requested = False
-
-        for m in messages:
-            content = m.get("content", "")
-
-            # Handle list-style content (from Forge's message serialization)
-            text_parts = []
-            if isinstance(content, list):
-                for item in content:
-                    if item.get("type") == "text":
-                        text_parts.append(item.get("text", ""))
-                        if item.get("cache_prompt"):
-                            caching_requested = True
-                    # Image support for Gemini could be added here
-                content = "\n".join(text_parts)
-
-            if m["role"] == "system":
-                system_instruction = content
-                continue
-
-            role_name = m.get("role", "user")
-            role = "model" if role_name == "assistant" else "user"
-            gemini_messages.append({"role": role, "parts": [content]})
-
-        return system_instruction, gemini_messages, caching_requested
-
-    @staticmethod
-    def _extract_gemini_generation_config(
-        kwargs: dict[str, Any],
-    ) -> tuple[str, dict[str, Any]]:
-        """Pop generation-config keys from *kwargs* and return (model_name, gen_config)."""
-        model_name = kwargs.pop("model", "")
-        if "/" in model_name:
-            model_name = model_name.split("/")[-1]
-        gen_cfg: dict[str, Any] = {}
-        for src, dst in [
-            ("temperature", "temperature"),
-            ("top_p", "top_p"),
-            ("top_k", "top_k"),
-            ("max_tokens", "max_output_tokens"),
-            ("stop", "stop_sequences"),
-        ]:
-            if src in kwargs:
-                gen_cfg[dst] = kwargs.pop(src)
-        # Native Gemini SDK (ChatSession.send_message) does not support tool_choice.
-        kwargs.pop("tool_choice", None)
-        # Strip OpenAI/liteLLM-style passthrough fields unsupported by Gemini SDK.
-        for unsupported_key in (
-            "extra_body",
-            "extra_headers",
-            "response_format",
-            "frequency_penalty",
-            "presence_penalty",
-            "logit_bias",
-            "seed",
-            "user",
-            "reasoning_effort",
-            "reasoning",
-            "parallel_tool_calls",
-            "metadata",
-        ):
-            kwargs.pop(unsupported_key, None)
-        return model_name, gen_cfg
-
-    @staticmethod
-    def _gemini_response_to_dict(response: Any) -> dict[str, Any] | None:
-        """Best-effort conversion of Gemini SDK response to dict for stable parsing."""
-        if isinstance(response, dict):
-            return response
-
-        to_dict = getattr(response, "to_dict", None)
-        if callable(to_dict):
-            try:
-                result = to_dict()
-                return result if isinstance(result, dict) else None
-            except Exception:
-                return None
-        return None
-
-    @staticmethod
-    def _iter_gemini_candidate_parts(response: Any) -> list[Any]:
-        """Return all candidate parts from a Gemini response across SDK shapes."""
-        parts: list[Any] = []
-
-        response_dict = GeminiClient._gemini_response_to_dict(response)
-        if response_dict:
-            for candidate in response_dict.get("candidates", []) or []:
-                if not isinstance(candidate, dict):
-                    continue
-                content = candidate.get("content", {})
-                if not isinstance(content, dict):
-                    continue
-                candidate_parts = content.get("parts")
-                if candidate_parts:
-                    parts.extend(candidate_parts)
-
-        if parts:
-            return parts
-
-        for candidate in getattr(response, "candidates", []) or []:
-            content = getattr(candidate, "content", None)
-            if content is None and isinstance(candidate, dict):
-                content = candidate.get("content")
-
-            candidate_parts = None
-            if isinstance(content, dict):
-                candidate_parts = content.get("parts")
-            elif content is not None:
-                candidate_parts = getattr(content, "parts", None)
-
-            if candidate_parts:
-                parts.extend(candidate_parts)
-        return parts
-
-    @staticmethod
-    def _coerce_gemini_fc_name_and_args(function_call: Any) -> tuple[str | None, Any]:
-        """Extract function-call name and args from object/dict Gemini shapes."""
-        if function_call is None:
-            return None, None
-
-        if isinstance(function_call, dict):
-            return function_call.get("name"), function_call.get("args")
-
-        return getattr(function_call, "name", None), getattr(function_call, "args", None)
-
-    @staticmethod
-    def _extract_gemini_tool_calls(response: Any) -> list[dict[str, Any]] | None:
-        """Extract function call parts from a Gemini response."""
-        tool_calls: list[dict[str, Any]] = []
-        for part in GeminiClient._iter_gemini_candidate_parts(response):
-            fc = getattr(part, "function_call", None)
-            if fc is None and isinstance(part, dict):
-                fc = part.get("function_call") or part.get("functionCall")
-
-            name, args = GeminiClient._coerce_gemini_fc_name_and_args(fc)
-            if not name:
-                continue
-
-            args_dict: dict[str, Any]
-            if args is None:
-                args_dict = {}
-            elif isinstance(args, dict):
-                args_dict = args
-            else:
-                try:
-                    args_dict = dict(args)
-                except Exception:
-                    args_dict = {}
-
-            tool_calls.append(
-                {
-                    "id": f"gemini-{len(tool_calls)}",
-                    "type": "function",
-                    "function": {
-                        "name": name,
-                        "arguments": json.dumps(args_dict),
-                    },
-                }
-            )
-        return tool_calls or None
-
-    @staticmethod
-    def _extract_gemini_text(response: Any) -> str:
-        """Extract assistant text from Gemini response across SDK shapes."""
-        text_parts: list[str] = []
-        for part in GeminiClient._iter_gemini_candidate_parts(response):
-            text = getattr(part, "text", None)
-            if text is None and isinstance(part, dict):
-                text = part.get("text")
-            if isinstance(text, str):
-                if text.strip():
-                    text_parts.append(text)
-
-        if text_parts:
-            return "\n".join(text_parts)
-
-        response_text = getattr(response, "text", "")
-        return response_text if isinstance(response_text, str) else str(response_text or "")
-
-    @staticmethod
-    def _extract_gemini_finish_reason(response: Any) -> str:
-        response_dict = GeminiClient._gemini_response_to_dict(response)
-        if isinstance(response_dict, dict):
-            candidates = response_dict.get("candidates") or []
-            if candidates and isinstance(candidates[0], dict):
-                reason = candidates[0].get("finishReason")
-                if isinstance(reason, str) and reason:
-                    return reason
-
-        for candidate in getattr(response, "candidates", []) or []:
-            reason = getattr(candidate, "finish_reason", None)
-            if isinstance(reason, str) and reason:
-                return reason
-            if isinstance(candidate, dict):
-                reason = candidate.get("finish_reason") or candidate.get("finishReason")
-                if isinstance(reason, str) and reason:
-                    return reason
-        return ""
-
-    @staticmethod
-    def _extract_gemini_block_reason(response: Any) -> str:
-        response_dict = GeminiClient._gemini_response_to_dict(response)
-        if isinstance(response_dict, dict):
-            prompt_feedback = response_dict.get("promptFeedback") or response_dict.get(
-                "prompt_feedback"
-            )
-            if isinstance(prompt_feedback, dict):
-                reason = prompt_feedback.get("blockReason") or prompt_feedback.get(
-                    "block_reason"
-                )
-                if isinstance(reason, str) and reason:
-                    return reason
-
-        feedback = getattr(response, "prompt_feedback", None)
-        if feedback is None:
-            feedback = getattr(response, "promptFeedback", None)
-        reason = getattr(feedback, "block_reason", None)
-        if reason is None:
-            reason = getattr(feedback, "blockReason", None)
-        return reason if isinstance(reason, str) else ""
-
-    @staticmethod
-    def _log_gemini_response_shape(
-        response: Any,
-        content: str,
-        tool_calls: list[dict[str, Any]] | None,
-    ) -> None:
-        parts = GeminiClient._iter_gemini_candidate_parts(response)
-        finish_reason = GeminiClient._extract_gemini_finish_reason(response)
-        block_reason = GeminiClient._extract_gemini_block_reason(response)
-        candidates = getattr(response, "candidates", None)
-        if not isinstance(candidates, list):
-            response_dict = GeminiClient._gemini_response_to_dict(response) or {}
-            candidates = response_dict.get("candidates") or []
-
-        payload = (
-            "Gemini response shape: candidates=%s parts=%s text_len=%s "
-            "tool_calls=%s finish_reason=%s block_reason=%s"
-        )
-        args = (
-            len(candidates),
-            len(parts),
-            len(content.strip()),
-            len(tool_calls or []),
-            finish_reason or "none",
-            block_reason or "none",
-        )
-        if not content.strip() and not tool_calls:
-            logger.warning(payload, *args)
-        else:
-            logger.debug(payload, *args)
-
-    @staticmethod
-    def _synthesize_empty_gemini_text(response: Any) -> str:
-        block_reason = GeminiClient._extract_gemini_block_reason(response)
-        if block_reason:
-            return (
-                "I couldn’t provide a response because this request was blocked by safety "
-                "filters. Please rephrase and try again."
-            )
-
-        finish_reason = GeminiClient._extract_gemini_finish_reason(response).upper()
-        if finish_reason in {"SAFETY", "RECITATION", "BLOCKLIST"}:
-            return (
-                "I couldn’t provide a response for this request. Please try a clearer "
-                "or safer phrasing and I’ll help."
-            )
-
-        return (
-            "I couldn’t generate a complete response this turn. Please resend your "
-            "request and I’ll answer directly."
-        )
-
-    @staticmethod
-    def _ensure_non_empty_gemini_content(
-        response: Any,
-        content: str,
-        tool_calls: list[dict[str, Any]] | None,
-    ) -> str:
-        if content.strip() or tool_calls:
-            return content
-        return GeminiClient._synthesize_empty_gemini_text(response)
-
-    @staticmethod
-    def _gemini_usage(response: Any) -> dict[str, int]:
-        """Extract token usage from a Gemini response."""
-        meta = getattr(response, "usage_metadata", None)
-        return {
-            "prompt_tokens": getattr(meta, "prompt_token_count", 0) if meta else 0,
-            "completion_tokens": getattr(meta, "candidates_token_count", 0)
-            if meta
-            else 0,
-            "total_tokens": getattr(meta, "total_token_count", 0) if meta else 0,
-            "cache_read_tokens": getattr(meta, "cached_content_token_count", 0)
-            if meta
-            else 0,
-        }
-
     def _resolve_gemini_model_name(self, model_name: str | None) -> str:
         """Normalize model name for Gemini API."""
         name = model_name or self.model_name
@@ -756,73 +438,81 @@ class GeminiClient(DirectLLMClient):
             messages=history_to_cache,
         )
 
-    def _build_gemini_with_cache(
-        self,
-        model_name: str,
-        gen_cfg: Any,
-        gemini_messages: list,
-        cache_name: str,
-        kwargs: dict[str, Any],
-    ):
-        """Build Gemini chat when context caching is used."""
-        prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
-        return model_name, cache_name, prompt
-
-    def _build_gemini_without_cache(
-        self,
-        model_name: str,
-        gen_cfg: Any,
-        system_instruction: str | None,
-        gemini_messages: list,
-    ):
-        """Build Gemini chat without context caching."""
-        prompt = gemini_messages[-1]["parts"][0] if gemini_messages else ""
-        history = gemini_messages[:-1] if gemini_messages else []
-        return model_name, gen_cfg, system_instruction, history, prompt
-
     def _build_gemini_chat(
         self, messages: list[dict[str, Any]], kwargs: dict[str, Any]
-    ):
+    ) -> tuple[
+        str, dict[str, Any], str | None, list[dict], str, list | None, str | None
+    ]:
         """Shared setup for Gemini completion / acompletion / astream."""
-        model_name_raw, gen_cfg = self._extract_gemini_generation_config(kwargs)
+        from backend.llm.mappers.gemini import (
+            extract_generation_config,
+            convert_messages,
+        )
+
+        model_name_raw, gen_cfg, tools = extract_generation_config(kwargs)
         model_name = self._resolve_gemini_model_name(model_name_raw)
 
-        system_instruction, gemini_messages, caching_requested = self._convert_messages(
+        system_instruction, gemini_messages, caching_requested = convert_messages(
             messages
         )
+
+        prompt_part = gemini_messages[-1]["parts"][0] if gemini_messages else ""
+        prompt = (
+            prompt_part.get("text", "")
+            if isinstance(prompt_part, dict)
+            else prompt_part
+        )
+        history = gemini_messages[:-1] if gemini_messages else []
 
         cache_name = self._get_gemini_cache_name(
             caching_requested, model_name, system_instruction, gemini_messages
         )
-
-        if cache_name:
-            return self._build_gemini_with_cache(
-                model_name, gen_cfg, gemini_messages, cache_name, kwargs
-            )
-        return self._build_gemini_without_cache(
-            model_name, gen_cfg, system_instruction, gemini_messages
+        return (
+            model_name,
+            gen_cfg,
+            system_instruction,
+            history,
+            prompt,
+            tools,
+            cache_name,
         )
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
-        model_name, gen_cfg, system_instruction, history, prompt = self._build_gemini_chat(messages, kwargs)
-        
+        from backend.llm.mappers.gemini import (
+            extract_tool_calls,
+            extract_text,
+            ensure_non_empty_content,
+            gemini_usage,
+        )
+
+        model_name, gen_cfg, system_instruction, history, prompt, tools, cache_name = (
+            self._build_gemini_chat(messages, kwargs)
+        )
+
+        config: Any = {
+            **gen_cfg,
+            "tools": tools,
+        }
+        if cache_name:
+            config["cached_content"] = cache_name
+        else:
+            config["system_instruction"] = system_instruction
+
+        logger.debug("Gemini config: %s", config)
+
         chat = self.client.chats.create(
             model=model_name,
-            config={
-                "generation_config": gen_cfg,
-                "system_instruction": system_instruction,
-            },
-            history=history,
+            config=config,
+            history=cast(Any, history),
         )
         response = chat.send_message(prompt, **kwargs)
-        tool_calls = self._extract_gemini_tool_calls(response)
-        content = self._extract_gemini_text(response)
-        self._log_gemini_response_shape(response, content, tool_calls)
-        content = self._ensure_non_empty_gemini_content(response, content, tool_calls)
+        tool_calls = extract_tool_calls(response)
+        content = extract_text(response)
+        content = ensure_non_empty_content(response, content, tool_calls)
         return LLMResponse(
             content=content,
             model=model_name,
-            usage=self._gemini_usage(response),
+            usage=gemini_usage(response),
             id="",
             finish_reason="stop",
             tool_calls=tool_calls,
@@ -831,36 +521,43 @@ class GeminiClient(DirectLLMClient):
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
-        result = self._build_gemini_chat(messages, kwargs)
-        
-        if len(result) == 3: # Cache case
-            model_name, cache_name, prompt = result
-            chat = self.client.aio.chats.create(
-                model=model_name,
-                config={
-                    "cached_content": cache_name,
-                }
-            )
+        """Asynchronous completion."""
+        from backend.llm.mappers.gemini import (
+            extract_tool_calls,
+            extract_text,
+            ensure_non_empty_content,
+            gemini_usage,
+        )
+
+        model_name, gen_cfg, system_instruction, history, prompt, tools, cache_name = (
+            self._build_gemini_chat(messages, kwargs)
+        )
+
+        config: Any = {
+            **gen_cfg,
+            "tools": tools,
+        }
+        if cache_name:
+            config["cached_content"] = cache_name
         else:
-            model_name, gen_cfg, system_instruction, history, prompt = result
-            chat = self.client.aio.chats.create(
-                model=model_name,
-                config={
-                    "generation_config": gen_cfg,
-                    "system_instruction": system_instruction,
-                },
-                history=history,
-            )
-            
+            config["system_instruction"] = system_instruction
+
+        logger.debug("Gemini config: %s", config)
+
+        chat = self.client.aio.chats.create(
+            model=model_name,
+            config=config,
+            history=cast(Any, history),
+        )
+
         response = await chat.send_message(prompt, **kwargs)
-        tool_calls = self._extract_gemini_tool_calls(response)
-        content = self._extract_gemini_text(response)
-        self._log_gemini_response_shape(response, content, tool_calls)
-        content = self._ensure_non_empty_gemini_content(response, content, tool_calls)
+        tool_calls = extract_tool_calls(response)
+        content = extract_text(response)
+        content = ensure_non_empty_content(response, content, tool_calls)
         return LLMResponse(
             content=content,
             model=model_name,
-            usage=self._gemini_usage(response),
+            usage=gemini_usage(response),
             id="",
             finish_reason="stop",
             tool_calls=tool_calls,
@@ -868,36 +565,35 @@ class GeminiClient(DirectLLMClient):
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
-    ) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override,misc]
-        result = self._build_gemini_chat(messages, kwargs)
-        
-        if len(result) == 3: # Cache case
-            model_name, cache_name, prompt = result
-            chat = self.client.aio.chats.create(
-                model=model_name,
-                config={
-                    "cached_content": cache_name,
-                }
-            )
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Asynchronous streaming completion."""
+        model_name, gen_cfg, system_instruction, history, prompt, tools, cache_name = (
+            self._build_gemini_chat(messages, kwargs)
+        )
+
+        config: Any = {
+            **gen_cfg,
+            "tools": tools,
+        }
+        if cache_name:
+            config["cached_content"] = cache_name
         else:
-            model_name, gen_cfg, system_instruction, history, prompt = result
-            chat = self.client.aio.chats.create(
-                model=model_name,
-                config={
-                    "generation_config": gen_cfg,
-                    "system_instruction": system_instruction,
-                },
-                history=history,
-            )
-            
+            config["system_instruction"] = system_instruction
+
+        logger.debug("Gemini config: %s", config)
+
+        chat = self.client.aio.chats.create(
+            model=model_name,
+            config=config,
+            history=cast(Any, history),
+        )
+
         stream = await chat.send_message_stream(prompt, **kwargs)
 
         async for chunk in stream:
             text = chunk.text or ""
             if text:
-                yield {
-                    "choices": [{"delta": {"content": text}, "finish_reason": None}]
-                }
+                yield {"choices": [{"delta": {"content": text}, "finish_reason": None}]}
         yield {"choices": [{"delta": {}, "finish_reason": "stop"}]}
 
 

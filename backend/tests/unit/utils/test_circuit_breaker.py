@@ -109,7 +109,9 @@ class TestCircuitBreakerTransitions:
         assert cb.state.state == "open"
 
         with pytest.raises(RuntimeError, match="circuit_open"):
-            await cb.async_call(lambda: asyncio.coroutine(lambda: "ok")())
+            async def _ok():
+                return "ok"
+            await cb.async_call(_ok)
 
     async def test_open_transitions_to_half_open_after_timeout(self):
         cb = self._make_breaker(threshold=1, base_seconds=0.01)

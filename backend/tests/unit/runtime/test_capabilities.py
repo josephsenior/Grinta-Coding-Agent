@@ -45,7 +45,7 @@ class TestRuntimeCapabilities:
         """Test RuntimeCapabilities is frozen (immutable)."""
         caps = RuntimeCapabilities(platform="linux")
         with pytest.raises(AttributeError):
-            caps.platform = "win32"
+            setattr(caps, "platform", "win32")
 
     def test_slotted_dataclass(self):
         """Test RuntimeCapabilities uses slots."""

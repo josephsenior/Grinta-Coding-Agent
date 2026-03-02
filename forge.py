@@ -12,7 +12,6 @@ For the two-terminal workflow (separate server + TUI), run:
     python -m tui         # terminal 2
 """
 
-import os
 import sys
 from pathlib import Path
 

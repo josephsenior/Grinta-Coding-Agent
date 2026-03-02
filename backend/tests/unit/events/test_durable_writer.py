@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import time
+from types import MethodType
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 
@@ -265,7 +267,7 @@ class TestBatchFlush:
             original_flush_batch(self_inner, batch)
 
         writer = DurableEventWriter(store, max_queue_size=128)
-        writer._flush_batch = patched_flush_batch.__get__(writer, DurableEventWriter)
+        cast(Any, writer)._flush_batch = MethodType(patched_flush_batch, writer)
         writer.start()
         try:
             # Enqueue many events at once

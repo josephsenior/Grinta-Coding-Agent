@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 
+from backend.core.message import TextContent
 from backend.events.action.message import SystemMessageAction
 from backend.events.event import EventSource
 from backend.memory.action_processors import (
@@ -89,7 +91,8 @@ class TestBuildThinkActionMessageProc:
         msgs = _build_think_action_message(action)
         assert len(msgs) == 1
         assert msgs[0].role == "assistant"
-        assert "I should check the file first" in msgs[0].content[0].text
+        part = msgs[0].content[0]
+        assert isinstance(part, TextContent) and "I should check the file first" in part.text
 
     def test_empty_thought(self):
         action = MagicMock()
@@ -127,7 +130,8 @@ class TestContentFromAssistantMessageProc:
         msg.content = "hello world"
         result = _content_from_assistant_message(msg)
         assert len(result) == 1
-        assert result[0].text == "hello world"
+        part = result[0]
+        assert isinstance(part, TextContent) and part.text == "hello world"
 
     def test_empty_string_content(self):
         msg = MagicMock()
@@ -146,7 +150,8 @@ class TestContentFromAssistantMessageProc:
         msg.content = 42
         result = _content_from_assistant_message(msg)
         assert len(result) == 1
-        assert "42" in result[0].text
+        part = result[0]
+        assert isinstance(part, TextContent) and "42" in part.text
 
 
 # ── _role_from_source ─────────────────────────────────────────────────
@@ -220,20 +225,21 @@ class TestConvertToolCallsProc:
 
 class TestEnsureToolCallFunctionProc:
     def test_creates_function_when_missing(self):
-        call_dict = {"name": "read_file", "arguments": '{"path": "a.py"}'}
+        call_dict: dict[str, Any] = {"name": "read_file", "arguments": '{"path": "a.py"}'}
         _ensure_tool_call_function(call_dict, MagicMock(), 0)
         assert "function" in call_dict
-        assert call_dict["function"]["name"] == "read_file"
+        fn = call_dict["function"]
+        assert isinstance(fn, dict) and fn["name"] == "read_file"
 
     def test_preserves_existing_function_dict(self):
-        fn = {"name": "edit", "arguments": "{}"}
-        call_dict = {"function": fn}
+        fn: dict[str, Any] = {"name": "edit", "arguments": "{}"}
+        call_dict: dict[str, Any] = {"function": fn}
         _ensure_tool_call_function(call_dict, MagicMock(), 0)
         assert call_dict["function"]["name"] == "edit"
 
     def test_sets_defaults_in_existing_function(self):
-        fn = {"name": "edit"}
-        call_dict = {"function": fn}
+        fn: dict[str, Any] = {"name": "edit"}
+        call_dict: dict[str, Any] = {"function": fn}
         _ensure_tool_call_function(call_dict, MagicMock(spec=[]), 0)
         assert "arguments" in call_dict["function"]
 
@@ -241,9 +247,10 @@ class TestEnsureToolCallFunctionProc:
         fn_obj = MagicMock()
         fn_obj.name = "obj_tool"
         fn_obj.arguments = '{"x": 1}'
-        call_dict = {"function": fn_obj}
+        call_dict: dict[str, Any] = {"function": fn_obj}
         _ensure_tool_call_function(call_dict, MagicMock(), 0)
-        assert call_dict["function"]["name"] == "obj_tool"
+        fn = call_dict["function"]
+        assert isinstance(fn, dict) and fn["name"] == "obj_tool"
 
 
 # ── _handle_message_action ────────────────────────────────────────────
@@ -258,7 +265,8 @@ class TestHandleMessageActionProc:
         msgs = _handle_message_action(action, vision_is_active=False)
         assert len(msgs) == 1
         assert msgs[0].role == "user"
-        assert msgs[0].content[0].text == "hello"
+        part = msgs[0].content[0]
+        assert isinstance(part, TextContent) and part.text == "hello"
 
     def test_agent_message(self):
         from backend.events.action import MessageAction
@@ -293,7 +301,8 @@ class TestHandleUserCmdActionProc:
         msgs = _handle_user_cmd_action(action)
         assert len(msgs) == 1
         assert msgs[0].role == "user"
-        assert "ls -la" in msgs[0].content[0].text
+        part = msgs[0].content[0]
+        assert isinstance(part, TextContent) and "ls -la" in part.text
 
 
 # ── _handle_system_message_action ─────────────────────────────────────
@@ -305,7 +314,8 @@ class TestHandleSystemMessageActionProc:
         msgs = _handle_system_message_action(action)
         assert len(msgs) == 1
         assert msgs[0].role == "system"
-        assert msgs[0].content[0].text == "System alert"
+        part = msgs[0].content[0]
+        assert isinstance(part, TextContent) and part.text == "System alert"
         assert msgs[0].tool_calls is None
 
 

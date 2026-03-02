@@ -25,15 +25,15 @@ from backend.events.observation import (
 class TestGetObservationContent:
     def test_content_attr(self):
         obs = SimpleNamespace(content="hello")
-        assert _get_observation_content(obs) == "hello"
+        assert _get_observation_content(obs) == "hello"  # type: ignore[arg-type]
 
     def test_message_attr(self):
         obs = SimpleNamespace(message="msg")
-        assert _get_observation_content(obs) == "msg"
+        assert _get_observation_content(obs) == "msg"  # type: ignore[arg-type]
 
     def test_fallback_str(self):
         obs = SimpleNamespace()
-        result = _get_observation_content(obs)
+        result = _get_observation_content(obs)  # type: ignore[arg-type]
         assert isinstance(result, str)
 
 
@@ -43,19 +43,19 @@ class TestGetObservationContent:
 class TestHandleSimpleObservation:
     def test_basic(self):
         obs = SimpleNamespace(content="output")
-        msg = _handle_simple_observation(obs, None)
+        msg = _handle_simple_observation(obs, None)  # type: ignore[arg-type]
         assert msg.role == "user"
-        assert msg.content[0].text == "output"
+        assert msg.content[0].text == "output"  # type: ignore[union-attr]
 
     def test_with_prefix_and_suffix(self):
         obs = SimpleNamespace(content="body")
-        msg = _handle_simple_observation(obs, None, prefix="P:", suffix=":S")
-        assert msg.content[0].text == "P:body:S"
+        msg = _handle_simple_observation(obs, None, prefix="P:", suffix=":S")  # type: ignore[arg-type]
+        assert msg.content[0].text == "P:body:S"  # type: ignore[union-attr]
 
     def test_truncation(self):
         obs = SimpleNamespace(content="x" * 200)
-        msg = _handle_simple_observation(obs, 50)
-        assert len(msg.content[0].text) < 200
+        msg = _handle_simple_observation(obs, 50)  # type: ignore[arg-type]
+        assert len(msg.content[0].text) < 200  # type: ignore[union-attr]
 
 
 # ── convert_observation_to_message ───────────────────────────────────
@@ -65,20 +65,20 @@ class TestConvertObservation:
     def test_error_observation(self):
         obs = ErrorObservation(content="bad thing")
         msg = convert_observation_to_message(obs, max_message_chars=None)
-        assert "bad thing" in msg.content[0].text
-        assert "[ERROR" in msg.content[0].text
+        assert "bad thing" in msg.content[0].text  # type: ignore[union-attr]
+        assert "[ERROR" in msg.content[0].text  # type: ignore[union-attr]
 
     def test_user_reject_observation(self):
         obs = UserRejectObservation(content="no thanks")
         msg = convert_observation_to_message(obs, max_message_chars=None)
-        assert "no thanks" in msg.content[0].text
-        assert "rejected" in msg.content[0].text.lower()
+        assert "no thanks" in msg.content[0].text  # type: ignore[union-attr]
+        assert "rejected" in msg.content[0].text.lower()  # type: ignore[union-attr]
 
     def test_file_read_observation(self):
         obs = FileReadObservation(content="file content", path="/tmp/x.py")
         msg = convert_observation_to_message(obs, max_message_chars=None)
-        assert "[FILE_READ" in msg.content[0].text
-        assert "file content" in msg.content[0].text
+        assert "[FILE_READ" in msg.content[0].text  # type: ignore[union-attr]
+        assert "file content" in msg.content[0].text  # type: ignore[union-attr]
 
     def test_file_edit_observation(self):
         obs = FileEditObservation(
@@ -94,8 +94,8 @@ class TestConvertObservation:
     def test_mcp_observation(self):
         obs = MCPObservation(content="mcp result")
         msg = convert_observation_to_message(obs, max_message_chars=None)
-        assert "[MCP_RESULT" in msg.content[0].text
-        assert "mcp result" in msg.content[0].text
+        assert "[MCP_RESULT" in msg.content[0].text  # type: ignore[union-attr]
+        assert "mcp result" in msg.content[0].text  # type: ignore[union-attr]
 
     def test_cmd_output_observation(self):
         obs = CmdOutputObservation(

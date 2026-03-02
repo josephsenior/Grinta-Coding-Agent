@@ -203,7 +203,7 @@ class TestToolCallMetadata:
 # ── build_tool_call_metadata function ──────────────────────────────────
 
 
-class TestBuildToolCallMetadata:
+class TestBuildToolCallMetadataHelper:
     """Test build_tool_call_metadata helper function."""
 
     def test_creates_metadata_with_all_fields(self):
@@ -254,7 +254,7 @@ class TestBuildToolCallMetadata:
 # ── ToolCallMetadata class ─────────────────────────────────────────────
 
 
-class TestToolCallMetadata:
+class TestToolCallMetadataModel:
     """Test ToolCallMetadata data model."""
 
     def test_from_sdk_creates_instance(self):

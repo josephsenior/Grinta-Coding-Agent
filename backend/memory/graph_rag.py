@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # TreeSitter is optional; fall back gracefully if unavailable
 _TREESITTER_AVAILABLE = False
-from backend.utils.treesitter_editor import (
+from backend.utils.treesitter_editor import (  # noqa: E402
     TreeSitterEditor,
     TREE_SITTER_AVAILABLE,
 )

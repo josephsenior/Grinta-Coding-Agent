@@ -4,10 +4,10 @@
 
 Write-Host "🚀 Starting Forge in Docker..." -ForegroundColor Cyan
 
-# Ensure config.toml exists so it can be mounted
-if (-not (Test-Path "config.toml")) {
-    Write-Host "📝 Creating config.toml from template..." -ForegroundColor Yellow
-    Copy-Item "config.template.toml" "config.toml"
+# Ensure settings.json exists so it can be mounted
+if (-not (Test-Path "settings.json")) {
+    Write-Host "📝 Creating settings.json from template..." -ForegroundColor Yellow
+    Copy-Item "settings.template.json" "settings.json"
 }
 
 # Run docker compose

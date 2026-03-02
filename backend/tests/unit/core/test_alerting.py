@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import urlparse
 
@@ -89,8 +90,8 @@ class TestAlertPolicy:
         p._violation_start_time = time.time()
         p._last_alert_time = time.time()
         p.reset()
-        assert p._violation_start_time is None
-        assert p._last_alert_time is None
+        assert getattr(p, "_violation_start_time") is None
+        assert getattr(p, "_last_alert_time") is None
 
     def test_unknown_comparison_never_violates(self):
         p = AlertPolicy("test", "cpu", 0.9, comparison="!=", duration=0.0)
@@ -244,7 +245,7 @@ class TestAlertManager:
                 return FakeContext(FakeResponse())
 
         result = await mgr._execute_alert_request(
-            FakeSession(), {"X": "Y"}, {"p": 1}, "p", "m", 1.0
+            cast(Any, FakeSession()), {"X": "Y"}, {"p": 1}, "p", "m", 1.0
         )
         assert result is True
 
@@ -273,7 +274,7 @@ class TestAlertManager:
                 return FakeContext(FakeResponse())
 
         result = await mgr._execute_alert_request(
-            FakeSession(), {"X": "Y"}, {"p": 1}, "p", "m", 1.0
+            cast(Any, FakeSession()), {"X": "Y"}, {"p": 1}, "p", "m", 1.0
         )
         assert result is False
 

@@ -85,7 +85,7 @@ def _find_powershell_executable() -> str:
     )
 
 
-from backend.runtime.utils.unified_shell import BaseShellSession
+from backend.runtime.utils.unified_shell import BaseShellSession  # noqa: E402
 
 
 class WindowsPowershellSession(BaseShellSession):

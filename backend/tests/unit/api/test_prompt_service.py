@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-import os
 from backend.api.services.prompt_service import (
     get_contextual_events,
     generate_prompt_template,

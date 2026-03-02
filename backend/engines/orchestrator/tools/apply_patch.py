@@ -80,7 +80,6 @@ def _b64(s: str) -> str:
 def build_apply_patch_action(patch: str, check_only: bool = False) -> CmdRunAction:
     """Return a CmdRunAction that applies the unified diff to the workspace."""
     pb = _b64(patch)
-    dry_run_flag = "--check" if check_only else ""
     dry_run_arg = "True" if check_only else "False"
 
     py = (

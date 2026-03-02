@@ -34,6 +34,7 @@ class CmdRunAction(Action):
     hidden: bool = False
     stdin: str | None = None
     is_background: bool = False
+    truncation_strategy: str | None = None
     grep_pattern: str | None = None
     action: ClassVar[str] = ActionType.RUN
     runnable: ClassVar[bool] = True

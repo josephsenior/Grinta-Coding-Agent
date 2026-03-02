@@ -2,10 +2,10 @@
 
 from backend.controller.agent import Agent
 from backend.engines.orchestrator.contracts import (
-    ExecutorProtocol,
-    MemoryManagerProtocol,
-    PlannerProtocol,
-    SafetyManagerProtocol,
+    ExecutorProtocol as ExecutorProtocol,
+    MemoryManagerProtocol as MemoryManagerProtocol,
+    PlannerProtocol as PlannerProtocol,
+    SafetyManagerProtocol as SafetyManagerProtocol,
 )
 from backend.engines.orchestrator.orchestrator import Orchestrator
 

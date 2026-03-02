@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 
 from backend.api.utils.pagination import (
     OffsetPaginationParams,
@@ -129,20 +130,20 @@ class TestPaginatedResponse:
         assert resp.pagination["has_more"] is True
 
     def test_total_pages_calculation(self):
-        resp = PaginatedResponse.create(items=[], page=1, limit=10, total=0)
+        resp: Any = PaginatedResponse.create(items=[], page=1, limit=10, total=0)
         assert resp.pagination["total_pages"] == 0
 
-        resp2 = PaginatedResponse.create(items=[], page=1, limit=10, total=1)
+        resp2: Any = PaginatedResponse.create(items=[], page=1, limit=10, total=1)
         assert resp2.pagination["total_pages"] == 1
 
-        resp3 = PaginatedResponse.create(items=[], page=1, limit=10, total=10)
+        resp3: Any = PaginatedResponse.create(items=[], page=1, limit=10, total=10)
         assert resp3.pagination["total_pages"] == 1
 
-        resp4 = PaginatedResponse.create(items=[], page=1, limit=10, total=11)
+        resp4: Any = PaginatedResponse.create(items=[], page=1, limit=10, total=11)
         assert resp4.pagination["total_pages"] == 2
 
     def test_next_cursor_included(self):
-        resp = PaginatedResponse.create(
+        resp: Any = PaginatedResponse.create(
             items=["a"],
             page=1,
             limit=10,
@@ -151,7 +152,7 @@ class TestPaginatedResponse:
         assert resp.pagination["next_cursor"] == "abc123"
 
     def test_no_total_no_total_pages(self):
-        resp = PaginatedResponse.create(items=[], page=1, limit=10)
+        resp: Any = PaginatedResponse.create(items=[], page=1, limit=10)
         assert "total" not in resp.pagination
         assert "total_pages" not in resp.pagination
 

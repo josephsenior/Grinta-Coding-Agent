@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from types import SimpleNamespace
 
 
@@ -12,7 +11,7 @@ class _Safety:
 class _LLMStub:
     def __init__(self, response_content: str):
         self._response_content = response_content
-        self.last_kwargs = None
+        self.last_kwargs: dict | None = None
 
         # Provide a minimal features object
         self.features = SimpleNamespace(supports_stop_words=True)

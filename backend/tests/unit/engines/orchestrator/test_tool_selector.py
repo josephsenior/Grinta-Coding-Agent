@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
 
 from backend.engines.orchestrator.tool_selector import ToolSelector, _get_tool_name
 

@@ -1,5 +1,7 @@
 """Tests for backend.events.serialization.utils — remove_fields helper."""
 
+from typing import Any, cast
+
 import pytest
 
 from backend.events.serialization.utils import remove_fields
@@ -83,12 +85,12 @@ class TestRemoveFields:
         assert obj == {"level1": {"level2": {"level3": {"keep": "yes"}}}}
 
     def test_empty_dict(self):
-        obj = {}
+        obj: dict[str, Any] = {}
         remove_fields(obj, {"a"})
         assert obj == {}
 
     def test_empty_list(self):
-        obj = []
+        obj: list[Any] = []
         remove_fields(obj, {"a"})
         assert obj == []
 
@@ -106,11 +108,11 @@ class TestRemoveFields:
             x: int = 1
 
         with pytest.raises(ValueError, match="dataclass"):
-            remove_fields(Dummy(), {"x"})
+            remove_fields(cast(Any, Dummy()), {"x"})
 
     def test_non_dict_non_list_noop(self):
         """Non-dict/list/tuple values are ignored (no error)."""
         # Passing a primitive should not raise
-        remove_fields(42, {"a"})
-        remove_fields("hello", {"a"})
-        remove_fields(None, {"a"})
+        remove_fields(cast(Any, 42), {"a"})
+        remove_fields(cast(Any, "hello"), {"a"})
+        remove_fields(cast(Any, None), {"a"})

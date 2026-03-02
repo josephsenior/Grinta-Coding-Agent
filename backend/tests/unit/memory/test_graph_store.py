@@ -14,11 +14,11 @@ class TestNodeType:
     """Tests for NodeType enum."""
 
     def test_values(self):
-        assert NodeType.FILE == "file"
-        assert NodeType.CLASS == "class"
-        assert NodeType.FUNCTION == "function"
-        assert NodeType.VARIABLE == "variable"
-        assert NodeType.CONCEPT == "concept"
+        assert NodeType.FILE.value == "file"
+        assert NodeType.CLASS.value == "class"
+        assert NodeType.FUNCTION.value == "function"
+        assert NodeType.VARIABLE.value == "variable"
+        assert NodeType.CONCEPT.value == "concept"
 
     def test_string_enum(self):
         assert isinstance(NodeType.FILE, str)
@@ -29,12 +29,12 @@ class TestEdgeType:
     """Tests for EdgeType enum."""
 
     def test_values(self):
-        assert EdgeType.IMPORTS == "imports"
-        assert EdgeType.CALLS == "calls"
-        assert EdgeType.DEFINES == "defines"
-        assert EdgeType.INHERITS == "inherits"
-        assert EdgeType.REFERENCES == "references"
-        assert EdgeType.RELATED_TO == "related_to"
+        assert EdgeType.IMPORTS.value == "imports"
+        assert EdgeType.CALLS.value == "calls"
+        assert EdgeType.DEFINES.value == "defines"
+        assert EdgeType.INHERITS.value == "inherits"
+        assert EdgeType.REFERENCES.value == "references"
+        assert EdgeType.RELATED_TO.value == "related_to"
 
 
 class TestGraphMemoryStoreInit:

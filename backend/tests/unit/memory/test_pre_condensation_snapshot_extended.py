@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 import unittest
-from unittest.mock import MagicMock
 from backend.memory.pre_condensation_snapshot import extract_snapshot
 from backend.events.action.commands import CmdRunAction
 from backend.events.action.files import FileEditAction
 from backend.events.observation.commands import CmdOutputObservation
 from backend.events.observation.error import ErrorObservation
-from backend.events.observation.files import FileEditObservation
 
 class TestPreCondensationSnapshot(unittest.TestCase):
     def test_extract_snapshot_attempted_approaches(self):

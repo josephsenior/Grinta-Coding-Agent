@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 
@@ -76,7 +77,7 @@ class TestFormatJson:
         """Test returns repr when serialization fails."""
         # Create object that fails both json.dumps and str()
         obj = MagicMock()
-        obj.__str__.side_effect = RuntimeError("Cannot stringify")
+        cast(MagicMock, obj.__str__).side_effect = RuntimeError("Cannot stringify")
 
         # Mock json.dumps to raise
         with patch(

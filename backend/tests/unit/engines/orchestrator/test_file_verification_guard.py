@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
+from typing import Any, cast
 
-import pytest
 
 from backend.engines.orchestrator.file_verification_guard import (
     FileOperationContext,
@@ -278,7 +278,7 @@ class TestInjectVerificationCommands:
         self.g = FileVerificationGuard()
         # Mock is_stale_read to False by default to avoid stale-read re-read injection
         # in these tests, as they focus on verification injection.
-        self.g.is_stale_read = MagicMock(return_value=False)
+        cast(Any, self.g).is_stale_read = MagicMock(return_value=False)
 
     def test_non_file_action_not_duplicated(self):
         action = _make_action_no_path()

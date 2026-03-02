@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import MagicMock
 
 import pytest
@@ -100,48 +101,44 @@ class TestToolInvocationContext:
 
 
 class TestBaseMiddleware:
-    @pytest.mark.asyncio
-    async def test_plan_is_noop(self):
+    def test_plan_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
         ctx = ToolInvocationContext(
             controller=_mock_controller(),
             action=_mock_action(),
             state=_mock_state(),
         )
-        result = await mw.plan(ctx)
+        result = asyncio.run(mw.plan(ctx))
         assert result is None
 
-    @pytest.mark.asyncio
-    async def test_verify_is_noop(self):
+    def test_verify_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
         ctx = ToolInvocationContext(
             controller=_mock_controller(),
             action=_mock_action(),
             state=_mock_state(),
         )
-        result = await mw.verify(ctx)
+        result = asyncio.run(mw.verify(ctx))
         assert result is None
 
-    @pytest.mark.asyncio
-    async def test_execute_is_noop(self):
+    def test_execute_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
         ctx = ToolInvocationContext(
             controller=_mock_controller(),
             action=_mock_action(),
             state=_mock_state(),
         )
-        result = await mw.execute(ctx)
+        result = asyncio.run(mw.execute(ctx))
         assert result is None
 
-    @pytest.mark.asyncio
-    async def test_observe_is_noop(self):
+    def test_observe_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
         ctx = ToolInvocationContext(
             controller=_mock_controller(),
             action=_mock_action(),
             state=_mock_state(),
         )
-        result = await mw.observe(ctx, None)
+        result = asyncio.run(mw.observe(ctx, None))
         assert result is None
 
 
@@ -311,6 +308,7 @@ class TestMiddlewareErrorHandling:
         ctx = pip.create_context(_mock_action(), _mock_state())
         await pip.run_execute(ctx)
         assert ctx.blocked is True
+        assert ctx.block_reason is not None
         assert "execute_error" in ctx.block_reason
         # recorder should NOT have been called
         assert "execute" not in recorder.calls

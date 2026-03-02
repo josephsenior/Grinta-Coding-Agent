@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 
@@ -103,7 +104,7 @@ class TestSetPendingAction:
     def test_set_via_action_service(self):
         action_svc = MagicMock()
         ctx = _make_ctx(action_service=action_svc)
-        ctx.set_pending_action("new_action")
+        ctx.set_pending_action(cast(Any, "new_action"))
         action_svc.set_pending_action.assert_called_once_with("new_action")
 
     def test_clear(self):
@@ -120,7 +121,7 @@ class TestEmitEvent:
     def test_emit(self):
         es = MagicMock()
         ctx = _make_ctx(event_stream=es)
-        ctx.emit_event("event", "source")
+        ctx.emit_event(cast(Any, "event"), cast(Any, "source"))
         es.add_event.assert_called_once_with("event", "source")
 
 

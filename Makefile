@@ -8,6 +8,20 @@ pretest:
 test-unit: pretest
 	@uv run pytest -q backend/tests/unit
 
+# Integration/e2e/stress are excluded by default in pytest.ini (-m "not integration").
+# Run them explicitly with -m integration or by path with marker override.
+.PHONY: test-integration
+test-integration: pretest
+	@uv run pytest backend/tests/integration -m integration -v
+
+.PHONY: test-e2e
+test-e2e: pretest
+	@uv run pytest backend/tests/e2e -m integration -v
+
+.PHONY: test-stress
+test-stress: pretest
+	@uv run pytest backend/tests/stress -v
+
 # Makefile for Forge project
 SHELL=/usr/bin/env bash
 
@@ -17,7 +31,7 @@ BACKEND_PORT ?= 3000
 BACKEND_HOST_PORT = "$(BACKEND_HOST):$(BACKEND_PORT)"
 DEFAULT_WORKSPACE_DIR = "./workspace"
 DEFAULT_MODEL = "gpt-4o"
-CONFIG_FILE = config.toml
+CONFIG_FILE = settings.json
 PRE_COMMIT_CONFIG_PATH = "./backend/dev_config/python/.pre-commit-config.yaml"
 PYTHON_VERSION = 3.12
 
@@ -147,41 +161,29 @@ run:
 	@echo "$(GREEN)Backend started successfully on $(BACKEND_HOST_PORT).$(RESET)"
 	@echo "$(GREEN)Launch TUI with: uv run forge-tui$(RESET)"
 
-# Setup config.toml
+# Setup settings.json
 setup-config:
 	@echo "$(YELLOW)Setting up Forge configuration...$(RESET)"
 	@$(MAKE) setup-config-prompts
 	@mv $(CONFIG_FILE).tmp $(CONFIG_FILE)
-	@echo "$(GREEN)Config.toml setup completed.$(RESET)"
+	@echo "$(GREEN)settings.json setup completed.$(RESET)"
 
 setup-config-prompts:
-	@echo "# Forge Configuration File" > $(CONFIG_FILE).tmp
-	@echo "[core]" >> $(CONFIG_FILE).tmp
-
+	@echo '{"workspace_base":"$(DEFAULT_WORKSPACE_DIR)","llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":"","model_aliases":{}}' > $(CONFIG_FILE).tmp
 	@read -p "Enter your workspace directory (as absolute path) [default: $(DEFAULT_WORKSPACE_DIR)]: " workspace_dir; \
 	 workspace_dir=$${workspace_dir:-$(DEFAULT_WORKSPACE_DIR)}; \
-	 echo "workspace_base=\"$$workspace_dir\"" >> $(CONFIG_FILE).tmp
-
-	@echo "" >> $(CONFIG_FILE).tmp
-
-	@echo "[llm]" >> $(CONFIG_FILE).tmp
+	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['workspace_base']='$$workspace_dir'; json.dump(d, open(f,'w'), indent=2)"
 	@read -p "Enter your LLM model name [default: $(DEFAULT_MODEL)]: " llm_model; \
 	 llm_model=$${llm_model:-$(DEFAULT_MODEL)}; \
-	 echo "model=\"$$llm_model\"" >> $(CONFIG_FILE).tmp
-
+	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_model']='$$llm_model'; json.dump(d, open(f,'w'), indent=2)"
 	@read -p "Enter your LLM API key: " llm_api_key; \
-	 echo "api_key=\"$$llm_api_key\"" >> $(CONFIG_FILE).tmp
-
-	@read -p "Enter your LLM base URL [mostly used for local LLMs, leave blank if not needed - example: http://localhost:5001/v1/]: " llm_base_url; \
-	 if [[ ! -z "$$llm_base_url" ]]; then echo "base_url=\"$$llm_base_url\"" >> $(CONFIG_FILE).tmp; fi
+	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_api_key']='$$llm_api_key'; json.dump(d, open(f,'w'), indent=2)"
+	@read -p "Enter your LLM base URL [mostly used for local LLMs, leave blank if not needed]: " llm_base_url; \
+	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_base_url']='$$llm_base_url'; json.dump(d, open(f,'w'), indent=2)"
 
 setup-config-basic:
-	@printf '%s\n' \
-	'# Forge Configuration' \
-	'[core]' \
-	'workspace_base="./workspace"' \
-	> config.toml
-	@echo "$(GREEN)config.toml created.$(RESET)"
+	@cp settings.template.json settings.json 2>/dev/null || (echo '{"workspace_base":"./workspace","max_budget_per_task":5.0,"llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":"","model_aliases":{}}' > settings.json)
+	@echo "$(GREEN)settings.json created.$(RESET)"
 
 # Clean up all caches
 clean:
@@ -204,41 +206,29 @@ help:
 # Phony targets
 .PHONY: build check-dependencies check-system check-python check-uv install-python-dependencies install-pre-commit-hooks lint start-backend run setup-config setup-config-prompts setup-config-basic clean help
 
-# Setup config.toml
+# Setup settings.json
 setup-config:
 	@echo "$(YELLOW)Setting up Forge configuration...$(RESET)"
 	@$(MAKE) setup-config-prompts
 	@mv $(CONFIG_FILE).tmp $(CONFIG_FILE)
-	@echo "$(GREEN)Config.toml setup completed.$(RESET)"
+	@echo "$(GREEN)settings.json setup completed.$(RESET)"
 
 setup-config-prompts:
-	@echo "# Forge Configuration File" > $(CONFIG_FILE).tmp
-	@echo "[core]" >> $(CONFIG_FILE).tmp
-
+	@echo '{"workspace_base":"$(DEFAULT_WORKSPACE_DIR)","llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":"","model_aliases":{}}' > $(CONFIG_FILE).tmp
 	@read -p "Enter your workspace directory (as absolute path) [default: $(DEFAULT_WORKSPACE_DIR)]: " workspace_dir; \
 	 workspace_dir=$${workspace_dir:-$(DEFAULT_WORKSPACE_DIR)}; \
-	 echo "workspace_base=\"$$workspace_dir\"" >> $(CONFIG_FILE).tmp
-
-	@echo "" >> $(CONFIG_FILE).tmp
-
-	@echo "[llm]" >> $(CONFIG_FILE).tmp
+	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['workspace_base']='$$workspace_dir'; json.dump(d, open(f,'w'), indent=2)"
 	@read -p "Enter your LLM model name [default: $(DEFAULT_MODEL)]: " llm_model; \
 	 llm_model=$${llm_model:-$(DEFAULT_MODEL)}; \
-	 echo "model=\"$$llm_model\"" >> $(CONFIG_FILE).tmp
-
+	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_model']='$$llm_model'; json.dump(d, open(f,'w'), indent=2)"
 	@read -p "Enter your LLM API key: " llm_api_key; \
-	 echo "api_key=\"$$llm_api_key\"" >> $(CONFIG_FILE).tmp
-
-	@read -p "Enter your LLM base URL [mostly used for local LLMs, leave blank if not needed - example: http://localhost:5001/v1/]: " llm_base_url; \
-	 if [[ ! -z "$$llm_base_url" ]]; then echo "base_url=\"$$llm_base_url\"" >> $(CONFIG_FILE).tmp; fi
+	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_api_key']='$$llm_api_key'; json.dump(d, open(f,'w'), indent=2)"
+	@read -p "Enter your LLM base URL [mostly used for local LLMs, leave blank if not needed]: " llm_base_url; \
+	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_base_url']='$$llm_base_url'; json.dump(d, open(f,'w'), indent=2)"
 
 setup-config-basic:
-	@printf '%s\n' \
-	'# Forge Configuration' \
-	'[core]' \
-	'workspace_base="./workspace"' \
-	> config.toml
-	@echo "$(GREEN)config.toml created.$(RESET)"
+	@cp settings.template.json settings.json 2>/dev/null || (echo '{"workspace_base":"./workspace","max_budget_per_task":5.0,"llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":"","model_aliases":{}}' > settings.json)
+	@echo "$(GREEN)settings.json created.$(RESET)"
 
 # Clean up all caches
 clean:

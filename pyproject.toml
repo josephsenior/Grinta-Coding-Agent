@@ -109,6 +109,7 @@ dev = [
   "grpcio>=1.70.0",
   "grpcio-tools>=1.70.0",
   "bandit>=1.9.3",
+  "types-requests>=2.32.4.20260107",
 ]
 test = [
   "pytest>=8.4.0",

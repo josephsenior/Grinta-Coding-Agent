@@ -287,7 +287,7 @@ def open_file(
     if not _validate_line_number(line_number, total_lines):
         return
     CURRENT_FILE = abs_path
-    CURRENT_LINE = line_number
+    CURRENT_LINE = line_number or 1
     output = _cur_file_header(CURRENT_FILE, total_lines)
     output += _print_window(
         CURRENT_FILE,

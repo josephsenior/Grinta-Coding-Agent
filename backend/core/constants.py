@@ -33,7 +33,7 @@ FORGE_MAX_ITERATIONS = (
 # ── Workspace & Paths ───────────────────────────────────────────────
 JWT_SECRET_FILE = ".jwt_secret"
 DEFAULT_WORKSPACE_BASE = "~/.Forge"
-DEFAULT_CONFIG_FILE = "config.toml"
+DEFAULT_CONFIG_FILE = "settings.json"
 
 # ── URLs ────────────────────────────────────────────────────────────
 GUIDE_URL = "https://docs.forge.dev/guide"

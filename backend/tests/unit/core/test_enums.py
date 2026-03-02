@@ -368,7 +368,7 @@ class TestEnumUsagePatterns:
         assert AgentState.ERROR.value == "error"
         # Both are str enums with same value, so they're equal
         # But they're different types
-        assert type(ErrorSeverity.ERROR) != type(AgentState.ERROR)
+        assert type(ErrorSeverity.ERROR) is not type(AgentState.ERROR)
 
     def test_enum_hash_stability(self):
         """Test enum members are hashable and stable."""

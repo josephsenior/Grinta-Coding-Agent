@@ -1,5 +1,3 @@
-{"asctime": "2026-02-23 19:19:50,468", "message": "Using config class None", "level": "INFO", "timestamp": "2026-02-23T18:19:50.468167+00:00"}
-{"asctime": "2026-02-23 19:19:51,747", "message": "Rate limiting configured: 1000 req/hour, 100 burst", "level": "INFO", "timestamp": "2026-02-23T18:19:51.747494+00:00"}
 {
   "openapi": "3.1.0",
   "info": {

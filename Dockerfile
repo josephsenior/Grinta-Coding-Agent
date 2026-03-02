@@ -24,7 +24,7 @@ COPY pyproject.toml ./
 RUN /uv/bin/uv pip install --system --no-cache -e .
 
 COPY backend/ ./backend/
-COPY config.template.toml start_server.py ./
+COPY settings.template.json start_server.py ./
 
 # --- Runtime stage: minimal image ---
 FROM python:3.12-slim AS runtime
@@ -43,10 +43,10 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /build/backend ./backend
-COPY --from=builder /build/config.template.toml /build/start_server.py ./
+COPY --from=builder /build/settings.template.json /build/start_server.py ./
 
-# Default config: copy template if no config.toml mounted
-RUN cp config.template.toml config.toml && \
+# Default config: copy template if no settings.json mounted
+RUN cp settings.template.json settings.json && \
     mkdir -p /app/workspace && \
     chown -R forge:forge /app
 

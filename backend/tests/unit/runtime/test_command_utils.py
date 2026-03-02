@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from typing import cast
+
+from backend.runtime.plugins.requirement import PluginRequirement
 
 
 from backend.runtime.utils.command import (
@@ -28,11 +31,14 @@ class TestBuildPluginArgs:
 
     def test_single_plugin(self):
         plugin = SimpleNamespace(name="myplugin")
-        result = _build_plugin_args([plugin])
+        result = _build_plugin_args([cast(PluginRequirement, plugin)])
         assert result == ["--plugins", "myplugin"]
 
     def test_multiple_plugins(self):
-        plugins = [SimpleNamespace(name="a"), SimpleNamespace(name="b")]
+        plugins = [
+            cast(PluginRequirement, SimpleNamespace(name="a")),
+            cast(PluginRequirement, SimpleNamespace(name="b")),
+        ]
         result = _build_plugin_args(plugins)
         assert result == ["--plugins", "a", "b"]
 
@@ -171,7 +177,7 @@ class TestGetStartupCommand:
 
     def test_plugins_included(self):
         cfg = self._make_config()
-        plugins = [SimpleNamespace(name="plugA")]
+        plugins = [cast(PluginRequirement, SimpleNamespace(name="plugA"))]
         cmd = get_action_execution_server_startup_command(
             server_port=8080,
             plugins=plugins,

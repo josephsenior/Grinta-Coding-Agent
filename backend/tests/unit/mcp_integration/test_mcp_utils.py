@@ -1,6 +1,7 @@
 """Tests for backend.mcp_integration.utils — MCP tool conversion & helper functions."""
 
 from __future__ import annotations
+from typing import Any, cast
 
 import json
 import sys
@@ -9,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.events.action.mcp import MCPAction
 from backend.mcp_integration.utils import (
     _find_matching_mcp,
     _is_windows_stdio_mcp_disabled,
@@ -58,7 +60,7 @@ class TestSerializeResultToJson:
     def test_double_fallback(self):
         """When json.dumps and repr both fail..."""
         bad = MagicMock()
-        bad.__repr__ = MagicMock(side_effect=Exception("repr fail"))
+        cast(Any, bad).__repr__ = MagicMock(side_effect=Exception("repr fail"))
         # Actually this shouldn't happen in practice, but the code handles it
         result = _serialize_result_to_json({"key": "val"})
         assert "key" in result
@@ -141,11 +143,14 @@ class TestLogSuccessfulConnection:
 # Async helpers
 # ---------------------------------------------------------------------------
 class TestAsyncHelpers:
+    def _as_action(self, payload: SimpleNamespace) -> MCPAction:
+        return cast(MCPAction, payload)
+
     @pytest.mark.asyncio
     async def test_execute_wrapper_tool_success(self):
         from backend.mcp_integration.utils import _execute_wrapper_tool
 
-        action = SimpleNamespace(name="test_wrapper", arguments={"q": "hello"})
+        action = self._as_action(SimpleNamespace(name="test_wrapper", arguments={"q": "hello"}))
 
         async def fake_wrapper(mcps, args, call_fn):
             return {"result": "ok"}
@@ -162,7 +167,7 @@ class TestAsyncHelpers:
     async def test_execute_wrapper_tool_error(self):
         from backend.mcp_integration.utils import _execute_wrapper_tool
 
-        action = SimpleNamespace(name="bad_wrapper", arguments={})
+        action = self._as_action(SimpleNamespace(name="bad_wrapper", arguments={}))
 
         async def failing_wrapper(mcps, args, call_fn):
             raise RuntimeError("wrapper broke")
@@ -179,7 +184,7 @@ class TestAsyncHelpers:
     async def test_execute_direct_tool_cache_hit(self):
         from backend.mcp_integration.utils import _execute_direct_tool
 
-        action = SimpleNamespace(name="tool1", arguments={"x": 1})
+        action = self._as_action(SimpleNamespace(name="tool1", arguments={"x": 1}))
         client = MagicMock()
 
         with patch("backend.mcp_integration.utils.get_cached", return_value={"cached": True}):
@@ -191,7 +196,7 @@ class TestAsyncHelpers:
     async def test_execute_direct_tool_success(self):
         from backend.mcp_integration.utils import _execute_direct_tool
 
-        action = SimpleNamespace(name="tool1", arguments={"x": 1})
+        action = self._as_action(SimpleNamespace(name="tool1", arguments={"x": 1}))
         client = AsyncMock()
         response = MagicMock()
 
@@ -212,7 +217,7 @@ class TestAsyncHelpers:
     async def test_call_tool_mcp_windows_disabled(self):
         from backend.mcp_integration.utils import call_tool_mcp
 
-        action = SimpleNamespace(name="tool1", arguments={})
+        action = self._as_action(SimpleNamespace(name="tool1", arguments={}))
         with patch("backend.mcp_integration.utils._is_windows_stdio_mcp_disabled", return_value=True):
             obs = await call_tool_mcp([], action)
             # Windows-disabled or empty clients — either message is fine
@@ -222,7 +227,7 @@ class TestAsyncHelpers:
     async def test_call_tool_mcp_no_clients(self):
         from backend.mcp_integration.utils import call_tool_mcp
 
-        action = SimpleNamespace(name="tool1", arguments={})
+        action = self._as_action(SimpleNamespace(name="tool1", arguments={}))
         with patch("backend.mcp_integration.utils._is_windows_stdio_mcp_disabled", return_value=False):
             obs = await call_tool_mcp([], action)
             assert "no mcp clients" in obs.content.lower() or "no mcp clients" in str(
@@ -233,7 +238,7 @@ class TestAsyncHelpers:
     async def test_call_tool_mcp_wrapper_dispatch(self):
         from backend.mcp_integration.utils import call_tool_mcp
 
-        action = SimpleNamespace(name="wrap_tool", arguments={"q": "test"})
+        action = self._as_action(SimpleNamespace(name="wrap_tool", arguments={"q": "test"}))
 
         async def fake_wrapper(mcps, args, call_fn):
             return {"wrapped": True}
@@ -285,7 +290,7 @@ class TestAsyncHelpers:
     async def test_call_mcp_raw_cache_hit(self):
         from backend.mcp_integration.utils import _call_mcp_raw
 
-        action = SimpleNamespace(name="raw_tool", arguments={"a": 1})
+        action = self._as_action(SimpleNamespace(name="raw_tool", arguments={"a": 1}))
         tool = MagicMock()
         tool.name = "raw_tool"
         client = MagicMock()
@@ -299,7 +304,7 @@ class TestAsyncHelpers:
     async def test_call_mcp_raw_no_match(self):
         from backend.mcp_integration.utils import _call_mcp_raw
 
-        action = SimpleNamespace(name="missing_tool", arguments={})
+        action = self._as_action(SimpleNamespace(name="missing_tool", arguments={}))
         client = MagicMock()
         client.tools = []
 

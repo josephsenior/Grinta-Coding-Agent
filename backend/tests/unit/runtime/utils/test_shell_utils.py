@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from backend.runtime.utils.shell_utils import format_shell_output
 
@@ -57,7 +56,8 @@ class TestFormatShellOutput:
     def test_metadata_working_dir_windows_normalized(self) -> None:
         # Windows paths with backslashes should be escaped
         result = format_shell_output("cmd", "", "", 0, "C:\\Users\\user")
-        assert "\\\\" in result.metadata.working_dir
+        wd = result.metadata.working_dir
+        assert wd is not None and "\\\\" in wd
 
     def test_metadata_prefix_set(self) -> None:
         result = format_shell_output("cmd", "data", "", 0, "/tmp")

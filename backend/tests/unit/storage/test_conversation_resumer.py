@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -73,7 +75,7 @@ class TestConversationResumerLoad:
     async def test_returns_none_when_no_metadata(self):
         fs = MagicMock()
         resumer = ConversationResumer(fs)
-        resumer._load_metadata = AsyncMock(side_effect=FileNotFoundError)
+        cast(Any, resumer)._load_metadata = AsyncMock(side_effect=FileNotFoundError)
 
         result = await resumer.load("sid-99")
         assert result is None
@@ -86,9 +88,9 @@ class TestConversationResumerLoad:
         mock_events = [MagicMock(), MagicMock()]
         mock_state = {"iteration": 3}
 
-        resumer._load_metadata = AsyncMock(return_value=mock_meta)
-        resumer._replay_events = AsyncMock(return_value=mock_events)
-        resumer._load_latest_checkpoint = AsyncMock(
+        cast(Any, resumer)._load_metadata = AsyncMock(return_value=mock_meta)
+        cast(Any, resumer)._replay_events = AsyncMock(return_value=mock_events)
+        cast(Any, resumer)._load_latest_checkpoint = AsyncMock(
             return_value=(mock_state, "checkpoint-5")
         )
 
@@ -104,9 +106,9 @@ class TestConversationResumerLoad:
         fs = MagicMock()
         resumer = ConversationResumer(fs)
 
-        resumer._load_metadata = AsyncMock(return_value={"title": "no cp"})
-        resumer._replay_events = AsyncMock(return_value=[])
-        resumer._load_latest_checkpoint = AsyncMock(return_value=(None, None))
+        cast(Any, resumer)._load_metadata = AsyncMock(return_value={"title": "no cp"})
+        cast(Any, resumer)._replay_events = AsyncMock(return_value=[])
+        cast(Any, resumer)._load_latest_checkpoint = AsyncMock(return_value=(None, None))
 
         snap = await resumer.load("sid-2")
         assert snap is not None

@@ -35,6 +35,7 @@ class TestBatchRequest:
         # Ensure each instance gets its own dict
         req2 = BatchRequest(prompt="y")
         req.metadata["key"] = "value"
+        assert req2.metadata is not None
         assert "key" not in req2.metadata
 
     def test_custom_values(self):

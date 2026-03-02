@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, cast
 
 import pytest
 
@@ -37,8 +38,8 @@ def _make_pending_service(action=None) -> MagicMock:
 
 def _make_observation(
     content: str = "result", cause: int | None = None
-) -> SimpleNamespace:
-    return SimpleNamespace(content=content, cause=cause)
+) -> Any:
+    return cast(Any, SimpleNamespace(content=content, cause=cause))
 
 
 # ── transition_agent_state_logic ─────────────────────────────────────

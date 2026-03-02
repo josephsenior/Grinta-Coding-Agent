@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -86,7 +87,7 @@ class TestGetEvents:
 
         store = _StubStore([e1, e2])
         # filter_out_type excludes types via EventFilter(exclude_types=...)
-        result = list(store.get_events(filter_out_type=(str,)))
+        result = list(store.get_events(filter_out_type=cast(Any, (str,))))
         # e2 is of type MagicMock with spec=str, so isinstance check may differ
         # The important thing is the filter is passed through
         assert isinstance(result, list)
@@ -109,9 +110,9 @@ class TestFilteredEventsBySource:
         e2 = _make_event(source="user")
         e3 = _make_event(source="agent")
         store = _StubStore([e1, e2, e3])
-        result = list(store.filtered_events_by_source("agent"))
+        result = list(store.filtered_events_by_source(cast(Any, "agent")))
         assert len(result) == 2
-        assert all(ev.source.value == "agent" for ev in result)
+        assert all(getattr(ev.source, "value", None) == "agent" for ev in result)
 
 
 # ── get_matching_events ───────────────────────────────────────────────
@@ -150,9 +151,9 @@ class TestGetMatchingEvents:
         e1 = _make_event(source="agent")
         e2 = _make_event(source="user")
         store = _StubStore([e1, e2])
-        result = store.get_matching_events(source="user")
+        result = store.get_matching_events(source=cast(Any, "user"))
         assert len(result) == 1
-        assert result[0].source.value == "user"
+        assert getattr(result[0].source, "value", None) == "user"
 
     def test_start_id(self):
         events = [_make_event() for _ in range(5)]

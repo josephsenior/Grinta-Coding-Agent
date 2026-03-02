@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, cast
 
 
 from backend.core.message import Message, TextContent, ToolCall, ToolCallFunction
@@ -83,7 +84,7 @@ class TestCollectToolResponseIdsExtended:
 class TestFlushResolvedExtended:
     def test_no_pending(self):
         state = _FakeToolState()
-        assert flush_resolved_tool_calls(state) == []
+        assert flush_resolved_tool_calls(cast(Any, state)) == []
 
     def test_flushes_when_resolved(self):
         tc = _tc("tc1")
@@ -93,7 +94,7 @@ class TestFlushResolvedExtended:
             pending_action_messages={"r1": pending},
             tool_call_messages={"tc1": resp},
         )
-        result = flush_resolved_tool_calls(state)
+        result = flush_resolved_tool_calls(cast(Any, state))
         assert len(result) == 2
         assert "r1" not in state.pending_action_messages
 
@@ -105,7 +106,7 @@ class TestFlushResolvedExtended:
             pending_action_messages={"r1": pending},
             tool_call_messages={"tc1": _tool_msg("tc1"), "tc2": _tool_msg("tc2")},
         )
-        result = flush_resolved_tool_calls(state)
+        result = flush_resolved_tool_calls(cast(Any, state))
         assert len(result) == 3  # pending + 2 tool responses
 
 

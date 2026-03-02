@@ -9,7 +9,7 @@ class AssistantToolCallLite(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     id: str | None = None
     # Optional extra payload for debugging; not relied on by core logic
-    function: Any | None = None
+    function: dict[str, Any] | None = None
 
 
 class AssistantMessageLite(BaseModel):
@@ -47,6 +47,28 @@ class ModelResponseLite(BaseModel):
         return default
 
     @classmethod
+    def _normalize_tool_function(cls, function: Any) -> dict[str, Any] | None:
+        if function is None:
+            return None
+
+        if isinstance(function, dict):
+            name = function.get("name")
+            arguments = function.get("arguments")
+            return {
+                "name": str(name) if name is not None else "",
+                "arguments": str(arguments) if arguments is not None else "{}",
+            }
+
+        name = cls._getattr_or_get(function, "name")
+        arguments = cls._getattr_or_get(function, "arguments")
+        if name is None and arguments is None:
+            return None
+        return {
+            "name": str(name) if name is not None else "",
+            "arguments": str(arguments) if arguments is not None else "{}",
+        }
+
+    @classmethod
     def from_sdk(cls, resp: Any) -> ModelResponseLite:
         rid = cls._getattr_or_get(resp, "id")
         rmodel = cls._getattr_or_get(resp, "model")
@@ -65,7 +87,9 @@ class ModelResponseLite(BaseModel):
                 tool_calls = []
                 for tc in raw_tool_calls:
                     tc_id = cls._getattr_or_get(tc, "id")
-                    function = cls._getattr_or_get(tc, "function")
+                    function = cls._normalize_tool_function(
+                        cls._getattr_or_get(tc, "function")
+                    )
                     tool_calls.append(
                         AssistantToolCallLite(id=tc_id, function=function)
                     )

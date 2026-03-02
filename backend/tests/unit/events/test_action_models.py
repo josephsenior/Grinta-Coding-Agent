@@ -110,6 +110,7 @@ class TestSystemMessageAction(unittest.TestCase):
 
     def test_tools_and_agent_class(self):
         s = SystemMessageAction(content="x", tools=[{"t": 1}], agent_class="TestAgent")
+        assert s.tools is not None
         self.assertEqual(len(s.tools), 1)
         self.assertEqual(s.agent_class, "TestAgent")
 

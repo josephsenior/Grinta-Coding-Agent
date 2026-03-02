@@ -8,24 +8,33 @@ import type { ForgeEvent, ActionEvent } from "@/types/events";
 import { ActionSecurityRisk } from "@/types/agent";
 
 interface ConfirmationBannerProps {
-  /** The most recent events — we search backward for the action needing confirmation */
-  events: ForgeEvent[];
+  /** The most recent events — used to resolve pending action if pendingAction is not supplied */
+  events?: ForgeEvent[];
+  /** Optional explicit pending action to render confirmation for inline usage. */
+  pendingAction?: ActionEvent;
+  /** Visual treatment. "inline" anchors confirmation in the chat stream. */
+  variant?: "default" | "inline";
 }
 
-export function ConfirmationBanner({ events }: ConfirmationBannerProps) {
+export function ConfirmationBanner({ events = [], pendingAction, variant = "default" }: ConfirmationBannerProps) {
   const [rejectReason, setRejectReason] = useState("");
   const [showReasonInput, setShowReasonInput] = useState(false);
 
   // Find the last action event that has awaiting_confirmation status
-  const pendingAction = [...events].reverse().find(
+  const resolvedPendingAction = pendingAction ?? [...events].reverse().find(
     (e) => "action" in e && (e as ActionEvent).confirmation_status === "awaiting_confirmation",
   ) as ActionEvent | undefined;
 
-  const description = pendingAction
-    ? pendingAction.message || `${pendingAction.action}: ${JSON.stringify(pendingAction.args)}`
+  const description = resolvedPendingAction
+    ? resolvedPendingAction.message || `${resolvedPendingAction.action}: ${JSON.stringify(resolvedPendingAction.args)}`
     : "An action requires your approval";
 
-  const risk = pendingAction?.security_risk as ActionSecurityRisk | undefined;
+  const risk = resolvedPendingAction?.security_risk as ActionSecurityRisk | undefined;
+  const containerClassName =
+    variant === "inline"
+      ? "rounded-lg border border-orange-500/30 bg-orange-500/10 p-3"
+      : "border-t bg-orange-500/10 p-4";
+  const contentClassName = variant === "inline" ? "space-y-3" : "mx-auto max-w-3xl space-y-3";
 
   const handleApprove = () => {
     sendUserAction({
@@ -56,8 +65,8 @@ export function ConfirmationBanner({ events }: ConfirmationBannerProps) {
   };
 
   return (
-    <div className="border-t bg-orange-500/10 p-4">
-      <div className="mx-auto max-w-3xl space-y-3">
+    <div className={containerClassName}>
+      <div className={contentClassName}>
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-orange-500" />
           <div className="flex-1 space-y-1">

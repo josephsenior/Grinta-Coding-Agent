@@ -3,19 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any, cast
+import importlib
 import unittest.mock
 import pytest
-import time
-from typing import Any
 
 import backend.utils.async_utils as async_utils
 import backend.utils.import_utils as import_utils
 import backend.utils.tenacity_metrics as tenacity_metrics
 import backend.utils.tenacity_stop as tenacity_stop
 import backend.utils.circuit_breaker as circuit_breaker
-import backend.utils.search_utils as search_utils
-import backend.utils.shutdown_listener as shutdown_listener
-import backend.utils.prompt as prompt
 
 
 class TestImportUtilsFinal:
@@ -23,15 +20,18 @@ class TestImportUtilsFinal:
 
     def test_get_impl_mro_match_true(self):
         """Covers lines 78, 81 (returning True from MRO match)."""
-        class Base: pass
+        class Base:
+            pass
         Base.__module__ = "mod"
         Base.__name__ = "Name"
-        
-        class SameNameBase: pass
+
+        class SameNameBase:
+            pass
         SameNameBase.__module__ = "mod"
         SameNameBase.__name__ = "Name"
-        
-        class Impl(SameNameBase): pass
+
+        class Impl(SameNameBase):
+            pass
         
         assert import_utils._impl_matches_base(Base, Impl) is True
 
@@ -42,10 +42,12 @@ class TestAsyncUtilsFinal:
     @pytest.mark.asyncio
     async def test_handle_pending_tasks_logging_empty(self):
         """Covers line 101 (logging with no pending info)."""
-        done = set()
-        pending = {unittest.mock.MagicMock(spec=asyncio.Task)}
+        done: set[asyncio.Task[Any]] = set()
+        pending: set[asyncio.Task[Any]] = {
+            cast(asyncio.Task[Any], unittest.mock.MagicMock(spec=asyncio.Task))
+        }
         pending_task = list(pending)[0]
-        pending_task.get_coro.return_value = None # Force "Unable to get task names"
+        cast(Any, pending_task).get_coro.return_value = None  # Force "Unable to get task names"
         
         with unittest.mock.patch("logging.getLogger") as mock_logger:
             async_utils._handle_pending_tasks(done, pending)
@@ -125,11 +127,11 @@ class TestTenacityStopFinal:
                 m = unittest.mock.MagicMock()
                 m.should_exit.side_effect = RuntimeError("fail")
                 return m
-            return unittest.mock.import_module(name)
+            return importlib.import_module(name)
 
         with unittest.mock.patch("importlib.import_module", side_effect=side_effect):
             # local fallback should return False (by default)
-            assert stop_cond(unittest.mock.MagicMock()) is False
+            assert stop_cond(cast(Any, unittest.mock.MagicMock())) is False
 
 
     def test_stop_if_should_exit_local_fallback(self):
@@ -142,10 +144,10 @@ class TestTenacityStopFinal:
                     m = unittest.mock.MagicMock()
                     m.should_exit.side_effect = Exception("fail")
                     return m
-                return unittest.mock.import_module(name)
+                return importlib.import_module(name)
             
             with unittest.mock.patch("importlib.import_module", side_effect=side_effect_mock):
-                assert stop_cond(unittest.mock.MagicMock()) is True
+                assert stop_cond(cast(Any, unittest.mock.MagicMock())) is True
 
 
 class TestPromptFinal:
@@ -157,11 +159,10 @@ class TestPromptFinal:
         from backend.utils.prompt import PromptManager
         
         pm = unittest.mock.MagicMock(spec=PromptManager)
-        pm.add_turns_left_reminder = PromptManager.add_turns_left_reminder.__get__(pm, PromptManager)
         
         msg = Message(role="user", content=[ImageContent(image_urls=["http://example.com/img.png"])])
         state = unittest.mock.MagicMock()
-        pm.add_turns_left_reminder([msg], state)
+        PromptManager.add_turns_left_reminder(pm, [msg], state)
 
 
 class TestTenacityMetricsFinal:
@@ -170,7 +171,7 @@ class TestTenacityMetricsFinal:
     def test_tenacity_before_sleep_exception(self):
         """Covers lines 57-72 (exception in _before_sleep)."""
         hook = tenacity_metrics.tenacity_before_sleep_factory("op")
-        hook(None)
+        hook(cast(Any, None))
 
     def test_tenacity_after_exception_in_sanitize(self):
         """Covers lines 95-100 (exception in _after start)."""

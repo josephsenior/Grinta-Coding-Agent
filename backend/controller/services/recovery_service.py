@@ -213,13 +213,18 @@ class RecoveryService:
             return False
 
         if error_type == ErrorType.TOOL_CALL_ERROR:
-            logger.info(
-                "Skipping recovery for tool call error to prevent infinite loop"
-            )
-            self._emit_recovery_event(
-                "skipped", error_type=error_type.value, reason="tool_call_error"
-            )
-            return False
+            if self._retry_service.retry_count >= 1:
+                logger.info(
+                    "Skipping recovery for tool call error — already retried once"
+                )
+                self._emit_recovery_event(
+                    "skipped", error_type=error_type.value, reason="tool_call_retry_exhausted"
+                )
+                return False
+            # Allow one retry: the LLM can self-correct from the error feedback
+            logger.info("Allowing single retry for tool call error")
+            await self._execute_recovery_actions(error_type, exc)
+            return True
 
         autonomy = getattr(controller, "autonomy_controller", None)
         if autonomy and autonomy.should_retry_on_error(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
+from typing import Any, cast
 
 import pytest
 
@@ -14,6 +15,7 @@ from backend.events.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
+    Action,
 )
 
 
@@ -26,6 +28,10 @@ def _make_context(**overrides) -> MagicMock:
     ctx.emit_event = MagicMock()
     ctx.clear_pending_action = MagicMock()
     return ctx
+
+
+def _as_action(payload: SimpleNamespace) -> Any:
+    return cast(Any, payload)
 
 
 # ── action_requires_confirmation ─────────────────────────────────────
@@ -49,7 +55,7 @@ class TestActionRequiresConfirmation:
 
     def test_generic_action_does_not_require_confirmation(self):
         svc = SafetyService(_make_context())
-        action = SimpleNamespace()  # not a confirmation type
+        action = _as_action(SimpleNamespace())  # not a confirmation type
         assert svc.action_requires_confirmation(action) is False
 
 
@@ -60,7 +66,7 @@ class TestEvaluateSecurityRisk:
     def test_high_risk(self):
         ctx = _make_context(security_analyzer=MagicMock())
         svc = SafetyService(ctx)
-        action = SimpleNamespace(security_risk=ActionSecurityRisk.HIGH)
+        action = _as_action(SimpleNamespace(security_risk=ActionSecurityRisk.HIGH))
         is_high, is_ask = svc.evaluate_security_risk(action)
         assert is_high is True
         assert is_ask is False
@@ -68,7 +74,7 @@ class TestEvaluateSecurityRisk:
     def test_unknown_risk_no_analyzer(self):
         ctx = _make_context(security_analyzer=None)
         svc = SafetyService(ctx)
-        action = SimpleNamespace(security_risk=ActionSecurityRisk.UNKNOWN)
+        action = _as_action(SimpleNamespace(security_risk=ActionSecurityRisk.UNKNOWN))
         is_high, is_ask = svc.evaluate_security_risk(action)
         assert is_high is False
         assert is_ask is True
@@ -76,7 +82,7 @@ class TestEvaluateSecurityRisk:
     def test_unknown_risk_with_analyzer(self):
         ctx = _make_context(security_analyzer=MagicMock())
         svc = SafetyService(ctx)
-        action = SimpleNamespace(security_risk=ActionSecurityRisk.UNKNOWN)
+        action = _as_action(SimpleNamespace(security_risk=ActionSecurityRisk.UNKNOWN))
         is_high, is_ask = svc.evaluate_security_risk(action)
         assert is_high is False
         assert is_ask is False  # analyzer present → don't ask for every action
@@ -84,7 +90,7 @@ class TestEvaluateSecurityRisk:
     def test_low_risk(self):
         ctx = _make_context()
         svc = SafetyService(ctx)
-        action = SimpleNamespace(security_risk=ActionSecurityRisk.LOW)
+        action = _as_action(SimpleNamespace(security_risk=ActionSecurityRisk.LOW))
         is_high, is_ask = svc.evaluate_security_risk(action)
         assert is_high is False
         assert is_ask is False
@@ -92,7 +98,7 @@ class TestEvaluateSecurityRisk:
     def test_no_security_risk_attr_defaults_unknown(self):
         ctx = _make_context(security_analyzer=None)
         svc = SafetyService(ctx)
-        action = SimpleNamespace()  # no security_risk attribute
+        action = _as_action(SimpleNamespace())  # no security_risk attribute
         is_high, is_ask = svc.evaluate_security_risk(action)
         assert is_high is False
         assert is_ask is True  # getattr returns UNKNOWN, no analyzer
@@ -106,7 +112,7 @@ class TestAnalyzeSecurity:
     async def test_no_analyzer_sets_unknown(self):
         ctx = _make_context(security_analyzer=None)
         svc = SafetyService(ctx)
-        action = SimpleNamespace(security_risk=ActionSecurityRisk.LOW)
+        action = _as_action(SimpleNamespace(security_risk=ActionSecurityRisk.LOW))
         await svc.analyze_security(action)
         assert action.security_risk == ActionSecurityRisk.UNKNOWN
 
@@ -116,7 +122,7 @@ class TestAnalyzeSecurity:
         analyzer.security_risk.return_value = ActionSecurityRisk.HIGH
         ctx = _make_context(security_analyzer=analyzer)
         svc = SafetyService(ctx)
-        action = SimpleNamespace(security_risk=ActionSecurityRisk.LOW)
+        action = _as_action(SimpleNamespace(security_risk=ActionSecurityRisk.LOW))
         await svc.analyze_security(action)
         assert action.security_risk == ActionSecurityRisk.HIGH
 
@@ -125,7 +131,7 @@ class TestAnalyzeSecurity:
         """Action without security_risk attr is unmodified."""
         ctx = _make_context(security_analyzer=None)
         svc = SafetyService(ctx)
-        action = SimpleNamespace()
+        action = _as_action(SimpleNamespace())
         await svc.analyze_security(action)
         assert not hasattr(action, "security_risk")
 
@@ -142,7 +148,7 @@ class TestApplyConfirmationState:
         ctx = _make_context(autonomy_controller=autonomy)
         ctx.get_controller.return_value = controller
         svc = SafetyService(ctx)
-        action = SimpleNamespace(confirmation_state=None)
+        action = _as_action(SimpleNamespace(confirmation_state=None))
         svc.apply_confirmation_state(
             action, is_high_security_risk=True, is_ask_for_every_action=False
         )
@@ -158,7 +164,7 @@ class TestApplyConfirmationState:
         ctx = _make_context(autonomy_controller=autonomy, confirmation_mode=True)
         ctx.get_controller.return_value = controller
         svc = SafetyService(ctx)
-        action = SimpleNamespace(confirmation_state=None)
+        action = _as_action(SimpleNamespace(confirmation_state=None))
         svc.apply_confirmation_state(
             action, is_high_security_risk=True, is_ask_for_every_action=False
         )
@@ -173,7 +179,7 @@ class TestApplyConfirmationState:
         ctx = _make_context(autonomy_controller=autonomy)
         ctx.get_controller.return_value = controller
         svc = SafetyService(ctx)
-        action = SimpleNamespace(confirmation_state=None)
+        action = _as_action(SimpleNamespace(confirmation_state=None))
         svc.apply_confirmation_state(
             action, is_high_security_risk=True, is_ask_for_every_action=True
         )
@@ -185,7 +191,9 @@ class TestApplyConfirmationState:
 
 class TestFinalizePendingAction:
     def test_confirmed(self):
-        action = SimpleNamespace(thought="thinking...", confirmation_state=None, _id=42)
+        action = _as_action(
+            SimpleNamespace(thought="thinking...", confirmation_state=None, _id=42)
+        )
         ctx = _make_context(pending_action=action)
         svc = SafetyService(ctx)
         svc.finalize_pending_action(confirmed=True)
@@ -196,7 +204,9 @@ class TestFinalizePendingAction:
         ctx.clear_pending_action.assert_called_once()
 
     def test_rejected(self):
-        action = SimpleNamespace(thought="thinking...", confirmation_state=None, _id=42)
+        action = _as_action(
+            SimpleNamespace(thought="thinking...", confirmation_state=None, _id=42)
+        )
         ctx = _make_context(pending_action=action)
         svc = SafetyService(ctx)
         svc.finalize_pending_action(confirmed=False)

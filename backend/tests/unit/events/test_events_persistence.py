@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 
@@ -24,7 +25,7 @@ def _make_persistence(**overrides) -> tuple[EventPersistence, MagicMock]:
     }
     defaults.update(overrides)
     with patch.dict("os.environ", {"FORGE_SQLITE_EVENTS": "false"}):
-        p = EventPersistence(**defaults)
+        p = EventPersistence(**cast(Any, defaults))
     return p, file_store
 
 
@@ -189,8 +190,8 @@ class TestTruncatePayloadPersist:
         big_value = "x" * 100_000
         payload = {"content": big_value, "id": 1}
         _truncate_payload(payload, max_bytes=10_000)
-        assert len(payload["content"]) < 100_000
-        assert "truncated by Forge" in payload["content"]
+        assert len(cast(str, payload["content"])) < 100_000
+        assert "truncated by Forge" in cast(str, payload["content"])
 
     def test_leaves_small_payloads_untouched(self):
         payload = {"content": "small", "id": 1}
@@ -201,4 +202,5 @@ class TestTruncatePayloadPersist:
         big_value = "y" * 100_000
         payload = {"nested": {"content": big_value}, "id": 1}
         _truncate_payload(payload, max_bytes=10_000)
-        assert len(payload["nested"]["content"]) < 100_000
+        nested = cast(dict[str, Any], payload["nested"])
+        assert len(cast(str, nested["content"])) < 100_000

@@ -19,10 +19,12 @@ class TestOffsetToPageIdUnit:
 
     def test_zero_offset(self):
         result = offset_to_page_id(0, has_next=True)
+        assert result is not None
         assert base64.b64decode(result).decode() == "0"
 
     def test_large_offset(self):
         result = offset_to_page_id(999999, has_next=True)
+        assert result is not None
         assert base64.b64decode(result).decode() == "999999"
 
 

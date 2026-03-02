@@ -8,7 +8,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import cast, Any
 from unittest.mock import MagicMock, patch
 from zipfile import ZipFile
 
@@ -103,14 +103,14 @@ class TestLoadPlaybooksFromDirectory:
     @patch("backend.runtime.playbook_loader.load_playbooks_from_dir")
     def test_loads_from_zip(self, mock_load, rt: _FakeRuntime):
         # Set up list_files to return something
-        rt.list_files = MagicMock(return_value=["playbook.md"])
+        cast(Any, rt).list_files = MagicMock(return_value=["playbook.md"])
 
         # Create a temp zip file
         tmp_zip = Path(tempfile.mktemp(suffix=".zip"))
         with ZipFile(tmp_zip, "w") as zf:
             zf.writestr("playbook.md", "# Test")
 
-        rt.copy_from = MagicMock(return_value=tmp_zip)
+        cast(Any, rt).copy_from = MagicMock(return_value=tmp_zip)
         mock_load.return_value = ({"a": MagicMock(spec=BasePlaybook)}, {})
 
         result = rt._load_playbooks_from_directory(Path("/some/dir"), "test")
@@ -119,11 +119,11 @@ class TestLoadPlaybooksFromDirectory:
 
     @patch("backend.runtime.playbook_loader.load_playbooks_from_dir")
     def test_loads_from_directory(self, mock_load, rt: _FakeRuntime):
-        rt.list_files = MagicMock(return_value=["playbook.md"])
+        cast(Any, rt).list_files = MagicMock(return_value=["playbook.md"])
 
         tmp_dir = Path(tempfile.mkdtemp())
         (tmp_dir / "playbook.md").write_text("# Test")
-        rt.copy_from = MagicMock(return_value=tmp_dir)
+        cast(Any, rt).copy_from = MagicMock(return_value=tmp_dir)
         mock_load.return_value = ({}, {"k": MagicMock(spec=BasePlaybook)})
 
         result = rt._load_playbooks_from_directory(Path("/some/dir"), "test")
@@ -132,11 +132,11 @@ class TestLoadPlaybooksFromDirectory:
 
     @patch("backend.runtime.playbook_loader.load_playbooks_from_dir")
     def test_handles_exception_gracefully(self, mock_load, rt: _FakeRuntime):
-        rt.list_files = MagicMock(return_value=["f.md"])
+        cast(Any, rt).list_files = MagicMock(return_value=["f.md"])
         tmp_zip = Path(tempfile.mktemp(suffix=".zip"))
         with ZipFile(tmp_zip, "w") as zf:
             zf.writestr("f.md", "x")
-        rt.copy_from = MagicMock(return_value=tmp_zip)
+        cast(Any, rt).copy_from = MagicMock(return_value=tmp_zip)
         mock_load.side_effect = RuntimeError("boom")
 
         result = rt._load_playbooks_from_directory(Path("/d"), "test")
@@ -223,7 +223,7 @@ class TestCloneAndLoadOrgPlaybooks:
 
 class TestExecuteCloneAndLoad:
     def test_clone_failure_returns_empty(self, rt: _FakeRuntime):
-        rt.run_action = MagicMock(
+        cast(Any, rt).run_action = MagicMock(
             return_value=CmdOutputObservation(
                 content="fatal", command_id=0, command="git clone", exit_code=128
             )
@@ -235,7 +235,7 @@ class TestExecuteCloneAndLoad:
 
     @patch.object(PlaybookLoaderMixin, "_load_and_cleanup_org_playbooks")
     def test_clone_success_loads(self, mock_load, rt: _FakeRuntime):
-        rt.run_action = MagicMock(
+        cast(Any, rt).run_action = MagicMock(
             return_value=CmdOutputObservation(
                 content="done", command_id=0, command="git clone", exit_code=0
             )
@@ -270,11 +270,11 @@ class TestGetPlaybooksFromSelectedRepo:
     def test_loads_forge_instructions_file(self, mock_org, rt: _FakeRuntime):
         mock_org.return_value = []
         # Make read return a FileReadObservation for .FORGE_instructions
-        rt.read = MagicMock(
+        cast(Any, rt).read = MagicMock(
             return_value=FileReadObservation(
                 content="# Forge instructions content", path=".FORGE_instructions"
             )
         )
-        rt.list_files = MagicMock(return_value=[])
+        cast(Any, rt).list_files = MagicMock(return_value=[])
         rt.get_playbooks_from_selected_repo("github.com/acme/repo")
         assert any("FORGE_instructions" in msg for _, msg in rt._logs)

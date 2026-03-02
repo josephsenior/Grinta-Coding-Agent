@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 
 from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.core.exceptions import (
@@ -196,14 +197,14 @@ class TestGetRecoveryActions:
             ErrorType.MODULE_NOT_FOUND, err
         )
         assert len(actions) == 3
-        assert "pip install requests" in actions[1].command
+        assert "pip install requests" in cast(Any, actions[1]).command
 
     def test_module_not_found_submodule(self):
         err = ImportError("No module named 'requests.auth'")
         actions = ErrorRecoveryStrategy.get_recovery_actions(
             ErrorType.MODULE_NOT_FOUND, err
         )
-        assert "pip install requests" in actions[1].command
+        assert "pip install requests" in cast(Any, actions[1]).command
 
     def test_module_not_found_no_match(self):
         err = ImportError("Something else happened")
@@ -223,7 +224,7 @@ class TestGetRecoveryActions:
         actions = ErrorRecoveryStrategy.get_recovery_actions(
             ErrorType.NETWORK_ERROR, Exception("git clone failed")
         )
-        assert any("git config" in a.command for a in actions if hasattr(a, "command"))
+        assert any("git config" in cast(Any, a).command for a in actions if hasattr(a, "command"))
 
     def test_network_error_general(self):
         actions = ErrorRecoveryStrategy.get_recovery_actions(
@@ -235,7 +236,12 @@ class TestGetRecoveryActions:
         actions = ErrorRecoveryStrategy.get_recovery_actions(
             ErrorType.FILESYSTEM_ERROR, Exception("file 'foo.py' not found")
         )
-        assert any("find" in a.command for a in actions if hasattr(a, "command"))
+        # On Unix the command contains "find"; on Windows it uses "Get-ChildItem"
+        assert any(
+            ("find" in cast(Any, a).command or "Get-ChildItem" in cast(Any, a).command)
+            for a in actions
+            if hasattr(a, "command")
+        )
 
     def test_filesystem_error_generic(self):
         actions = ErrorRecoveryStrategy.get_recovery_actions(

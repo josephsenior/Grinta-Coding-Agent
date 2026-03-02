@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from typing import cast
 
 
 from backend.controller.replay import ReplayDivergence, ReplayManager
@@ -33,8 +34,7 @@ def _make_observation(source=EventSource.ENVIRONMENT, content="done"):
     # The replay manager only checks isinstance(event, Action) and
     # isinstance(event, NullObservation); this is neither, so it's kept
     # as a normal event (observation).
-    obs.__class__ = Event  # satisfy type checks loosely
-    return obs
+    return cast(Event, obs)
 
 
 def _content_hash(content: str) -> str:
@@ -107,7 +107,8 @@ class TestReplayManagerInit:
         a2 = _make_action(source=EventSource.AGENT)
         rm = ReplayManager(events=[a1, a2])
         # wait_for_response should be set to False
-        assert rm.replay_events[0].wait_for_response is False
+        first_action = cast(MessageAction, rm.replay_events[0])
+        assert first_action.wait_for_response is False
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +137,7 @@ class TestShouldReplayAndStep:
         rm = ReplayManager(events=[a])
         result = rm.step()
         assert isinstance(result, Action)
-        assert result.content == "step 1"
+        assert cast(MessageAction, result).content == "step 1"
 
     def test_step_advances_index(self):
         a1 = _make_action(content="first")
@@ -153,9 +154,9 @@ class TestShouldReplayAndStep:
         obs = MagicMock(spec=Event)
         obs.source = EventSource.AGENT
         # Make isinstance(obs, Action) return False
-        obs.__class__ = Event
+        obs_event = cast(Event, obs)
         a2 = _make_action(content="second")
-        rm = ReplayManager(events=[a1, obs, a2])
+        rm = ReplayManager(events=[a1, obs_event, a2])
         rm.step()  # first action
         # should_replay will advance past the non-action obs to a2
         assert rm.should_replay() is True
@@ -179,9 +180,9 @@ class TestDeterminismVerification:
         expected_obs = MagicMock()
         expected_obs.content = "expected output"
         expected_obs.source = EventSource.AGENT
-        expected_obs.__class__ = Event
+        expected_event = cast(Event, expected_obs)
 
-        rm = ReplayManager(events=[a, expected_obs])
+        rm = ReplayManager(events=[a, expected_event])
         rm.step()  # advance past the action
 
         actual_obs = MagicMock()
@@ -197,9 +198,9 @@ class TestDeterminismVerification:
         expected_obs = MagicMock()
         expected_obs.content = "same output"
         expected_obs.source = EventSource.AGENT
-        expected_obs.__class__ = Event
+        expected_event = cast(Event, expected_obs)
 
-        rm = ReplayManager(events=[a, expected_obs])
+        rm = ReplayManager(events=[a, expected_event])
         rm.step()
 
         actual_obs = MagicMock()
@@ -289,7 +290,15 @@ class TestProperties:
         divergences = rm.divergences
         assert divergences == []
         # Modifying the returned list should not affect internal state
-        divergences.append("fake")
+        divergences.append(
+            ReplayDivergence(
+                index=999,
+                action_type="Fake",
+                expected_hash="x",
+                actual_hash="y",
+                message="fake",
+            )
+        )
         assert not rm.divergences
 
     def test_is_deterministic_true_initially(self):

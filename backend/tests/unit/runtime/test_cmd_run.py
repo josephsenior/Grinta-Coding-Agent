@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 from backend.events.action import CmdRunAction
 from backend.events.observation import CmdOutputObservation
 from backend.runtime.action_execution_server import ActionExecutor
@@ -8,7 +8,7 @@ from backend.runtime.action_execution_server import ActionExecutor
 def mock_executor():
     """Create a minimal mocked ActionExecutor to avoid full initialization."""
     with patch("os.makedirs"), \
-         patch("backend.runtime.action_execution_server.SessionManager") as MockSessionManager, \
+         patch("backend.runtime.action_execution_server.SessionManager"), \
          patch("backend.runtime.action_execution_server.ActionExecutor._init_browser_async"):
         
         executor = ActionExecutor(

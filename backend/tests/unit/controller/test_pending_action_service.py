@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 
@@ -39,12 +40,12 @@ class TestSetGet:
     def test_set_and_get_returns_action(self):
         svc = PendingActionService(_make_context(), timeout=300.0)
         action = _make_action()
-        svc.set(action)
+        svc.set(cast(Any, action))
         assert svc.get() is action
 
     def test_set_none_clears_pending(self):
         svc = PendingActionService(_make_context(), timeout=300.0)
-        svc.set(_make_action())
+        svc.set(cast(Any, _make_action()))
         svc.set(None)
         assert svc.get() is None
 
@@ -56,7 +57,7 @@ class TestSetGet:
     def test_info_returns_tuple(self):
         svc = PendingActionService(_make_context(), timeout=300.0)
         action = _make_action()
-        svc.set(action)
+        svc.set(cast(Any, action))
         info = svc.info()
         assert info is not None
         stored_action, ts = info
@@ -67,8 +68,8 @@ class TestSetGet:
         svc = PendingActionService(_make_context(), timeout=300.0)
         a1 = _make_action(1)
         a2 = _make_action(2)
-        svc.set(a1)
-        svc.set(a2)
+        svc.set(cast(Any, a1))
+        svc.set(cast(Any, a2))
         assert svc.get() is a2
 
 
@@ -80,9 +81,9 @@ class TestTimeout:
         ctx = _make_context()
         svc = PendingActionService(ctx, timeout=5.0)
         action = _make_action()
-        svc.set(action)
+        svc.set(cast(Any, action))
         # Manually backdate the stored timestamp so elapsed > timeout
-        svc._pending = (action, time.time() - 10.0)
+        svc._pending = cast(Any, (action, time.time() - 10.0))
         result = svc.get()
         assert result is None
 
@@ -91,8 +92,8 @@ class TestTimeout:
         controller = ctx.get_controller()
         svc = PendingActionService(ctx, timeout=5.0)
         action = _make_action(42)
-        svc.set(action)
-        svc._pending = (action, time.time() - 10.0)
+        svc.set(cast(Any, action))
+        svc._pending = cast(Any, (action, time.time() - 10.0))
         svc.get()  # triggers timeout
         controller.event_stream.add_event.assert_called_once()
         obs = controller.event_stream.add_event.call_args[0][0]
@@ -103,8 +104,8 @@ class TestTimeout:
         controller = ctx.get_controller()
         svc = PendingActionService(ctx, timeout=5.0)
         action = _make_action(77)
-        svc.set(action)
-        svc._pending = (action, time.time() - 10.0)
+        svc.set(cast(Any, action))
+        svc._pending = cast(Any, (action, time.time() - 10.0))
         svc.get()
         obs = controller.event_stream.add_event.call_args[0][0]
         assert obs.cause == 77
@@ -114,8 +115,8 @@ class TestTimeout:
         controller = ctx.get_controller()
         svc = PendingActionService(ctx, timeout=5.0)
         action = SimpleNamespace(id="not-an-int")
-        svc.set(action)
-        svc._pending = (action, time.time() - 10.0)
+        svc.set(cast(Any, action))
+        svc._pending = cast(Any, (action, time.time() - 10.0))
         svc.get()
         obs = controller.event_stream.add_event.call_args[0][0]
         assert obs.cause is None
@@ -131,13 +132,15 @@ class TestSlowPendingLogging:
         controller = ctx.get_controller()
         svc = PendingActionService(ctx, timeout=600.0)  # long timeout
         action = _make_action()
-        svc.set(action)
+        svc.set(cast(Any, action))
         # Patch the stored timestamp to 90s ago and make elapsed divisible by 30
-        svc._pending = (action, time.time() - 90.0)
+        svc._pending = cast(Any, (action, time.time() - 90.0))
         with patch(
             "backend.controller.services.pending_action_service.time"
         ) as mock_time:
-            mock_time.time.return_value = svc._pending[1] + 90.0
+            pending = svc._pending
+            assert pending is not None
+            mock_time.time.return_value = pending[1] + 90.0
             svc.get()
         # controller.log should have been called for the slow warning
         calls = [c for c in controller.log.call_args_list if "active for" in str(c)]

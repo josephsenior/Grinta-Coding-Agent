@@ -191,6 +191,7 @@ class TestSemanticCondenserCondensation(unittest.TestCase):
         view.__iter__ = lambda self: iter(events)
         result = c.get_condensation(view)
         self.assertIsInstance(result, Condensation)
+        assert result.action.forgotten_event_ids is not None
         self.assertGreater(len(result.action.forgotten_event_ids), 0)
 
     def test_empty_events(self):

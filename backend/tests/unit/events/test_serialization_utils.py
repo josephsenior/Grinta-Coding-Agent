@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 from backend.events.serialization.utils import remove_fields
@@ -46,7 +48,7 @@ class TestRemoveFields:
             x: int = 1
 
         with pytest.raises(ValueError, match="dataclass"):
-            remove_fields(Foo(), {"x"})
+            remove_fields(cast(Any, Foo()), {"x"})
 
     def test_tuple_of_dicts(self):
         data = ({"a": 1, "b": 2},)

@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import cast
+
+from backend.controller.state.state import State
+from backend.events.action import Action
 
 
 from backend.engines.orchestrator.safety import OrchestratorSafetyManager
@@ -10,29 +14,40 @@ from backend.engines.orchestrator.safety import OrchestratorSafetyManager
 
 class TestToolFunctionName:
     def test_from_tool_call_metadata(self):
-        action = SimpleNamespace(
-            tool_call_metadata=SimpleNamespace(function_name="execute_bash"),
-            action=None,
+        action = cast(
+            Action,
+            SimpleNamespace(
+                tool_call_metadata=SimpleNamespace(function_name="execute_bash"),
+                action=None,
+            ),
         )
         assert OrchestratorSafetyManager._tool_function_name(action) == "execute_bash"
 
     def test_from_action_attr(self):
-        action = SimpleNamespace(tool_call_metadata=None, action="run_cmd")
+        action = cast(
+            Action,
+            SimpleNamespace(tool_call_metadata=None, action="run_cmd"),
+        )
         assert OrchestratorSafetyManager._tool_function_name(action) == "run_cmd"
 
     def test_none_when_no_name(self):
-        action = SimpleNamespace(tool_call_metadata=None, action=None)
+        action = cast(Action, SimpleNamespace(tool_call_metadata=None, action=None))
         assert OrchestratorSafetyManager._tool_function_name(action) is None
 
     def test_empty_function_name_skipped(self):
-        action = SimpleNamespace(
-            tool_call_metadata=SimpleNamespace(function_name="   "),
-            action="fallback",
+        action = cast(
+            Action,
+            SimpleNamespace(
+                tool_call_metadata=SimpleNamespace(function_name="   "),
+                action="fallback",
+            ),
         )
         assert OrchestratorSafetyManager._tool_function_name(action) == "fallback"
 
     def test_metadata_without_function_name(self):
-        action = SimpleNamespace(tool_call_metadata=SimpleNamespace(), action="act")
+        action = cast(
+            Action, SimpleNamespace(tool_call_metadata=SimpleNamespace(), action="act")
+        )
         assert OrchestratorSafetyManager._tool_function_name(action) == "act"
 
 
@@ -41,7 +56,7 @@ class TestShouldWarnOnDetection:
         assert OrchestratorSafetyManager._should_warn_on_detection({}) is False
 
     def test_none_detection(self):
-        assert OrchestratorSafetyManager._should_warn_on_detection(None) is False
+        assert OrchestratorSafetyManager._should_warn_on_detection(cast(dict, None)) is False
 
     def test_not_hallucinated(self):
         assert (
@@ -109,11 +124,17 @@ class TestDeriveToolsCalled:
     def test_extracts_tool_names(self):
         mgr = OrchestratorSafetyManager(None, None)
         actions = [
-            SimpleNamespace(
-                tool_call_metadata=SimpleNamespace(function_name="bash"),
-                action=None,
+            cast(
+                Action,
+                SimpleNamespace(
+                    tool_call_metadata=SimpleNamespace(function_name="bash"),
+                    action=None,
+                ),
             ),
-            SimpleNamespace(tool_call_metadata=None, action="editor"),
+            cast(
+                Action,
+                SimpleNamespace(tool_call_metadata=None, action="editor"),
+            ),
         ]
         result = mgr._derive_tools_called(actions)
         assert result == ["bash", "editor"]
@@ -128,15 +149,20 @@ class TestDeriveToolsCalled:
 
     def test_skips_unnamed(self):
         mgr = OrchestratorSafetyManager(None, None)
-        actions = [SimpleNamespace(tool_call_metadata=None, action=None)]
+        actions = [cast(Action, SimpleNamespace(tool_call_metadata=None, action=None))]
         assert mgr._derive_tools_called(actions) == []
 
 
 class TestShouldEnforceTools:
     def test_no_message(self):
         mgr = OrchestratorSafetyManager(None, None)
-        assert mgr.should_enforce_tools(None, None, "auto") == "auto"
+        assert mgr.should_enforce_tools(None, cast(State, None), "auto") == "auto"
 
     def test_no_anti_hallucination(self):
         mgr = OrchestratorSafetyManager(None, None)
-        assert mgr.should_enforce_tools("create a file", None, "required") == "required"
+        assert (
+            mgr.should_enforce_tools(
+                "create a file", cast(State, None), "required"
+            )
+            == "required"
+        )

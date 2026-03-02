@@ -61,7 +61,7 @@ class TestModelEntry:
         """Test ModelEntry is frozen (immutable)."""
         entry = ModelEntry(name="test", provider="test")
         with pytest.raises(AttributeError):
-            entry.name = "new-name"
+            setattr(entry, "name", "new-name")
 
     def test_default_supports_stop_words(self):
         """Test supports_stop_words defaults to True."""
@@ -72,8 +72,8 @@ class TestModelEntry:
 class TestLoadRaw:
     """Tests for _load_raw function."""
 
-    def test_loads_toml_data(self):
-        """Test _load_raw returns dict from catalog.toml."""
+    def test_loads_catalog_data(self):
+        """Test _load_raw returns dict from catalog.json."""
         data = _load_raw()
         assert isinstance(data, dict)
         assert "models" in data
@@ -229,6 +229,7 @@ class TestGetPricing:
             )
             mock_lookup.return_value = mock_entry
             pricing = get_pricing("test")
+            assert pricing is not None
             assert pricing["output"] == 0.0
 
     def test_pricing_returns_none_if_no_match(self):
@@ -326,6 +327,7 @@ class TestGetVerifiedModels:
             # All returned models should be from this provider
             for model_name in verified:
                 entry = lookup(model_name)
+                assert entry is not None
                 assert entry.provider == provider
 
     def test_filter_no_results(self):

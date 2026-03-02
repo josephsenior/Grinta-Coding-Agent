@@ -139,8 +139,17 @@ def truncate_large_text(value: str, max_chars: int, *, label: str) -> str:
 _DEFAULT_MAX_CMD_OUTPUT_CHARS = 40_000
 
 _ERROR_KEYWORDS = (
-    "error", "traceback", "exception", "fatal", "fail", "panic",
-    "abort", "critical", "stderr", "assert", "warning",
+    "error",
+    "traceback",
+    "exception",
+    "fatal",
+    "fail",
+    "panic",
+    "abort",
+    "critical",
+    "stderr",
+    "assert",
+    "warning",
 )
 
 
@@ -186,6 +195,95 @@ def _extract_truncation_lines(
     return head_lines, tail_lines, error_lines
 
 
+_TEST_FRAMEWORK_PATTERNS = [
+    # pytest: "5 passed, 2 failed, 1 error" / "PASSED" / "FAILED" / "ERROR"
+    (r"(\d+) passed", "pytest"),
+    (r"(\d+) failed", "pytest"),
+    (r"PASSED|FAILED|ERROR|pytest", "pytest"),
+    # jest: "Tests: N failed, N passed, N total"
+    (r"Tests:\s+\d+\s+\w+", "jest"),
+    # cargo test: "test result: FAILED. N passed; N failed"
+    (r"test result:\s+(ok|FAILED)\.", "cargo"),
+    # go test: "--- FAIL" / "ok  	package"
+    (r"--- FAIL:", "go"),
+]
+
+_FAILURE_LINE_PATTERNS = [
+    r"FAILED\s+",  # pytest failed test line
+    r"--- FAIL:",  # go test
+    r"FAIL\s+",  # cargo
+    r"✕\s+",  # jest
+    r"×\s+",  # jest unicode
+    r"AssertionError",
+    r"Error:",
+    r"FAILED\[",
+]
+
+
+def _extract_test_summary(output: str) -> str | None:
+    """Extract a structured test summary from pytest/jest/go/cargo test output.
+
+    Returns a [TEST_SUMMARY] block string, or None if no test output detected.
+    """
+    import re
+
+    lines = output.splitlines()
+
+    # Check if this looks like test output
+    is_test_output = any(
+        re.search(pat, output, re.IGNORECASE) for pat, _ in _TEST_FRAMEWORK_PATTERNS
+    )
+    if not is_test_output:
+        return None
+
+    # Find the summary line (usually the last line with counts)
+    summary_lines: list[str] = []
+    failure_lines: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # Summary lines (test result totals)
+        if re.search(r"\d+ (passed|failed|error|skipped)", stripped, re.IGNORECASE):
+            summary_lines.append(stripped)
+        elif re.search(r"test result:\s+(ok|FAILED)\.", stripped):
+            summary_lines.append(stripped)
+        elif re.search(r"Tests:\s+\d+", stripped):
+            summary_lines.append(stripped)
+        elif re.search(r"^ok\s+\S+\s+\d", stripped):  # go test ok line
+            summary_lines.append(stripped)
+
+        # Failure lines
+        if any(
+            re.search(pat, stripped, re.IGNORECASE) for pat in _FAILURE_LINE_PATTERNS
+        ):
+            if (
+                re.search(r"FAILED\s+\S+", stripped)
+                or re.search(r"--- FAIL:", stripped)
+                or re.search(r"AssertionError|Error:", stripped)
+            ):
+                failure_lines.append(stripped)
+
+    if not summary_lines and not failure_lines:
+        return None
+
+    parts = ["[TEST_SUMMARY]"]
+    if summary_lines:
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        for line in summary_lines:
+            if line not in seen:
+                parts.append(line)
+                seen.add(line)
+    if failure_lines:
+        parts.append("[FAILURES]")
+        for line in failure_lines[:10]:  # Cap at 10 failure lines
+            parts.append(f"  {line}")
+    return "\n".join(parts)
+
+
 def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     """Truncate bash command output with error-aware head+tail strategy.
 
@@ -194,6 +292,8 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     - Always preserves the last TAIL_LINES lines (final status/results)
     - Extracts and surfaces any lines containing error/traceback keywords
       so the LLM sees failure information even mid-truncation
+    - Prepends a [TEST_SUMMARY] block when test runner output is detected
+      (P2-A: structured test result extraction)
 
     Args:
         output: Raw command output string.
@@ -205,6 +305,12 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
         Possibly-truncated output string with a clear [TRUNCATED] notice.
     """
     max_chars = _get_max_cmd_output_chars(max_chars)
+
+    # P2-A: Prepend test summary when test output is detected (before truncation).
+    test_summary = _extract_test_summary(output)
+    if test_summary:
+        output = test_summary + "\n\n" + output
+
     if max_chars <= 0 or len(output) <= max_chars:
         return output
 
@@ -224,13 +330,19 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
         f"Showing first {len(head_lines)} lines, last {len(tail_lines)} lines"
     )
     notice += (
-        f", plus {len(error_lines)} error/warning lines extracted]\n" + "".join(error_lines)
-        if error_lines else "]\n"
+        f", plus {len(error_lines)} error/warning lines extracted]\n"
+        + "".join(error_lines)
+        if error_lines
+        else "]\n"
     )
 
     logger.warning(
         "Truncated bash output from %d lines (%d chars) → head=%d tail=%d errors=%d",
-        total_lines, len(output), len(head_lines), len(tail_lines), len(error_lines),
+        total_lines,
+        len(output),
+        len(head_lines),
+        len(tail_lines),
+        len(error_lines),
     )
     return "".join(head_lines) + notice + "".join(tail_lines)
 

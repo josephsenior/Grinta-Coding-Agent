@@ -27,4 +27,4 @@ debug_*.txt
 debug_*.py
 debug_backups/
 tmp_*
-config.toml
+settings.json

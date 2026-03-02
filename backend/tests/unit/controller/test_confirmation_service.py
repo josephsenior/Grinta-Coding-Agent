@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
+from typing import cast
 
 import pytest
 
@@ -11,6 +12,7 @@ from backend.controller.services.confirmation_service import ConfirmationService
 from backend.core.schemas import AgentState
 from backend.events import EventSource
 from backend.events.action import ActionConfirmationStatus
+from backend.events.action.action import Action
 
 
 def _make_context(**overrides) -> MagicMock:
@@ -103,7 +105,7 @@ class TestEvaluateAction:
         ctx = _make_context(confirmation_mode=False)
         ss = _make_safety_service()
         svc = ConfirmationService(ctx, ss)
-        await svc.evaluate_action(SimpleNamespace())
+        await svc.evaluate_action(cast(Action, SimpleNamespace()))
         ss.action_requires_confirmation.assert_not_called()
 
     @pytest.mark.asyncio
@@ -112,7 +114,7 @@ class TestEvaluateAction:
         ss = _make_safety_service()
         ss.action_requires_confirmation.return_value = False
         svc = ConfirmationService(ctx, ss)
-        await svc.evaluate_action(SimpleNamespace())
+        await svc.evaluate_action(cast(Action, SimpleNamespace()))
         ss.analyze_security.assert_not_called()
 
     @pytest.mark.asyncio
@@ -121,7 +123,7 @@ class TestEvaluateAction:
         ss = _make_safety_service()
         ss.action_requires_confirmation.return_value = True
         svc = ConfirmationService(ctx, ss)
-        action = SimpleNamespace()
+        action = cast(Action, SimpleNamespace())
         await svc.evaluate_action(action)
         ss.analyze_security.assert_awaited_once_with(action)
         ss.evaluate_security_risk.assert_called_once_with(action)
@@ -136,22 +138,28 @@ class TestHandlePendingConfirmation:
     async def test_returns_false_for_no_confirmation_attr(self):
         ctx = _make_context()
         svc = ConfirmationService(ctx, _make_safety_service())
-        action = SimpleNamespace()  # no confirmation_state
+        action = cast(Action, SimpleNamespace())  # no confirmation_state
         assert await svc.handle_pending_confirmation(action) is False
 
     @pytest.mark.asyncio
     async def test_returns_false_when_not_awaiting(self):
         ctx = _make_context()
         svc = ConfirmationService(ctx, _make_safety_service())
-        action = SimpleNamespace(confirmation_state=ActionConfirmationStatus.CONFIRMED)
+        action = cast(
+            Action,
+            SimpleNamespace(confirmation_state=ActionConfirmationStatus.CONFIRMED),
+        )
         assert await svc.handle_pending_confirmation(action) is False
 
     @pytest.mark.asyncio
     async def test_transitions_when_awaiting(self):
         ctx = _make_context()
         svc = ConfirmationService(ctx, _make_safety_service())
-        action = SimpleNamespace(
-            confirmation_state=ActionConfirmationStatus.AWAITING_CONFIRMATION
+        action = cast(
+            Action,
+            SimpleNamespace(
+                confirmation_state=ActionConfirmationStatus.AWAITING_CONFIRMATION
+            ),
         )
         result = await svc.handle_pending_confirmation(action)
         assert result is True

@@ -135,7 +135,7 @@ def process_runtime_section(
         except ValueError as e:
             if summary:
                 summary.record("runtime", "error", str(e))
-            msg = "Error in [runtime] section in config.toml"
+            msg = "Error in [runtime] section in settings.json"
             raise ValueError(msg) from e
 
 
@@ -158,7 +158,7 @@ def process_mcp_section(
         except ValueError as err:
             if summary:
                 summary.record("mcp", "error", str(err))
-            msg = "Error in MCP sections in config.toml"
+            msg = "Error in MCP sections in settings.json"
             raise ValueError(msg) from err
 
 

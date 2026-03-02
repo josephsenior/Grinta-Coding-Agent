@@ -1,17 +1,24 @@
 """Full end-to-end trace: create conversation -> connect socket -> send message -> wait for agent response."""
+
 import asyncio
 import json
+
 import httpx
+import pytest
 import socketio
 
-BASE = "http://localhost:3000"
+BASE = "http://127.0.0.1:3000"
 
-async def main():
+
+async def _run_e2e_trace():
     # 1. Create a new conversation
-    async with httpx.AsyncClient(base_url=BASE) as client:
-        r = await client.post("/api/v1/conversations", json={
-            "initial_user_msg": "say hello",
-        })
+    async with httpx.AsyncClient(base_url=BASE, timeout=60.0) as client:
+        r = await client.post(
+            "/api/v1/conversations",
+            json={
+                "initial_user_msg": "say hello",
+            },
+        )
         print(f"[HTTP] POST /conversations -> {r.status_code}: {r.text[:300]}")
         if r.status_code not in (200, 201):
             print("FAILED to create conversation, trying without body...")
@@ -52,8 +59,12 @@ async def main():
 
     @sio.on("forge_event")
     async def on_forge_event(data):
-        event_type = data.get("payload", {}).get("type") if isinstance(data, dict) else "?"
-        print(f"[EVENT] id={data.get('id')} type={event_type}: {json.dumps(data)[:200]}")
+        event_type = (
+            data.get("payload", {}).get("type") if isinstance(data, dict) else "?"
+        )
+        print(
+            f"[EVENT] id={data.get('id')} type={event_type}: {json.dumps(data)[:200]}"
+        )
         events_received.append(data)
 
     @sio.on("*")
@@ -93,10 +104,13 @@ async def main():
 
     # 3. Send a user message
     print("\n[INFO] Sending user message 'say hello'...")
-    await sio.emit("forge_user_action", {
-        "action": "message",
-        "args": {"content": "say hello", "image_urls": []},
-    })
+    await sio.emit(
+        "forge_user_action",
+        {
+            "action": "message",
+            "args": {"content": "say hello", "image_urls": []},
+        },
+    )
 
     # 4. Wait for agent response
     print("[INFO] Waiting up to 30s for agent events...\n")
@@ -109,4 +123,8 @@ async def main():
 
     await sio.disconnect()
 
-asyncio.run(main())
+
+@pytest.mark.integration
+async def test_full_e2e_trace():
+    """Full e2e trace: create conversation, connect socket, send message, wait for agent."""
+    await _run_e2e_trace()

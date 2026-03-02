@@ -341,7 +341,7 @@ async def list_files(
     if fetch_error is not None:
         return fetch_error
 
-    return _apply_path_prefix_and_filter(file_list, path)
+    return _apply_path_prefix_and_filter(file_list or [], path)
 
 
 @sub_router.get(

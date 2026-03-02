@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 
+from backend.core.message import TextContent
 from backend.events.action import (
     AgentThinkAction,
     CmdRunAction,
@@ -70,7 +71,8 @@ class TestHandleMessageAction:
         msgs = _handle_message_action(action, vision_is_active=False)
         assert len(msgs) == 1
         assert msgs[0].role == "user"
-        assert msgs[0].content[0].text == "hello"
+        part = msgs[0].content[0]
+        assert isinstance(part, TextContent) and part.text == "hello"
 
     def test_agent_message(self):
         action = MessageAction(content="reply")
@@ -94,7 +96,8 @@ class TestHandleUserCmdAction:
         action = CmdRunAction(command="ls -la")
         msgs = _handle_user_cmd_action(action)
         assert len(msgs) == 1
-        assert "ls -la" in msgs[0].content[0].text
+        part = msgs[0].content[0]
+        assert isinstance(part, TextContent) and "ls -la" in part.text
         assert msgs[0].role == "user"
 
 
@@ -107,7 +110,8 @@ class TestHandleSystemMessageAction:
         msgs = _handle_system_message_action(action)
         assert len(msgs) == 1
         assert msgs[0].role == "system"
-        assert msgs[0].content[0].text == "You are an agent."
+        part = msgs[0].content[0]
+        assert isinstance(part, TextContent) and part.text == "You are an agent."
 
 
 # ── convert_action_to_messages ───────────────────────────────────────

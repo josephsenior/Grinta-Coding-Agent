@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 from backend.controller.agent_controller import AgentController
 from backend.controller.services.step_guard_service import StepGuardService
 from backend.controller.agent_circuit_breaker import CircuitBreakerResult

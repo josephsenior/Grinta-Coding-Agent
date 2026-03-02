@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
-from pydantic import (
+from pydantic import (  # noqa: E402
     BaseModel,
     ConfigDict,
     Field,
@@ -16,12 +16,12 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from pydantic.json import pydantic_encoder
+from pydantic.json import pydantic_encoder  # noqa: E402
 
-from backend.core.config.mcp_config import MCPConfig
-from backend.core.config.utils import load_forge_config
-from backend.storage.data_models.knowledge_base import KnowledgeBaseSettings
-from backend.storage.data_models.user_secrets import UserSecrets
+from backend.core.config.mcp_config import MCPConfig  # noqa: E402
+from backend.core.config.utils import load_forge_config  # noqa: E402
+from backend.storage.data_models.knowledge_base import KnowledgeBaseSettings  # noqa: E402
+from backend.storage.data_models.user_secrets import UserSecrets  # noqa: E402
 
 try:
     from unittest.mock import Mock
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from backend.core.config.llm_config import LLMConfig
 
 # 🚀 PERFORMANCE FIX: Module-level cache for Settings.from_config()
-#   Prevents repeated config.toml parsing (1,119ms bottleneck under concurrent load)
+#   Prevents repeated settings.json parsing (1,119ms bottleneck under concurrent load)
 #   OPTIMIZED: Increased TTL from 30s to 60s for 2-3x improvement
 _settings_from_config_cache: Settings | None = None
 _settings_from_config_cache_time: float = 0.0
@@ -86,6 +86,66 @@ class Settings(BaseModel):
     email_verified: bool | None = None
     vcs_user_name: str | None = None
     vcs_user_email: str | None = None
+
+    # Core & Runtime Configuration
+    runtime: str | None = None
+    file_store: str | None = None
+    file_store_path: str | None = None
+    workspace_base: str | None = None
+    workspace_mount_path_in_runtime: str | None = None
+    enable_browser: bool | None = None
+    cache_dir: str | None = None
+    max_budget_per_session: float | None = None
+    max_budget_per_day: float | None = None
+    debug: bool | None = None
+    disable_color: bool | None = None
+    conversation_max_age_seconds: int | None = None
+    max_concurrent_conversations: int | None = None
+    log_format: str | None = None
+    log_level: str | None = None
+    file_store_web_hook_url: str | None = None
+    file_store_web_hook_headers: dict[str, str] | None = None
+    file_store_web_hook_batch: bool | None = None
+    replay_trajectory_path: str | None = None
+    save_trajectory_path: str | None = None
+    save_screenshots_in_trajectory: bool | None = None
+    cli_multiline_input: bool | None = None
+    mcp_host: str | None = None
+    init_git_in_empty_workspace: bool | None = None
+    run_as_Forge: bool | None = None
+    file_uploads_max_file_size_mb: int | None = None
+    file_uploads_restrict_file_types: bool | None = None
+    file_uploads_allowed_extensions: list[str] | None = None
+
+    # Agent Optional Abilities
+    agent_enable_browsing: bool | None = None
+    agent_enable_llm_editor: bool | None = None
+    agent_enable_editor: bool | None = None
+    agent_enable_cmd: bool | None = None
+    agent_enable_think: bool | None = None
+    agent_enable_finish: bool | None = None
+    agent_enable_circuit_breaker: bool | None = None
+    agent_enable_graceful_shutdown: bool | None = None
+    agent_enable_history_truncation: bool | None = None
+    agent_enable_condensation_request: bool | None = None
+    # Parallel sub-agents: shared blackboard for coordination (off by default)
+    delegate_task_blackboard_enabled: bool = False
+
+    # Condenser Customization
+    condenser_type: str | None = None
+    condenser_keep_first: int | None = None
+    condenser_max_events: int | None = None
+    condenser_attention_window: int | None = None
+    condenser_llm_config: str | None = None
+    condenser_max_event_length: int | None = None
+    condenser_token_budget: int | None = None
+
+    # Graph RAG Configurations
+    graph_rag_enabled: bool | None = None
+    graph_rag_persistence_path: str | None = None
+    graph_rag_graph_depth: int | None = None
+    graph_rag_max_seed_results: int | None = None
+
     model_config = ConfigDict(validate_assignment=True)
 
     @property
@@ -333,9 +393,9 @@ class Settings(BaseModel):
 
     @staticmethod
     def from_config() -> Settings | None:
-        """Load settings from config.toml with global caching.
+        """Load settings from settings.json with global caching.
 
-        🚀 PERFORMANCE FIX: Added module-level cache to prevent repeated config.toml parsing.
+        🚀 PERFORMANCE FIX: Added module-level cache to prevent repeated settings.json parsing.
            This fixes the 1,119ms bottleneck when 10+ users load settings concurrently.
         """
         import time
@@ -369,9 +429,9 @@ class Settings(BaseModel):
         return settings_from_config
 
     def merge_with_config_settings(self) -> Settings:
-        """Merge config.toml settings with stored settings.
+        """Merge settings.json config with stored settings.
 
-        Config.toml takes priority for MCP settings, but they are merged rather than replaced.
+        settings.json takes priority for MCP settings, but they are merged rather than replaced.
         This method can be used by both server mode and CLI mode.
         """
         config_settings = Settings.from_config()

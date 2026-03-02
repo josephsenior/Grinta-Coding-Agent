@@ -8,6 +8,8 @@ ignore=.venv,.venv-wsl-backup,node_modules,.git
 disable=C0114,  # missing-module-docstring
         C0115,  # missing-class-docstring
         C0116,  # missing-function-docstring
+        R0801,  # duplicate-code (high noise across tests/shared patterns)
+        R0401,  # cyclic-import (known package-level import graph)
         E0401,  # import-error (false positives with dynamic imports)
         E0611,  # no-name-in-module (false positives with lazy imports)
         E0603,  # undefined-all-variable (false positives with __getattr__)

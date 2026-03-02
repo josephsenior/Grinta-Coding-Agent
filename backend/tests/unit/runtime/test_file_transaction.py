@@ -67,7 +67,7 @@ class TestFileTransaction:
 
     @pytest.mark.asyncio
     async def test_write_new_file(self, workspace):
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
         file_path = os.path.join(workspace, "new.txt")
 
@@ -85,7 +85,7 @@ class TestFileTransaction:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("original")
 
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         await txn.write_file(file_path, "updated")
@@ -101,7 +101,7 @@ class TestFileTransaction:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("before")
 
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         await txn.edit_file(file_path, "after")
@@ -112,7 +112,7 @@ class TestFileTransaction:
 
     @pytest.mark.asyncio
     async def test_edit_nonexistent_raises(self, workspace):
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         with pytest.raises(FileNotFoundError):
@@ -124,7 +124,7 @@ class TestFileTransaction:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("bye")
 
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         await txn.delete_file(file_path)
@@ -133,7 +133,7 @@ class TestFileTransaction:
 
     @pytest.mark.asyncio
     async def test_delete_nonexistent_is_noop(self, workspace):
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         # Should not raise
@@ -143,7 +143,7 @@ class TestFileTransaction:
     @pytest.mark.asyncio
     async def test_rollback_write_new_file(self, workspace):
         file_path = os.path.join(workspace, "rollback_new.txt")
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         await txn.write_file(file_path, "should be removed")
@@ -158,7 +158,7 @@ class TestFileTransaction:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("original content")
 
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         await txn.write_file(file_path, "new content")
@@ -173,7 +173,7 @@ class TestFileTransaction:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("before edit")
 
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         await txn.edit_file(file_path, "after edit")
@@ -188,7 +188,7 @@ class TestFileTransaction:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("resurrection")
 
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         await txn.delete_file(file_path)
@@ -201,7 +201,7 @@ class TestFileTransaction:
 
     @pytest.mark.asyncio
     async def test_commit(self, workspace):
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         assert txn.committed is False
@@ -210,7 +210,7 @@ class TestFileTransaction:
 
     @pytest.mark.asyncio
     async def test_context_manager_auto_commit(self, workspace):
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
         txn.operations = []
 
@@ -223,7 +223,7 @@ class TestFileTransaction:
     async def test_context_manager_rollback_on_exception(self, workspace):
         file_path = os.path.join(workspace, "ctx_rollback.txt")
 
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         with pytest.raises(ValueError, match="boom"):
@@ -239,7 +239,7 @@ class TestFileTransaction:
         f1 = os.path.join(workspace, "multi1.txt")
         f2 = os.path.join(workspace, "multi2.txt")
 
-        txn = FileTransaction(runtime=None)
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
         txn.backup_dir = tempfile.mkdtemp()
 
         await txn.write_file(f1, "file1")

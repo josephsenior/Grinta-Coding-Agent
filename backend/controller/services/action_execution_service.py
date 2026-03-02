@@ -50,12 +50,22 @@ class ActionExecutionService:
             try:
                 confirmation = self._context.confirmation_service
                 if confirmation:
-                    # If confirmation is active, we don't retry as it's user-driven
-                    return confirmation.get_next_action()
-
-                # Get action from agent based on current state
-                action = self._context.agent.step(self._context.state)
+                    # Delegate to confirmation/replay service, but still inside
+                    # the try/except so LLMMalformedActionError from agent.step()
+                    # is retried the same as the direct path.
+                    action = confirmation.get_next_action()
+                else:
+                    # Prefer the async step path (real LLM streaming) when
+                    # available; fall back to synchronous step() otherwise.
+                    import asyncio as _asyncio
+                    agent = self._context.agent
+                    astep = getattr(agent, "astep", None)
+                    if astep is not None and _asyncio.iscoroutinefunction(astep):
+                        action = await astep(self._context.state)
+                    else:
+                        action = agent.step(self._context.state)
                 action.source = EventSource.AGENT
+
                 return action
 
             except (

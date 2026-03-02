@@ -55,6 +55,7 @@ class TestProviderToken:
         )
         assert token.user_id == "user1"
         assert token.host == "github.com"
+        assert token.token is not None
         assert token.token.get_secret_value() == "secret123"
 
     def test_create_with_none_values(self):
@@ -86,11 +87,13 @@ class TestProviderToken:
         result = ProviderToken.from_value(token_dict)
         assert result.user_id == "user1"
         assert result.host == "github.com"
+        assert result.token is not None
         assert result.token.get_secret_value() == "secret123"
 
     def test_from_value_with_empty_dict(self):
         """Test from_value with empty dictionary."""
         result = ProviderToken.from_value({})
+        assert result.token is not None
         assert result.token.get_secret_value() == ""
         assert result.user_id is None
 

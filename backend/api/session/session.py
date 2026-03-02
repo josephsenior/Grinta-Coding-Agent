@@ -30,7 +30,6 @@ from backend.core.enums import RuntimeStatus
 from backend.api.constants import ROOM_KEY
 from backend.api.session.agent_session import AgentSession
 from backend.api.session.conversation_init_data import ConversationInitData
-from backend.utils.async_utils import run_or_schedule
 
 if TYPE_CHECKING:
     from logging import LoggerAdapter
@@ -378,11 +377,19 @@ class Session:
     def on_event(self, event: Event) -> None:
         """Synchronous event callback that delegates to async handler.
 
+        Called from EventStream's delivery thread pool, NOT the main
+        event loop thread.  We must schedule work on ``self.loop`` so
+        that ``_publish_queue`` operations happen on the same loop as
+        ``_monitor_publish_queue``, avoiding cross-thread notification
+        issues with ``asyncio.Queue``.
+
         Args:
             event: Event to process
 
         """
-        run_or_schedule(self._on_event(event))
+        import asyncio as _asyncio
+
+        _asyncio.run_coroutine_threadsafe(self._on_event(event), self.loop)
 
     async def _on_event(self, event: Event) -> None:
         """Callback function for events that mainly come from the agent.
@@ -404,6 +411,8 @@ class Session:
             CmdOutputObservation | AgentStateChangedObservation | RecallObservation,
         ):
             event_dict = event_to_dict(event)
+            # Preserve original source for frontend provenance tracking
+            event_dict["original_source"] = EventSource.ENVIRONMENT
             event_dict["source"] = EventSource.AGENT
             # Debug logging for agent state changes
             if isinstance(event, AgentStateChangedObservation):
@@ -422,6 +431,7 @@ class Session:
                 )
         elif isinstance(event, ErrorObservation):
             event_dict = event_to_dict(event)
+            event_dict["original_source"] = event.source
             event_dict["source"] = EventSource.AGENT
             await self.send(event_dict)
 

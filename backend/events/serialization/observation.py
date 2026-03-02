@@ -53,8 +53,17 @@ observations = (
     TaskTrackingObservation,
     StatusObservation,
 )
+
+
+def _observation_key_for_class(observation_class: type[Observation]) -> str:
+    key = getattr(observation_class, "observation", "")
+    if not key:
+        key = getattr(observation_class, "observation_type", "")
+    return key
+
+
 _OBSERVATION_CLASS_PATHS = {
-    observation_class.observation: (
+    _observation_key_for_class(observation_class): (
         observation_class.__module__,
         observation_class.__name__,
     )
@@ -110,7 +119,7 @@ def _get_observation_class(observation_type: str):
     return observation_class
 
 
-from backend.events.serialization.common import (
+from backend.events.serialization.common import (  # noqa: E402
     COMMON_METADATA_FIELDS as METADATA_FIELDS,
 )
 

@@ -262,6 +262,10 @@ def log_uncaught_exceptions(
 
 
 sys.excepthook = log_uncaught_exceptions
+
+# Module-level flags that can be toggled at runtime by config loading
+DISABLE_COLOR_PRINTING: bool = False
+
 forge_logger = logging.getLogger("forge")
 access_logger = logging.getLogger("forge.access")
 current_log_level = logging.INFO

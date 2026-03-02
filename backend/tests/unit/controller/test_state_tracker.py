@@ -30,7 +30,7 @@ class TestStateTrackerInit:
         st = StateTracker(sid="s1", file_store=None, user_id=None)
         stats = MagicMock()
         st.set_initial_state(
-            id="s1",
+            session_id="s1",
             state=None,
             conversation_stats=stats,
             max_iterations=200,
@@ -50,7 +50,7 @@ class TestStateTrackerInit:
         existing.start_id = 10
         stats = MagicMock()
         st.set_initial_state(
-            id="s1",
+            session_id="s1",
             state=existing,
             conversation_stats=stats,
             max_iterations=100,
@@ -64,7 +64,7 @@ class TestStateTrackerInit:
         existing = State()
         existing.start_id = -1
         st.set_initial_state(
-            id="s1",
+            session_id="s1",
             state=existing,
             conversation_stats=MagicMock(),
             max_iterations=100,
@@ -104,7 +104,7 @@ class TestStateTrackerAddHistory:
     def test_add_event(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s",
+            session_id="s",
             state=None,
             conversation_stats=MagicMock(),
             max_iterations=100,
@@ -117,7 +117,7 @@ class TestStateTrackerAddHistory:
     def test_excluded_events_not_added(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s",
+            session_id="s",
             state=None,
             conversation_stats=MagicMock(),
             max_iterations=100,
@@ -129,14 +129,14 @@ class TestStateTrackerAddHistory:
     def test_trim_on_count_overflow(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s",
+            session_id="s",
             state=None,
             conversation_stats=MagicMock(),
             max_iterations=100,
             max_budget_per_task=None,
         )
-        # Stuff history just above the cap
-        st.state.history = list(range(MAX_HISTORY_EVENTS + 10))
+        # Stuff history just above the cap (use int placeholders for overflow test)
+        st.state.history = list(range(MAX_HISTORY_EVENTS + 10))  # type: ignore[arg-type]
         st._maybe_trim_history()
         assert len(st.state.history) < MAX_HISTORY_EVENTS + 10
 
@@ -150,7 +150,7 @@ class TestStateTrackerControlFlags:
     def test_run_control_flags_increments_iteration(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s",
+            session_id="s",
             state=None,
             conversation_stats=MagicMock(),
             max_iterations=100,
@@ -163,7 +163,7 @@ class TestStateTrackerControlFlags:
     def test_maybe_increase_limits(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s",
+            session_id="s",
             state=None,
             conversation_stats=MagicMock(),
             max_iterations=100,
@@ -185,7 +185,7 @@ class TestValidateHistoryRange:
     def test_valid_range(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s",
+            session_id="s",
             state=None,
             conversation_stats=MagicMock(),
             max_iterations=100,
@@ -196,7 +196,7 @@ class TestValidateHistoryRange:
     def test_invalid_range(self):
         st = StateTracker(sid="s", file_store=None, user_id=None)
         st.set_initial_state(
-            id="s",
+            session_id="s",
             state=None,
             conversation_stats=MagicMock(),
             max_iterations=100,

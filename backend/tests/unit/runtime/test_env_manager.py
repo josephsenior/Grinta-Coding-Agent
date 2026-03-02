@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -19,8 +20,8 @@ class _FakeRuntime(EnvManagerMixin):
 
     def __init__(self, *, windows: bool = False):
         self._windows = windows
-        self._last_action = None
-        self._run_result = None
+        self._last_action: Any = None
+        self._run_result: Any = None
 
     def _uses_windows_shell(self) -> bool:
         return self._windows

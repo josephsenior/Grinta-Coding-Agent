@@ -15,6 +15,7 @@ from backend.utils.treesitter_editor import EditResult, SymbolLocation, TreeSitt
 from .atomic_refactor import AtomicRefactor, RefactorResult, RefactorTransaction
 from .smart_errors import SmartErrorHandler
 from .whitespace_handler import WhitespaceHandler
+from .lsp_client import get_lsp_client
 
 
 @dataclass
@@ -281,6 +282,10 @@ class StructureEditor:
         if not result.success and "not found" in result.message.lower():
             self._enrich_error_with_symbol_suggestions(file_path, function_name, result)
 
+        # Blast Radius Hook: if successful, checking symbol references
+        if result.success:
+            self._check_blast_radius(file_path, function_name, result)
+
         return result
 
     def rename_symbol(self, file_path: str, old_name: str, new_name: str) -> EditResult:
@@ -502,13 +507,18 @@ class StructureEditor:
 
             self._write_and_clean_file(file_path, new_content)
 
-            return EditResult(
+            result = EditResult(
                 success=True,
                 message=f"Replaced lines {start_line}-{end_line}",
                 modified_code=new_content,
                 lines_changed=end_line - start_line + 1,
                 original_code="".join(lines),
             )
+
+            # Blast Radius Hook: best-effort check using the first few symbols found in the new code
+            self._check_blast_radius_from_code(file_path, new_code, result)
+
+            return result
 
         except Exception as e:
             return EditResult(success=False, message=f"Error: {e}")
@@ -770,5 +780,55 @@ class StructureEditor:
             available_symbols = self._get_available_symbols(file_path, "function")
             suggestion = self.errors.symbol_not_found(symbol_name, available_symbols)
             result.message += f"\n\n{suggestion.message}"
+        except Exception:
+            pass
+
+    def _check_blast_radius(
+        self, file_path: str, symbol_name: str, result: EditResult, threshold: int = 10
+    ) -> None:
+        """Query LSP for references to the edited symbol and append a warning if it exceeds the threshold."""
+        try:
+            # First find where the symbol actually is so we can query LSP
+            loc = self.universal.find_symbol(file_path, symbol_name)
+            if not loc:
+                return
+
+            lsp = get_lsp_client()
+
+            lsp_result = lsp.query(
+                "find_references",
+                file=file_path,
+                line=loc.line_start,
+                column=1,
+            )
+            refs = lsp_result.locations
+
+            if len(refs) > threshold:
+                warning = f"\n\n[WARNING: BLAST RADIUS EXCEEDS {threshold}] The symbol '{symbol_name}' is referenced in {len(refs)} other locations. Please consider if those call sites need updating."
+                result.message += warning
+                logger.info(
+                    "Blast radius warning added for %s (%d references)",
+                    symbol_name,
+                    len(refs),
+                )
+        except Exception as e:
+            logger.debug("Blast radius check failed for %s: %s", symbol_name, e)
+
+    def _check_blast_radius_from_code(
+        self, file_path: str, code_snippet: str, result: EditResult, threshold: int = 10
+    ) -> None:
+        """Extract a primary symbol from the snippet and check its blast radius."""
+        try:
+            # Very basic heuristic: if they're defining a function/class, check that.
+            import re
+
+            match = re.search(
+                r"^\s*(?:async\s+)?(?:def|class)\s+([a-zA-Z_]\w*)",
+                code_snippet,
+                re.MULTILINE,
+            )
+            if match:
+                symbol_name = match.group(1)
+                self._check_blast_radius(file_path, symbol_name, result, threshold)
         except Exception:
             pass

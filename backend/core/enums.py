@@ -91,6 +91,9 @@ class ActionType(str, Enum):
     CLARIFICATION = "clarification"
     ESCALATE = "escalate"
     DELEGATE_TASK = "delegate_task"
+    BLACKBOARD = "blackboard"
+    LSP_QUERY = "lsp_query"
+    SIGNAL_PROGRESS = "signal_progress"
 
 
 class LifecyclePhase(str, Enum):
@@ -154,6 +157,8 @@ class ObservationType(str, Enum):
     STATUS = "status"
     TERMINAL = "terminal"
     DELEGATE_TASK_RESULT = "delegate_task_result"
+    LSP_QUERY_RESULT = "lsp_query_result"
+    SIGNAL_PROGRESS = "signal_progress"
 
 
 class ExitReason(str, Enum):

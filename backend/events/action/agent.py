@@ -378,11 +378,52 @@ class DelegateTaskAction(Action):
     task_description: str = ""
     files: list[str] = field(default_factory=list)
     parallel_tasks: list[dict] = field(default_factory=list)
+    run_in_background: bool = False
     action: ClassVar[str] = ActionType.DELEGATE_TASK
 
     @property
     def message(self) -> str:
         """Get delegation message."""
         return f"Delegating task: {self.task_description[:50]}..."
+
+    __test__ = False
+
+
+@dataclass
+class BlackboardAction(Action):
+    """Read or write the shared blackboard when running as a delegated worker.
+
+    Used only when delegate_task_blackboard_enabled is True and this agent
+    is a sub-agent; the blackboard is shared across parallel workers.
+    """
+
+    command: str = "get"  # get | set | keys
+    key: str = ""
+    value: str = ""
+    action: ClassVar[str] = ActionType.BLACKBOARD
+    runnable: ClassVar[bool] = True
+
+    @property
+    def message(self) -> str:
+        """Get human-readable message."""
+        if self.command == "set":
+            return f"Blackboard set {self.key}"
+        if self.command == "keys":
+            return "Blackboard keys"
+        return f"Blackboard get {self.key or 'all'}"
+
+    __test__ = False
+
+
+@dataclass
+class QueryToolboxAction(Action):
+    """An action where the agent queries the full registry of tools based on semantic tags or keywords."""
+    capability_query: str = ""
+    action: ClassVar[str] = "query_toolbox"
+    runnable: ClassVar[bool] = True
+
+    @property
+    def message(self) -> str:
+        return f"Querying toolbox for: {self.capability_query}"
 
     __test__ = False

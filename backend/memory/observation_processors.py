@@ -107,12 +107,34 @@ _POST_CONDENSATION_RECOVERY = (
     "⚠️ POST-CONDENSATION RECOVERY PROTOCOL:\n"
     "Your context was just condensed. Prior tool outputs and file contents are gone.\n"
     "Before continuing, you MUST:\n"
-    "1. recall(key=\"all\") — retrieve your scratchpad to restore decisions and findings\n"
-    "2. Re-read any files you were actively editing (use view command)\n"
-    "3. Review your task tracker (task_tracker view) to confirm current progress\n"
-    "4. Use think() to re-orient: what was I doing? what's next?\n"
+    "1. Re-read any files you were actively editing (use view command)\n"
+    "2. Review your task tracker (task_tracker view) to confirm current progress\n"
+    "3. Use think() to re-orient: what was I doing? what's next?\n"
     "Do NOT proceed with edits until you have re-established context.\n"
 )
+
+
+def _load_scratchpad_snapshot() -> str:
+    """Load scratchpad notes for injection into post-condensation context.
+
+    Returns the formatted scratchpad content, or empty string if unavailable.
+    This replaces the unreliable 'call recall(key=all)' instruction with
+    a programmatic guarantee that scratchpad data survives condensation.
+    """
+    try:
+        from backend.engines.orchestrator.tools.note import _load_notes
+        notes = _load_notes()
+        if not notes:
+            return ""
+        import json
+        body = json.dumps(notes, indent=2, ensure_ascii=False)
+        return (
+            "\n" + "─" * 60 + "\n"
+            "📋 SCRATCHPAD (auto-restored):\n"
+            f"{body}\n"
+        )
+    except Exception:
+        return ""
 
 
 def _handle_condensation_observation(
@@ -120,8 +142,9 @@ def _handle_condensation_observation(
 ) -> Message:
     """Handle AgentCondensationObservation with an explicit visibility banner."""
     summary = obs.content or "(no summary provided)"
+    scratchpad = _load_scratchpad_snapshot()
     text = truncate_content(
-        _CONDENSATION_BANNER + summary + _POST_CONDENSATION_RECOVERY,
+        _CONDENSATION_BANNER + summary + scratchpad + _POST_CONDENSATION_RECOVERY,
         max_message_chars,
     )
     return Message(role="user", content=[TextContent(text=text)])
@@ -198,7 +221,9 @@ def _handle_cmd_output_observation(
 
     tag = f"[CMD_OUTPUT{exit_tag}{error_type_tag}]"
     # Use tail_heavy for errors (traceback at end), balanced otherwise
-    cmd_strategy = "tail_heavy" if (exit_code is not None and exit_code != 0) else "balanced"
+    cmd_strategy = getattr(obs, "truncation_strategy", None)
+    if not cmd_strategy:
+        cmd_strategy = "tail_heavy" if (exit_code is not None and exit_code != 0) else "balanced"
     if obs.tool_call_metadata is None:
         text = truncate_content(
             f"{tag}\nObserved result of command executed by user:\n{obs.to_agent_observation()}",

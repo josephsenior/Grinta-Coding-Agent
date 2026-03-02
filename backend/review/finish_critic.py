@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from backend.events.action import Action, PlaybookFinishAction
 from backend.review.base import BaseCritic, CriticResult
@@ -22,7 +22,7 @@ class AgentFinishedCritic(BaseCritic):
         """Initialize the finish critic with no external dependencies."""
 
     def evaluate(
-        self, events: list[Event], diff_patch: str | None = None
+        self, events: Sequence[Event], diff_patch: str | None = None
     ) -> CriticResult:
         """Score run success by checking PlaybookFinishAction and optional git patch content."""
         last_action = next((h for h in reversed(events) if isinstance(h, Action)), None)

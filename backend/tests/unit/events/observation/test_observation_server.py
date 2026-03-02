@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from backend.events.observation.server import ServerReadyObservation
 
 
@@ -13,7 +15,7 @@ class TestServerReadyObservation:
             "url": "http://localhost:8080",
         }
         defaults.update(kwargs)
-        return ServerReadyObservation(**defaults)
+        return ServerReadyObservation(**cast(Any, defaults))
 
     # ── Construction ────────────────────────────────────────────────
 

@@ -146,12 +146,14 @@ class TestGetConversationInfo:
     async def test_conversation_id_matches_metadata(self):
         meta = _make_metadata("abc-123")
         info = await get_conversation_info(meta, num_connections=0, agent_loop_info=None)
+        assert info is not None
         assert info.conversation_id == "abc-123"
 
     @pytest.mark.asyncio
     async def test_title_from_metadata(self):
         meta = _make_metadata(title="Explicit Title")
         info = await get_conversation_info(meta, num_connections=0, agent_loop_info=None)
+        assert info is not None
         assert info.title == "Explicit Title"
 
     @pytest.mark.asyncio
@@ -159,6 +161,7 @@ class TestGetConversationInfo:
         meta = _make_metadata(conversation_id="xyz-456", title="")
         meta.title = ""
         info = await get_conversation_info(meta, num_connections=0, agent_loop_info=None)
+        assert info is not None
         # Should be non-empty even without a title
         assert info.title != ""
         assert info.conversation_id in info.title or len(info.title) > 0
@@ -167,18 +170,21 @@ class TestGetConversationInfo:
     async def test_num_connections_is_set(self):
         meta = _make_metadata()
         info = await get_conversation_info(meta, num_connections=3, agent_loop_info=None)
+        assert info is not None
         assert info.num_connections == 3
 
     @pytest.mark.asyncio
     async def test_no_agent_loop_info_gives_stopped_status(self):
         meta = _make_metadata()
         info = await get_conversation_info(meta, num_connections=0, agent_loop_info=None)
+        assert info is not None
         assert info.status == ConversationStatus.STOPPED
 
     @pytest.mark.asyncio
     async def test_no_agent_loop_info_gives_none_url(self):
         meta = _make_metadata()
         info = await get_conversation_info(meta, num_connections=0, agent_loop_info=None)
+        assert info is not None
         assert info.url is None
 
     @pytest.mark.asyncio
@@ -190,6 +196,7 @@ class TestGetConversationInfo:
         loop_info.agent_state = None
         loop_info.url = None
         info = await get_conversation_info(meta, num_connections=1, agent_loop_info=loop_info)
+        assert info is not None
         assert info.status == ConversationStatus.RUNNING
 
     @pytest.mark.asyncio
@@ -201,6 +208,7 @@ class TestGetConversationInfo:
         loop_info.agent_state = None
         loop_info.url = "https://example.com/runtime"
         info = await get_conversation_info(meta, num_connections=1, agent_loop_info=loop_info)
+        assert info is not None
         assert info.url == "https://example.com/runtime"
 
     @pytest.mark.asyncio
@@ -211,6 +219,7 @@ class TestGetConversationInfo:
         meta.trigger = ConversationTrigger.GUI
         meta.pr_number = [7, 8]
         info = await get_conversation_info(meta, num_connections=0, agent_loop_info=None)
+        assert info is not None
         assert info.selected_repository == "owner/repo"
         assert info.selected_branch == "main"
         assert info.trigger == ConversationTrigger.GUI
@@ -233,6 +242,7 @@ class TestGetConversationInfo:
         fixed_time = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
         meta = _make_metadata(created_at=fixed_time)
         info = await get_conversation_info(meta, num_connections=0, agent_loop_info=None)
+        assert info is not None
         assert info.created_at == fixed_time
 
     @pytest.mark.asyncio
@@ -241,6 +251,7 @@ class TestGetConversationInfo:
         meta = _make_metadata()
         meta.last_updated_at = fixed_time
         info = await get_conversation_info(meta, num_connections=0, agent_loop_info=None)
+        assert info is not None
         assert info.last_updated_at == fixed_time
 
 
@@ -262,7 +273,7 @@ class TestResolveConversationStore:
             mock_store = MagicMock()
             mock_get.return_value = mock_store
             
-            result = await resolve_conversation_store(None, user_id="u1")
+            await resolve_conversation_store(None, user_id="u1")
             
             assert mock_get.called
 
@@ -271,7 +282,7 @@ class TestResolveConversationStore:
         with patch("backend.api.utils.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = None
             
-            result = await resolve_conversation_store(None, user_id=MISSING)
+            await resolve_conversation_store(None, user_id=MISSING)
             
             mock_resolve.assert_called_once()
 
@@ -280,7 +291,7 @@ class TestResolveConversationStore:
         with patch("backend.api.utils.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = None
             
-            result = await resolve_conversation_store(None, user_id=None)
+            await resolve_conversation_store(None, user_id=None)
             
             mock_resolve.assert_called_once()
 
@@ -317,7 +328,7 @@ class TestSearchConversations:
             with patch("backend.api.services.conversation_query_service.build_conversation_result_set") as mock_build:
                 mock_build.return_value = ConversationInfoResultSet(results=[], next_page_id="page-2")
                 
-                result = await search_conversations(page_id="page-1", limit=50)
+                await search_conversations(page_id="page-1", limit=50)
                 
                 assert mock_store.search.called
 
@@ -337,7 +348,7 @@ class TestSearchConversations:
             with patch("backend.api.services.conversation_query_service.build_conversation_result_set") as mock_build:
                 mock_build.return_value = ConversationInfoResultSet(results=[], next_page_id=None)
                 
-                result = await search_conversations(selected_repository="repo1")
+                await search_conversations(selected_repository="repo1")
                 
                 assert mock_build.called
 
@@ -494,6 +505,6 @@ class TestDeleteConversationEntry:
                     mock_rt.delete = AsyncMock()
                     mock_runtime.return_value = mock_rt
                     
-                    result = await delete_conversation_entry("c1")
+                    await delete_conversation_entry("c1")
                     
                     mock_mgr.close_session.assert_called_once_with("c1")

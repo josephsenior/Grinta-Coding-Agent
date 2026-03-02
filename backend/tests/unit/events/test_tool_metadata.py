@@ -48,6 +48,7 @@ class TestModelResponseLite:
         assert lite.id == "r1"
         assert lite.model == "gpt-4"
         assert len(lite.choices) == 1
+        assert lite.choices[0].message is not None
         assert lite.choices[0].message.content == "hi"
         assert lite.choices[0].message.role == "assistant"
 
@@ -69,6 +70,7 @@ class TestModelResponseLite:
         assert lite.id == "d1"
         assert lite.model == "claude"
         assert len(lite.choices) == 1
+        assert lite.choices[0].message is not None
         assert lite.choices[0].message.content == "text"
 
     def test_from_sdk_no_choices(self):
@@ -91,6 +93,7 @@ class TestModelResponseLite:
         resp = _fake_sdk_response(tool_call_id="tc-42")
         lite = ModelResponseLite.from_sdk(resp)
         msg = lite.choices[0].message
+        assert msg is not None
         assert msg.tool_calls is not None
         assert len(msg.tool_calls) == 1
         assert msg.tool_calls[0].id == "tc-42"

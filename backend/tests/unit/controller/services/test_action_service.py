@@ -1,6 +1,7 @@
 """Tests for ActionService."""
 
 import unittest
+from typing import cast, Any
 from unittest.mock import MagicMock, AsyncMock
 
 from backend.controller.services.action_service import ActionService
@@ -45,7 +46,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
     async def test_run_non_action_type(self):
         """Test run raises TypeError for non-Action input."""
         with self.assertRaises(TypeError):
-            await self.service.run("not an action", None)
+            await self.service.run(cast(Any, "not an action"), None)
 
     async def test_run_non_runnable_action(self):
         """Test run skips runnable handling for non-runnable actions."""

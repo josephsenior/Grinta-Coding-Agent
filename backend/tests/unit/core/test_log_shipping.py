@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import urlparse
 
@@ -123,7 +124,7 @@ class TestLogShipper:
             def post(self, *args, **kwargs):
                 return FakeContext(FakeResponse())
 
-        result = await shipper._post_payload(FakeSession(), {"logs": []}, {"X": "Y"}, 1)
+        result = await shipper._post_payload(cast(Any, FakeSession()), {"logs": []}, {"X": "Y"}, 1)
         assert result is True
 
     @pytest.mark.asyncio
@@ -150,7 +151,7 @@ class TestLogShipper:
             def post(self, *args, **kwargs):
                 return FakeContext(FakeResponse())
 
-        result = await shipper._post_payload(FakeSession(), {"logs": []}, {"X": "Y"}, 1)
+        result = await shipper._post_payload(cast(Any, FakeSession()), {"logs": []}, {"X": "Y"}, 1)
         assert result is False
 
     @pytest.mark.asyncio
@@ -187,22 +188,22 @@ class TestLogShipper:
     @pytest.mark.asyncio
     async def test_ship_batch_breaks_on_shutdown(self):
         shipper = LogShipper(endpoint="http://x", enabled=True)
-        shipper._wait_for_batch_window = AsyncMock(return_value=True)
-        shipper._ship_available_logs = AsyncMock()
+        cast(Any, shipper)._wait_for_batch_window = AsyncMock(return_value=True)
+        cast(Any, shipper)._ship_available_logs = AsyncMock()
 
         await shipper._ship_batch()
 
-        shipper._ship_available_logs.assert_not_called()
+        cast(Any, shipper)._ship_available_logs.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_ship_batch_runs_available_logs(self):
         shipper = LogShipper(endpoint="http://x", enabled=True)
-        shipper._wait_for_batch_window = AsyncMock(side_effect=[False, True])
-        shipper._ship_available_logs = AsyncMock()
+        cast(Any, shipper)._wait_for_batch_window = AsyncMock(side_effect=[False, True])
+        cast(Any, shipper)._ship_available_logs = AsyncMock()
 
         await shipper._ship_batch()
 
-        shipper._ship_available_logs.assert_awaited_once()
+        cast(Any, shipper)._ship_available_logs.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_attempt_ship_with_retries(self):
@@ -211,7 +212,7 @@ class TestLogShipper:
         )
         logs = [{"message": "x"}]
 
-        shipper._ship_logs = AsyncMock(side_effect=[False, True])
+        cast(Any, shipper)._ship_logs = AsyncMock(side_effect=[False, True])
         with patch(
             "backend.core.log_shipping.asyncio.sleep", new=AsyncMock()
         ) as sleep_mock:
@@ -225,10 +226,10 @@ class TestLogShipper:
         shipper = LogShipper(endpoint="http://x", enabled=True)
         shipper._log_queue.append({"message": "x"})
 
-        shipper._attempt_ship_with_retries = AsyncMock(return_value=False)
+        cast(Any, shipper)._attempt_ship_with_retries = AsyncMock(return_value=False)
         await shipper._ship_available_logs()
 
-        shipper._attempt_ship_with_retries.assert_awaited_once()
+        cast(Any, shipper)._attempt_ship_with_retries.assert_awaited_once()
 
     def test_enqueue_triggers_background_task(self, monkeypatch):
         shipper = LogShipper(endpoint="http://x", enabled=True, batch_size=1)
@@ -249,10 +250,10 @@ class TestLogShipper:
         shipper = LogShipper(endpoint="http://x", enabled=True)
         shipper._log_queue.append({"message": "x"})
 
-        shipper._ship_logs = AsyncMock(return_value=True)
+        cast(Any, shipper)._ship_logs = AsyncMock(return_value=True)
         await shipper.flush()
 
-        shipper._ship_logs.assert_awaited_once()
+        cast(Any, shipper)._ship_logs.assert_awaited_once()
         assert not shipper._log_queue
 
     @pytest.mark.asyncio
@@ -273,14 +274,15 @@ class TestLogShipper:
     @pytest.mark.asyncio
     async def test_stop_closes_session_and_flushes(self):
         shipper = LogShipper(endpoint="http://x", enabled=True)
-        shipper._ship_task = asyncio.get_event_loop().create_future()
-        shipper._ship_task.set_result(None)
+        future: asyncio.Future[Any] = asyncio.get_event_loop().create_future()
+        future.set_result(None)
+        cast(Any, shipper)._ship_task = future
 
         shipper._session = MagicMock()
         shipper._session.closed = False
         shipper._session.close = AsyncMock()
 
-        shipper._ship_logs = AsyncMock(return_value=True)
+        cast(Any, shipper)._ship_logs = AsyncMock(return_value=True)
         shipper._log_queue.append({"message": "x"})
 
         await shipper.stop()
@@ -383,6 +385,7 @@ class TestLogShippingHandler:
         shipper = MagicMock()
         shipper.enabled = True
         handler = LogShippingHandler(shipper=shipper)
+        exc_info = None
 
         try:
             raise ValueError("boom")

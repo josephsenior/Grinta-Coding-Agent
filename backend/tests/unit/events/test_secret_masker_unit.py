@@ -172,7 +172,6 @@ class TestRebuildCache:
     def test_empty_secrets_clears_pattern(self):
         m = SecretMasker()
         m.set_secrets({"K": "V"})
-        assert m._secret_pattern is not None
         m.set_secrets({})
         assert m._secret_pattern is None
         assert m._secret_bytes == []

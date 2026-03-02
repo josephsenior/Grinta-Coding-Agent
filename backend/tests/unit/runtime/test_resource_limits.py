@@ -32,15 +32,15 @@ class TestResourceStats:
 
 class TestResourceLimits:
     def test_defaults(self):
-        l = ResourceLimits()
-        assert l.max_memory_mb > 0
-        assert l.max_cpu_percent > 0
+        limits = ResourceLimits()
+        assert limits.max_memory_mb > 0
+        assert limits.max_cpu_percent > 0
 
     def test_custom(self):
-        l = ResourceLimits(
+        limits = ResourceLimits(
             max_memory_mb=256, max_cpu_percent=50.0, max_disk_gb=5, max_file_count=1000
         )
-        assert l.max_memory_mb == 256
+        assert limits.max_memory_mb == 256
 
 
 # ===================================================================

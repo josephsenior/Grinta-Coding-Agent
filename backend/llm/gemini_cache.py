@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from google import genai
@@ -22,6 +22,7 @@ class GeminiCacheManager:
 
     _instance = None
     _lock = None
+    _caches: dict[str, str]
 
     def __new__(cls):
         if cls._instance is None:
@@ -84,7 +85,7 @@ class GeminiCacheManager:
                     {"role": role, "parts": [{"text": m.get("content", "")}]}
                 )
 
-            cache = client.caches.create(
+            cache = cast(Any, client.caches.create)(
                 model=model,
                 config={
                     "display_name": f"forge_cache_{int(time.time())}",

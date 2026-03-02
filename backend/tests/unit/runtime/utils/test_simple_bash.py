@@ -1,10 +1,8 @@
 import pytest
-import os
 import subprocess
 from unittest.mock import MagicMock, patch
 from backend.runtime.utils.simple_bash import SimpleBashSession
 from backend.events.action import CmdRunAction
-from backend.events.observation.commands import CmdOutputObservation
 from backend.events.observation import ErrorObservation
 
 class TestSimpleBashSession:

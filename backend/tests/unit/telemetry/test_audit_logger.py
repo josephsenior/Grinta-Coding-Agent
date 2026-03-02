@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -92,7 +93,7 @@ class TestExtractActionContent:
     def test_fallback_str(self, tmp_path):
         al = AuditLogger(str(tmp_path))
         action = MagicMock()
-        action.__str__ = MagicMock(return_value="some-action")
+        cast(Any, action).__str__ = MagicMock(return_value="some-action")
         # Remove CmdRunAction and FileEditAction spec
         type(action).__name__ = "OtherAction"
         content = al._extract_action_content(action)
@@ -167,7 +168,7 @@ class TestLogAction:
         )
 
         log_file = al._get_session_log_file("s1")
-        lines = [l for l in log_file.read_text().strip().split("\n") if l]
+        lines = [ln for ln in log_file.read_text().strip().split("\n") if ln]
         data = json.loads(lines[-1])
         assert data["validation_result"] == "blocked"
         assert data["id"] == audit_id
@@ -187,7 +188,7 @@ class TestLogAction:
         )
 
         log_file = al._get_session_log_file("s1")
-        lines = [l for l in log_file.read_text().strip().split("\n") if l]
+        lines = [ln for ln in log_file.read_text().strip().split("\n") if ln]
         data = json.loads(lines[-1])
         assert data["validation_result"] == "requires_review"
 

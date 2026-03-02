@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 
@@ -77,7 +78,7 @@ class TestTenacityBeforeSleepFactory:
     def test_hook_with_no_stop_attribute(self, mock_record):
         hook = tenacity_before_sleep_factory("test_op")
         rs = SimpleNamespace(attempt_number=1)  # no 'stop'
-        hook(rs)
+        hook(cast(Any, rs))
         mock_record.assert_called_once()
         event = mock_record.call_args[0][0]
         assert event["max_attempts"] is None
@@ -86,7 +87,7 @@ class TestTenacityBeforeSleepFactory:
         """The hook wraps everything in contextlib.suppress."""
         hook = tenacity_before_sleep_factory("op")
         # Pass something that isn't a proper retry_state — should not raise
-        hook("not a retry state")
+        hook(cast(Any, "not a retry state"))
 
 
 class TestTenacityAfterFactory:
@@ -145,7 +146,7 @@ class TestTenacityAfterFactory:
     def test_no_outcome_attribute(self, mock_record):
         hook = tenacity_after_factory("op")
         rs = SimpleNamespace(attempt_number=3)  # no 'outcome', no 'stop'
-        hook(rs)
+        hook(cast(Any, rs))
         # Should not crash; outcome is None → not successful → check max attempts
         # No stop attr → max_attempts is None → isinstance check fails
         mock_record.assert_not_called()

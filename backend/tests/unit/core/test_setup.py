@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from backend.runtime.plugins.requirement import PluginRequirement
 from backend.core.config.forge_config import ForgeConfig
 from backend.core.setup import (
     filter_plugins_by_config,
@@ -30,9 +31,9 @@ def test_generate_sid():
 
 
 def test_filter_plugins_by_config():
-    mock_plugin = MagicMock()
+    mock_plugin = MagicMock(spec=PluginRequirement)
     mock_plugin.name = "plugin1"
-    plugins = [mock_plugin]
+    plugins: list[PluginRequirement] = [mock_plugin]
 
     # No agent, no config
     assert filter_plugins_by_config(plugins) == plugins

@@ -1,7 +1,8 @@
 
+from typing import Any, cast
+
 import pytest
 from pydantic import ValidationError
-from backend.core.schemas import ActionType
 from backend.core.schemas.actions import (
     AgentThinkActionSchema,
     ClarificationRequestActionSchema,
@@ -166,4 +167,4 @@ def test_browse_interactive_action_schema():
 
 def test_validation_error():
     with pytest.raises(ValidationError):
-        MCPActionSchema(action_type="mcp")  # Missing name
+        cast(Any, MCPActionSchema)(action_type="mcp")  # Missing name

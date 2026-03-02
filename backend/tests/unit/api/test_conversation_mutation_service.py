@@ -126,6 +126,7 @@ async def test_update_title_permission_denied():
     ):
         result = await update_conversation_title("conv1", "New Title", "different-user")
     assert result.ok is False
+    assert result.error_message is not None
     assert "Permission" in result.error_message
 
 

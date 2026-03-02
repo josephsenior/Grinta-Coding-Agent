@@ -11,7 +11,7 @@ from backend.runtime.utils.process_registry import TaskCancellationService
 from backend.runtime.utils.unified_shell import UnifiedShellSession, create_shell_session
 
 if TYPE_CHECKING:
-    from backend.runtime.tools import ToolRegistry
+    from backend.runtime.tools import ToolRegistry  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
 

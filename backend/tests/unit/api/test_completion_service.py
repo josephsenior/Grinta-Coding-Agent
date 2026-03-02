@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -155,6 +156,7 @@ class TestCircuitBreaker:
             record_error(cid, Exception("err"))
         should_block, reason = check_circuit_breaker(cid)
         assert should_block is True
+        assert reason is not None
         assert "consecutive errors" in reason.lower()
 
     def test_consecutive_errors_trips_above_five(self):
@@ -163,6 +165,7 @@ class TestCircuitBreaker:
             record_error(cid, Exception("err"))
         should_block, reason = check_circuit_breaker(cid)
         assert should_block is True
+        assert reason is not None
         assert "consecutive errors" in reason.lower()
 
     def test_error_rate_path_exactly_50_percent(self):
@@ -183,6 +186,7 @@ class TestCircuitBreaker:
         _error_tracking[cid]["consecutive_errors"] = 0
         should_block, reason = check_circuit_breaker(cid)
         assert should_block is True
+        assert reason is not None
         assert "error rate" in reason.lower()
         assert "50%" in reason
 
@@ -195,6 +199,7 @@ class TestCircuitBreaker:
         _error_tracking[cid]["consecutive_errors"] = 0
         should_block, reason = check_circuit_breaker(cid)
         assert should_block is True
+        assert reason is not None
         assert "error rate" in reason.lower()
 
     def test_error_rate_path_below_50_percent_not_blocked(self):
@@ -701,6 +706,7 @@ async def test_get_code_completion_timeout_all_retries_exhausted(
         )
     assert result.status_code == 504
     assert result.stop_reason == "timeout"
+    assert result.error is not None
     assert "Timed out" in result.error
 
 

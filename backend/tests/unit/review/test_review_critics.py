@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -76,7 +77,7 @@ class TestAgentFinishedCritic:
 
         mock = MagicMock(spec=Action)
         # Ensure isinstance(mock, Action) is True
-        mock.__class__ = Action
+        cast(Any, mock).__class__ = Action
         return mock
 
     def test_agent_finished(self, critic):

@@ -96,9 +96,13 @@ def _register_config():
         - Avoids import-time circular dependency that would occur if config imported at top level
 
     """
-    from backend.core.config.condenser_config import ObservationMaskingCondenserConfig
+    from backend.core.config.condenser_config import (
+        BrowserOutputCondenserConfig,
+        ObservationMaskingCondenserConfig,
+    )
 
     ObservationMaskingCondenser.register_config(ObservationMaskingCondenserConfig)
+    ObservationMaskingCondenser.register_config(BrowserOutputCondenserConfig)
 
 
 _register_config()

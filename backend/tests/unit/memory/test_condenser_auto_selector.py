@@ -14,6 +14,7 @@ from backend.core.config.condenser_config import (
     SmartCondenserConfig,
 )
 from backend.events.action import CmdRunAction, MessageAction
+from backend.events.event import Event
 from backend.events.event import EventSource
 from backend.events.observation import ErrorObservation, CmdOutputObservation
 from backend.memory.condenser.impl.auto_selector import (
@@ -57,17 +58,17 @@ def _make_cmd_output(eid: int, content: str = "output") -> CmdOutputObservation:
     return ev
 
 
-def _make_events(n: int) -> list:
+def _make_events(n: int) -> list[Event]:
     """Create n generic command events."""
-    events = []
+    events: list[Event] = []
     for i in range(n):
         events.append(_make_cmd(i, f"cmd_{i}"))
     return events
 
 
-def _make_error_heavy_events(total: int, error_count: int) -> list:
+def _make_error_heavy_events(total: int, error_count: int) -> list[Event]:
     """Create events where error_count are errors and rest are commands."""
-    events = []
+    events: list[Event] = []
     for i in range(total):
         if i < error_count:
             events.append(_make_error(i, f"error_{i}"))
@@ -201,4 +202,4 @@ class TestAutoCondenserConfig:
 
     def test_rejects_extra_fields(self):
         with pytest.raises(Exception):
-            AutoCondenserConfig(type="auto", unknown_field=True)
+            AutoCondenserConfig.model_validate({"type": "auto", "unknown_field": True})

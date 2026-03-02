@@ -282,7 +282,8 @@ class TestMemoryPressureCondenserWiring:
         # Should have called get_condensation to force condensation
         fake_condenser.get_condensation.assert_called_once_with(fake_view)
         # Memory pressure flag should be consumed
-        assert state.turn_signals.memory_pressure is None
+        pressure1: str | None = state.turn_signals.memory_pressure
+        assert pressure1 is None
         # Result should reflect the forced condensation
         assert result.pending_action is fake_condensation.action
 
@@ -310,7 +311,8 @@ class TestMemoryPressureCondenserWiring:
         result = mgr.condense_history(state)
 
         # Flag should still be consumed
-        assert state.turn_signals.memory_pressure is None
+        pressure2: str | None = state.turn_signals.memory_pressure
+        assert pressure2 is None
         # Falls back to returning the original view
         assert result.events == ["e1"]
 
@@ -339,7 +341,8 @@ class TestMemoryPressureCondenserWiring:
         result = mgr.condense_history(state)
 
         # Flag consumed
-        assert state.turn_signals.memory_pressure is None
+        pressure3: str | None = state.turn_signals.memory_pressure
+        assert pressure3 is None
         # Events returned as-is (View)
         assert result.events == ["e1", "e2"]
 

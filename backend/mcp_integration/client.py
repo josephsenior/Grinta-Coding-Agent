@@ -198,6 +198,7 @@ class MCPClient(BaseModel):
     ) -> None:
         """Connect to MCP server using stdio transport."""
         try:
+            assert server.command is not None
             transport = StdioTransport(
                 command=server.command, args=server.args or [], env=server.env
             )

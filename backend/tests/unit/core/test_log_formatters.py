@@ -59,7 +59,7 @@ class TestFixRecord:
 
     def test_exc_info_true_resolved(self):
         rec = logging.LogRecord("name", logging.ERROR, "file", 1, "msg", (), None)
-        rec.exc_info = True
+        setattr(rec, "exc_info", True)
         fixed = _fix_record(rec)
         # Should be replaced with actual sys.exc_info() tuple
         assert fixed.exc_info is not True
@@ -289,8 +289,8 @@ class TestTraceContextFilter:
         try:
             rec = logging.LogRecord("n", logging.INFO, "f", 1, "msg", (), None)
             assert f.filter(rec) is True
-            assert rec.trace_id == "abc123"
-            assert rec.span_id == "def456"
+            assert getattr(rec, "trace_id") == "abc123"
+            assert getattr(rec, "span_id") == "def456"
         finally:
             _TRACE_LOCAL.context = {}
 
@@ -306,9 +306,9 @@ class TestTraceContextFilter:
         _TRACE_LOCAL.context = {"trace_id": "new_value"}
         try:
             rec = logging.LogRecord("n", logging.INFO, "f", 1, "msg", (), None)
-            rec.trace_id = "original"
+            setattr(rec, "trace_id", "original")
             f.filter(rec)
-            assert rec.trace_id == "original"
+            assert getattr(rec, "trace_id") == "original"
         finally:
             _TRACE_LOCAL.context = {}
 

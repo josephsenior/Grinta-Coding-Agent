@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, patch
 import os
 from backend.api.services.email_service import EmailService, get_email_service
 
@@ -70,7 +70,7 @@ def test_send_password_reset_email_url_construction(mock_send, email_service):
     # Verify the URL in the call
         args, kwargs = mock_send.call_args
         to_email = args[0]
-        subject = args[1]
+        args[1]
         html_body = args[2]
         
         assert to_email == "user@test.com"

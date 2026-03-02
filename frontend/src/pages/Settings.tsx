@@ -51,12 +51,24 @@ function ModelSection({
     apiKey !== "" ||
     baseUrl !== (settings.llm_base_url ?? "");
 
+  const [errors, setErrors] = useState<{ model?: string; baseUrl?: string }>({});
+
+  const validate = (): boolean => {
+    const next: typeof errors = {};
+    if (!model.trim()) next.model = "Model is required";
+    if (baseUrl.trim() && !/^https?:\/\/.+/.test(baseUrl.trim()))
+      next.baseUrl = "Must be a valid URL starting with http:// or https://";
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
   const handleSave = async () => {
+    if (!validate()) return;
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
-        llm_model: model || null,
-        llm_base_url: baseUrl || null,
+        llm_model: model.trim(),
+        llm_base_url: baseUrl.trim() || null,
       };
       if (apiKey) body.llm_api_key = apiKey;
       await onSave(body as Partial<SettingsResponse>);
@@ -80,9 +92,10 @@ function ModelSection({
           <Input
             placeholder="e.g. claude-sonnet-4-20250514"
             value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="font-mono text-sm"
+            onChange={(e) => { setModel(e.target.value); setErrors((p) => ({ ...p, model: undefined })); }}
+            className={cn("font-mono text-sm", errors.model && "border-destructive")}
           />
+          {errors.model && <p className="text-xs text-destructive">{errors.model}</p>}
           <p className="text-xs text-muted-foreground">
             Provider-prefixed model identifier — e.g.{" "}
             <code className="rounded bg-muted px-1">anthropic/claude-3-5-sonnet</code>,{" "}
@@ -143,9 +156,10 @@ function ModelSection({
           <Input
             placeholder="https://api.openai.com/v1"
             value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            className="font-mono text-sm"
+            onChange={(e) => { setBaseUrl(e.target.value); setErrors((p) => ({ ...p, baseUrl: undefined })); }}
+            className={cn("font-mono text-sm", errors.baseUrl && "border-destructive")}
           />
+          {errors.baseUrl && <p className="text-xs text-destructive">{errors.baseUrl}</p>}
           <p className="text-xs text-muted-foreground">
             Custom endpoint for self-hosted or proxy deployments
           </p>

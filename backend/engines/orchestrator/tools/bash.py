@@ -83,6 +83,11 @@ def create_cmd_run_tool(use_short_description: bool = False):
                     "The bash command to execute. Can be empty string to view additional logs when previous exit code is `-1`. Can be `C-c` (Ctrl+C) to interrupt the currently running process. Note: You can only execute one bash command at a time. If you need to run multiple commands sequentially, you can use `&&` or `;` to chain them together.",
                 ),
             ),
+            "truncation_strategy": {
+                "type": "string",
+                "enum": ["tail_heavy", "head_heavy", "balanced"],
+                "description": "How to truncate long output. 'tail_heavy' (default) keeps the end of the log in case of error. 'head_heavy' keeps the beginning. 'balanced' keeps both."
+            },
             "is_input": get_is_input_param(
                 refine_prompt(
                     "If True, the command is an input to the running process. If False, the command is a bash command to be executed in the terminal. Default is False.",

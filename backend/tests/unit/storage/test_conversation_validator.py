@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -143,7 +144,7 @@ class TestValidateStrictInternal:
         mock_store.get_metadata = AsyncMock(side_effect=FileNotFoundError)
         created_meta = MagicMock()
         created_meta.user_id = "user-5"
-        v._create_metadata = AsyncMock(return_value=created_meta)
+        cast(Any, v)._create_metadata = AsyncMock(return_value=created_meta)
 
         mock_config = MagicMock()
         mock_server_config = MagicMock()

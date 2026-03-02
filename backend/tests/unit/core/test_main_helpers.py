@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
@@ -27,7 +28,7 @@ from backend.core.main import (
 )
 from backend.events.action import MessageAction, NullAction
 from backend.events.observation import AgentStateChangedObservation
-from backend.core.enums import AgentState
+from backend.core.enums import AgentState, RuntimeStatus
 
 
 def test_validate_run_controller_inputs():
@@ -168,7 +169,7 @@ def test_create_early_status_callback():
 
     # Test error
     with patch("backend.core.main.logger.error") as mock_err:
-        callback("error", "some_status", "bad thing")
+        callback("error", RuntimeStatus.ERROR_MEMORY, "bad thing")
         assert mock_err.called
         mock_controller.state.set_last_error.assert_called_with(
             "bad thing", source="main._early_status_callback"
@@ -222,9 +223,10 @@ def test_load_replay_log(mock_open, mock_is_file, mock_exists, mock_get_events):
         mock_json_load.return_value = {}
         events, initial = load_replay_log("path.json")
 
-    assert initial.content == "task"
+    assert cast(Any, initial).content == "task"
+    assert events is not None
     assert len(events) == 1
-    assert events[0].content == "next"
+    assert cast(Any, events[0]).content == "next"
 
 
 @patch("backend.core.main._initialize_session_components")

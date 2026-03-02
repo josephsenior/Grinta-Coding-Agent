@@ -67,19 +67,22 @@ class StateTracker:
             exclude_hidden=True,
         )
 
+    # pylint: disable=R0917
     def set_initial_state(
         self,
-        id: str,
+        session_id: str,
         state: State | None,
         conversation_stats: ConversationStats,
         max_iterations: int,
         max_budget_per_task: float | None,
         confirmation_mode: bool = False,
     ) -> None:
-        """Sets the initial state for the agent, either from the previous session, or from a parent agent, or by creating a new one.
+        """Set the initial state for the agent.
+
+        Uses previous session state, parent state, or creates a new state.
 
         Args:
-            id: The session ID for the agent.
+            session_id: The session ID for the agent.
             state: The state to initialize with, or None to create a new state.
             conversation_stats: Statistics for the conversation.
             max_iterations: The maximum number of iterations allowed for the task.
@@ -89,7 +92,7 @@ class StateTracker:
         """
         if state is None:
             self.state = State(
-                session_id=id.removesuffix("-delegate"),
+                session_id=session_id.removesuffix("-delegate"),
                 user_id=self.user_id,
                 inputs={},
                 conversation_stats=conversation_stats,
@@ -112,7 +115,7 @@ class StateTracker:
             self.state.start_id = 0
             logger.info(
                 "AgentController %s - created new state. start_id: %s",
-                id,
+                session_id,
                 self.state.start_id,
             )
         else:

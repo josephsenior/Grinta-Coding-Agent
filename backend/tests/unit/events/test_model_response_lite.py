@@ -1,5 +1,7 @@
 """Tests for backend.events.model_response_lite — lightweight SDK response model."""
 
+# pylint: disable=unsubscriptable-object
+
 from types import SimpleNamespace
 
 
@@ -41,8 +43,10 @@ class TestAssistantMessageLite:
         msg = AssistantMessageLite(role="assistant", content="hi", tool_calls=[tc])
         assert msg.role == "assistant"
         assert msg.content == "hi"
-        assert len(msg.tool_calls) == 1
-        assert msg.tool_calls[0].id == "tc_a"
+        assert msg.tool_calls is not None
+        tool_calls = msg.tool_calls
+        assert len(tool_calls) == 1
+        assert tool_calls[0].id == "tc_a"
 
 
 # ── ChoiceLite ───────────────────────────────────────────────────────
@@ -56,6 +60,7 @@ class TestChoiceLite:
     def test_with_message(self):
         msg = AssistantMessageLite(role="assistant")
         c = ChoiceLite(message=msg)
+        assert c.message is not None
         assert c.message.role == "assistant"
 
 
@@ -96,6 +101,7 @@ class TestModelResponseLite:
         assert lite.id == "chatcmpl-abc"
         assert lite.model == "gpt-4"
         assert len(lite.choices) == 1
+        assert lite.choices[0].message is not None
         assert lite.choices[0].message.content == "Hello!"
         assert lite.choices[0].message.role == "assistant"
         assert lite.choices[0].message.tool_calls is None
@@ -115,6 +121,7 @@ class TestModelResponseLite:
         assert lite.id == "resp_42"
         assert lite.model == "claude"
         assert len(lite.choices) == 1
+        assert lite.choices[0].message is not None
         assert lite.choices[0].message.tool_calls is not None
         assert len(lite.choices[0].message.tool_calls) == 1
         assert lite.choices[0].message.tool_calls[0].id == "tc_1"
@@ -150,6 +157,7 @@ class TestModelResponseLite:
         choice = SimpleNamespace(message=msg)
         resp = SimpleNamespace(id="r4", model="m4", choices=[choice])
         lite = ModelResponseLite.from_sdk(resp)
+        assert lite.choices[0].message is not None
         assert lite.choices[0].message.tool_calls is None
 
     def test_model_dump_roundtrip(self):

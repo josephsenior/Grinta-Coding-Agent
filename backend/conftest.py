@@ -25,12 +25,12 @@ def _preload_pydantic_root_model() -> None:
 _sanitize_sys_path()
 
 
-import asyncio
-import inspect
-import pathlib
-from collections.abc import Iterator
+import asyncio  # noqa: E402
+import inspect  # noqa: E402
+import pathlib  # noqa: E402
+from collections.abc import Iterator  # noqa: E402
 
-import pytest
+import pytest  # noqa: E402
 
 
 @pytest.fixture
@@ -75,7 +75,15 @@ def _has_pkg(name: str) -> bool:
 
 
 def pytest_configure(config):
-    markers = ["windows", "optional", "heavy", "integration", "benchmark", "stress"]
+    markers = [
+        "windows",
+        "optional",
+        "heavy",
+        "integration",
+        "benchmark",
+        "stress",
+        "asyncio",
+    ]
     for m in markers:
         config.addinivalue_line("markers", f"{m}: mark test as {m}")
 

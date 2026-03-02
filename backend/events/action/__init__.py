@@ -7,6 +7,7 @@ from backend.events.action.action import Action
 from backend.events.action.agent import (
     AgentRejectAction,
     AgentThinkAction,
+    BlackboardAction,
     ChangeAgentStateAction,
     ClarificationRequestAction,
     CondensationAction,
@@ -46,6 +47,7 @@ __all__ = [
     "PlaybookFinishAction",
     "AgentRejectAction",
     "AgentThinkAction",
+    "BlackboardAction",
     "ChangeAgentStateAction",
     "ClarificationRequestAction",
     "CmdRunAction",

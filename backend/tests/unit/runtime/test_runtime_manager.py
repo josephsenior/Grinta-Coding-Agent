@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from typing import Any
 from unittest.mock import MagicMock
 
 
@@ -17,7 +18,7 @@ from backend.runtime.runtime_manager import (
 
 
 def _make_info(**overrides) -> RuntimeServerInfo:
-    defaults = {
+    defaults: dict[str, Any] = {
         "process": None,
         "execution_server_port": 9000,
         "app_ports": [],

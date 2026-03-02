@@ -35,9 +35,9 @@ _META_COGNITION_ACTION_TYPES = (
     UncertaintyAction,
     EscalateToHumanAction,
 )
-from backend.events.action.message import SystemMessageAction
-from backend.events.event import EventSource
-from backend.events.model_response_lite import ModelResponseLite
+from backend.events.action.message import SystemMessageAction  # noqa: E402
+from backend.events.event import EventSource  # noqa: E402
+from backend.events.model_response_lite import ModelResponseLite  # noqa: E402
 
 if TYPE_CHECKING:
     pass

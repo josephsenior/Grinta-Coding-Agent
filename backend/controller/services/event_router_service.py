@@ -28,6 +28,7 @@ from backend.events.action.agent import (
     RecallAction,
     UncertaintyAction,
 )
+from backend.events.action.message import StreamingChunkAction
 from backend.events.observation import (
     Observation,
 )
@@ -66,7 +67,11 @@ class EventRouterService:
         except Exception:
             pass
 
-        self._ctrl.state_tracker.add_history(event)
+        # StreamingChunkAction events are transient display hints — they
+        # must NOT be added to the history that the LLM sees on the next
+        # step, otherwise the context window fills up with chunk noise.
+        if not isinstance(event, StreamingChunkAction):
+            self._ctrl.state_tracker.add_history(event)
 
         if isinstance(event, Action):
             await self._handle_action(event)
@@ -194,11 +199,14 @@ class EventRouterService:
         from backend.controller.agent import Agent
         from backend.controller.agent_controller import AgentController
         from backend.controller.controller_config import ControllerConfig
+        from backend.controller.blackboard import Blackboard
         from backend.core.config.agent_config import AgentConfig
+
+        blackboard = Blackboard()
 
         # Background task so we don't block the routing loop
         async def _execute_single_worker(
-            task_description: str, files: list
+            task_description: str, files: list, shared_blackboard: Blackboard | None = None
         ) -> tuple[bool, str, str]:
             """Run one worker agent and return (success, content, error_message)."""
             try:
@@ -260,6 +268,10 @@ class EventRouterService:
                 parent_context_lines: list[str] = [
                     f"You are a worker agent delegated the following task:\n\n{task_description}\n\nFocus ONLY on this task. Once completed, finish."
                 ]
+                if shared_blackboard is not None:
+                    parent_context_lines.append(
+                        "\n\nSHARED BLACKBOARD: Use the blackboard tool (get/set/keys) to coordinate with other parallel workers. Publish contracts, status, or shared data there."
+                    )
 
                 # --- inherit parent working memory ---
                 try:
@@ -323,6 +335,9 @@ class EventRouterService:
                     ) from exc
 
                 worker_agent = agent_cls(config=worker_agent_config, llm_registry=llm_registry)
+                if shared_blackboard is not None:
+                    worker_agent.blackboard = shared_blackboard  # type: ignore[attr-defined]
+                    worker_agent.tools = worker_agent.planner.build_toolset()  # type: ignore[attr-defined]
 
                 conversation_stats = ConversationStats(
                     file_store=file_store,
@@ -344,6 +359,7 @@ class EventRouterService:
                     agent_configs=agent_configs,
                     confirmation_mode=False,
                     security_analyzer=parent_config.security_analyzer,
+                    blackboard=shared_blackboard,
                 )
 
                 worker_controller = AgentController(worker_config)
@@ -391,7 +407,7 @@ class EventRouterService:
                 return success, content, error_message
 
             except Exception as e:
-                self._ctrl.log("error", f"Worker execution failed: {e}", exc_info=True)
+                self._ctrl.log("error", f"Worker execution failed: {e}")
                 return False, "", f"Worker execution crashed: {e}"
 
         async def _run_subagent():
@@ -410,6 +426,7 @@ class EventRouterService:
                         _execute_single_worker(
                             t.get("task_description", ""),
                             t.get("files", []),
+                            blackboard,
                         )
                         for t in parallel_tasks
                     ],
@@ -422,6 +439,10 @@ class EventRouterService:
                     status = "OK" if s else "FAILED"
                     parts.append(f"[{status}] {label}\n{c or e}")
                 combined_content = "\n\n".join(parts)
+                if blackboard is not None and blackboard.snapshot():
+                    combined_content += "\n\n[SHARED BLACKBOARD SNAPSHOT]\n" + "\n".join(
+                        f"  {k}: {v}" for k, v in blackboard.snapshot().items()
+                    )
                 obs = DelegateTaskObservation(
                     success=all_success,
                     content=combined_content,
@@ -430,8 +451,12 @@ class EventRouterService:
             else:
                 # Single worker mode
                 success, content, error_message = await _execute_single_worker(
-                    action.task_description, getattr(action, "files", [])
+                    action.task_description, getattr(action, "files", []), blackboard
                 )
+                if blackboard is not None and blackboard.snapshot():
+                    content += "\n\n[SHARED BLACKBOARD SNAPSHOT]\n" + "\n".join(
+                        f"  {k}: {v}" for k, v in blackboard.snapshot().items()
+                    )
                 obs = DelegateTaskObservation(
                     success=success,
                     content=content,
@@ -439,9 +464,19 @@ class EventRouterService:
                 )
 
             # Ensure the observation maps to the exact action that requested it
-            obs.cause = action.id
+            obs.cause = None if getattr(action, "run_in_background", False) else action.id
             obs.tool_call_metadata = action.tool_call_metadata
             self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
+
+        if getattr(action, "run_in_background", False):
+            early_obs = DelegateTaskObservation(
+                success=True,
+                content="Worker(s) started in background. Use the blackboard to coordinate.",
+                error_message="",
+            )
+            early_obs.cause = action.id
+            early_obs.tool_call_metadata = action.tool_call_metadata
+            self._ctrl.event_stream.add_event(early_obs, EventSource.ENVIRONMENT)
 
         # Run the subagent without blocking
         run_or_schedule(_run_subagent())

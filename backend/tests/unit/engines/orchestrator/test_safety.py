@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+from typing import cast
 
-import pytest
 
 from backend.engines.orchestrator.safety import OrchestratorSafetyManager
 from backend.events.action import MessageAction, NullAction
@@ -249,7 +249,7 @@ class TestToolFunctionName:
 
 class TestShouldWarnOnDetection:
     def test_none_returns_false(self):
-        assert OrchestratorSafetyManager._should_warn_on_detection(None) is False
+        assert OrchestratorSafetyManager._should_warn_on_detection(cast(dict, None)) is False
 
     def test_not_hallucinated_returns_false(self):
         assert OrchestratorSafetyManager._should_warn_on_detection({"hallucinated": False}) is False

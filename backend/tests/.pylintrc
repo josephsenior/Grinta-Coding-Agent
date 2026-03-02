@@ -26,4 +26,15 @@ disable=
     # Docstrings not required in tests
     C0114,  # missing-module-docstring
     C0115,  # missing-class-docstring
-    C0116   # missing-function-docstring
+    C0116,  # missing-function-docstring
+    # Test files often use local imports/fixtures and lightweight helper classes
+    C0415,  # import-outside-toplevel
+    W0613,  # unused-argument
+    R0903,  # too-few-public-methods
+    R0402,  # consider-using-from-import
+    # Keep test lint focused on correctness, not formatting conventions
+    C0301,  # line-too-long
+    C0303,  # trailing-whitespace
+    C0321,  # multiple-statements
+    W0311,  # bad-indentation
+    C1803   # use-implicit-booleaness-not-comparison

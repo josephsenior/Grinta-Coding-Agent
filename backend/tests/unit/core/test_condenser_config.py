@@ -27,7 +27,7 @@ class TestNoOpCondenserConfig:
 
     def test_rejects_extra_fields(self):
         with pytest.raises(ValidationError):
-            NoOpCondenserConfig(type="noop", extra_field="bad")
+            NoOpCondenserConfig(**{"type": "noop", "extra_field": "bad"})
 
 
 class TestObservationMaskingConfig:

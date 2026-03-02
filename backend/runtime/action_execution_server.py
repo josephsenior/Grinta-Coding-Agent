@@ -38,6 +38,9 @@ from backend.events.observation import (
     FileWriteObservation,
     Observation,
 )
+from backend.events.action.code_nav import LspQueryAction
+from backend.events.action.signal import SignalProgressAction
+from backend.events.observation.signal import SignalProgressObservation
 from backend.events.observation.terminal import TerminalObservation
 from backend.events.action.terminal import (
     TerminalInputAction,
@@ -67,12 +70,10 @@ from backend.runtime.server_routes import (
     register_routes,
 )
 from backend.runtime.utils import find_available_tcp_port
-from backend.runtime.utils.unified_shell import UnifiedShellSession
 from backend.runtime.utils.diff import get_diff
 from backend.runtime.utils.file_editor import FileEditor
 from backend.runtime.utils.memory_monitor import MemoryMonitor
 from backend.runtime.utils.session_manager import SessionManager
-from backend.runtime.utils.process_registry import TaskCancellationService
 from backend.utils.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
@@ -119,20 +120,20 @@ class ActionExecutor:
         self.browser: BrowserEnv | None = None
 
         self.tool_registry = tool_registry
-        
+
         # Initialize SessionManager
         # We pass None for cancellation_service so it creates its own scoped to sessions
         self.session_manager = SessionManager(
             work_dir=work_dir,
             username=username,
             tool_registry=tool_registry,
-            max_memory_gb=None, # Will be updated in ainit
+            max_memory_gb=None,  # Will be updated in ainit
         )
-        
-        # Keep a separate cancellation service for non-session tasks if needed, 
+
+        # Keep a separate cancellation service for non-session tasks if needed,
         # or just rely on session manager for shell tasks.
         # But ActionExecutor might have other tasks? For now, let's keep it minimal.
-        
+
         self.lock = asyncio.Lock()
         self.plugins: dict[str, Plugin] = {}
         # We need the file editor for ACI actions (view) even if we use helper functions
@@ -197,7 +198,7 @@ class ActionExecutor:
             total_mem_gb = int(_psutil.virtual_memory().total / (1024**3))
             # Reserve 2GB for system/other processes
             self.max_memory_gb = max(1, total_mem_gb - 2)
-            
+
             # Update session manager with memory limit
             self.session_manager.max_memory_gb = self.max_memory_gb
 
@@ -313,7 +314,9 @@ class ActionExecutor:
                 observation.content = truncate_cmd_output(observation.content)
 
             if not action.is_static:
-                self._attach_detected_server(observation, self.session_manager.get_session("default"))
+                self._attach_detected_server(
+                    observation, self.session_manager.get_session("default")
+                )
 
             return observation
         except Exception as e:
@@ -329,9 +332,15 @@ class ActionExecutor:
         """
         session_id = f"bg-{uuid.uuid4().hex[:8]}"
         default_session = self.session_manager.get_session("default")
-        cwd = action.cwd or (default_session.cwd if default_session else None) or self._initial_cwd
+        cwd = (
+            action.cwd
+            or (default_session.cwd if default_session else None)
+            or self._initial_cwd
+        )
         session = self.session_manager.create_session(session_id=session_id, cwd=cwd)
-        logger.debug("Starting background task in session %s: %s", session_id, action.command)
+        logger.debug(
+            "Starting background task in session %s: %s", session_id, action.command
+        )
         session.write_input(action.command + "\n")
         time.sleep(0.5)
         content = session.read_output()
@@ -367,10 +376,10 @@ class ActionExecutor:
         session immediately. Used for isolated/one-off executions.
         """
         temp_id = f"static-{uuid.uuid4().hex[:8]}"
-        bash_session = self.session_manager.create_session(session_id=temp_id, cwd=action.cwd)
+        bash_session = self.session_manager.create_session(
+            session_id=temp_id, cwd=action.cwd
+        )
         try:
-            if bash_session is None:
-                return ErrorObservation("Failed to create static session")
             return cast(
                 CmdOutputObservation,
                 await call_sync_from_async(bash_session.execute, action),
@@ -393,7 +402,9 @@ class ActionExecutor:
             result = "\n".join(filtered)
             return result or f"[Grep: No lines matched pattern '{pattern_str}']"
         except re.error as e:
-            return f"[Grep Error: Invalid regex pattern '{pattern_str}': {e}]\n{content}"
+            return (
+                f"[Grep Error: Invalid regex pattern '{pattern_str}': {e}]\n{content}"
+            )
 
     def _attach_detected_server(
         self, observation: CmdOutputObservation, bash_session: Any
@@ -424,7 +435,7 @@ class ActionExecutor:
         try:
             # Generate a unique session ID
             session_id = f"term-{uuid.uuid4().hex[:8]}"
-            
+
             # Determine working directory
             # Prefer provided CWD -> default session CWD -> initial CWD
             default_session = self.session_manager.get_session("default")
@@ -433,21 +444,27 @@ class ActionExecutor:
                 cwd = default_session.cwd
             if not cwd:
                 cwd = self._initial_cwd
-                
+
             # Create the new session via manager
-            session = self.session_manager.create_session(session_id=session_id, cwd=cwd)
-            
+            session = self.session_manager.create_session(
+                session_id=session_id, cwd=cwd
+            )
+
             if action.command:
                 # Send the initial command if provided
-                logger.debug("Running initial command in terminal %s: %s", session_id, action.command)
+                logger.debug(
+                    "Running initial command in terminal %s: %s",
+                    session_id,
+                    action.command,
+                )
                 # Attempt to write input. If underlying session doesn't support input,
                 # it will log a warning but not crash.
                 session.write_input(action.command + "\n")
-            
+
             # Return initial output
             content = session.read_output()
             return TerminalObservation(session_id=session_id, content=content)
-            
+
         except Exception as e:
             logger.error("Error starting terminal session: %s", e, exc_info=True)
             return ErrorObservation(f"Failed to start terminal: {e}")
@@ -457,14 +474,14 @@ class ActionExecutor:
         session = self.session_manager.get_session(action.session_id)
         if not session:
             return ErrorObservation(f"Terminal session {action.session_id} not found.")
-            
+
         try:
             write_content = action.input
             # Add newline if not a control sequence, unless user explicitly handles it?
             # TerminalInputAction usually implies raw input.
             # If user types "ls", they usually mean "ls\n".
             # Control sequences are separate.
-            
+
             session.write_input(write_content, is_control=action.is_control)
             # Wait briefly for output to appear
             await call_sync_from_async(time.sleep, 0.2)
@@ -478,8 +495,10 @@ class ActionExecutor:
         """Read the output of an interactive terminal session."""
         session = self.session_manager.get_session(action.session_id)
         if not session:
-             return ErrorObservation(f"Terminal session {action.session_id} not found or closed.")
-            
+            return ErrorObservation(
+                f"Terminal session {action.session_id} not found or closed."
+            )
+
         try:
             content = session.read_output()
             return TerminalObservation(session_id=action.session_id, content=content)
@@ -569,14 +588,11 @@ class ActionExecutor:
             pass
         return None
 
-    def _edit_via_file_editor(
-        self, action: FileEditAction
-    ) -> Observation:
+    def _edit_via_file_editor(self, action: FileEditAction) -> Observation:
         """Execute FILE_EDITOR-style edit and return observation."""
         command = action.command or "write"
         enable_lint = bool(
-            os.environ.get("ENABLE_AUTO_LINT", "").lower()
-            in {"1", "true", "yes"}
+            os.environ.get("ENABLE_AUTO_LINT", "").lower() in {"1", "true", "yes"}
         )
         result_str, (old_content, new_content) = execute_file_editor(
             self.file_editor,
@@ -591,6 +607,32 @@ class ActionExecutor:
         )
         max_chars = get_max_edit_observation_chars()
         result_str = truncate_large_text(result_str, max_chars, label="edit")
+        # P1-B: Append a short unified diff to the observation so the LLM can
+        # confirm what changed without a follow-up view call.
+        if old_content is not None and new_content is not None and command != "view":
+            try:
+                diff = get_diff(old_content, new_content, action.path)
+                if diff:
+                    result_str = result_str + "\n\n[EDIT_DIFF]\n" + diff
+            except Exception:
+                pass  # diff is a nice-to-have; never block the observation
+        # Blast Radius Hook
+        # If the edit is successful and there's new content, check symbol references
+        if old_content is not None and new_content is not None and command != "view":
+            try:
+                from backend.engines.orchestrator.tools.structure_editor import (
+                    StructureEditor,
+                )
+
+                editor_instance = StructureEditor()
+                dummy_result = type("DummyResult", (), {"message": result_str})()
+                editor_instance._check_blast_radius_from_code(
+                    action.path, new_content, dummy_result
+                )  # type: ignore
+                result_str = dummy_result.message
+            except Exception as e:
+                logger.debug("Failed to check blast radius: %s", e)
+
         return FileEditObservation(
             content=result_str,
             path=action.path,
@@ -604,8 +646,7 @@ class ActionExecutor:
         """Execute LLM-based range edit and return observation."""
         command = action.command or "edit"
         enable_lint = bool(
-            os.environ.get("ENABLE_AUTO_LINT", "").lower()
-            in {"1", "true", "yes"}
+            os.environ.get("ENABLE_AUTO_LINT", "").lower() in {"1", "true", "yes"}
         )
         result_str, (old_content, new_content) = execute_file_editor(
             self.file_editor,
@@ -620,6 +661,23 @@ class ActionExecutor:
             return ErrorObservation(result_str)
         if old_content and new_content:
             diff = get_diff(old_content, new_content, action.path)
+
+            # Blast Radius Hook
+            if command != "view":
+                try:
+                    from backend.engines.orchestrator.tools.structure_editor import (
+                        StructureEditor,
+                    )
+
+                    editor_instance = StructureEditor()
+                    dummy_result = type("DummyResult", (), {"message": diff})()
+                    editor_instance._check_blast_radius_from_code(
+                        action.path, new_content, dummy_result
+                    )  # type: ignore
+                    diff = dummy_result.message
+                except Exception as e:
+                    logger.debug("Failed to check blast radius: %s", e)
+
             return FileEditObservation(
                 content=diff,
                 path=action.path,
@@ -628,6 +686,22 @@ class ActionExecutor:
                 new_content=new_content,
                 impl_source=FileEditSource.LLM_BASED_EDIT,
             )
+        # Blast Radius Hook
+        if old_content is not None and new_content is not None and command != "view":
+            try:
+                from backend.engines.orchestrator.tools.structure_editor import (
+                    StructureEditor,
+                )
+
+                editor_instance = StructureEditor()
+                dummy_result = type("DummyResult", (), {"message": result_str})()
+                editor_instance._check_blast_radius_from_code(
+                    action.path, new_content, dummy_result
+                )  # type: ignore
+                result_str = dummy_result.message
+            except Exception as e:
+                logger.debug("Failed to check blast radius: %s", e)
+
         return FileEditObservation(
             content=result_str,
             path=action.path,
@@ -682,12 +756,16 @@ class ActionExecutor:
                 self._mcp_clients = await create_mcps(servers)
 
             observation = await call_tool_mcp(self._mcp_clients, action)  # type: ignore[arg-type]
-            
+
             # Apply truncation to large MCP outputs
             if hasattr(observation, "content") and isinstance(observation.content, str):
-                max_chars = get_max_edit_observation_chars() # Reuse same limit or similar logic
-                observation.content = truncate_large_text(observation.content, max_chars, label=f"MCP:{action.name}")
-                
+                max_chars = (
+                    get_max_edit_observation_chars()
+                )  # Reuse same limit or similar logic
+                observation.content = truncate_large_text(
+                    observation.content, max_chars, label=f"MCP:{action.name}"
+                )
+
             return observation
         except Exception as e:
             logger.error("MCP call failed for %s: %s", action.name, e, exc_info=True)
@@ -697,6 +775,31 @@ class ActionExecutor:
                     "Use non-MCP tools as a fallback or check MCP configuration."
                 )
             )
+
+    async def lsp_query(self, action: LspQueryAction) -> Observation:
+        """Execute an LSP query using the lsp_client."""
+        from backend.engines.orchestrator.tools.lsp_client import LspClient
+
+        try:
+            client = LspClient()
+            result = client.query(
+                command=action.command,
+                file=action.file,
+                line=action.line,
+                column=action.column,
+                symbol=getattr(action, "symbol", ""),
+            )
+            return Observation(content=result.format_text(action.command))
+        except Exception as e:
+            logger.error("LSP query failed: %s", e, exc_info=True)
+            return ErrorObservation(
+                f"LSP query failed: {e}. Check if python-lsp-server is installed."
+            )
+
+    async def signal_progress(self, action: SignalProgressAction) -> Observation:
+        """Handle a progress signal from the agent."""
+        # The actual decrementation happens in AgentController. We just return ack here.
+        return SignalProgressObservation(acknowledged=True)
 
     def close(self) -> None:
         """Clean up resources owned by the in-process executor."""
@@ -708,7 +811,7 @@ class ActionExecutor:
             self.memory_monitor.stop_monitoring()
         except Exception:
             pass
-        
+
         if self.browser is not None:
             try:
                 self.browser.close()

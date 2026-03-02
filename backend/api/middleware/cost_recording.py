@@ -7,18 +7,14 @@ returns the appropriate middleware instance, plus a convenience
 
 from __future__ import annotations
 
+import importlib.util
 import os
 
 from backend.core.logger import forge_logger as logger
 from backend.api.middleware.cost_quota import CostQuotaMiddleware
 
 # Redis availability detection (matches redis_cost_quota.py)
-try:
-    import redis.asyncio as _redis
-
-    REDIS_AVAILABLE = True
-except ImportError:
-    REDIS_AVAILABLE = False
+REDIS_AVAILABLE = importlib.util.find_spec("redis.asyncio") is not None
 
 
 _GLOBAL_QUOTA_MIDDLEWARE: CostQuotaMiddleware | None = None

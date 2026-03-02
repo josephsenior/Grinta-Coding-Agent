@@ -1,5 +1,7 @@
 """Tests for backend.events.utils — action/observation pair extraction."""
 
+from typing import Any
+
 from backend.events.action.empty import NullAction
 from backend.events.action.message import MessageAction
 from backend.events.observation import CmdOutputObservation, NullObservation
@@ -64,18 +66,18 @@ class TestBuildMaps:
 
 class TestAddPairs:
     def test_paired(self):
-        action_map = {1: _make_message(1)}
-        obs_map = {1: _make_cmd_obs(1)}
-        tuples = []
+        action_map: dict[int, Any] = {1: _make_message(1)}
+        obs_map: dict[int, Any] = {1: _make_cmd_obs(1)}
+        tuples: list[Any] = []
         _add_action_observation_pairs(tuples, action_map, obs_map)
         assert len(tuples) == 1
         assert tuples[0][0] is action_map[1]
         assert tuples[0][1] is obs_map[1]
 
     def test_unpaired_action_gets_null_obs(self):
-        action_map = {1: _make_message(1)}
-        obs_map = {}
-        tuples = []
+        action_map: dict[int, Any] = {1: _make_message(1)}
+        obs_map: dict[int, Any] = {}
+        tuples: list[Any] = []
         _add_action_observation_pairs(tuples, action_map, obs_map)
         assert len(tuples) == 1
         assert isinstance(tuples[0][1], NullObservation)
@@ -86,29 +88,29 @@ class TestAddPairs:
 
 class TestOrphanedObservations:
     def test_orphaned_cmd_output(self):
-        action_map = {}
+        action_map: dict[int, Any] = {}
         obs = _make_cmd_obs(99)
-        obs_map = {99: obs}
-        tuples = []
+        obs_map: dict[int, Any] = {99: obs}
+        tuples: list[Any] = []
         _add_orphaned_observations(tuples, action_map, obs_map)
         assert len(tuples) == 1
         assert isinstance(tuples[0][0], NullAction)
         assert tuples[0][1] is obs
 
     def test_null_observation_skipped(self):
-        action_map = {}
+        action_map: dict[int, Any] = {}
         obs = _make_null_obs(99)
-        obs_map = {99: obs}
-        tuples = []
+        obs_map: dict[int, Any] = {99: obs}
+        tuples: list[Any] = []
         _add_orphaned_observations(tuples, action_map, obs_map)
         assert not tuples
 
     def test_already_paired_not_orphaned(self):
         action = _make_message(1)
         obs = _make_cmd_obs(1)
-        action_map = {1: action}
-        obs_map = {1: obs}
-        tuples = []
+        action_map: dict[int, Any] = {1: action}
+        obs_map: dict[int, Any] = {1: obs}
+        tuples: list[Any] = []
         _add_orphaned_observations(tuples, action_map, obs_map)
         assert not tuples  # cause=1 is in action_map
 

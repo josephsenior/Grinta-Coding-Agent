@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 from backend.llm.capabilities import ModelCapabilities
@@ -38,7 +40,7 @@ class TestModelCapabilities:
     def test_kw_only(self):
         # positional args should not work
         with pytest.raises(TypeError):
-            ModelCapabilities(True, False)  # pylint: disable=too-many-function-args
+            cast(Any, ModelCapabilities)(True, False)  # pylint: disable=too-many-function-args
 
     def test_equality(self):
         a = ModelCapabilities(supports_function_calling=True)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 
@@ -63,7 +64,8 @@ class TestStaticHelpers:
         msg = message_with_text("user", "hello")
         assert msg.role == "user"
         assert len(msg.content) == 1
-        assert msg.content[0].text == "hello"
+        c = msg.content[0]
+        assert isinstance(c, TextContent) and c.text == "hello"
 
     def test_is_valid_image_url_valid(self):
         assert (
@@ -222,8 +224,8 @@ class TestUserMessageFormatting:
             _text_msg("user", "second"),
         ]
         result = apply_user_message_formatting(msgs)
-        # Second user message should have \n\n prefix
-        assert result[1].content[0].text.startswith("\n\n")
+        c = result[1].content[0]
+        assert isinstance(c, TextContent) and c.text.startswith("\n\n")
 
     def test_non_consecutive_not_modified(self):
         msgs = [
@@ -232,7 +234,8 @@ class TestUserMessageFormatting:
             _text_msg("user", "follow-up"),
         ]
         result = apply_user_message_formatting(msgs)
-        assert not result[2].content[0].text.startswith("\n\n")
+        c = result[2].content[0]
+        assert isinstance(c, TextContent) and not c.text.startswith("\n\n")
 
     def test_formatting_idempotent(self):
         msgs = [
@@ -240,15 +243,15 @@ class TestUserMessageFormatting:
             _text_msg("user", "\n\nsecond"),
         ]
         result = apply_user_message_formatting(msgs)
-        # Already has \n\n prefix; should not double it
-        assert result[1].content[0].text == "\n\nsecond"
+        c = result[1].content[0]
+        assert isinstance(c, TextContent) and c.text == "\n\nsecond"
 
     def test_original_not_mutated(self):
         msg = _text_msg("user", "text")
         msgs = [_text_msg("user", "prev"), msg]
         apply_user_message_formatting(msgs)
-        # Original message should be unchanged (deep copy)
-        assert msg.content[0].text == "text"
+        c = msg.content[0]
+        assert isinstance(c, TextContent) and c.text == "text"
 
 
 # ---------------------------------------------------------------------------
@@ -303,7 +306,8 @@ class TestRemoveDuplicateSystemPromptUser:
         ]
         result = remove_duplicate_system_prompt_user(msgs)
         assert len(result) == 2
-        assert result[1].content[0].text == "actual question"
+        c = result[1].content[0]
+        assert isinstance(c, TextContent) and c.text == "actual question"
 
     def test_different_content_preserved(self):
         msgs = [
@@ -355,14 +359,14 @@ class TestMemoryStoreRecall:
 
     def test_store_with_mock_vector_store(self):
         mem = _make_memory()
-        mem._ctx.vector_store = MagicMock()
+        cast(Any, mem._ctx).vector_store = MagicMock()
         mem.store_in_memory("ev1", "user", "content", {"key": "val"})
-        mem._ctx.vector_store.add.assert_called_once()
+        cast(Any, mem._ctx).vector_store.add.assert_called_once()
 
     def test_recall_with_mock_vector_store(self):
         mem = _make_memory()
-        mem._ctx.vector_store = MagicMock()
-        mem._ctx.vector_store.search.return_value = [{"content": "result"}]
+        cast(Any, mem._ctx).vector_store = MagicMock()
+        cast(Any, mem._ctx).vector_store.search.return_value = [{"content": "result"}]
         result = mem.recall_from_memory("query", k=3)
         assert len(result) == 1
-        mem.vector_store.search.assert_called_once_with("query", k=3)
+        cast(Any, mem._ctx).vector_store.search.assert_called_once_with("query", k=3)

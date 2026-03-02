@@ -1,8 +1,5 @@
 import json
 import os
-import re
-import time
-from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -244,7 +241,7 @@ class TestBashSession:
 
     def test_handle_previous_command_timeout(self, session):
         session.prev_status = BashCommandStatus.HARD_TIMEOUT
-        action = CmdRunAction(command="ls")
+        CmdRunAction(command="ls")
         # If output doesn't end with PS1, it should return an observation
         with patch.object(session, "_get_pane_content", return_value="still running"):
              result = session._handle_previous_command_timeout("ls", "still running", [], False)

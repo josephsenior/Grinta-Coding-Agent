@@ -8,8 +8,8 @@ models without changing agent configurations.
 from __future__ import annotations
 
 import functools
+import json
 import os
-import tomllib  # Python 3.11+
 from pathlib import Path
 from typing import Any
 
@@ -39,10 +39,10 @@ class ModelAliasManager:
             search_paths.append(config_path)
 
         # Check current directory
-        search_paths.append(Path("config.toml"))
+        search_paths.append(Path("settings.json"))
 
         # Check home directory
-        home_config = Path.home() / ".forge" / "config.toml"
+        home_config = Path.home() / ".forge" / "settings.json"
         search_paths.append(home_config)
 
         # Check environment variable
@@ -64,16 +64,13 @@ class ModelAliasManager:
         self._loaded = True
 
     def _load_from_file(self, path: Path) -> None:
-        """Load aliases from a TOML file.
+        """Load aliases from a JSON config file.
 
         Expected format:
-        [model_aliases]
-        my-coding-model = "claude-3-7-sonnet"
-        fast-chat = "ollama/llama3.2"
-        local-coder = "ollama/qwen2.5-coder"
+        {"model_aliases": {"my-coding-model": "claude-3-7-sonnet", ...}}
         """
-        with open(path, "rb") as f:
-            data = tomllib.load(f)
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
 
         aliases = data.get("model_aliases", {})
         for alias, target in aliases.items():
@@ -149,32 +146,26 @@ class ModelAliasManager:
         return name in self._aliases
 
     def save_aliases(self, path: Path) -> None:
-        """Save current aliases to a TOML file.
+        """Save current aliases to a JSON config file.
 
         Args:
             path: Path to save aliases to
         """
         try:
-            import tomli_w
-
             # Read existing config if it exists
             config: dict[str, Any] = {}
             if path.exists():
-                with open(path, "rb") as f:
-                    config = tomllib.load(f)
+                with open(path, encoding="utf-8") as f:
+                    config = json.load(f)
 
             # Update aliases section
             config["model_aliases"] = self._aliases
 
             # Write back
-            with open(path, "wb") as f:
-                f.write(tomli_w.dumps(config).encode("utf-8"))
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2)
 
             logger.info("Saved %d aliases to %s", len(self._aliases), path)
-        except ImportError:
-            logger.error(
-                "tomli-w package not available for writing. Install with: pip install tomli-w"
-            )
         except Exception as e:
             logger.error("Failed to save aliases: %s", e)
 

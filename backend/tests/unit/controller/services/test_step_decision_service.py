@@ -2,6 +2,7 @@
 
 import unittest
 from unittest.mock import MagicMock
+from typing import Any, cast
 
 from backend.controller.services.step_decision_service import StepDecisionService
 from backend.core.schemas import AgentState
@@ -148,13 +149,13 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_should_step_non_event(self):
         """Test should_step returns False for non-event objects."""
-        result = self.service.should_step("not an event")
+        result = self.service.should_step(cast(Any, "not an event"))
 
         self.assertFalse(result)
 
     def test_should_step_none(self):
         """Test should_step returns False for None."""
-        result = self.service.should_step(None)
+        result = self.service.should_step(cast(Any, None))
 
         self.assertFalse(result)
 

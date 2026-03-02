@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from backend.core.logger import forge_logger as logger
 
@@ -48,20 +48,21 @@ class OrchestratorSafetyManager:
     # Action validation pipeline
     # ------------------------------------------------------------------ #
     def apply(
-        self, response_text: str, actions: list[Action]
+        self, response_text: str, actions: Sequence[Action]
     ) -> tuple[bool, list[Action]]:
         """Run the full safety pipeline on proposed actions.
 
         Returns:
             Tuple of (continue_processing, updated_actions)
         """
-        continue_processing, actions = self._pre_validate(response_text, actions)
+        actions_list = list(actions)
+        continue_processing, actions_list = self._pre_validate(response_text, actions_list)
         if not continue_processing:
-            return False, actions
+            return False, actions_list
 
-        actions = self._inject_verification(actions)
-        actions = self._detect_and_warn(response_text, actions)
-        return True, actions
+        actions_list = self._inject_verification(actions_list)
+        actions_list = self._detect_and_warn(response_text, actions_list)
+        return True, actions_list
 
     def _pre_validate(
         self,

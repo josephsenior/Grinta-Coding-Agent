@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import cast
 from unittest import TestCase
 from unittest.mock import MagicMock
 
@@ -46,8 +47,9 @@ class TestTaskTrackingMixin(TestCase):
             result = self.mixin._handle_task_tracking_action(action)
 
         self.assertIsInstance(result, TaskTrackingObservation)
-        self.assertEqual(result.command, "plan")
-        self.assertEqual(result.task_list, task_list)
+        result_obs = cast(TaskTrackingObservation, result)
+        self.assertEqual(result_obs.command, "plan")
+        self.assertEqual(result_obs.task_list, task_list)
         self.assertIn("2 items", result.content)
         self.mixin.event_stream.file_store.write.assert_called_once()
 
@@ -61,7 +63,8 @@ class TestTaskTrackingMixin(TestCase):
             result = self.mixin._handle_task_tracking_action(action)
 
         self.assertIsInstance(result, TaskTrackingObservation)
-        self.assertEqual(result.command, "view")
+        result_obs = cast(TaskTrackingObservation, result)
+        self.assertEqual(result_obs.command, "view")
         self.assertEqual(result.content, stored_content)
         self.mixin.event_stream.file_store.read.assert_called_once()
 
@@ -84,8 +87,9 @@ class TestTaskTrackingMixin(TestCase):
         result = self.mixin._handle_task_plan_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
-        self.assertEqual(result.command, "plan")
-        self.assertEqual(result.task_list, task_list)
+        result_obs = cast(TaskTrackingObservation, result)
+        self.assertEqual(result_obs.command, "plan")
+        self.assertEqual(result_obs.task_list, task_list)
         self.assertIn("1 items", result.content)
         self.assertIn(task_file_path, result.content)
         self.mixin.event_stream.file_store.write.assert_called_once()
@@ -123,9 +127,10 @@ class TestTaskTrackingMixin(TestCase):
         result = self.mixin._handle_task_view_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
-        self.assertEqual(result.command, "view")
+        result_obs = cast(TaskTrackingObservation, result)
+        self.assertEqual(result_obs.command, "view")
         self.assertEqual(result.content, stored_content)
-        self.assertEqual(result.task_list, [])
+        self.assertEqual(result_obs.task_list, [])
 
     def test_handle_task_view_action_file_not_found(self):
         """Test task view action when file doesn't exist."""
@@ -136,9 +141,10 @@ class TestTaskTrackingMixin(TestCase):
         result = self.mixin._handle_task_view_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
-        self.assertEqual(result.command, "view")
+        result_obs = cast(TaskTrackingObservation, result)
+        self.assertEqual(result_obs.command, "view")
         self.assertIn("No task list found", result.content)
-        self.assertEqual(result.task_list, [])
+        self.assertEqual(result_obs.task_list, [])
 
     def test_handle_task_view_action_read_error(self):
         """Test task view action when file read fails."""
@@ -151,7 +157,8 @@ class TestTaskTrackingMixin(TestCase):
         result = self.mixin._handle_task_view_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
-        self.assertEqual(result.command, "view")
+        result_obs = cast(TaskTrackingObservation, result)
+        self.assertEqual(result_obs.command, "view")
         self.assertIn("Failed to read", result.content)
         self.assertIn(task_file_path, result.content)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 from unittest.mock import MagicMock, patch
+from typing import cast
 
 import pytest
 
@@ -206,7 +207,8 @@ class TestPromptManagerTurnsReminder:
         pm.add_turns_left_reminder(messages, state)
 
         assert len(msg.content) == 2
-        assert "7 turns left" in msg.content[1].text
+        reminder = cast(TextContent, msg.content[1])
+        assert "7 turns left" in reminder.text
 
 
 class TestOrchestratorPromptManager:

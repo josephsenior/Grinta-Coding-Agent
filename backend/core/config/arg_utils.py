@@ -54,9 +54,8 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         type=str,
         help=(
-            "Replace default LLM ([llm] section in config.toml) config with "
-            "the specified LLM config, e.g. 'llama3' for [llm.llama3] section "
-            "in config.toml"
+            "Replace default LLM config with the specified LLM config, "
+            "e.g. 'llama3' for llm.llama3 section in settings.json"
         ),
     )
     parser.add_argument(
@@ -64,9 +63,8 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         type=str,
         help=(
-            "Replace default Agent ([agent] section in config.toml) config "
-            "with the specified Agent config, e.g. 'Orchestrator' for "
-            "[agent.Orchestrator] section in config.toml"
+            "Replace default Agent config with the specified Agent config, "
+            "e.g. 'Orchestrator' for agent.Orchestrator section in settings.json"
         ),
     )
     parser.add_argument(

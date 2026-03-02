@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json
-import time
 
-import pytest
 
 from backend.engines.orchestrator.streaming_checkpoint import (
     CheckpointRecord,
@@ -46,7 +44,7 @@ class TestCheckpointRecord:
 class TestInit:
     def test_creates_directory(self, tmp_path):
         subdir = tmp_path / "sub" / "ckpt"
-        ckpt = StreamingCheckpoint(str(subdir))
+        StreamingCheckpoint(str(subdir))
         assert subdir.exists()
 
     def test_no_active_on_init(self, tmp_path):
@@ -191,6 +189,7 @@ class TestRecover:
         ckpt.begin({"model": "x"}, attempt=4)
         ckpt2 = StreamingCheckpoint(str(tmp_path))
         record = ckpt2.recover()
+        assert record is not None
         assert record.attempt == 4
 
     def test_recover_clears_corrupt_wal(self, tmp_path):
@@ -206,7 +205,7 @@ class TestRecover:
 
 class TestSummariseParams:
     def setup_method(self, tmp_path=None):
-        import tempfile, os
+        import tempfile
         self._tmp = tempfile.mkdtemp()
         self.ckpt = StreamingCheckpoint(self._tmp)
 

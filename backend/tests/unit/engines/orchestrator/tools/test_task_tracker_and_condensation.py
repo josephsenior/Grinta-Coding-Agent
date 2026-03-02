@@ -1,6 +1,8 @@
 """Tests for backend.engines.orchestrator.tools.task_tracker and condensation_request."""
 from __future__ import annotations
 
+from typing import Any
+
 from backend.engines.orchestrator.tools.task_tracker import (
     _TASK_TRACKER_DESCRIPTION,
     create_task_tracker_tool,
@@ -16,19 +18,19 @@ from backend.engines.orchestrator.tools.condensation_request import (
 # ---------------------------------------------------------------------------
 
 
-def _func(tool: dict) -> dict:
+def _func(tool: Any) -> Any:
     return tool["function"]
 
 
-def _params(tool: dict) -> dict:
+def _params(tool: Any) -> Any:
     return _func(tool)["parameters"]
 
 
-def _props(tool: dict) -> dict:
+def _props(tool: Any) -> Any:
     return _params(tool).get("properties", {})
 
 
-def _required(tool: dict) -> list[str]:
+def _required(tool: Any) -> list[str]:
     return _params(tool).get("required", [])
 
 

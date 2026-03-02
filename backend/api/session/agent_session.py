@@ -261,6 +261,7 @@ class AgentSession:
                 max_budget_per_task,
                 agent_to_llm_config,
                 agent_configs,
+                user_settings=user_settings,
             )
 
             # Phase: EXECUTION
@@ -481,6 +482,7 @@ class AgentSession:
         max_budget_per_task,
         agent_to_llm_config,
         agent_configs,
+        user_settings: Settings | None = None,
     ):
         """Setup controller and handle replay if specified."""
         if replay_json:
@@ -502,6 +504,7 @@ class AgentSession:
                 max_budget_per_task=max_budget_per_task,
                 agent_to_llm_config=agent_to_llm_config,
                 agent_configs=agent_configs,
+                user_settings=user_settings,
             )
         return initial_message
 
@@ -776,6 +779,7 @@ class AgentSession:
         agent_to_llm_config: dict[str, LLMConfig] | None = None,
         agent_configs: dict[str, AgentConfig] | None = None,
         replay_events: list[Event] | None = None,
+        user_settings: Settings | None = None,
     ) -> tuple[AgentController, bool]:
         """Creates an AgentController instance.
 
@@ -810,6 +814,9 @@ class AgentSession:
         }\n-------------------------------------------------------------------------------------------"
         self.logger.debug(msg)
         initial_state = self._maybe_restore_state()
+        delegate_task_blackboard_enabled = bool(
+            user_settings and getattr(user_settings, "delegate_task_blackboard_enabled", False)
+        )
         controller = AgentController(
             ControllerConfig(
                 sid=self.sid,
@@ -830,6 +837,7 @@ class AgentSession:
                 security_analyzer=self.runtime.security_analyzer
                 if self.runtime
                 else None,
+                delegate_task_blackboard_enabled=delegate_task_blackboard_enabled,
             )
         )
         return (controller, initial_state is not None)

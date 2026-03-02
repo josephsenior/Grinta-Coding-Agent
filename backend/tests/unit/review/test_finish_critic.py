@@ -4,6 +4,7 @@ from __future__ import annotations
 
 
 from backend.events.action import PlaybookFinishAction, AgentThinkAction
+from backend.events.event import Event
 from backend.events.observation import Observation
 from backend.review.finish_critic import AgentFinishedCritic
 
@@ -128,7 +129,7 @@ index 1234567..abcdefg 100644
     def test_empty_events_list(self):
         """Test failure with empty events list."""
         critic = AgentFinishedCritic()
-        events = []
+        events: list[Event] = []
 
         result = critic.evaluate(events)
 

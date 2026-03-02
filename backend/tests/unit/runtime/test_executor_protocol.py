@@ -170,22 +170,25 @@ class TestProtocolDocumentation:
 
     def test_protocol_has_docstring(self):
         """Test ActionExecutorProtocol has class docstring."""
-        assert ActionExecutorProtocol.__doc__ is not None
-        assert "Structural sub-typing interface" in ActionExecutorProtocol.__doc__
+        doc = ActionExecutorProtocol.__doc__
+        assert doc is not None and "Structural sub-typing interface" in doc
 
     def test_ainit_has_docstring(self):
         """Test ainit method has docstring."""
-        # Protocol methods should have docstrings
-        assert "async initialisation" in ActionExecutorProtocol.ainit.__doc__
+        doc = ActionExecutorProtocol.ainit.__doc__
+        assert doc is not None and "async initialisation" in doc
 
     def test_hard_kill_has_docstring(self):
         """Test hard_kill method has docstring."""
-        assert "Emergency teardown" in ActionExecutorProtocol.hard_kill.__doc__
+        doc = ActionExecutorProtocol.hard_kill.__doc__
+        assert doc is not None and "Emergency teardown" in doc
 
     def test_run_action_has_docstring(self):
         """Test run_action method has docstring."""
-        assert "Generic dispatch" in ActionExecutorProtocol.run_action.__doc__
+        doc = ActionExecutorProtocol.run_action.__doc__
+        assert doc is not None and "Generic dispatch" in doc
 
     def test_initial_cwd_has_docstring(self):
         """Test initial_cwd property has docstring."""
-        assert "root working directory" in ActionExecutorProtocol.initial_cwd.__doc__
+        doc = ActionExecutorProtocol.initial_cwd.__doc__
+        assert doc is not None and "root working directory" in doc

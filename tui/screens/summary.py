@@ -137,7 +137,7 @@ class SummaryScreen(Screen[None]):
     async def on_mount(self) -> None:
         await self._render()
 
-    async def _render(self) -> None:
+    async def _render(self) -> None:  # type: ignore[override]
         scroll = self.query_one("#sum-scroll", VerticalScroll)
         await scroll.remove_children()
 

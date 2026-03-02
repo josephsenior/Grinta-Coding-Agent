@@ -1,5 +1,6 @@
 """Tests for AgentController — the main agent orchestration controller."""
 
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -49,6 +50,8 @@ def _make_controller():
     ctrl._lifecycle = LifecyclePhase.ACTIVE
     ctrl._cached_first_user_message = None
     ctrl._step_task = None
+    ctrl._step_lock = asyncio.Lock()
+    ctrl._step_pending = False
 
     return ctrl
 
@@ -733,7 +736,6 @@ class TestReset(unittest.TestCase):
         dropped.id = "dropped-id"
         self.ctrl.agent.pending_actions = [dropped]
         
-        from backend.events.observation import ErrorObservation
         self.ctrl._reset()
         
         # Verify event stream add_event was called for the dropped action

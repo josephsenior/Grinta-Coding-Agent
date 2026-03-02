@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from typing import cast
+
+from backend.controller.services.controller_context import ControllerContext
 
 
 from backend.controller.services.budget_guard_service import (
@@ -13,6 +16,11 @@ from backend.controller.services.budget_guard_service import (
 
 
 class _FakeContext:
+    id: str
+    state: SimpleNamespace | None
+    state_tracker: object | None
+    events: list[tuple[MagicMock, object]]
+
     def __init__(self, current: float, max_value: float):
         self.id = "sess-1"
         budget_flag = SimpleNamespace(current_value=current, max_value=max_value)
@@ -27,27 +35,27 @@ class _FakeContext:
 class TestBudgetGuardService:
     def test_no_alert_below_threshold(self):
         ctx = _FakeContext(current=0.10, max_value=1.00)  # 10%
-        svc = BudgetGuardService(ctx)
+        svc = BudgetGuardService(cast(ControllerContext, ctx))
         svc._check_budget_thresholds()
         assert not svc._alerted_thresholds
 
     def test_alert_at_50_percent(self):
         ctx = _FakeContext(current=0.55, max_value=1.00)
-        svc = BudgetGuardService(ctx)
+        svc = BudgetGuardService(cast(ControllerContext, ctx))
         svc._check_budget_thresholds()
         assert 0.50 in svc._alerted_thresholds
         assert 0.80 not in svc._alerted_thresholds
 
     def test_alert_at_90_percent(self):
         ctx = _FakeContext(current=0.95, max_value=1.00)
-        svc = BudgetGuardService(ctx)
+        svc = BudgetGuardService(cast(ControllerContext, ctx))
         svc._check_budget_thresholds()
         # All three thresholds should fire
         assert svc._alerted_thresholds == {0.50, 0.80, 0.90}
 
     def test_each_threshold_fires_once(self):
         ctx = _FakeContext(current=0.95, max_value=1.00)
-        svc = BudgetGuardService(ctx)
+        svc = BudgetGuardService(cast(ControllerContext, ctx))
         svc._check_budget_thresholds()
         count_1 = len(ctx.events)
         svc._check_budget_thresholds()  # call again
@@ -56,13 +64,13 @@ class TestBudgetGuardService:
     def test_no_state(self):
         ctx = _FakeContext(current=0, max_value=1.0)
         ctx.state = None
-        svc = BudgetGuardService(ctx)
+        svc = BudgetGuardService(cast(ControllerContext, ctx))
         svc._check_budget_thresholds()  # should not raise
 
     def test_no_budget_flag(self):
         ctx = _FakeContext(current=0, max_value=1.0)
         ctx.state = SimpleNamespace(budget_flag=None)
-        svc = BudgetGuardService(ctx)
+        svc = BudgetGuardService(cast(ControllerContext, ctx))
         svc._check_budget_thresholds()  # should not raise
 
     def test_max_value_zero(self):
@@ -70,7 +78,7 @@ class TestBudgetGuardService:
         ctx.state = SimpleNamespace(
             budget_flag=SimpleNamespace(current_value=5, max_value=0)
         )
-        svc = BudgetGuardService(ctx)
+        svc = BudgetGuardService(cast(ControllerContext, ctx))
         svc._check_budget_thresholds()  # no div-by-zero
         assert not svc._alerted_thresholds
 
@@ -78,13 +86,13 @@ class TestBudgetGuardService:
         ctx = _FakeContext(current=0.1, max_value=1.0)
         tracker = MagicMock()
         ctx.state_tracker = tracker
-        svc = BudgetGuardService(ctx)
+        svc = BudgetGuardService(cast(ControllerContext, ctx))
         svc.sync_with_metrics()
         tracker.sync_budget_flag_with_metrics.assert_called_once()
 
     def test_emit_budget_alert_content(self):
         ctx = _FakeContext(current=0.85, max_value=1.00)
-        svc = BudgetGuardService(ctx)
+        svc = BudgetGuardService(cast(ControllerContext, ctx))
         svc._check_budget_thresholds()
         # Should have alerts for 50% and 80%
         assert len(ctx.events) >= 2

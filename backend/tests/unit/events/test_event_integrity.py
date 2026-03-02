@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from unittest.mock import MagicMock, PropertyMock
 
 
@@ -14,7 +15,7 @@ from backend.events.integrity import iter_events_until_corrupt
 # ---------------------------------------------------------------------------
 
 
-def _make_event_store(events: dict[int, object], cur_id: int):
+def _make_event_store(events: Mapping[int, object], cur_id: int):
     """Build a mock EventStore.
 
     events: mapping from id → event object (or exception to raise).

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 
@@ -97,6 +98,7 @@ class TestSimulateEdit:
         action.insert_line = 1
         action.new_str = "inserted line"
         result = self.mw._simulate_edit("line0\nline1\n", action)
+        assert result is not None
         assert "inserted line" in result
 
     def test_unknown_command_returns_none(self):
@@ -178,6 +180,7 @@ class TestMetadataPropagation:
         # Manually test the helper directly since the execute flow
         # depends on lazy imports
         old_content = PreExecDiffMiddleware._read_file(str(test_file))
+        assert old_content is not None
         new_content = mw._simulate_edit(old_content, action)
         assert new_content == "new content"
         assert old_content != new_content

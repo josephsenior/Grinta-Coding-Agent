@@ -1,3 +1,4 @@
+from typing import Any, cast
 """Unit tests for backend.controller.tool_result_validator module.
 
 Tests cover:
@@ -342,12 +343,13 @@ class TestObserve:
         controller = MagicMock()
         state = MagicMock()
         ctx = ToolInvocationContext(controller=controller, action=action, state=state)
-        ctx.block = MagicMock()
+        mock_block = cast(Any, ctx)
+        mock_block.block = MagicMock()
 
         await validator.observe(ctx, obs)
 
-        ctx.block.assert_called_once()
-        call_args = ctx.block.call_args
+        mock_block.block.assert_called_once()
+        call_args = mock_block.block.call_args
         assert "RESULT VALIDATION BLOCKED" in call_args.kwargs["reason"]
 
     @pytest.mark.asyncio

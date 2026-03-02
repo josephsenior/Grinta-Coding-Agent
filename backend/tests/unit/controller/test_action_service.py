@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
+from typing import Any, cast
 
 import pytest
 
@@ -63,7 +64,7 @@ class TestRunTypeCheck:
             _make_context(), _make_pending_service(), _make_confirmation_service()
         )
         with pytest.raises(TypeError, match="requires an Action"):
-            await svc.run("not_an_action", None)
+            await svc.run(cast(Any, "not_an_action"), None)
 
 
 # ── run: blocked ─────────────────────────────────────────────────────

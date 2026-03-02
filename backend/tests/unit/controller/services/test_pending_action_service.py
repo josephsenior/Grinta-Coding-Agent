@@ -36,6 +36,7 @@ class TestPendingActionService(unittest.TestCase):
         self.service.set(mock_action)
 
         self.assertIsNotNone(self.service._pending)
+        assert self.service._pending is not None
         action, timestamp = self.service._pending
         self.assertEqual(action, mock_action)
         self.assertIsInstance(timestamp, float)
@@ -131,6 +132,7 @@ class TestPendingActionService(unittest.TestCase):
         result = self.service.info()
 
         self.assertIsNotNone(result)
+        assert result is not None
         action, timestamp = result
         self.assertEqual(action, mock_action)
         self.assertIsInstance(timestamp, float)
@@ -235,6 +237,7 @@ class TestPendingActionService(unittest.TestCase):
         self.assertEqual(self.mock_controller.log.call_count, 2)  # set1 + set2
 
         # Current pending should be action2
+        assert self.service._pending is not None
         action, timestamp = self.service._pending
         self.assertEqual(action, mock_action2)
 

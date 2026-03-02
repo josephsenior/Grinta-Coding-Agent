@@ -9,6 +9,7 @@ import Settings from "@/pages/Settings";
 import KnowledgeBase from "@/pages/KnowledgeBase";
 import { useEffect } from "react";
 import { useAppStore } from "@/stores/app-store";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,14 +34,16 @@ export default function App() {
       <TooltipProvider delayDuration={300}>
         <BrowserRouter>
           <ThemeInitializer />
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/chat/:id" element={<Chat />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/knowledge" element={<KnowledgeBase />} />
-            </Route>
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Home />} />
+                <Route path="/chat/:id" element={<Chat />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/knowledge" element={<KnowledgeBase />} />
+              </Route>
+            </Routes>
+          </ErrorBoundary>
           <Toaster richColors position="bottom-right" />
         </BrowserRouter>
       </TooltipProvider>

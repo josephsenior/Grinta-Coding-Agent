@@ -1,0 +1,8 @@
+{
+  "workspace_base": "./workspace",
+  "max_budget_per_task": 5.0,
+  "llm_model": "gpt-4o",
+  "llm_api_key": "",
+  "llm_base_url": "",
+  "model_aliases": {}
+}

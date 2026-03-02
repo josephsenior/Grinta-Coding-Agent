@@ -46,10 +46,10 @@ class _TestPlugin(ForgePlugin):
 
 class TestHookType:
     def test_has_expected_members(self):
-        assert HookType.ACTION_PRE == "action_pre"
-        assert HookType.LLM_POST == "llm_post"
-        assert HookType.SESSION_START == "session_start"
-        assert HookType.TOOL_INVOKE == "tool_invoke"
+        assert HookType.ACTION_PRE.value == "action_pre"
+        assert HookType.LLM_POST.value == "llm_post"
+        assert HookType.SESSION_START.value == "session_start"
+        assert HookType.TOOL_INVOKE.value == "tool_invoke"
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ class TestForgePlugin:
     async def test_on_action_post_passthrough(self):
         p = _TestPlugin()
         obs = SimpleNamespace()
-        result = await p.on_action_post(SimpleNamespace(), obs)
+        result = await p.on_action_post(SimpleNamespace(), obs)  # type: ignore[arg-type]
         assert result is obs
 
     async def test_on_llm_post_passthrough(self):
@@ -121,13 +121,13 @@ class TestForgePlugin:
     async def test_abstract_hooks_raise(self):
         class Raises(ForgePlugin):
             async def on_event(self, event):
-                return await super().on_event(event)
+                return await super().on_event(event)  # type: ignore[safe-super]
 
             async def on_session_start(self, session_id, metadata):
-                return await super().on_session_start(session_id, metadata)
+                return await super().on_session_start(session_id, metadata)  # type: ignore[safe-super]
 
             async def on_session_end(self, session_id, metadata):
-                return await super().on_session_end(session_id, metadata)
+                return await super().on_session_end(session_id, metadata)  # type: ignore[safe-super]
 
         p = Raises()
         with pytest.raises(NotImplementedError):
@@ -247,8 +247,8 @@ class TestPluginRegistry:
         from types import SimpleNamespace
 
         a = SimpleNamespace()
-        result = await reg.dispatch_action_pre(a)
-        assert result.tag == "modified"
+        result = await reg.dispatch_action_pre(a)  # type: ignore[arg-type]
+        assert result.tag == "modified"  # type: ignore[attr-defined]
 
     async def test_dispatch_swallows_errors(self):
         class Broken(_TestPlugin):
@@ -262,7 +262,7 @@ class TestPluginRegistry:
         from types import SimpleNamespace
 
         a = SimpleNamespace()
-        result = await reg.dispatch_action_pre(a)
+        result = await reg.dispatch_action_pre(a)  # type: ignore[arg-type]
         assert result is a  # original returned despite error
 
     async def test_dispatch_llm_pre(self):
@@ -303,8 +303,8 @@ class TestPluginRegistry:
         reg = PluginRegistry()
         reg.register(Modify())
         obs = SimpleNamespace()
-        result = await reg.dispatch_action_post(SimpleNamespace(), obs)
-        assert result.tag == "post"
+        result = await reg.dispatch_action_post(SimpleNamespace(), obs)  # type: ignore[arg-type]
+        assert result.tag == "post"  # type: ignore[attr-defined]
 
     async def test_dispatch_action_post_error(self):
         class Broken(_TestPlugin):
@@ -316,7 +316,7 @@ class TestPluginRegistry:
         reg = PluginRegistry()
         reg.register(Broken())
         obs = SimpleNamespace()
-        result = await reg.dispatch_action_post(SimpleNamespace(), obs)
+        result = await reg.dispatch_action_post(SimpleNamespace(), obs)  # type: ignore[arg-type]
         assert result is obs
 
     async def test_dispatch_event(self):
@@ -329,7 +329,7 @@ class TestPluginRegistry:
         reg = PluginRegistry()
         reg.register(EventPlugin())
         evt = SimpleNamespace()
-        await reg.dispatch_event(evt)
+        await reg.dispatch_event(evt)  # type: ignore[arg-type]
         assert evt.tag == "event"
 
     async def test_dispatch_event_error(self):
@@ -341,7 +341,7 @@ class TestPluginRegistry:
 
         reg = PluginRegistry()
         reg.register(Broken())
-        await reg.dispatch_event(SimpleNamespace())
+        await reg.dispatch_event(SimpleNamespace())  # type: ignore[arg-type]
 
     async def test_dispatch_session_hooks(self):
         class SessionPlugin(_TestPlugin):

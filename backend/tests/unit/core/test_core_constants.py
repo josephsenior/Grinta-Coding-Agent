@@ -85,7 +85,7 @@ class TestCoreConstants:
         assert FORGE_MAX_ITERATIONS > 0
 
     def test_path_constants(self):
-        assert DEFAULT_CONFIG_FILE == "config.toml"
+        assert DEFAULT_CONFIG_FILE == "settings.json"
         assert isinstance(DEFAULT_WORKSPACE_BASE, str)
 
     def test_security(self):

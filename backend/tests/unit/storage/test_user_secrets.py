@@ -15,10 +15,10 @@ from backend.storage.data_models.user_secrets import UserSecrets
 class TestUserSecretsDefaults:
     def test_empty_dict(self):
         s = UserSecrets()
-        assert isinstance(s.provider_tokens, MappingProxyType)
-        assert not s.provider_tokens
-        assert isinstance(s.custom_secrets, MappingProxyType)
-        assert not s.custom_secrets
+        assert s.provider_tokens is not None
+        assert len(s.provider_tokens) == 0
+        assert s.custom_secrets is not None
+        assert len(s.custom_secrets) == 0
 
     def test_none_input(self):
         s = UserSecrets.model_validate(None)

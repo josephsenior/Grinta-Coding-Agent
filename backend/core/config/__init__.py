@@ -28,7 +28,7 @@ from backend.core.config.utils import (
     get_llm_config_arg,
     load_forge_config,
     load_from_env,
-    load_from_toml,
+    load_from_json,
     parse_arguments,
     setup_config_from_args,
 )
@@ -56,7 +56,7 @@ __all__ = [
     "get_headless_parser",
     "get_llm_config_arg",
     "load_from_env",
-    "load_from_toml",
+    "load_from_json",
     "load_forge_config",
     "parse_arguments",
     "setup_config_from_args",

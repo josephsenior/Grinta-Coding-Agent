@@ -1,6 +1,7 @@
 """Tests for GeminiCacheManager (singleton, hash-based context caching)."""
 
 import unittest
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from backend.llm.gemini_cache import GeminiCacheManager
@@ -57,7 +58,7 @@ class TestGeminiCacheManager(unittest.TestCase):
         """If hash already in _caches and Google confirms it, return name."""
         self.manager._caches["somehash"] = "cache/abc"
         # Patch _get_hash to return our known hash
-        self.manager._get_hash = MagicMock(return_value="somehash")
+        cast(Any, self.manager)._get_hash = MagicMock(return_value="somehash")
         self.mock_client.caches.get.return_value = MagicMock()
 
         result = self.manager.get_or_create_cache(
@@ -74,7 +75,7 @@ class TestGeminiCacheManager(unittest.TestCase):
         """If cached name is gone from Google, delete and create new."""
         mock_time.time.return_value = 1000000
         self.manager._caches["somehash"] = "cache/old"
-        self.manager._get_hash = MagicMock(return_value="somehash")
+        cast(Any, self.manager)._get_hash = MagicMock(return_value="somehash")
         self.mock_client.caches.get.side_effect = Exception("not found")
 
         mock_cache_obj = MagicMock()

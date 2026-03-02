@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from pydantic import BaseModel
 
@@ -28,6 +28,6 @@ class BaseCritic(abc.ABC):
 
     @abc.abstractmethod
     def evaluate(
-        self, events: list[Event], diff_patch: str | None = None
+        self, events: Sequence[Event], diff_patch: str | None = None
     ) -> CriticResult:
         """Assess events (and optional patch) and return qualitative CriticResult."""

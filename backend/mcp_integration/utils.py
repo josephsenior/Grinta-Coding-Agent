@@ -128,7 +128,7 @@ async def _connect_to_server(
 async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
     """Connect to an MCP stdio server."""
     # Validate command availability
-    if not shutil.which(server.command):
+    if not server.command or not shutil.which(server.command):
         logger.error(
             'Skipping MCP stdio server "%s": command "%s" not found. '
             "Please install %s or remove this server from your configuration.",
@@ -176,7 +176,7 @@ async def _connect_http_server(
             client.connect_http(server, conversation_id=conversation_id),
             timeout=timeout_sec,
         )
-        _log_successful_connection(client, server.url, connection_type)
+        _log_successful_connection(client, server.url or "", connection_type)
         return client
     except TimeoutError:
         logger.warning(

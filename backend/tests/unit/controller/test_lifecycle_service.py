@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from unittest.mock import ANY, MagicMock, patch
 
+from backend.core.config import AgentConfig, LLMConfig
+from backend.events import Event
 
 from backend.controller.services.lifecycle_service import LifecycleService
 from backend.events import EventStreamSubscriber
@@ -152,7 +156,7 @@ class TestInitializeStateAndTracking:
         ctrl = _make_controller()
         svc = LifecycleService(ctrl)
 
-        replay_events = [MagicMock(), MagicMock()]
+        replay_events = cast(list[Event], [MagicMock(), MagicMock()])
 
         with patch("backend.controller.services.lifecycle_service.StateTracker"):
             with patch(
@@ -182,8 +186,12 @@ class TestInitializeAgentConfigs:
         ctrl = _make_controller()
         svc = LifecycleService(ctrl)
 
-        llm_configs = {"agent1": MagicMock()}
-        agent_configs = {"agent1": MagicMock()}
+        llm_configs: dict[str, LLMConfig] = cast(
+            dict[str, LLMConfig], {"agent1": MagicMock()}
+        )
+        agent_configs: dict[str, AgentConfig] = cast(
+            dict[str, AgentConfig], {"agent1": MagicMock()}
+        )
 
         svc.initialize_agent_configs(
             agent_to_llm_config=llm_configs,

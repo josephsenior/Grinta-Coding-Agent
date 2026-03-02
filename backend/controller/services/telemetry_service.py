@@ -24,6 +24,7 @@ class TelemetryService:
         from backend.controller.rollback_middleware import RollbackMiddleware
         from backend.controller.tool_pipeline import (
             AutoCheckMiddleware,
+            BlackboardMiddleware,
             CircuitBreakerMiddleware,
             ConflictDetectionMiddleware,
             ContextWindowMiddleware,
@@ -57,6 +58,7 @@ class TelemetryService:
         controller._reflection_middleware_enabled = reflection_enabled
         middlewares = [
             SafetyValidatorMiddleware(controller),
+            BlackboardMiddleware(controller),
             IdempotencyMiddleware(),
             CircuitBreakerMiddleware(controller),
             CostQuotaMiddleware(controller),

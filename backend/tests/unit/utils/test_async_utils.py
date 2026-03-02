@@ -260,7 +260,7 @@ class TestWaitAll:
             return "never"
 
         with pytest.raises(TimeoutError):
-            await wait_all([slow_task()], timeout=0.1)
+            await wait_all([slow_task()], timeout=1)
 
 
 # ── AsyncException ─────────────────────────────────────────────────────

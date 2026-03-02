@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-import tomllib  # Python 3.11+
+import json
 
 from backend.core import logger
 from backend.core.config.forge_config import ForgeConfig
@@ -19,38 +19,42 @@ if TYPE_CHECKING:
     import argparse
 
 
-def _load_toml_config(toml_file: str) -> dict | None:
-    """Load and parse TOML configuration file."""
+def _load_json_config(json_file: str) -> dict | None:
+    """Load and parse JSON configuration file."""
     try:
-        with open(toml_file, "rb") as toml_contents:
-            return tomllib.load(toml_contents)
+        with open(json_file, "r", encoding="utf-8") as json_contents:
+            return json.load(json_contents)
     except FileNotFoundError as e:
-        logger.forge_logger.error("Config file not found: %s. Error: %s", toml_file, e)
+        logger.forge_logger.error("Config file not found: %s. Error: %s", json_file, e)
         return None
     except Exception as e:
         logger.forge_logger.error(
-            "Cannot parse config file %s. Exception: %s", toml_file, e
+            "Cannot parse config file %s. Exception: %s", json_file, e
         )
         return None
 
 
 def get_llm_config_arg(
-    llm_config_arg: str, toml_file: str = "config.toml"
+    llm_config_arg: str, json_file: str = "settings.json"
 ) -> LLMConfig | None:
-    """Get a group of llm settings from the config file."""
-    llm_config_arg = llm_config_arg.strip("[]").removeprefix("llm.")
-    logger.forge_logger.debug(
-        'Loading llm config "%s" from %s', llm_config_arg, toml_file
-    )
-    toml_config = _load_toml_config(toml_file)
-    if toml_config is None:
+    """Get llm settings from the config file."""
+    json_config = _load_json_config(json_file)
+    if json_config is None:
         return None
-    if "llm" in toml_config and llm_config_arg in toml_config["llm"]:
-        return LLMConfig(**toml_config["llm"][llm_config_arg])
-    logger.forge_logger.debug(
-        'LLM config "%s" not found in %s', llm_config_arg, toml_file
-    )
-    return None
+
+    # Check if there are any LLM keys present
+    llm_keys = ("llm_model", "llm_api_key", "llm_base_url")
+    if not any(k in json_config for k in llm_keys):
+        return None
+
+    llm = LLMConfig()
+    if "llm_model" in json_config:
+        llm.model = json_config["llm_model"]
+    if "llm_api_key" in json_config:
+        llm.api_key = json_config["llm_api_key"]
+    if "llm_base_url" in json_config:
+        llm.base_url = json_config["llm_base_url"]
+    return llm
 
 
 def _resolve_llm_config_from_cli(
@@ -75,8 +79,8 @@ def _resolve_llm_config_from_cli(
 
 
 def _try_user_config_llm(llm_config_name: str, config_file: str) -> LLMConfig | None:
-    """Try to load LLM config from user config file."""
-    user_config = os.path.join(os.path.expanduser("~"), ".Forge", "config.toml")
+    """Try to load LLM config from user settings file."""
+    user_config = os.path.join(os.path.expanduser("~"), ".Forge", "settings.json")
     if config_file == user_config or not os.path.exists(user_config):
         return None
 

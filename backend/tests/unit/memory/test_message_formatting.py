@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 
@@ -238,7 +239,7 @@ class TestMessageWithText:
         msg = message_with_text("user", "")
 
         assert msg.role == "user"
-        assert msg.content[0].text == ""
+        assert cast(Any, msg.content[0]).text == ""
 
 
 class TestRemoveDuplicateSystemPromptUser:
@@ -316,8 +317,8 @@ class TestApplyUserMessageFormatting:
 
         result = apply_user_message_formatting(messages)
 
-        assert result[0].content[0].text == "First user message"
-        assert result[1].content[0].text == "\n\nSecond user message"
+        assert cast(Any, result[0].content[0]).text == "First user message"
+        assert cast(Any, result[1].content[0]).text == "\n\nSecond user message"
 
     def test_preserves_non_consecutive_user_messages(self):
         """Test doesn't add newlines when user messages aren't consecutive."""
@@ -329,8 +330,8 @@ class TestApplyUserMessageFormatting:
 
         result = apply_user_message_formatting(messages)
 
-        assert result[0].content[0].text == "User 1"
-        assert result[2].content[0].text == "User 2"  # No \n\n prefix
+        assert cast(Any, result[0].content[0]).text == "User 1"
+        assert cast(Any, result[2].content[0]).text == "User 2"  # No \n\n prefix
 
     def test_skips_empty_content_messages(self):
         """Test handles messages with empty content gracefully."""
@@ -355,9 +356,9 @@ class TestApplyUserMessageFormatting:
         result = apply_user_message_formatting(messages)
 
         # Original should be unchanged
-        assert messages[1].content[0].text == "Second"
+        assert cast(Any, messages[1].content[0]).text == "Second"
         # Result should have modification
-        assert result[1].content[0].text == "\n\nSecond"
+        assert cast(Any, result[1].content[0]).text == "\n\nSecond"
 
     def test_handles_multiple_consecutive_user_messages(self):
         """Test handles chain of 3+ consecutive user messages."""
@@ -369,9 +370,9 @@ class TestApplyUserMessageFormatting:
 
         result = apply_user_message_formatting(messages)
 
-        assert result[0].content[0].text == "First"
-        assert result[1].content[0].text == "\n\nSecond"
-        assert result[2].content[0].text == "\n\nThird"
+        assert cast(Any, result[0].content[0]).text == "First"
+        assert cast(Any, result[1].content[0]).text == "\n\nSecond"
+        assert cast(Any, result[2].content[0]).text == "\n\nThird"
 
     def test_preserves_existing_newlines(self):
         """Test doesn't add newlines when text already starts with \\n\\n."""
@@ -383,7 +384,7 @@ class TestApplyUserMessageFormatting:
         result = apply_user_message_formatting(messages)
 
         # Should not add additional \n\n
-        assert result[1].content[0].text == "\n\nAlready formatted"
+        assert cast(Any, result[1].content[0]).text == "\n\nAlready formatted"
 
     def test_handles_non_text_content(self):
         """Test skips non-text content items."""

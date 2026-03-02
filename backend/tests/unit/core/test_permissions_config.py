@@ -13,10 +13,10 @@ from backend.core.config.permissions_config import (
 
 class TestRiskLevel:
     def test_values(self):
-        assert RiskLevel.LOW == "low"
-        assert RiskLevel.MEDIUM == "medium"
-        assert RiskLevel.HIGH == "high"
-        assert RiskLevel.CRITICAL == "critical"
+        assert RiskLevel.LOW.value == "low"
+        assert RiskLevel.MEDIUM.value == "medium"
+        assert RiskLevel.HIGH.value == "high"
+        assert RiskLevel.CRITICAL.value == "critical"
 
 
 class TestPermissionCategory:
@@ -122,6 +122,7 @@ class TestCheckPermission:
         config = PermissionsConfig(file_read_enabled=False)
         allowed, reason = config.check_permission(PermissionCategory.FILE_READ, "read")
         assert allowed is False
+        assert reason is not None
         assert "disabled" in reason.lower()
 
     def test_denied_file_write(self):
@@ -169,6 +170,7 @@ class TestCheckPermission:
             PermissionCategory.GIT, "git_force_push"
         )
         assert allowed is False
+        assert reason is not None
         assert "force push" in reason.lower()
 
     def test_denied_branch_delete_operation(self):
@@ -184,6 +186,7 @@ class TestCheckPermission:
             PermissionCategory.SHELL, "sudo_command"
         )
         assert allowed is False
+        assert reason is not None
         assert "sudo" in reason.lower()
 
     def test_allowed_force_push_when_enabled(self):

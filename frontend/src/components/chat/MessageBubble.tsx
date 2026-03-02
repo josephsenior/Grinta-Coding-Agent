@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "./MarkdownContent";
+import { CardSectionLabel } from "./CardSectionLabel";
 import type { ActionEvent } from "@/types/events";
 
 interface MessageBubbleProps {
@@ -19,6 +20,10 @@ export function MessageBubble({ event }: MessageBubbleProps) {
           : "bg-muted",
       )}
     >
+      <CardSectionLabel
+        label={isUser ? "You" : "Assistant"}
+        className={cn(isUser ? "text-primary-foreground/70" : "text-muted-foreground")}
+      />
       {isUser ? (
         <p className="whitespace-pre-wrap">{content}</p>
       ) : (

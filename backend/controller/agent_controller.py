@@ -39,6 +39,7 @@ from backend.events.observation import (
     ErrorObservation,
     Observation,
 )
+from backend.events.action.signal import SignalProgressAction
 
 TRAFFIC_CONTROL_REMINDER = (
     "Please click on resume button if you'd like to continue, or start a new task."
@@ -184,12 +185,25 @@ class AgentController:
         """Initializes a new instance of the AgentController class."""
         self.config = config
 
+        # Attributes set by telemetry service during pipeline initialization
+        self._planning_middleware_enabled: bool = False
+        self._reflection_middleware_enabled: bool = False
+        self._file_state_tracker: Any = None
+
         # --- Service wiring (order matters) ---
         self.services = ControllerServices(self)
 
         # Rate governor and memory monitor
         self.rate_governor = LLMRateGovernor()
         self.memory_pressure = MemoryPressureMonitor()
+
+        # Guard against concurrent step execution across dispatch threads.
+        # Uses asyncio.Lock for proper async safety (threading.Lock is fragile
+        # in async contexts and can deadlock on event-loop refactors).
+        self._step_lock = asyncio.Lock()
+        # When a step is requested while another is running, this flag ensures
+        # the dropped request is re-queued after the current step completes.
+        self._step_pending = False
 
         # Initialize core state via lifecycle service
         self.services.lifecycle.initialize_core_attributes(
@@ -332,9 +346,15 @@ class AgentController:
     def step(self) -> None:
         """Trigger agent to take one step asynchronously.
 
-        Creates async task for step execution with exception handling.
-        Keeps a strong reference to prevent GC of the running task.
+        Creates an async task for step execution if one is not already running.
+        Otherwise, marks the current step as pending to re-trigger after completion.
+        Maintains a strong reference to the task to prevent garbage collection.
         """
+        if self._step_task and not self._step_task.done():
+            # Lock is likely held, or task is about to acquire it
+            self._step_pending = True
+            return
+
         self._step_task = asyncio.create_task(self._step_with_exception_handling())
 
     async def _step_with_exception_handling(self) -> None:
@@ -384,7 +404,9 @@ class AgentController:
 
     def _emit_pending_action_error_if_unmatched(self) -> None:
         """Emit ErrorObservation if pending action has no matching observation."""
-        if not self._pending_action or not hasattr(self._pending_action, "tool_call_metadata"):
+        if not self._pending_action or not hasattr(
+            self._pending_action, "tool_call_metadata"
+        ):
             return
         meta = self._pending_action.tool_call_metadata
         found = any(
@@ -462,7 +484,31 @@ class AgentController:
         When the agent returns a non-blocking action (e.g. AgentThinkAction)
         and has more queued actions from the same LLM response, those are
         drained immediately without re-entering the full polling cycle.
+
+        If another step is already running, marks _step_pending so the
+        current step will re-trigger after it completes — no events are
+        silently dropped.
         """
+        if self._step_lock.locked():
+            self._step_pending = True
+            return
+        async with self._step_lock:
+            await self._step_inner()
+            # Yield to the event loop so that any pending _on_event tasks
+            # (e.g. the one that sets state to AWAITING_USER_INPUT after a
+            # MessageAction arrives) have a chance to run before we decide
+            # whether to trigger another step.  Without this, a
+            # _step_pending=True set by an observation callback during
+            # streaming could kick off a second LLM call while the agent
+            # state is still RUNNING.
+            await asyncio.sleep(0)
+            # Drain any steps that were requested while we held the lock
+            while self._step_pending:
+                self._step_pending = False
+                await self._step_inner()
+
+    async def _step_inner(self) -> None:
+        """Inner step logic, guarded by _step_lock."""
         if not self.step_prerequisites.can_step():
             return
 
@@ -488,6 +534,12 @@ class AgentController:
             )
             self.retry_service.reset_retry_metrics()
 
+        if isinstance(action, SignalProgressAction):
+            if hasattr(self.circuit_breaker_service, "record_progress_signal"):
+                self.circuit_breaker_service.record_progress_signal(
+                    action.progress_note
+                )
+
         await self.action_execution.execute_action(action)
         await self._handle_post_execution()
 
@@ -495,12 +547,66 @@ class AgentController:
         # After a non-runnable action (e.g. AgentThinkAction), no pending_action
         # is set, so we can immediately process the next queued action without
         # waiting for the full polling cycle.
-        while self._can_drain_pending():
-            action = await self.action_execution.get_next_action()
-            if action is None:
-                break
-            await self.action_execution.execute_action(action)
-            await self._handle_post_execution()
+        #
+        # P2-B: First, try to execute all pending read-only actions in parallel.
+        # If all are reads/searches, asyncio.gather runs them concurrently,
+        # saving turns on research-heavy tasks. Falls back to serial if mixed.
+        if not await self._try_parallel_read_batch():
+            while self._can_drain_pending():
+                action = await self.action_execution.get_next_action()
+                if action is None:
+                    break
+                await self.action_execution.execute_action(action)
+                await self._handle_post_execution()
+
+    # Action types that are safe to run concurrently (pure reads, no side effects)
+    _PARALLEL_SAFE_ACTION_TYPES: ClassVar[tuple[str, ...]] = (
+        "read",  # FileReadAction
+        "think",  # AgentThinkAction (non-runnable in runtime)
+        "search_code",  # search_code tool result
+        "explore_tree",  # explore_tree_structure
+        "get_entity",  # get_entity_contents
+    )
+
+    def _is_parallel_safe(self, action: Any) -> bool:
+        """Return True if action type is safe to run concurrently with other reads."""
+        action_type = getattr(action, "action", "") or ""
+        return any(action_type.startswith(t) for t in self._PARALLEL_SAFE_ACTION_TYPES)
+
+    async def _try_parallel_read_batch(self) -> bool:
+        """Attempt to drain ALL pending actions in parallel if every one is read-only.
+
+        P2-B: When the LLM emits multiple reads (e.g. read 3 files), execute them
+        concurrently via asyncio.gather instead of sequentially. Only activates when
+        every queued action is verified parallel-safe.
+
+        Returns True if batch was executed (caller should skip the serial drain),
+        False if any action is not parallel-safe (fall through to serial execution).
+        """
+        pending = getattr(self.agent, "pending_actions", None)
+        if not pending or len(pending) < 2:
+            return False
+
+        batch = list(pending)
+        if not all(self._is_parallel_safe(a) for a in batch):
+            return False
+
+        # Drain the queue before executing to prevent double-processing
+        pending.clear()
+
+        logger.debug(
+            "[P2-B] Parallel read batch: executing %d read-only actions concurrently",
+            len(batch),
+        )
+        try:
+            await asyncio.gather(
+                *(self.action_execution.execute_action(a) for a in batch),
+                return_exceptions=True,
+            )
+        except Exception as exc:
+            logger.warning("[P2-B] Parallel batch encountered error: %s", exc)
+        await self._handle_post_execution()
+        return True
 
     def _can_drain_pending(self) -> bool:
         """Check if we can immediately execute the next queued action.

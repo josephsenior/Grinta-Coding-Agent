@@ -1,8 +1,11 @@
 """Tests for backend.llm.direct_clients — LLMResponse, httpx pool, get_direct_client."""
 
+# pylint: disable=protected-access,unsubscriptable-object,invalid-overridden-method
+
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -52,7 +55,11 @@ class TestLLMResponse:
         ]
         resp = LLMResponse(content="", model="m", usage={}, tool_calls=tcs)
         assert resp.tool_calls == tcs
-        assert resp.choices[0].message.tool_calls == tcs
+        # message.tool_calls are ToolCall objects wrapping the dicts
+        tc_list = resp.choices[0].message.tool_calls
+        assert tc_list is not None
+        assert len(tc_list) == 1
+        assert tc_list[0].function.name == "f"
 
     def test_to_dict(self):
         resp = LLMResponse(
@@ -183,41 +190,35 @@ class TestGetDirectClient:
 # ---------------------------------------------------------------------------
 class TestAnthropicClientHelpers:
     def test_extract_tool_calls(self):
-        from backend.llm.direct_clients import AnthropicClient
+        from backend.llm.mappers.anthropic import extract_tool_calls
 
         text_block = MagicMock(type="text", text="Hello")
         tool_block = MagicMock(type="tool_use", id="tu1", input={"q": "test"})
         tool_block.name = "search"
-        text, tcs = AnthropicClient._extract_anthropic_tool_calls(
-            [text_block, tool_block]
-        )
+        text, tcs = extract_tool_calls([text_block, tool_block])
         assert text == "Hello"
+        assert tcs is not None
         assert len(tcs) == 1
         assert tcs[0]["function"]["name"] == "search"
         parsed_args = json.loads(tcs[0]["function"]["arguments"])
         assert parsed_args["q"] == "test"
 
     def test_extract_no_tool_calls(self):
-        from backend.llm.direct_clients import AnthropicClient
+        from backend.llm.mappers.anthropic import extract_tool_calls
 
         text_block = MagicMock(type="text", text="Just text")
-        text, tcs = AnthropicClient._extract_anthropic_tool_calls([text_block])
+        text, tcs = extract_tool_calls([text_block])
         assert text == "Just text"
         assert tcs is None
 
     def test_prepare_kwargs(self):
-        from backend.llm.direct_clients import AnthropicClient
+        from backend.llm.mappers.anthropic import prepare_kwargs
 
-        with (
-            patch("backend.llm.direct_clients.Anthropic"),
-            patch("backend.llm.direct_clients.AsyncAnthropic"),
-        ):
-            client = AnthropicClient("claude-3", "key")
         messages = [
             {"role": "system", "content": "Be helpful"},
             {"role": "user", "content": "Hi"},
         ]
-        filtered, kwargs = client._prepare_anthropic_kwargs(messages, {})
+        filtered, kwargs = prepare_kwargs(messages, {}, default_model="claude-3")
         assert len(filtered) == 1
         assert filtered[0]["role"] == "user"
         assert kwargs["system"] == "Be helpful"
@@ -229,7 +230,7 @@ class TestAnthropicClientHelpers:
 # ---------------------------------------------------------------------------
 class TestOpenAIClientHelpers:
     def test_extract_openai_tool_calls(self):
-        from backend.llm.direct_clients import OpenAIClient
+        from backend.llm.mappers.openai import extract_tool_calls
 
         tc = MagicMock()
         tc.id = "call_1"
@@ -237,21 +238,22 @@ class TestOpenAIClientHelpers:
         tc.function.name = "search"
         tc.function.arguments = '{"q":"test"}'
         msg = MagicMock(tool_calls=[tc])
-        result = OpenAIClient._extract_openai_tool_calls(msg)
+        result = extract_tool_calls(msg)
+        assert result is not None
         assert len(result) == 1
         assert result[0]["id"] == "call_1"
 
     def test_extract_no_tool_calls(self):
-        from backend.llm.direct_clients import OpenAIClient
+        from backend.llm.mappers.openai import extract_tool_calls
 
         msg = MagicMock(tool_calls=None)
-        assert OpenAIClient._extract_openai_tool_calls(msg) is None
+        assert extract_tool_calls(msg) is None
 
     def test_extract_empty_tool_calls(self):
-        from backend.llm.direct_clients import OpenAIClient
+        from backend.llm.mappers.openai import extract_tool_calls
 
         msg = MagicMock(tool_calls=[])
-        assert OpenAIClient._extract_openai_tool_calls(msg) is None
+        assert extract_tool_calls(msg) is None
 
 
 # ---------------------------------------------------------------------------
@@ -259,23 +261,21 @@ class TestOpenAIClientHelpers:
 # ---------------------------------------------------------------------------
 class TestGeminiClientHelpers:
     def test_convert_messages(self):
-        with patch("backend.llm.direct_clients.genai"):
-            from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import convert_messages
 
-            client = GeminiClient("gemini-pro", "key")
         messages = [
             {"role": "system", "content": "System prompt"},
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there"},
         ]
-        system, gemini, caching = client._convert_messages(messages)
+        system, gemini, _caching = convert_messages(messages)
         assert system == "System prompt"
         assert len(gemini) == 2
         assert gemini[0]["role"] == "user"
         assert gemini[1]["role"] == "model"
 
     def test_extract_generation_config(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import extract_generation_config
 
         kwargs = {
             "model": "models/gemini-pro",
@@ -283,34 +283,34 @@ class TestGeminiClientHelpers:
             "max_tokens": 100,
             "top_p": 0.9,
         }
-        model_name, gen_cfg = GeminiClient._extract_gemini_generation_config(kwargs)
+        model_name, gen_cfg, _tools = extract_generation_config(kwargs)
         assert model_name == "gemini-pro"  # Strip "models/"
         assert gen_cfg["temperature"] == 0.7
         assert gen_cfg["max_output_tokens"] == 100
         assert "model" not in kwargs  # Popped
 
     def test_gemini_usage_none(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import gemini_usage
 
         resp = MagicMock(usage_metadata=None)
-        usage = GeminiClient._gemini_usage(resp)
+        usage = gemini_usage(resp)
         assert usage["prompt_tokens"] == 0
         assert usage["total_tokens"] == 0
 
     def test_gemini_usage_valid(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import gemini_usage
 
         meta = MagicMock(
             prompt_token_count=10, candidates_token_count=20, total_token_count=30
         )
         resp = MagicMock(usage_metadata=meta)
-        usage = GeminiClient._gemini_usage(resp)
+        usage = gemini_usage(resp)
         assert usage["prompt_tokens"] == 10
         assert usage["completion_tokens"] == 20
         assert usage["total_tokens"] == 30
 
     def test_extract_gemini_tool_calls(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import extract_tool_calls
 
         fc = MagicMock()
         fc.name = "search"
@@ -319,21 +319,22 @@ class TestGeminiClientHelpers:
         candidate = MagicMock()
         candidate.content = {"parts": [part]}
         resp = MagicMock(candidates=[candidate])
-        tcs = GeminiClient._extract_gemini_tool_calls(resp)
+        tcs = extract_tool_calls(resp)
+        assert tcs is not None
         assert len(tcs) == 1
         assert tcs[0]["function"]["name"] == "search"
 
     def test_extract_gemini_no_tool_calls(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import extract_tool_calls
 
         part = MagicMock(function_call=None)
         candidate = MagicMock()
         candidate.content = {"parts": [part]}
         resp = MagicMock(candidates=[candidate])
-        assert GeminiClient._extract_gemini_tool_calls(resp) is None
+        assert extract_tool_calls(resp) is None
 
     def test_extract_gemini_finish_reason_from_dict_shape(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import extract_finish_reason
 
         response = {
             "candidates": [
@@ -343,26 +344,26 @@ class TestGeminiClientHelpers:
                 }
             ]
         }
-        assert GeminiClient._extract_gemini_finish_reason(response) == "SAFETY"
+        assert extract_finish_reason(response) == "SAFETY"
 
     def test_extract_gemini_block_reason_from_prompt_feedback(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import extract_block_reason
 
         response = {
             "promptFeedback": {
                 "blockReason": "SAFETY",
             }
         }
-        assert GeminiClient._extract_gemini_block_reason(response) == "SAFETY"
+        assert extract_block_reason(response) == "SAFETY"
 
     def test_ensure_non_empty_gemini_content_synthesizes_for_empty_response(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import ensure_non_empty_content
 
         response = {
             "candidates": [{"finishReason": "SAFETY", "content": {"parts": []}}],
             "promptFeedback": {"blockReason": "SAFETY"},
         }
-        content = GeminiClient._ensure_non_empty_gemini_content(
+        content = ensure_non_empty_content(
             response,
             content="",
             tool_calls=None,
@@ -371,9 +372,9 @@ class TestGeminiClientHelpers:
         assert "blocked by safety" in content.lower()
 
     def test_ensure_non_empty_gemini_content_keeps_text_when_present(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import ensure_non_empty_content
 
-        content = GeminiClient._ensure_non_empty_gemini_content(
+        content = ensure_non_empty_content(
             response={},
             content="hello",
             tool_calls=None,
@@ -381,12 +382,18 @@ class TestGeminiClientHelpers:
         assert content == "hello"
 
     def test_ensure_non_empty_gemini_content_keeps_empty_for_tool_calls(self):
-        from backend.llm.direct_clients import GeminiClient
+        from backend.llm.mappers.gemini import ensure_non_empty_content
 
-        content = GeminiClient._ensure_non_empty_gemini_content(
+        content = ensure_non_empty_content(
             response={},
             content="",
-            tool_calls=[{"id": "tc1", "type": "function", "function": {"name": "x", "arguments": "{}"}}],
+            tool_calls=[
+                {
+                    "id": "tc1",
+                    "type": "function",
+                    "function": {"name": "x", "arguments": "{}"},
+                }
+            ],
         )
         assert content == ""
 

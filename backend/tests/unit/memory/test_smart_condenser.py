@@ -18,6 +18,7 @@ from backend.memory.condenser.impl.smart_condenser import SmartCondenser
 
 
 def _event(eid: int, cls=None, source=EventSource.AGENT, content="x") -> Event:
+    e: Event
     if cls is None or cls == MessageAction:
         e = MessageAction(content=content, wait_for_response=False)
         e._source = source  # type: ignore[attr-defined]
@@ -144,7 +145,7 @@ class TestScoreEventImportance:
     def test_falls_back_to_heuristic_without_llm(self):
         sc = SmartCondenser(llm=None)
         events = [_event(i) for i in range(5)]
-        essential = {0}
+        essential: set[int] = {0}
         scores = sc._score_event_importance(events, essential)
         # Essential events should not be scored
         assert 0 not in scores
@@ -155,7 +156,7 @@ class TestScoreEventImportance:
     def test_empty_non_essential(self):
         sc = SmartCondenser(llm=None)
         events = [_event(0)]
-        essential = {0}
+        essential: set[int] = {0}
         scores = sc._score_event_importance(events, essential)
         assert scores == {}
 
@@ -186,7 +187,7 @@ class TestSelectEventsToKeep:
     def test_keeps_high_importance(self):
         sc = SmartCondenser(llm=None, recency_bonus_window=3, importance_threshold=0.5)
         events = [_event(i) for i in range(20)]
-        essential = set()
+        essential: set[int] = set()
         scores = dict.fromkeys(range(20), 0.2)
         scores[5] = 0.9  # This one is high importance
         keep = sc._select_events_to_keep(events, essential, scores)

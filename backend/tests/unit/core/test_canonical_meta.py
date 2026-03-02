@@ -29,8 +29,9 @@ class TestCanonicalModelMetaclass:
             x: int = 1
 
         # Simulate a "reloaded" class with same name but different identity
-        class Reloaded(BaseModel):
-            x: int = 2
+        class Reloaded:
+            def __init__(self, x: int = 2) -> None:
+                self.x = x
 
         Reloaded.__name__ = "Original"
         obj = Reloaded(x=42)
@@ -43,10 +44,10 @@ class TestCanonicalModelMetaclass:
         class ModelA(BaseModel, metaclass=CanonicalModelMetaclass):
             x: int = 1
 
-        class ModelB(BaseModel):
+        class Other:
             x: int = 2
 
-        obj_b = ModelB(x=5)
+        obj_b = Other()
         assert not isinstance(obj_b, ModelA)
 
     def test_subclasscheck_same_name(self):
@@ -55,7 +56,7 @@ class TestCanonicalModelMetaclass:
         class Base(BaseModel, metaclass=CanonicalModelMetaclass):
             x: int = 1
 
-        class Other(BaseModel):
+        class Other:
             x: int = 2
 
         Other.__name__ = "Base"

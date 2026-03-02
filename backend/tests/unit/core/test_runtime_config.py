@@ -35,7 +35,7 @@ class TestRuntimeConfigValidation:
 
     def test_extra_field_rejected(self):
         with pytest.raises(Exception):
-            RuntimeConfig(nonexistent="x")
+            RuntimeConfig(**{"nonexistent": "x"})
 
     def test_custom_values(self):
         cfg = RuntimeConfig(

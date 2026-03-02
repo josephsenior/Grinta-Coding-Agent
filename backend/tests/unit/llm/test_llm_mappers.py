@@ -1,6 +1,7 @@
 """Tests for LLM exception mapping functions."""
 
 import pytest
+from typing import Any, cast
 
 from backend.llm.exceptions import (
     APIConnectionError,
@@ -64,8 +65,10 @@ class TestMapOpenAIException:
         """Test mapping OpenAI APIConnectionError."""
         try:
             import openai
+            from unittest.mock import MagicMock
 
-            exc = openai.APIConnectionError(request=None)
+            mock_request = MagicMock()
+            exc = openai.APIConnectionError(request=mock_request)
             result = _map_openai_exception(exc, model="gpt-4")
 
             assert isinstance(result, APIConnectionError)
@@ -209,7 +212,7 @@ class TestMapOpenAIException:
 
         original_openai = sys.modules.get("openai")
         if original_openai:
-            sys.modules["openai"] = None
+            sys.modules["openai"] = cast(Any, None)
 
         exc = ValueError("Some error")
         result = _map_openai_exception(exc, model="gpt-4")
@@ -263,8 +266,10 @@ class TestMapAnthropicException:
         """Test mapping Anthropic APIConnectionError."""
         try:
             import anthropic
+            from unittest.mock import MagicMock
 
-            exc = anthropic.APIConnectionError(request=None)
+            mock_request = MagicMock()
+            exc = anthropic.APIConnectionError(request=mock_request)
             result = _map_anthropic_exception(exc, model="claude-3")
 
             assert isinstance(result, APIConnectionError)

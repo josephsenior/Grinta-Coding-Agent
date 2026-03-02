@@ -15,9 +15,9 @@ from backend.events.action import CmdRunAction, FileEditAction, FileWriteAction
 # ---------------------------------------------------------------------------
 class TestAutonomyLevel:
     def test_values(self):
-        assert AutonomyLevel.SUPERVISED == "supervised"
-        assert AutonomyLevel.BALANCED == "balanced"
-        assert AutonomyLevel.FULL == "full"
+        assert AutonomyLevel.SUPERVISED.value == "supervised"
+        assert AutonomyLevel.BALANCED.value == "balanced"
+        assert AutonomyLevel.FULL.value == "full"
 
     def test_from_string(self):
         assert AutonomyLevel("supervised") is AutonomyLevel.SUPERVISED

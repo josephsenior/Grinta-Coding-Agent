@@ -314,6 +314,18 @@ output_price_per_m = 24.00
 verified = true
 
 # ── Google Gemini ───────────────────────────────────────────────────────────────
+[models."gemini-pro-latest"]
+provider = "google"
+aliases = ["google/gemini-pro-latest", "gemini-pro"]
+max_input_tokens = 32_768
+max_output_tokens = 8_192
+input_price_per_m = 0.50
+output_price_per_m = 1.50
+verified = true
+featured = true
+supports_function_calling = true
+supports_vision = true
+
 
 [models."gemini-3-deep-think"]
 provider = "google"

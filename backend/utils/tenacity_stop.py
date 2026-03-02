@@ -1,10 +1,11 @@
 """Tenacity stop condition integrating Forge shutdown listener."""
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from tenacity.stop import stop_base
 
 from backend.utils.shutdown_listener import should_exit
+
 
 if TYPE_CHECKING:
     from tenacity import RetryCallState

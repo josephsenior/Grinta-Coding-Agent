@@ -315,7 +315,7 @@ class AsyncSmartCache:
             logger.debug("🚀 Invalidated memory cache for user '%s'", user_id)
 
     async def invalidate_global_cache(self) -> None:
-        """Invalidate global config cache (when config.toml changes)."""
+        """Invalidate global config cache (when settings.json changes)."""
         # Invalidate Redis cache
         if await self._ensure_connection():
             client = self.redis_client

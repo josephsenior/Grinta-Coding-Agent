@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from backend.core.exceptions import LLMMalformedActionError
@@ -63,7 +65,7 @@ class TestNormalizeSecurityRisk:
         assert "security_risk" not in args
 
     def test_no_key(self):
-        args = {}
+        args: dict[str, Any] = {}
         _normalize_security_risk(args)
         assert "security_risk" not in args
 

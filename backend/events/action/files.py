@@ -109,6 +109,7 @@ class FileEditAction(Action):
     old_str: str | None = None
     new_str: str | None = None
     insert_line: int | None = None
+    view_range: list[int] | None = None
     content: str = ""
     start: int = 1
     end: int = -1

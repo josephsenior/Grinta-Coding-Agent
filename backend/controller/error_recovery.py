@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sys
 from enum import Enum
 
 from backend.core.exceptions import (
@@ -39,6 +40,16 @@ _AUTH_INDICATORS = (
     "invalid credentials",
     "authenticate",
 )
+
+
+def _is_windows_platform() -> bool:
+    """Return True when running on a Windows host."""
+    return sys.platform == "win32"
+
+
+def _powershell_escape_single_quoted(value: str) -> str:
+    """Escape a string for use inside PowerShell single quotes."""
+    return value.replace("'", "''")
 
 
 def _is_auth_related_tool_error(error_str: str) -> bool:
@@ -450,17 +461,42 @@ class ErrorRecoveryStrategy:
                 AgentThinkAction(
                     thought="File not found error. Verifying current directory and listing files...",
                 ),
-                CmdRunAction(command="pwd"),
-                CmdRunAction(command="ls -F"),
+                CmdRunAction(
+                    command=(
+                        "Get-Location | Select-Object -ExpandProperty Path"
+                        if _is_windows_platform()
+                        else "pwd"
+                    )
+                ),
+                CmdRunAction(
+                    command=(
+                        "Get-ChildItem -Force"
+                        if _is_windows_platform()
+                        else "ls -F"
+                    )
+                ),
             ]
 
             if filename:
                 # If we have a filename, try to find it
                 base_name = filename.split("/")[-1]
                 if base_name and base_name:
+                    if _is_windows_platform():
+                        escaped = _powershell_escape_single_quoted(base_name)
+                        find_cmd = (
+                            "Get-ChildItem -Path . -Recurse -Depth 3 "
+                            "-ErrorAction SilentlyContinue | "
+                            f"Where-Object {{ $_.Name -like '*{escaped}*' }} | "
+                            "Select-Object -ExpandProperty FullName"
+                        )
+                    else:
+                        find_cmd = (
+                            "find . -name "
+                            f"'*{base_name}*' -not -path '*/.*' -maxdepth 3 2>/dev/null || true"
+                        )
                     actions.append(
                         CmdRunAction(
-                            command=f"find . -name '*{base_name}*' -not -path '*/.*' -maxdepth 3 2>/dev/null || true"
+                            command=find_cmd
                         )
                     )
 
@@ -475,8 +511,20 @@ class ErrorRecoveryStrategy:
             AgentThinkAction(
                 thought="Filesystem error detected. Checking directory structure and permissions...",
             ),
-            CmdRunAction(command="pwd"),
-            CmdRunAction(command="ls -la"),
+            CmdRunAction(
+                command=(
+                    "Get-Location | Select-Object -ExpandProperty Path"
+                    if _is_windows_platform()
+                    else "pwd"
+                )
+            ),
+            CmdRunAction(
+                command=(
+                    "Get-ChildItem -Force"
+                    if _is_windows_platform()
+                    else "ls -la"
+                )
+            ),
             MessageAction(
                 content="Filesystem error encountered. Verified current directory. "
                 "Will create necessary directories or adjust approach.",

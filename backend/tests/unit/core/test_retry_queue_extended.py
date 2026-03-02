@@ -281,6 +281,7 @@ class TestInMemoryRetryBackend(unittest.IsolatedAsyncioTestCase):
 
         result = await self.backend.mark_failure(task, 30.0)
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertGreater(result.next_attempt_at, time.time())
         self.assertIn("tf", self.backend._tasks)
 
@@ -434,6 +435,7 @@ class TestRetryQueue(unittest.IsolatedAsyncioTestCase):
             ready[0], error_message="connection refused"
         )
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result.reason, "connection refused")
 
     async def test_mark_failure_exhausted(self):
@@ -509,6 +511,7 @@ class TestGetRetryQueue(unittest.TestCase):
         ):
             result = get_retry_queue()
             self.assertIsNotNone(result)
+            assert result is not None
             self.assertIsInstance(result, RetryQueue)
             self.assertIsInstance(result.backend, InMemoryRetryBackend)
 
@@ -539,6 +542,7 @@ class TestGetRetryQueue(unittest.TestCase):
             clear=False,
         ):
             q = get_retry_queue()
+            assert q is not None
             self.assertEqual(q.base_delay, 30.0)
             self.assertEqual(q.max_delay, 1800.0)
             self.assertEqual(q.max_retries, 5)

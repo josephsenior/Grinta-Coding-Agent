@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
@@ -481,7 +482,7 @@ class TestConvertMultipleToSingle:
             },
             {"role": "tool", "tool_call_id": "t1", "content": "done"},
         ]
-        result = convert_from_multiple_tool_calls_to_single_tool_call_messages(messages)
+        result = convert_from_multiple_tool_calls_to_single_tool_call_messages(cast(list[dict[Any, Any]], messages))
         assert len(result) == 2
 
     def test_multiple_tool_calls_split(self):
@@ -505,7 +506,7 @@ class TestConvertMultipleToSingle:
             {"role": "tool", "tool_call_id": "t1", "content": "r1"},
             {"role": "tool", "tool_call_id": "t2", "content": "r2"},
         ]
-        result = convert_from_multiple_tool_calls_to_single_tool_call_messages(messages)
+        result = convert_from_multiple_tool_calls_to_single_tool_call_messages(cast(list[dict[Any, Any]], messages))
         # Should have: assistant(t1), tool(t1), assistant(t2), tool(t2)
         assert len(result) == 4
 

@@ -25,8 +25,9 @@ if TYPE_CHECKING:
 
 
 # Event types eligible for coalescing and how to merge them.
+# NOTE: StreamingChunkAction is intentionally NOT here — each chunk must be
+# dispatched individually so the frontend can display tokens as they arrive.
 _COALESCE_TYPES: set[str] = {
-    "StreamingChunkAction",
     "AgentStateChangedObservation",
     "NullObservation",
     "ChangeAgentStateAction",

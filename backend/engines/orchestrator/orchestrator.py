@@ -317,6 +317,54 @@ class Orchestrator(Agent):
             # Wrap generic exceptions in AgentRuntimeError for standardized handling upstream
             raise AgentRuntimeError(f"Critical agent failure: {str(e)}") from e
 
+    async def astep(self, state: State) -> Action:
+        """Async version of step() that uses real LLM streaming."""
+        try:
+            exit_action = self._check_exit_command(state)
+            if exit_action:
+                return exit_action
+
+            pending = self._consume_pending_action()
+            if pending:
+                self._steps_since_reflection += 1
+                return pending
+
+            reflection = self._maybe_inject_reflection(state)
+            if reflection:
+                return reflection
+
+            condensed = self.memory_manager.condense_history(state)
+            self._steps_since_reflection += 1
+            return await self._execute_llm_step_async(state, condensed)
+
+        except ContextLimitError:
+            logger.warning(
+                "Auto-Healing: Context limit reached. Attempting condensation + retry."
+            )
+            try:
+                condensed = self.memory_manager.condense_history(state)
+                return await self._execute_llm_step_async(state, condensed)
+            except Exception:
+                logger.warning(
+                    "Auto-Healing retry failed after condensation. Falling back to think action."
+                )
+                return AgentThinkAction(
+                    thought="I have reached the context limit. I must condense my memory before proceeding.",
+                )
+
+        except ToolExecutionError as e:
+            logger.warning("Auto-Healing: Tool Execution Error: %s", e)
+            return AgentThinkAction(
+                thought=f"I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.",
+            )
+
+        except ModelProviderError:
+            raise
+
+        except Exception as e:
+            logger.error("Critical Failure in Orchestrator.astep: %s", e, exc_info=True)
+            raise AgentRuntimeError(f"Critical agent failure: {str(e)}") from e
+
     def _handle_pending_action_from_condensation(
         self, state: State, condensed: Any
     ) -> Action | None:
@@ -367,6 +415,46 @@ class Orchestrator(Agent):
         self._sync_executor_llm()
 
         result = self.executor.execute(params, self.event_stream)
+
+        try:
+            if hasattr(state, "ack_planning_directive"):
+                state.ack_planning_directive(source="Orchestrator")
+            if hasattr(state, "ack_memory_pressure"):
+                state.ack_memory_pressure(source="Orchestrator")
+        finally:
+            with contextlib.suppress(Exception):
+                state.extra_data.pop("planning_directive", None)
+                state.extra_data.pop("memory_pressure", None)
+
+        self._last_llm_latency = result.execution_time
+
+        actions = result.actions or []
+        if not actions:
+            return self._build_fallback_action(result)
+        self._queue_additional_actions(actions[1:])
+        return actions[0]
+
+    async def _execute_llm_step_async(self, state: State, condensed: Any) -> Action:
+        """Async variant of _execute_llm_step using real LLM streaming."""
+        pending = self._handle_pending_action_from_condensation(state, condensed)
+        if pending is not None:
+            return pending
+
+        initial_user_message = self.memory_manager.get_initial_user_message(
+            state.history
+        )
+        self._set_prompt_tier_from_recent_history(state)
+
+        messages = self.memory_manager.build_messages(
+            condensed_history=condensed.events,
+            initial_user_message=initial_user_message,
+            llm_config=self.llm.config,
+        )
+        serialized_messages = self._serialize_messages(messages)
+        params = self.planner.build_llm_params(serialized_messages, state, self.tools)
+        self._sync_executor_llm()
+
+        result = await self.executor.async_execute(params, self.event_stream)
 
         try:
             if hasattr(state, "ack_planning_directive"):

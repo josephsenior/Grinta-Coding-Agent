@@ -66,7 +66,7 @@ class TestAgentConfigValidation:
 
     def test_extra_fields_rejected(self):
         with pytest.raises(ValidationError):
-            AgentConfig(nonexistent_field="value")
+            AgentConfig(**{"nonexistent_field": "value"})
 
 
 class TestAgentConfigCustom:

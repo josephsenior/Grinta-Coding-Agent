@@ -13,6 +13,7 @@ Tests the full push-based navigation flow:
 
 import os
 import unittest
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 from textual.widgets import Input, Label, ListView, Select, Static
@@ -78,6 +79,9 @@ def _make_mock_client() -> MagicMock:
     client.get_workspace_changes = AsyncMock(return_value=[])
     client.get_file_diff = AsyncMock(return_value={"diff": ""})
     client.set_secret = AsyncMock(return_value=None)
+    client.get_budget_limits = AsyncMock(
+        return_value={"session_limit": None, "daily_limit": None}
+    )
 
     return client
 
@@ -201,7 +205,7 @@ class TestNavigation(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
 
             self.assertIsInstance(app.screen, ChatScreen)
-            self.assertEqual(app.screen.conversation_id, "conv_1")
+            self.assertEqual(cast(Any, app.screen).conversation_id, "conv_1")
 
     async def test_dismiss_returns_to_home(self) -> None:
         """Dismissing ChatScreen should pop back to HomeScreen."""
@@ -217,7 +221,7 @@ class TestNavigation(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.screen, ChatScreen)
 
             # Pop back via the action method (same as ctrl+q binding)
-            app.screen.action_go_home()
+            cast(Any, app.screen).action_go_home()
             for _ in range(8):
                 await pilot.pause()
             self.assertIsInstance(app.screen, HomeScreen)

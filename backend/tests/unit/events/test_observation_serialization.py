@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 from backend.events.observation import (
@@ -44,12 +46,12 @@ class TestUpdateCmdOutputMetadata:
     def test_dict_updates(self):
         meta = {"exit_code": -1}
         result = _update_cmd_output_metadata(meta, exit_code=0)
-        assert result["exit_code"] == 0
+        assert cast(dict[str, Any], result)["exit_code"] == 0
 
     def test_instance_updates(self):
         meta = CmdOutputMetadata(exit_code=-1)
         result = _update_cmd_output_metadata(meta, exit_code=42)
-        assert result.exit_code == 42
+        assert cast(CmdOutputMetadata, result).exit_code == 42
 
 
 # ── _process_recall_observation_data ─────────────────────────────────
@@ -62,7 +64,7 @@ class TestProcessRecallData:
         assert extras["recall_type"] == RecallType.WORKSPACE_CONTEXT
 
     def test_no_recall_type(self):
-        extras = {}
+        extras: dict[str, Any] = {}
         _process_recall_observation_data(extras)
         assert "recall_type" not in extras
 
@@ -87,9 +89,9 @@ class TestObservationFromDict:
         assert isinstance(obs, FileReadObservation)
 
     def test_cmd_output_observation(self):
-        # CmdOutputObservation.observation is an empty string in the registry
+        # CmdOutputObservation maps to observation_type "run"
         d = {
-            "observation": "",
+            "observation": "run",
             "content": "output",
             "extras": {"command": "ls", "command_id": 1},
         }

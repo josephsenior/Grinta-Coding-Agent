@@ -3,6 +3,7 @@
 import json
 import tempfile
 from pathlib import Path
+from typing import Any, cast
 
 
 from backend.tools.sanitize_trajectories import (
@@ -239,7 +240,7 @@ class TestSanitizeDict:
     def test_sanitize_dict_removes_null_nested(self):
         """Test sanitizing dict removes null nested values."""
         obj = {"valid": "data", "nested": {"observation": "null"}}
-        result = _sanitize_dict(obj)
+        result = cast(dict[str, Any], _sanitize_dict(obj))
         # Nested null event should be removed
         assert (
             "nested" not in result or result["nested"] is None or result["nested"] == {}

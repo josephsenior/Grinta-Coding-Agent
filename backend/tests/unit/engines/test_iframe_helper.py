@@ -28,7 +28,7 @@ class TestAddIframeHeaders:
         assert "Content-Security-Policy" in result
 
     def test_returns_same_dict(self):
-        headers = {}
+        headers: dict[str, str] = {}
         result = add_iframe_headers(headers)
         assert result is headers
 

@@ -13,9 +13,9 @@ Covers all pure/near-pure functions:
 
 from __future__ import annotations
 
-import os
 import re
 from types import MappingProxyType
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -280,6 +280,7 @@ class TestApplyConversationOverrides:
         )
         expected = task.get_prompt_for_task()
         assert msg == expected
+        assert msg is not None
         assert "Fix failing checks" in msg
         assert "#7" in msg
 
@@ -295,6 +296,7 @@ class TestApplyConversationOverrides:
         )
         assert repo == "new/repo"
         assert provider == ProviderType.ENTERPRISE_SSO
+        assert msg is not None
         assert "All overrides" in msg
 
 
@@ -313,25 +315,25 @@ class TestNormalizeProviderTokens:
         original = MappingProxyType(
             {ProviderType.ENTERPRISE_SSO: "token123"}
         )
-        result = normalize_provider_tokens(original)
+        result = normalize_provider_tokens(cast(Any, original))
         assert result is original
 
     def test_dict_with_enum_keys_becomes_mapping_proxy(self):
         tokens = {ProviderType.ENTERPRISE_SSO: "token_val"}
-        result = normalize_provider_tokens(tokens)
+        result = normalize_provider_tokens(cast(Any, tokens))
         assert isinstance(result, MappingProxyType)
         assert result[ProviderType.ENTERPRISE_SSO] == "token_val"
 
     def test_dict_with_valid_string_key_converted_to_enum(self):
         tokens = {"enterprise_sso": "token_val"}
-        result = normalize_provider_tokens(tokens)
+        result = normalize_provider_tokens(cast(Any, tokens))
         assert isinstance(result, MappingProxyType)
         assert ProviderType.ENTERPRISE_SSO in result
         assert result[ProviderType.ENTERPRISE_SSO] == "token_val"
 
     def test_dict_with_invalid_string_key_is_silently_dropped(self):
         tokens = {"not_a_valid_provider": "token_val"}
-        result = normalize_provider_tokens(tokens)
+        result = normalize_provider_tokens(cast(Any, tokens))
         assert isinstance(result, MappingProxyType)
         assert len(result) == 0
 
@@ -340,7 +342,7 @@ class TestNormalizeProviderTokens:
             "enterprise_sso": "good_token",
             "invalid_key": "bad_token",
         }
-        result = normalize_provider_tokens(tokens)
+        result = normalize_provider_tokens(cast(Any, tokens))
         assert ProviderType.ENTERPRISE_SSO in result
         assert len(result) == 1
 
@@ -397,7 +399,7 @@ class TestPrepareConversationParams:
     def test_provided_tokens_normalized(self):
         raw_tokens = {"enterprise_sso": "my_token"}
         _, tokens, _ = prepare_conversation_params(
-            user_id=None, provider_tokens=raw_tokens, user_secrets=None
+            user_id=None, provider_tokens=cast(Any, raw_tokens), user_secrets=None
         )
         assert isinstance(tokens, MappingProxyType)
         assert ProviderType.ENTERPRISE_SSO in tokens
@@ -445,7 +447,6 @@ class TestHandleConversationErrors:
 class TestResolveConversationId:
     def test_without_env_var_always_generates_uuid(self):
         data = _make_init_request(conversation_id="user-supplied-id")
-        env = {"ALLOW_SET_CONVERSATION_ID": "0"}
         with pytest.MonkeyPatch().context() as m:
             m.setenv("ALLOW_SET_CONVERSATION_ID", "0")
             result = resolve_conversation_id(data)

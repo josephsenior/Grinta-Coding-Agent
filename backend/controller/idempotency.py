@@ -20,6 +20,7 @@ Usage::
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
@@ -49,7 +50,8 @@ _READ_ONLY_COMMAND_PATTERNS: tuple[str, ...] = (
     "pytest", "python -m pytest", "npm test", "yarn test",
     "make test", "go test", "cargo test",
     "cat ", "head ", "tail ", "grep ", "rg ",
-    "ls ", "find ", "tree ", "wc ",
+    "ls", "find ", "tree ", "wc ",
+    "get-childitem", "dir ", "pwd", "get-location",
     "git status", "git diff", "git log",
     "python -c", "node -e",
 )
@@ -60,6 +62,16 @@ _IDEMPOTENT_ACTIONS: set[str] = {
     "AgentThinkAction",
     "MessageAction",
 }
+
+
+def _normalize_command_for_readonly_match(command: str) -> str:
+    """Normalize shell command for robust read-only pattern matching.
+
+    Handles common prompt prefixes and case differences, e.g. "$ ls -F".
+    """
+    cmd = command.strip()
+    cmd = re.sub(r"^\s*(?:PS\s+[^>]*>\s*|PS>\s*|\$\s*)", "", cmd, flags=re.IGNORECASE)
+    return cmd.lower().strip()
 
 
 def compute_idempotency_key(action: Any) -> str:
@@ -129,8 +141,8 @@ class IdempotencyMiddleware(ToolInvocationMiddleware):
         action_name = type(ctx.action).__name__
         if action_name == "CmdRunAction":
             cmd = getattr(ctx.action, "command", "")
-            cmd_stripped = cmd.strip()
-            if any(cmd_stripped.startswith(pat) for pat in _READ_ONLY_COMMAND_PATTERNS):
+            normalized_cmd = _normalize_command_for_readonly_match(cmd)
+            if any(normalized_cmd.startswith(pat) for pat in _READ_ONLY_COMMAND_PATTERNS):
                 return  # Always allow verification/read commands
 
         # Check for recent duplicate

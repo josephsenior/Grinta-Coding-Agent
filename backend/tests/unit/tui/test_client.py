@@ -4,6 +4,7 @@ Tests HTTP client for backend API communication.
 """
 
 import unittest
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -29,7 +30,7 @@ class TestConversationInfo(unittest.TestCase):
         """Test ConversationInfo with optional fields."""
         info = ConversationInfo(
             conversation_id="conv_123",
-            title=None,
+            title=cast(str, None),
             status="completed",
         )
         self.assertIsNone(info.title)

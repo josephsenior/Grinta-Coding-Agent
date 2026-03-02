@@ -176,7 +176,7 @@ Help ─────────────┘
             """\
 ## Model Selection
 
-Switch models in **Settings** or by editing `config.toml`.
+Switch models in **Settings** or by editing `settings.json`.
 
 ### Cloud Models
 | Provider | Model ID | Notes |

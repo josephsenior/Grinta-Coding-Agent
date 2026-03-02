@@ -14,12 +14,12 @@ from backend.events.stream import (
 class TestEventStreamSubscriber:
     def test_enum_values(self):
         """Test EventStreamSubscriber enum values."""
-        assert EventStreamSubscriber.AGENT_CONTROLLER == "agent_controller"
-        assert EventStreamSubscriber.SERVER == "server"
-        assert EventStreamSubscriber.RUNTIME == "runtime"
-        assert EventStreamSubscriber.MEMORY == "memory"
-        assert EventStreamSubscriber.MAIN == "main"
-        assert EventStreamSubscriber.TEST == "test"
+        assert EventStreamSubscriber.AGENT_CONTROLLER.value == "agent_controller"
+        assert EventStreamSubscriber.SERVER.value == "server"
+        assert EventStreamSubscriber.RUNTIME.value == "runtime"
+        assert EventStreamSubscriber.MEMORY.value == "memory"
+        assert EventStreamSubscriber.MAIN.value == "main"
+        assert EventStreamSubscriber.TEST.value == "test"
 
     def test_enum_is_string(self):
         """Test that EventStreamSubscriber extends str."""

@@ -5,7 +5,7 @@ Targets low coverage in plugin.py.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -156,7 +156,7 @@ class TestDispatchHooks:
         registry.register(_MutatingPlugin())
         action = MagicMock()
         result = await registry.dispatch_action_pre(action)
-        assert result.mutated is True
+        assert cast(Any, result).mutated is True
 
     @pytest.mark.asyncio
     async def test_dispatch_action_pre_tolerates_exception(
@@ -212,7 +212,7 @@ class TestDispatchHooks:
     @pytest.mark.asyncio
     async def test_dispatch_llm_post(self, registry: PluginRegistry):
         registry.register(_SimplePlugin())
-        resp = {"choices": []}
+        resp: dict[str, Any] = {"choices": []}
         result = await registry.dispatch_llm_post(resp)
         assert result is resp
 
@@ -293,7 +293,7 @@ class TestForgePluginDefaultHooks:
 
     @pytest.mark.asyncio
     async def test_on_llm_post_passthrough(self):
-        resp = {"choices": []}
+        resp: dict[str, Any] = {"choices": []}
         plugin = _SimplePlugin()
         assert await plugin.on_llm_post(resp) is resp
 

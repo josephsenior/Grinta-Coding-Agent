@@ -9,6 +9,7 @@ Business logic is delegated to:
 from __future__ import annotations
 
 import sys
+import traceback
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -237,7 +238,7 @@ async def new_conversation(
             if settings:
                 settings = settings.merge_with_config_settings()
                 logger.info(
-                    "Loaded default settings from config.toml for user_id: %s", user_id
+                    "Loaded default settings from settings.json for user_id: %s", user_id
                 )
         except Exception as e:
             logger.error("Failed to load settings from config: %s", e)
@@ -313,6 +314,8 @@ async def new_conversation(
         )
     except Exception as e:
         logger.exception("Failed to initialize conversation: %s", e)
+        with open("crash_new_conv.log", "w") as f:
+            traceback.print_exc(file=f)
         return handle_conversation_errors(e)
 
 

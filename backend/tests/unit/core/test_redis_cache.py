@@ -234,7 +234,7 @@ class TestDistributedCacheRedisEdgeCases:
 
     def test_set_json_serialization_failure(self, redis_cache):
         # Create a circular reference which will fail JSON serialization
-        circular = {}
+        circular: dict[str, object] = {}
         circular["self"] = circular
 
         # Even with _json_fallback, deeply nested circular refs will fail

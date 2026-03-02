@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from typing import cast
 
 
 from backend.controller.services.telemetry_service import TelemetryService
+from backend.events.action.action import Action
 
 
 def _make_context(**overrides) -> MagicMock:
@@ -76,7 +78,7 @@ class TestHandleBlockedInvocation:
     def test_emits_error_observation(self):
         ctx = _make_context()
         svc = TelemetryService(ctx)
-        action = SimpleNamespace(id=1)
+        action = cast(Action, SimpleNamespace(id=1))
         invocation_ctx = MagicMock()
         invocation_ctx.block_reason = "Too dangerous"
         invocation_ctx.metadata = {}
@@ -91,7 +93,7 @@ class TestHandleBlockedInvocation:
     def test_handled_metadata_skips_error_observation(self):
         ctx = _make_context()
         svc = TelemetryService(ctx)
-        action = SimpleNamespace(id=1)
+        action = cast(Action, SimpleNamespace(id=1))
         invocation_ctx = MagicMock()
         invocation_ctx.block_reason = "blocked"
         invocation_ctx.metadata = {"handled": True}
@@ -103,7 +105,7 @@ class TestHandleBlockedInvocation:
     def test_telemetry_failure_does_not_propagate(self):
         ctx = _make_context()
         svc = TelemetryService(ctx)
-        action = SimpleNamespace(id=1)
+        action = cast(Action, SimpleNamespace(id=1))
         invocation_ctx = MagicMock()
         invocation_ctx.block_reason = "boom"
         invocation_ctx.metadata = {}

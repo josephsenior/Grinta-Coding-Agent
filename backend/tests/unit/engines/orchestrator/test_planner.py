@@ -1,6 +1,7 @@
 """Tests for backend.engines.orchestrator.planner."""
 
 from __future__ import annotations
+from typing import Any, cast
 
 from unittest.mock import MagicMock, patch
 
@@ -147,7 +148,7 @@ class TestShouldUseShortToolDescriptions:
 
     def test_no_llm_returns_false(self):
         p = _make_planner(llm=_make_llm())
-        p._llm = None
+        cast(Any, p)._llm = None
         assert p._should_use_short_tool_descriptions() is False
 
 
@@ -331,12 +332,12 @@ class TestDetermineToolChoice:
 class TestBuildToolset:
     def _mock_tool(self, name: str):
         t = MagicMock()
-        t.__repr__ = lambda self: name
+        cast(Any, t).__repr__ = lambda: name
         return t
 
     def test_cache_cleared_on_rebuild(self):
         p = _make_planner()
-        p._checked_tools_cache = ["old_cache"]
+        cast(Any, p)._checked_tools_cache = ["old_cache"]
 
         with (
             patch(
@@ -378,20 +379,22 @@ class TestBuildToolset:
 class TestAddBrowsingTool:
     def test_windows_uses_web_reader_tool(self):
         # NOTE: Browsing implementation moved to MCP in recent versions.
-        # This test is kept to verify that no legacy browsing tools are
-        # inadvertently added when enable_browsing=True.
+        # _add_browsing_tool always adds verify_ui_change for frontend verification.
         cfg = _make_config(enable_browsing=True)
         p = _make_planner(config=cfg)
-        tools = []
+        tools: list[Any] = []
         p._add_browsing_tool(tools)
-        assert tools == []
+        assert len(tools) == 1
+        assert tools[0].get("function", {}).get("name") == "verify_ui_change"
 
     def test_browsing_disabled_adds_nothing(self):
+        # _add_browsing_tool always adds verify_ui_change for frontend verification.
         cfg = _make_config(enable_browsing=False)
         p = _make_planner(config=cfg)
-        tools = []
+        tools: list[Any] = []
         p._add_browsing_tool(tools)
-        assert tools == []
+        assert len(tools) == 1
+        assert tools[0].get("function", {}).get("name") == "verify_ui_change"
 
 
 # ---------------------------------------------------------------------------
@@ -455,7 +458,7 @@ class TestBuildLlmParams:
         p = _make_planner()
         state = _make_state()
         messages = [{"role": "user", "content": "add function"}]
-        tools = []
+        tools: list[Any] = []
 
         with patch("backend.engines.orchestrator.planner.check_tools", return_value=[]):
             params = p.build_llm_params(messages, state, tools)
@@ -543,7 +546,7 @@ class TestBuildLlmParams:
 class TestMetaCognitionTools:
     def test_meta_cognition_tools_added_by_default(self):
         p = _make_planner()
-        tools = []
+        tools: list[Any] = []
         p._add_core_tools(tools, use_short_tool_desc=True)
         names = [t.get("function", {}).get("name") for t in tools]
         assert "uncertainty" in names
@@ -554,7 +557,7 @@ class TestMetaCognitionTools:
     def test_meta_cognition_tools_can_be_disabled(self):
         cfg = _make_config(enable_meta_cognition=False)
         p = _make_planner(config=cfg)
-        tools = []
+        tools: list[Any] = []
         p._add_core_tools(tools, use_short_tool_desc=True)
         names = [t.get("function", {}).get("name") for t in tools]
         assert "uncertainty" not in names

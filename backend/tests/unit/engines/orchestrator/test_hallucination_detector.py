@@ -12,7 +12,6 @@ import pytest
 
 from backend.engines.orchestrator.hallucination_detector import HallucinationDetector
 from backend.events.action.files import FileEditAction
-from backend.events.action import NullAction
 
 
 # ---------------------------------------------------------------------------

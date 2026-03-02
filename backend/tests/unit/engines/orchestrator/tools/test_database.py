@@ -1,6 +1,8 @@
 """Tests for backend.engines.orchestrator.tools.database."""
 from __future__ import annotations
 
+from typing import Any
+
 from backend.engines.orchestrator.tools.database import (
     create_database_connect_tool,
     create_database_query_tool,
@@ -14,19 +16,19 @@ from backend.engines.orchestrator.tools.database import (
 # ---------------------------------------------------------------------------
 
 
-def _get_func(tool: dict) -> dict:
+def _get_func(tool: Any) -> Any:
     return tool["function"]
 
 
-def _get_params(tool: dict) -> dict:
+def _get_params(tool: Any) -> Any:
     return _get_func(tool)["parameters"]
 
 
-def _required(tool: dict) -> list[str]:
+def _required(tool: Any) -> list[str]:
     return _get_params(tool).get("required", [])
 
 
-def _properties(tool: dict) -> dict:
+def _properties(tool: Any) -> Any:
     return _get_params(tool).get("properties", {})
 
 

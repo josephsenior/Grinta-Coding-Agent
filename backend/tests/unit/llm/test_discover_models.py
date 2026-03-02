@@ -146,7 +146,7 @@ class TestStatusCommand(TestCase):
             output = fake_out.getvalue()
 
         lines = output.split("\n")
-        status_lines = [l for l in lines if "RUNNING" in l or "NOT FOUND" in l]
+        status_lines = [ln for ln in lines if "RUNNING" in ln or "NOT FOUND" in ln]
         self.assertGreaterEqual(len(status_lines), 2)
 
     @patch("backend.llm.discover_models.check_local_providers")
@@ -177,7 +177,7 @@ class TestAliasesCommand(TestCase):
 
         self.assertIn("No model aliases defined", output)
         self.assertIn("model_aliases", output)
-        self.assertIn("config.toml", output)
+        self.assertIn("settings.json", output)
 
     @patch("backend.llm.discover_models.get_alias_manager")
     def test_aliases_with_aliases(self, mock_get_manager):

@@ -4,7 +4,7 @@ Classes:
     Observation
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import ClassVar
 
 from backend._canonical import CanonicalMeta
@@ -23,6 +23,7 @@ class Observation(Event, metaclass=CanonicalMeta):
 
     content: str
     observation: ClassVar[str] = ""
+    truncation_strategy: str | None = field(default=None, kw_only=True)
     __test__: ClassVar[bool] = False
 
     @property

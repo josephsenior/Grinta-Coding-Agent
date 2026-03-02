@@ -84,7 +84,7 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 ### 🐧 Linux / macOS / Manual
 1. **Prerequisites:** Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 2. **Install:** `uv sync`
-3. **Setup Config:** `cp config.template.toml config.toml`
+3. **Setup Config:** `cp settings.template.json settings.json`
 4. **Start Backend:** `uv run python start_server.py`
 5. **Start TUI:** `uv run forge-tui`
 
@@ -95,7 +95,7 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 Forge features an **Intelligent Provider Resolver** that handles routing, local discovery, and model aliases automatically.
 
 ### Cloud Models
-Configure in `config.toml`. Forge auto-resolves providers (OpenAI, Anthropic, Gemini, etc.):
+Configure in `settings.json`. Forge auto-resolves providers (OpenAI, Anthropic, Gemini, etc.):
 - **Anthropic**: `claude-3-7-sonnet` (Native SDK, no prefix needed)
 - **OpenAI**: `gpt-4o`, `gpt-4o-mini`
 - **Google**: `gemini-2.0-pro-exp`
@@ -103,18 +103,19 @@ Configure in `config.toml`. Forge auto-resolves providers (OpenAI, Anthropic, Ge
 ### Local Models & Auto-Discovery
 Forge automatically discovers running local providers (Ollama, LM Studio, vLLM):
 1. Start your local provider (e.g., `ollama serve`).
-2. Set `model = "ollama/llama3.2"` (or `lmstudio/...`) in `config.toml`.
+2. Set `llm_model = "ollama/llama3.2"` (or `lmstudio/...`) in `settings.json`.
 3. Forge probes localhost ports (:11434, :1234, :8000) and routes locally with ZERO manual configuration.
 
 ### Model Aliases
-Define semantic aliases in `config.toml` to swap models without changing code:
-```toml
-[model_aliases]
-coding = "claude-3-7-sonnet"
-fast = "gpt-4o-mini"
-local = "ollama/qwen2.5-coder"
+Define semantic aliases in `settings.json` to swap models without changing code:
+```json
+"model_aliases": {
+  "coding": "claude-3-7-sonnet",
+  "fast": "gpt-4o-mini",
+  "local": "ollama/qwen2.5-coder"
+}
 ```
-Then use `model = "coding"` in your config or agent settings.
+Then use `llm_model = "coding"` in your settings or agent config.
 
 ---
 

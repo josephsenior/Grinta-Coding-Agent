@@ -5,12 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    # This should not happen on Python 3.12, but we keep the fallback structure
-    # for compatibility with older environments if they bypass our version check.
-    import tomli as tomllib  # type: ignore[no-redef]
+import json
 
 from pydantic import BaseModel, Field
 
@@ -23,7 +18,7 @@ from backend.core.providers import (
 if TYPE_CHECKING:
     pass
 
-_LOCAL_CONFIG_FILE_PATH = Path.home() / ".Forge" / "config.toml"
+_LOCAL_CONFIG_FILE_PATH = Path.home() / ".Forge" / "settings.json"
 _DEFAULT_CONFIG: dict[str, dict[str, list[str]]] = {"runtime": {"trusted_dirs": []}}
 
 
@@ -35,9 +30,9 @@ def get_local_config_trusted_dirs() -> list[str]:
 
     """
     if _LOCAL_CONFIG_FILE_PATH.exists():
-        with open(_LOCAL_CONFIG_FILE_PATH, "rb") as f:
+        with open(_LOCAL_CONFIG_FILE_PATH, encoding="utf-8") as f:
             try:
-                config = tomllib.load(f)
+                config = json.load(f)
             except Exception:
                 config = _DEFAULT_CONFIG
         if "runtime" in config and "trusted_dirs" in config["runtime"]:
@@ -49,8 +44,8 @@ def _load_local_config() -> dict:
     """Load local config file or return default config."""
     if _LOCAL_CONFIG_FILE_PATH.exists():
         try:
-            with open(_LOCAL_CONFIG_FILE_PATH, "rb") as f:
-                return tomllib.load(f)
+            with open(_LOCAL_CONFIG_FILE_PATH, encoding="utf-8") as f:
+                return json.load(f)
         except Exception:
             return _DEFAULT_CONFIG
     else:
@@ -74,20 +69,8 @@ def _add_trusted_dir(config: dict, folder_path: str) -> None:
 
 def _save_local_config(config: dict) -> None:
     """Save config to local config file."""
-    try:
-        import tomli_w
-
-        with open(_LOCAL_CONFIG_FILE_PATH, "wb") as f:
-            f.write(tomli_w.dumps(config).encode("utf-8"))
-    except ImportError:
-        # Fallback to a very simple manual dump if only runtime dirs are involved
-        # or just log a warning. For now, we prefer keeping tomli-w for these
-        # rare write operations.
-        from backend.core import logger
-
-        logger.forge_logger.warning(
-            "The 'tomli-w' package is required to save configuration changes. Please install it with 'pip install tomli-w'."
-        )
+    with open(_LOCAL_CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
 
 
 def add_local_config_trusted_dir(folder_path: str) -> None:

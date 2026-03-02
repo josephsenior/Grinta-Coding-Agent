@@ -182,7 +182,7 @@ class TestElapsedSince:
 
     def test_missing_start_time_returns_zero(self):
         tt = ToolTelemetry()
-        telemetry = {}
+        telemetry: dict[str, float] = {}
         duration = tt._elapsed_since(telemetry)
         assert duration == 0.0
 

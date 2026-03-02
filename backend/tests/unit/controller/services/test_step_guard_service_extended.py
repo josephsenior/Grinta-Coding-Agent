@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 from backend.controller.services.step_guard_service import StepGuardService
-from backend.core.schemas import AgentState
 from backend.events import EventSource
 from backend.events.action import AgentThinkAction
 

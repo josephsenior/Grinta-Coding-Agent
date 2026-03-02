@@ -5,18 +5,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import forge_logger as logger
-from backend.events.action import MessageAction
-from backend.events.observation import Observation
 from backend.memory.condenser.condenser import BaseLLMCondenser, Condensation
 from backend.memory.view import View
 
 if TYPE_CHECKING:
     from backend.events.event import Event
-    from backend.llm.llm_registry import LLMRegistry
 
 try:
     from sentence_transformers import SentenceTransformer
-    import numpy as np
     HAS_SENTENCE_TRANSFORMERS = True
 except ImportError:
     HAS_SENTENCE_TRANSFORMERS = False
@@ -114,6 +110,9 @@ class SemanticCondenser(BaseLLMCondenser):
         """
         import numpy as np
         from numpy.linalg import norm
+
+        if self.model is None:
+            return [0.0] * (end - start)
 
         query_events = events[-min(recent_window, len(events)):]
         query_text = "\n".join(

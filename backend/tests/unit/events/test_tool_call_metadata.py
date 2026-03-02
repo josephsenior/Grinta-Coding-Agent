@@ -103,6 +103,7 @@ class TestToolCallMetadata:
         )
         assert meta.total_calls_in_response == 2
         # Verify model_response preserved both tool calls
+        assert meta.model_response is not None
         choices = meta.model_response.get("choices", [])
         assert len(choices) == 1
         tool_calls = choices[0]["message"]["tool_calls"]

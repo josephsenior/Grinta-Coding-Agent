@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from backend.controller.services.controller_context import ControllerContext
     from backend.controller.services.pending_action_service import PendingActionService
     from backend.controller.state.context import ToolInvocationContext
+    from backend.engines.orchestrator.action_verifier import ActionVerifier
 
 
 async def transition_agent_state_logic(
@@ -47,7 +48,7 @@ class ObservationService:
     ) -> None:
         self._context = context
         self._pending_service = pending_action_service
-        self._action_verifier = None
+        self._action_verifier: ActionVerifier | None = None
 
     async def handle_observation(self, observation: Observation) -> None:
         controller = self._context.get_controller()

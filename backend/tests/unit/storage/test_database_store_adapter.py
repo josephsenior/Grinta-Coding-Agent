@@ -10,6 +10,8 @@ Tests cover:
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -68,14 +70,17 @@ class TestCollectionOperations:
         self, adapter: DatabaseStoreAdapter, example_collection: KnowledgeBaseCollection
     ) -> None:
         """Test creating a new collection."""
-        adapter._db_store.create_collection = AsyncMock(return_value=example_collection)
+        cast(Any, adapter._db_store).create_collection = AsyncMock(return_value=example_collection)
 
         result = adapter.create_collection("user_1", "Test Collection", "A test KB")
 
+        assert result is not None
         assert result.id == "col_123"
+        assert result is not None
         assert result.name == "Test Collection"
+        assert result is not None
         assert result.description == "A test knowledge base"
-        adapter._db_store.create_collection.assert_called_once_with(
+        cast(Any, adapter._db_store).create_collection.assert_called_once_with(
             "user_1", "Test Collection", "A test KB"
         )
 
@@ -83,12 +88,13 @@ class TestCollectionOperations:
         self, adapter: DatabaseStoreAdapter, example_collection: KnowledgeBaseCollection
     ) -> None:
         """Test creating a collection without description."""
-        adapter._db_store.create_collection = AsyncMock(return_value=example_collection)
+        cast(Any, adapter._db_store).create_collection = AsyncMock(return_value=example_collection)
 
         result = adapter.create_collection("user_1", "Test Collection")
 
+        assert result is not None
         assert result.name == "Test Collection"
-        adapter._db_store.create_collection.assert_called_once_with(
+        cast(Any, adapter._db_store).create_collection.assert_called_once_with(
             "user_1", "Test Collection", None
         )
 
@@ -96,17 +102,19 @@ class TestCollectionOperations:
         self, adapter: DatabaseStoreAdapter, example_collection: KnowledgeBaseCollection
     ) -> None:
         """Test retrieving a collection."""
-        adapter._db_store.get_collection = AsyncMock(return_value=example_collection)
+        cast(Any, adapter._db_store).get_collection = AsyncMock(return_value=example_collection)
 
         result = adapter.get_collection("col_123")
 
+        assert result is not None
         assert result.id == "col_123"
+        assert result is not None
         assert result.name == "Test Collection"
-        adapter._db_store.get_collection.assert_called_once_with("col_123")
+        cast(Any, adapter._db_store).get_collection.assert_called_once_with("col_123")
 
     def test_get_collection_not_found(self, adapter: DatabaseStoreAdapter) -> None:
         """Test getting a collection that doesn't exist."""
-        adapter._db_store.get_collection = AsyncMock(return_value=None)
+        cast(Any, adapter._db_store).get_collection = AsyncMock(return_value=None)
 
         result = adapter.get_collection("nonexistent")
 
@@ -116,7 +124,7 @@ class TestCollectionOperations:
         self, adapter: DatabaseStoreAdapter, example_collection: KnowledgeBaseCollection
     ) -> None:
         """Test listing all collections for a user."""
-        adapter._db_store.list_collections = AsyncMock(
+        cast(Any, adapter._db_store).list_collections = AsyncMock(
             return_value=[example_collection]
         )
 
@@ -124,11 +132,11 @@ class TestCollectionOperations:
 
         assert len(result) == 1
         assert result[0].name == "Test Collection"
-        adapter._db_store.list_collections.assert_called_once_with("user_1")
+        cast(Any, adapter._db_store).list_collections.assert_called_once_with("user_1")
 
     def test_list_collections_empty(self, adapter: DatabaseStoreAdapter) -> None:
         """Test listing collections when user has none."""
-        adapter._db_store.list_collections = AsyncMock(return_value=[])
+        cast(Any, adapter._db_store).list_collections = AsyncMock(return_value=[])
 
         result = adapter.list_collections("user_1")
 
@@ -142,7 +150,7 @@ class TestCollectionOperations:
         col2 = KnowledgeBaseCollection(
             id="col_2", user_id="user_1", name="Collection 2"
         )
-        adapter._db_store.list_collections = AsyncMock(return_value=[col1, col2])
+        cast(Any, adapter._db_store).list_collections = AsyncMock(return_value=[col1, col2])
 
         result = adapter.list_collections("user_1")
 
@@ -162,12 +170,13 @@ class TestCollectionOperations:
             document_count=5,
             total_size_bytes=10240,
         )
-        adapter._db_store.update_collection = AsyncMock(return_value=updated)
+        cast(Any, adapter._db_store).update_collection = AsyncMock(return_value=updated)
 
         result = adapter.update_collection("col_123", name="Updated Name")
 
+        assert result is not None
         assert result.name == "Updated Name"
-        adapter._db_store.update_collection.assert_called_once_with(
+        cast(Any, adapter._db_store).update_collection.assert_called_once_with(
             "col_123", "Updated Name", None
         )
 
@@ -179,10 +188,11 @@ class TestCollectionOperations:
             name="Test Collection",
             description="New description",
         )
-        adapter._db_store.update_collection = AsyncMock(return_value=updated)
+        cast(Any, adapter._db_store).update_collection = AsyncMock(return_value=updated)
 
         result = adapter.update_collection("col_123", description="New description")
 
+        assert result is not None
         assert result.description == "New description"
 
     def test_update_collection_both(self, adapter: DatabaseStoreAdapter) -> None:
@@ -193,18 +203,20 @@ class TestCollectionOperations:
             name="New Name",
             description="New description",
         )
-        adapter._db_store.update_collection = AsyncMock(return_value=updated)
+        cast(Any, adapter._db_store).update_collection = AsyncMock(return_value=updated)
 
         result = adapter.update_collection(
             "col_123", name="New Name", description="New description"
         )
 
+        assert result is not None
         assert result.name == "New Name"
+        assert result is not None
         assert result.description == "New description"
 
     def test_update_collection_not_found(self, adapter: DatabaseStoreAdapter) -> None:
         """Test updating a collection that doesn't exist."""
-        adapter._db_store.update_collection = AsyncMock(return_value=None)
+        cast(Any, adapter._db_store).update_collection = AsyncMock(return_value=None)
 
         result = adapter.update_collection("nonexistent", name="New Name")
 
@@ -212,16 +224,16 @@ class TestCollectionOperations:
 
     def test_delete_collection(self, adapter: DatabaseStoreAdapter) -> None:
         """Test deleting a collection."""
-        adapter._db_store.delete_collection = AsyncMock(return_value=True)
+        cast(Any, adapter._db_store).delete_collection = AsyncMock(return_value=True)
 
         result = adapter.delete_collection("col_123")
 
         assert result is True
-        adapter._db_store.delete_collection.assert_called_once_with("col_123")
+        cast(Any, adapter._db_store).delete_collection.assert_called_once_with("col_123")
 
     def test_delete_collection_not_found(self, adapter: DatabaseStoreAdapter) -> None:
         """Test deleting a collection that doesn't exist."""
-        adapter._db_store.delete_collection = AsyncMock(return_value=False)
+        cast(Any, adapter._db_store).delete_collection = AsyncMock(return_value=False)
 
         result = adapter.delete_collection("nonexistent")
 
@@ -235,29 +247,33 @@ class TestDocumentOperations:
         self, adapter: DatabaseStoreAdapter, example_document: KnowledgeBaseDocument
     ) -> None:
         """Test adding a document."""
-        adapter._db_store.add_document = AsyncMock(return_value=example_document)
+        cast(Any, adapter._db_store).add_document = AsyncMock(return_value=example_document)
 
         result = adapter.add_document(example_document)
 
+        assert result is not None
         assert result.id == "doc_123"
+        assert result is not None
         assert result.filename == "test.txt"
-        adapter._db_store.add_document.assert_called_once_with(example_document)
+        cast(Any, adapter._db_store).add_document.assert_called_once_with(example_document)
 
     def test_get_document(
         self, adapter: DatabaseStoreAdapter, example_document: KnowledgeBaseDocument
     ) -> None:
         """Test retrieving a document."""
-        adapter._db_store.get_document = AsyncMock(return_value=example_document)
+        cast(Any, adapter._db_store).get_document = AsyncMock(return_value=example_document)
 
         result = adapter.get_document("doc_123")
 
+        assert result is not None
         assert result.id == "doc_123"
+        assert result is not None
         assert result.filename == "test.txt"
-        adapter._db_store.get_document.assert_called_once_with("doc_123")
+        cast(Any, adapter._db_store).get_document.assert_called_once_with("doc_123")
 
     def test_get_document_not_found(self, adapter: DatabaseStoreAdapter) -> None:
         """Test retrieving a document that doesn't exist."""
-        adapter._db_store.get_document = AsyncMock(return_value=None)
+        cast(Any, adapter._db_store).get_document = AsyncMock(return_value=None)
 
         result = adapter.get_document("nonexistent")
 
@@ -267,17 +283,17 @@ class TestDocumentOperations:
         self, adapter: DatabaseStoreAdapter, example_document: KnowledgeBaseDocument
     ) -> None:
         """Test listing documents in a collection."""
-        adapter._db_store.list_documents = AsyncMock(return_value=[example_document])
+        cast(Any, adapter._db_store).list_documents = AsyncMock(return_value=[example_document])
 
         result = adapter.list_documents("col_123")
 
         assert len(result) == 1
         assert result[0].filename == "test.txt"
-        adapter._db_store.list_documents.assert_called_once_with("col_123")
+        cast(Any, adapter._db_store).list_documents.assert_called_once_with("col_123")
 
     def test_list_documents_empty(self, adapter: DatabaseStoreAdapter) -> None:
         """Test listing documents in an empty collection."""
-        adapter._db_store.list_documents = AsyncMock(return_value=[])
+        cast(Any, adapter._db_store).list_documents = AsyncMock(return_value=[])
 
         result = adapter.list_documents("col_123")
 
@@ -301,7 +317,7 @@ class TestDocumentOperations:
             file_size_bytes=200,
             mime_type="text/plain",
         )
-        adapter._db_store.list_documents = AsyncMock(return_value=[doc1, doc2])
+        cast(Any, adapter._db_store).list_documents = AsyncMock(return_value=[doc1, doc2])
 
         result = adapter.list_documents("col_123")
 
@@ -311,16 +327,16 @@ class TestDocumentOperations:
 
     def test_delete_document(self, adapter: DatabaseStoreAdapter) -> None:
         """Test deleting a document."""
-        adapter._db_store.delete_document = AsyncMock(return_value=True)
+        cast(Any, adapter._db_store).delete_document = AsyncMock(return_value=True)
 
         result = adapter.delete_document("doc_123")
 
         assert result is True
-        adapter._db_store.delete_document.assert_called_once_with("doc_123")
+        cast(Any, adapter._db_store).delete_document.assert_called_once_with("doc_123")
 
     def test_delete_document_not_found(self, adapter: DatabaseStoreAdapter) -> None:
         """Test deleting a document that doesn't exist."""
-        adapter._db_store.delete_document = AsyncMock(return_value=False)
+        cast(Any, adapter._db_store).delete_document = AsyncMock(return_value=False)
 
         result = adapter.delete_document("nonexistent")
 
@@ -330,20 +346,21 @@ class TestDocumentOperations:
         self, adapter: DatabaseStoreAdapter, example_document: KnowledgeBaseDocument
     ) -> None:
         """Test finding a document by its content hash."""
-        adapter._db_store.get_document_by_hash = AsyncMock(
+        cast(Any, adapter._db_store).get_document_by_hash = AsyncMock(
             return_value=example_document
         )
 
         result = adapter.get_document_by_hash("abc123def456")
 
+        assert result is not None
         assert result.id == "doc_123"
-        adapter._db_store.get_document_by_hash.assert_called_once_with("abc123def456")
+        cast(Any, adapter._db_store).get_document_by_hash.assert_called_once_with("abc123def456")
 
     def test_get_document_by_hash_not_found(
         self, adapter: DatabaseStoreAdapter
     ) -> None:
         """Test finding a document by hash when it doesn't exist."""
-        adapter._db_store.get_document_by_hash = AsyncMock(return_value=None)
+        cast(Any, adapter._db_store).get_document_by_hash = AsyncMock(return_value=None)
 
         result = adapter.get_document_by_hash("nonexistent_hash")
 
@@ -362,7 +379,7 @@ class TestStatistics:
             document_count=5,
             total_size_bytes=5120,
         )
-        adapter._db_store.list_collections = AsyncMock(return_value=[col])
+        cast(Any, adapter._db_store).list_collections = AsyncMock(return_value=[col])
 
         stats = adapter.get_stats()
 
@@ -389,7 +406,7 @@ class TestStatistics:
             document_count=10,
             total_size_bytes=2048,
         )
-        adapter._db_store.list_collections = AsyncMock(return_value=[col1, col2])
+        cast(Any, adapter._db_store).list_collections = AsyncMock(return_value=[col1, col2])
 
         stats = adapter.get_stats()
 
@@ -399,7 +416,7 @@ class TestStatistics:
 
     def test_get_stats_empty(self, adapter: DatabaseStoreAdapter) -> None:
         """Test getting stats with no collections."""
-        adapter._db_store.list_collections = AsyncMock(return_value=[])
+        cast(Any, adapter._db_store).list_collections = AsyncMock(return_value=[])
 
         stats = adapter.get_stats()
 
@@ -417,7 +434,7 @@ class TestStatistics:
             document_count=1,
             total_size_bytes=1024 * 1024 * 500,  # 500 MB
         )
-        adapter._db_store.list_collections = AsyncMock(return_value=[col])
+        cast(Any, adapter._db_store).list_collections = AsyncMock(return_value=[col])
 
         stats = adapter.get_stats()
 
@@ -452,15 +469,16 @@ class TestAsyncBridging:
         self, adapter: DatabaseStoreAdapter, example_collection: KnowledgeBaseCollection
     ) -> None:
         """Test multiple async calls are properly bridged."""
-        adapter._db_store.create_collection = AsyncMock(return_value=example_collection)
-        adapter._db_store.get_collection = AsyncMock(return_value=example_collection)
+        cast(Any, adapter._db_store).create_collection = AsyncMock(return_value=example_collection)
+        cast(Any, adapter._db_store).get_collection = AsyncMock(return_value=example_collection)
 
         col1 = adapter.create_collection("user_1", "Col1")
         col2 = adapter.get_collection(col1.id)
 
+        assert col2 is not None
         assert col1.id == col2.id
-        assert adapter._db_store.create_collection.called
-        assert adapter._db_store.get_collection.called
+        assert cast(Any, adapter._db_store).create_collection.called
+        assert cast(Any, adapter._db_store).get_collection.called
 
 
 class TestIntegrationScenarios:
@@ -469,8 +487,8 @@ class TestIntegrationScenarios:
     def test_create_and_list_workflow(self, adapter: DatabaseStoreAdapter) -> None:
         """Test creating a collection and listing it."""
         col = KnowledgeBaseCollection(id="col_1", user_id="user_1", name="My KB")
-        adapter._db_store.create_collection = AsyncMock(return_value=col)
-        adapter._db_store.list_collections = AsyncMock(return_value=[col])
+        cast(Any, adapter._db_store).create_collection = AsyncMock(return_value=col)
+        cast(Any, adapter._db_store).list_collections = AsyncMock(return_value=[col])
 
         # Create
         created = adapter.create_collection("user_1", "My KB")
@@ -501,8 +519,8 @@ class TestIntegrationScenarios:
             file_size_bytes=200,
             mime_type="text/plain",
         )
-        adapter._db_store.add_document = AsyncMock(side_effect=[doc1, doc2])
-        adapter._db_store.list_documents = AsyncMock(return_value=[doc1, doc2])
+        cast(Any, adapter._db_store).add_document = AsyncMock(side_effect=[doc1, doc2])
+        cast(Any, adapter._db_store).list_documents = AsyncMock(return_value=[doc1, doc2])
 
         # Add documents
         adapter.add_document(doc1)
@@ -524,7 +542,7 @@ class TestIntegrationScenarios:
             file_size_bytes=100,
             mime_type="text/plain",
         )
-        adapter._db_store.get_document_by_hash = AsyncMock(return_value=doc)
+        cast(Any, adapter._db_store).get_document_by_hash = AsyncMock(return_value=doc)
 
         # Check if document already exists by hash
         existing = adapter.get_document_by_hash("abc123")

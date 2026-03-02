@@ -1,6 +1,7 @@
 """Tests for backend.llm.llm_utils — tool adaptation and token counting."""
 
 import copy
+from typing import Any
 from unittest.mock import MagicMock
 
 from backend.core.config import LLMConfig
@@ -206,13 +207,13 @@ class TestCleanToolsForGemini:
 
     def test_missing_properties(self):
         """Test tools without properties don't crash."""
-        tools = [{"function": {"parameters": {}}}]
+        tools: list[dict[str, Any]] = [{"function": {"parameters": {}}}]
         result = _clean_tools_for_gemini(tools)
         assert result == tools
 
     def test_empty_properties(self):
         """Test empty properties dict."""
-        tools = [{"function": {"parameters": {"properties": {}}}}]
+        tools: list[dict[str, Any]] = [{"function": {"parameters": {"properties": {}}}}]
         result = _clean_tools_for_gemini(tools)
         assert result[0]["function"]["parameters"]["properties"] == {}
 
@@ -222,7 +223,7 @@ class TestCleanToolProperties:
 
     def test_removes_defaults_in_place(self):
         """Test removes default values in place."""
-        props = {
+        props: dict[str, Any] = {
             "arg1": {"type": "string", "default": "value"},
             "arg2": {"type": "number"},
         }
@@ -254,7 +255,7 @@ class TestCleanToolProperties:
 
     def test_empty_properties(self):
         """Test with empty properties dict."""
-        props = {}
+        props: dict[str, dict[str, Any]] = {}
         _clean_tool_properties(props)
         assert props == {}
 

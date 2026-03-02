@@ -29,10 +29,10 @@ if ($pythonVersion -match "Python 3\.(1[2-9]|[2-9][0-9])") {
     exit 1
 }
 
-# Check for config.toml
-if (-not (Test-Path "config.toml")) {
-    Write-Host "📝 Creating config.toml from template..." -ForegroundColor Cyan
-    Copy-Item "config.template.toml" "config.toml"
+# Check for settings.json
+if (-not (Test-Path "settings.json")) {
+    Write-Host "📝 Creating settings.json from template..." -ForegroundColor Cyan
+    Copy-Item "settings.template.json" "settings.json"
 }
 
 Write-Host "📦 Step 1: Syncing dependencies with uv..." -ForegroundColor Yellow
@@ -48,7 +48,7 @@ if ($LASTEXITCODE -ne 0) {
 # Step 1.5: Auto-discover local models
 Write-Host "🤖 Step 1.5: Discovering local models (Ollama/LM Studio/vLLM)..." -ForegroundColor Yellow
 uv run python -m backend.llm.discover_models aliases
-Write-Host "✅ Model aliases updated in config.toml" -ForegroundColor Green
+Write-Host "✅ Model aliases updated in settings.json" -ForegroundColor Green
 
 Write-Host "✅ Dependencies synced!" -ForegroundColor Green
 Write-Host ""

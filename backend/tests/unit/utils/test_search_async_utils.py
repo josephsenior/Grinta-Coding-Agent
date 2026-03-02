@@ -6,6 +6,7 @@ import asyncio
 import base64
 import unittest
 from dataclasses import dataclass
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 from backend.utils.search_utils import iterate, offset_to_page_id, page_id_to_offset
@@ -20,6 +21,7 @@ class TestOffsetToPageId(unittest.TestCase):
     def test_has_next_returns_encoded(self):
         pid = offset_to_page_id(42, has_next=True)
         self.assertIsNotNone(pid)
+        assert pid is not None
         decoded = int(base64.b64decode(pid).decode())
         self.assertEqual(decoded, 42)
 
@@ -28,6 +30,7 @@ class TestOffsetToPageId(unittest.TestCase):
 
     def test_zero_offset(self):
         pid = offset_to_page_id(0, has_next=True)
+        assert pid is not None
         decoded = int(base64.b64decode(pid).decode())
         self.assertEqual(decoded, 0)
 
@@ -92,7 +95,7 @@ class TestIterate(unittest.IsolatedAsyncioTestCase):
 # async_utils
 # ---------------------------------------------------------------------------
 
-from backend.utils.async_utils import (
+from backend.utils.async_utils import (  # noqa: E402
     AsyncException,
     _collect_results,
     _handle_pending_tasks,
@@ -153,7 +156,7 @@ class TestCallAsyncFromSync(unittest.TestCase):
 
     def test_non_coroutine_raises(self):
         with self.assertRaises(ValueError):
-            call_async_from_sync(lambda: 1)
+            call_async_from_sync(cast(Any, lambda: 1))
 
 
 class TestWaitAll(unittest.IsolatedAsyncioTestCase):
@@ -209,6 +212,7 @@ class TestGetActiveLoop(unittest.IsolatedAsyncioTestCase):
     async def test_returns_running_loop(self):
         loop = get_active_loop()
         self.assertIsNotNone(loop)
+        assert loop is not None
         self.assertTrue(loop.is_running())
 
 

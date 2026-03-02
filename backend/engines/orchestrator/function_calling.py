@@ -100,6 +100,23 @@ from backend.engines.orchestrator.tools.delegate_task import (
     build_delegate_task_action,
     DELEGATE_TASK_TOOL_NAME,
 )
+from backend.engines.orchestrator.tools.lsp_query import (
+    build_lsp_query_action,
+    LSP_QUERY_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.signal_progress import (
+    build_signal_progress_action,
+    SIGNAL_PROGRESS_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.verify_ui import (
+    build_verify_ui_change_action,
+    VERIFY_UI_CHANGE_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.blackboard import (
+    build_blackboard_action,
+    BLACKBOARD_TOOL_NAME,
+)
+from backend.engines.orchestrator.tools.query_toolbox import QUERY_TOOLBOX_TOOL_NAME, build_query_toolbox_action
 from backend.engines.orchestrator.tools.meta_cognition import (
     UNCERTAINTY_TOOL_NAME,
     CLARIFICATION_TOOL_NAME,
@@ -200,6 +217,7 @@ def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
         is_input=is_input,
         is_background=is_background,
         grep_pattern=grep_pattern,
+        truncation_strategy=arguments.get("truncation_strategy"),
     )
     if "timeout" in arguments:
         try:
@@ -519,7 +537,12 @@ def _get_search_content_by_range(content: str, view_range: Any) -> str:
 def _old_str_not_found_action(path: str, view_range: Any) -> AgentThinkAction:
     """Build AgentThinkAction for 'old_str not found' error."""
     range_suffix = ""
-    if view_range and len(view_range) >= 2 and view_range[0] is not None and view_range[1] is not None:
+    if (
+        view_range
+        and len(view_range) >= 2
+        and view_range[0] is not None
+        and view_range[1] is not None
+    ):
         range_suffix = f" (within lines {view_range[0]}-{view_range[1]})"
     return AgentThinkAction(
         thought=f"[VIEW_AND_REPLACE] old_str not found in {path}{range_suffix}. "
@@ -592,7 +615,7 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
 
 def _preview_str_replace_edit(
     path: str, command: str, kwargs: dict
-) -> AgentThinkAction:
+) -> AgentThinkAction | CmdRunAction:
     """Generate a unified diff preview of what a str_replace or insert would produce."""
     import difflib
     import os
@@ -641,7 +664,29 @@ def _preview_str_replace_edit(
     diff_text = "\n".join(diff)
     if not diff_text:
         return AgentThinkAction(thought=f"[PREVIEW] No changes detected for {path}")
-    return AgentThinkAction(thought=f"[PREVIEW] Dry-run diff for {path}:\n{diff_text}")
+    
+    # Write the new text actually to the file to make changes "kept by default",
+    # and write old text to a .orig file to do a VS Code native split diff.
+    orig_path = f"{path}.orig"
+    try:
+        with open(orig_path, "w", encoding="utf-8") as f:
+            f.writelines(original_lines)
+        with open(path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+    except OSError as exc:
+        return AgentThinkAction(thought=f"[PREVIEW] Cannot write to {path}: {exc}")
+
+    cmd = (
+        f'python -c "import subprocess, os;'
+        f'subprocess.run([\'code\', \'--wait\', \'--diff\', r\'{orig_path}\', r\'{path}\']);'
+        f'os.remove(r\'{orig_path}\')"'
+    )
+    
+    return CmdRunAction(
+        command=cmd,
+        thought=f"[PREVIEW -> NATIVE DIFF] Edit applied to {path}. Opening native VS Code diff. Changes kept by default. You can undo and save in the editor if you reject them.",
+        blocking=True
+    )
 
 
 def _apply_confidence_preview_override(kwargs: dict, path: str) -> None:
@@ -661,12 +706,10 @@ def _apply_confidence_preview_override(kwargs: dict, path: str) -> None:
 
 def _is_preview_enabled(raw: Any) -> bool:
     """Parse preview flag from tool arguments."""
-    return raw is True or (
-        isinstance(raw, str) and raw.lower() == "true"
-    )
+    return raw is True or (isinstance(raw, str) and raw.lower() == "true")
 
 
-def _handle_str_replace_editor_tool(arguments: dict) -> Action | list[Action]:
+def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     """Handle str_replace_editor tool call."""
     path, command = _validate_str_replace_editor_args(arguments)
     other_kwargs = {k: v for k, v in arguments.items() if k not in ["command", "path"]}
@@ -747,7 +790,9 @@ def _normalize_task_tracker_step(s: dict, idx: int) -> dict:
 def _normalize_task_tracker_list(raw_list: list) -> list[dict]:
     """Normalize task list. Raises FunctionCallValidationError on invalid structure."""
     try:
-        return [_normalize_task_tracker_step(task, i + 1) for i, task in enumerate(raw_list)]
+        return [
+            _normalize_task_tracker_step(task, i + 1) for i, task in enumerate(raw_list)
+        ]
     except FunctionCallValidationError:
         raise
     except Exception as e:
@@ -809,8 +854,8 @@ def _handle_mcp_tool(
     return MCPAction(name=tool_call_name, arguments=normalized_args)
 
 
-def _validate_ultimate_editor_args(arguments: dict, tool_name: str) -> tuple[str, str]:
-    """Validate required arguments for ultimate editor.
+def _validate_structure_editor_args(arguments: dict, tool_name: str) -> tuple[str, str]:
+    """Validate required arguments for structure editor.
 
     Args:
         arguments: Tool call arguments
@@ -975,7 +1020,7 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
     tool_name = create_structure_editor_tool()["function"]["name"]
 
     # Validate arguments
-    command, file_path = _validate_ultimate_editor_args(arguments, tool_name)
+    command, file_path = _validate_structure_editor_args(arguments, tool_name)
 
     # Initialize editor
     try:
@@ -1009,8 +1054,8 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
             handler = editor_command_handlers[command]
             return handler(editor, file_path, arguments)
         elif command in simple_command_handlers:
-            handler = simple_command_handlers[command]
-            return handler(file_path, arguments)
+            simple_handler = simple_command_handlers[command]
+            return simple_handler(file_path, arguments)
         else:
             all_cmds = list(editor_command_handlers) + list(simple_command_handlers)
             raise FunctionCallValidationError(
@@ -1106,9 +1151,18 @@ def _handle_escalate_tool(arguments: dict) -> Action:
     )
 
 
+
+def _handle_query_toolbox_tool(
+    arguments: dict,
+    mcp_tool_names: list[str] | None = None,
+    mcp_tools: list[dict] | None = None
+) -> Action:
+    return build_query_toolbox_action(arguments)
+
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
+        QUERY_TOOLBOX_TOOL_NAME: _handle_query_toolbox_tool,
         create_cmd_run_tool()["function"]["name"]: _handle_cmd_run_tool,
         create_finish_tool()["function"]["name"]: _handle_finish_tool,
         create_llm_based_edit_tool()["function"][
@@ -1145,6 +1199,10 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         VERIFY_STATE_TOOL_NAME: _handle_verify_state_tool,
         WORKING_MEMORY_TOOL_NAME: _handle_working_memory_tool,
         DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
+        LSP_QUERY_TOOL_NAME: build_lsp_query_action,
+        SIGNAL_PROGRESS_TOOL_NAME: build_signal_progress_action,
+        VERIFY_UI_CHANGE_TOOL_NAME: build_verify_ui_change_action,
+        BLACKBOARD_TOOL_NAME: build_blackboard_action,
         BATCH_EDIT_TOOL_NAME: _handle_batch_edit_tool,
         TERMINAL_OPEN_TOOL_NAME: build_terminal_open_action,
         TERMINAL_INPUT_TOOL_NAME: build_terminal_input_action,

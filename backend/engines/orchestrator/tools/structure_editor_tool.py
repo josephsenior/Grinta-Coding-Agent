@@ -1,4 +1,4 @@
-"""Ultimate Editor tool providing structure-aware editing for the Orchestrator agent."""
+"""Structure Editor tool providing structure-aware editing for the Orchestrator agent."""
 
 from backend.engines.orchestrator.tools.common import (
     create_tool_definition,
@@ -8,7 +8,7 @@ from backend.engines.orchestrator.tools.common import (
 )
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
 
-_DETAILED_ULTIMATE_EDITOR_DESCRIPTION = """Structure-aware editor powered by Tree-sitter (40+ languages)
+_DETAILED_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor powered by Tree-sitter (40+ languages)
 
 This is a next-generation editor that understands code structure, not just text.
 
@@ -73,7 +73,7 @@ BEST PRACTICES:
 4. For typos, check error messages - they suggest corrections
 """
 
-_SHORT_ULTIMATE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
+_SHORT_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
 
 Commands: edit_function, rename_symbol, find_symbol, replace_range, normalize_indent,
           create_file, view_file, insert_code, undo_last_edit
@@ -87,23 +87,23 @@ Commands: edit_function, rename_symbol, find_symbol, replace_range, normalize_in
 def create_structure_editor_tool(
     use_short_description: bool = False,
 ) -> ChatCompletionToolParam:
-    """Create the Ultimate Editor tool for the Orchestrator agent.
+    """Create the Structure Editor tool for the Orchestrator agent.
 
     Args:
         use_short_description: Whether to use short or detailed description
 
     Returns:
-        ChatCompletionToolParam with the Ultimate Editor configuration
+        ChatCompletionToolParam with the Structure Editor configuration
 
     """
     description = (
-        _SHORT_ULTIMATE_EDITOR_DESCRIPTION
+        _SHORT_STRUCTURE_EDITOR_DESCRIPTION
         if use_short_description
-        else _DETAILED_ULTIMATE_EDITOR_DESCRIPTION
+        else _DETAILED_STRUCTURE_EDITOR_DESCRIPTION
     )
 
     return create_tool_definition(
-        name="ultimate_editor",
+        name="structure_editor",
         description=description,
         properties={
             "command": get_command_param(

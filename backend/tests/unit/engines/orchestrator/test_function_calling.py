@@ -1,6 +1,7 @@
 """Tests for backend.engines.orchestrator.function_calling."""
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,6 +16,7 @@ from backend.engines.orchestrator.function_calling import (
     _handle_finish_tool,
     _handle_llm_based_file_edit_tool,
     _handle_mcp_tool,
+    _handle_edit_function_command,
     _handle_str_replace_editor_tool,
     _handle_task_tracker_tool,
     _handle_think_tool,
@@ -42,21 +44,21 @@ from backend.events.action import TaskTrackingAction
 class TestCombineThought:
     def test_sets_thought_when_empty(self):
         action = CmdRunAction(command="ls")
-        action.thought = ""
+        cast(Any, action).thought = ""
         result = combine_thought(action, "new thought")
-        assert result.thought == "new thought"
+        assert cast(Any, result).thought == "new thought"
 
     def test_prepends_when_already_has_thought(self):
         action = CmdRunAction(command="ls")
-        action.thought = "existing thought"
+        cast(Any, action).thought = "existing thought"
         result = combine_thought(action, "prefix")
-        assert result.thought == "prefix\nexisting thought"
+        assert cast(Any, result).thought == "prefix\nexisting thought"
 
     def test_empty_thought_no_change(self):
         action = CmdRunAction(command="ls")
-        action.thought = "existing"
+        cast(Any, action).thought = "existing"
         result = combine_thought(action, "")
-        assert result.thought == "existing"
+        assert cast(Any, result).thought == "existing"
 
     def test_returns_action_unchanged_when_no_thought_attr(self):
         action = MagicMock(spec=[])  # no 'thought' attribute
@@ -357,10 +359,10 @@ class TestProcessSingleToolCall:
 
 
 # ---------------------------------------------------------------------------
-# _validate_ultimate_editor_args (via _handle_structure_editor_tool)
+# _validate_structure_editor_args (via _handle_structure_editor_tool)
 # ---------------------------------------------------------------------------
 
-class TestValidateUltimateEditorArgs:
+class TestValidateStructureEditorArgs:
     """Tests for missing command / file_path validation."""
 
     def test_missing_command_raises(self):
@@ -388,8 +390,6 @@ class TestValidateUltimateEditorArgs:
 # ---------------------------------------------------------------------------
 
 class TestHandleEditFunctionCommand:
-    from backend.engines.orchestrator.function_calling import _handle_edit_function_command
-
     def _make_editor(self, success=True, message="ok"):
         editor = MagicMock()
         result = MagicMock()
@@ -399,7 +399,6 @@ class TestHandleEditFunctionCommand:
         return editor
 
     def test_success_returns_file_read_action(self):
-        from backend.engines.orchestrator.function_calling import _handle_edit_function_command
         editor = self._make_editor(success=True)
         result = _handle_edit_function_command(
             editor, "foo.py", {"function_name": "my_fn", "new_body": "return 1"}
@@ -407,7 +406,6 @@ class TestHandleEditFunctionCommand:
         assert isinstance(result, FileReadAction)
 
     def test_failure_returns_message_action(self):
-        from backend.engines.orchestrator.function_calling import _handle_edit_function_command
         editor = self._make_editor(success=False, message="parse error")
         result = _handle_edit_function_command(
             editor, "foo.py", {"function_name": "my_fn", "new_body": "return 1"}
@@ -416,14 +414,12 @@ class TestHandleEditFunctionCommand:
         assert "parse error" in result.content
 
     def test_missing_function_name_raises(self):
-        from backend.engines.orchestrator.function_calling import _handle_edit_function_command
         with pytest.raises(FunctionCallValidationError, match="function_name"):
             _handle_edit_function_command(
                 MagicMock(), "foo.py", {"new_body": "return 1"}
             )
 
     def test_missing_new_body_raises(self):
-        from backend.engines.orchestrator.function_calling import _handle_edit_function_command
         with pytest.raises(FunctionCallValidationError, match="new_body"):
             _handle_edit_function_command(
                 MagicMock(), "foo.py", {"function_name": "fn"}
@@ -512,7 +508,7 @@ class TestHandleFindSymbolCommand:
         sym.parent_name = None
         editor.find_symbol.return_value = sym
         result = _handle_find_symbol_command(editor, "f.py", {"symbol_name": "Klass"})
-        assert "Parent" not in result.content
+        assert "Parent" not in cast(Any, result).content
 
 
 # ---------------------------------------------------------------------------

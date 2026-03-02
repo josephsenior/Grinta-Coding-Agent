@@ -401,20 +401,20 @@ async def create_new_conversation(
         conversation_trigger,
         vcs_provider,
     )
-    if not conversation_metadata:
-        msg = "Failed to initialize conversation"
-        raise RuntimeError(msg)
+    if conversation_metadata is None:
+        raise ValueError("Failed to initialize conversation metadata")
+
     return await start_conversation(
-        user_id,
-        vcs_provider_tokens,
-        custom_secrets,
-        initial_user_msg,
-        image_urls,
-        replay_json,
-        conversation_metadata.conversation_id,
-        conversation_metadata,
-        conversation_instructions,
-        mcp_config,
+        user_id=user_id,
+        vcs_provider_tokens=vcs_provider_tokens,
+        custom_secrets=custom_secrets,
+        initial_user_msg=initial_user_msg,
+        image_urls=image_urls,
+        replay_json=replay_json,
+        conversation_id=conversation_metadata.conversation_id,
+        conversation_metadata=conversation_metadata,
+        conversation_instructions=conversation_instructions,
+        mcp_config=mcp_config,
     )
 
 
@@ -461,7 +461,7 @@ async def setup_init_conversation_settings(
     )
     settings = await settings_store.load()
 
-    # If no user settings exist, try to load from config.toml
+    # If no user settings exist, try to load from settings.json
     if settings is None:
         from backend.storage.data_models.settings import Settings
 
@@ -470,7 +470,7 @@ async def setup_init_conversation_settings(
             if settings:
                 settings = settings.merge_with_config_settings()
                 logger.info(
-                    "Loaded default settings from config.toml for WebSocket connection (user_id: %s)",
+                    "Loaded default settings from settings.json for WebSocket connection (user_id: %s)",
                     user_id,
                 )
         except Exception as e:
@@ -478,7 +478,7 @@ async def setup_init_conversation_settings(
 
     if settings is None:
         raise MissingSettingsError(
-            "Settings not found (neither user settings nor config.toml)"
+            "Settings not found (neither user settings nor settings.json)"
         )
 
     # Validate API key for the selected model

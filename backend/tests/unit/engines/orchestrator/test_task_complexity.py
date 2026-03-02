@@ -7,9 +7,11 @@ methods can be tested without mocking external services.
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+from typing import cast
 
 import pytest
 
+from backend.controller.state.state import State
 from backend.engines.orchestrator.task_complexity import TaskComplexityAnalyzer
 
 
@@ -117,7 +119,7 @@ class TestAnalyzeComplexity:
 
     def test_none_state_does_not_crash(self):
         # state=None should not cause AttributeError
-        score = self.analyzer.analyze_complexity("create a module", None)
+        score = self.analyzer.analyze_complexity("create a module", cast(State, None))
         assert isinstance(score, float)
 
 

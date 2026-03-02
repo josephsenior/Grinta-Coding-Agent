@@ -1,5 +1,6 @@
 """Tests for backend.events.utils — action/observation pairing utilities."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 
@@ -93,9 +94,9 @@ class TestAddActionObservationPairs:
         action = MagicMock(spec=NullAction, id=1)
         obs = MagicMock(spec=NullObservation, id=2, cause=1)
 
-        action_map = {1: action}
-        obs_map = {1: obs}
-        tuples = []
+        action_map: dict[int, Any] = {1: action}
+        obs_map: dict[int, Any] = {1: obs}
+        tuples: list[Any] = []
 
         _add_action_observation_pairs(tuples, action_map, obs_map)
 
@@ -106,9 +107,9 @@ class TestAddActionObservationPairs:
         """Test action without matching observation gets NullObservation."""
         action = MagicMock(spec=NullAction, id=1)
 
-        action_map = {1: action}
-        obs_map = {}
-        tuples = []
+        action_map: dict[int, Any] = {1: action}
+        obs_map: dict[int, Any] = {}
+        tuples: list[Any] = []
 
         _add_action_observation_pairs(tuples, action_map, obs_map)
 
@@ -123,9 +124,9 @@ class TestAddActionObservationPairs:
         obs1 = MagicMock(spec=NullObservation, id=3, cause=1)
         obs2 = MagicMock(spec=NullObservation, id=4, cause=2)
 
-        action_map = {1: action1, 2: action2}
-        obs_map = {1: obs1, 2: obs2}
-        tuples = []
+        action_map: dict[int, Any] = {1: action1, 2: action2}
+        obs_map: dict[int, Any] = {1: obs1, 2: obs2}
+        tuples: list[Any] = []
 
         _add_action_observation_pairs(tuples, action_map, obs_map)
 
@@ -133,7 +134,7 @@ class TestAddActionObservationPairs:
 
     def test_empty_maps(self):
         """Test with empty maps."""
-        tuples = []
+        tuples: list[Any] = []
         _add_action_observation_pairs(tuples, {}, {})
         assert tuples == []
 
@@ -145,9 +146,9 @@ class TestAddOrphanedObservations:
         """Test observation without matching action."""
         obs = MagicMock(spec=CmdOutputObservation, id=10, cause=99)
 
-        action_map = {}
-        obs_map = {99: obs}
-        tuples = []
+        action_map: dict[int, Any] = {}
+        obs_map: dict[int, Any] = {99: obs}
+        tuples: list[Any] = []
 
         _add_orphaned_observations(tuples, action_map, obs_map)
 
@@ -159,9 +160,9 @@ class TestAddOrphanedObservations:
         """Test NullObservation without action is skipped."""
         obs = MagicMock(spec=NullObservation, id=10, cause=99)
 
-        action_map = {}
-        obs_map = {99: obs}
-        tuples = []
+        action_map: dict[int, Any] = {}
+        obs_map: dict[int, Any] = {99: obs}
+        tuples: list[Any] = []
 
         _add_orphaned_observations(tuples, action_map, obs_map)
 
@@ -172,9 +173,9 @@ class TestAddOrphanedObservations:
         action = MagicMock(spec=NullAction, id=1)
         obs = MagicMock(spec=CmdOutputObservation, id=2, cause=1)
 
-        action_map = {1: action}
-        obs_map = {1: obs}
-        tuples = []
+        action_map: dict[int, Any] = {1: action}
+        obs_map: dict[int, Any] = {1: obs}
+        tuples: list[Any] = []
 
         _add_orphaned_observations(tuples, action_map, obs_map)
 
@@ -186,9 +187,9 @@ class TestAddOrphanedObservations:
         obs1 = MagicMock(spec=CmdOutputObservation, id=10, cause=99)
         obs2 = MagicMock(spec=CmdOutputObservation, id=11, cause=88)
 
-        action_map = {}
-        obs_map = {99: obs1, 88: obs2}
-        tuples = []
+        action_map: dict[int, Any] = {}
+        obs_map: dict[int, Any] = {99: obs1, 88: obs2}
+        tuples: list[Any] = []
 
         _add_orphaned_observations(tuples, action_map, obs_map)
 

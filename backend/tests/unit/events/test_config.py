@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
+from typing import Any, cast
 
 import pytest
 
@@ -58,7 +59,7 @@ class TestEventRuntimeDefaults:
         """Test EventRuntimeDefaults is immutable."""
         defaults = EventRuntimeDefaults()
         with pytest.raises(Exception):  # FrozenInstanceError
-            defaults.max_queue_size = 3000
+            cast(Any, defaults).max_queue_size = 3000
 
 
 # ── get_event_runtime_defaults function ────────────────────────────────

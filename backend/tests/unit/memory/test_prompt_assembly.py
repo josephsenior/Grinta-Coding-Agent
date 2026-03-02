@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 
@@ -23,7 +24,7 @@ from backend.utils.prompt import ConversationInstructions, RepositoryInfo, Runti
 
 def _make_obs(**kw) -> RecallObservation:
     """Build a minimal RecallObservation with sensible defaults."""
-    defaults = {
+    defaults: dict[str, Any] = {
         "recall_type": RecallType.WORKSPACE_CONTEXT,
         "content": "test",
         "repo_name": "",
@@ -155,7 +156,7 @@ class TestProcessRecallObservation:
 
     def test_unknown_recall_type(self):
         obs = _make_obs()
-        obs.recall_type = "UNKNOWN_TYPE"
+        obs.recall_type = cast(RecallType, "UNKNOWN_TYPE")
         cfg = _agent_config()
         assert process_recall_observation(obs, 0, [], cfg, _prompt_manager()) == []
 

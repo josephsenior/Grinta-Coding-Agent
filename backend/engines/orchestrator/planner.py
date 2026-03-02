@@ -3,7 +3,11 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 from backend.llm.llm_utils import check_tools
-from backend.llm.catalog_loader import prefers_short_tool_descriptions, supports_tool_choice
+from backend.llm.catalog_loader import (
+    prefers_short_tool_descriptions,
+    supports_tool_choice,
+)
+from backend.engines.orchestrator.tools.verify_ui import create_verify_ui_change_tool
 
 ChatCompletionToolParam = Any
 
@@ -32,6 +36,16 @@ PLAIN_CHAT_PATTERNS = [
     r"\bhow are you\b",
     r"\bwho are you\b",
 ]
+
+# Markers that appear only in system-injected user messages (workspace context,
+# playbook knowledge, knowledge-base results) — never in human-typed messages.
+_INJECTED_MSG_MARKERS = (
+    "<RUNTIME_INFORMATION>",
+    "<REPOSITORY_INFO>",
+    "<REPOSITORY_INSTRUCTIONS>",
+    "<CONVERSATION_INSTRUCTIONS>",
+    "<EXTRA_INFO>",
+)
 
 ACTION_PATTERNS = [
     r"\bcreate\b",
@@ -77,10 +91,12 @@ class OrchestratorPlanner:
         config,
         llm: LLM,
         safety_manager: OrchestratorSafetyManager,
+        agent: Any = None,
     ) -> None:
         self._config = config
         self._llm = llm
         self._safety = safety_manager
+        self._agent = agent
         # Lazy cache for check_tools output (model-scoped)
         self._checked_tools_cache: list[ChatCompletionToolParam] | None = None
         self._checked_tools_model: str | None = None
@@ -121,10 +137,16 @@ class OrchestratorPlanner:
     def _add_basic_tools(self, tools: list, use_short_tool_desc: bool) -> None:
         """Add cmd, think, finish, condensation_request, note, recall, run_tests tools."""
         from backend.engines.orchestrator.tools.bash import create_cmd_run_tool
-        from backend.engines.orchestrator.tools.condensation_request import create_condensation_request_tool
+        from backend.engines.orchestrator.tools.condensation_request import (
+            create_condensation_request_tool,
+        )
         from backend.engines.orchestrator.tools.finish import create_finish_tool
         from backend.engines.orchestrator.tools.think import create_think_tool
-        from backend.engines.orchestrator.tools.note import create_note_tool, create_recall_tool, create_semantic_recall_tool
+        from backend.engines.orchestrator.tools.note import (
+            create_note_tool,
+            create_recall_tool,
+            create_semantic_recall_tool,
+        )
         from backend.engines.orchestrator.tools.run_tests import create_run_tests_tool
 
         if getattr(self._config, "enable_cmd", True):
@@ -144,16 +166,29 @@ class OrchestratorPlanner:
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
         """Add apply_patch, batch_edit, task_tracker, search_code, explore_code tools."""
-        from backend.engines.orchestrator.tools.apply_patch import create_apply_patch_tool
+        from backend.engines.orchestrator.tools.apply_patch import (
+            create_apply_patch_tool,
+        )
         from backend.engines.orchestrator.tools.batch_edit import create_batch_edit_tool
-        from backend.engines.orchestrator.tools.task_tracker import create_task_tracker_tool
-        from backend.engines.orchestrator.tools.search_code import create_search_code_tool
-        from backend.engines.orchestrator.tools.explore_code import create_explore_tree_structure_tool, create_get_entity_contents_tool
+        from backend.engines.orchestrator.tools.task_tracker import (
+            create_task_tracker_tool,
+        )
+        from backend.engines.orchestrator.tools.query_toolbox import (
+            create_query_toolbox_tool,
+        )
+        from backend.engines.orchestrator.tools.search_code import (
+            create_search_code_tool,
+        )
+        from backend.engines.orchestrator.tools.explore_code import (
+            create_explore_tree_structure_tool,
+            create_get_entity_contents_tool,
+        )
 
         if getattr(self._config, "enable_apply_patch", True):
             tools.append(create_apply_patch_tool())
             tools.append(create_batch_edit_tool())
         if getattr(self._config, "enable_task_tracker", True):
+            tools.append(create_query_toolbox_tool())
             tools.append(create_task_tracker_tool())
         if getattr(self._config, "enable_search_code", True):
             tools.append(create_search_code_tool())
@@ -170,39 +205,89 @@ class OrchestratorPlanner:
         """Add terminal open/input/read tools when terminal support is enabled."""
         if getattr(self._config, "enable_terminal", True):
             from backend.engines.orchestrator.tools.terminal import (
-                create_terminal_open_tool, create_terminal_input_tool, create_terminal_read_tool,
+                create_terminal_open_tool,
+                create_terminal_input_tool,
+                create_terminal_read_tool,
             )
+
             tools.append(create_terminal_open_tool())
             tools.append(create_terminal_input_tool())
             tools.append(create_terminal_read_tool())
 
     def _add_optional_feature_tools(self, tools: list) -> None:
         """Add check_tool_status, web_search, delegate, rollback, workspace_status, etc."""
-        from backend.engines.orchestrator.tools.check_tool_status import create_check_tool_status_tool
-        from backend.engines.orchestrator.tools.delegate_task import create_delegate_task_tool
-        from backend.engines.orchestrator.tools.revert_to_safe_state import create_revert_to_safe_state_tool
+        from backend.engines.orchestrator.tools.check_tool_status import (
+            create_check_tool_status_tool,
+        )
+        from backend.engines.orchestrator.tools.delegate_task import (
+            create_delegate_task_tool,
+        )
+        from backend.engines.orchestrator.tools.revert_to_safe_state import (
+            create_revert_to_safe_state_tool,
+        )
+        from backend.engines.orchestrator.tools.lsp_query import create_lsp_query_tool
+        from backend.engines.orchestrator.tools.signal_progress import (
+            create_signal_progress_tool,
+        )
 
         if getattr(self._config, "enable_check_tool_status", True):
             tools.append(create_check_tool_status_tool())
         if getattr(self._config, "enable_web_search", False):
-            from backend.engines.orchestrator.tools.web_search import create_web_search_tool
+            from backend.engines.orchestrator.tools.web_search import (
+                create_web_search_tool,
+            )
+
             tools.append(create_web_search_tool())
+
+        # New core tools
+        tools.append(create_lsp_query_tool())
+        tools.append(create_signal_progress_tool())
         if getattr(self._config, "enable_swarming", True):
             tools.append(create_delegate_task_tool())
+            
+        from backend.engines.orchestrator.tools.blackboard import create_blackboard_tool
+        tools.append(create_blackboard_tool())
         if getattr(self._config, "enable_rollback", True):
             tools.append(create_revert_to_safe_state_tool())
         self._add_lazy_import_tools(
             tools,
             [
-                ("enable_workspace_status", True, "workspace_status", "create_workspace_status_tool"),
-                ("enable_error_patterns", True, "error_patterns", "create_error_patterns_tool"),
+                (
+                    "enable_workspace_status",
+                    True,
+                    "workspace_status",
+                    "create_workspace_status_tool",
+                ),
+                (
+                    "enable_error_patterns",
+                    True,
+                    "error_patterns",
+                    "create_error_patterns_tool",
+                ),
                 ("enable_checkpoints", True, "checkpoint", "create_checkpoint_tool"),
                 ("enable_project_map", True, "project_map", "create_project_map_tool"),
-                ("enable_session_diff", True, "session_diff", "create_session_diff_tool"),
-                ("enable_working_memory", True, "working_memory", "create_working_memory_tool"),
-                ("enable_verify_state", True, "verify_state", "create_verify_state_tool"),
+                (
+                    "enable_session_diff",
+                    True,
+                    "session_diff",
+                    "create_session_diff_tool",
+                ),
+                (
+                    "enable_working_memory",
+                    True,
+                    "working_memory",
+                    "create_working_memory_tool",
+                ),
+                (
+                    "enable_verify_state",
+                    True,
+                    "verify_state",
+                    "create_verify_state_tool",
+                ),
             ],
         )
+        if getattr(self._agent, "blackboard", None) is not None:
+            tools.append(create_blackboard_tool())
 
     def _add_lazy_import_tools(
         self, tools: list, specs: list[tuple[str, bool, str, str]]
@@ -223,8 +308,12 @@ class OrchestratorPlanner:
         """Add uncertainty, clarification, escalate, proposal tools when meta-cognition is enabled."""
         if getattr(self._config, "enable_meta_cognition", True):
             from backend.engines.orchestrator.tools.meta_cognition import (
-                create_uncertainty_tool, create_clarification_tool, create_escalate_tool, create_proposal_tool,
+                create_uncertainty_tool,
+                create_clarification_tool,
+                create_escalate_tool,
+                create_proposal_tool,
             )
+
             tools.append(create_uncertainty_tool())
             tools.append(create_clarification_tool())
             tools.append(create_escalate_tool())
@@ -234,6 +323,9 @@ class OrchestratorPlanner:
         if getattr(self._config, "enable_browsing", False):
             # We now rely on external MCP (like browser-use)
             pass
+
+        # We always add verify_ui_change to make visual verification easy when working with frontends
+        tools.append(create_verify_ui_change_tool())
 
     def _add_editor_tools(self, tools: list, use_short_tool_desc: bool) -> None:
         if getattr(self._config, "enable_editor", True):
@@ -248,7 +340,7 @@ class OrchestratorPlanner:
                     use_short_description=use_short_tool_desc
                 )
             )
-            # Advanced editor: ultimate_editor (tree-sitter AST) for symbol-level refactoring
+            # Advanced editor: structure_editor (tree-sitter AST) for symbol-level refactoring
             tools.append(
                 create_structure_editor_tool(use_short_description=use_short_tool_desc)
             )
@@ -435,7 +527,7 @@ class OrchestratorPlanner:
         rep_score = 0.0
         if ts is not None:
             rep_score = getattr(ts, "repetition_score", 0.0)
-        if rep_score and rep_score >= 0.3:
+        if rep_score and rep_score >= 0.45:
             parts.append(f"repetition_score={rep_score:.1f}")
 
         # Proactive context pressure warning at ~70% token usage
@@ -444,6 +536,7 @@ class OrchestratorPlanner:
             prompt_tok = (
                 int(parts[0].split("=")[0]) if "tokens_used" in " ".join(parts) else 0
             )
+            ctx_window = 0
             for p in parts:
                 if p.startswith("tokens_used="):
                     prompt_tok = int(p.split("=")[1])
@@ -455,11 +548,19 @@ class OrchestratorPlanner:
                     remaining_pct = round((1.0 - usage_pct) * 100)
                     context_pressure_warning = (
                         f"\n⚠️ CONTEXT PRESSURE: {remaining_pct}% of context window remaining. "
-                        "Condensation will occur soon. Save critical state NOW:\n"
+                        "Condensation will occur soon. To preserve context AND work efficiently:\n"
                         "1. note(key, value) — persist important findings and decisions\n"
                         "2. task_tracker(update) — ensure plan reflects current progress\n"
                         "3. working_memory(update) — save current hypothesis and blockers\n"
+                        "4. Prefer targeted reads: use view_range instead of reading full files\n"
+                        "5. Prefer search_code over cat/grep for lookups — it returns only relevant lines\n"
+                        "6. Keep responses concise — avoid restating what the code does\n"
                         "Unsaved context from early turns WILL be lost during condensation."
+                    )
+                elif usage_pct >= 0.85 and not memory_pressure:
+                    context_pressure_warning += (
+                        "\n🔴 CRITICAL: Consider calling condensation_request() NOW to control "
+                        "what context survives before automatic condensation forces a reset."
                     )
         except Exception:
             pass
@@ -468,8 +569,10 @@ class OrchestratorPlanner:
         if context_pressure_warning:
             status += context_pressure_warning
 
-        # Repetition warning when approaching stuck threshold
-        if rep_score >= 0.6:
+        # Repetition warning when approaching stuck threshold.
+        # Thresholds are raised from the original 0.3/0.6 to 0.45/0.7 to
+        # avoid false positives on legitimate edit-test-edit debug cycles.
+        if rep_score >= 0.7:
             status += (
                 "\n⚠️ REPETITION WARNING (score={:.1f}/1.0): You are approaching the stuck detection threshold. "
                 "Your recent actions show a repeating pattern. You MUST change strategy:\n"
@@ -477,7 +580,7 @@ class OrchestratorPlanner:
                 "2. Try a fundamentally different approach\n"
                 "3. If editing files, re-read the file first with view command"
             ).format(rep_score)
-        elif rep_score >= 0.3:
+        elif rep_score >= 0.45:
             status += (
                 "\n📊 Mild repetition detected (score={:.1f}/1.0). Consider varying your approach."
             ).format(rep_score)
@@ -490,7 +593,9 @@ class OrchestratorPlanner:
             current_turn = int(current_turn)
         except Exception:
             current_turn = 0
-        if current_turn <= 1:
+        if current_turn <= 1 and not self._is_plain_chat_request(
+            self._get_last_user_message(messages) or ""
+        ):
             status += (
                 "\n<FIRST_TURN_ORIENTATION>"
                 "\nThis is the first turn. Before diving in:"
@@ -563,7 +668,7 @@ class OrchestratorPlanner:
         ),
         (
             ["edit", "fix", "change", "modify", "update", "refactor"],
-            "Pick the right editor: str_replace_editor for targeted edits, ultimate_editor for function-level, edit_file for large rewrites. Use verify_state to confirm line contents before str_replace.",
+            "Pick the right editor: str_replace_editor for targeted edits, structure_editor for function-level, edit_file for large rewrites. Use verify_state to confirm line contents before str_replace.",
         ),
         (
             ["test", "testing", "pytest", "unittest"],
@@ -586,10 +691,22 @@ class OrchestratorPlanner:
             return ""
 
         text_lower = text.lower()
-        hints = [hint for keywords, hint in self._TOOL_HINT_MAP if any(kw in text_lower for kw in keywords)]
+        hints = [
+            hint
+            for keywords, hint in self._TOOL_HINT_MAP
+            if any(kw in text_lower for kw in keywords)
+        ]
         behavioral = self._get_behavioral_hints(messages)
         if behavioral:
             hints.extend(behavioral)
+
+        # P2-C: Think() usage reminder for complex multi-step tasks
+        if self._detect_no_think_pattern(messages) and self._is_complex_task(text):
+            hints.append(
+                "You haven't used think() in 5+ turns. For complex tasks, "
+                "pausing to reason with think() before acting reduces errors."
+            )
+
         return " ".join(hints) if hints else ""
 
     def _get_behavioral_hints(self, messages: list) -> list[str]:
@@ -601,7 +718,9 @@ class OrchestratorPlanner:
         edited_files, error_count, has_test_run = self._extract_tool_patterns(recent)
         return self._build_behavioral_hints(edited_files, error_count, has_test_run)
 
-    def _collect_recent_assistant_messages(self, messages: list, max_messages: int = 15) -> list:
+    def _collect_recent_assistant_messages(
+        self, messages: list, max_messages: int = 15
+    ) -> list:
         """Collect last N assistant messages in chronological order."""
         recent: list = []
         for msg in reversed(messages):
@@ -661,7 +780,8 @@ class OrchestratorPlanner:
         """Build hint strings from detected patterns.
 
         Includes: repeated edits to same file, many edits without tests,
-        multiple errors suggesting strategy change.
+        multiple errors suggesting strategy change, cross-file impact warnings,
+        and think() usage reminders.
         """
         hints: list[str] = []
 
@@ -685,7 +805,34 @@ class OrchestratorPlanner:
                 "to reassess, or error_patterns(query) for known fixes."
             )
 
+        # Cross-file impact warning: when any file was edited, suggest checking callers
+        if edited_files and total_edits >= 2:
+            hints.append(
+                "You have edited multiple files. If you changed a function or class signature, "
+                'use explore_tree_structure(start_entities=["<file>:<Symbol>"], direction="upstream") '
+                "to find callers that may need updating."
+            )
+
         return hints
+
+    def _detect_no_think_pattern(self, messages: list) -> bool:
+        """Return True if agent hasn't called think() in the last 5+ assistant turns."""
+        think_turns_ago = 0
+        assistant_turns = 0
+        for msg in reversed(messages):
+            if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                continue
+            assistant_turns += 1
+            tc_list = msg.get("tool_calls", [])
+            if isinstance(tc_list, list) and any(
+                isinstance(tc, dict) and tc.get("function", {}).get("name") == "think"
+                for tc in tc_list
+            ):
+                break  # Found a think() call
+            think_turns_ago += 1
+            if assistant_turns >= 8:
+                break
+        return think_turns_ago >= 5
 
     def _determine_tool_choice(self, messages: list, state: State) -> str | dict | None:
         last_user_msg = self._get_last_user_message(messages)
@@ -695,16 +842,10 @@ class OrchestratorPlanner:
         if self._is_plain_chat_request(last_user_msg):
             return "none"
 
-        # Force think on the first turn of a complex task
-        iter_flag = getattr(state, "iteration_flag", None)
-        current_iter = getattr(iter_flag, "current_value", 0) if iter_flag else 0
-        # Defensive: state objects in tests/mocks (or corrupted restore data)
-        # can yield non-int values; treat those as 0.
-        try:
-            current_iter = int(current_iter)
-        except Exception:
-            current_iter = 0
-        if current_iter <= 1 and self._is_complex_task(last_user_msg):
+        # Force think on complex tasks when the agent hasn't thought recently.
+        # This covers both first-turn planning AND mid-session topic switches
+        # (e.g., "now refactor the entire auth module" on turn 15).
+        if self._is_complex_task(last_user_msg) and self._detect_no_think_pattern(messages):
             return {"type": "function", "function": {"name": "think"}}
 
         if self._is_question(last_user_msg):
@@ -734,7 +875,15 @@ class OrchestratorPlanner:
     def _get_last_user_message(self, messages: list) -> str | None:
         for message in reversed(messages):
             if isinstance(message, dict) and message.get("role") == "user":
-                return message.get("content", "")
+                content = message.get("content", "")
+                # Skip workspace-context / knowledge-recall injections so that
+                # simple greetings like "hello" are still recognized even after
+                # the recall observation inserts a long synthetic user message.
+                if isinstance(content, str) and any(
+                    marker in content for marker in _INJECTED_MSG_MARKERS
+                ):
+                    continue
+                return content
         return None
 
     def _is_question(self, message: str) -> bool:
@@ -745,8 +894,13 @@ class OrchestratorPlanner:
 
     def _is_plain_chat_request(self, message: str) -> bool:
         text = (message or "").strip().lower()
-        if not text or len(text) > 120:
+        if not text:
             return False
+        # Semantic check: matches a conversational pattern AND has no action verbs.
+        # This replaces the old brittle 120-char length cutoff — "hi, what's the
+        # overall architecture of this project?" is now correctly recognized as
+        # needing tools even though it looks conversational.
         if any(re.search(pattern, text) for pattern in PLAIN_CHAT_PATTERNS):
-            return True
+            if not any(re.search(p, text) for p in ACTION_PATTERNS):
+                return True
         return False

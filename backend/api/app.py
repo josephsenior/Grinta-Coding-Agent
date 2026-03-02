@@ -51,7 +51,7 @@ from backend.api.otel_config import (
     get_effective_http_sample,
 )
 
-mcp_app = mcp_server.http_app(path="/mcp")
+mcp_app = mcp_server.http_app(path="/mcp", stateless_http=True)
 
 
 def combine_lifespans(*lifespans):
@@ -167,7 +167,7 @@ def _check_budget_sanity(warnings: list[str]) -> None:
         warnings.append(
             "max_budget_per_task is unlimited (None / 0). Long sessions with "
             "expensive models can accumulate significant costs. "
-            "Set max_budget_per_task in config.toml (default: $5.00)."
+            "Set max_budget_per_task in settings.json (default: $5.00)."
         )
 
 
@@ -191,12 +191,12 @@ def _check_system_dependencies(warnings: list[str]) -> None:
 
 
 def _check_config_file_existence(warnings: list[str]) -> None:
-    """Check for config.toml."""
+    """Check for settings.json."""
     from pathlib import Path
 
-    if not Path("config.toml").exists():
+    if not Path("settings.json").exists():
         warnings.append(
-            "No config.toml found. Copy config.template.toml → config.toml and set your LLM API key."
+            "No settings.json found. Copy settings.template.json → settings.json and set your LLM API key."
         )
 
 def _check_mcp_host_config(warnings: list[str]) -> None:
@@ -204,7 +204,7 @@ def _check_mcp_host_config(warnings: list[str]) -> None:
     mcp_host = getattr(_forge_config, "mcp_host", None)
     if not mcp_host:
         warnings.append(
-            "mcp_host is not set in config.toml. The internal Forge MCP server "
+            "mcp_host is not set in settings.json. The internal Forge MCP server "
             "will be disabled. AI agents will not have access to built-in "
             "workspace tools like search and file reading. Set mcp_host=\"localhost:8000\" "
             "(or your server's host:port) to enable internal tools."

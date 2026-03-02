@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.events.action import AgentThinkAction
+
 from backend.engines.orchestrator.tools.common import create_tool_definition
 
 _EXPLORE_TREE_STRUCTURE_DESCRIPTION = """

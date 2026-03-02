@@ -25,6 +25,7 @@ class TestExtractCode:
     def test_multiline_extraction(self):
         text = "<updated_code>line1\nline2\nline3</updated_code>"
         result = _extract_code(text)
+        assert result is not None
         assert "line1" in result
         assert "line3" in result
 

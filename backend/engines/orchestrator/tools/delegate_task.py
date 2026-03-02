@@ -40,6 +40,10 @@ def create_delegate_task_tool() -> dict:
                         "items": {"type": "string"},
                         "description": "List of file paths the worker agent needs to read or modify.",
                     },
+                    "run_in_background": {
+                        "type": "boolean",
+                        "description": "If true, spawns the worker(s) in the background and returns immediately. Best when used with the shared blackboard to monitor progress."
+                    },
                     "parallel_tasks": {
                         "type": "array",
                         "description": (
@@ -74,6 +78,7 @@ def build_delegate_task_action(arguments: dict) -> DelegateTaskAction:
     from backend.core.exceptions import FunctionCallValidationError
 
     parallel_tasks = arguments.get("parallel_tasks", [])
+    run_in_background = arguments.get("run_in_background", False)
     if parallel_tasks:
         # Parallel mode — validate each task has task_description
         for i, t in enumerate(parallel_tasks):
@@ -81,7 +86,7 @@ def build_delegate_task_action(arguments: dict) -> DelegateTaskAction:
                 raise FunctionCallValidationError(
                     f"parallel_tasks[{i}] is missing required 'task_description'"
                 )
-        return DelegateTaskAction(parallel_tasks=parallel_tasks)
+        return DelegateTaskAction(parallel_tasks=parallel_tasks, run_in_background=run_in_background)
 
     # Single task mode
     if "task_description" not in arguments:
@@ -102,4 +107,5 @@ def build_delegate_task_action(arguments: dict) -> DelegateTaskAction:
     return DelegateTaskAction(
         task_description=task_description,
         files=files,
+        run_in_background=run_in_background,
     )

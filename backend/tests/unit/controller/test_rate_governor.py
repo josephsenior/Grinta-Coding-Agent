@@ -10,6 +10,7 @@ Tests cover:
 """
 
 import asyncio
+from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -205,7 +206,7 @@ class TestCheckAndWait:
         """History should prune entries outside the window."""
         governor = LLMRateGovernor(
             max_tokens_per_minute=10000,
-            history_window_seconds=0.05,  # 50ms window
+            history_window_seconds=cast(int, 0.05),  # 50ms window
         )
 
         # Add first entry

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from typing import cast
 
 import pytest
 
+from backend.core.config import LLMConfig
+from backend.llm.metrics import Metrics
 from backend.llm.cost_tracker import (
     get_completion_cost,
     record_llm_cost_from_metrics,
@@ -24,17 +27,26 @@ class TestGetCompletionCostConfig:
 
     def test_config_override_takes_precedence(self):
         """When config supplies both cost fields, they should be used."""
-        cfg = SimpleNamespace(input_cost_per_token=0.001, output_cost_per_token=0.002)
+        cfg = cast(
+            LLMConfig,
+            SimpleNamespace(input_cost_per_token=0.001, output_cost_per_token=0.002),
+        )
         cost = get_completion_cost("any-model", 100, 50, config=cfg)
         assert cost == pytest.approx(100 * 0.001 + 50 * 0.002)
 
     def test_config_override_with_zero_tokens(self):
-        cfg = SimpleNamespace(input_cost_per_token=0.001, output_cost_per_token=0.002)
+        cfg = cast(
+            LLMConfig,
+            SimpleNamespace(input_cost_per_token=0.001, output_cost_per_token=0.002),
+        )
         assert get_completion_cost("m", 0, 0, config=cfg) == 0.0
 
     def test_config_partial_override_falls_through(self):
         """If only one cost field is set, config path is NOT used."""
-        cfg = SimpleNamespace(input_cost_per_token=0.001, output_cost_per_token=None)
+        cfg = cast(
+            LLMConfig,
+            SimpleNamespace(input_cost_per_token=0.001, output_cost_per_token=None),
+        )
         # Should fall through to catalog lookup
         with patch(
             "backend.llm.cost_tracker.get_pricing",
@@ -80,7 +92,7 @@ class TestGetCompletionCostCatalog:
 
 class TestRecordLLMCostFromMetrics:
     def test_records_accumulated_cost(self):
-        metrics = SimpleNamespace(accumulated_cost=1.23)
+        metrics = cast(Metrics, SimpleNamespace(accumulated_cost=1.23))
         mock_record = MagicMock()
         with patch.dict(
             "sys.modules",
@@ -94,13 +106,13 @@ class TestRecordLLMCostFromMetrics:
         mock_record.assert_called_once_with("user:42", 1.23)
 
     def test_zero_cost_not_recorded(self):
-        metrics = SimpleNamespace(accumulated_cost=0.0)
+        metrics = cast(Metrics, SimpleNamespace(accumulated_cost=0.0))
         # Should not raise even if the import is missing
         record_llm_cost_from_metrics("user:1", metrics)
 
     def test_missing_import_handled_gracefully(self):
         """If the telemetry module is absent, no error is raised."""
-        metrics = SimpleNamespace(accumulated_cost=5.0)
+        metrics = cast(Metrics, SimpleNamespace(accumulated_cost=5.0))
         with patch(
             "builtins.__import__",
             side_effect=ImportError("no module"),

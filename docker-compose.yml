@@ -14,7 +14,7 @@ services:
       - "${FORGE_PORT:-3000}:3000"
     volumes:
       - ./workspace:/app/workspace          # Persist agent workspace
-      - ./config.toml:/app/config.toml      # Mount your host config
+      - ./settings.json:/app/settings.json  # Mount your host config
       - forge_data:/home/forge/.Forge       # Persist KB and Memory
     environment:
       - FORGE_HOST=0.0.0.0

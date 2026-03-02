@@ -9,6 +9,11 @@ import pytest
 from backend.storage.base_web_hook import BaseWebHookFileStore
 
 
+class _ConcreteWebHookFileStore(BaseWebHookFileStore):
+    def write(self, path: str, contents: str | bytes) -> None:
+        self.file_store.write(path, contents)
+
+
 @pytest.fixture()
 def inner_store():
     return MagicMock()
@@ -17,7 +22,7 @@ def inner_store():
 @pytest.fixture()
 def hook_store(inner_store):
     client = MagicMock()
-    return BaseWebHookFileStore(
+    return _ConcreteWebHookFileStore(
         file_store=inner_store, base_url="http://hook.test/", client=client
     )
 
@@ -25,14 +30,14 @@ def hook_store(inner_store):
 class TestBaseWebHookInit:
     def test_stores_fields(self, inner_store):
         client = MagicMock()
-        s = BaseWebHookFileStore(inner_store, "http://example.com/", client)
+        s = _ConcreteWebHookFileStore(inner_store, "http://example.com/", client)
         assert s.file_store is inner_store
         assert s.base_url == "http://example.com/"
         assert s.client is client
 
     def test_default_client(self, inner_store):
         """If no client is given, a new httpx.Client is created."""
-        s = BaseWebHookFileStore(inner_store, "http://test.com/")
+        s = _ConcreteWebHookFileStore(inner_store, "http://test.com/")
         assert s.client is not None
 
 

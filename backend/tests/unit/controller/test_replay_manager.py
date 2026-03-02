@@ -3,11 +3,13 @@
 import hashlib
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from typing import cast
 
 
 from backend.controller.replay import ReplayDivergence, ReplayManager
 from backend.events.action.message import MessageAction
 from backend.events.event import EventSource
+from backend.events.event import Event
 from backend.events.observation.empty import NullObservation
 
 
@@ -71,7 +73,8 @@ class TestReplayManagerInit:
         a2 = _make_action(content="msg2")
         rm = ReplayManager([a1, a2])
         # First action's wait_for_response should be set to False
-        assert rm.replay_events[0].wait_for_response is False
+        first_action = cast(MessageAction, rm.replay_events[0])
+        assert first_action.wait_for_response is False
 
 
 class TestShouldReplay:
@@ -96,15 +99,15 @@ class TestStep:
         action = _make_action(content="first")
         rm = ReplayManager([action])
         result = rm.step()
-        assert result.content == "first"
+        assert cast(MessageAction, result).content == "first"
         assert rm.replay_index == 1
 
     def test_multiple_steps(self):
         a1 = _make_action(content="first")
         a2 = _make_action(content="second")
         rm = ReplayManager([a1, a2])
-        assert rm.step().content == "first"
-        assert rm.step().content == "second"
+        assert cast(MessageAction, rm.step()).content == "first"
+        assert cast(MessageAction, rm.step()).content == "second"
         assert rm.replay_index == 2
 
 
@@ -176,18 +179,18 @@ class TestContentHash:
 
     def test_event_with_content(self):
         event = SimpleNamespace(content="hello")
-        h = ReplayManager._content_hash(event)
+        h = ReplayManager._content_hash(cast(Event, event))
         expected = hashlib.sha256(b"hello").hexdigest()
         assert h == expected
 
     def test_event_with_none_content(self):
         event = SimpleNamespace(content=None)
-        h = ReplayManager._content_hash(event)
+        h = ReplayManager._content_hash(cast(Event, event))
         expected = hashlib.sha256(b"").hexdigest()
         assert h == expected
 
     def test_event_without_content_attr(self):
         event = SimpleNamespace()
-        h = ReplayManager._content_hash(event)
+        h = ReplayManager._content_hash(cast(Event, event))
         expected = hashlib.sha256(b"").hexdigest()
         assert h == expected

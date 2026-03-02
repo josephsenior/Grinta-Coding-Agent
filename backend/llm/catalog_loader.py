@@ -1,23 +1,22 @@
 """Unified model catalog loader.
 
-Reads ``catalog.toml`` once and exposes typed helpers consumed by
+Reads ``catalog.json`` once and exposes typed helpers consumed by
 ``cost_tracker``, ``model_features``, ``model_catalog``, and ``constants``.
 
-Adding a new model requires editing **only** ``catalog.toml`` — no Python
+Adding a new model requires editing **only** ``catalog.json`` — no Python
 changes needed.
 """
 
 from __future__ import annotations
 
 import functools
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Sequence
 from typing import Any
 
-import tomllib  # Python 3.11+
-
-_CATALOG_PATH = Path(__file__).with_name("catalog.toml")
+_CATALOG_PATH = Path(__file__).with_name("catalog.json")
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,14 +48,14 @@ class ModelEntry:
 
 @functools.lru_cache(maxsize=1)
 def _load_raw() -> dict:
-    """Load and cache the raw TOML data."""
-    with open(_CATALOG_PATH, "rb") as f:
-        return tomllib.load(f)
+    """Load and cache the raw catalog data."""
+    with open(_CATALOG_PATH, encoding="utf-8") as f:
+        return json.load(f)
 
 
 @functools.lru_cache(maxsize=1)
 def get_catalog() -> tuple[ModelEntry, ...]:
-    """Return all model entries from ``catalog.toml``."""
+    """Return all model entries from ``catalog.json``."""
     data = _load_raw()
     entries: list[ModelEntry] = []
     for name, info in data.get("models", {}).items():

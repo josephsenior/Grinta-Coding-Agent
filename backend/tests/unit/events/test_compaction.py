@@ -1,5 +1,6 @@
 """Tests for backend.events.compaction — event compaction utilities."""
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 
@@ -24,8 +25,8 @@ class TestTypeName:
 
     def test_builtin_type(self):
         """Test with builtin type."""
-        assert _type_name([]) == "list"
-        assert _type_name({}) == "dict"
+        assert _type_name(cast(Any, [])) == "list"
+        assert _type_name(cast(Any, {})) == "dict"
 
 
 class TestIsNull:
@@ -150,7 +151,7 @@ class TestEventCompactorCompact:
         """Test original list is not modified."""
         event = MagicMock()
         event.__class__.__name__ = "NullAction"
-        events = [event]
+        events: list[Any] = [event]
 
         compactor = EventCompactor()
         compactor.compact(events)

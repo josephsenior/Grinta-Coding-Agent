@@ -7,8 +7,7 @@ runtime are tested with mocked runtimes.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import cast
+from unittest.mock import MagicMock, patch
 
 import pytest
 

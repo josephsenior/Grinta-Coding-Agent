@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -155,12 +156,12 @@ class TestEventTimeout:
 class TestEventMessage:
     def test_with_message(self):
         e = Event()
-        e._message = "Hello"
+        cast(Any, e)._message = "Hello"
         assert e.message == "Hello"
 
     def test_with_none_message(self):
         e = Event()
-        e._message = None
+        cast(Any, e)._message = None
         assert e.message is None
 
 
@@ -170,14 +171,14 @@ class TestEventToolCallMetadata:
         meta = SimpleNamespace(
             function_name="test", tool_call_id="tc1", total_calls_in_response=1
         )
-        e.tool_call_metadata = meta
+        cast(Any, e).tool_call_metadata = meta
         assert e.tool_call_metadata is not None
         assert e.tool_call_metadata.function_name == "test"
 
     def test_rejects_incomplete_duck_type(self):
         e = Event()
         bad = SimpleNamespace(function_name="test")  # missing required attrs
-        e._tool_call_metadata = bad
+        cast(Any, e)._tool_call_metadata = bad
         assert e.tool_call_metadata is None
 
 

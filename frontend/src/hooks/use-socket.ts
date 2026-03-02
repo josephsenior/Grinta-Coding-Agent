@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useSessionStore } from "@/stores/session-store";
+import { useContextPanelStore } from "@/stores/context-panel-store";
 import { connectSocket, disconnectSocket, onForgeEvent } from "@/socket/client";
 import { toast } from "sonner";
 
@@ -58,8 +59,23 @@ export function useSocket(conversationId: string | undefined) {
       });
 
       const unsubscribe = onForgeEvent((event) => {
-        // Dedup: skip events we already have (can happen during replay after reconnection)
-        if (event.id <= latestEventIdRef.current) return;
+        if (typeof event.id === "number" && event.id >= 0) {
+          // Skip exact duplicates (replay after reconnection).
+          if (event.id <= latestEventIdRef.current) return;
+
+          // Detect replay gaps: if event ID jumps by more than a small
+          // tolerance, the server may have pruned intermediate events.
+          const gap = event.id - latestEventIdRef.current;
+          if (latestEventIdRef.current >= 0 && gap > 50) {
+            console.warn(
+              `[forge] Event gap detected: expected ~${latestEventIdRef.current + 1}, got ${event.id} (gap=${gap}). Some history may be missing.`,
+            );
+          }
+
+          // Update ref immediately — don't wait for React re-render — to
+          // block duplicate events that arrive before the next render cycle.
+          latestEventIdRef.current = event.id;
+        }
         addEvent(event);
       });
 
@@ -74,6 +90,7 @@ export function useSocket(conversationId: string | undefined) {
     connectedRef.current = true;
 
     setConversation(conversationId);
+    useContextPanelStore.getState().resetPanel();
     const unsubscribe = connect(conversationId, -1);
 
     return () => {

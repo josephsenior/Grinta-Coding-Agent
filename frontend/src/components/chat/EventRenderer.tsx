@@ -1,7 +1,7 @@
 import { ActionType, ObservationType } from "@/types/agent";
 import type { ForgeEvent, ActionEvent, ObservationEvent } from "@/types/events";
 import { MessageBubble } from "./MessageBubble";
-import { ThinkCard } from "./ThinkCard";
+import { ThinkCard, ThoughtTray } from "./ThinkCard";
 import { FileCard } from "./FileCard";
 import { CommandCard, CommandOutputCard } from "./CommandCard";
 import {
@@ -31,7 +31,8 @@ export function EventCard({ event }: EventCardProps) {
   // Actions
   if ("action" in event) {
     const action = event as ActionEvent;
-    switch (action.action) {
+    const renderAction = () => {
+      switch (action.action) {
       case ActionType.MESSAGE:
         return <MessageBubble event={action} />;
       case ActionType.THINK:
@@ -91,7 +92,21 @@ export function EventCard({ event }: EventCardProps) {
             [{action.action}] {action.message}
           </div>
         );
+      }
+    };
+    
+    const node = renderAction();
+    if (!node) return null;
+    
+    if (action.args?.thought && action.action !== ActionType.THINK && action.action !== ActionType.MESSAGE) {
+      return (
+        <div className="flex flex-col gap-1 w-full m-0 p-0">
+          <ThoughtTray thought={String(action.args.thought)} />
+          {node}
+        </div>
+      );
     }
+    return node;
   }
 
   // Observations

@@ -12,7 +12,6 @@ to answer questions or locate documentation.
 
 from __future__ import annotations
 
-import shlex
 
 from backend.engines.orchestrator.tools.common import create_tool_definition
 from backend.events.action import CmdRunAction

@@ -73,8 +73,8 @@ def detect_capabilities(
 
     # MCP can be supported either via HTTP/SSE servers (cross-platform) or via
     # stdio servers (requires spawning npx/uvx or other commands).
-    has_npx = shutil.which("npx") is not None
-    has_uvx = shutil.which("uvx") is not None
+    shutil.which("npx") is not None
+    shutil.which("uvx") is not None
 
     has_http_mcp = False
     try:

@@ -14,6 +14,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 import time
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +30,7 @@ def store_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def store(store_path: Path) -> SQLiteEventStore:
+def store(store_path: Path) -> Generator[SQLiteEventStore, None, None]:
     """Provide a fresh SQLiteEventStore instance."""
     s = SQLiteEventStore(store_path)
     yield s
@@ -99,6 +100,7 @@ class TestWriteOperations:
         store.write_event(0, event)
 
         result = store.read_event(0)
+        assert result is not None
         assert result["timestamp"] == now
 
     def test_write_event_with_source(self, store: SQLiteEventStore) -> None:
@@ -107,6 +109,7 @@ class TestWriteOperations:
         store.write_event(0, event)
 
         result = store.read_event(0)
+        assert result is not None
         assert result["source"] == "agent"
 
     def test_write_event_defaults_to_action(self, store: SQLiteEventStore) -> None:
@@ -154,6 +157,7 @@ class TestWriteOperations:
         store.write_event(0, {"id": 0, "action": "second"})
 
         result = store.read_event(0)
+        assert result is not None
         assert result["action"] == "second"
 
     def test_write_event_with_complex_json(self, store: SQLiteEventStore) -> None:
@@ -169,6 +173,7 @@ class TestWriteOperations:
         store.write_event(0, event)
 
         result = store.read_event(0)
+        assert result is not None
         assert result["data"]["nested"]["deep"] == [1, 2, 3]
         assert result["data"]["unicode"] == "🚀 emoji test"
 
@@ -181,9 +186,15 @@ class TestWriteOperations:
         ]
         store.write_events_batch(events)
 
-        assert store.read_event(0)["action"] == "first"
-        assert store.read_event(1)["action"] == "second"
-        assert store.read_event(2)["action"] == "third"
+        r0 = store.read_event(0)
+        assert r0 is not None
+        assert r0["action"] == "first"
+        r1 = store.read_event(1)
+        assert r1 is not None
+        assert r1["action"] == "second"
+        r2 = store.read_event(2)
+        assert r2 is not None
+        assert r2["action"] == "third"
 
     def test_write_batch_events_empty(self, store: SQLiteEventStore) -> None:
         """Test that empty batch is safe."""
@@ -198,8 +209,12 @@ class TestWriteOperations:
         ]
         store.write_events_batch(events)
 
-        assert store.read_event(0)["source"] == "agent"
-        assert store.read_event(1)["source"] == "tool"
+        r0 = store.read_event(0)
+        assert r0 is not None
+        assert r0["source"] == "agent"
+        r1 = store.read_event(1)
+        assert r1 is not None
+        assert r1["source"] == "tool"
 
 
 class TestReadOperations:
@@ -216,6 +231,7 @@ class TestReadOperations:
         store.write_event(5, event)
 
         result = store.read_event(5)
+        assert result is not None
         assert result["action"] == "test"
         assert result["value"] == 42
 
@@ -462,6 +478,7 @@ class TestDataIntegrity:
         store.write_event(0, {"text": special})
 
         result = store.read_event(0)
+        assert result is not None
         assert result["text"] == special
 
     def test_very_large_payload(self, store: SQLiteEventStore) -> None:
@@ -470,6 +487,7 @@ class TestDataIntegrity:
         store.write_event(0, {"data": large_data})
 
         result = store.read_event(0)
+        assert result is not None
         assert result["data"] == large_data
         assert len(result["data"]) == 10000
 
@@ -486,6 +504,7 @@ class TestDataIntegrity:
         )
 
         result = store.read_event(0)
+        assert result is not None
         assert result["int"] == 42
         assert result["float"] == 3.14159
         assert result["negative"] == -100
@@ -496,6 +515,7 @@ class TestDataIntegrity:
         store.write_event(0, {"nullable": None, "exists": "value"})
 
         result = store.read_event(0)
+        assert result is not None
         assert result["nullable"] is None
         assert result["exists"] == "value"
 
@@ -504,6 +524,7 @@ class TestDataIntegrity:
         store.write_event(0, {"yes": True, "no": False})
 
         result = store.read_event(0)
+        assert result is not None
         assert result["yes"] is True
         assert result["no"] is False
 
@@ -512,6 +533,7 @@ class TestDataIntegrity:
         store.write_event(0, {"items": [1, "two", 3.0, None, True]})
 
         result = store.read_event(0)
+        assert result is not None
         assert result["items"] == [1, "two", 3.0, None, True]
 
 
@@ -561,6 +583,7 @@ class TestErrorHandling:
         """Test that None source is handled gracefully."""
         store.write_event(0, {"action": "test", "source": None})
         result = store.read_event(0)
+        assert result is not None
         assert result["source"] is None
 
     def test_list_events_with_nonexistent_source(self, store: SQLiteEventStore) -> None:

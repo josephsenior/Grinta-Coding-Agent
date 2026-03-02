@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 import pytest
 
 from backend.core.exceptions import FunctionCallValidationError
@@ -33,22 +34,22 @@ class TestCombineThought:
 
     def test_add_thought_to_action(self):
         action = CmdRunAction(command="ls")
-        action.thought = ""
+        cast(Any, action).thought = ""
         result = combine_thought(action, "I should list files")
-        assert "I should list files" in result.thought
+        assert "I should list files" in cast(Any, result).thought
 
     def test_combine_with_existing_thought(self):
         action = CmdRunAction(command="ls")
-        action.thought = "existing thought"
+        cast(Any, action).thought = "existing thought"
         result = combine_thought(action, "new thought")
-        assert "new thought" in result.thought
-        assert "existing thought" in result.thought
+        assert "new thought" in cast(Any, result).thought
+        assert "existing thought" in cast(Any, result).thought
 
     def test_empty_thought_no_change(self):
         action = CmdRunAction(command="ls")
-        action.thought = "original"
+        cast(Any, action).thought = "original"
         result = combine_thought(action, "")
-        assert result.thought == "original"
+        assert cast(Any, result).thought == "original"
 
     def test_action_without_thought_attr(self):
         action = MessageAction(content="hello")

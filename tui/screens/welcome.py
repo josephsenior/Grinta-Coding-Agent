@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import os
+import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Vertical, Horizontal
 from textual.screen import Screen
-from textual.widgets import Button, Input, Label, Static, RadioSet, RadioButton
+from textual.widgets import Button, Input, Label, RadioButton, RadioSet, Static
 
 class WelcomeScreen(Screen[bool]):
     """Onboarding wizard for first-time users."""
@@ -60,38 +60,37 @@ class WelcomeScreen(Screen[bool]):
     def finish_setup(self) -> None:
         """Save config and dismiss."""
         provider = "openai"
-        if self.query_one("#provider-anthropic").value:
+        anth_radio = cast(RadioButton, self.query_one("#provider-anthropic"))
+        local_radio = cast(RadioButton, self.query_one("#provider-local"))
+        api_key_input = cast(Input, self.query_one("#api-key-input"))
+        workspace_input = cast(Input, self.query_one("#workspace-input"))
+        if anth_radio.value:
             provider = "anthropic"
-        elif self.query_one("#provider-local").value:
+        elif local_radio.value:
             provider = "local"
 
-        api_key = self.query_one("#api-key-input").value.strip()
-        workspace = self.query_one("#workspace-input").value.strip()
+        api_key = api_key_input.value.strip()
+        workspace = workspace_input.value.strip()
 
-        # Generate config.toml
+        # Generate settings.json
         self._save_config(provider, api_key, workspace)
         self.dismiss(True)
 
     def _save_config(self, provider: str, api_key: str, workspace: str) -> None:
-        import tomli_w
-        
-        config_path = Path.cwd() / "config.toml"
-        template_path = Path.cwd() / "config.template.toml"
-        
-        # Start with defaults or template
+        settings_path = Path.cwd() / "settings.json"
+
+        # Start with defaults (flat format for load_from_json compatibility)
         config_data: dict[str, Any] = {
-            "core": {
-                "workspace_base": workspace,
-                "max_budget_per_task": 5.0,
-            },
-            "llm": {
-                "api_key": api_key,
-                "model": "gpt-4o" if provider == "openai" else "claude-3-5-sonnet-20240620" if provider == "anthropic" else "ollama/llama3.2"
-            }
+            "workspace_base": workspace,
+            "max_budget_per_task": 5.0,
+            "llm_model": "gpt-4o" if provider == "openai" else "claude-3-5-sonnet-20240620" if provider == "anthropic" else "ollama/llama3.2",
+            "llm_api_key": api_key,
+            "llm_base_url": "",
+            "model_aliases": {},
         }
 
-        with open(config_path, "wb") as f:
-            f.write(tomli_w.dumps(config_data).encode("utf-8"))
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=2)
         
         # Create workspace dir if missing
         w_path = Path(workspace)

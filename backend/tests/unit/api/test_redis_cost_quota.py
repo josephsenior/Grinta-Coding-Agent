@@ -46,10 +46,6 @@ def redis_middleware():
         )
         mw.day_window = 86400
         mw.month_window = 86400 * 30
-        mw._daily_costs = {}
-        mw._monthly_costs = {}
-        mw._daily_reset = {}
-        mw._monthly_reset = {}
         yield mw
 
 

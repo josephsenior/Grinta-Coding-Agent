@@ -15,7 +15,7 @@ import aiohttp
 logger = logging.getLogger(__name__)
 
 
-from backend.core.external_service import ExternalServiceBase
+from backend.core.external_service import ExternalServiceBase  # noqa: E402
 
 
 class LogShipper(ExternalServiceBase):

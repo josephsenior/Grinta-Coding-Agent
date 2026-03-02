@@ -165,6 +165,7 @@ class TestMetricsService(unittest.TestCase):
         self.service.start_task("task-123")
 
         self.assertIsNotNone(self.service._current_task)
+        assert self.service._current_task is not None
         self.assertEqual(self.service._current_task.task_id, "task-123")
         mock_logger.info.assert_called_once()
 
@@ -173,6 +174,7 @@ class TestMetricsService(unittest.TestCase):
         self.service.start_task("test")
 
         self.service.record_iteration()
+        assert self.service._current_task is not None
         self.assertEqual(self.service._current_task.iterations_count, 1)
 
         self.service.record_iteration()
@@ -188,6 +190,7 @@ class TestMetricsService(unittest.TestCase):
         self.service.start_task("test")
 
         self.service.record_error()
+        assert self.service._current_task is not None
         self.assertEqual(self.service._current_task.error_count, 1)
 
     def test_record_high_risk_action(self):
@@ -195,6 +198,7 @@ class TestMetricsService(unittest.TestCase):
         self.service.start_task("test")
 
         self.service.record_high_risk_action()
+        assert self.service._current_task is not None
         self.assertEqual(self.service._current_task.high_risk_actions, 1)
 
     def test_record_stuck_detection(self):
@@ -202,6 +206,7 @@ class TestMetricsService(unittest.TestCase):
         self.service.start_task("test")
 
         self.service.record_stuck_detection()
+        assert self.service._current_task is not None
         self.assertEqual(self.service._current_task.stuck_detections, 1)
 
     def test_record_llm_call_no_cost(self):
@@ -209,6 +214,7 @@ class TestMetricsService(unittest.TestCase):
         self.service.start_task("test")
 
         self.service.record_llm_call()
+        assert self.service._current_task is not None
         self.assertEqual(self.service._current_task.llm_calls, 1)
         self.assertEqual(self.service._current_task.total_cost, 0.0)
 
@@ -219,6 +225,7 @@ class TestMetricsService(unittest.TestCase):
         self.service.record_llm_call(cost=0.5)
         self.service.record_llm_call(cost=0.3)
 
+        assert self.service._current_task is not None
         self.assertEqual(self.service._current_task.llm_calls, 2)
         self.assertAlmostEqual(self.service._current_task.total_cost, 0.8)
 
@@ -276,6 +283,7 @@ class TestMetricsService(unittest.TestCase):
         self.service.record_llm_call(cost=0.3)
 
         # Simulate some duration
+        assert self.service._current_task is not None
         self.service._current_task.started_at = time.time() - 10.0
 
         self.service.complete_task(success=True)
@@ -303,6 +311,7 @@ class TestMetricsService(unittest.TestCase):
         current = self.service.get_current_task_metrics()
 
         self.assertIsNotNone(current)
+        assert current is not None
         self.assertEqual(current.task_id, "test")
 
     def test_get_aggregate_metrics(self):

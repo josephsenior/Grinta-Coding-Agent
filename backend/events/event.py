@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from backend.core.schemas import EventSource
 from backend.events.tool import ToolCallMetadata
@@ -78,10 +78,12 @@ class Event:
         return None
 
     @timestamp.setter
-    def timestamp(self, value: datetime) -> None:
-        """Set event timestamp from datetime object."""
+    def timestamp(self, value: datetime | None) -> None:
+        """Set event timestamp from datetime object. Accepts None to clear."""
         if isinstance(value, datetime):
             self._timestamp = value.isoformat()
+        elif value is None:
+            self._timestamp = None  # type: ignore[assignment]
 
     @property
     def source(self) -> EventSource | None:

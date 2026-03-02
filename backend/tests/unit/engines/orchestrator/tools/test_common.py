@@ -1,7 +1,6 @@
 """Tests for backend.engines.orchestrator.tools.common."""
 from __future__ import annotations
 
-import pytest
 
 from backend.engines.orchestrator.tools.common import (
     create_tool_definition,

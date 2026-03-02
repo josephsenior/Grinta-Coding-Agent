@@ -42,10 +42,12 @@ class TestPortLockAcquireRelease:
     def test_acquire_and_release(self, lock_dir):
         lock = PortLock(12345, lock_dir=lock_dir)
         assert lock.acquire(timeout=2.0) is True
-        assert lock.is_locked is True
-        assert lock.lock_fd is not None
+        is_locked_state = lock.is_locked
+        assert is_locked_state is True
+        lock_fd_before = lock.lock_fd
+        assert lock_fd_before is not None
         lock.release()
-        assert lock.is_locked is False
+        assert not lock.is_locked
         assert lock.lock_fd is None
 
     def test_acquire_already_locked(self, lock_dir):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -61,8 +62,8 @@ class TestRetryMixin(TestCase):
         retry_state = MagicMock()
         retry_state.attempt_number = 2
         exception = ValueError("Test error")
-        exception.retry_attempt = None
-        exception.max_retries = None
+        cast(Any, exception).retry_attempt = None
+        cast(Any, exception).max_retries = None
         retry_state.outcome.exception.return_value = exception
 
         self.mixin.log_retry_attempt(retry_state)
@@ -89,8 +90,8 @@ class TestRetryMixin(TestCase):
         self.mixin.log_retry_attempt(retry_state)
 
         mock_logger.error.assert_called_once()
-        self.assertEqual(exception.retry_attempt, 1)
-        self.assertEqual(exception.max_retries, 3)
+        self.assertEqual(cast(Any, exception).retry_attempt, 1)
+        self.assertEqual(cast(Any, exception).max_retries, 3)
 
     @patch("backend.llm.retry_mixin.logger")
     def test_log_retry_attempt_no_retry_object(self, mock_logger):
@@ -309,8 +310,8 @@ class TestRetryMixin(TestCase):
         retry_state = MagicMock()
         retry_state.attempt_number = 2
         exception = ValueError("Error")
-        exception.retry_attempt = None
-        exception.max_retries = None
+        cast(Any, exception).retry_attempt = None
+        cast(Any, exception).max_retries = None
         retry_state.outcome.exception.return_value = exception
 
         # Mock single stop function (not stops list)
@@ -323,8 +324,8 @@ class TestRetryMixin(TestCase):
         with patch("backend.llm.retry_mixin.logger"):
             self.mixin.log_retry_attempt(retry_state)
 
-        self.assertEqual(exception.retry_attempt, 2)
-        self.assertEqual(exception.max_retries, 5)
+        self.assertEqual(cast(Any, exception).retry_attempt, 2)
+        self.assertEqual(cast(Any, exception).max_retries, 5)
 
     @patch("backend.llm.retry_mixin.logger")
     def test_log_retry_attempt_no_max_attempts(self, mock_logger):
@@ -332,8 +333,8 @@ class TestRetryMixin(TestCase):
         retry_state = MagicMock()
         retry_state.attempt_number = 1
         exception = ValueError("Error")
-        exception.retry_attempt = None
-        exception.max_retries = None
+        cast(Any, exception).retry_attempt = None
+        cast(Any, exception).max_retries = None
         retry_state.outcome.exception.return_value = exception
 
         # Mock stop condition without max_attempts
@@ -344,8 +345,8 @@ class TestRetryMixin(TestCase):
 
         # Should still log without setting retry_attempt/max_retries
         mock_logger.error.assert_called_once()
-        self.assertIsNone(exception.retry_attempt)
-        self.assertIsNone(exception.max_retries)
+        self.assertIsNone(cast(Any, exception).retry_attempt)
+        self.assertIsNone(cast(Any, exception).max_retries)
 
     def test_retry_decorator_reraise_behavior(self):
         """Test that retry decorator reraises exceptions after exhausting retries."""

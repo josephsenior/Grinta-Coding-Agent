@@ -253,8 +253,10 @@ class TestFilterUnmatchedToolCalls:
         ]
         result = list(filter_unmatched_tool_calls(messages))
         assert len(result) == 2
-        assert result[0].content[0].text == "Hello"
-        assert result[1].content[0].text == "Hi there"
+        c0 = result[0].content[0]
+        c1 = result[1].content[0]
+        assert isinstance(c0, TextContent) and c0.text == "Hello"
+        assert isinstance(c1, TextContent) and c1.text == "Hi there"
 
     def test_partially_matched_tool_calls(self):
         """Test assistant message with multiple tool calls, some matched."""

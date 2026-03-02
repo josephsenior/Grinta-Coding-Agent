@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 
 from backend.events.action.action import Action
 from backend.events.action.empty import NullAction
@@ -115,16 +116,16 @@ class TestOrphaned:
         assert not pairs  # 1 is in action_map
 
     def test_orphan_cmd_obs_added(self):
-        a_map: dict = {}
-        o_map = {99: _cmd_obs(99)}
+        a_map: dict[int, Any] = {}
+        o_map: dict[int, Any] = {99: _cmd_obs(99)}
         pairs: list = []
         _add_orphaned_observations(pairs, a_map, o_map)
         assert len(pairs) == 1
         assert isinstance(pairs[0][0], NullAction)
 
     def test_null_obs_orphan_skipped(self):
-        a_map: dict = {}
-        o_map = {99: NullObservation("")}
+        a_map: dict[int, Any] = {}
+        o_map: dict[int, Any] = {99: NullObservation("")}
         # Set cause
         o_map[99]._cause = 99
         pairs: list = []

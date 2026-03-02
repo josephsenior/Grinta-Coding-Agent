@@ -352,6 +352,7 @@ class TestSimulateEdit:
         old_content = "line 0\\nline 1\\nline 2"
         new_content = middleware._simulate_edit(old_content, action)
 
+        assert new_content is not None
         assert "inserted line" in new_content
 
     def test_simulate_edit_insert_at_end(self):
@@ -365,6 +366,7 @@ class TestSimulateEdit:
         old_content = "line 0\\nline 1"
         new_content = middleware._simulate_edit(old_content, action)
 
+        assert new_content is not None
         assert "appended line" in new_content
 
     def test_simulate_edit_view_returns_none(self):

@@ -299,10 +299,30 @@ class DefaultLinter:
 
     def _lint_file(self, file_path: str) -> LintResult:
         """Lint a file using the detected backend."""
-        if self._detected_backend == "ruff":
-            return self._lint_with_ruff(file_path=file_path)
-        if self._detected_backend == "pylint":
-            return self._lint_with_pylint(file_path=file_path)
+        # Try LSP first for all supported languages
+        from backend.engines.orchestrator.tools.lsp_client import get_lsp_client
+        lsp = get_lsp_client()
+        lsp_res = lsp.query("diagnostics", file_path)
+        
+        if lsp_res.available and not lsp_res.error:
+            errors = []
+            for loc in lsp_res.locations:
+                errors.append(LintError(
+                    line=loc.line,
+                    column=loc.column,
+                    message="LSP Diagnostic",
+                    severity="error",
+                    file_path=file_path
+                ))
+            if errors:
+                return LintResult(errors=errors, warnings=[])
+
+        # Fallback to existing logic for Python if LSP failed or returned nothing
+        if file_path.endswith(".py"):
+            if self._detected_backend == "ruff":
+                return self._lint_with_ruff(file_path=file_path)
+            if self._detected_backend == "pylint":
+                return self._lint_with_pylint(file_path=file_path)
 
         return LintResult(errors=[], warnings=[])
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import sys
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import forge_logger as logger
 
@@ -237,7 +237,7 @@ def create_shell_session(
     logger.info("Has tmux: %s", tools.has_tmux)
 
     # Common session arguments
-    session_kwargs = {
+    session_kwargs: dict[str, Any] = {
         "work_dir": work_dir,
         "username": username,
         "no_change_timeout_seconds": no_change_timeout_seconds,
@@ -246,7 +246,7 @@ def create_shell_session(
     }
 
     # Windows: Use PowerShell session
-    if sys.platform == "win32":
+    if os.name == "nt":
         from backend.runtime.utils.windows_bash import WindowsPowershellSession
 
         logger.info("Using WindowsPowershellSession")
@@ -254,7 +254,6 @@ def create_shell_session(
             **session_kwargs,  # type: ignore[arg-type]
             powershell_exe=tools.shell_type if tools.has_powershell else None,
         )
-        # Type cast for mypy - WindowsPowershellSession implements UnifiedShellSession interface
 
     # Unix with tmux: Use full BashSession
     if tools.has_tmux and tools.has_bash:

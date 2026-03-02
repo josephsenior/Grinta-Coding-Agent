@@ -2,6 +2,7 @@
 
 import unittest
 import asyncio
+from typing import Any, cast
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from backend.controller.services.retry_service import RetryService
@@ -82,9 +83,10 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(self.service._task_loop)
 
         # Cleanup
-        self.service._retry_worker_task.cancel()
+        task = cast(asyncio.Task[Any], self.service._retry_worker_task)
+        task.cancel()
         try:
-            await self.service._retry_worker_task
+            await task
         except asyncio.CancelledError:
             pass
 

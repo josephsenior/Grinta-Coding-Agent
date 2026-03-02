@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import logging
+from typing import IO, Any, cast
 from unittest.mock import patch
 
 
@@ -232,6 +233,7 @@ class TestLogUncaughtExceptions:
             import sys
 
             _, exc, tb = sys.exc_info()
+            assert exc is not None
             log_uncaught_exceptions(ValueError, exc, tb)
         mock_logging.error.assert_called()
 
@@ -257,7 +259,7 @@ class TestLlmFileHandler:
             assert handler.message_counter == 2
             # Stream is already closed by emit(); just remove the handler
             # to avoid ValueError on flush of closed file.
-            handler.stream = None
+            cast(Any, handler).stream = None
 
 
 # ── Trace context Errors ─────────────────────────────────────────────

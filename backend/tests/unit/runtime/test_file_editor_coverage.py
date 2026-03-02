@@ -1,8 +1,6 @@
 import pytest
-import os
-from pathlib import Path
 from unittest.mock import patch
-from backend.runtime.utils.file_editor import FileEditor, ToolResult
+from backend.runtime.utils.file_editor import FileEditor
 
 class TestFileEditorCoverageGaps:
     @pytest.fixture(autouse=True)
@@ -25,6 +23,7 @@ class TestFileEditorCoverageGaps:
     def test_path_validation_error(self):
         """Covers line 126 (PathValidationError in __call__)."""
         result = self.editor(command="view", path="../outside.txt")
+        assert result.error is not None
         assert "Path validation error" in result.error
 
     def test_handle_view_exception(self):
@@ -32,6 +31,7 @@ class TestFileEditorCoverageGaps:
         self._write("test.txt", "content")
         with patch.object(self.editor, "_prepare_view_content", side_effect=Exception("View error")):
             result = self.editor(command="view", path="test.txt")
+            assert result.error is not None
             assert "Error reading file: View error" in result.error
 
     def test_handle_edit_exception(self):
@@ -39,12 +39,14 @@ class TestFileEditorCoverageGaps:
         self._write("test.txt", "content")
         with patch.object(self.editor, "_read_file", side_effect=Exception("Read fail")):
             result = self.editor(command="edit", path="test.txt", old_str="c", new_str="d")
+            assert result.error is not None
             assert "Error editing file: Read fail" in result.error
 
     def test_apply_edit_logic_no_content(self):
         """Covers line 382 (ToolResult for no content provided)."""
         self._write("test.txt", "content")
         result = self.editor(command="edit", path="test.txt")
+        assert result.error is not None
         assert "No content provided" in result.error
 
     def test_apply_edit_logic_append_only(self):
@@ -52,6 +54,7 @@ class TestFileEditorCoverageGaps:
         # old_str is MISSING, new_str is provided
         self._write("test.txt", "line1\n")
         result = self.editor(command="edit", path="test.txt", new_str="line2\n")
+        assert result.new_content is not None
         assert "line1\nline2\n" in result.new_content
 
     def test_transaction_success(self):
@@ -95,7 +98,7 @@ class TestFileEditorCoverageGaps:
         """Covers line 567-572 (rollback error handling)."""
         file_path = self.test_dir / "failed_restore.txt"
         self._write("failed_restore.txt", "content")
-        backup = {str(file_path): "original"}
+        backup: dict[str, str | None] = {str(file_path): "original"}
         
         with patch.object(self.editor, "_write_file", side_effect=Exception("Restore error")):
              # Hit lines 568-572
@@ -105,9 +108,10 @@ class TestFileEditorCoverageGaps:
     def test_fuzzy_match_error_high_ratio(self):
         """Covers lines 353-372 (difflib suggestion)."""
         content = "def foo():\n    print('hello')\n    return True\n"
-        p = self._write("fuzzy.py", content)
+        self._write("fuzzy.py", content)
         old_str = "def foo():\n    print('helo')\n    return True\n"
         result = self.editor(command="edit", path="fuzzy.py", old_str=old_str, new_str="something")
+        assert result.error is not None
         assert "Did you mean this block" in result.error
 
     def test_unicode_decode_fallback(self):

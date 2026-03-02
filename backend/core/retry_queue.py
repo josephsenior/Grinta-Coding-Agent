@@ -9,7 +9,8 @@ import os
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from collections.abc import Awaitable
+from typing import Any, cast
 
 from backend.core.logger import forge_logger as logger
 
@@ -220,15 +221,15 @@ class RedisRetryBackend(BaseRetryBackend):
         now = time.time()
 
         for _ in range(limit):
-            popped = await self._client.zpopmin(schedule_key)
+            popped = await cast(Any, self._client.zpopmin(schedule_key))
             if not popped:
                 break
             task_id, score = popped[0]
             if score > now:
                 # Not ready yet; requeue and stop fetching
-                await self._client.zadd(schedule_key, {task_id: score})
+                await cast(Any, self._client.zadd(schedule_key, {task_id: score}))
                 break
-            task_json = await self._client.hget(tasks_key, task_id)
+            task_json = await cast(Any, self._client.hget(tasks_key, task_id))
             if not task_json:
                 continue
             task_dict = json.loads(task_json)
@@ -239,7 +240,7 @@ class RedisRetryBackend(BaseRetryBackend):
 
     async def mark_success(self, task: RetryTask) -> None:
         tasks_key = self._tasks_key(task.controller_id)
-        await self._client.hdel(tasks_key, task.id)
+        await cast(Any, self._client.hdel(tasks_key, task.id))
         logger.debug(
             "Retry task %s acknowledged by controller %s", task.id, task.controller_id
         )

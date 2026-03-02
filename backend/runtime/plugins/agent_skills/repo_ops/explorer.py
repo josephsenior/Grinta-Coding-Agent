@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.logger import forge_logger as logger
-from backend.memory.graph_store import GraphMemoryStore, NodeType, EdgeType
+from backend.memory.graph_store import GraphMemoryStore
 from backend.memory.graph_rag import GraphRAG
 from backend.memory.vector_store import EnhancedVectorStore
 
@@ -21,7 +21,7 @@ _graph_store: GraphMemoryStore | None = None
 _graph_rag: GraphRAG | None = None
 
 
-def _get_graph_store(workspace_root: str = "/workspace") -> tuple[GraphMemoryStore, GraphRAG]:
+def _get_graph_store(workspace_root: str = "/workspace") -> tuple[GraphMemoryStore, GraphRAG | None]:
     """Get or create the global graph store and GraphRAG."""
     global _graph_store, _graph_rag
     if _graph_store is None:
@@ -67,7 +67,8 @@ def explore_tree_structure(
             if os.path.exists(full_path):
                 with open(full_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                graph_rag.index_code_file(file_path, content)
+                if graph_rag is not None:
+                    graph_rag.index_code_file(file_path, content)
 
     # Collect results
     explored_entities: dict[str, dict] = {}
@@ -95,7 +96,8 @@ def explore_tree_structure(
             if os.path.exists(os.path.join(workspace_root, entity_id)):
                 with open(os.path.join(workspace_root, entity_id), "r", encoding="utf-8") as f:
                     content = f.read()
-                graph_rag.index_code_file(entity_id, content)
+                if graph_rag is not None:
+                    graph_rag.index_code_file(entity_id, content)
                 node = graph_store.get_node(entity_id)
 
         if not node:
@@ -206,7 +208,8 @@ def get_entity_contents(
                 continue
 
             # Find specific symbol
-            graph_rag.index_code_file(file_path, content)
+            if graph_rag is not None:
+                graph_rag.index_code_file(file_path, content)
             
             node = graph_store.get_node(symbol_path)
             if node and node.get("line_start") and node.get("line_end"):

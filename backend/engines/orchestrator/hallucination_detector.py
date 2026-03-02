@@ -85,18 +85,33 @@ class HallucinationDetector:
         self._actually_executed_commands += 1
 
     def _check_state_consistency(
-        self, claimed_paths: list[str], claimed_exec: bool
+        self,
+        claimed_paths: list[str],
+        claimed_exec: bool,
+        tools_called: list[str] | None = None,
+        actions: list[Action] | None = None,
     ) -> list[dict]:
         """Compare claimed operations against state-tracked actual operations.
 
         Args:
             claimed_paths: File paths extracted from LLM text claims.
             claimed_exec: Whether the LLM claimed to run code.
+            tools_called: Tools actually invoked this turn (used to suppress
+                false positives when the tool ran but tracking hasn't caught up).
+            actions: Action objects created this turn.
 
         Returns:
             List of state-inconsistency findings.
         """
         findings = []
+
+        # If file-editing tools were actually called (or FileEditActions exist),
+        # state tracking may simply not have caught up yet — skip path checks.
+        file_tools = {"edit_file", "str_replace_editor", "structure_editor"}
+        if tools_called and any(t in file_tools for t in tools_called):
+            return findings
+        if actions and any(isinstance(a, FileEditAction) for a in actions):
+            return findings
 
         for path in claimed_paths:
             # Normalize path: strip leading/trailing whitespace and quotes
@@ -110,16 +125,17 @@ class HallucinationDetector:
                 for p in self._actually_written_paths
             )
             if not actually_touched and self._actually_written_paths is not None:
-                # Only flag if we have SOME tracked operations this session
-                # (avoids false positives at session start before any tools run)
-                if len(self._actually_written_paths) > 0 or self._actually_executed_commands > 0:
-                    findings.append({
-                        "type": "state_mismatch",
-                        "claim": f"claimed operation on '{clean}'",
-                        "confidence": 0.85,
-                        "missing_tools": ["str_replace_editor", "ultimate_editor"],
-                        "detail": f"'{clean}' does not appear in tracked tool operations this session.",
-                    })
+                has_tracked_ops = len(self._actually_written_paths) > 0 or self._actually_executed_commands > 0
+                # At session start (no tracked ops yet), still flag claims
+                # but with lower confidence to reduce false positive impact.
+                confidence = 0.85 if has_tracked_ops else 0.6
+                findings.append({
+                    "type": "state_mismatch",
+                    "claim": f"claimed operation on '{clean}'",
+                    "confidence": confidence,
+                    "missing_tools": ["str_replace_editor", "structure_editor"],
+                    "detail": f"'{clean}' does not appear in tracked tool operations this session.",
+                })
 
         return findings
 
@@ -148,7 +164,8 @@ class HallucinationDetector:
             findings.append(exec_h)
         claimed_paths = self._extract_claimed_paths(llm_response_text)
         state_findings = self._check_state_consistency(
-            claimed_paths, exec_h is not None
+            claimed_paths, exec_h is not None,
+            tools_called=tools_called, actions=actions,
         )
         existing = {f["claim"] for f in findings}
         for f in state_findings:

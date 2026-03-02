@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -211,7 +212,7 @@ class TestObserveStage:
             "audit_id": "audit-123",
         }
         mock_audit = AsyncMock()
-        ctx.controller.id = "sid-1"
+        cast(Any, ctx.controller).id = "sid-1"
         ctx.controller.safety_validator = MagicMock()
         ctx.controller.safety_validator.telemetry_logger = mock_audit
 

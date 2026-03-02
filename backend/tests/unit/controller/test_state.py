@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 
 import pytest
 
@@ -13,6 +14,7 @@ from backend.controller.state.state import (
     TrafficControlState,
 )
 from backend.core.schemas import AgentState
+from backend.events.event import Event
 
 
 # ---------------------------------------------------------------------------
@@ -162,13 +164,13 @@ class TestStateJsonRoundTrip:
 class TestStatePickle:
     def test_getstate_excludes_history(self):
         s = State()
-        s.history = ["a", "b"]
-        d = s.__getstate__()
+        s.history = cast(list[Event], ["a", "b"])
+        d: dict[str, Any] = s.__getstate__()
         assert d["history"] == []
 
     def test_setstate_defaults(self):
         s = State()
-        d = {}
+        d: dict[str, Any] = {}
         s.__setstate__(d)
         assert s.history == []
         assert s.iteration_flag is not None

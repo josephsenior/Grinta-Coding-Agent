@@ -94,10 +94,12 @@ AGENT_LEVEL_ACTIONS: frozenset[str] = frozenset(
         "reject",
         "delegate",
         "delegate_task",
+        "blackboard",
         "condensation",
         "condensation_request",
         "task_tracking",
         "system",
+        "streaming_chunk",
     }
 )
 
@@ -573,6 +575,9 @@ class Runtime(
 
         # Execute the action (synchronous path)
         observation = self._execute_action_sync(action)
+        if hasattr(action, 'truncation_strategy') and getattr(action, 'truncation_strategy'):
+            observation.truncation_strategy = getattr(action, 'truncation_strategy')
+
 
         # Verify critical actions (Layer 3: Post-Action Verification)
         verification_obs = self._verify_action_if_needed(action, observation)
@@ -580,7 +585,10 @@ class Runtime(
             # Return combined observation with verification result
             return verification_obs
 
+        if hasattr(action, 'truncation_strategy') and getattr(action, 'truncation_strategy'):
+            observation.truncation_strategy = getattr(action, 'truncation_strategy')
         return observation
+
 
     def _verify_action_if_needed(
         self, action: Action, observation: Observation

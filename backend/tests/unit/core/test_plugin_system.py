@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -199,7 +200,8 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
         reg.register(_ActionPlugin())
         action = MagicMock()
         result = await reg.dispatch_action_pre(action)
-        self.assertTrue(result.modified)
+        self.assertIsNotNone(result)
+        self.assertTrue(cast(Any, result).modified)
 
     async def test_dispatch_action_post(self):
         reg = PluginRegistry()
@@ -207,7 +209,8 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
         action = MagicMock()
         obs = MagicMock()
         result = await reg.dispatch_action_post(action, obs)
-        self.assertTrue(result.modified)
+        self.assertIsNotNone(result)
+        self.assertTrue(cast(Any, result).modified)
 
     async def test_dispatch_event(self):
         reg = PluginRegistry()
@@ -252,7 +255,7 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
         reg = PluginRegistry()
         p = _SimplePlugin()
         reg.register(p)
-        resp = {"choices": []}
+        resp: dict[str, Any] = {"choices": []}
         result = await reg.dispatch_llm_post(resp)
         self.assertEqual(result, resp)
 

@@ -1,5 +1,7 @@
 """Tests for backend.controller.error_recovery module."""
 
+import sys
+
 from backend.controller.error_recovery import (
     ErrorRecoveryStrategy,
     ErrorType,
@@ -17,16 +19,16 @@ class TestErrorType:
 
     def test_error_types_defined(self):
         """Test all error types are defined."""
-        assert ErrorType.MODULE_NOT_FOUND == "module_not_found"
-        assert ErrorType.RUNTIME_CRASH == "runtime_crash"
-        assert ErrorType.NETWORK_ERROR == "network_error"
-        assert ErrorType.FILESYSTEM_ERROR == "filesystem_error"
-        assert ErrorType.TOOL_CALL_ERROR == "tool_call_error"
-        assert ErrorType.TIMEOUT_ERROR == "timeout_error"
-        assert ErrorType.PERMISSION_ERROR == "permission_error"
-        assert ErrorType.DISK_FULL_ERROR == "disk_full_error"
-        assert ErrorType.SYNTAX_ERROR == "syntax_error"
-        assert ErrorType.UNKNOWN_ERROR == "unknown_error"
+        assert ErrorType.MODULE_NOT_FOUND.value == "module_not_found"
+        assert ErrorType.RUNTIME_CRASH.value == "runtime_crash"
+        assert ErrorType.NETWORK_ERROR.value == "network_error"
+        assert ErrorType.FILESYSTEM_ERROR.value == "filesystem_error"
+        assert ErrorType.TOOL_CALL_ERROR.value == "tool_call_error"
+        assert ErrorType.TIMEOUT_ERROR.value == "timeout_error"
+        assert ErrorType.PERMISSION_ERROR.value == "permission_error"
+        assert ErrorType.DISK_FULL_ERROR.value == "disk_full_error"
+        assert ErrorType.SYNTAX_ERROR.value == "syntax_error"
+        assert ErrorType.UNKNOWN_ERROR.value == "unknown_error"
 
 
 class TestClassifyError:
@@ -382,8 +384,14 @@ class TestRecoverFilesystemError:
         assert actions
         # Should include pwd and ls commands
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
-        assert any("pwd" in action.command for action in cmd_actions)
-        assert any("ls" in action.command for action in cmd_actions)
+        assert any(
+            "pwd" in action.command or "Get-Location" in action.command
+            for action in cmd_actions
+        )
+        assert any(
+            "ls" in action.command or "Get-ChildItem" in action.command
+            for action in cmd_actions
+        )
 
     def test_file_not_found_includes_find(self):
         """Test includes find command to search for file."""
@@ -392,7 +400,10 @@ class TestRecoverFilesystemError:
 
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
         # Should include find command when filename is extracted
-        assert any("find" in action.command for action in cmd_actions)
+        assert any(
+            "find" in action.command or "Where-Object" in action.command
+            for action in cmd_actions
+        )
 
     def test_general_filesystem_error(self):
         """Test general filesystem error recovery."""
@@ -401,7 +412,22 @@ class TestRecoverFilesystemError:
 
         assert actions
         cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
-        assert any("pwd" in action.command for action in cmd_actions)
+        assert any(
+            "pwd" in action.command or "Get-Location" in action.command
+            for action in cmd_actions
+        )
+
+    def test_windows_file_not_found_uses_powershell_listing(self, monkeypatch):
+        """On Windows, recovery should emit PowerShell-safe listing commands."""
+        monkeypatch.setattr(sys, "platform", "win32")
+        error_str = "'test.py' not found"
+
+        actions = ErrorRecoveryStrategy._recover_filesystem_error(error_str)
+        cmd_actions = [a for a in actions if isinstance(a, CmdRunAction)]
+
+        assert any("Get-Location" in action.command for action in cmd_actions)
+        assert any("Get-ChildItem -Force" in action.command for action in cmd_actions)
+        assert not any("ls -F" in action.command for action in cmd_actions)
 
 
 class TestRecoverTimeoutError:

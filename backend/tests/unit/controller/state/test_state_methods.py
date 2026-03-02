@@ -2,6 +2,7 @@
 
 import json
 from unittest.mock import MagicMock
+from typing import cast
 
 
 from backend.controller.state.control_flags import (
@@ -115,7 +116,7 @@ class TestStateMutationMethods:
     def test_adjust_iteration_limit_no_flag(self):
         """Test adjust_iteration_limit when iteration_flag is None."""
         state = State()
-        state.iteration_flag = None
+        state.iteration_flag = cast(IterationControlFlag, None)
         # Should not raise an exception
         state.adjust_iteration_limit(200)
 

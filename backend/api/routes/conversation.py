@@ -620,6 +620,7 @@ async def get_code_completion(
         suffix=request_body.suffix,
     )
 
+    assert llm_config is not None
     try:
         result: CompletionResult = await _run_completion(
             req=req,

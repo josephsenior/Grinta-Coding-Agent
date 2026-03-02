@@ -1,6 +1,5 @@
 """Forge automation framework package."""
 
-import os
 import warnings
 from pathlib import Path
 from importlib.metadata import version, PackageNotFoundError

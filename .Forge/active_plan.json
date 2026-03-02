@@ -1,0 +1,52 @@
+[
+  {
+    "id": "1",
+    "description": "Explore repository structure and context",
+    "status": "in_progress",
+    "result": null,
+    "tags": [
+      "exploration"
+    ],
+    "subtasks": []
+  },
+  {
+    "id": "2",
+    "description": "Identify the task or issue to be solved",
+    "status": "pending",
+    "result": null,
+    "tags": [
+      "analysis"
+    ],
+    "subtasks": []
+  },
+  {
+    "id": "3",
+    "description": "Create a plan to solve the task",
+    "status": "pending",
+    "result": null,
+    "tags": [
+      "planning"
+    ],
+    "subtasks": []
+  },
+  {
+    "id": "4",
+    "description": "Implement the solution",
+    "status": "pending",
+    "result": null,
+    "tags": [
+      "implementation"
+    ],
+    "subtasks": []
+  },
+  {
+    "id": "5",
+    "description": "Verify the solution",
+    "status": "pending",
+    "result": null,
+    "tags": [
+      "verification"
+    ],
+    "subtasks": []
+  }
+]

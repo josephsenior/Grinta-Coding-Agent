@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 
 from backend.core.config.provider_config import (
     ParameterType,
@@ -130,13 +131,13 @@ class TestProviderConfigurationManager:
 
     def test_validate_and_clean_params_unknown_provider(self):
         """Test unknown params for unknown provider."""
-        params = {"model": "custom", "custom_param": "value"}
+        params: dict[str, Any] = {"model": "custom", "custom_param": "value"}
         cleaned = self.mgr.validate_and_clean_params("unknown_provider", params)
         assert "custom_param" in cleaned
 
     def test_validate_and_clean_params_missing_required(self):
         """Test warning for missing required params."""
-        params = {}  # Missing required 'model'
+        params: dict[str, Any] = {}  # Missing required 'model'
         cleaned = self.mgr.validate_and_clean_params("openai", params)
         # Should return cleaned dict even with missing required params
         assert isinstance(cleaned, dict)
@@ -162,7 +163,7 @@ class TestProviderConfigurationManager:
         # Lowercased lookup
         assert cfg.name == "openai"
 
-    def test_validate_and_clean_params_forbidden(self):
+    def test_validate_and_clean_params_forbidden_unknown(self):
         # Find a provider with forbidden params
         result = self.mgr.validate_and_clean_params(
             "unknown",
@@ -196,7 +197,7 @@ class TestProviderConfigurationManager:
     def test_validate_api_key_format_valid(self):
         assert self.mgr.validate_api_key_format("openai", "sk-" + "x" * 48) is True
 
-    def test_get_environment_variable(self):
+    def test_get_environment_variable_not_none(self):
         env_var = self.mgr.get_environment_variable("openai")
         assert env_var is not None
 

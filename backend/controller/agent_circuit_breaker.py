@@ -26,8 +26,12 @@ class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
 
     enabled: bool = True
-    max_consecutive_errors: int = 3  # Reduced from 5 — 3 consecutive errors is already a bad loop
-    max_high_risk_actions: int = 5   # Reduced from 10 — 5 high-risk actions warrants intervention
+    max_consecutive_errors: int = (
+        3  # Reduced from 5 — 3 consecutive errors is already a bad loop
+    )
+    max_high_risk_actions: int = (
+        5  # Reduced from 10 — 5 high-risk actions warrants intervention
+    )
     max_stuck_detections: int = 3
     max_error_rate: float = 0.5  # 50% of last N actions
     error_rate_window: int = 10  # Look at last 10 actions
@@ -65,11 +69,19 @@ class CircuitBreakerConfig:
 
         return CircuitBreakerConfig(
             enabled=self.enabled,
-            max_consecutive_errors=max(self.max_consecutive_errors, int(self.max_consecutive_errors * scale)),
-            max_high_risk_actions=max(self.max_high_risk_actions, int(self.max_high_risk_actions * scale)),
-            max_stuck_detections=max(self.max_stuck_detections, int(self.max_stuck_detections * scale)),
+            max_consecutive_errors=max(
+                self.max_consecutive_errors, int(self.max_consecutive_errors * scale)
+            ),
+            max_high_risk_actions=max(
+                self.max_high_risk_actions, int(self.max_high_risk_actions * scale)
+            ),
+            max_stuck_detections=max(
+                self.max_stuck_detections, int(self.max_stuck_detections * scale)
+            ),
             max_error_rate=min(self.max_error_rate * (1 + (scale - 1) * 0.3), 0.8),
-            error_rate_window=max(self.error_rate_window, int(self.error_rate_window * scale)),
+            error_rate_window=max(
+                self.error_rate_window, int(self.error_rate_window * scale)
+            ),
             adaptive=False,  # prevent re-scaling
         )
 
@@ -183,7 +195,7 @@ class CircuitBreaker:
                     system_message=(
                         "SYSTEM INTERVENTION: You are stuck in a loop. Stop repeating the same actions. "
                         "Switch context immediately: use escalate() or project_map()."
-                    )
+                    ),
                 )
 
             return CircuitBreakerResult(
@@ -250,6 +262,17 @@ class CircuitBreaker:
         """Record a stuck loop detection."""
         self.stuck_detection_count += 1
         logger.warning("Stuck detection #%s recorded", self.stuck_detection_count)
+
+    def record_progress_signal(self, note: str) -> None:
+        """Proactively decrement the stuck loop detection count when LLM signals progress."""
+        old_count = self.stuck_detection_count
+        self.stuck_detection_count = max(0, self.stuck_detection_count - 2)
+        logger.info(
+            "Progress signal received: %r. Reduced stuck_detection_count from %d to %d.",
+            note,
+            old_count,
+            self.stuck_detection_count,
+        )
 
     def adapt(self, complexity: float, max_iterations: int) -> None:
         """Adapt thresholds to task complexity and iteration budget.

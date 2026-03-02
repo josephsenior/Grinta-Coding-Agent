@@ -92,6 +92,7 @@ class TestControllerConfig:
         assert config.user_id == "user_456"
         assert config.confirmation_mode is True
         assert config.headless_mode is False
+        assert config.replay_events is not None
         assert len(config.replay_events) == 2
 
     def test_headless_mode_default_true(self):

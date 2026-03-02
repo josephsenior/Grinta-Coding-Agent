@@ -9,15 +9,17 @@ from __future__ import annotations
 import pytest
 from types import MappingProxyType
 from unittest.mock import AsyncMock, MagicMock, patch
+from typing import cast
 
 
 from backend.core.provider_types import ProviderToken, ProviderType
 from backend.events.action.message import MessageAction
+from backend.storage.data_models.user_secrets import CustomSecret
 
 # Only member: ProviderType.ENTERPRISE_SSO
 _SSO = ProviderType.ENTERPRISE_SSO
 
-from backend.api.services.conversation_service import (
+from backend.api.services.conversation_service import (  # noqa: E402
     _create_initial_message_action,
     _ensure_provider_tokens_for_providers,
     _get_normalized_provider_tokens,
@@ -129,6 +131,7 @@ class TestGetNormalizedProviderTokens:
     def test_with_valid_tokens(self):
         tokens = {_SSO: ProviderToken(token="t", user_id="u")}
         result = _get_normalized_provider_tokens(tokens, None)
+        assert result is not None
         assert _SSO in result
 
     def test_none_tokens_falls_back_to_defaults(self):
@@ -166,7 +169,9 @@ class TestEnsureProviderTokensForProviders:
         )
         result = _ensure_provider_tokens_for_providers(existing, [_SSO], "u2")
         # token is SecretStr, compare via get_secret_value
-        assert result[_SSO].token.get_secret_value() == "existing"
+        token = result[_SSO].token
+        assert token is not None
+        assert token.get_secret_value() == "existing"
 
     def test_none_tokens_creates_new(self):
         result = _ensure_provider_tokens_for_providers(None, [_SSO], "u1")
@@ -187,16 +192,19 @@ class TestCreateInitialMessageAction:
 
     def test_with_message(self):
         action = _create_initial_message_action("Hello", None)
+        assert action is not None
         assert isinstance(action, MessageAction)
         assert action.content == "Hello"
 
     def test_with_images_only(self):
         action = _create_initial_message_action(None, ["http://img.png"])
+        assert action is not None
         assert isinstance(action, MessageAction)
         assert action.image_urls == ["http://img.png"]
 
     def test_with_msg_and_images(self):
         action = _create_initial_message_action("Hi", ["http://a.png"])
+        assert action is not None
         assert action.content == "Hi"
         assert action.image_urls == ["http://a.png"]
 
@@ -245,6 +253,7 @@ async def test_initialize_conversation_new(mock_uuid, mock_get_store):
         selected_branch="main",
     )
 
+    assert result is not None
     assert result.conversation_id == "mock-uuid"
     assert result.title.startswith("Conversation")
     store.save_metadata.assert_awaited_once()
@@ -431,7 +440,7 @@ class TestBuildSessionInitArgs:
         metadata.selected_branch = "main"
         metadata.vcs_provider = None
 
-        secrets = {"API_KEY": "secret"}
+        secrets = {"API_KEY": CustomSecret(secret="secret")}
 
         result = _build_session_init_args(
             settings, metadata, None, secrets, None, None
@@ -503,7 +512,7 @@ async def test_create_new_conversation_init_fails(mock_init):
 
     mock_init.return_value = None
 
-    with pytest.raises(RuntimeError, match="Failed to initialize conversation"):
+    with pytest.raises(ValueError, match="Failed to initialize conversation"):
         await create_new_conversation(
             user_id="u1",
             vcs_provider_tokens=None,
@@ -582,6 +591,7 @@ async def test_initialize_conversation_with_all_params(mock_get_store):
             vcs_provider=_SSO,
         )
 
+    assert result is not None
     assert result.conversation_id == "test-uuid-123"
     assert result.selected_repository == "myrepo"
     assert result.selected_branch == "develop"

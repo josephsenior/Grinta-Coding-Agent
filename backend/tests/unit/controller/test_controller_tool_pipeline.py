@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -51,28 +52,24 @@ class TestToolInvocationContextPipeline:
 
 
 class TestToolInvocationMiddlewareBase:
-    @pytest.mark.asyncio
-    async def test_default_plan_is_noop(self):
+    def test_default_plan_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
-        result = await mw.plan(MagicMock())
+        result = asyncio.run(mw.plan(MagicMock()))
         assert result is None
 
-    @pytest.mark.asyncio
-    async def test_default_verify_is_noop(self):
+    def test_default_verify_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
-        result = await mw.verify(MagicMock())
+        result = asyncio.run(mw.verify(MagicMock()))
         assert result is None
 
-    @pytest.mark.asyncio
-    async def test_default_execute_is_noop(self):
+    def test_default_execute_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
-        result = await mw.execute(MagicMock())
+        result = asyncio.run(mw.execute(MagicMock()))
         assert result is None
 
-    @pytest.mark.asyncio
-    async def test_default_observe_is_noop(self):
+    def test_default_observe_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
-        result = await mw.observe(MagicMock(), None)
+        result = asyncio.run(mw.observe(MagicMock(), None))
         assert result is None
 
 

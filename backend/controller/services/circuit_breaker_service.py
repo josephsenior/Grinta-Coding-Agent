@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.controller.agent_circuit_breaker import (
     CircuitBreaker,
@@ -41,7 +41,7 @@ class CircuitBreakerService:
         if not getattr(agent_config, "enable_circuit_breaker", True):
             return
 
-        config_kwargs = {
+        config_kwargs: dict[str, Any] = {
             "enabled": True,
             "max_consecutive_errors": getattr(agent_config, "max_consecutive_errors", 5),
             "max_high_risk_actions": getattr(agent_config, "max_high_risk_actions", 10),

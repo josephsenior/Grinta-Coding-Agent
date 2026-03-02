@@ -436,6 +436,7 @@ class TestAtomicRefactor:
         """Test cleaning up transaction resources."""
         txn = self.refactor.begin_transaction()
         backup_dir = txn.backup_dir
+        assert backup_dir is not None
 
         self.refactor.cleanup_transaction(txn)
 

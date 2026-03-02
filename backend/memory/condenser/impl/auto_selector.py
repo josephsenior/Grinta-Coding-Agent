@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from backend.core.config.condenser_config import (
     AmortizedForgettingCondenserConfig,
@@ -77,7 +77,7 @@ def _update_signals_from_event(sig: TaskSignals, ev: Event) -> tuple[int, int]:
     return (len_delta, obs_delta)
 
 
-def compute_signals(events: list[Event]) -> TaskSignals:
+def compute_signals(events: Sequence[Event]) -> TaskSignals:
     """Compute :class:`TaskSignals` from a list of events.
 
     Import-safe: only uses ``isinstance`` against classes that are always
@@ -112,7 +112,7 @@ _HIGH_ERROR_RATIO = 0.15
 
 
 def select_condenser_config(
-    events: list[Event],
+    events: Sequence[Event],
     *,
     llm_config_name: str | None = None,
     fallback: CondenserConfig | None = None,

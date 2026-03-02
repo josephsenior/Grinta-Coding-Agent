@@ -6,6 +6,7 @@ Tests CORS, cache control, and rate limiting middleware.
 import asyncio
 import unittest
 from datetime import datetime, timedelta
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import FastAPI, Request
@@ -238,7 +239,7 @@ class TestInMemoryRateLimiter(unittest.IsolatedAsyncioTestCase):
 
     async def test_sleeps_when_over_limit(self) -> None:
         """Test limiter sleeps when over limit but under 2x."""
-        limiter = InMemoryRateLimiter(requests=2, seconds=10, sleep_seconds=0.1)
+        limiter = InMemoryRateLimiter(requests=2, seconds=10, sleep_seconds=cast(int, 0.1))
 
         mock_request = MagicMock(spec=Request)
         mock_request.client = MagicMock(host="192.168.1.100")

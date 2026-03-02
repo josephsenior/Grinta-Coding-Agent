@@ -1,9 +1,12 @@
 """Unit tests for backend.llm.model_aliases."""
 
+# pylint: disable=protected-access,too-many-function-args
+
 from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from typing import Any, cast
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -109,8 +112,8 @@ class TestModelAliasManager(TestCase):
 
     def test_load_aliases_from_explicit_path(self):
         """Test loading aliases from explicit config path."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
-            tmp.write('[model_aliases]\nmy-model = "claude-3-7-sonnet"\n')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+            tmp.write('{"model_aliases": {"my-model": "claude-3-7-sonnet"}}')
             tmp_path = Path(tmp.name)
 
         try:
@@ -123,10 +126,10 @@ class TestModelAliasManager(TestCase):
             tmp_path.unlink()
 
     def test_load_aliases_searches_multiple_locations(self):
-        """Test loading aliases searches config.toml in multiple locations."""
+        """Test loading aliases searches settings.json in multiple locations."""
         # Create a temp file to use
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
-            tmp.write('[model_aliases]\nfast-chat = "ollama/llama3.2"\n')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+            tmp.write('{"model_aliases": {"fast-chat": "ollama/llama3.2"}}')
             tmp_path = Path(tmp.name)
 
         try:
@@ -146,16 +149,12 @@ class TestModelAliasManager(TestCase):
         self.assertTrue(manager._loaded)
         self.assertEqual(manager._aliases, {})
 
-    def test_load_from_file_valid_toml(self):
-        """Test _load_from_file with valid TOML."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
+    def test_load_from_file_valid_json(self):
+        """Test _load_from_file with valid JSON."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
             tmp.write(
-                """
-[model_aliases]
-my-coding-model = "claude-3-7-sonnet"
-fast-chat = "ollama/llama3.2"
-local-coder = "ollama/qwen2.5-coder"
-"""
+                '{"model_aliases": {"my-coding-model": "claude-3-7-sonnet", '
+                '"fast-chat": "ollama/llama3.2", "local-coder": "ollama/qwen2.5-coder"}}'
             )
             tmp_path = Path(tmp.name)
 
@@ -174,8 +173,8 @@ local-coder = "ollama/qwen2.5-coder"
 
     def test_load_from_file_no_model_aliases_section(self):
         """Test _load_from_file when model_aliases section is missing."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
-            tmp.write('[other_section]\nkey = "value"\n')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+            tmp.write('{"other_section": {"key": "value"}}')
             tmp_path = Path(tmp.name)
 
         try:
@@ -186,14 +185,10 @@ local-coder = "ollama/qwen2.5-coder"
 
     def test_load_from_file_invalid_alias_types(self):
         """Test _load_from_file skips non-string alias values."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
             tmp.write(
-                """
-[model_aliases]
-valid-alias = "claude-3-7-sonnet"
-invalid-number = 123
-invalid-array = ["gpt-4o", "gpt-4"]
-"""
+                '{"model_aliases": {"valid-alias": "claude-3-7-sonnet", '
+                '"invalid-number": 123, "invalid-array": ["gpt-4o", "gpt-4"]}}'
             )
             tmp_path = Path(tmp.name)
 
@@ -204,10 +199,10 @@ invalid-array = ["gpt-4o", "gpt-4"]
         finally:
             tmp_path.unlink()
 
-    def test_load_from_file_invalid_toml(self):
-        """Test _load_from_file handles invalid TOML gracefully."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
-            tmp.write("invalid [ toml {")
+    def test_load_from_file_invalid_json(self):
+        """Test _load_from_file handles invalid JSON gracefully."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+            tmp.write("invalid { json")
             tmp_path = Path(tmp.name)
 
         try:
@@ -218,14 +213,8 @@ invalid-array = ["gpt-4o", "gpt-4"]
 
     def test_save_aliases_creates_file(self):
         """Test save_aliases creates file with aliases."""
-        # Skip if toml is not available for writing
-        try:
-            import toml
-        except ImportError:
-            self.skipTest("toml package not available")
-
         with tempfile.TemporaryDirectory() as tmpdir:
-            save_path = Path(tmpdir) / "config.toml"
+            save_path = Path(tmpdir) / "settings.json"
 
             self.manager._aliases = {
                 "my-model": "claude-3-7-sonnet",
@@ -237,28 +226,22 @@ invalid-array = ["gpt-4o", "gpt-4"]
             self.assertTrue(save_path.exists())
 
             # Verify content
-            content = save_path.read_text()
+            content = save_path.read_text(encoding="utf-8")
             self.assertIn("model_aliases", content)
             self.assertIn("my-model", content)
             self.assertIn("claude-3-7-sonnet", content)
 
     def test_save_aliases_preserves_existing_config(self):
         """Test save_aliases preserves other config sections."""
-        # Skip if toml is not available
-        try:
-            import toml
-        except ImportError:
-            self.skipTest("toml package not available")
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
-            tmp.write('[other_section]\nkey = "value"\n')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+            tmp.write('{"other_section": {"key": "value"}}')
             tmp_path = Path(tmp.name)
 
         try:
             self.manager._aliases = {"my-model": "claude-3-7-sonnet"}
             self.manager.save_aliases(tmp_path)
 
-            content = tmp_path.read_text()
+            content = tmp_path.read_text(encoding="utf-8")
             self.assertIn("other_section", content)
             self.assertIn("model_aliases", content)
         finally:
@@ -269,7 +252,7 @@ invalid-array = ["gpt-4o", "gpt-4"]
         with patch("backend.llm.model_aliases.logger") as mock_logger:
             # Test with file write error
             with tempfile.TemporaryDirectory() as tmpdir:
-                save_path = Path(tmpdir) / "nonexistent" / "config.toml"
+                save_path = Path(tmpdir) / "nonexistent" / "settings.json"
                 self.manager._aliases = {"test": "model"}
 
                 # This should fail but not raise
@@ -286,13 +269,13 @@ invalid-array = ["gpt-4o", "gpt-4"]
             mock_exists.return_value = False
             manager.load_aliases()
 
-            # Should check config.toml, home directory, environment variable
+            # Should check settings.json, home directory, environment variable
             self.assertGreaterEqual(mock_exists.call_count, 2)
 
     def test_load_aliases_respects_env_variable(self):
         """Test load_aliases uses FORGE_CONFIG environment variable."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as tmp:
-            tmp.write('[model_aliases]\nenv-model = "gpt-4o"\n')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+            tmp.write('{"model_aliases": {"env-model": "gpt-4o"}}')
             tmp_path = Path(tmp.name)
 
         try:
@@ -334,13 +317,13 @@ class TestGetAliasManager(TestCase):
         get_alias_manager.cache_clear()
 
         manager1 = get_alias_manager()
-        cache_info = get_alias_manager.cache_info()
+        cache_info = cast(Any, get_alias_manager).cache_info()
 
         # First call should be a miss
         self.assertEqual(cache_info.misses, 1)
 
         manager2 = get_alias_manager()
-        cache_info = get_alias_manager.cache_info()
+        cache_info = cast(Any, get_alias_manager).cache_info()
 
         # Second call should be a hit
         self.assertEqual(cache_info.hits, 1)

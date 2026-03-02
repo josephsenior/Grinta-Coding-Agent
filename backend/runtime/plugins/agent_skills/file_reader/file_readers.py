@@ -20,10 +20,10 @@ Note:
 """
 
 import base64
+import warnings
 from typing import Any, cast
 
 import docx
-import PyPDF2
 from pptx import Presentation
 from pylatexenc.latex2text import LatexNodes2Text  # type: ignore[import-untyped]
 
@@ -33,6 +33,18 @@ from backend.runtime.plugins.agent_skills.utils.config import (
     _get_openai_model,
 )
 
+def _read_pdf_reader():
+    try:
+        from pypdf import PdfReader
+
+        return PdfReader
+    except Exception:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            import PyPDF2
+
+            return PyPDF2.PdfReader
+
 
 def parse_pdf(file_path: str) -> None:
     """Parses the content of a PDF file and prints it.
@@ -41,7 +53,7 @@ def parse_pdf(file_path: str) -> None:
         file_path: str: The path to the file to open.
 
     """
-    content = PyPDF2.PdfReader(file_path)
+    content = _read_pdf_reader()(file_path)
     output_lines = [f"[Reading PDF file from {file_path}]"]
     for page_idx, page in enumerate(content.pages, start=1):
         output_lines.append(f"@@ Page {page_idx} @@")

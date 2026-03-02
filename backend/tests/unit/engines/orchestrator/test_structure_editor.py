@@ -518,3 +518,59 @@ class TestGetAvailableSymbols:
     def test_nonexistent_file_returns_empty(self, editor):
         symbols = editor._get_available_symbols("/no/file.py")
         assert symbols == []
+
+
+# ---------------------------------------------------------------------------
+# _check_blast_radius
+# ---------------------------------------------------------------------------
+
+from unittest.mock import patch, MagicMock
+from backend.engines.orchestrator.tools.structure_editor import EditResult
+
+
+class TestBlastRadiusHook:
+    @patch("backend.engines.orchestrator.tools.structure_editor.get_lsp_client")
+    def test_blast_radius_exceeds_threshold(self, mock_get_lsp_client, editor, py_file):
+        mock_client = MagicMock()
+        mock_get_lsp_client.return_value = mock_client
+        mock_result = MagicMock()
+        mock_result.locations = [MagicMock()] * 15  # 15 references
+        mock_client.query.return_value = mock_result
+        # Mock find_symbol so we reach the LSP query path
+        editor.universal.find_symbol = MagicMock(return_value=MagicMock(line_start=1))
+
+        result = EditResult(success=True, message="Success")
+        editor._check_blast_radius(py_file, "greet", result, threshold=10)
+
+        assert "BLAST RADIUS EXCEEDS" in result.message
+        assert "15 other locations" in result.message
+
+    @patch("backend.engines.orchestrator.tools.structure_editor.get_lsp_client")
+    def test_blast_radius_under_threshold(self, mock_get_lsp_client, editor, py_file):
+        mock_client = MagicMock()
+        mock_get_lsp_client.return_value = mock_client
+        mock_result = MagicMock()
+        mock_result.locations = [MagicMock()] * 5  # 5 references
+        mock_client.query.return_value = mock_result
+        editor.universal.find_symbol = MagicMock(return_value=MagicMock(line_start=1))
+
+        result = EditResult(success=True, message="Success")
+        editor._check_blast_radius(py_file, "greet", result, threshold=10)
+
+        assert "BLAST RADIUS EXCEEDS" not in result.message
+
+    @patch("backend.engines.orchestrator.tools.structure_editor.get_lsp_client")
+    def test_blast_radius_from_code_snippet(self, mock_get_lsp_client, editor, py_file):
+        mock_client = MagicMock()
+        mock_get_lsp_client.return_value = mock_client
+        mock_result = MagicMock()
+        mock_result.locations = [MagicMock()] * 12  # 12 references
+        mock_client.query.return_value = mock_result
+        editor.universal.find_symbol = MagicMock(return_value=MagicMock(line_start=1))
+
+        result = EditResult(success=True, message="Replaced code successfully")
+        snippet = "def add(a, b):\n    return a + b"
+        editor._check_blast_radius_from_code(py_file, snippet, result, threshold=10)
+
+        assert "BLAST RADIUS EXCEEDS" in result.message
+        assert "add" in result.message

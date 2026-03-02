@@ -224,6 +224,32 @@ class TestIdempotencyMiddleware:
         assert isinstance(ctx.metadata["idempotency_key"], str)
         assert len(ctx.metadata["idempotency_key"]) == 64
 
+    @pytest.mark.asyncio
+    async def test_prompt_prefixed_readonly_command_not_blocked(self):
+        middleware = IdempotencyMiddleware(ttl_seconds=10.0)
+        action = CmdRunAction(command="$ ls -F")
+
+        ctx1 = _mock_ctx(action)
+        await middleware.plan(ctx1)
+        assert not ctx1.blocked
+
+        ctx2 = _mock_ctx(action)
+        await middleware.plan(ctx2)
+        assert not ctx2.blocked
+
+    @pytest.mark.asyncio
+    async def test_powershell_listing_command_not_blocked(self):
+        middleware = IdempotencyMiddleware(ttl_seconds=10.0)
+        action = CmdRunAction(command="Get-ChildItem -Force")
+
+        ctx1 = _mock_ctx(action)
+        await middleware.plan(ctx1)
+        assert not ctx1.blocked
+
+        ctx2 = _mock_ctx(action)
+        await middleware.plan(ctx2)
+        assert not ctx2.blocked
+
 
 # ---------------------------------------------------------------------------
 # LRU cache behavior

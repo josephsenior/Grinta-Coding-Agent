@@ -85,10 +85,11 @@ def aliases_command() -> None:
 
     if not aliases:
         print("\n❌ No model aliases defined.")
-        print("\nTo define aliases, add to config.toml:")
-        print("  [model_aliases]")
-        print('  my-coding-model = "claude-3-7-sonnet"')
-        print('  fast-chat = "ollama/llama3.2"')
+        print("\nTo define aliases, add to settings.json:")
+        print('  "model_aliases": {')
+        print('    "my-coding-model": "claude-3-7-sonnet",')
+        print('    "fast-chat": "ollama/llama3.2"')
+        print("  }")
         return
 
     print(f"\n✓ {len(aliases)} aliases defined:\n")

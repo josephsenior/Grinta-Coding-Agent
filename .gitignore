@@ -25,7 +25,7 @@ build/
 backend/~/  # Never commit JWT secrets or sensitive backend configs
 
 # Runtime config (user-specific — only template is tracked)
-config.toml
+settings.json
 
 # local venv created during snapshot work
 .venv2/

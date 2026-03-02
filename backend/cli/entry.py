@@ -126,8 +126,8 @@ def _launch_all_in_one() -> None:
     # 3. Launch TUI in foreground
     print("[OK] Backend ready! Launching TUI...")
     try:
-        client = ForgeClient(base_url="http://localhost:3001")
-        app = ForgeApp(client)
+        forge_client = ForgeClient(base_url="http://localhost:3001")
+        app = ForgeApp(forge_client)
         app.run()
     finally:
         cleanup()
@@ -141,7 +141,7 @@ def _execute_command(args, parser) -> None:
         _launch_all_in_one()
     elif args.command == "health":
         # Import dynamically to avoid loading heavy modules if not requested
-        from backend.cli.cli.health_check import run_health_check
+        from backend.cli.cli.health_check import run_health_check  # type: ignore[import-not-found]
 
         run_health_check(args)
     elif args.command == "init":

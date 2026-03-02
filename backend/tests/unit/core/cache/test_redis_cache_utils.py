@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 from backend.core.cache.utils import (
@@ -36,9 +37,9 @@ class TestExtractRedisStats:
 
     def test_extract_empty_info(self):
         """Test extracting stats from empty info dict."""
-        info = {}
-        global_keys = []
-        user_keys = []
+        info: dict[str, Any] = {}
+        global_keys: list[str] = []
+        user_keys: list[str] = []
 
         result = extract_redis_stats(info, global_keys, user_keys)
 
@@ -52,7 +53,7 @@ class TestExtractRedisStats:
     def test_extract_no_global_config(self):
         """Test when no global config is cached."""
         info = {"used_memory": 2 * 1024 * 1024}
-        global_keys = []
+        global_keys: list[str] = []
         user_keys = ["user1", "user2", "user3"]
 
         result = extract_redis_stats(info, global_keys, user_keys)
@@ -65,7 +66,7 @@ class TestExtractRedisStats:
         """Test with large memory usage."""
         info = {"used_memory": 512 * 1024 * 1024}  # 512 MB
         global_keys = ["config"]
-        user_keys = []
+        user_keys: list[str] = []
 
         result = extract_redis_stats(info, global_keys, user_keys)
 
@@ -74,8 +75,8 @@ class TestExtractRedisStats:
     def test_extract_high_command_count(self):
         """Test with high command count."""
         info = {"total_commands_processed": 1000000}
-        global_keys = []
-        user_keys = []
+        global_keys: list[str] = []
+        user_keys: list[str] = []
 
         result = extract_redis_stats(info, global_keys, user_keys)
 
@@ -87,8 +88,8 @@ class TestExtractRedisStats:
             "keyspace_hits": 9000,
             "keyspace_misses": 1000,
         }
-        global_keys = []
-        user_keys = []
+        global_keys: list[str] = []
+        user_keys: list[str] = []
 
         result = extract_redis_stats(info, global_keys, user_keys)
 
@@ -109,7 +110,7 @@ class TestMergeSettingsWithCache:
         settings.merge_with_config_settings.return_value = MagicMock(name="merged")
 
         global_config = {"key": "value"}
-        cache = {}
+        cache: dict[str, tuple[Any, float]] = {}
         current_time = 1000.0
 
         result = merge_settings_with_cache(
@@ -128,7 +129,7 @@ class TestMergeSettingsWithCache:
         user_id = "user1"
         settings = MagicMock()
         global_config = None
-        cache = {}
+        cache: dict[str, tuple[Any, float]] = {}
         current_time = 1000.0
 
         result = merge_settings_with_cache(
@@ -148,7 +149,7 @@ class TestMergeSettingsWithCache:
         settings.merge_with_config_settings.return_value = merged
 
         global_config = {"key": "value"}
-        cache = {}
+        cache: dict[str, tuple[Any, float]] = {}
         current_time = 1000.0
 
         merge_settings_with_cache(user_id, settings, global_config, cache, current_time)
@@ -193,7 +194,7 @@ class TestMergeSettingsWithCache:
 
     def test_multiple_users_in_cache(self):
         """Test cache with multiple users."""
-        cache = {}
+        cache: dict[str, tuple[Any, float]] = {}
 
         for i in range(5):
             user_id = f"user{i}"
@@ -207,7 +208,7 @@ class TestMergeSettingsWithCache:
 
     def test_cache_timestamp_precision(self):
         """Test that cache preserves timestamp precision."""
-        cache = {}
+        cache: dict[str, tuple[Any, float]] = {}
         current_time = 1234567890.123456
 
         settings = MagicMock()

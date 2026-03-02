@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+from typing import cast
 
 
 from backend.engines.orchestrator.safety import OrchestratorSafetyManager
@@ -94,7 +95,7 @@ class TestToolFunctionName:
 
 class TestShouldWarnOnDetection:
     def test_none(self):
-        assert not OrchestratorSafetyManager._should_warn_on_detection(None)
+        assert not OrchestratorSafetyManager._should_warn_on_detection(cast(dict, None))
 
     def test_not_hallucinated(self):
         assert not OrchestratorSafetyManager._should_warn_on_detection(

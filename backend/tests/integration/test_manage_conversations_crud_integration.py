@@ -106,7 +106,7 @@ async def test_search_conversations_handler_success() -> None:
     with (
         patch(
             "backend.api.routes.manage_conversations.get_user_id",
-            AsyncMock(return_value="user-1"),
+            MagicMock(return_value="user-1"),
         ),
         patch(
             "backend.api.routes.manage_conversations.get_conversation_store",
@@ -139,7 +139,7 @@ async def test_get_update_delete_handlers() -> None:
     with (
         patch(
             "backend.api.routes.manage_conversations.get_user_id",
-            AsyncMock(return_value="user-1"),
+            MagicMock(return_value="user-1"),
         ),
         patch(
             "backend.api.routes.manage_conversations.get_conversation_store",

@@ -103,7 +103,7 @@ class TestCheckConfigFileExistence:
         with patch("pathlib.Path.exists", return_value=False):
             _check_config_file_existence(warnings)
         assert len(warnings) == 1
-        assert "config.toml" in warnings[0]
+        assert "settings.json" in warnings[0]
 
     def test_existing_config_no_warnings(self):
         warnings: list[str] = []

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from backend.core.message import (
@@ -105,7 +107,7 @@ class TestImageContent:
         data = ic.serialize_model()
         assert isinstance(data, list)
         assert len(data) == 2
-        assert data[0]["image_url"]["url"] == "http://a.com/1.png"
+        assert cast(dict[str, str], data[0]["image_url"])["url"] == "http://a.com/1.png"
 
     def test_cache_prompt_on_last_image(self):
         ic = ImageContent(

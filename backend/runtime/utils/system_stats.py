@@ -1,6 +1,7 @@
 """Utilities for getting system resource statistics."""
 
 import time
+from typing import Any
 
 import psutil
 
@@ -8,11 +9,11 @@ _start_time = time.time()
 _last_execution_time = time.time()
 
 
-def get_system_info() -> dict[str, object]:
+def get_system_info() -> dict[str, Any]:
     """Get comprehensive system information including uptime and resource stats.
 
     Returns:
-        dict[str, object]: Dictionary containing uptime, idle_time, and resources.
+        dict[str, Any]: Dictionary containing uptime, idle_time, and resources.
 
     """
     current_time = time.time()
@@ -27,7 +28,7 @@ def update_last_execution_time() -> None:
     _last_execution_time = time.time()
 
 
-def get_system_stats() -> dict[str, object]:
+def get_system_stats() -> dict[str, Any]:
     """Get current system resource statistics.
 
     Returns:

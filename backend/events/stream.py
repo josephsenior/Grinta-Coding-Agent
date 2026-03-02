@@ -69,13 +69,17 @@ async def session_exists(
 
 def _warn_unclosed_stream(sid: str) -> None:
     """weakref.finalize callback — fires if a stream is GC'd without close()."""
-    # At interpreter shutdown (or after pytest capture teardown) logging
-    # handlers may already be closed; best-effort warn without raising.
+    # Avoid logger.warning: at interpreter shutdown / pytest teardown the
+    # logging handlers' streams are often closed, causing "Logging error" spam.
     try:
-        logger.warning(
-            "EventStream '%s' was GC'd without close(); resources may leak.", sid
-        )
-    except Exception:
+        import sys
+
+        s = getattr(sys, "stderr", None)
+        if s is not None:
+            s.write(
+                f"EventStream '{sid}' was GC'd without close(); resources may leak.\n"
+            )
+    except (ValueError, OSError, AttributeError, BrokenPipeError):
         pass
 
 
@@ -363,7 +367,7 @@ class EventStream(EventStore):
             event = merged  # Use the merged representative event
 
         self._ensure_event_can_be_added(event)
-        event.timestamp = datetime.now().isoformat()
+        event.timestamp = datetime.now()
         event.source = source
 
         sanitized_event, payload, cache_page_data = self._serialize_and_cache_event(

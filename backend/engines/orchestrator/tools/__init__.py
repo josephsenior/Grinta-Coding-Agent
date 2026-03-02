@@ -17,6 +17,8 @@ from .meta_cognition import (
     create_proposal_tool,
     create_uncertainty_tool,
 )
+from .lsp_query import create_lsp_query_tool
+from .signal_progress import create_signal_progress_tool
 from .delegate_task import create_delegate_task_tool
 from .revert_to_safe_state import create_revert_to_safe_state_tool
 from .note import create_note_tool, create_recall_tool, create_semantic_recall_tool
@@ -31,12 +33,13 @@ from .task_tracker import create_task_tracker_tool
 from .think import create_think_tool
 from .web_search import create_web_search_tool
 from .verify_state import create_verify_state_tool
+from .verify_ui import create_verify_ui_change_tool
 from .working_memory import create_working_memory_tool
 from .workspace_status import create_workspace_status_tool
 from .terminal import (
-    create_terminal_open_tool,
-    create_terminal_input_tool,
-    create_terminal_read_tool,
+    create_terminal_open_tool as create_terminal_open_tool,
+    create_terminal_input_tool as create_terminal_input_tool,
+    create_terminal_read_tool as create_terminal_read_tool,
 )
 
 __all__ = [
@@ -50,6 +53,7 @@ __all__ = [
     "create_get_entity_contents_tool",
     "create_finish_tool",
     "create_llm_based_edit_tool",
+    "create_lsp_query_tool",
     "create_note_tool",
     "create_project_map_tool",
     "create_proposal_tool",
@@ -58,6 +62,7 @@ __all__ = [
     "create_run_tests_tool",
     "create_search_code_tool",
     "create_session_diff_tool",
+    "create_signal_progress_tool",
     "create_think_tool",
     "create_uncertainty_tool",
     "create_cmd_run_tool",
@@ -71,4 +76,5 @@ __all__ = [
     "create_workspace_status_tool",
     "create_delegate_task_tool",
     "create_revert_to_safe_state_tool",
+    "create_verify_ui_change_tool",
 ]

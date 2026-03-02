@@ -1,3 +1,4 @@
+from typing import Any, cast
 """Tests for backend.controller.safety_validator module."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -133,7 +134,7 @@ class TestSafetyValidator:
         validator = SafetyValidator(config)
 
         # Mock analyzer to return low risk
-        validator.analyzer.analyze = MagicMock(
+        cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(RiskCategory.NONE, "safe command", [])
         )
 
@@ -158,7 +159,7 @@ class TestSafetyValidator:
         validator = SafetyValidator(config)
 
         # Mock analyzer to return critical risk
-        validator.analyzer.analyze = MagicMock(
+        cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(
                 RiskCategory.CRITICAL,
                 "dangerous command",
@@ -190,7 +191,7 @@ class TestSafetyValidator:
         validator = SafetyValidator(config)
 
         # Mock analyzer to return high risk
-        validator.analyzer.analyze = MagicMock(
+        cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(
                 RiskCategory.HIGH,
                 "risky command",
@@ -221,7 +222,7 @@ class TestSafetyValidator:
         validator = SafetyValidator(config)
 
         # Mock analyzer to return high risk
-        validator.analyzer.analyze = MagicMock(
+        cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(
                 RiskCategory.HIGH,
                 "risky but allowed",
@@ -251,7 +252,7 @@ class TestSafetyValidator:
         validator = SafetyValidator(config)
 
         # Mock analyzer to return high risk
-        validator.analyzer.analyze = MagicMock(
+        cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(
                 RiskCategory.HIGH,
                 "risky",
@@ -286,7 +287,7 @@ class TestSafetyValidator:
         mock_logger.log_action = AsyncMock(return_value="audit_xyz")
         validator.telemetry_logger = mock_logger  # Manually set
 
-        validator.analyzer.analyze = MagicMock(
+        cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(RiskCategory.NONE, "safe", [])
         )
 
@@ -313,12 +314,13 @@ class TestSafetyValidator:
         validator = SafetyValidator(config)
 
         # Mock analyzer
-        validator.analyzer.analyze = MagicMock(
+        cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(RiskCategory.HIGH, "risky", [])
         )
 
         # Mock _send_alert
-        validator._send_alert = AsyncMock()
+        send_alert_mock = AsyncMock()
+        cast(Any, validator)._send_alert = send_alert_mock
 
         action = CmdRunAction(command="test")
         context = ExecutionContext(
@@ -331,7 +333,7 @@ class TestSafetyValidator:
 
         await validator.validate(action, context)
 
-        validator._send_alert.assert_called_once()
+        send_alert_mock.assert_called_once()
 
     def test_should_block_action_blocks_critical(self):
         """Test _should_block_action blocks CRITICAL risks."""

@@ -172,7 +172,7 @@ class TestForgeConfigPostInit:
 class TestForgeConfigValidation:
     def test_extra_fields_rejected(self):
         with pytest.raises(ValidationError):
-            ForgeConfig(totally_fake_field="value")
+            ForgeConfig(**{"totally_fake_field": "value"})
 
 
 # ── get_llm_config_from_agent ────────────────────────────────────────

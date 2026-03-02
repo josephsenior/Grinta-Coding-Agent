@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from typing import cast
 
 
 from backend.core.message import ImageContent, Message, TextContent
+from backend.core.config import AgentConfig
 from backend.memory.conversation_memory import ConversationMemory
 from backend.memory.memory_types import DecisionType
 from backend.memory.message_formatting import (
@@ -35,7 +37,7 @@ def _make_memory(**config_kw) -> ConversationMemory:
     cfg = _make_config(**config_kw)
     pm = MagicMock()
     pm.get_system_message.return_value = "System prompt"
-    return ConversationMemory(cfg, pm)
+    return ConversationMemory(cast(AgentConfig, cfg), pm)
 
 
 # ── _is_valid_image_url ─────────────────────────────────────────────
@@ -66,7 +68,8 @@ class TestMessageWithText:
         msg = message_with_text("user", "hello")
         assert msg.role == "user"
         assert len(msg.content) == 1
-        assert msg.content[0].text == "hello"
+        c = msg.content[0]
+        assert isinstance(c, TextContent) and c.text == "hello"
 
     def test_creates_system_message(self):
         msg = message_with_text("system", "sys prompt")
@@ -156,8 +159,9 @@ class TestApplyPromptCaching:
         user_msg = Message(role="user", content=[TextContent(text="hello")])
         msgs = [sys_msg, user_msg]
         mem.apply_prompt_caching(msgs)
-        assert msgs[0].content[0].cache_prompt is True
-        assert msgs[1].content[0].cache_prompt is True
+        c0, c1 = msgs[0].content[0], msgs[1].content[0]
+        assert isinstance(c0, TextContent) and c0.cache_prompt is True
+        assert isinstance(c1, TextContent) and c1.cache_prompt is True
 
     def test_no_caching_when_disabled(self):
         mem = _make_memory(enable_prompt_caching=False)
@@ -180,20 +184,23 @@ class TestUserMessageFormatting:
         m1 = Message(role="user", content=[TextContent(text="first")])
         m2 = Message(role="user", content=[TextContent(text="second")])
         result = apply_user_message_formatting([m1, m2])
-        assert result[1].content[0].text.startswith("\n\n")
+        c = result[1].content[0]
+        assert isinstance(c, TextContent) and c.text.startswith("\n\n")
 
     def test_no_separator_for_mixed_roles(self):
         m1 = Message(role="user", content=[TextContent(text="first")])
         m2 = Message(role="assistant", content=[TextContent(text="reply")])
         m3 = Message(role="user", content=[TextContent(text="follow")])
         result = apply_user_message_formatting([m1, m2, m3])
-        assert not result[2].content[0].text.startswith("\n\n")
+        c = result[2].content[0]
+        assert isinstance(c, TextContent) and not c.text.startswith("\n\n")
 
     def test_idempotent(self):
         m1 = Message(role="user", content=[TextContent(text="a")])
         m2 = Message(role="user", content=[TextContent(text="\n\nalready")])
         result = apply_user_message_formatting([m1, m2])
-        assert result[1].content[0].text == "\n\nalready"  # not double-prefixed
+        c = result[1].content[0]
+        assert isinstance(c, TextContent) and c.text == "\n\nalready"
 
 
 # ── _remove_duplicate_system_prompt_user ─────────────────────────────
@@ -206,7 +213,8 @@ class TestRemoveDuplicateSystemUser:
         follow = Message(role="user", content=[TextContent(text="real")])
         result = remove_duplicate_system_prompt_user([sys_msg, dup_user, follow])
         assert len(result) == 2
-        assert result[1].content[0].text == "real"
+        c = result[1].content[0]
+        assert isinstance(c, TextContent) and c.text == "real"
 
     def test_keeps_non_duplicate(self):
         sys_msg = Message(role="system", content=[TextContent(text="prompt")])

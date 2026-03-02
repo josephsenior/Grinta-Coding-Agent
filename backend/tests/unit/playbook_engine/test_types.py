@@ -1,6 +1,7 @@
 """Tests for backend.playbook_engine.types — playbook metadata models."""
 
 from datetime import datetime
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -58,12 +59,12 @@ class TestInputMetadata:
     def test_name_required(self):
         """Test name is required."""
         with pytest.raises(ValidationError):
-            InputMetadata(description="Test description")
+            cast(Any, InputMetadata)(description="Test description")
 
     def test_description_required(self):
         """Test description is required."""
         with pytest.raises(ValidationError):
-            InputMetadata(name="test_name")
+            cast(Any, InputMetadata)(name="test_name")
 
     def test_empty_name_allowed(self):
         """Test empty name is allowed."""
@@ -185,17 +186,17 @@ class TestPlaybookResponse:
     def test_name_required(self):
         """Test name is required."""
         with pytest.raises(ValidationError):
-            PlaybookResponse(path="/path", created_at=datetime.now())
+            cast(Any, PlaybookResponse)(path="/path", created_at=datetime.now())
 
     def test_path_required(self):
         """Test path is required."""
         with pytest.raises(ValidationError):
-            PlaybookResponse(name="test", created_at=datetime.now())
+            cast(Any, PlaybookResponse)(name="test", created_at=datetime.now())
 
     def test_created_at_required(self):
         """Test created_at is required."""
         with pytest.raises(ValidationError):
-            PlaybookResponse(name="test", path="/path")
+            cast(Any, PlaybookResponse)(name="test", path="/path")
 
     def test_datetime_object(self):
         """Test created_at is a datetime object."""
@@ -247,12 +248,12 @@ class TestPlaybookContentResponse:
     def test_content_required(self):
         """Test content is required."""
         with pytest.raises(ValidationError):
-            PlaybookContentResponse(path="/path")
+            cast(Any, PlaybookContentResponse)(path="/path")
 
     def test_path_required(self):
         """Test path is required."""
         with pytest.raises(ValidationError):
-            PlaybookContentResponse(content="content")
+            cast(Any, PlaybookContentResponse)(content="content")
 
     def test_empty_content_allowed(self):
         """Test empty content is allowed."""

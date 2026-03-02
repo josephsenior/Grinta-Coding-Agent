@@ -1,6 +1,8 @@
+from typing import Any, cast
 """Tests for RecoveryService."""
 
 import unittest
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.controller.error_recovery import ErrorType
@@ -118,6 +120,7 @@ class TestRecoveryService(unittest.IsolatedAsyncioTestCase):
         result = self.service._format_llm_error(exc)
 
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertIn("API Connection Error", result)
         self.assertIn("Connection refused", result)
 
@@ -129,6 +132,7 @@ class TestRecoveryService(unittest.IsolatedAsyncioTestCase):
         result = self.service._format_llm_error(exc)
 
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertIn("Authentication Error", result)
 
     def test_format_llm_error_rate_limit(self):
@@ -139,6 +143,7 @@ class TestRecoveryService(unittest.IsolatedAsyncioTestCase):
         result = self.service._format_llm_error(exc)
 
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertIn("Rate Limit", result)
 
     def test_format_llm_error_generic_returns_none(self):
@@ -150,7 +155,7 @@ class TestRecoveryService(unittest.IsolatedAsyncioTestCase):
 
     def test_format_llm_error_none_returns_none(self):
         """Test _format_llm_error returns None for None."""
-        result = self.service._format_llm_error(None)
+        result = self.service._format_llm_error(cast(Exception, None))
 
         self.assertIsNone(result)
 
@@ -212,11 +217,21 @@ class TestRecoveryService(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result)
 
     async def test_try_error_recovery_tool_call_error_skipped(self):
-        """Test _try_error_recovery skips tool call errors."""
+        """Test _try_error_recovery skips tool call errors after one retry."""
+        self.mock_retry_service.retry_count = 1
         exc = RuntimeError("Tool error")
         result = await self.service._try_error_recovery(exc, ErrorType.TOOL_CALL_ERROR)
 
         self.assertFalse(result)
+
+    async def test_try_error_recovery_tool_call_error_allows_first_retry(self):
+        """Test _try_error_recovery allows a single retry for tool call errors."""
+        self.mock_retry_service.retry_count = 0
+        exc = RuntimeError("Tool error")
+        result = await self.service._try_error_recovery(exc, ErrorType.TOOL_CALL_ERROR)
+
+        # First attempt is allowed through (not skipped)
+        self.assertTrue(result)
 
     async def test_try_error_recovery_with_autonomy_controller(self):
         """Test _try_error_recovery uses autonomy controller when available."""
@@ -409,7 +424,7 @@ class TestRecoveryService(unittest.IsolatedAsyncioTestCase):
         from backend.core.schemas import AgentState
 
         exc = MagicMock(spec=["message", "__str__"])
-        exc.__str__ = lambda self: "Rate limited"
+        cast(Any, exc).__str__ = lambda self: "Rate limited"
         # No retry_attempt / max_retries attrs
 
         await self.service._handle_rate_limit_error(exc)

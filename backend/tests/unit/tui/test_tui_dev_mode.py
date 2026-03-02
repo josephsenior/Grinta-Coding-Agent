@@ -13,15 +13,15 @@ class TestParseArgs:
     """CLI argument parsing tests."""
 
     def test_defaults(self):
-        with patch("argparse._sys.argv", ["forge-tui"]):
+        with patch("sys.argv", ["forge-tui"]):
             args = _parse_args()
         assert args.host == "localhost"
-        assert args.port == 3000
+        assert args.port == 3001
         assert args.verbose is False
         assert args.dev is False
 
     def test_dev_flag(self):
-        with patch("argparse._sys.argv", ["forge-tui", "--dev"]):
+        with patch("sys.argv", ["forge-tui", "--dev"]):
             args = _parse_args()
         assert args.dev is True
 
@@ -34,7 +34,7 @@ class TestParseArgs:
         assert args.port == 8080
 
     def test_verbose_flag(self):
-        with patch("argparse._sys.argv", ["forge-tui", "-v"]):
+        with patch("sys.argv", ["forge-tui", "-v"]):
             args = _parse_args()
         assert args.verbose is True
 
@@ -73,12 +73,13 @@ class TestMain:
     def test_main_dispatches_dev(self, mock_parse, mock_run, mock_dev):
         mock_parse.return_value = argparse.Namespace(
             host="localhost",
-            port=3000,
+            port=3001,
             verbose=False,
             dev=True,
+            embedded=False,
         )
         main()
-        mock_dev.assert_called_once_with("localhost", 3000, False)
+        mock_dev.assert_called_once_with("localhost", 3001, False)
         mock_run.assert_not_called()
 
     @patch("tui.__main__._run_dev_mode")
@@ -87,10 +88,11 @@ class TestMain:
     def test_main_dispatches_normal(self, mock_parse, mock_run, mock_dev):
         mock_parse.return_value = argparse.Namespace(
             host="localhost",
-            port=3000,
+            port=3001,
             verbose=False,
             dev=False,
+            embedded=False,
         )
         main()
-        mock_run.assert_called_once_with("localhost", 3000, False)
+        mock_run.assert_called_once_with("localhost", 3001, False)
         mock_dev.assert_not_called()

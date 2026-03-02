@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import json
 from unittest.mock import MagicMock
+from typing import cast
 
 import pytest
 
@@ -272,7 +273,7 @@ class TestSaveMetricsEdgeCases:
     def test_unexpected_type_in_combined_metrics(self):
         fs = _make_file_store(raise_fnf=True)
         cs = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
-        cs.service_to_metrics = {"weird": "just a string"}
+        cs.service_to_metrics = cast(dict[str, Metrics], {"weird": "just a string"})
         
         cs.save_metrics()
         written = fs.write.call_args[0][1]
@@ -287,7 +288,7 @@ class TestSaveMetricsEdgeCases:
             def get(self):
                 return {"val": 123}
         
-        cs.service_to_metrics = {"obj": MockWithGet()}
+        cs.service_to_metrics = cast(dict[str, Metrics], {"obj": MockWithGet()})
         cs.save_metrics()
         written = fs.write.call_args[0][1]
         decoded = json.loads(base64.b64decode(written).decode())

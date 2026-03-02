@@ -1,10 +1,12 @@
 """Tests for backend.review — critic system for scoring agent runs."""
 
+from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
 
 from backend.events.action import Action, PlaybookFinishAction
+from backend.events.event import Event
 from backend.events.observation import Observation
 from backend.review import AgentFinishedCritic
 from backend.review.base import BaseCritic, CriticResult
@@ -206,7 +208,7 @@ index 1234567..89abcdef 100644
         action2 = MagicMock(spec=Action)
         finish_action = PlaybookFinishAction(outputs={})
 
-        events = [action1, action2, finish_action]
+        events = cast(list[Event], [action1, action2, finish_action])
 
         result = critic.evaluate(events)
 
@@ -221,7 +223,7 @@ index 1234567..89abcdef 100644
         finish_action = PlaybookFinishAction(outputs={})
         obs2 = MagicMock(spec=Observation)
 
-        events = [action1, obs1, finish_action, obs2]
+        events = cast(list[Event], [action1, obs1, finish_action, obs2])
 
         result = critic.evaluate(events)
 
@@ -236,7 +238,7 @@ index 1234567..89abcdef 100644
         obs = MagicMock(spec=Observation)
 
         # Finish action followed by observation
-        events = [finish_action, obs, obs]
+        events = cast(list[Event], [finish_action, obs, obs])
 
         result = critic.evaluate(events)
 
@@ -249,7 +251,7 @@ index 1234567..89abcdef 100644
         obs1 = MagicMock(spec=Observation)
         obs2 = MagicMock(spec=Observation)
 
-        events = [obs1, obs2]
+        events = cast(list[Event], [obs1, obs2])
 
         result = critic.evaluate(events)
 

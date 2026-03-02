@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -22,7 +23,7 @@ from backend.events.observation.error import ErrorObservation
 # ---------------------------------------------------------------------------
 
 
-def _state(history: list) -> SimpleNamespace:
+def _state(history: list) -> Any:
     """Build a minimal State-like object."""
     return SimpleNamespace(history=history)
 
@@ -124,20 +125,20 @@ class TestFilterRelevantHistory:
 class TestRepeatingActionObservation:
     def test_four_identical_pairs_is_stuck(self):
         sd = StuckDetector(_state([]))
-        actions = [_cmd("echo 1")] * 4
-        observations = [_cmd_output("echo 1", "1", 0)] * 4
+        actions: list[Any] = [_cmd("echo 1")] * 4
+        observations: list[Any] = [_cmd_output("echo 1", "1", 0)] * 4
         assert sd._is_stuck_repeating_action_observation(actions, observations) is True
 
     def test_different_actions_not_stuck(self):
         sd = StuckDetector(_state([]))
-        actions = [_cmd("echo 1"), _cmd("echo 2"), _cmd("echo 3"), _cmd("echo 4")]
-        observations = [_cmd_output("echo 1", "1", 0)] * 4
+        actions: list[Any] = [_cmd("echo 1"), _cmd("echo 2"), _cmd("echo 3"), _cmd("echo 4")]
+        observations: list[Any] = [_cmd_output("echo 1", "1", 0)] * 4
         assert sd._is_stuck_repeating_action_observation(actions, observations) is False
 
     def test_fewer_than_four_not_stuck(self):
         sd = StuckDetector(_state([]))
-        actions = [_cmd("echo 1")] * 3
-        observations = [_cmd_output("echo 1", "1", 0)] * 3
+        actions: list[Any] = [_cmd("echo 1")] * 3
+        observations: list[Any] = [_cmd_output("echo 1", "1", 0)] * 3
         assert sd._is_stuck_repeating_action_observation(actions, observations) is False
 
 
@@ -149,20 +150,20 @@ class TestRepeatingActionObservation:
 class TestRepeatingActionError:
     def test_three_same_action_with_errors_is_stuck(self):
         sd = StuckDetector(_state([]))
-        actions = [_cmd("bad-cmd")] * 3
-        observations = [_error("fail")] * 3
+        actions: list[Any] = [_cmd("bad-cmd")] * 3
+        observations: list[Any] = [_error("fail")] * 3
         assert sd._is_stuck_repeating_action_error(actions, observations) is True
 
     def test_different_actions_with_errors_not_stuck(self):
         sd = StuckDetector(_state([]))
-        actions = [_cmd("a"), _cmd("b"), _cmd("c")]
-        observations = [_error()] * 3
+        actions: list[Any] = [_cmd("a"), _cmd("b"), _cmd("c")]
+        observations: list[Any] = [_error()] * 3
         assert sd._is_stuck_repeating_action_error(actions, observations) is False
 
     def test_fewer_than_three_not_stuck(self):
         sd = StuckDetector(_state([]))
-        actions = [_cmd("bad")] * 2
-        observations = [_error()] * 2
+        actions: list[Any] = [_cmd("bad")] * 2
+        observations: list[Any] = [_error()] * 2
         assert sd._is_stuck_repeating_action_error(actions, observations) is False
 
 
@@ -175,19 +176,19 @@ class TestMonologue:
     def test_three_identical_agent_messages_is_stuck(self):
         sd = StuckDetector(_state([]))
         msg = _agent_msg("I'm stuck")
-        filtered = [msg, msg, msg]
+        filtered: list[Any] = [msg, msg, msg]
         assert sd._is_stuck_monologue(filtered) is True
 
     def test_three_different_messages_not_stuck(self):
         sd = StuckDetector(_state([]))
-        filtered = [_agent_msg("a"), _agent_msg("b"), _agent_msg("c")]
+        filtered: list[Any] = [_agent_msg("a"), _agent_msg("b"), _agent_msg("c")]
         assert sd._is_stuck_monologue(filtered) is False
 
     def test_messages_with_observations_between_not_stuck(self):
         sd = StuckDetector(_state([]))
         msg = _agent_msg("x")
         # observation breaks the monologue
-        filtered = [msg, _cmd_output("ls", "file"), msg, msg]
+        filtered: list[Any] = [msg, _cmd_output("ls", "file"), msg, msg]
         # First and last two are identical but have observation between first and second
         assert sd._is_stuck_monologue(filtered) is False
 
@@ -200,12 +201,12 @@ class TestMonologue:
 class TestContextWindowError:
     def test_ten_consecutive_condensations_is_stuck(self):
         sd = StuckDetector(_state([]))
-        events = [_condensation("c")] * 12
+        events: list[Any] = [_condensation("c")] * 12
         assert sd._is_stuck_context_window_error(events) is True
 
     def test_condensations_with_actions_between_not_stuck(self):
         sd = StuckDetector(_state([]))
-        events = []
+        events: list[Any] = []
         for _ in range(12):
             events.append(_condensation("c"))
             events.append(_cmd("ls"))  # Action breaks consecutiveness
@@ -213,7 +214,7 @@ class TestContextWindowError:
 
     def test_fewer_than_ten_not_stuck(self):
         sd = StuckDetector(_state([]))
-        events = [_condensation("c")] * 8
+        events: list[Any] = [_condensation("c")] * 8
         assert sd._is_stuck_context_window_error(events) is False
 
 
@@ -226,18 +227,18 @@ class TestTokenRepetition:
     def test_three_identical_long_messages_is_stuck(self):
         sd = StuckDetector(_state([]))
         msg = _agent_msg("This is a sufficiently long message to trigger repetition")
-        events = [msg, msg, msg]
+        events: list[Any] = [msg, msg, msg]
         assert sd._is_stuck_token_repetition(events) is True
 
     def test_short_messages_not_stuck(self):
         sd = StuckDetector(_state([]))
         msg = _agent_msg("ok")  # <= 10 chars
-        events = [msg, msg, msg]
+        events: list[Any] = [msg, msg, msg]
         assert sd._is_stuck_token_repetition(events) is False
 
     def test_different_messages_not_stuck(self):
         sd = StuckDetector(_state([]))
-        events = [
+        events: list[Any] = [
             _agent_msg("This is message A with enough text"),
             _agent_msg("This is message B with enough text"),
             _agent_msg("This is message C with enough text"),
@@ -247,7 +248,7 @@ class TestTokenRepetition:
     def test_fewer_than_three_not_stuck(self):
         sd = StuckDetector(_state([]))
         msg = _agent_msg("long enough to score")
-        events = [msg, msg]
+        events: list[Any] = [msg, msg]
         assert sd._is_stuck_token_repetition(events) is False
 
 
@@ -343,7 +344,7 @@ class TestIsStuck:
 
     def test_action_observation_loop_detected(self):
         """4 identical action-observation pairs should trigger stuck."""
-        history = []
+        history: list[Any] = []
         for _ in range(4):
             history.append(_cmd("echo hello"))
             history.append(_cmd_output("echo hello", "hello", 0))

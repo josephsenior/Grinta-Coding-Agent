@@ -6,7 +6,7 @@ Provides intelligent caching for global config, user settings, and merged result
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.cache._serializer import deserialize_model, serialize_model
 from backend.core.cache.utils import (
@@ -101,7 +101,7 @@ class SmartConfigCache:
         """Get global config from Redis cache."""
         try:
             cached = self.redis.get("smart_cache:global_config")
-            if cached:
+            if isinstance(cached, bytes):
                 from backend.core.config.forge_config import ForgeConfig
 
                 config = deserialize_model(cached, ForgeConfig)
@@ -174,7 +174,7 @@ class SmartConfigCache:
             user_key = f"smart_cache:user_settings:{user_id}"
             cached = self.redis.get(user_key)
 
-            if cached:
+            if isinstance(cached, bytes):
                 from backend.storage.data_models.settings import (
                     Settings as SettingsModel,
                 )
@@ -260,7 +260,7 @@ class SmartConfigCache:
                 logger.debug("🚀 Invalidated user memory cache for %s", user_id)
 
     def invalidate_global_cache(self) -> None:
-        """Invalidate global config cache (when config.toml changes)."""
+        """Invalidate global config cache (when settings.json changes)."""
         if self.redis_available:
             try:
                 self.redis.delete("smart_cache:global_config")
@@ -288,9 +288,9 @@ class SmartConfigCache:
         if self.redis_available:
             try:
                 # Get Redis info and keys
-                info = self.redis.info()
-                global_keys = self.redis.keys("smart_cache:global_config")
-                user_keys = self.redis.keys("smart_cache:user_settings:*")
+                info = cast(dict[str, Any], self.redis.info())
+                global_keys = cast(list[Any], self.redis.keys("smart_cache:global_config"))
+                user_keys = cast(list[Any], self.redis.keys("smart_cache:user_settings:*"))
 
                 # Extract standard stats
                 stats.update(extract_redis_stats(info, global_keys, user_keys))

@@ -1,5 +1,6 @@
 """Tests for backend.core.message_utils — event token usage metadata helpers."""
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 
@@ -218,7 +219,7 @@ class TestFindEventIndexById:
 
     def test_event_found_in_middle(self):
         """Test finding event in middle."""
-        events = [MagicMock() for _ in range(5)]
+        events: list[Any] = [MagicMock() for _ in range(5)]
         for i, event in enumerate(events):
             event.id = i * 10
 
@@ -249,7 +250,7 @@ class TestSearchBackwardsForTokenUsage:
         metrics = MagicMock()
         metrics.token_usages = [usage]
 
-        events = [event]
+        events: list[Any] = [event]
         result = _search_backwards_for_token_usage(events, 0, metrics)
         assert result is usage
 
@@ -271,7 +272,7 @@ class TestSearchBackwardsForTokenUsage:
         metrics = MagicMock()
         metrics.token_usages = [usage]
 
-        events = [event0, event1, event2]
+        events: list[Any] = [event0, event1, event2]
         # Start at index 2, should find usage at index 0
         result = _search_backwards_for_token_usage(events, 2, metrics)
         assert result is usage
@@ -289,7 +290,7 @@ class TestSearchBackwardsForTokenUsage:
         metrics = MagicMock()
         metrics.token_usages = []
 
-        events = [event1, event2]
+        events: list[Any] = [event1, event2]
         result = _search_backwards_for_token_usage(events, 1, metrics)
         assert result is None
 
@@ -298,7 +299,7 @@ class TestSearchBackwardsForTokenUsage:
         event0 = MagicMock()
         event0.tool_call_metadata = None
 
-        events = [event0]
+        events: list[Any] = [event0]
         metrics = MagicMock()
         metrics.token_usages = []
 
@@ -344,7 +345,7 @@ class TestGetTokenUsageForEventId:
         metrics = MagicMock()
         metrics.token_usages = [usage]
 
-        events = [event1, event2]
+        events: list[Any] = [event1, event2]
         result = get_token_usage_for_event_id(events, 200, metrics)
         assert result is usage
 
@@ -369,7 +370,7 @@ class TestGetTokenUsageForEventId:
         metrics = MagicMock()
         metrics.token_usages = [usage]
 
-        events = [event1, event2, event3]
+        events: list[Any] = [event1, event2, event3]
         # Search from event 300 should find usage from event 100
         result = get_token_usage_for_event_id(events, 300, metrics)
         assert result is usage
@@ -408,7 +409,7 @@ class TestGetTokenUsageForEventId:
         metrics = MagicMock()
         metrics.token_usages = [usage1, usage2]
 
-        events = [event1, event2, event3, event4]
+        events: list[Any] = [event1, event2, event3, event4]
 
         # Event 400 should find usage from event 300
         result = get_token_usage_for_event_id(events, 400, metrics)

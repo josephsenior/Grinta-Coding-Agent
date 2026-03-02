@@ -463,7 +463,7 @@ class KnowledgeBaseManager:
                 current_start = sym_end
                 continue
 
-            last_start = chunks[-1].metadata.get("_byte_start", 0) if chunks else 0
+            last_start = int(chunks[-1].metadata.get("_byte_start", 0) if chunks else 0)
             chunk_index = self._merge_append_or_extend_chunk(
                 chunks, content, document_id, metadata,
                 max_chunk_bytes, overlap_bytes, chunk_index, last_start, current_start, sym_end,

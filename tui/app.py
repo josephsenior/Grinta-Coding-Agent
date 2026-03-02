@@ -24,7 +24,7 @@ class ForgeApp(App[None]):
 
     Lifecycle
     ---------
-    1. WelcomeScreen is pushed if config.toml is missing.
+    1. WelcomeScreen is pushed if settings.json is missing.
     2. HomeScreen is pushed if config exists.
     3. When the user selects a conversation, HomeScreen pushes ChatScreen
        on top (via ``app.open_chat``).
@@ -49,19 +49,19 @@ class ForgeApp(App[None]):
         if self._client_provided:
             self._start_main_flow()
             return
-        config_path = Path.cwd() / "config.toml"
-        if not config_path.exists():
+        settings_path = Path.cwd() / "settings.json"
+        if not settings_path.exists():
             self.push_screen(WelcomeScreen(), self._on_welcome_finished)
         else:
             self._start_main_flow()
 
-    def _on_welcome_finished(self, setup_completed: bool) -> None:
+    def _on_welcome_finished(self, setup_completed: bool | None) -> None:
         """Called when user finishes the onboarding wizard."""
-        if setup_completed:
-            self.notify("Setup complete! Welcome to Forge.", severity="information")
-            self._start_main_flow()
-        else:
+        if not setup_completed:
             self.exit()
+            return
+        self.notify("Setup complete! Welcome to Forge.", severity="information")
+        self._start_main_flow()
 
     def _start_main_flow(self) -> None:
         """Load home screen and verify connectivity."""

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -20,12 +21,13 @@ from backend.core.config.config_sections import (
     process_security_section,
 )
 from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.utils import ConfigLoadSummary
 
 
 class TestCheckUnknownSections:
     def test_known_sections_no_warning(self):
         """All known sections should not trigger any warnings."""
-        toml = {
+        toml: dict[str, Any] = {
             "core": {},
             "agent": {},
             "llm": {},
@@ -40,7 +42,7 @@ class TestCheckUnknownSections:
 
     def test_unknown_section_logged(self):
         """Unknown sections do not raise but get logged."""
-        toml = {"core": {}, "custom_plugin": {}}
+        toml: dict[str, Any] = {"core": {}, "custom_plugin": {}}
         # check_unknown_sections uses logger.debug — just ensure no exception
         check_unknown_sections(toml, "config.toml")
 
@@ -49,15 +51,16 @@ class TestCheckUnknownSections:
 
     def test_case_insensitive(self):
         """Known section names are matched case-insensitively."""
-        toml = {"Core": {}, "LLM": {}, "SECURITY": {}}
+        toml: dict[str, Any] = {"Core": {}, "LLM": {}, "SECURITY": {}}
         check_unknown_sections(toml, "config.toml")
 
 
-class DummySummary:
-    def __init__(self):
-        self.records = []
+class DummySummary(ConfigLoadSummary):
+    def __init__(self) -> None:
+        super().__init__("test.toml")
+        self.records: list[Any] = []
 
-    def record(self, section, reason, detail):
+    def record(self, section: str, reason: str, detail: str) -> None:
         self.records.append((section, reason, detail))
 
 
@@ -74,7 +77,7 @@ class TestProcessCoreSection:
     def test_applies_secret_str(self):
         cfg = DummyCfg()
         summary = DummySummary()
-        process_core_section({"secret": "value", "plain": 3}, cfg, summary)
+        process_core_section({"secret": "value", "plain": 3}, cfg, summary)  # type: ignore[arg-type]
         assert isinstance(cfg.secret, SecretStr)
         assert cfg.secret.get_secret_value() == "value"
         assert cfg.plain == 3
@@ -84,7 +87,7 @@ class TestProcessCoreSection:
         cfg = DummyCfg()
         summary = DummySummary()
         # Pass unknown key
-        process_core_section({"unknown_field": "value"}, cfg, summary)
+        process_core_section({"unknown_field": "value"}, cfg, summary)  # type: ignore[arg-type]
         # Should not raise, just log warning
         assert not hasattr(cfg, "unknown_field")
 
@@ -97,7 +100,7 @@ class TestProcessCoreSection:
 
         cfg = NoHintsCfg()
         summary = DummySummary()
-        process_core_section({"value": 42}, cfg, summary)
+        process_core_section({"value": 42}, cfg, summary)  # type: ignore[arg-type]
         assert cfg.value == 42
 
 
@@ -192,9 +195,12 @@ class TestProcessLLMSection:
         """Test that ValidationError in LLM section is caught and recorded."""
         cfg = MagicMock()
         summary = DummySummary()
+        def _noop_gen():
+            yield
+
         with patch(
             "backend.core.config.llm_config.suppress_llm_env_export",
-            contextmanager(lambda: (yield))(),
+            contextmanager(_noop_gen),
         ):
             with patch(
                 "backend.core.config.config_sections.LLMConfig"

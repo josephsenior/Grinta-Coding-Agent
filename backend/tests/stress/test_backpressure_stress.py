@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -146,7 +147,7 @@ class TestBackpressureCriticalEvents:
         bp = BackpressureManager(
             max_queue_size=5,
             drop_policy="drop_newest",
-            is_critical_event=lambda e: "critical" in e.content,
+            is_critical_event=lambda e: "critical" in cast(Any, e).content,
         )
         q: asyncio.Queue = asyncio.Queue(maxsize=5)
 

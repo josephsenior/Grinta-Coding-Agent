@@ -242,10 +242,12 @@ def _build_restore_cmd(
     db_name = os.getenv("DB_NAME", "forge")
     is_custom = backup_path.suffix == ".sql" and backup_path.stat().st_size < 1000
     if is_custom or backup_path.suffix == ".dump":
+        assert pg_restore_exe is not None
         return [
             pg_restore_exe, "-h", host, "-p", port, "-U", user,
             "-d", db_name, "--clean", "--if-exists", str(backup_path),
         ]
+    assert psql_exe is not None
     return [
         psql_exe, "-h", host, "-p", port, "-U", user,
         "-d", db_name, "-f", str(backup_path),

@@ -84,7 +84,13 @@ class PendingActionService:
             extra={"msg_type": "PENDING_ACTION_TIMEOUT_CLEARED"},
         )
         timeout_obs = ErrorObservation(
-            content=f"Pending action timed out after {elapsed:.1f}s: {action_type}",
+            content=(
+                f"Pending action timed out after {elapsed:.1f}s: {action_type}. "
+                f"WARNING: The operation may still complete in the background. "
+                f"Before proceeding, verify the current state of any files or "
+                f"resources this action was modifying to avoid working with "
+                f"stale assumptions."
+            ),
             error_id="PENDING_ACTION_TIMEOUT",
         )
         cause_value: int | None = None

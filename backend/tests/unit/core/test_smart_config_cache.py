@@ -152,7 +152,7 @@ class TestInvalidateCache:
         cache._global_config_cache = MagicMock()
         cache._global_config_time = time.time()
         cache.invalidate_global_cache()
-        assert cache._global_config_cache is None
+        assert getattr(cache, "_global_config_cache") is None
         assert cache._global_config_time == 0
 
 
@@ -452,7 +452,7 @@ class TestMemoryCache:
 
         cache.invalidate_global_cache()
 
-        assert cache._global_config_cache is None
+        assert getattr(cache, "_global_config_cache") is None
         assert cache._global_config_time == 0
 
 
@@ -494,7 +494,9 @@ class TestEdgeCasesAndErrors:
 
         assert stats["cache_type"] == "redis"
         assert "redis_error" in stats
-        assert "redis error" in stats["redis_error"]
+        redis_error = stats["redis_error"]
+        assert isinstance(redis_error, str)
+        assert "redis error" in redis_error
 
     @patch("backend.core.cache.smart_config_cache.deserialize_model")
     def test_get_global_config_redis_deserialize_error(self, mock_deserialize):

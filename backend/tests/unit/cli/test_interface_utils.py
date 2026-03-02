@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -137,13 +138,13 @@ class TestGetProviderKey:
 
 class TestEnsureRuntimeConfig:
     def test_adds_missing_runtime(self):
-        config: dict = {}
+        config: dict[str, Any] = {}
         _ensure_runtime_config(config)
         assert "runtime" in config
         assert "trusted_dirs" in config["runtime"]
 
     def test_adds_missing_trusted_dirs(self):
-        config = {"runtime": {}}
+        config: dict[str, Any] = {"runtime": {}}
         _ensure_runtime_config(config)
         assert config["runtime"]["trusted_dirs"] == []
 

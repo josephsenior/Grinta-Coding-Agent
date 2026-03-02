@@ -2,6 +2,7 @@
 
 import pytest
 
+from typing import Any, cast
 from backend.security.analyzer import SecurityAnalyzer
 from backend.security.options import SecurityAnalyzers, get_security_analyzer
 
@@ -118,6 +119,6 @@ class TestGetSecurityAnalyzer:
         try:
             test_config = {"key": "value", "number": 42}
             analyzer = get_security_analyzer(name="config_capture", config=test_config)
-            assert analyzer.captured_config == test_config
+            assert cast(Any, analyzer).captured_config == test_config
         finally:
             del SecurityAnalyzers["config_capture"]

@@ -1,16 +1,11 @@
 """Unit tests for backend.utils.prompt — Prompt management and template rendering."""
 
-import os
 import pytest
 from unittest.mock import MagicMock, patch
-from jinja2 import Environment
 
 from backend.utils.prompt import (
     PromptManager,
     OrchestratorPromptManager,
-    RuntimeInfo,
-    RepositoryInfo,
-    ConversationInstructions,
     UNINITIALIZED_PROMPT_MANAGER,
     _UninitializedPromptManager
 )

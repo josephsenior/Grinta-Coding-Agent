@@ -7,7 +7,7 @@ sizes within the repository guideline (~400 LOC).
 from __future__ import annotations
 
 import copy
-from typing import Any, TypeGuard
+from typing import Any, Literal, TypeGuard
 
 from backend.core.message import Message, TextContent
 from backend.events.action import Action, MessageAction
@@ -76,7 +76,7 @@ def extract_first_text(message: Message | None) -> str | None:
     return None
 
 
-def message_with_text(role: str, text: str) -> Message:
+def message_with_text(role: Literal["user", "system", "assistant", "tool"], text: str) -> Message:
     """Create a single-text-content :class:`Message`."""
     return Message(role=role, content=[TextContent(text=text)])
 

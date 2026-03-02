@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from backend.memory.memory_types import (
     ContextAnchor,
@@ -46,7 +47,7 @@ class TestMemoryTier:
 
 class TestDecision:
     def _make(self, **overrides) -> Decision:
-        defaults = {
+        defaults: dict[str, Any] = {
             "decision_id": "d1",
             "type": DecisionType.TECHNICAL,
             "description": "Use Redis",
@@ -119,7 +120,7 @@ class TestDecision:
 
 class TestContextAnchor:
     def _make(self, **overrides) -> ContextAnchor:
-        defaults = {
+        defaults: dict[str, Any] = {
             "anchor_id": "a1",
             "content": "Must support 10k concurrent users",
             "category": "requirement",

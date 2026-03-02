@@ -25,7 +25,6 @@ from backend.core.workspace_context import (
     detect_project_type,
     get_conversation_meta,
     list_projects,
-    list_all_tags,
     set_conversation_tags,
     today_stats,
 )

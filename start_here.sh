@@ -39,9 +39,9 @@ fi
 echo -e "${GREEN}✅ uv found!${NC}"
 
 # Step 1: Configuration
-if [ ! -f "config.toml" ]; then
-    echo -e "${CYAN}📝 Creating config.toml from template...${NC}"
-    cp config.template.toml config.toml
+if [ ! -f "settings.json" ]; then
+    echo -e "${CYAN}📝 Creating settings.json from template...${NC}"
+    cp settings.template.json settings.json
 fi
 
 # Step 2: Install dependencies

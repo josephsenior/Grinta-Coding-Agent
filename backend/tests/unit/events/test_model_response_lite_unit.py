@@ -36,6 +36,7 @@ class TestAssistantMessageLite:
         msg = AssistantMessageLite(role="assistant", content="Hello", tool_calls=[tc])
         assert msg.role == "assistant"
         assert msg.content == "Hello"
+        assert msg.tool_calls is not None
         assert len(msg.tool_calls) == 1
 
 
@@ -47,6 +48,7 @@ class TestChoiceLite:
     def test_with_message(self):
         msg = AssistantMessageLite(role="assistant")
         c = ChoiceLite(message=msg)
+        assert c.message is not None
         assert c.message.role == "assistant"
 
 
@@ -81,6 +83,7 @@ class TestModelResponseLiteModel:
         assert lite.id == "resp-1"
         assert lite.model == "gpt-4"
         assert len(lite.choices) == 1
+        assert lite.choices[0].message is not None
         assert lite.choices[0].message.role == "assistant"
         assert lite.choices[0].message.content == "Hello"
 
@@ -102,6 +105,8 @@ class TestModelResponseLiteModel:
             ],
         )
         lite = ModelResponseLite.from_sdk(resp)
+        assert lite.choices[0].message is not None
+        assert lite.choices[0].message.tool_calls is not None
         assert len(lite.choices[0].message.tool_calls) == 2
         assert lite.choices[0].message.tool_calls[0].id == "tc1"
         assert lite.choices[0].message.tool_calls[1].id == "tc2"

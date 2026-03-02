@@ -174,12 +174,14 @@ class TestRollbackManager:
         rm = RollbackManager(str(workspace))
         cp_id = rm.create_checkpoint("risky", checkpoint_type="before_risky")
         cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
         assert cp.checkpoint_type == "before_risky"
 
     def test_checkpoint_metadata(self, workspace):
         rm = RollbackManager(str(workspace))
         cp_id = rm.create_checkpoint("meta", metadata={"action": "delete"})
         cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
         assert cp.metadata == {"action": "delete"}
 
     def test_load_checkpoints_from_manifest(self, workspace):
@@ -265,6 +267,7 @@ class TestRollbackManager:
 
         cp_id = rm.create_checkpoint("with git")
         cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
         assert cp.git_commit_sha == "abc123def456"
 
     def test_create_checkpoint_git_disabled(self, workspace, monkeypatch):
@@ -287,6 +290,7 @@ class TestRollbackManager:
         # Create with use_git=False
         cp_id = rm.create_checkpoint("no git", use_git=False)
         cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
         assert cp.git_commit_sha is None
 
     def test_create_git_snapshot_fails(self, workspace, monkeypatch):
@@ -316,6 +320,7 @@ class TestRollbackManager:
 
         cp_id = rm.create_checkpoint("failed git")
         cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
         # git_commit_sha should be None when commit fails
         assert cp.git_commit_sha is None
 
@@ -351,6 +356,7 @@ class TestRollbackManager:
 
         cp_id = rm.create_checkpoint("sha read fail")
         cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
         assert cp.git_commit_sha is None
 
     def test_create_git_snapshot_exception(self, workspace, monkeypatch):
@@ -372,6 +378,7 @@ class TestRollbackManager:
         # Should not crash, git snapshot should return None
         cp_id = rm.create_checkpoint("git exception")
         cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
         assert cp.git_commit_sha is None
 
     def test_file_snapshot_exception(self, workspace):
@@ -468,6 +475,7 @@ class TestRollbackManager:
         # Manually create scenario where git_commit_sha is None (no git)
         # by creating a checkpoint without git available
         checkpoint = rm.get_checkpoint(cp_id)
+        assert checkpoint is not None
         checkpoint.git_commit_sha = None  # Simulate failed git snapshot
 
         # Modify workspace
@@ -503,6 +511,7 @@ class TestRollbackManager:
 
         cp_id = rm.create_checkpoint("no sha")
         cp = rm.get_checkpoint(cp_id)
+        assert cp is not None
         assert cp.git_commit_sha is None
 
         # Should fall back to file-based rollback

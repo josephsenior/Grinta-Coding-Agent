@@ -48,7 +48,7 @@ class TestResponseParser:
     def test_cannot_instantiate(self):
         """Test cannot instantiate ABC directly."""
         with pytest.raises(TypeError):
-            ResponseParser()
+            ResponseParser()  # type: ignore[abstract]
 
     def test_init_creates_empty_action_parsers_list(self):
         """Test __init__ creates empty action_parsers list."""
@@ -93,7 +93,7 @@ class TestResponseParser:
                 return MagicMock(spec=Action)
 
         with pytest.raises(TypeError):
-            IncompleteParser()
+            IncompleteParser()  # type: ignore[abstract]
 
     def test_subclass_must_implement_parse_response(self):
         """Test subclass must implement parse_response method."""
@@ -106,7 +106,7 @@ class TestResponseParser:
                 return MagicMock(spec=Action)
 
         with pytest.raises(TypeError):
-            IncompleteParser()
+            IncompleteParser()  # type: ignore[abstract]
 
     def test_subclass_must_implement_parse_action(self):
         """Test subclass must implement parse_action method."""
@@ -119,7 +119,7 @@ class TestResponseParser:
                 return ""
 
         with pytest.raises(TypeError):
-            IncompleteParser()
+            IncompleteParser()  # type: ignore[abstract]
 
     def test_concrete_subclass_can_be_instantiated(self):
         """Test concrete implementation can be instantiated."""
@@ -149,7 +149,7 @@ class TestActionParser:
     def test_cannot_instantiate(self):
         """Test cannot instantiate ABC directly."""
         with pytest.raises(TypeError):
-            ActionParser()
+            ActionParser()  # type: ignore[abstract]
 
     def test_has_required_abstract_methods(self):
         """Test has all required abstract methods."""
@@ -169,7 +169,7 @@ class TestActionParser:
                 return MagicMock(spec=Action)
 
         with pytest.raises(TypeError):
-            IncompleteParser()
+            IncompleteParser()  # type: ignore[abstract]
 
     def test_subclass_must_implement_parse(self):
         """Test subclass must implement parse method."""
@@ -179,7 +179,7 @@ class TestActionParser:
                 return True
 
         with pytest.raises(TypeError):
-            IncompleteParser()
+            IncompleteParser()  # type: ignore[abstract]
 
     def test_concrete_subclass_can_be_instantiated(self):
         """Test concrete implementation can be instantiated."""

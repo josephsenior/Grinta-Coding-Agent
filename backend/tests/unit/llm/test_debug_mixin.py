@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -90,7 +91,7 @@ class TestDebugMixin(TestCase):
         """Test logging None messages."""
         mock_logger.isEnabledFor.return_value = True
 
-        self.mixin.log_prompt(None)
+        self.mixin.log_prompt(cast(Any, None))
 
         mock_logger.debug.assert_called_once_with("No completion messages!")
 
@@ -99,8 +100,8 @@ class TestDebugMixin(TestCase):
         """Test logging messages without content field."""
         mock_logger.isEnabledFor.return_value = True
 
-        messages = [
-            {"role": "user", "content": None},
+        messages: list[dict[str, Any]] = [
+            {"role": "user", "content": cast(Any, None)},
             {"role": "assistant"},  # No content field
         ]
         self.mixin.log_prompt(messages)

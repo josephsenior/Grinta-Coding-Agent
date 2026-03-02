@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from backend.core.enums import EventSource, EventVersion
 
@@ -29,8 +29,11 @@ class EventMetadata(BaseModel):
 
     model_config = ConfigDict(
         use_enum_values=True,
-        json_encoders={datetime: lambda v: v.isoformat() if v else None},
     )
+
+    @field_serializer("timestamp")
+    def serialize_timestamp(self, value: datetime | None) -> str | None:
+        return value.isoformat() if value else None
 
 
 def _create_default_event_metadata() -> EventMetadata:
@@ -50,7 +53,6 @@ class BaseEventSchema(BaseModel):
 
     model_config = ConfigDict(
         use_enum_values=True,
-        json_encoders={datetime: lambda v: v.isoformat() if v else None},
     )
 
     def to_dict(self) -> dict[str, Any]:

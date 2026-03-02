@@ -2,9 +2,11 @@
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
+from typing import cast
 
 import pytest
 
+from backend.core.config import LLMConfig
 from backend.llm.llm import (
     _map_openai_exception,
     _map_anthropic_exception,
@@ -719,14 +721,17 @@ class TestGetCallKwargs:
 
     def _make_llm_stub(self, model: str = "gpt-4o") -> LLM:
         llm = LLM.__new__(LLM)
-        llm.config = SimpleNamespace(
-            model=model,
-            temperature=0.2,
-            max_output_tokens=1024,
-            top_p=0.9,
-            top_k=40,
-            reasoning_effort="medium",
-            seed=123,
+        llm.config = cast(
+            LLMConfig,
+            SimpleNamespace(
+                model=model,
+                temperature=0.2,
+                max_output_tokens=1024,
+                top_p=0.9,
+                top_k=40,
+                reasoning_effort="medium",
+                seed=123,
+            ),
         )
         return llm
 

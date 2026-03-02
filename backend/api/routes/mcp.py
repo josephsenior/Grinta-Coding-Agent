@@ -42,7 +42,7 @@ def get_config():
     return config
 
 
-mcp_server = FastMCP("mcp", stateless_http=True, mask_error_details=True)
+mcp_server = FastMCP("mcp", mask_error_details=True)
 
 # Optional OpenTelemetry setup for MCP instrumentation
 _OTEL_MCP_ENABLED = os.getenv(
@@ -80,7 +80,7 @@ async def _request_context() -> _McpRequestContext:
     request = get_http_request()
     headers = request.headers
     conversation_id = headers.get("X-Forge-ServerConversation-ID", None)
-    provider_tokens_raw = get_provider_tokens(request)
+    provider_tokens_raw = get_provider_tokens()
     provider_tokens = (
         dict(provider_tokens_raw) if provider_tokens_raw is not None else None
     )

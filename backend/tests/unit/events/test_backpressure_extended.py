@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 import unittest
+from typing import Any
 from unittest.mock import MagicMock
 
 from backend.events.backpressure import BackpressureManager
@@ -88,7 +89,7 @@ class TestBackpressureManagerEnqueue(unittest.IsolatedAsyncioTestCase):
 
     async def test_enqueue_basic(self):
         mgr = BackpressureManager(max_queue_size=10, drop_policy="drop_oldest")
-        queue = asyncio.Queue(maxsize=10)
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=10)
         event = _make_event()
 
         await mgr.enqueue_event(event, queue)
@@ -99,7 +100,7 @@ class TestBackpressureManagerEnqueue(unittest.IsolatedAsyncioTestCase):
 
     async def test_enqueue_multiple(self):
         mgr = BackpressureManager(max_queue_size=10, drop_policy="drop_oldest")
-        queue = asyncio.Queue(maxsize=10)
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=10)
 
         for _ in range(5):
             await mgr.enqueue_event(_make_event(), queue)
@@ -109,7 +110,7 @@ class TestBackpressureManagerEnqueue(unittest.IsolatedAsyncioTestCase):
 
     async def test_drop_oldest_when_full(self):
         mgr = BackpressureManager(max_queue_size=3, drop_policy="drop_oldest")
-        queue = asyncio.Queue(maxsize=3)
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=3)
 
         # Fill the queue
         for _ in range(3):
@@ -127,7 +128,7 @@ class TestBackpressureManagerEnqueue(unittest.IsolatedAsyncioTestCase):
 
     async def test_drop_newest_when_full(self):
         mgr = BackpressureManager(max_queue_size=3, drop_policy="drop_newest")
-        queue = asyncio.Queue(maxsize=3)
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=3)
 
         # Fill the queue
         for _ in range(3):
@@ -143,7 +144,7 @@ class TestBackpressureManagerEnqueue(unittest.IsolatedAsyncioTestCase):
         mgr = BackpressureManager(
             max_queue_size=2, drop_policy="block", block_timeout=1.0
         )
-        queue = asyncio.Queue(maxsize=2)
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=2)
 
         # Fill the queue
         await mgr.enqueue_event(_make_event(), queue)
@@ -166,7 +167,7 @@ class TestBackpressureManagerEnqueue(unittest.IsolatedAsyncioTestCase):
         mgr = BackpressureManager(
             max_queue_size=1, drop_policy="block", block_timeout=0.05
         )
-        queue = asyncio.Queue(maxsize=1)
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=1)
         await queue.put(_make_event())
 
         mgr.stats["enqueued"] = 1  # Manually track first put
@@ -180,7 +181,7 @@ class TestBackpressureManagerEnqueue(unittest.IsolatedAsyncioTestCase):
         mgr = BackpressureManager(
             max_queue_size=10, drop_policy="drop_oldest", hwm_ratio=0.5
         )
-        queue = asyncio.Queue(maxsize=10)
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=10)
 
         # Fill to 50% (5 items) to hit HWM ratio of 0.5
         for _ in range(5):
@@ -197,7 +198,7 @@ class TestBackpressureManagerEnqueue(unittest.IsolatedAsyncioTestCase):
             drop_policy="drop_newest",
             is_critical_event=lambda e: True,
         )
-        queue = asyncio.Queue(maxsize=2)
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=2)
 
         # Fill queue
         await mgr.enqueue_event(_make_event(), queue)
@@ -222,7 +223,7 @@ class TestBackpressureManagerEnqueue(unittest.IsolatedAsyncioTestCase):
             drop_policy="drop_newest",
             is_critical_event=lambda e: True,
         )
-        queue = asyncio.Queue(maxsize=1)
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=1)
         await queue.put(_make_event())
         mgr.stats["critical_events"] = 1
 

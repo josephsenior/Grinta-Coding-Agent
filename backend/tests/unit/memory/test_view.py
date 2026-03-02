@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 from backend.events.action import MessageAction
@@ -63,7 +65,7 @@ class TestViewContainer:
     def test_getitem_invalid_type_raises(self):
         v = View(events=[_event(0)])
         with pytest.raises(TypeError, match="Invalid key type"):
-            v["bad"]
+            cast(Any, v)["bad"]
 
     def test_getitem_out_of_bounds_raises(self):
         v = View(events=[_event(0)])
@@ -140,7 +142,7 @@ class TestFindSummaryInfo:
             summary="New",
             summary_offset=1,
         )
-        evts = [ca1, ca2]
+        evts: list[Any] = [ca1, ca2]
         summary, offset = View._find_summary_info(evts)
         assert summary == "New"
 
@@ -158,7 +160,7 @@ class TestCheckUnhandledRequest:
     def test_handled_request_returns_false(self):
         cra = CondensationRequestAction()
         ca = CondensationAction(forgotten_events_start_id=1, forgotten_events_end_id=2)
-        evts = [cra, ca]
+        evts: list[Any] = [cra, ca]
         assert View._check_unhandled_condensation_request(evts) is False
 
     def test_unhandled_request_returns_true(self):

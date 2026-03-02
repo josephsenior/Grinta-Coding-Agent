@@ -303,7 +303,6 @@ class TestOrchestratorPromptManager:
             assert "REPOSITORY_LESSONS_LEARNED" not in result
             
         # Test existing lessons file
-        import os
         lessons_dir = tmp_path / ".Forge"
         lessons_dir.mkdir(exist_ok=True)
         lessons_file = lessons_dir / "lessons.md"

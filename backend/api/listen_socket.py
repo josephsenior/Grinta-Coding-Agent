@@ -19,6 +19,7 @@ from socketio.exceptions import (
 )
 
 from backend.core.logger import forge_logger as logger
+from backend.core.provider_types import ProviderType
 from backend.events.event_store import EventStore
 from backend.api.middleware.socketio_connection_manager import get_connection_manager
 from backend.api.services.conversation_service import (
@@ -73,12 +74,13 @@ async def _create_event_store_and_replay(
     connection_id: str,
     conversation_id: str | None,
     user_id: str | None,
-    latest_event_id: str | None,
+    latest_event_id: int,
 ) -> None:
     """Create EventStore and replay events. Raises SocketIOConnectionRefusedError on failure."""
     manager = _get_conversation_manager_instance()
     if manager is None:
         raise SocketIOConnectionRefusedError("Conversation manager is not initialized")
+    assert conversation_id is not None
     try:
         event_store = EventStore(conversation_id, manager.file_store, user_id)
     except FileNotFoundError as e:
@@ -97,12 +99,13 @@ async def _setup_and_join(
     connection_id: str,
     conversation_id: str | None,
     user_id: str | None,
-    providers_set: set[str] | None,
+    providers_set: list[ProviderType] | None,
 ) -> bool:
     """Setup conversation and join. Returns False if MissingSettingsError (allow connect); raises on other failure."""
     manager = _get_conversation_manager_instance()
     if manager is None:
         raise SocketIOConnectionRefusedError("Conversation manager is not initialized")
+    assert conversation_id is not None
     try:
         conversation_init_data = await setup_init_conversation_settings(
             user_id, conversation_id, providers_set
@@ -111,13 +114,17 @@ async def _setup_and_join(
         logger.warning(
             "No settings for conversation %s (user_id: %s) — "
             "socket stays connected but agent will not start: %s",
-            conversation_id, user_id, e,
+            conversation_id,
+            user_id,
+            e,
         )
         return False
     except Exception as e:
         logger.error(
             "Failed to setup conversation settings for conversation %s (user_id: %s): %s",
-            conversation_id, user_id, e,
+            conversation_id,
+            user_id,
+            e,
             exc_info=True,
         )
         raise SocketIOConnectionRefusedError(
@@ -151,9 +158,16 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
             "*** DEBUG: connect handler called with connection_id: %s", connection_id
         )
         logger.info("sio:connect: %s", connection_id)
-        query_params = parse_qs(environ.get("QUERY_STRING", ""))
-
         # Parse parameters
+        query_string = environ.get("QUERY_STRING", "")
+        if not query_string and "query_string" in environ:
+            # Handle ASGI scope where query_string is bytes
+            qs_bytes = environ["query_string"]
+            query_string = (
+                qs_bytes.decode() if isinstance(qs_bytes, bytes) else str(qs_bytes)
+            )
+
+        query_params = parse_qs(query_string)
         latest_event_id = parse_latest_event_id(query_params)
         conversation_id = query_params.get("conversation_id", [None])[0]
         providers_set = parse_providers_set(query_params)
@@ -171,8 +185,9 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
         cookies_str = environ.get("HTTP_COOKIE", "")
         authorization_header = environ.get("HTTP_AUTHORIZATION")
         conversation_validator = create_conversation_validator()
+        # At this point, conversation_id is guaranteed to be a string due to validate_connection_params
         user_id = await conversation_validator.validate(
-            conversation_id, cookies_str, authorization_header
+            conversation_id, cookies_str, authorization_header  # type: ignore[arg-type]
         )
         logger.info(
             "User %s is allowed to connect to conversation %s", user_id, conversation_id

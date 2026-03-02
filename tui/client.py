@@ -21,7 +21,7 @@ from collections import deque
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import socketio  # type: ignore[import-untyped]
@@ -195,7 +195,7 @@ class ForgeClient:
         }.get(code, f"HTTP {code}")
         reason_phrase = getattr(resp, "reason_phrase", "")
         msg = f"{prefix}: {detail}" if detail else f"HTTP {code} {reason_phrase}"
-        request = getattr(resp, "request", None)
+        request = cast(httpx.Request, getattr(resp, "request", None))
         raise httpx.HTTPStatusError(msg, request=request, response=resp)
 
     # ── conversations ─────────────────────────────────────────────
@@ -302,14 +302,14 @@ class ForgeClient:
         except Exception:
             # Fall back to reading config file directly when server is unavailable
             try:
-                import tomllib
+                import json
                 from pathlib import Path
 
-                cfg_path = Path.cwd() / "config.toml"
+                cfg_path = Path.cwd() / "settings.json"
                 if cfg_path.exists():
-                    with cfg_path.open("rb") as fh:
-                        cfg = tomllib.load(fh)
-                    core = cfg.get("core", {})
+                    with cfg_path.open(encoding="utf-8") as fh:
+                        cfg = json.load(fh)
+                    core = cfg
                     return {
                         "session_limit": core.get("max_budget_per_session") or None,
                         "daily_limit": core.get("max_budget_per_day") or None,

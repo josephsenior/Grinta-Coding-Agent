@@ -52,6 +52,7 @@ class DurableEventWriter:
         self._drops = 0
         self._errors = 0
         self._put_timeout = put_timeout
+        self._in_flight = 0
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -88,7 +89,7 @@ class DurableEventWriter:
     @property
     def queue_depth(self) -> int:
         """Current number of events waiting to be flushed."""
-        return self._queue.qsize()
+        return self._queue.qsize() + self._in_flight
 
     @property
     def error_count(self) -> int:
@@ -144,6 +145,7 @@ class DurableEventWriter:
         if first is None:
             self._queue.task_done()
             return None  # sentinel
+        self._in_flight += 1
         batch.append(first)
 
         # Opportunistically drain more items within a short window
@@ -161,6 +163,7 @@ class DurableEventWriter:
                 # Flush what we have, then tell caller to stop
                 self._flush_batch(batch)
                 return None
+            self._in_flight += 1
             batch.append(item)
 
         return batch
@@ -183,6 +186,8 @@ class DurableEventWriter:
                 )
             finally:
                 self._queue.task_done()
+                if self._in_flight > 0:
+                    self._in_flight -= 1
 
     def _flush_with_retry(self, persisted_event: PersistedEvent) -> None:
         """Attempt to flush an event with exponential-backoff retry on transient errors."""

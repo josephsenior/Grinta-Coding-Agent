@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+from typing import cast
+
+from backend.controller.services.controller_context import ControllerContext
 
 
 from backend.controller.services.step_prerequisite_service import (
@@ -26,37 +29,37 @@ class _FakeContext:
 class TestStepPrerequisiteService:
     def test_can_step_when_running_no_pending(self):
         ctx = _FakeContext(AgentState.RUNNING)
-        svc = StepPrerequisiteService(ctx)
+        svc = StepPrerequisiteService(cast(ControllerContext, ctx))
         assert svc.can_step() is True
 
     def test_cannot_step_when_paused(self):
         ctx = _FakeContext(AgentState.PAUSED)
-        svc = StepPrerequisiteService(ctx)
+        svc = StepPrerequisiteService(cast(ControllerContext, ctx))
         assert svc.can_step() is False
 
     def test_cannot_step_when_stopped(self):
         ctx = _FakeContext(AgentState.STOPPED)
-        svc = StepPrerequisiteService(ctx)
+        svc = StepPrerequisiteService(cast(ControllerContext, ctx))
         assert svc.can_step() is False
 
     def test_cannot_step_when_error(self):
         ctx = _FakeContext(AgentState.ERROR)
-        svc = StepPrerequisiteService(ctx)
+        svc = StepPrerequisiteService(cast(ControllerContext, ctx))
         assert svc.can_step() is False
 
     def test_cannot_step_when_finished(self):
         ctx = _FakeContext(AgentState.FINISHED)
-        svc = StepPrerequisiteService(ctx)
+        svc = StepPrerequisiteService(cast(ControllerContext, ctx))
         assert svc.can_step() is False
 
     def test_cannot_step_when_pending_action(self):
         pending = MagicMock()
         pending.id = 42
         ctx = _FakeContext(AgentState.RUNNING, pending_action=pending)
-        svc = StepPrerequisiteService(ctx)
+        svc = StepPrerequisiteService(cast(ControllerContext, ctx))
         assert svc.can_step() is False
 
     def test_can_step_no_pending_running(self):
         ctx = _FakeContext(AgentState.RUNNING, pending_action=None)
-        svc = StepPrerequisiteService(ctx)
+        svc = StepPrerequisiteService(cast(ControllerContext, ctx))
         assert svc.can_step() is True

@@ -48,6 +48,10 @@ _CORE_TOOLS = frozenset(
         "clarification",
         "proposal",
         "escalate_to_human",
+        # Tool inquiry
+        "query_toolbox",
+        # Swarm coordination
+        "blackboard",
     }
 )
 

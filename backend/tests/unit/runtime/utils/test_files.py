@@ -357,8 +357,8 @@ class TestInsertLines:
 
     def test_insert_empty_list(self):
         """Test inserting empty list."""
-        to_insert = []
-        original = ["line 1\n", "line 2\n"]
+        to_insert: list[str] = []
+        original: list[str] = ["line 1\n", "line 2\n"]
 
         result = insert_lines(to_insert, original, start=1, end=1)
 
@@ -366,8 +366,8 @@ class TestInsertLines:
 
     def test_insert_into_empty_file(self):
         """Test inserting into empty file."""
-        to_insert = ["first line"]
-        original = []
+        to_insert: list[str] = ["first line"]
+        original: list[str] = []
 
         result = insert_lines(to_insert, original, start=0, end=-1)
 

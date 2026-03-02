@@ -34,7 +34,7 @@ class TestRuntimeSupervisorConfig(IsolatedAsyncioTestCase):
         """Test that config is immutable (frozen dataclass)."""
         config = RuntimeSupervisorConfig()
         with self.assertRaises(AttributeError):
-            config.connect_timeout_s = 100.0
+            setattr(config, "connect_timeout_s", 100.0)
 
 
 class TestRuntimeSupervisor(IsolatedAsyncioTestCase):

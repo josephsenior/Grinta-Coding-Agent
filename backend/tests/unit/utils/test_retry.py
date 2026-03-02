@@ -6,7 +6,6 @@ import unittest
 from unittest.mock import MagicMock
 
 import asyncio
-import unittest
 import pytest
 
 from backend.core.enums import RetryStrategy
@@ -273,7 +272,6 @@ class TestRetryAsyncDecorator:
             return "ok"
             
         # We can mock time.sleep to verify it's called and avoid actually waiting
-        import time
         with unittest.mock.patch("time.sleep") as mock_sleep:
             assert fail_once() == "ok"
             assert call_count == 2

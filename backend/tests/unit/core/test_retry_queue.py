@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -167,7 +168,7 @@ class TestInMemoryRetryBackend:
 
 class TestRetryQueue:
     def _make_queue(self, **kwargs) -> RetryQueue:
-        defaults = {
+        defaults: dict[str, Any] = {
             "backend": InMemoryRetryBackend(),
             "base_delay": 1.0,
             "max_delay": 60.0,
@@ -386,6 +387,7 @@ class TestGetRetryQueue:
 
         rq._retry_queue = None
         queue = get_retry_queue()
+        assert queue is not None
         assert isinstance(queue.backend, InMemoryRetryBackend)
 
     def test_redis_backend_selected(self, monkeypatch):

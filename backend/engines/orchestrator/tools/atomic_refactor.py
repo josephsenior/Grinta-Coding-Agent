@@ -300,30 +300,6 @@ class AtomicRefactor:
             os.makedirs(os.path.dirname(edit.new_path), exist_ok=True)
             shutil.move(edit.file_path, edit.new_path)
 
-    def _apply_single_edit(
-        self,
-        edit: RefactorEdit,
-        validate: bool,
-        validator: Callable[[str, str], bool] | None,
-    ) -> None:
-        """Apply a single edit operation.
-
-        Args:
-            edit: Edit to apply
-            validate: Whether to validate after edit
-            validator: Optional validation function
-
-        Raises:
-            ValueError: If validation fails
-
-        """
-        if edit.operation in ("modify", "create"):
-            self._apply_modify_or_create(edit, validate, validator)
-        elif edit.operation == "delete":
-            self._apply_delete(edit)
-        elif edit.operation == "rename":
-            self._apply_rename(edit)
-
     def _write_edit_content(self, edit: RefactorEdit) -> None:
         """Write file content for modify/create."""
         os.makedirs(os.path.dirname(edit.file_path), exist_ok=True)

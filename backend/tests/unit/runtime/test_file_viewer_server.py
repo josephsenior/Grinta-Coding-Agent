@@ -14,9 +14,10 @@ from fastapi.testclient import TestClient
 import backend.runtime.file_viewer_server as fvs_module
 from backend.runtime.file_viewer_server import create_app
 from backend.runtime.utils.file_viewer import generate_file_viewer_html
+from typing import Any, cast
 
 # Inject the function so the module-level lookup works
-fvs_module.generate_file_viewer_html = generate_file_viewer_html
+setattr(cast(Any, fvs_module), "generate_file_viewer_html", generate_file_viewer_html)
 
 
 @pytest.fixture()

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch, PropertyMock
+from typing import Any, cast
 
 import pytest
 
@@ -9,6 +10,7 @@ from backend.engines.orchestrator.memory_manager import (
     CondensedHistory,
     ConversationMemoryManager,
 )
+from backend.events.event import Event
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +36,6 @@ def _make_manager(condenser_config=None) -> ConversationMemoryManager:
 
 def _make_event(source_value, is_message_action=False, action_type=None, content="hello"):
     """Build a minimal mock event."""
-    from backend.events.event import EventSource
 
     event = MagicMock()
     event.source = source_value
@@ -69,7 +70,7 @@ class TestCondensedHistory:
     def test_with_events_and_action(self):
         events = [MagicMock(), MagicMock()]
         action = MagicMock()
-        ch = CondensedHistory(events=events, pending_action=action)
+        ch = CondensedHistory(events=cast(list[Event], events), pending_action=action)
         assert len(ch.events) == 2
         assert ch.pending_action is action
 
@@ -159,7 +160,7 @@ class TestCondenseHistory:
 
         mock_condenser = MagicMock()
         view = MagicMock(spec=View)
-        view.events = [MagicMock(), MagicMock()]
+        view.events = cast(list[Event], [MagicMock(), MagicMock()])
         mock_condenser.condensed_history.return_value = view
         m.condenser = mock_condenser
 
@@ -170,12 +171,11 @@ class TestCondenseHistory:
 
     def test_condenser_non_view_result_returns_action(self):
         m = _make_manager()
-        from backend.memory.view import View
 
         mock_condenser = MagicMock()
         condensation = MagicMock()
         # Not a View instance → will reach the else branch
-        condensation.__class__ = object  # NOT a View
+        cast(Any, condensation).__class__ = object  # NOT a View
         condensation.action = MagicMock(name="action")
         mock_condenser.condensed_history.return_value = condensation
         m.condenser = mock_condenser
@@ -295,7 +295,7 @@ class TestGetInitialUserMessage:
             wait_for_response = False
 
         m = _make_manager()
-        result = m.get_initial_user_message([_RawEvent()])
+        result = m.get_initial_user_message([cast(Event, _RawEvent())])
         assert isinstance(result, MessageAction)
         assert result.content == "cloned content"
 

@@ -2,6 +2,7 @@
 
 import os
 from unittest.mock import patch
+from typing import Any, cast
 
 import pytest
 
@@ -46,7 +47,7 @@ class TestEventRuntimeDefaults:
     def test_frozen(self):
         d = EventRuntimeDefaults()
         with pytest.raises(AttributeError):
-            d.max_queue_size = 999
+            cast(Any, d).max_queue_size = 999
 
 
 class TestGetEventRuntimeDefaults:

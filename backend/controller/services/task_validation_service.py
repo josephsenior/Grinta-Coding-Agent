@@ -12,9 +12,9 @@ class _TestCoverageResult:
     has_test_run: bool
     has_passing_test_run: bool
 
-from backend.core.logger import forge_logger as logger
-from backend.core.schemas import AgentState
-from backend.events import EventSource
+from backend.core.logger import forge_logger as logger  # noqa: E402
+from backend.core.schemas import AgentState  # noqa: E402
+from backend.events import EventSource  # noqa: E402
 
 if TYPE_CHECKING:
     from backend.controller.services.controller_context import ControllerContext
@@ -68,7 +68,8 @@ class TaskValidationService:
         from datetime import datetime
         
         # Path to project-level session memory
-        project_root = self._context.get_controller().config.file_store.root_dir if self._context.get_controller().config.file_store else "."
+        file_store = self._context.get_controller().config.file_store
+        project_root = file_store.root if file_store else "."
         memories_path = os.path.join(project_root, ".Forge", "lessons.md")
         
         try:
@@ -131,7 +132,6 @@ class TaskValidationService:
     def _analyze_test_coverage(self, tail: list) -> _TestCoverageResult:
         """Analyze recent history for file edits and test execution."""
         from backend.events.action import CmdRunAction, FileEditAction, FileWriteAction
-        from backend.events.observation import CmdOutputObservation
 
         has_file_edits = False
         has_test_run = False

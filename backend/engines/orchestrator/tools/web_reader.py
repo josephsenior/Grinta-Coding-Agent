@@ -6,7 +6,6 @@ using requests and html2text. Safe for Windows.
 
 from __future__ import annotations
 
-import shlex
 import sys
 
 from backend.engines.orchestrator.tools.common import create_tool_definition

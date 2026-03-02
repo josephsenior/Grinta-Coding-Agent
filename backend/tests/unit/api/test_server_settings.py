@@ -75,5 +75,6 @@ class TestGETCustomSecrets:
                 CustomSecretWithoutValueModel(name="KEY2", description="desc"),
             ]
         )
+        assert model.custom_secrets is not None
         assert len(model.custom_secrets) == 2
         assert model.custom_secrets[0].name == "KEY1"

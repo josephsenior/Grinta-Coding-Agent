@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 import time
@@ -158,6 +159,131 @@ class OrchestratorExecutor:
             if getattr(action, "action", "") == "message":
                 content = getattr(action, "content", "")
                 if not str(content).strip():
+                    raise ModelProviderError("LLM returned an empty message action")
+        return ExecutionResult(actions, response, execution_time, error_message)
+
+    # ------------------------------------------------------------------ #
+    # Async streaming execution
+    # ------------------------------------------------------------------ #
+    async def async_execute(
+        self,
+        params: dict,
+        event_stream: EventStream | None,
+    ) -> ExecutionResult:
+        """Execute LLM call with real async streaming.
+
+        Uses the LLM's ``astream()`` method so tokens are emitted to
+        the event stream as they arrive from the provider, rather than
+        post-hoc chunking a completed response.
+        """
+        from backend.events.action.message import StreamingChunkAction
+        from backend.events.event import EventSource
+        from backend.llm.direct_clients import LLMResponse
+
+        start_time = time.time()
+        error_message: str | None = None
+
+        call_params = dict(params)
+        call_params.pop("stream", None)  # astream handles stream=True internally
+
+        ckpt_token = self._checkpoint.begin(call_params)
+
+        accumulated_text = ""
+        tool_call_deltas: dict[int, dict[str, Any]] = {}
+        response_id = ""
+        response_model = call_params.get("model", "")
+
+        try:
+            async for chunk in self._llm.astream(**call_params):
+                choices = chunk.get("choices")
+                if not choices:
+                    continue
+
+                choice = choices[0]
+                delta = choice.get("delta", {})
+
+                # Capture response metadata from the first chunk
+                if not response_id:
+                    response_id = chunk.get("id", "")
+                    response_model = chunk.get("model", response_model)
+
+                # --- text content ---
+                content = delta.get("content")
+                if content:
+                    accumulated_text += content
+                    if event_stream is not None:
+                        ev = StreamingChunkAction(
+                            chunk=content,
+                            accumulated=accumulated_text,
+                            is_final=False,
+                        )
+                        ev.source = EventSource.AGENT
+                        event_stream.add_event(ev, EventSource.AGENT)
+                        # Yield to the event loop so the session's
+                        # _monitor_publish_queue can flush each chunk via
+                        # Socket.IO before the next one arrives.
+                        await asyncio.sleep(0)
+
+                # --- tool call deltas ---
+                for tc_delta in delta.get("tool_calls") or []:
+                    idx = tc_delta.get("index", 0)
+                    if idx not in tool_call_deltas:
+                        tool_call_deltas[idx] = {
+                            "id": tc_delta.get("id", ""),
+                            "type": "function",
+                            "function": {
+                                "name": "",
+                                "arguments": "",
+                            },
+                        }
+                    entry = tool_call_deltas[idx]
+                    if tc_delta.get("id"):
+                        entry["id"] = tc_delta["id"]
+                    func = tc_delta.get("function") or {}
+                    if func.get("name"):
+                        entry["function"]["name"] = func["name"]
+                    if func.get("arguments"):
+                        entry["function"]["arguments"] += func["arguments"]
+
+        except Exception as exc:
+            logger.error("Error during LLM streaming: %s", exc)
+            error_message = str(exc)
+            raise ModelProviderError(
+                "LLM streaming failed",
+                context={"error": error_message},
+            ) from exc
+
+        # Emit final streaming marker
+        if accumulated_text and event_stream is not None:
+            final_ev = StreamingChunkAction(
+                chunk="", accumulated=accumulated_text, is_final=True
+            )
+            final_ev.source = EventSource.AGENT
+            event_stream.add_event(final_ev, EventSource.AGENT)
+
+        self._checkpoint.commit(ckpt_token)
+
+        # Build an LLMResponse compatible with _response_to_actions()
+        tool_calls = (
+            [tool_call_deltas[i] for i in sorted(tool_call_deltas)]
+            if tool_call_deltas
+            else None
+        )
+        response = LLMResponse(
+            content=accumulated_text,
+            model=response_model,
+            usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            id=response_id or f"stream-{int(time.time())}",
+            finish_reason="stop",
+            tool_calls=tool_calls,
+        )
+
+        execution_time = time.time() - start_time
+        actions = self._response_to_actions(response)
+        for action in actions:
+            if getattr(action, "action", "") == "message":
+                action_content = getattr(action, "content", "")
+                if not str(action_content).strip():
                     raise ModelProviderError("LLM returned an empty message action")
         return ExecutionResult(actions, response, execution_time, error_message)
 

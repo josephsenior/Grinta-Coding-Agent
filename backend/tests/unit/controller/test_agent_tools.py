@@ -1,9 +1,11 @@
 """Tests for backend.controller.agent_tools — tool construction helpers."""
 
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 
 from backend.controller.agent_tools import (
+    AgentFunctionChunkArgs,
     build_tool,
     chunk_args_from_payload,
     make_function_chunk_wrapper,
@@ -177,7 +179,7 @@ class TestMakeFunctionChunkWrapper:
 
     def test_successful_creation(self):
         """Test successful function chunk creation."""
-        chunk_kwargs = {"name": "test"}
+        chunk_kwargs = cast(AgentFunctionChunkArgs, {"name": "test"})
 
         with patch("backend.controller.agent_tools.make_function_chunk") as mock:
             mock.return_value = {"name": "test"}
@@ -187,7 +189,7 @@ class TestMakeFunctionChunkWrapper:
 
     def test_type_error_returns_none(self):
         """Test TypeError returns None."""
-        chunk_kwargs = {"name": "test"}
+        chunk_kwargs = cast(AgentFunctionChunkArgs, {"name": "test"})
 
         with patch("backend.controller.agent_tools.make_function_chunk") as mock:
             mock.side_effect = TypeError("Invalid")
@@ -196,12 +198,12 @@ class TestMakeFunctionChunkWrapper:
 
     def test_preserves_all_kwargs(self):
         """Test all kwargs are passed through."""
-        chunk_kwargs = {
+        chunk_kwargs = cast(AgentFunctionChunkArgs, {
             "name": "test",
             "description": "desc",
             "parameters": {},
             "strict": True,
-        }
+        })
 
         with patch("backend.controller.agent_tools.make_function_chunk") as mock:
             make_function_chunk_wrapper(chunk_kwargs, {})

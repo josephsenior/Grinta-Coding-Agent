@@ -8,10 +8,10 @@ from typing import Any
 from backend.core.logger import forge_logger as logger
 
 
-def check_ultimate_editor_dependencies() -> tuple[bool, str]:
-    """Verify Ultimate Editor (Tree-sitter) is available.
+def check_structure_editor_dependencies() -> tuple[bool, str]:
+    """Verify Structure Editor (Tree-sitter) is available.
 
-    This is CRITICAL for production - Ultimate Editor is Forge's competitive moat!
+    This is CRITICAL for production - Structure Editor is Forge's competitive moat!
 
     Returns:
         (success, message): Success status and detailed message
@@ -102,14 +102,14 @@ def run_production_health_check(raise_on_failure: bool = True) -> dict[str, Any]
     logger.info("=" * 60)
 
     results: dict[str, Any] = {
-        "ultimate_editor": None,
+        "structure_editor": None,
         "atomic_refactor": None,
         "overall_status": "UNKNOWN",
     }
 
-    # Check Ultimate Editor (CRITICAL)
-    ue_success, ue_msg = check_ultimate_editor_dependencies()
-    results["ultimate_editor"] = {
+    # Check Structure Editor (CRITICAL)
+    ue_success, ue_msg = check_structure_editor_dependencies()
+    results["structure_editor"] = {
         "status": "PASS" if ue_success else "FAIL",
         "message": ue_msg,
         "critical": True,

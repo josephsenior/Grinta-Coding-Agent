@@ -26,6 +26,7 @@ export interface ContextPanelState {
   clearTerminal: () => void;
   setPreviewUrl: (url: string | null) => void;
   setEditorReadOnly: (readOnly: boolean) => void;
+  resetPanel: () => void;
 }
 
 /** Infer Monaco language from file path extension. */
@@ -125,6 +126,20 @@ export const useContextPanelStore = create<ContextPanelState>()(
     setEditorReadOnly: (readOnly) =>
       set((state) => {
         state.editorReadOnly = readOnly;
+      }),
+
+    /** Reset all panel state — call on conversation change to prevent data leaking. */
+    resetPanel: () =>
+      set((state) => {
+        state.activeTab = "editor";
+        state.editorFilePath = null;
+        state.editorContent = null;
+        state.editorLanguage = "plaintext";
+        state.editorReadOnly = true;
+        state.diffFilePath = null;
+        state.diffContent = null;
+        state.terminalLines = [];
+        state.previewUrl = null;
       }),
   })),
 );

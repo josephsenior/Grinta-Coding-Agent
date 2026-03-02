@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+from typing import cast
 
 import pytest
+from backend.core.config.condenser_config import CondenserConfig
 
 from backend.memory.condenser.condenser import (
     CONDENSER_METADATA_KEY,
@@ -137,33 +139,39 @@ class TestCondenserRegistry:
                 return cls()
 
         # Register
-        DummyCondenser.register_config(DummyConfig)
+        DummyCondenser.register_config(cast(type[CondenserConfig], DummyConfig))
         try:
             assert DummyConfig in CONDENSER_REGISTRY
             # from_config should work
-            instance = Condenser.from_config(DummyConfig(), MagicMock())
+            instance = Condenser.from_config(
+                cast(CondenserConfig, DummyConfig()), MagicMock()
+            )
             assert isinstance(instance, DummyCondenser)
         finally:
             # Cleanup global registry
-            CONDENSER_REGISTRY.pop(DummyConfig, None)
+            CONDENSER_REGISTRY.pop(cast(type[CondenserConfig], DummyConfig), None)
 
     def test_register_duplicate_raises(self):
         class DuplicateConfig:
             pass
 
-        ConcreteCondenser.register_config(DuplicateConfig)
+        ConcreteCondenser.register_config(
+            cast(type[CondenserConfig], DuplicateConfig)
+        )
         try:
             with pytest.raises(ValueError, match="already registered"):
-                ConcreteCondenser.register_config(DuplicateConfig)
+                ConcreteCondenser.register_config(
+                    cast(type[CondenserConfig], DuplicateConfig)
+                )
         finally:
-            CONDENSER_REGISTRY.pop(DuplicateConfig, None)
+            CONDENSER_REGISTRY.pop(cast(type[CondenserConfig], DuplicateConfig), None)
 
     def test_from_config_unknown_raises(self):
         class UnknownConfig:
             pass
 
         with pytest.raises(ValueError, match="Unknown condenser config"):
-            Condenser.from_config(UnknownConfig(), MagicMock())
+            Condenser.from_config(cast(CondenserConfig, UnknownConfig()), MagicMock())
 
 
 # ===================================================================

@@ -7,7 +7,7 @@ Targets 16.7% coverage (126 statements) by testing:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -374,7 +374,7 @@ class TestSetupGitConfig:
         def raise_error(_action):
             raise RuntimeError("git config error")
 
-        runtime.run = raise_error
+        cast(Any, runtime).run = raise_error
         runtime._setup_git_config()
         # Should log warning but not raise
 

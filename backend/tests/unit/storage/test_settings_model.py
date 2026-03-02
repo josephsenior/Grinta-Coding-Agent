@@ -38,6 +38,7 @@ class TestSettingsDefaults:
         assert s.language == "en"
         assert s.agent == "Orchestrator"
         assert s.llm_model == "gpt-4"
+        assert s.llm_api_key is not None
         assert s.llm_api_key.get_secret_value() == "sk-test"
 
     @pytest.mark.parametrize(
@@ -169,8 +170,8 @@ class TestSettingsCache:
         mod._settings_from_config_cache = Settings()
         mod._settings_from_config_cache_time = 999.0
         Settings._reset_settings_cache()
-        assert mod._settings_from_config_cache is None
-        assert mod._settings_from_config_cache_time == 0.0
+        assert getattr(mod, "_settings_from_config_cache") is None
+        assert getattr(mod, "_settings_from_config_cache_time") == 0.0
 
     def test_cache_and_return_none(self):
         import backend.storage.data_models.settings as mod

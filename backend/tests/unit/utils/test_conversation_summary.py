@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from unittest.mock import MagicMock, patch
+from typing import Any, cast
 
 from backend.utils.conversation_summary import (
     _generate_truncated_title,
@@ -80,6 +81,7 @@ class TestGenerateConversationTitle:
         result = await generate_conversation_title(
             "hello world", MagicMock(), registry, max_length=20
         )
+        assert result is not None
         assert len(result) <= 20
         assert result.endswith("...")
 
@@ -253,7 +255,7 @@ class TestAutoGenerateTitleImpl:
             ) as mock_try_llm:
                 mock_try_llm.return_value = "LLM Seed Title"
                 result = await _auto_generate_title_impl(
-                    "conv", "user", file_store, settings, registry
+                    "conv", "user", cast(Any, file_store), settings, registry
                 )
                 assert result == "LLM Seed Title"
                 mock_try_llm.assert_called_with("Hello", settings, registry)
@@ -288,7 +290,7 @@ class TestAutoGenerateTitleImpl:
             )  # By default it will have attributes, need to mock its lack
             del settings.llm_model
             result = await _auto_generate_title_impl(
-                "conv", "user", file_store, settings, MagicMock()
+                "conv", "user", cast(Any, file_store), settings, MagicMock()
             )
             assert result == ""
 

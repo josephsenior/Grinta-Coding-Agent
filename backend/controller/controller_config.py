@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from backend.controller.agent_controller import AgentController
@@ -70,6 +70,8 @@ class ControllerConfig:
     status_callback: Callable | None = None
     replay_events: list[Event] | None = None
     security_analyzer: SecurityAnalyzer | None = None
+    delegate_task_blackboard_enabled: bool = False
+    blackboard: Any = None  # Shared blackboard for worker agents when delegate_task_blackboard_enabled
 
 
 class ControllerServices:

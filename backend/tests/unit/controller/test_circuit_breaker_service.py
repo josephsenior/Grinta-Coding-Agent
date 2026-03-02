@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from typing import cast
 
 
 from backend.controller.services.circuit_breaker_service import CircuitBreakerService
+from backend.core.config import AgentConfig
 
 
 def _make_context() -> MagicMock:
@@ -46,21 +48,21 @@ class TestConfigure:
             max_high_risk_actions=12,
             max_stuck_detections=5,
         )
-        svc.configure(config)
+        svc.configure(cast(AgentConfig, config))
         assert svc.circuit_breaker is not None
 
     def test_configure_disabled(self):
         ctx = _make_context()
         svc = CircuitBreakerService(ctx)
         config = SimpleNamespace(enable_circuit_breaker=False)
-        svc.configure(config)
+        svc.configure(cast(AgentConfig, config))
         assert svc.circuit_breaker is None
 
     def test_configure_uses_defaults_for_missing_attrs(self):
         ctx = _make_context()
         svc = CircuitBreakerService(ctx)
         config = SimpleNamespace(enable_circuit_breaker=True)
-        svc.configure(config)
+        svc.configure(cast(AgentConfig, config))
         assert svc.circuit_breaker is not None
 
 

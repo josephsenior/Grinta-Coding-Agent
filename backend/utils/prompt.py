@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from itertools import islice
 from typing import TYPE_CHECKING
@@ -127,6 +128,7 @@ class PromptManager:
         """Render system prompt with optional context and apply refinement helpers."""
         from backend.engines.orchestrator.tools.prompt import refine_prompt
 
+        context.setdefault("is_windows", sys.platform == "win32")
         system_message = self.system_template.render(**context).strip()
         return refine_prompt(system_message)
 
@@ -244,6 +246,7 @@ class OrchestratorPromptManager(PromptManager):
             context.setdefault("config", self._config)
             context.setdefault("cli_mode", getattr(self._config, "cli_mode", False))
 
+        context.setdefault("is_windows", sys.platform == "win32")
         context.setdefault("mcp_tool_names", self.mcp_tool_names)
         context.setdefault("mcp_tool_descriptions", self.mcp_tool_descriptions)
         content = super().get_system_message(**context)

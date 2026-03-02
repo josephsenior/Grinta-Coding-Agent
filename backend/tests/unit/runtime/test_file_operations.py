@@ -50,7 +50,7 @@ class TestParseInsertLine:
     def test_str_invalid(self):
         val, err = _parse_insert_line("abc")
         assert val is None
-        assert "Invalid insert_line" in err
+        assert err is not None and "Invalid insert_line" in err
 
 
 # ---------------------------------------------------------------------------
@@ -282,9 +282,12 @@ class TestDirectoryViewing:
             # Create structure
             os.makedirs(os.path.join(td, "subdir"))
             # Corrected: open args and context manager
-            with open(os.path.join(td, "file1.txt"), "w", encoding="utf-8") as f: f.write("f1")
-            with open(os.path.join(td, "subdir", "file2.txt"), "w", encoding="utf-8") as f: f.write("f2")
-            with open(os.path.join(td, ".hidden"), "w", encoding="utf-8") as f: f.write("h")
+            with open(os.path.join(td, "file1.txt"), "w", encoding="utf-8") as f:
+                f.write("f1")
+            with open(os.path.join(td, "subdir", "file2.txt"), "w", encoding="utf-8") as f:
+                f.write("f2")
+            with open(os.path.join(td, ".hidden"), "w", encoding="utf-8") as f:
+                f.write("h")
 
             entries, hidden = _list_directory_recursive(td, max_depth=2)
             assert any("file1.txt" in e for e in entries)

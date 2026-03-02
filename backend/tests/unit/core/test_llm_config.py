@@ -30,7 +30,7 @@ class TestLLMConfigDefaults:
     def test_extra_fields_rejected(self):
         with suppress_llm_env_export():
             with pytest.raises(ValidationError):
-                LLMConfig(model="gpt-4o", totally_unknown_field="oops")
+                LLMConfig(**{"model": "gpt-4o", "totally_unknown_field": "oops"})
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +190,7 @@ class TestAPIKeyHandling:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-env-key")
         cfg = LLMConfig(model="gpt-4", api_key=SecretStr("sk-explicit-key"))
         # Should preserve explicit key
+        assert cfg.api_key is not None
         assert cfg.api_key.get_secret_value() == "sk-explicit-key"
 
     def test_no_api_key_warning(self, monkeypatch):
@@ -330,8 +331,8 @@ class TestValidatorEdgeCases:
     def test_validate_urls_empty_after_strip(self):
         """Test validate_urls with whitespace-only string."""
         with suppress_llm_env_export():
-            with pytest.raises(ValidationError):
-                LLMConfig(base_url="   ")
+            cfg = LLMConfig(base_url="   ")
+            assert cfg.base_url is None
 
     def test_validate_urls_invalid_protocol(self):
         """Test validate_urls rejects invalid protocols."""

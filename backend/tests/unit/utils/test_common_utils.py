@@ -10,6 +10,7 @@ Tests cover:
 from __future__ import annotations
 
 from unittest.mock import Mock, patch
+from typing import cast
 
 import pytest
 
@@ -81,7 +82,7 @@ class TestSetupLlmConfig:
         setup_llm_config(base_config, user_settings)
 
         # Get the LLM config that was set
-        set_call_args = base_config.set_llm_config.call_args
+        set_call_args = cast(Mock, base_config.set_llm_config).call_args
         assert set_call_args is not None
 
         updated_llm_config = set_call_args[0][0]
@@ -97,7 +98,7 @@ class TestSetupLlmConfig:
         mock_deepcopy.side_effect = lambda x: x
         setup_llm_config(base_config, minimal_settings)
 
-        set_call_args = base_config.set_llm_config.call_args
+        set_call_args = cast(Mock, base_config.set_llm_config).call_args
         updated_llm_config = set_call_args[0][0]
 
         # API key should be updated
@@ -121,7 +122,7 @@ class TestSetupLlmConfig:
         """Test that get_llm_config is called to retrieve current config."""
         mock_deepcopy.side_effect = lambda x: x
         setup_llm_config(base_config, user_settings)
-        base_config.get_llm_config.assert_called_once()
+        cast(Mock, base_config.get_llm_config).assert_called_once()
 
     @patch("backend.utils.utils.deepcopy")
     def test_setup_llm_config_set_llm_config_called(
@@ -130,7 +131,7 @@ class TestSetupLlmConfig:
         """Test that set_llm_config is called to update config."""
         mock_deepcopy.side_effect = lambda x: x
         setup_llm_config(base_config, user_settings)
-        base_config.set_llm_config.assert_called_once()
+        cast(Mock, base_config.set_llm_config).assert_called_once()
 
     def test_setup_llm_config_does_not_modify_original(
         self, base_config: ForgeConfig, user_settings: Settings
@@ -156,7 +157,7 @@ class TestSetupLlmConfig:
 
         setup_llm_config(base_config, settings)
 
-        set_call_args = base_config.set_llm_config.call_args
+        set_call_args = cast(Mock, base_config.set_llm_config).call_args
         updated_llm_config = set_call_args[0][0]
         assert updated_llm_config.model == ""
 
@@ -167,12 +168,12 @@ class TestSetupLlmConfig:
         """Test that settings not modified in user config are preserved."""
         mock_deepcopy.side_effect = lambda x: x
         # Set a custom value in base config
-        base_llm_config = base_config.get_llm_config.return_value
+        base_llm_config = cast(Mock, base_config.get_llm_config).return_value
         base_llm_config.some_field = "preserved_value"
 
         setup_llm_config(base_config, user_settings)
 
-        set_call_args = base_config.set_llm_config.call_args
+        set_call_args = cast(Mock, base_config.set_llm_config).call_args
         updated_llm_config = set_call_args[0][0]
         # The field we didn't modify should still be there
         assert updated_llm_config.some_field == "preserved_value"
@@ -460,7 +461,7 @@ class TestConfigComplexity:
 
         setup_llm_config(base_config, settings)
 
-        set_call_args = base_config.set_llm_config.call_args
+        set_call_args = cast(Mock, base_config.set_llm_config).call_args
         assert set_call_args is not None
         updated_llm_config = set_call_args[0][0]
         assert updated_llm_config.model == 'gpt-4 "special"'
