@@ -241,10 +241,20 @@ def _resolve_path(
             normalized = posixpath.normpath(path.lstrip("/"))
             full_path = (workspace / normalized).resolve()
             try:
-                full_path.relative_to(workspace)
+                rel_parts = full_path.relative_to(workspace).parts
             except ValueError:
-                raise PathValidationError(f"Path outside workspace boundary: {path}", path) from None
-            depth = len(full_path.relative_to(workspace).parts)
+                import os
+                if os.name == 'nt':
+                    full_str = str(full_path).lower()
+                    work_str = str(workspace).lower()
+                    if not work_str.endswith(os.sep):
+                        work_str += os.sep
+                    if not full_str.startswith(work_str) and full_str != work_str.rstrip(os.sep):
+                        raise PathValidationError(f"Path outside workspace boundary: {path}", path) from None
+                    rel_parts = full_path.parts[len(workspace.parts):]
+                else:
+                    raise PathValidationError(f"Path outside workspace boundary: {path}", path) from None
+            depth = len(rel_parts)
             if depth > 100:
                 raise PathValidationError(f"Path depth too great (max 100): {depth}", path)
             return full_path

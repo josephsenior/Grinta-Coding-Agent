@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import builtins
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from pydantic import BaseModel, Field, SecretStr
@@ -47,6 +49,23 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
 
     # Flag to temporarily suppress environment variable export (useful during config loading)
     suppress_env_export: bool = Field(default=False)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Post-initialization hook."""
+        super().model_post_init(__context)
+        # Ensure we don't accidentally suppress if we're not in a context
+        if not hasattr(self, "suppress_env_export"):
+            object.__setattr__(self, "suppress_env_export", False)
+
+    @contextmanager
+    def suppress_env_export_context(self) -> Iterator[None]:
+        """Context manager to temporarily disable environment export."""
+        previous = self.suppress_env_export
+        object.__setattr__(self, "suppress_env_export", True)
+        try:
+            yield
+        finally:
+            object.__setattr__(self, "suppress_env_export", previous)
 
     def get_api_key_for_model(
         self, model: str, provided_key: SecretStr | None = None
@@ -227,9 +246,10 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         else:
             logger.debug("No environment variable specified for provider: %s", provider)
 
-        # Also set generic fallback
-        os.environ["LLM_API_KEY"] = api_key_value
-        logger.debug("Set LLM_API_KEY fallback environment variable")
+        # ALSO set generic fallback ONLY if not already set
+        if "LLM_API_KEY" not in os.environ:
+            os.environ["LLM_API_KEY"] = api_key_value
+            logger.debug("Set LLM_API_KEY fallback environment variable")
 
     def _check_prefix_match(self, model: str, model_lower: str) -> str | None:
         """Check for provider prefix matches.

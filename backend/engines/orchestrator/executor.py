@@ -130,6 +130,9 @@ class OrchestratorExecutor:
             call_params["stream"] = False
             response = self._llm.completion(**call_params)
         except Exception as exc:
+            from backend.llm.exceptions import LLMError
+            if isinstance(exc, LLMError):
+                raise
             logger.error("Error during LLM completion: %s", exc)
             error_message = str(exc)
             raise ModelProviderError(
@@ -246,6 +249,9 @@ class OrchestratorExecutor:
                         entry["function"]["arguments"] += func["arguments"]
 
         except Exception as exc:
+            from backend.llm.exceptions import LLMError
+            if isinstance(exc, LLMError):
+                raise
             logger.error("Error during LLM streaming: %s", exc)
             error_message = str(exc)
             raise ModelProviderError(

@@ -571,31 +571,34 @@ class AgentSession:
 
         # Add error observation to the event stream so the UI can show it
         if self.event_stream:
-            self.event_stream.add_event(
-                ErrorObservation(content=error_content),
-                EventSource.ENVIRONMENT,
-            )
-            from backend.events.observation import AgentStateChangedObservation
+            try:
+                self.event_stream.add_event(
+                    ErrorObservation(content=error_content),
+                    EventSource.ENVIRONMENT,
+                )
+                from backend.events.observation import AgentStateChangedObservation
 
-            user_message = ctx.error_msg or "Agent session failed to initialize"
-            if ctx.error_exception:
-                try:
-                    formatted = format_error_for_user(
-                        ctx.error_exception,
-                        context={"session_id": self.sid},
-                    )
-                    user_message = formatted.get("message", user_message)
-                except Exception:
-                    pass
+                user_message = ctx.error_msg or "Agent session failed to initialize"
+                if ctx.error_exception:
+                    try:
+                        formatted = format_error_for_user(
+                            ctx.error_exception,
+                            context={"session_id": self.sid},
+                        )
+                        user_message = formatted.get("message", user_message)
+                    except Exception:
+                        pass
 
-            self.event_stream.add_event(
-                AgentStateChangedObservation(
-                    content=user_message,
-                    agent_state=AgentState.ERROR,
-                    reason=user_message,
-                ),
-                EventSource.ENVIRONMENT,
-            )
+                self.event_stream.add_event(
+                    AgentStateChangedObservation(
+                        content=user_message,
+                        agent_state=AgentState.ERROR,
+                        reason=user_message,
+                    ),
+                    EventSource.ENVIRONMENT,
+                )
+            except Exception as e:
+                self.logger.error("Failed to add startup failure observation to event stream: %s", e)
 
     def _format_startup_error(self, ctx: StartupContext) -> str:
         """Format the startup error for user display."""

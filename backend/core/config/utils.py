@@ -662,19 +662,59 @@ def parse_arguments() -> argparse.Namespace:
 def load_forge_config(
     set_logging_levels: bool = True, config_file: str = "settings.json"
 ) -> ForgeConfig:
-    """Load the configuration from the specified config file and environment variables."""
+    """Load the configuration from environment variables and the specified config file.
+
+    Precedence (highest to lowest):
+    1. settings.json (explicit user configuration)
+    2. Environment variables (deployment-specific overrides)
+    3. Defaults (hardcoded fallbacks)
+    """
     rebuild_config_models()
 
-    original_env = dict(os.environ)
-
     config = ForgeConfig()
-    load_from_json(config, config_file)
-    restore_environment(original_env)
-    env_copy = dict(os.environ)
-    env_copy.pop("LLM_API_KEY", None)
-    load_from_env(config, env_copy)
+
+    # 1. Load from environment first (lower precedence than file)
+    load_from_env(config, dict(os.environ))
+
+    # 2. Load from JSON (higher precedence, overrides env vars)
+    # CRITICAL: Use suppress_env_export_context to prevent LLMConfig from
+    # logging "No API key found" before we've had a chance to sync.
+    from backend.core.config.api_key_manager import api_key_manager
+    with api_key_manager.suppress_env_export_context():
+        load_from_json(config, config_file)
+        # Ensure the default LLM config is updated with the loaded values
+        # and its model_post_init (which triggers key resolution) is re-run
+        # but with suppression still active.
+        llm_cfg = config.get_llm_config()
+        # Re-trigger post_init logic by re-validating
+        # Use model_dump(exclude_none=True) to avoid issues with None values
+        config.set_llm_config(llm_cfg.__class__.model_validate(llm_cfg.model_dump(exclude_none=True)))
+
+    # 3. Finalize and sync
     finalize_config(config)
+    
+    # CRITICAL: Sync the loaded config (which might have come from settings.json)
+    # back to the APIKeyManager so that DirectLLMClient can find it.
+    from backend.core.config.api_key_manager import api_key_manager
+    # Temporarily suppress env export to avoid double-setting during sync
+    with api_key_manager.suppress_env_export_context():
+        for llm_name, llm_cfg in config.llms.items():
+            if llm_cfg.api_key:
+                api_key_manager.set_api_key(llm_cfg.model, llm_cfg.api_key)
+                api_key_manager.set_environment_variables(llm_cfg.model, llm_cfg.api_key)
+            else:
+                # If no key in config, try to load from environment
+                provider = api_key_manager._extract_provider(llm_cfg.model)
+                env_key = api_key_manager._get_provider_key_from_env(provider)
+                if env_key:
+                    from pydantic import SecretStr
+                    llm_cfg.api_key = SecretStr(env_key)
+                    api_key_manager.set_api_key(llm_cfg.model, llm_cfg.api_key)
+                    api_key_manager.set_environment_variables(llm_cfg.model, llm_cfg.api_key)
+    
+    # Export all keys to environment after sync
     export_llm_api_keys(config)
+
     register_custom_agents(config)
     if set_logging_levels:
         logger.DEBUG = config.debug

@@ -11,8 +11,8 @@ Usage (programmatic)::
 
     from backend.core.config.quickstart import generate_quickstart_config
     json_str = generate_quickstart_config(
-        api_key="sk-...",
-        model="claude-sonnet-4-20250514",
+        api_key="AIza...",
+        model="gemini-pro-latest",
     )
 
 """
@@ -29,7 +29,7 @@ from backend.llm.provider_resolver import discover_all_local_models
 def generate_quickstart_config(
     *,
     api_key: str = "",
-    model: str = "claude-sonnet-4-20250514",
+    model: str = "gemini-pro-latest",
     base_url: str = "",
     max_budget: float = 5.0,
 ) -> str:
@@ -63,7 +63,7 @@ def _interactive_init(dest: Path) -> None:
     # 1. Detect local models
     print("\n🔍 Scanning for local LLMs (Ollama, LM Studio, etc.)...")
     local_models = discover_all_local_models()
-    suggested_model = "claude-3-7-sonnet"
+    suggested_model = "gemini-pro-latest"
 
     found_any = False
     for provider, models in local_models.items():
@@ -91,7 +91,7 @@ def _interactive_init(dest: Path) -> None:
     model = input(f"   Model name [{suggested_model}]: ").strip() or suggested_model
     api_key = ""
     if "/" not in model:
-        api_key = input("   Anthropic API key (optional): ").strip()
+        api_key = input("   LLM API key (optional): ").strip()
 
     budget_str = input("   Max budget per task (USD) [5.0]: ").strip()
     max_budget = float(budget_str) if budget_str else 5.0

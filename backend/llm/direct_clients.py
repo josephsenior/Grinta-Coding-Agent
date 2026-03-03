@@ -409,7 +409,11 @@ class GeminiClient(DirectLLMClient):
     def __init__(self, model_name: str, api_key: str):
         self._model_name = model_name
         self.api_key = api_key
-        self.client = genai.Client(api_key=api_key)
+        
+        # Add timeout to prevent infinite hanging when the API is overloaded
+        from google.genai.types import HttpOptions
+        http_options = HttpOptions(timeout=120000) # 2 minutes
+        self.client = genai.Client(api_key=api_key, http_options=http_options)
 
     def _resolve_gemini_model_name(self, model_name: str | None) -> str:
         """Normalize model name for Gemini API."""
@@ -477,6 +481,34 @@ class GeminiClient(DirectLLMClient):
             cache_name,
         )
 
+    def _map_gemini_error(self, exc: Exception) -> Exception:
+        """Map google.genai exceptions to Forge LLM exceptions."""
+        from google.genai.errors import APIError
+        from backend.llm.exceptions import (
+            RateLimitError,
+            ServiceUnavailableError,
+            Timeout,
+            APIConnectionError,
+            APIError as ForgeAPIError,
+        )
+        import asyncio
+        import aiohttp
+        import httpx
+        
+        if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
+            return Timeout(str(exc), llm_provider="google", model=self.model_name)
+        if isinstance(exc, (aiohttp.ClientError, httpx.RequestError)):
+            return APIConnectionError(str(exc), llm_provider="google", model=self.model_name)
+            
+        if isinstance(exc, APIError):
+            error_str = str(exc).lower()
+            if exc.code == 429 or "quota" in error_str or "rate limit" in error_str:
+                return RateLimitError(str(exc), llm_provider="google", model=self.model_name)
+            if exc.code in (500, 502, 503, 504) or "unavailable" in error_str or "overloaded" in error_str:
+                return ServiceUnavailableError(str(exc), llm_provider="google", model=self.model_name)
+            return ForgeAPIError(str(exc), llm_provider="google", model=self.model_name)
+        return exc
+
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
         from backend.llm.mappers.gemini import (
             extract_tool_calls,
@@ -505,7 +537,10 @@ class GeminiClient(DirectLLMClient):
             config=config,
             history=cast(Any, history),
         )
-        response = chat.send_message(prompt, **kwargs)
+        try:
+            response = chat.send_message(prompt, **kwargs)
+        except Exception as e:
+            raise self._map_gemini_error(e) from e
         tool_calls = extract_tool_calls(response)
         content = extract_text(response)
         content = ensure_non_empty_content(response, content, tool_calls)
@@ -550,7 +585,10 @@ class GeminiClient(DirectLLMClient):
             history=cast(Any, history),
         )
 
-        response = await chat.send_message(prompt, **kwargs)
+        try:
+            response = await chat.send_message(prompt, **kwargs)
+        except Exception as e:
+            raise self._map_gemini_error(e) from e
         tool_calls = extract_tool_calls(response)
         content = extract_text(response)
         content = ensure_non_empty_content(response, content, tool_calls)
@@ -588,12 +626,14 @@ class GeminiClient(DirectLLMClient):
             history=cast(Any, history),
         )
 
-        stream = await chat.send_message_stream(prompt, **kwargs)
-
-        async for chunk in stream:
-            text = chunk.text or ""
-            if text:
-                yield {"choices": [{"delta": {"content": text}, "finish_reason": None}]}
+        try:
+            stream = await chat.send_message_stream(prompt, **kwargs)
+            async for chunk in stream:
+                text = chunk.text or ""
+                if text:
+                    yield {"choices": [{"delta": {"content": text}, "finish_reason": None}]}
+        except Exception as e:
+            raise self._map_gemini_error(e) from e
         yield {"choices": [{"delta": {}, "finish_reason": "stop"}]}
 
 

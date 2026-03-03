@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from backend.core.config import LLMConfig
@@ -52,8 +53,14 @@ async def generate_conversation_title(
                 "content": f"Generate a title (maximum {max_length} characters) for a conversation that starts with this message:\n\n{truncated_message}",
             },
         ]
-        title = llm_registry.request_extraneous_completion(
-            "conversation_title_creator", llm_config, messages
+        title = await asyncio.wait_for(
+            asyncio.to_thread(
+                llm_registry.request_extraneous_completion,
+                "conversation_title_creator",
+                llm_config,
+                messages,
+            ),
+            timeout=60.0,
         )
         if len(title) > max_length:
             title = f"{title[: max_length - 3]}..."

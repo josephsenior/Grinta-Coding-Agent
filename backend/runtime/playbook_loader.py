@@ -157,7 +157,7 @@ class PlaybookLoaderMixin:
                 FileReadAction(path=str(self.workspace_root / ".FORGE_instructions"))
             ),
         )
-        if isinstance(obs, ErrorObservation) and repo_root is not None:
+        if (isinstance(obs, ErrorObservation) or (isinstance(obs, FileReadObservation) and not obs.content)) and repo_root is not None:
             self.log(
                 "debug",
                 f".FORGE_instructions not present, trying to load from repository playbooks_dir={playbooks_dir!r}",
@@ -166,7 +166,7 @@ class PlaybookLoaderMixin:
                 Any,
                 self.read(FileReadAction(path=str(repo_root / ".FORGE_instructions"))),
             )
-        if isinstance(obs, FileReadObservation):
+        if isinstance(obs, FileReadObservation) and obs.content:
             self.log("info", "FORGE_instructions playbook loaded.")
             loaded_playbooks.append(
                 BasePlaybook.load(

@@ -214,6 +214,10 @@ def _check_mcp_host_config(warnings: list[str]) -> None:
 async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
     """Manage application-specific resources during startup/shutdown."""
     # ── Config validation (fail fast on misconfiguration) ───────────────
+    # Reload config to ensure it picks up any changes made to settings.json
+    from backend.core.config.utils import load_forge_config
+    fastapi_app.state.config = load_forge_config()
+    
     _validate_config()
 
     # Startup

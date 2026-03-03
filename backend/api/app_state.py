@@ -116,6 +116,11 @@ class AppState:
                     self.server_config.conversation_manager_class,
                 )
                 impl = self.get_conversation_manager_impl()
+                
+                # Ensure config is fresh before initializing manager
+                from backend.core.config.utils import load_forge_config
+                self.config = load_forge_config()
+                
                 self._conversation_manager = impl.get_instance(  # type: ignore[attr-defined]
                     self.sio,
                     self.config,

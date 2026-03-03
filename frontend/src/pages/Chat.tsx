@@ -495,6 +495,7 @@ export default function Chat() {
             <button
               type="button"
               onClick={() => scrollToBottom()}
+              aria-label="Scroll to bottom"
               className="absolute bottom-24 right-6 z-10 flex h-8 w-8 items-center justify-center rounded-full border bg-background shadow-md hover:bg-accent transition-colors"
             >
               <ArrowDown className="h-3.5 w-3.5" />

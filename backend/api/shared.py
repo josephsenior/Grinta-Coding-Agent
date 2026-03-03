@@ -23,7 +23,13 @@ _state = get_app_state()
 
 server_config = _state.server_config
 sio = _state.sio
-config = _state.config
+def get_config():
+    """Get the current ForgeConfig reference."""
+    return _state.config
+
+# Note: 'config' is a legacy reference that might be stale if AppState.config is reloaded.
+# Prefer calling get_config() for fresh configuration.
+config = get_config()
 file_store = _state.file_store
 monitoring_listener = _state.monitoring_listener
 

@@ -576,14 +576,21 @@ class LocalConversationManager(ConversationManager):
         llm_config: LLMConfig,
         messages: list[dict[str, str]],
     ):
-        """Proxy completion requests through the session's LLM registry."""
+        """Proxy completion requests through the session's LLM registry.
+
+        Runs the synchronous LLM completion in a thread pool to avoid blocking
+        the event loop (which would stall the main agent's streaming).
+        """
         session = self._local_agent_loops_by_sid.get(sid)
         if not session:
             msg = f"no_conversation:{sid}"
             raise RuntimeError(msg)
         llm_registry = session.llm_registry
-        return llm_registry.request_extraneous_completion(
-            service_id, llm_config, messages
+        return await asyncio.to_thread(
+            llm_registry.request_extraneous_completion,
+            service_id,
+            llm_config,
+            messages,
         )
 
     async def disconnect_from_session(self, connection_id: str) -> None:

@@ -388,10 +388,16 @@ def get_retry_queue() -> RetryQueue | None:
             backend = RedisRetryBackend(
                 redis_url, pool_size=pool_size, connection_timeout=timeout
             )
+            # Verify Redis is reachable; connection is lazy so init may not fail
+            # We use a synchronous ping here since get_retry_queue is not async
+            import redis as redis_sync
+            sync_client = redis_sync.from_url(redis_url, socket_timeout=timeout)
+            sync_client.ping()
+            sync_client.close()
             logger.info("RetryQueue configured with Redis backend (%s)", redis_url)
         except Exception as exc:  # pragma: no cover - fallback path
             logger.warning(
-                "Failed to initialize Redis retry backend: %s. Falling back to in-memory.",
+                "Redis unreachable (%s). RetryQueue falling back to in-memory backend.",
                 exc,
             )
             backend = InMemoryRetryBackend()
