@@ -303,7 +303,7 @@ class DefaultLinter:
         from backend.engines.orchestrator.tools.lsp_client import get_lsp_client
         lsp = get_lsp_client()
         lsp_res = lsp.query("diagnostics", file_path)
-        
+
         if lsp_res.available and not lsp_res.error:
             errors = []
             for loc in lsp_res.locations:

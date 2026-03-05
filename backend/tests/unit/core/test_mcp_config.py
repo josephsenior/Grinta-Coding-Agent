@@ -217,19 +217,19 @@ class TestMCPServerConfigStdio:
         mcp_dir = tmp_path / "backend" / "runtime" / "mcp"
         mcp_dir.mkdir(parents=True)
         config_json = mcp_dir / "config.json"
-        
+
         with open(config_json, "w") as f:
             f.write("invalid json")
-            
+
         import os
         monkeypatch.setattr("os.path.exists", lambda p: True if p == os.path.join("backend", "runtime", "mcp", "config.json") else os.path.exists(p))
-        
+
         original_open = open
         def mock_open(file, *args, **kwargs):
             if file == os.path.join("backend", "runtime", "mcp", "config.json"):
                 return original_open(config_json, *args, **kwargs)
             return original_open(file, *args, **kwargs)
-        
+
         monkeypatch.setattr("builtins.open", mock_open)
 
         # Should not raise, just log/print error
@@ -239,7 +239,7 @@ class TestMCPServerConfigStdio:
     def test_from_toml_section_with_dict_servers(self):
         """Test from_toml_section with a single dict instead of a list for servers."""
         mapping = MCPConfig.from_toml_section({
-            "enabled": True, 
+            "enabled": True,
             "servers": {"name": "s1", "type": "sse", "url": "http://localhost/sse"}
         })
         assert len(mapping["mcp"].servers) == 1
@@ -250,14 +250,14 @@ class TestMCPServerConfigStdio:
         a = MCPConfig(enabled=False, servers=[])
         b = MCPConfig(enabled=True, servers=[])
         assert a.merge(b).enabled is True
-        
+
         c = MCPConfig(enabled=False, servers=[])
         d = MCPConfig(enabled=False, servers=[])
         assert c.merge(d).enabled is False
 
     def test_from_toml_section_no_mcp_key(self):
         """Test from_toml_section when the 'mcp' key is missing from the section data."""
-        # The function is called with the content OF the [mcp] section, 
+        # The function is called with the content OF the [mcp] section,
         # so it expects 'enabled' and 'servers' keys directly.
         mapping = MCPConfig.from_toml_section({"enabled": True})
         assert "mcp" in mapping
@@ -268,10 +268,10 @@ class TestMCPServerConfigStdio:
         import platform
         if platform.system() != "Windows":
             pytest.skip("This test is specific to Windows filtering logic")
-            
+
         monkeypatch.setattr("os.path.exists", lambda p: False) # No config.json
         monkeypatch.delenv("FORGE_ENABLE_WINDOWS_MCP", raising=False)
-        
+
         data = {
             "enabled": True,
             "servers": [
@@ -280,10 +280,10 @@ class TestMCPServerConfigStdio:
                 {"name": "my-sse", "type": "sse", "url": "http://localhost/sse"}
             ]
         }
-        
+
         mapping = MCPConfig.from_toml_section(data)
         names = [s.name for s in mapping["mcp"].servers]
-        
+
         assert "generic-stdio" not in names
         assert "browser-use" in names
         assert "my-sse" in names
@@ -387,7 +387,7 @@ class TestMCPConfig:
         mcp_dir = tmp_path / "backend" / "runtime" / "mcp"
         mcp_dir.mkdir(parents=True)
         config_json = mcp_dir / "config.json"
-        
+
         import json
         with open(config_json, "w") as f:
             json.dump({
@@ -395,19 +395,19 @@ class TestMCPConfig:
                     "json-server": {"command": "npx", "args": ["test"]}
                 }
             }, f)
-            
+
         # Mock the path in the code to use our temp file
         import os
-        
+
         monkeypatch.setattr("os.path.exists", lambda p: True if p == os.path.join("backend", "runtime", "mcp", "config.json") else os.path.exists(p))
-        
+
         # We need to mock open to return our temp file content when that specific path is requested
         original_open = open
         def mock_open(file, *args, **kwargs):
             if file == os.path.join("backend", "runtime", "mcp", "config.json"):
                 return original_open(config_json, *args, **kwargs)
             return original_open(file, *args, **kwargs)
-        
+
         monkeypatch.setattr("builtins.open", mock_open)
         monkeypatch.setenv("FORGE_ENABLE_WINDOWS_MCP", "1")
 

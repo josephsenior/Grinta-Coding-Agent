@@ -62,10 +62,10 @@ class TestPromptManager:
         state = MagicMock()
         state.iteration_flag.max_value = 10
         state.iteration_flag.current_value = 2
-        
+
         msgs = [msg]
         pm.add_turns_left_reminder(msgs, state)
-        
+
         last_content = msgs[0].content[-1]
         assert isinstance(last_content, TextContent)
         assert "8 turns left" in last_content.text
@@ -129,7 +129,7 @@ class TestOrchestratorPromptManager:
             opm = OrchestratorPromptManager(prompt_dir)
             opm.set_prompt_tier("debug")
             assert opm._prompt_tier == "debug"
-            
+
             with patch.object(opm, "_inject_lessons_learned", return_value="lessons-injected"):
                 msg = opm.get_system_message()
                 assert "lessons-injected" in msg

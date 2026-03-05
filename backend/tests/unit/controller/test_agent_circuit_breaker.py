@@ -62,16 +62,16 @@ class TestCircuitBreakerConfig:
     def test_scaled_complexity_levels(self):
         """Should scale thresholds based on complexity (50-66)."""
         config = CircuitBreakerConfig(adaptive=True)
-        
+
         # Complexity 3 (1.0x)
         c3 = config.scaled(complexity=3, max_iterations=100)
         assert c3.max_consecutive_errors == config.max_consecutive_errors
-        
+
         # Complexity 6 (1.5x)
         # 1.5x * 1.0 (itr) = 1.5x
         c6 = config.scaled(complexity=6, max_iterations=100)
         assert c6.max_consecutive_errors == int(config.max_consecutive_errors * 1.5)
-        
+
         # Complexity 10 (2.0x)
         c10 = config.scaled(complexity=10, max_iterations=100)
         assert c10.max_consecutive_errors == config.max_consecutive_errors * 2
@@ -79,7 +79,7 @@ class TestCircuitBreakerConfig:
     def test_scaled_iteration_multiplier(self):
         """Should scale thresholds based on iteration budget (58)."""
         config = CircuitBreakerConfig(adaptive=True)
-        
+
         # 500 iterations (max budget shift: 1.0 + (500-100)/400 = 2.0 -> capped at 1.5)
         # complexity 10 (2.0x) -> total scale 2.0 * 1.5 = 3.0x
         c500 = config.scaled(complexity=10, max_iterations=500)
@@ -468,7 +468,7 @@ class TestCircuitBreakerAdapt:
 
         # Adapt complexity 10 (2x multiplier)
         breaker.adapt(complexity=10, max_iterations=100)
-        
+
         assert breaker.config.max_consecutive_errors == config.max_consecutive_errors * 2
         assert breaker.config.adaptive is False  # newly scaled config has adaptive=False
 

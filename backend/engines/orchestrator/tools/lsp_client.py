@@ -291,13 +291,13 @@ class LspClient:
 
         msgs = self._build_init_msgs(uri, abs_path)
         msgs[2]["params"]["textDocument"]["text"] = source
-        
+
         # Some LSPs send diagnostics as notifications after didOpen
         # We also send a shutdown to ensure we get all responses
         msgs.append({"jsonrpc": "2.0", "method": "shutdown", "id": 99, "params": {}})
-        
+
         responses = self._rpc(msgs, server_cmd)
-        
+
         errors = []
         for resp in responses:
             if resp.get("method") == "textDocument/publishDiagnostics":
@@ -313,7 +313,7 @@ class LspClient:
                         ))
                         # We hijack LspLocation for diagnostics temporarily
                         # In a real impl, we'd have a LspDiagnostic class
-        
+
         return LspResult(available=True, locations=errors)
 
     def _query_document_symbols(
@@ -321,7 +321,7 @@ class LspClient:
     ) -> LspResult:
         if abs_path.endswith(".py"):
             return _ast_list_symbols(abs_path, source, symbol_filter)
-        
+
         # For other languages, could implement LSP documentSymbol query here
         return LspResult(available=True, error="list_symbols only supported for Python currently")
 
@@ -330,7 +330,7 @@ class LspClient:
     ) -> LspResult:
         if abs_path.endswith(".py"):
             return _ast_hover(abs_path, source, lsp_line + 1)
-        
+
         server_cmd = self._get_server_command(abs_path)
         if not server_cmd:
             return LspResult(available=False)
@@ -347,7 +347,7 @@ class LspClient:
             },
         })
         msgs.append({"jsonrpc": "2.0", "method": "shutdown", "id": 11, "params": {}})
-        
+
         responses = self._rpc(msgs, server_cmd)
         for resp in responses:
             if resp.get("id") == 10 and "result" in resp:
@@ -359,7 +359,7 @@ class LspClient:
                     elif isinstance(contents, list):
                         return LspResult(available=True, hover_text="\n".join([str(c) for c in contents]))
                     return LspResult(available=True, hover_text=str(contents))
-        
+
         return LspResult(available=True, hover_text="No hover info")
 
     def _query_locations(
@@ -427,7 +427,7 @@ class LspClient:
 
         if abs_path.endswith(".py"):
             return _ast_grep_symbol(abs_path, source, lsp_line + 1)
-        
+
         return LspResult(available=True, error="LSP query failed and no fallback available")
 
 

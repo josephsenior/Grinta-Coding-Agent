@@ -70,9 +70,9 @@ class TestSemanticLoopDetection:
             history.append(_cmd_output(exit_code=1))
             history.append(_cmd("cat file1"))
             history.append(_error())
-        
+
         sd = StuckDetector(_state(history))  # type: ignore[arg-type]
-        # unique intents: inspect_filesystem (ls), inspect_filesystem (cat) -> diversity = 1/6? 
+        # unique intents: inspect_filesystem (ls), inspect_filesystem (cat) -> diversity = 1/6?
         # Wait, _categorize_cmd_action maps both to inspect_filesystem.
         # So unique intents = 1. Diversity = 1/6 = 0.16. Failure rate = 1.0.
         assert sd._is_stuck_semantic_loop(history) is True  # type: ignore[arg-type]
@@ -100,7 +100,7 @@ class TestAdvancedPatterns:
 
     def test_is_stuck_cost_acceleration(self):
         from backend.llm.metrics import Metrics, TokenUsage
-        
+
         history: list[Any] = []
         for i in range(10):
             m = _cmd(f"cmd {i}")
@@ -111,6 +111,6 @@ class TestAdvancedPatterns:
             ]
             history.append(m)
             history.append(_cmd_output())
-            
+
         sd = StuckDetector(_state(history))  # type: ignore[arg-type]
         assert sd._is_stuck_cost_acceleration(history) is True  # type: ignore[arg-type]

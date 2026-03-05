@@ -93,7 +93,7 @@ def get(key: str, default: Any = None, ttl: int | None = None) -> Any:
             if cached:
                 value = json.loads(cached)
                 # Also store in L1 for faster access
-                set(key, value, ttl=ttl, layer="l1")
+                set_value(key, value, ttl=ttl, layer="l1")
                 return value
         except Exception as e:
             logger.debug("Redis cache get error: %s", e)
@@ -101,7 +101,7 @@ def get(key: str, default: Any = None, ttl: int | None = None) -> Any:
     return default
 
 
-def set(
+def set_value(
     key: str,
     value: Any,
     ttl: int | None = None,

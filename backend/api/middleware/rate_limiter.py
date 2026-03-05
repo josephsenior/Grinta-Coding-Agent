@@ -247,8 +247,6 @@ class EndpointRateLimiter:
     @staticmethod
     def _get_default_limits():
         """Get default rate limits from environment variables."""
-        import os
-
         requests_per_hour = int(os.getenv("RATE_LIMIT_REQUESTS", "1000"))
         burst_limit = int(os.getenv("RATE_LIMIT_BURST", "100"))
         logger.info(
@@ -528,7 +526,7 @@ class RedisRateLimiter(RateLimiter):
         hour_count: int | None,
         burst_count: int | None,
         reason: str | None = None,
-        error: Exception | None = None,
+        exc: Exception | None = None,
     ) -> None:
         """Emit a single structured OTEL span for rate limiting decisions."""
         if not self._should_trace():
@@ -552,9 +550,9 @@ class RedisRateLimiter(RateLimiter):
                     span.set_attribute("ratelimit.burst.limit", int(self.burst_limit))
                 if reason:
                     span.set_attribute("ratelimit.reason", reason)
-                if error:
+                if exc:
                     span.set_attribute("error", True)
-                    span.record_exception(error)
+                    span.record_exception(exc)
         except Exception:
             # Never let instrumentation break request flow
             return
@@ -567,7 +565,7 @@ class RedisRateLimiter(RateLimiter):
             hour_count=None,
             burst_count=None,
             reason="error",
-            error=exc,
+            exc=exc,
         )
 
     async def _get_remaining_requests(self, key: str) -> int:

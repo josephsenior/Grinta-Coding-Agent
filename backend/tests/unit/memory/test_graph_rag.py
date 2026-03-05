@@ -189,9 +189,9 @@ def my_function():
 '''
         file_path = tmp_path / "test.py"
         file_path.write_text(code, encoding="utf-8")
-        
+
         rag.index_code_file(str(file_path), code)
-        
+
         # Check class node
         class_node = gs.get_node("MyClass")
         assert class_node is not None
@@ -199,7 +199,7 @@ def my_function():
         assert class_node["file_path"] == str(file_path)
         assert class_node["line_start"] == 2
         assert class_node["line_end"] == 4
-        
+
         # Check method node
         method_node = gs.get_node("MyClass.my_method")
         assert method_node is not None
@@ -208,7 +208,7 @@ def my_function():
         assert method_node["line_start"] == 3
         assert method_node["line_end"] == 4
         assert method_node["parent_id"] == "MyClass"
-        
+
         # Check function node
         func_node = gs.get_node("my_function")
         assert func_node is not None

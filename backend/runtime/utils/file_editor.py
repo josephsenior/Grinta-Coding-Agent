@@ -558,7 +558,7 @@ class FileEditor:
                 error=f"Cannot edit range {start_line}-{end_line} in an empty file.",
                 new_content=content
             )
-            
+
         if start_line < 1:
              return ToolResult(
                 output="",
@@ -569,8 +569,8 @@ class FileEditor:
         # 1-based to 0-based conversion
         start_idx = start_line - 1
         # end_line is inclusive, but slice end is exclusive
-        end_idx = end_line 
-        
+        end_idx = end_line
+
         # Validation
         if start_idx >= len(lines):
              return ToolResult(
@@ -581,18 +581,18 @@ class FileEditor:
 
         # Allow end_line to exceed file length (truncate/replace until end)
         end_idx = min(end_idx, len(lines))
-        
+
         # Prepare replacement
         new_lines_to_insert = new_text.splitlines(keepends=True)
         # If input text doesn't end with newline but we are inserting blocks, usually we want consistency
         # But 'lines' have keepends=True.
-        # If new_text is "foo" and we replace a line "bar\n", we get "foo". 
+        # If new_text is "foo" and we replace a line "bar\n", we get "foo".
         # If there are subsequent lines, they will be attached: "foobaz\n" if next line is "baz\n".
         # This is expected behavior for raw string replacement.
-        
+
         result_lines = lines[:start_idx] + new_lines_to_insert + lines[end_idx:]
         return "".join(result_lines)
-    
+
     def _backup_file(self, file_path: Path, content: str | None) -> None:
         """Backup file content for transaction rollback.
 

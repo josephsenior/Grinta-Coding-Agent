@@ -8,25 +8,24 @@ blackboard tool to read/write shared state (e.g. schema contracts, status).
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+import json
+import os
 
 
 class Blackboard:
     """Thread- and async-safe key-value store for sub-agent coordination."""
 
-    def _save(self):
-        import json, os
-        path = '.forge/blackboard.json'
+    def _save(self) -> None:
+        path = ".forge/blackboard.json"
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w') as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(self._data, f)
 
-    def _load(self):
-        import json, os
-        path = '.forge/blackboard.json'
+    def _load(self) -> None:
+        path = ".forge/blackboard.json"
         if os.path.exists(path):
             try:
-                with open(path, 'r') as f:
+                with open(path, "r", encoding="utf-8") as f:
                     loaded_data = json.load(f)
                     self._data.update(loaded_data)
             except Exception:

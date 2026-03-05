@@ -251,9 +251,9 @@ class TestMergeAndSave:
         fs = _make_file_store(raise_fnf=True)
         cs1 = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
         cs2 = ConversationStats(file_store=None, conversation_id="c2", user_id=None)
-        
+
         cs1.service_to_metrics = {"active": Metrics()}
-        
+
         # Should log error but not fail
         cs1.merge_and_save(cs2)
         assert "active" in cs1.service_to_metrics
@@ -265,7 +265,7 @@ class TestSaveMetricsEdgeCases:
         cs = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
         cs.restored_metrics = {"svc": Metrics()}
         cs.service_to_metrics = {"svc": Metrics()}
-        
+
         # Should log error and prefer service_to_metrics
         cs.save_metrics()
         fs.write.assert_called_once()
@@ -274,7 +274,7 @@ class TestSaveMetricsEdgeCases:
         fs = _make_file_store(raise_fnf=True)
         cs = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
         cs.service_to_metrics = cast(dict[str, Metrics], {"weird": "just a string"})
-        
+
         cs.save_metrics()
         written = fs.write.call_args[0][1]
         decoded = json.loads(base64.b64decode(written).decode())
@@ -283,11 +283,11 @@ class TestSaveMetricsEdgeCases:
     def test_object_with_get_method(self):
         fs = _make_file_store(raise_fnf=True)
         cs = ConversationStats(file_store=fs, conversation_id="c1", user_id="u1")
-        
+
         class MockWithGet:
             def get(self):
                 return {"val": 123}
-        
+
         cs.service_to_metrics = cast(dict[str, Metrics], {"obj": MockWithGet()})
         cs.save_metrics()
         written = fs.write.call_args[0][1]

@@ -55,10 +55,10 @@ def build_web_reader_action(url: str) -> CmdRunAction:
     """
     # Create a robust Python script to read the URL
     # structure ensures it runs on Windows/Linux without shell dependecies complexity
-    
+
     # We use repr() to get a python-safe string representation for the URL
     safe_url_repr = repr(url)
-    
+
     script = (
         "import requests, html2text, sys; "
         "h = html2text.HTML2Text(); "
@@ -76,20 +76,20 @@ def build_web_reader_action(url: str) -> CmdRunAction:
     )
 
     # Use sys.executable to ensure we run in the correct environment
-    # We don't need shlex.quote for the whole script on Windows if we trust the runtime to handle it, 
+    # We don't need shlex.quote for the whole script on Windows if we trust the runtime to handle it,
     # but strictly speaking, passing a multiline string to python -c can be tricky across platforms.
     # The safest is to minimize special chars.
-    
-    # However, `CmdRunAction` implies a shell. 
+
+    # However, `CmdRunAction` implies a shell.
     # On Windows `cmd.exe` / `powershell` differs from `bash`.
-    # `shlex.quote` produces single-quoted strings which `cmd.exe` DOES NOT like. 
+    # `shlex.quote` produces single-quoted strings which `cmd.exe` DOES NOT like.
     # But Python's `shlex` is POSIX based.
-    
+
     # To be safe for the "Forge" environment which seems to run `pwsh` (PowerShell) based on user context terminals:
     # "Terminal: pwsh"
-    
+
     # PowerShell handles single quotes okay, generally.
-    
+
     # construct the command
     cmd = f"{sys.executable} -c \"{script}\""
 

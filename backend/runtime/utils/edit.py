@@ -193,7 +193,7 @@ class FileEditRuntimeMixin(ABC):
             updated_lint_error = linter.lint_file_diff(
                 original_file_copy.name, updated_file_copy.name
             )
-            
+
             # If local linter (LSP/Ruff) found nothing, use rigour as a deep fallback for non-Python
             if not updated_lint_error and suffix != ".py":
                 # We don't trigger rigour automatically here to avoid latency

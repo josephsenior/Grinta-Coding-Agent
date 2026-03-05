@@ -119,7 +119,7 @@ class TestSetMcpTools:
         """Line 227-228 coverage for exception in tool name gathering."""
         cls = _make_concrete_agent()
         agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
-        
+
         # We mock build_tool to return None so it doesn't crash on the non-dict
         # but _log_tool_update_start will hit its try...except
         with patch("backend.controller.agent.build_tool", return_value=None):
@@ -130,7 +130,7 @@ class TestSetMcpTools:
         """Ensure line 205-207 is covered."""
         cls = _make_concrete_agent()
         agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
-        
+
         tool = {"function": {"name": "tool", "parameters": {}}}
         # We use a side_effect to return the same tool twice.
         # The first time it registers, the second time it's a duplicate.

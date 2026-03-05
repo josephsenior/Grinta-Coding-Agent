@@ -11,11 +11,11 @@ from backend.core.config.llm_config import LLMConfig
 def test_get_contextual_events_calls_query_service():
     """Test that get_contextual_events calls the underlying query service with filter."""
     mock_event_store = MagicMock()
-    
+
     with patch("backend.api.services.prompt_service.get_contextual_events_text") as mock_query:
         mock_query.return_value = "stringified events"
         result = get_contextual_events(mock_event_store, 123)
-        
+
         assert result == "stringified events"
         mock_query.assert_called_once()
         # Verify event_id and event_store passed through
@@ -32,9 +32,9 @@ def test_generate_prompt_template_rendering(mock_env_class):
     mock_template = MagicMock()
     mock_env.get_template.return_value = mock_template
     mock_template.render.return_value = "rendered prompt"
-    
+
     result = generate_prompt_template("some events")
-    
+
     assert result == "rendered prompt"
     mock_env.get_template.assert_called_with("generate_remember_prompt.j2")
     mock_template.render.assert_called_with(events="some events")
@@ -46,10 +46,10 @@ async def test_generate_prompt_success(mock_get_manager):
     mock_manager = AsyncMock()
     mock_get_manager.return_value = mock_manager
     mock_manager.request_llm_completion = AsyncMock(return_value="Some noise <update_prompt>Remember I like Python</update_prompt> more noise")
-    
+
     llm_config = LLMConfig(model="gpt-4")
     result = await generate_prompt(llm_config, "template", "conv1")
-    
+
     assert result == "Remember I like Python"
     mock_manager.request_llm_completion.assert_called_once()
     # Verify the role messages
@@ -63,7 +63,7 @@ async def test_generate_prompt_no_tag(mock_get_manager):
     mock_manager = AsyncMock()
     mock_get_manager.return_value = mock_manager
     mock_manager.request_llm_completion = AsyncMock(return_value="No tags here")
-    
+
     llm_config = LLMConfig(model="gpt-4")
     with pytest.raises(ValueError, match="No valid prompt found"):
         await generate_prompt(llm_config, "template", "conv1")
@@ -73,7 +73,7 @@ async def test_generate_prompt_no_tag(mock_get_manager):
 async def test_generate_prompt_manager_none(mock_get_manager):
     """Test RuntimeError when conversation manager is unavailable."""
     mock_get_manager.return_value = None
-    
+
     llm_config = LLMConfig(model="gpt-4")
     with pytest.raises(RuntimeError, match="Conversation manager implementation unavailable"):
         await generate_prompt(llm_config, "template", "conv1")
@@ -86,17 +86,17 @@ async def test_build_remember_prompt_success(mock_gen_prompt, mock_get_ctx_event
     """Test the full orchestration of build_remember_prompt."""
     mock_user_settings_store = AsyncMock()
     mock_file_store = MagicMock()
-    
+
     mock_get_ctx_events.return_value = "events string"
     mock_gen_prompt.return_value = "Final Prompt"
-    
+
     # Mock settings
     mock_settings = MagicMock()
     mock_settings.llm_model = "gpt-4"
     mock_settings.llm_api_key = "sk-test"
     mock_settings.llm_base_url = "https://api.openai.com"
     mock_user_settings_store.load.return_value = mock_settings
-    
+
     result = await build_remember_prompt(
         conversation_id="conv1",
         event_id=123,
@@ -104,7 +104,7 @@ async def test_build_remember_prompt_success(mock_gen_prompt, mock_get_ctx_event
         user_settings_store=mock_user_settings_store,
         file_store=mock_file_store
     )
-    
+
     assert result == "Final Prompt"
     mock_event_store_class.assert_called_once_with(
         sid="conv1",
@@ -125,10 +125,10 @@ async def test_generate_prompt_multiple_tags(mock_get_manager):
     mock_manager = AsyncMock()
     mock_get_manager.return_value = mock_manager
     mock_manager.request_llm_completion = AsyncMock(return_value="<update_prompt>First</update_prompt><update_prompt>Second</update_prompt>")
-    
+
     llm_config = LLMConfig(model="gpt-4")
     result = await generate_prompt(llm_config, "template", "conv1")
-    
+
     assert result == "First"
 
 @pytest.mark.asyncio
@@ -143,7 +143,7 @@ async def test_build_remember_prompt_partial_settings(mock_gen_prompt, mock_get_
     mock_settings.llm_api_key = None
     mock_settings.llm_base_url = None
     mock_user_settings_store.load.return_value = mock_settings
-    
+
     await build_remember_prompt(
         conversation_id="conv1",
         event_id=123,
@@ -151,7 +151,7 @@ async def test_build_remember_prompt_partial_settings(mock_gen_prompt, mock_get_
         user_settings_store=mock_user_settings_store,
         file_store=MagicMock()
     )
-    
+
     llm_config = mock_gen_prompt.call_args[0][0]
     # LLMConfig should have defaults if settings were None
     assert llm_config.model is not None # Default in LLMConfig
@@ -163,7 +163,7 @@ async def test_build_remember_prompt_no_settings(mock_es):
     """Test failure when settings cannot be loaded."""
     mock_user_settings_store = AsyncMock()
     mock_user_settings_store.load.return_value = None
-    
+
     with pytest.raises(ValueError, match="Settings not found"):
         await build_remember_prompt(
             conversation_id="conv1",

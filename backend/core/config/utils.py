@@ -710,7 +710,7 @@ def load_forge_config(
 
     # 3. Finalize and sync
     finalize_config(config)
-    
+
     # CRITICAL: Sync the loaded config (which might have come from settings.json)
     # back to the APIKeyManager so that DirectLLMClient can find it.
     from backend.core.config.api_key_manager import api_key_manager
@@ -729,7 +729,7 @@ def load_forge_config(
                     llm_cfg.api_key = SecretStr(env_key)
                     api_key_manager.set_api_key(llm_cfg.model, llm_cfg.api_key)
                     api_key_manager.set_environment_variables(llm_cfg.model, llm_cfg.api_key)
-    
+
     # Export all keys to environment after sync
     export_llm_api_keys(config)
 

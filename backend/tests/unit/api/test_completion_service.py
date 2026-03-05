@@ -717,12 +717,12 @@ async def test_get_code_completion_non_retryable_error_permission(
     """Non-retryable error (PERMISSION_ERROR) should raise immediately."""
     error = Exception("403 Forbidden")
     manager.request_llm_completion = AsyncMock(side_effect=error)
-    
+
     with patch(
         "backend.api.services.completion_service.ErrorRecoveryStrategy.classify_error"
     ) as mock_classify:
         mock_classify.return_value = ErrorType.PERMISSION_ERROR
-        
+
         with pytest.raises(Exception, match="403 Forbidden"):
             await get_code_completion(
                 req=completion_req,
@@ -742,14 +742,14 @@ async def test_get_code_completion_retryable_error_network(
     manager.request_llm_completion = AsyncMock(
         side_effect=[Exception("Connection lost"), "os.path"]
     )
-    
+
     with patch(
         "backend.api.services.completion_service.ErrorRecoveryStrategy.classify_error"
     ) as mock_classify:
         mock_classify.side_effect = [
             ErrorType.NETWORK_ERROR,  # First attempt
         ]
-        
+
         with patch(
             "backend.api.services.completion_service.asyncio.sleep",
             new_callable=AsyncMock,

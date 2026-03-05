@@ -83,7 +83,7 @@ class PromptManager:
             msg = "Prompt directory is not set"
             raise ValueError(msg)
         self.prompt_dir: str = prompt_dir
-        
+
         # We always include a shared prompts directory as a fallback
         shared_dir = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "engines", "shared", "prompts"
@@ -269,17 +269,17 @@ class OrchestratorPromptManager(PromptManager):
                 lessons_path = os.path.join("memories", "repo", "lessons.md")
                 if not os.path.exists(lessons_path):
                     return content
-            
+
             with open(lessons_path, "r", encoding="utf-8") as f:
                 lessons = f.read().strip()
-            
+
             if not lessons:
                 return content
-                
+
             # Keep only the last 3000 chars to avoid prompt bloat
             if len(lessons) > 3000:
                 lessons = "... (earlier lessons truncated)\n" + lessons[-3000:]
-                
+
             return (
                 f"{content}\n\n"
                 f"<REPOSITORY_LESSONS_LEARNED>\n"

@@ -59,34 +59,34 @@ class TaskValidationService:
         outputs = getattr(action, "outputs", {})
         if not outputs or not isinstance(outputs, dict):
             return
-            
+
         lesson = outputs.get("lessons_learned")
         if not lesson or not str(lesson).strip():
             return
-            
+
         import os
         from datetime import datetime
-        
+
         # Path to project-level session memory
         file_store = self._context.get_controller().config.file_store
         project_root = file_store.root if file_store else "."
         memories_path = os.path.join(project_root, ".Forge", "lessons.md")
-        
+
         try:
             os.makedirs(os.path.dirname(memories_path), exist_ok=True)
-            
+
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
             initial_task = self._context.get_controller()._get_initial_task()
             summary = initial_task.description[:100] if initial_task else "Task"
-            
+
             entry = (
                 f"\n## {timestamp} — {summary}\n"
                 f"{lesson}\n"
             )
-            
+
             with open(memories_path, "a", encoding="utf-8") as f:
                 f.write(entry)
-                
+
             logger.info("Saved lessons learned to %s", memories_path)
         except Exception as e:
             logger.warning("Failed to save lessons learned: %s", e)

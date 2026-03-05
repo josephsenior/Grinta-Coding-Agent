@@ -14,31 +14,31 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         events = [
             CmdRunAction(command="pip install flask"),
             CmdOutputObservation(content="Successfully installed", command="pip install flask", exit_code=0),
-            
+
             FileEditAction(path="test.py", command="str_replace", old_str="old", new_str="new"),
             ErrorObservation(content="Match not found"),
-            
+
             CmdRunAction(command="pytest"),
             CmdOutputObservation(content="FAILED tests/test_x.py", command="pytest", exit_code=1)
         ]
-        
+
         # Run
         snapshot = extract_snapshot(events)
-        
+
         # Verify
         approaches = snapshot["attempted_approaches"]
         assert len(approaches) == 3
-        
+
         # Success command
         assert approaches[0]["type"] == "command"
         assert "pip install flask" in approaches[0]["detail"]
         assert approaches[0]["outcome"] == "SUCCESS"
-        
+
         # Failed file edit
         assert approaches[1]["type"] == "file_edit"
         assert "test.py" in approaches[1]["detail"]
         assert "FAILED" in approaches[1]["outcome"]
-        
+
         # Failed command
         assert approaches[2]["type"] == "command"
         assert "pytest" in approaches[2]["detail"]
@@ -46,7 +46,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
 
     def test_format_snapshot_for_injection(self):
         from backend.memory.pre_condensation_snapshot import format_snapshot_for_injection
-        
+
         snapshot = {
             "events_condensed": 10,
             "files_touched": {"test.py": {"action": "edit"}},
@@ -54,7 +54,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
                 {"type": "command", "detail": "pytest", "outcome": "FAILED (exit=1): FAILED tests/test_x.py"}
             ]
         }
-        
+
         formatted = format_snapshot_for_injection(snapshot)
         assert "<RESTORED_CONTEXT>" in formatted
         assert "Events condensed: 10" in formatted

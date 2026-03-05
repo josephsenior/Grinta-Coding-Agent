@@ -79,9 +79,7 @@ class ActionExecutionService:
                                 astep(self._context.state),
                                 timeout=timeout,
                             )
-                        except _asyncio.TimeoutError:
-                            from backend.llm.exceptions import Timeout as LLMTimeout
-
+                        except _asyncio.TimeoutError as timeout_exc:
                             model_name = None
                             try:
                                 llm = getattr(agent, "llm", None)
@@ -96,10 +94,10 @@ class ActionExecutionService:
                                 timeout,
                                 model_name,
                             )
-                            raise LLMTimeout(
+                            raise Timeout(
                                 f"LLM step timed out after {timeout} seconds",
                                 model=model_name,
-                            )
+                            ) from timeout_exc
                     else:
                         action = agent.step(self._context.state)
                 action.source = EventSource.AGENT
@@ -155,7 +153,7 @@ class ActionExecutionService:
                     )
                     await controller.set_agent_state_to(_AgentState.ERROR)
                 return None
-                
+
             except (ContextWindowExceededError, BadRequestError, OpenAIError) as exc:
                 return await self._handle_context_window_error(exc)
             except (
@@ -168,7 +166,7 @@ class ActionExecutionService:
                 Timeout,
             ):
                 raise
-        
+
         return None
 
     async def execute_action(self, action: Action) -> None:

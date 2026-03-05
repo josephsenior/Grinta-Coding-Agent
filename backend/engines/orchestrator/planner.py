@@ -244,7 +244,7 @@ class OrchestratorPlanner:
         tools.append(create_signal_progress_tool())
         if getattr(self._config, "enable_swarming", True):
             tools.append(create_delegate_task_tool())
-            
+
         from backend.engines.orchestrator.tools.blackboard import create_blackboard_tool
         tools.append(create_blackboard_tool())
         if getattr(self._config, "enable_rollback", True):

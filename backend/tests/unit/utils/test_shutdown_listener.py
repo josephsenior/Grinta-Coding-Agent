@@ -343,7 +343,7 @@ class TestShutdownListenerInternal:
     def test_register_signal_handler_sig_ign(self):
         """Test with SIG_IGN to ensure we hit elif but not assign."""
         import backend.utils.shutdown_listener as mod
-        
+
         with patch("backend.utils.shutdown_listener.signal.signal"), \
              patch("backend.utils.shutdown_listener.signal.getsignal", return_value=_signal.SIG_IGN):
             mod._register_signal_handler(_signal.SIGINT)
@@ -352,21 +352,21 @@ class TestShutdownListenerInternal:
         """Test _register_signal_handlers from a real non-main thread."""
         import backend.utils.shutdown_listener as mod
         import threading
-        
+
         # Reset to ensure we run registration again
         mod._should_exit = None
-        
+
         exceptions = []
         def run():
             try:
                 mod._register_signal_handlers()
             except Exception as e:
                 exceptions.append(e)
-                
+
         t = threading.Thread(target=run)
         t.start()
         t.join()
-        
+
         assert not exceptions
 
     def test_sleep_long_duration_chunks(self):
@@ -425,7 +425,7 @@ class TestShutdownListenerInternal:
             # Line 34-40: neither callable nor SIG_DFL
             mod._register_signal_handler(_sig.SIGINT)
             handler = mock_signal.call_args[0][1]
-            
+
             # Should not crash when called
             # No KeyboardInterrupt because fallback_handler is None
             handler(_sig.SIGINT, None)
@@ -434,10 +434,10 @@ class TestShutdownListenerInternal:
     def test_register_signal_handlers_main_thread_success(self):
         """Test _register_signal_handlers actually calls registration (Line 75)."""
         import backend.utils.shutdown_listener as mod
-        
+
         # Reset to ensure we run registration
         mod._should_exit = None
-        
+
         with patch("backend.utils.shutdown_listener._register_signal_handler") as mock_reg, \
              patch("threading.current_thread", return_value=threading.main_thread()):
             mod._register_signal_handlers()
@@ -449,19 +449,19 @@ class TestShutdownListenerInternal:
         """Ensure the while loop in async sleep is fully covered (Line 127)."""
         import backend.utils.shutdown_listener as mod
         mod._should_exit = False
-        
+
         # We use a mocked sleep to avoid real time waiting and ensure we hit the line
         with patch("asyncio.sleep", new_callable=MagicMock) as mock_sleep:
             # We need to make it return a coro
             async def mock_coro(d): return None
             mock_sleep.side_effect = mock_coro
-            
+
             # setup time.time to simulate passage of time
             # 1st call: start_time
             # 2nd call: loop check 1 (0 diff)
             # 3rd call: loop check 2 (after 1s sleep)
             with patch("time.time", side_effect=[10.0, 10.0, 11.5, 12.5]):
                 await async_sleep_if_should_continue(2.0)
-            
+
             # Should have called sleep(1) at least once
             mock_sleep.assert_any_call(1)

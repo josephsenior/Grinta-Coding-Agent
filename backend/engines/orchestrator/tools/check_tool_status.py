@@ -64,7 +64,7 @@ def create_check_tool_status_tool() -> ChatCompletionToolParam:
 def build_check_tool_status_action(arguments: dict[str, Any], mcp_tools: dict[str, Any]) -> Any:
     """Run the health check for tools."""
     from backend.events.action import AgentThinkAction
-    
+
     tool_name = arguments.get("tool_name")
     checked_at = datetime.now(UTC).isoformat()
 

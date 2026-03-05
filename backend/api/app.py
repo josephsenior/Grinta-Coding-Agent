@@ -222,7 +222,7 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
     # Reload config to ensure it picks up any changes made to settings.json
     from backend.core.config.utils import load_forge_config
     fastapi_app.state.config = load_forge_config()
-    
+
     _validate_config()
 
     # Startup

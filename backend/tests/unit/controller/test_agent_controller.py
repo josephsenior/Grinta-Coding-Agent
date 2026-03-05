@@ -731,14 +731,14 @@ class TestReset(unittest.TestCase):
     def test_reset_dropped_agent_actions(self):
         """Test ErrorObservations for dropped agent actions (393-403)."""
         self.ctrl.services.pending_action.get.return_value = None
-        
+
         dropped = MagicMock()
         dropped.tool_call_metadata = "meta"
         dropped.id = "dropped-id"
         self.ctrl.agent.pending_actions = [dropped]
-        
+
         self.ctrl._reset()
-        
+
         # Verify event stream add_event was called for the dropped action
         # The exact content check is less important than hitting the code.
         self.ctrl.config.event_stream.add_event.assert_called()
@@ -884,10 +884,10 @@ class TestAgentControllerExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
         self.ctrl.services.action_execution.get_next_action = AsyncMock(return_value=None)
         self.ctrl.services.retry.retry_count = 0
-        
+
         with patch.object(self.ctrl, "_run_control_flags_safely", return_value=True):
             await self.ctrl._step()
-        
+
         # execute_action should not be called
         self.ctrl.services.action_execution.execute_action.assert_not_called()
 
@@ -896,31 +896,31 @@ class TestAgentControllerExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.step_prerequisites.can_step.return_value = True
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
         self.ctrl.services.retry.retry_count = 0
-        
+
         # 1st action: something. 2nd: something else. 3rd: None.
         a1 = MagicMock()
         a2 = MagicMock()
         self.ctrl.services.action_execution.get_next_action = AsyncMock(side_effect=[a1, a2, None])
         self.ctrl.services.action_execution.execute_action = AsyncMock()
-        
+
         # _can_drain_pending: 1st True, 2nd False
         with patch.object(self.ctrl, "_run_control_flags_safely", return_value=True), \
              patch.object(self.ctrl, "_can_drain_pending", side_effect=[True, False]), \
              patch.object(self.ctrl, "_handle_post_execution", new_callable=AsyncMock):
             await self.ctrl._step()
-            
+
         self.assertEqual(self.ctrl.services.action_execution.execute_action.call_count, 2)
 
     def test_cleanup_action_context_no_action(self):
         """Line 213-228 coverage for action=None path."""
         self.ctrl._action_contexts_by_object = {}
         self.ctrl._action_contexts_by_event_id = {}
-        
+
         ctx = MagicMock()
         ctx.action_id = 123
         self.ctrl._action_contexts_by_object[1] = ctx
         self.ctrl._action_contexts_by_event_id[123] = ctx
-        
+
         self.ctrl._cleanup_action_context(ctx, action=None)
         self.assertEqual(len(self.ctrl._action_contexts_by_object), 0)
         self.assertEqual(len(self.ctrl._action_contexts_by_event_id), 0)
@@ -938,7 +938,7 @@ class TestAgentControllerExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         from backend.events.action import SystemMessageAction
         sys_msg = SystemMessageAction(content="test")
         self.ctrl.event_stream.search_events = MagicMock(return_value=[sys_msg])
-        
+
         self.ctrl.agent.get_system_message = MagicMock()
         self.ctrl._add_system_message()
         self.ctrl.agent.get_system_message.assert_not_called()
@@ -1092,7 +1092,7 @@ class TestStepDispatch(unittest.TestCase):
         mock_sys_msg.content = "System instruction"
         self.ctrl.agent.get_system_message = MagicMock(return_value=mock_sys_msg)
         self.ctrl.event_stream.add_event = MagicMock()
-        
+
         self.ctrl._add_system_message()
         self.ctrl.event_stream.add_event.assert_called_once()
 
@@ -1101,7 +1101,7 @@ class TestStepDispatch(unittest.TestCase):
         mock_action = MagicMock()
         self.ctrl.services.pending_action.get = MagicMock(return_value=mock_action)
         self.assertEqual(self.ctrl._pending_action, mock_action)
-        
+
         self.ctrl.services.pending_action.set = MagicMock()
         self.ctrl._pending_action = None
         self.ctrl.services.pending_action.set.assert_called_with(None)
@@ -1111,10 +1111,10 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl.agent._last_llm_latency = 0.5
         self.ctrl.rate_governor.record_llm_latency = MagicMock()
         self.ctrl.state.metrics = MagicMock()
-        
+
         with patch.object(self.ctrl.rate_governor, "check_and_wait", new_callable=AsyncMock):
             await self.ctrl._handle_post_execution()
-            
+
         self.ctrl.rate_governor.record_llm_latency.assert_called_once_with(0.5)
 
     def test_reset_with_error_obs(self):
@@ -1123,9 +1123,9 @@ class TestStepDispatch(unittest.TestCase):
         mock_pending.tool_call_metadata = MagicMock() # To trigger hasattr
         mock_pending.tool_call_metadata.tool_call_id = "123"
         self.ctrl._pending_action = mock_pending
-        self.ctrl.state.history = [] 
-        self.ctrl.state.agent_state = AgentState.RUNNING 
-        
+        self.ctrl.state.history = []
+        self.ctrl.state.agent_state = AgentState.RUNNING
+
         with patch.object(self.ctrl.event_stream, "add_event") as mock_add:
             self.ctrl._reset()
             mock_add.assert_called()
@@ -1138,7 +1138,7 @@ class TestStepDispatch(unittest.TestCase):
         msg = MessageAction(content="user input")
         msg.source = EventSource.USER
         self.ctrl.event_stream.search_events = MagicMock(return_value=[msg])
-        
+
         res = self.ctrl._first_user_message()
         self.assertEqual(res, msg)
         self.assertEqual(self.ctrl._cached_first_user_message, msg)
@@ -1171,12 +1171,12 @@ class TestStepDispatch(unittest.TestCase):
         # First action found, second None
         self.ctrl.services.action_execution.get_next_action = AsyncMock(side_effect=[MagicMock(), None])
         self.ctrl.services.action_execution.execute_action = AsyncMock()
-        
+
         with patch.object(self.ctrl, "_run_control_flags_safely", return_value=True), \
              patch.object(self.ctrl, "_can_drain_pending", return_value=True), \
              patch.object(self.ctrl, "_handle_post_execution", new_callable=AsyncMock):
             await self.ctrl._step()
-            
+
         self.assertEqual(self.ctrl.services.action_execution.execute_action.call_count, 1)
 
     def test_add_system_message_user_present(self):
@@ -1200,10 +1200,10 @@ class TestStepDispatch(unittest.TestCase):
         # Ensure property returns None
         self.ctrl.services.pending_action.get = MagicMock(return_value=None)
         self.ctrl.services.action.get_pending_action = MagicMock(return_value=None)
-        
+
         self.ctrl.agent.pending_actions = [MagicMock()]
         self.assertTrue(self.ctrl._can_drain_pending())
-        
+
         self.ctrl.agent.pending_actions = []
         self.assertFalse(self.ctrl._can_drain_pending())
 
@@ -1212,12 +1212,12 @@ class TestStepDispatch(unittest.TestCase):
         # We need to bypass the properties that look up services
         with patch.object(self.ctrl, "pending_action_service", None), \
              patch.object(self.ctrl, "action_service", None):
-             
+
              # Setter
              act = MagicMock()
              self.ctrl._pending_action = act
              # Check internal attr
-             self.assertEqual(getattr(self.ctrl, "_pending_action_val", None), None) 
+             self.assertEqual(getattr(self.ctrl, "_pending_action_val", None), None)
              # Wait, where does it store it if no service?
              # Ah, looking at code:
              # service = getattr(self, "action_service", None)
@@ -1225,7 +1225,7 @@ class TestStepDispatch(unittest.TestCase):
              # return None !! It doesn't store it in fallback! LOL.
              # So we just test it doesn't crash.
              self.ctrl._pending_action = act
-             
+
              # Getter
              val = self.ctrl._pending_action
              self.assertIsNone(val)
@@ -1246,6 +1246,6 @@ class TestStepDispatch(unittest.TestCase):
         msg.source = EventSource.USER
         self.ctrl._cached_first_user_message = msg
         self.ctrl.state.metrics = MagicMock()
-        
+
         await self.ctrl.log_task_audit("completed")
         self.ctrl._audit_callback.assert_called()

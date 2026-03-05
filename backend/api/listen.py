@@ -8,7 +8,7 @@ from backend.api.shared import sio
 
 # Import Socket.IO handlers to register them - this MUST be after sio is imported
 try:
-    from backend.api import listen_socket  # noqa: F401
+    import backend.api.listen_socket  # noqa: F401 - side-effect import
 except Exception as e:
     logger.error("Failed to import Socket.IO handlers: %s", e, exc_info=True)
 else:

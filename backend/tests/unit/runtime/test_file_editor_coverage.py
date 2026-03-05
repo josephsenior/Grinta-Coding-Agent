@@ -99,7 +99,7 @@ class TestFileEditorCoverageGaps:
         file_path = self.test_dir / "failed_restore.txt"
         self._write("failed_restore.txt", "content")
         backup: dict[str, str | None] = {str(file_path): "original"}
-        
+
         with patch.object(self.editor, "_write_file", side_effect=Exception("Restore error")):
              # Hit lines 568-572
              self.editor._rollback_transaction(backup)

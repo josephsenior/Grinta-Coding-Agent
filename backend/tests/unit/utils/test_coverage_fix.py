@@ -32,7 +32,7 @@ class TestImportUtilsFinal:
 
         class Impl(SameNameBase):
             pass
-        
+
         assert import_utils._impl_matches_base(Base, Impl) is True
 
 
@@ -48,7 +48,7 @@ class TestAsyncUtilsFinal:
         }
         pending_task = list(pending)[0]
         cast(Any, pending_task).get_coro.return_value = None  # Force "Unable to get task names"
-        
+
         with unittest.mock.patch("logging.getLogger") as mock_logger:
             async_utils._handle_pending_tasks(done, pending)
             mock_logger.return_value.error.assert_called()
@@ -63,9 +63,9 @@ class TestCircuitBreakerFinal:
         cb = circuit_breaker.CircuitBreaker("test")
         cb.state.state = "half_open"
         cb.state.half_open_probes_left = 0
-        
+
         async def dummy(): return "ok"
-        
+
         with pytest.raises(RuntimeError, match="circuit_half_open_block"):
             await cb.async_call(dummy)
 
@@ -75,9 +75,9 @@ class TestCircuitBreakerFinal:
         cb = circuit_breaker.CircuitBreaker("test")
         cb.state.state = "half_open"
         cb.state.half_open_probes_left = 1
-        
+
         async def success(): return "ok"
-        
+
         with unittest.mock.patch("backend.utils.circuit_breaker._CB_METRICS") as mock_metrics:
             await cb.async_call(success)
             mock_metrics.on_close_success.assert_called_with("test")
@@ -106,7 +106,7 @@ class TestShutdownFinal:
         """Covers lines where fallback_handler is None."""
         import backend.utils.shutdown_listener as mod
         import signal
-        
+
         with unittest.mock.patch("signal.signal") as mock_sig, \
              unittest.mock.patch("signal.getsignal", return_value=None):
             mod._register_signal_handler(signal.SIGINT)
@@ -121,7 +121,7 @@ class TestTenacityStopFinal:
     def test_stop_if_should_exit_exception(self):
         """Covers lines 33-37 (exception handling in mod.should_exit)."""
         stop_cond = tenacity_stop.stop_if_should_exit()
-        
+
         def side_effect(name):
             if name == "backend.utils.tenacity_stop":
                 m = unittest.mock.MagicMock()
@@ -137,7 +137,7 @@ class TestTenacityStopFinal:
     def test_stop_if_should_exit_local_fallback(self):
         """Covers line 38 (local fallback)."""
         stop_cond = tenacity_stop.stop_if_should_exit()
-        
+
         with unittest.mock.patch("backend.utils.tenacity_stop.should_exit", return_value=True):
             def side_effect_mock(name):
                 if name == "backend.utils.tenacity_stop":
@@ -145,7 +145,7 @@ class TestTenacityStopFinal:
                     m.should_exit.side_effect = Exception("fail")
                     return m
                 return importlib.import_module(name)
-            
+
             with unittest.mock.patch("importlib.import_module", side_effect=side_effect_mock):
                 assert stop_cond(cast(Any, unittest.mock.MagicMock())) is True
 
@@ -157,9 +157,9 @@ class TestPromptFinal:
         """Covers lines 243-244 (Message with no TextContent)."""
         from backend.core.message import Message, ImageContent
         from backend.utils.prompt import PromptManager
-        
+
         pm = unittest.mock.MagicMock(spec=PromptManager)
-        
+
         msg = Message(role="user", content=[ImageContent(image_urls=["http://example.com/img.png"])])
         state = unittest.mock.MagicMock()
         PromptManager.add_turns_left_reminder(pm, [msg], state)
@@ -183,5 +183,5 @@ class TestTenacityMetricsFinal:
         """Covers lines 128-129 (final catch-all)."""
         hook = tenacity_metrics.tenacity_after_factory("op")
         rs = unittest.mock.MagicMock()
-        rs.outcome = "not an object" 
+        rs.outcome = "not an object"
         hook(rs)

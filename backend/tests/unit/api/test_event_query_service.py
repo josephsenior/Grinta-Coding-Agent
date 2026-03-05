@@ -13,22 +13,22 @@ class MockEvent:
 @pytest.fixture
 def mock_event_store():
     store = MagicMock()
-    
+
     def search_events(start_id=0, end_id=None, reverse=False, filter=None, limit=None):
         # Very simple simulation of search_events logic
         if end_id is None:
             end_id = 9 # assumed cur_id-1 in mock
-        
+
         events = [MockEvent(i) for i in range(10)]
-        
+
         # normalized range [start_id, end_id] inclusive in this simulation
         # Wait, the real normalize_search_range does end_id = end_id + 1 if not None.
         # So [start_id, end_id] inclusive in common talk.
-        
+
         results = [e for e in events if start_id <= e.id <= end_id]
         if reverse:
             results.reverse()
-        
+
         if limit:
             results = results[:limit]
         return results
@@ -47,7 +47,7 @@ def test_get_contextual_events_text_range(mock_event_store):
         event_filter=None,
         context_size=2
     )
-    
+
     # Check lines
     lines = result.split("\n")
     # Expected: Event 3, Event 4, Event 5, Event 6, Event 7
@@ -75,7 +75,7 @@ def test_get_contextual_events_text_near_start(mock_event_store):
 def test_get_contextual_events_invalid_inputs(mock_event_store):
     with pytest.raises(ReplayError, match="event_id must be non-negative"):
         get_contextual_events_text(event_store=mock_event_store, event_id=-1, event_filter=None)
-    
+
     with pytest.raises(ReplayError, match="context_size must be non-negative"):
         get_contextual_events_text(event_store=mock_event_store, event_id=5, event_filter=None, context_size=-1)
 

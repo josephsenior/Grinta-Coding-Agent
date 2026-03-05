@@ -39,10 +39,10 @@ class AppState:
 
         # Eagerly loaded (cheap, no I/O)
         self.server_config: ServerConfig = server_config or load_server_config()
-        
+
         from backend.core.config.utils import load_forge_config
         self.config: ForgeConfig = load_forge_config()
-        
+
         workspace_base = os.path.expanduser(self.config.file_store_path)
         self.file_store: FileStore = LocalFileStore(workspace_base)
 
@@ -116,11 +116,11 @@ class AppState:
                     self.server_config.conversation_manager_class,
                 )
                 impl = self.get_conversation_manager_impl()
-                
+
                 # Ensure config is fresh before initializing manager
                 from backend.core.config.utils import load_forge_config
                 self.config = load_forge_config()
-                
+
                 self._conversation_manager = impl.get_instance(  # type: ignore[attr-defined]
                     self.sio,
                     self.config,

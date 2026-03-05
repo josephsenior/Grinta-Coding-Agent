@@ -23,8 +23,8 @@ if TYPE_CHECKING:
 
 class PythonREPL:
     """A stateful Python REPL environment.
-    
-    This REPL runs as a persistent subprocess, allowing state (variables, 
+
+    This REPL runs as a persistent subprocess, allowing state (variables,
     imports, functions) to be maintained across multiple execution calls.
     """
 
@@ -44,7 +44,7 @@ class PythonREPL:
         # Start python in unbuffered mode with a simple prompt
         # We use a unique sentinel to detect end of output
         self.sentinel = f"REPL_END_{os.urandom(8).hex()}"
-        
+
         # Command to start python REPL
         cmd = [
             sys.executable,
@@ -83,7 +83,7 @@ class PythonREPL:
         ]
         for line in setup_code:
             self.execute_raw(line)
-        
+
         # Wait for ready signal
         self._wait_for_sentinel("REPL_READY")
 
@@ -102,7 +102,7 @@ class PythonREPL:
         """Send raw code to the REPL stdin."""
         if not self.process or not self.process.stdin:
             raise RuntimeError("REPL process not started")
-        
+
         self.process.stdin.write(code + "\n")
         self.process.stdin.flush()
 
@@ -115,7 +115,7 @@ class PythonREPL:
         while True:
             if time.time() - start_time > effective_timeout:
                 return "".join(output) + f"\n[Timeout waiting for {sentinel}]"
-            
+
             try:
                 line = self.output_queue.get(timeout=0.1)
                 if sentinel in line:
@@ -125,7 +125,7 @@ class PythonREPL:
                 output.append(line)
             except queue.Empty:
                 continue
-        
+
         return "".join(output)
 
     def run_code(self, code: str) -> str:
@@ -138,15 +138,15 @@ class PythonREPL:
         sentinel_id = os.urandom(4).hex()
         start_sentinel = f"START_{sentinel_id}"
         end_sentinel = f"END_{sentinel_id}"
-        
+
         # We use print statements to mark boundaries
         full_code = f"print('{start_sentinel}')\n{code}\nprint('{end_sentinel}')"
-        
+
         self.execute_raw(full_code)
-        
+
         # First wait for start sentinel to clear previous junk
         self._wait_for_sentinel(start_sentinel)
-        
+
         # Then capture everything until end sentinel
         return self._wait_for_sentinel(end_sentinel).strip()
 
@@ -163,7 +163,7 @@ class PythonREPL:
 
 class REPLManager:
     """Manages REPL sessions for different working directories."""
-    
+
     def __init__(self):
         self._repls: dict[str, PythonREPL] = {}
 

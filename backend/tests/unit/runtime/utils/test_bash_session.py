@@ -30,16 +30,16 @@ class TestBashSession:
             mock_session = MagicMock()
             mock_window = MagicMock()
             mock_pane = MagicMock()
-            
+
             mock_server.new_session.return_value = mock_session
             mock_session.active_window = mock_window
             mock_window.active_pane = mock_pane
-            
+
             # Mock pane.cmd("capture-pane", ...)
             mock_cmd_result = MagicMock()
             mock_cmd_result.stdout = [""]
             mock_pane.cmd.return_value = mock_cmd_result
-            
+
             yield {
                 "server": mock_server,
                 "session": mock_session,
@@ -96,7 +96,7 @@ class TestBashSession:
     def test_execute_command_success(self, mock_should_continue, session, mock_tmux):
         mock_should_continue.return_value = True
         ps1_full = _fake_ps1_json_block(working_dir=session.work_dir, exit_code=0)
-        
+
         # We need to mock _get_pane_content to exit the loop eventually
         with patch.object(session, "_get_pane_content") as mock_get_content:
             mock_get_content.side_effect = [
@@ -108,10 +108,10 @@ class TestBashSession:
             ]
             action = CmdRunAction(command="echo hello world")
             action.set_hard_timeout(10.0)
-            
+
             with patch("time.sleep"):
                 result = session.execute(action)
-        
+
         assert "hello world" in result.content
         assert result.metadata.exit_code == 0
 
@@ -128,7 +128,7 @@ class TestBashSession:
 
         ps1_full = _fake_ps1_json_block(working_dir=session.work_dir, exit_code=0)
         running_output = ps1_full + "\nsleep 100\n"
-        
+
         action = CmdRunAction(command="sleep 100")
         action.set_hard_timeout(200.0, blocking=False)
 
@@ -140,7 +140,7 @@ class TestBashSession:
             ]
             with patch("time.sleep"):
                 result = session.execute(action)
-        
+
         assert "no new output" in result.metadata.suffix
         assert session.prev_status == BashCommandStatus.NO_CHANGE_TIMEOUT
 
@@ -158,7 +158,7 @@ class TestBashSession:
 
         ps1_full = _fake_ps1_json_block(working_dir=session.work_dir, exit_code=0)
         running_output = ps1_full + "\nsleep 100\n"
-        
+
         action = CmdRunAction(command="sleep 100")
         action.set_hard_timeout(10.0)
 
@@ -170,7 +170,7 @@ class TestBashSession:
             ]
             with patch("time.sleep"):
                 result = session.execute(action)
-            
+
         assert "timed out after 10.0 seconds" in result.metadata.suffix
         assert session.prev_status == BashCommandStatus.HARD_TIMEOUT
 
@@ -185,10 +185,10 @@ class TestBashSession:
             mock_server = MagicMock()
             mock_server.url = "http://localhost:8080"
             mock_detect.return_value = mock_server
-            
+
             session._detect_server_startup("Listening on port 8080")
             assert session._last_detected_server == mock_server
-            
+
             # get_detected_server should return and clear it
             assert session.get_detected_server() == mock_server
             assert session.get_detected_server() is None
@@ -202,11 +202,11 @@ class TestBashSession:
         if not hasattr(os, "geteuid"):
             assert session._should_use_su() is False
             return
-            
+
         with patch("os.geteuid", return_value=0):
             with patch("getpass.getuser", return_value="root"):
                 assert session._should_use_su() is True
-        
+
         with patch("os.geteuid", return_value=1000):
             assert session._should_use_su() is False
 
@@ -215,11 +215,11 @@ class TestBashSession:
         mock_session = MagicMock()
         mock_window = MagicMock()
         mock_pane = MagicMock()
-        
+
         # Test success on first attempt
         mock_session.active_window = mock_window
         mock_window.active_pane = mock_pane
-        
+
         w, p = session._get_window_and_pane_with_retry(mock_session)
         assert w == mock_window
         assert p == mock_pane

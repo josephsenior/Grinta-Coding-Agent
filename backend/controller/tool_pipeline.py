@@ -193,7 +193,7 @@ class BlackboardMiddleware(ToolInvocationMiddleware):
         if blackboard is None:
             from backend.controller.blackboard import Blackboard
             blackboard = Blackboard()
-        
+
         # If it somehow still fails
         if blackboard is None:
             ctx.block("blackboard_not_available")

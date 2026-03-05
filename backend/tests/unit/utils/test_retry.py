@@ -255,7 +255,7 @@ class TestRetryAsyncDecorator:
     def test_sync_retry_with_delay(self):
         """Test that sync retry actually sleeps (covers time.sleep)."""
         call_count = 0
-        
+
         @retry(
             config=RetryConfig(
                 max_attempts=2,
@@ -270,7 +270,7 @@ class TestRetryAsyncDecorator:
             if call_count == 1:
                 raise ValueError("fail")
             return "ok"
-            
+
         # We can mock time.sleep to verify it's called and avoid actually waiting
         with unittest.mock.patch("time.sleep") as mock_sleep:
             assert fail_once() == "ok"
@@ -281,7 +281,7 @@ class TestRetryAsyncDecorator:
     async def test_async_retry_with_delay(self):
         """Test that async retry actually sleeps (covers asyncio.sleep)."""
         call_count = 0
-        
+
         @retry(
             config=RetryConfig(
                 max_attempts=2,
@@ -296,13 +296,13 @@ class TestRetryAsyncDecorator:
             if call_count == 1:
                 raise ValueError("fail")
             return "ok"
-            
+
         with unittest.mock.patch("asyncio.sleep") as mock_sleep:
             # We must return a future/coro for patch with asyncio.sleep to work or use AsyncMock
             # In python 3.8+ AsyncMock is preferred
             mock_sleep.return_value = asyncio.Future()
             mock_sleep.return_value.set_result(None)
-            
+
             assert await async_fail_once() == "ok"
             assert call_count == 2
             mock_sleep.assert_called_once_with(0.01)
@@ -311,7 +311,7 @@ class TestRetryAsyncDecorator:
         """Test calling retry with func argument (not as decorator)."""
         def work():
             return "done"
-        
+
         # Line 260: return decorator(func)
         result = retry(work, max_attempts=3)
         assert result() == "done"

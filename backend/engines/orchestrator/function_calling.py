@@ -664,7 +664,7 @@ def _preview_str_replace_edit(
     diff_text = "\n".join(diff)
     if not diff_text:
         return AgentThinkAction(thought=f"[PREVIEW] No changes detected for {path}")
-    
+
     # Write the new text actually to the file to make changes "kept by default",
     # and write old text to a .orig file to do a VS Code native split diff.
     orig_path = f"{path}.orig"
@@ -681,7 +681,7 @@ def _preview_str_replace_edit(
         f'subprocess.run([\'code\', \'--wait\', \'--diff\', r\'{orig_path}\', r\'{path}\']);'
         f'os.remove(r\'{orig_path}\')"'
     )
-    
+
     return CmdRunAction(
         command=cmd,
         thought=f"[PREVIEW -> NATIVE DIFF] Edit applied to {path}. Opening native VS Code diff. Changes kept by default. You can undo and save in the editor if you reject them.",

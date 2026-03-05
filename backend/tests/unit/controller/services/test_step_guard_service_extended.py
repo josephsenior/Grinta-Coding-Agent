@@ -20,14 +20,14 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         stuck_svc.compute_repetition_score.return_value = 0.75
         stuck_svc.is_stuck.return_value = False
         self.controller.stuck_service = stuck_svc
-        
+
         state = MagicMock()
         state.turn_signals = MagicMock()
         self.controller.state = state
-        
+
         # Run
         result = await self.service._handle_stuck_detection(self.controller)
-        
+
         # Verify
         self.assertTrue(result)
         self.assertEqual(state.turn_signals.repetition_score, 0.75)
@@ -38,18 +38,18 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         stuck_svc.compute_repetition_score.return_value = 1.0
         stuck_svc.is_stuck.return_value = True
         self.controller.stuck_service = stuck_svc
-        
+
         self.controller.event_stream = MagicMock()
         state = MagicMock()
         self.controller.state = state
-        
+
         # Run first attempt
         result = await self.service._handle_stuck_detection(self.controller)
-        
+
         # Verify
         self.assertTrue(result)
         self.assertEqual(self.service._replan_attempts, 1)
-        
+
         # Check event emitted
         self.controller.event_stream.add_event.assert_called()
         args, kwargs = self.controller.event_stream.add_event.call_args
@@ -63,13 +63,13 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         stuck_svc.is_stuck.return_value = True
         self.controller.stuck_service = stuck_svc
         self.controller._react_to_exception = AsyncMock()
-        
+
         # Set attempts to max
         self.service._replan_attempts = 2
-        
+
         # Run
         result = await self.service._handle_stuck_detection(self.controller)
-        
+
         # Verify
         self.assertFalse(result)
         self.assertEqual(self.service._replan_attempts, 0)

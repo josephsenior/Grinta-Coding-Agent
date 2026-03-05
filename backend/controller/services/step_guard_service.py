@@ -48,21 +48,21 @@ class StepGuardService:
             logger.warning(
                 "Circuit breaker triggered CONTEXT SWITCH: %s", result.reason
             )
-            
+
             # Inject System Message directly to LLM context
             from backend.events.action import SystemMessageAction
             msg_content = result.system_message or result.recommendation
-            
+
             sys_msg = SystemMessageAction(content=msg_content)
             controller.event_stream.add_event(sys_msg, EventSource.ENVIRONMENT)
-            
+
             # Also emit a visible error obs so user sees it in UI
             error_obs = ErrorObservation(
                 content=f"[SYSTEM INTERVENTION]: {msg_content}",
                 error_id="CIRCUIT_BREAKER_SWITCH_CONTEXT",
             )
             controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
-            
+
             # Allow the step to proceed so agent can act on the message
             return True
 

@@ -73,7 +73,7 @@ class SessionManager:
             session_id = str(uuid.uuid4())
 
         logger.info("Creating session %s (cwd=%s)", session_id, cwd or self.work_dir)
-        
+
         try:
             session = create_shell_session(
                 work_dir=cwd or self.work_dir,

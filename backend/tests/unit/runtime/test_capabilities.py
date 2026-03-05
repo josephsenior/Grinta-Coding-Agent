@@ -231,7 +231,7 @@ class TestDetectCapabilities:
         class MockServer:
             def __init__(self, t):
                 self.type = t
-        
+
         class MockConfig:
             def __init__(self, svrs):
                 self.servers = svrs

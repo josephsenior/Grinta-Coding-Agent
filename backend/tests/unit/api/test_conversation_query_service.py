@@ -272,27 +272,27 @@ class TestResolveConversationStore:
         with patch("backend.api.services.conversation_query_service.get_conversation_store_instance") as mock_get:
             mock_store = MagicMock()
             mock_get.return_value = mock_store
-            
+
             await resolve_conversation_store(None, user_id="u1")
-            
+
             assert mock_get.called
 
     @pytest.mark.asyncio
     async def test_none_with_missing_user_id_calls_resolve_store(self):
         with patch("backend.api.utils.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = None
-            
+
             await resolve_conversation_store(None, user_id=MISSING)
-            
+
             mock_resolve.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_none_with_none_user_id_calls_resolve_store(self):
         with patch("backend.api.utils.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = None
-            
+
             await resolve_conversation_store(None, user_id=None)
-            
+
             mock_resolve.assert_called_once()
 
 
@@ -306,9 +306,9 @@ class TestSearchConversations:
     async def test_no_store_returns_empty_results(self):
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = None
-            
+
             result = await search_conversations()
-            
+
             assert isinstance(result, ConversationInfoResultSet)
             assert result.results == []
             assert result.next_page_id is None
@@ -321,15 +321,15 @@ class TestSearchConversations:
         result_set.results = [meta]
         result_set.next_page_id = "page-2"
         mock_store.search = AsyncMock(return_value=result_set)
-        
+
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = mock_store
-            
+
             with patch("backend.api.services.conversation_query_service.build_conversation_result_set") as mock_build:
                 mock_build.return_value = ConversationInfoResultSet(results=[], next_page_id="page-2")
-                
+
                 await search_conversations(page_id="page-1", limit=50)
-                
+
                 assert mock_store.search.called
 
     @pytest.mark.asyncio
@@ -341,15 +341,15 @@ class TestSearchConversations:
         result_set.results = [meta]
         result_set.next_page_id = None
         mock_store.search = AsyncMock(return_value=result_set)
-        
+
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = mock_store
-            
+
             with patch("backend.api.services.conversation_query_service.build_conversation_result_set") as mock_build:
                 mock_build.return_value = ConversationInfoResultSet(results=[], next_page_id=None)
-                
+
                 await search_conversations(selected_repository="repo1")
-                
+
                 assert mock_build.called
 
 
@@ -362,18 +362,18 @@ class TestBuildConversationResultSet:
     @pytest.mark.asyncio
     async def test_builds_result_set_from_conversations(self):
         meta = _make_metadata("c1")
-        
+
         with patch("backend.api.services.conversation_query_service._require_conversation_manager") as mock_req:
             mock_mgr = MagicMock()
             mock_mgr.get_connections = AsyncMock(return_value={})
             mock_mgr.get_agent_loop_info = AsyncMock(return_value=[])
             mock_req.return_value = mock_mgr
-            
+
             with patch("backend.api.services.conversation_query_service.wait_all") as mock_wait:
                 mock_wait.return_value = [MagicMock(conversation_id="c1")]
-                
+
                 result = await build_conversation_result_set([meta], None)
-                
+
                 assert isinstance(result, ConversationInfoResultSet)
                 assert result.next_page_id is None
 
@@ -388,21 +388,21 @@ class TestGetConversationDetails:
     async def test_returns_none_if_not_found(self):
         mock_store = MagicMock()
         mock_store.get_metadata = AsyncMock(side_effect=FileNotFoundError)
-        
+
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = mock_store
-            
+
             result = await get_conversation_details("c1")
-            
+
             assert result is None
 
     @pytest.mark.asyncio
     async def test_returns_none_if_no_store(self):
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = None
-            
+
             result = await get_conversation_details("c1")
-            
+
             assert result is None
 
     @pytest.mark.asyncio
@@ -410,10 +410,10 @@ class TestGetConversationDetails:
         meta = _make_metadata("c1")
         mock_store = MagicMock()
         mock_store.get_metadata = AsyncMock(return_value=meta)
-        
+
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = mock_store
-            
+
             with patch("backend.api.services.conversation_query_service._require_conversation_manager") as mock_req:
                 mock_mgr = MagicMock()
                 loop_info = MagicMock()
@@ -421,12 +421,12 @@ class TestGetConversationDetails:
                 mock_mgr.get_agent_loop_info = AsyncMock(return_value=[loop_info])
                 mock_mgr.get_connections = AsyncMock(return_value=None)
                 mock_req.return_value = mock_mgr
-                
+
                 with patch("backend.api.services.conversation_query_service.get_conversation_info") as mock_info:
                     mock_info.return_value = MagicMock()
-                    
+
                     result = await get_conversation_details("c1")
-                    
+
                     assert result is not None
 
 
@@ -440,21 +440,21 @@ class TestDeleteConversationEntry:
     async def test_returns_false_if_no_store(self):
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = None
-            
+
             result = await delete_conversation_entry("c1")
-            
+
             assert result is False
 
     @pytest.mark.asyncio
     async def test_returns_false_if_not_found(self):
         mock_store = MagicMock()
         mock_store.get_metadata = AsyncMock(side_effect=FileNotFoundError)
-        
+
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = mock_store
-            
+
             result = await delete_conversation_entry("c1")
-            
+
             assert result is False
 
     @pytest.mark.asyncio
@@ -463,23 +463,23 @@ class TestDeleteConversationEntry:
         mock_store = MagicMock()
         mock_store.get_metadata = AsyncMock(return_value=meta)
         mock_store.delete_metadata = AsyncMock()
-        
+
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = mock_store
-            
+
             with patch("backend.api.services.conversation_query_service._require_conversation_manager") as mock_req:
                 mock_mgr = MagicMock()
                 mock_mgr.is_agent_loop_running = AsyncMock(return_value=False)
                 mock_mgr.close_session = AsyncMock()
                 mock_req.return_value = mock_mgr
-                
+
                 with patch("backend.api.services.conversation_query_service.get_runtime_cls") as mock_runtime:
                     mock_rt = MagicMock()
                     mock_rt.delete = AsyncMock()
                     mock_runtime.return_value = mock_rt
-                    
+
                     result = await delete_conversation_entry("c1")
-                    
+
                     assert result is True
                     mock_store.delete_metadata.assert_called_once()
                     mock_rt.delete.assert_called_once()
@@ -490,21 +490,21 @@ class TestDeleteConversationEntry:
         mock_store = MagicMock()
         mock_store.get_metadata = AsyncMock(return_value=meta)
         mock_store.delete_metadata = AsyncMock()
-        
+
         with patch("backend.api.services.conversation_query_service.resolve_conversation_store") as mock_resolve:
             mock_resolve.return_value = mock_store
-            
+
             with patch("backend.api.services.conversation_query_service._require_conversation_manager") as mock_req:
                 mock_mgr = MagicMock()
                 mock_mgr.is_agent_loop_running = AsyncMock(return_value=True)
                 mock_mgr.close_session = AsyncMock()
                 mock_req.return_value = mock_mgr
-                
+
                 with patch("backend.api.services.conversation_query_service.get_runtime_cls") as mock_runtime:
                     mock_rt = MagicMock()
                     mock_rt.delete = AsyncMock()
                     mock_runtime.return_value = mock_rt
-                    
+
                     await delete_conversation_entry("c1")
-                    
+
                     mock_mgr.close_session.assert_called_once_with("c1")

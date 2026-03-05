@@ -89,7 +89,7 @@ def explore_tree_structure(
         node_id = entity_id
         if ":" in entity_id:
             node_id = entity_id.split(":")[1]
-            
+
         node = graph_store.get_node(node_id)
         if not node:
             # Try to resolve as file path
@@ -130,7 +130,7 @@ def explore_tree_structure(
                     "to_entity": neighbor["id"],
                     "dependency_type": neighbor["relationship"],
                 })
-        
+
         if direction in ("upstream", "both"):
             if node_id in graph_store.graph:
                 for pred in graph_store.graph.predecessors(node_id):
@@ -210,7 +210,7 @@ def get_entity_contents(
             # Find specific symbol
             if graph_rag is not None:
                 graph_rag.index_code_file(file_path, content)
-            
+
             node = graph_store.get_node(symbol_path)
             if node and node.get("line_start") and node.get("line_end"):
                 lines = content.splitlines()

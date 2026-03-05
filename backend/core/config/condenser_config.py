@@ -278,7 +278,7 @@ class SemanticCondenserConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     similarity_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     model_name: str = Field(default="all-MiniLM-L6-v2")
     token_budget: int | None = Field(default=None, ge=1)
-    
+
     model_config = ConfigDict(extra="forbid")
 
 

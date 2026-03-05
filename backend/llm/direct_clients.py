@@ -101,7 +101,7 @@ class LLMResponse:
             def __init__(self, name: str, arguments: str):
                 self.name = name
                 self.arguments = arguments
-            
+
             def model_dump(self):
                 return {"name": self.name, "arguments": self.arguments}
 
@@ -118,7 +118,7 @@ class LLMResponse:
                 for k, v in tc_dict.items():
                     if k not in ["id", "type", "function"]:
                         setattr(self, k, v)
-            
+
             def model_dump(self):
                 return {
                     "id": self.id,
@@ -409,7 +409,7 @@ class GeminiClient(DirectLLMClient):
     def __init__(self, model_name: str, api_key: str):
         self._model_name = model_name
         self.api_key = api_key
-        
+
         # Add timeout to prevent infinite hanging when the API is overloaded
         from google.genai.types import HttpOptions
         http_options = HttpOptions(timeout=120000) # 2 minutes
@@ -494,12 +494,12 @@ class GeminiClient(DirectLLMClient):
         import asyncio
         import aiohttp
         import httpx
-        
+
         if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
             return Timeout(str(exc), llm_provider="google", model=self.model_name)
         if isinstance(exc, (aiohttp.ClientError, httpx.RequestError)):
             return APIConnectionError(str(exc), llm_provider="google", model=self.model_name)
-            
+
         if isinstance(exc, APIError):
             error_str = str(exc).lower()
             if exc.code == 429 or "quota" in error_str or "rate limit" in error_str:

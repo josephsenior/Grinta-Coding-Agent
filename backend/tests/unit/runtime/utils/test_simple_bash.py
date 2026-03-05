@@ -48,11 +48,11 @@ class TestSimpleBashSession:
         mock_process.communicate.return_value = ("stdout_val", "")
         mock_process.returncode = 0
         mock_popen.return_value = mock_process
-        
+
         action = CmdRunAction(command="echo hello")
         action.set_hard_timeout(10.0)
         result = session.execute(action)
-        
+
         assert result.content == "stdout_val"
 
     @patch("subprocess.Popen")
@@ -62,7 +62,7 @@ class TestSimpleBashSession:
         mock_process.communicate.return_value = ("/new/path", "")
         mock_process.returncode = 0
         mock_popen.return_value = mock_process
-        
+
         action = CmdRunAction(command="cd /new/path")
         action.set_hard_timeout(10.0)
         session.execute(action)
@@ -81,7 +81,7 @@ class TestSimpleBashSession:
         ]
         mock_process.returncode = 0
         mock_popen.return_value = mock_process
-        
+
         action = CmdRunAction(command="sleep 100 &")
         action.set_hard_timeout(10.0)
         result = session.execute(action)
@@ -94,10 +94,10 @@ class TestSimpleBashSession:
         mock_process.communicate.return_value = ("123\n", "")
         mock_process.returncode = 0
         mock_popen.return_value = mock_process
-        
+
         # Mock register_pid to fail
         session._cancellation.register_pid.side_effect = Exception("Reg fail")
-        
+
         action = CmdRunAction(command="sleep 100 &")
         action.set_hard_timeout(10.0)
         result = session.execute(action)
@@ -114,7 +114,7 @@ class TestSimpleBashSession:
         mock_process = MagicMock()
         mock_process.communicate.side_effect = subprocess.TimeoutExpired(cmd="ls", timeout=10)
         mock_popen.return_value = mock_process
-        
+
         action = CmdRunAction(command="ls")
         action.set_hard_timeout(10.0)
         result = session.execute(action)

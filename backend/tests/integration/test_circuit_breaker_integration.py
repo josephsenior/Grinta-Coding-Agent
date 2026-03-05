@@ -20,18 +20,18 @@ class TestCircuitBreakerIntegration:
         mock_context = MagicMock()
         mock_controller = MagicMock(spec=AgentController)
         mock_context.get_controller.return_value = mock_controller
-        
+
         # Setup Event Stream
         mock_controller.event_stream = MagicMock()
         mock_controller.event_stream.add_event = MagicMock()
-        
+
         # Setup Circuit Breaker Service on Controller
         mock_cb_service = MagicMock()
         mock_controller.circuit_breaker_service = mock_cb_service
-        
+
         # Create StepGuardService with the mock context
         step_guard = StepGuardService(mock_context)
-        
+
         # Configure Circuit Breaker to return 'switch_context'
         mock_cb_service.check.return_value = CircuitBreakerResult(
             tripped=True,
@@ -40,24 +40,24 @@ class TestCircuitBreakerIntegration:
             system_message="SYSTEM INTERVENTION: Switch context immediately.",
             recommendation="Use escalate() or project_map()."
         )
-        
+
         # Execute
         can_step = await step_guard.ensure_can_step()
-        
+
         # Assert 1: Step should be allowed (True) so agent can process the new message
         assert can_step is True, "Step should be allowed for context switching"
-        
+
         # Assert 2: Verify SystemMessageAction injection
         # Check calls to event_stream.add_event
         calls = mock_controller.event_stream.add_event.call_args_list
         assert len(calls) >= 2, "Should add at least SystemMessage and ErrorObservation"
-        
+
         # Find SystemMessageAction
         sys_msg_call = next((call for call in calls if isinstance(call[0][0], SystemMessageAction)), None)
         assert sys_msg_call is not None, "SystemMessageAction was not added"
         sys_msg = sys_msg_call[0][0]
         assert "Switch context immediately" in sys_msg.content
-        
+
         # Find ErrorObservation
         error_obs_call = next((call for call in calls if isinstance(call[0][0], ErrorObservation)), None)
         assert error_obs_call is not None, "ErrorObservation was not added"
@@ -78,7 +78,7 @@ class TestCircuitBreakerIntegration:
         mock_cb_service = MagicMock()
         mock_controller.circuit_breaker_service = mock_cb_service
         step_guard = StepGuardService(mock_context)
-        
+
         # Configure Circuit Breaker to return 'stop'
         mock_cb_service.check.return_value = CircuitBreakerResult(
             tripped=True,
@@ -86,10 +86,10 @@ class TestCircuitBreakerIntegration:
             action="stop",
             recommendation="Restart."
         )
-        
+
         # Execute
         can_step = await step_guard.ensure_can_step()
-        
+
         # Assert
         assert can_step is False, "Step should be blocked for stop action"
         mock_controller.set_agent_state_to.assert_called() # Should call with STOPPED
