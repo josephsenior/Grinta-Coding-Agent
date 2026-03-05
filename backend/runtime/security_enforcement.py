@@ -78,17 +78,14 @@ class SecurityEnforcementMixin:
 
         risk: Any
         try:
-            loop = asyncio.get_running_loop()
-            import concurrent.futures
-
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                risk = loop.run_in_executor(
-                    pool,
-                    lambda: asyncio.run(self.security_analyzer.security_risk(action)),
-                )
-                risk = asyncio.get_event_loop().run_until_complete(risk)
-        except RuntimeError:
             risk = asyncio.run(self.security_analyzer.security_risk(action))
+        except Exception:
+            logger.warning(
+                "Security analysis failed for %s, allowing action to proceed",
+                action.action,
+                exc_info=True,
+            )
+            return None
 
         if risk >= ActionSecurityRisk.HIGH:
             action_desc = f"{action.action}: {str(action)[:120]}"

@@ -399,6 +399,14 @@ class Runtime(
 
         """
         if isinstance(event, Action):
+            action_type = type(event).__name__
+            action_id = getattr(event, "id", "?")
+            logger.info(
+                "[runtime %s] on_event received %s (id=%s), dispatching via run_or_schedule",
+                self.sid,
+                action_type,
+                action_id,
+            )
             run_or_schedule(self._handle_action(event))
 
     async def _export_latest_git_provider_tokens(self, event: Action) -> None:
@@ -513,6 +521,12 @@ class Runtime(
 
     async def _handle_action(self, event: Action) -> None:
         """Handle action execution with timeout, error handling, and observation processing."""
+        action_type = type(event).__name__
+        action_id = getattr(event, "id", "?")
+        logger.info(
+            "[runtime %s] _handle_action START %s (id=%s)",
+            self.sid, action_type, action_id,
+        )
         self._set_action_timeout(event)
 
         assert event.timeout is not None or (
@@ -522,14 +536,32 @@ class Runtime(
 
         try:
             observation = await self._execute_action(event)
+            logger.info(
+                "[runtime %s] _handle_action GOT observation %s for %s (id=%s)",
+                self.sid, type(observation).__name__, action_type, action_id,
+            )
         except PermissionError as e:
             observation = ErrorObservation(content=str(e))
         except (httpx.NetworkError, AgentRuntimeDisconnectedError) as e:
             self._handle_runtime_error(event, e, is_network_error=True)
-            return
+            # Always emit an observation so the controller isn't stuck
+            # waiting for the pending-action timeout.
+            observation = ErrorObservation(
+                content=f"Runtime error during action execution: {type(e).__name__}: {e}"
+            )
+            logger.warning(
+                "[runtime %s] _handle_action RUNTIME ERROR for %s (id=%s): %s",
+                self.sid, action_type, action_id, e,
+            )
         except Exception as e:
             self._handle_runtime_error(event, e, is_network_error=False)
-            return
+            observation = ErrorObservation(
+                content=f"Unexpected error during action execution: {type(e).__name__}: {e}"
+            )
+            logger.warning(
+                "[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s",
+                self.sid, action_type, action_id, type(e).__name__, e,
+            )
 
         if not self._process_observation(observation, event):
             return

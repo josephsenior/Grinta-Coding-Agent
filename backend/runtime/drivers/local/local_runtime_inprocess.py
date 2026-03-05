@@ -242,7 +242,11 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """Execute command via ActionExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
-        return call_async_from_sync(self._executor.run, 15.0, action)
+        # Use the action's own timeout (set by _set_action_timeout) plus a
+        # buffer for thread-pool scheduling, instead of the fixed 15s which
+        # was too short for commands with larger timeouts.
+        timeout = (action.timeout or 120) + 10
+        return call_async_from_sync(self._executor.run, timeout, action)
 
     def read(self, action: FileReadAction) -> Observation:
         """Read file via ActionExecutor."""

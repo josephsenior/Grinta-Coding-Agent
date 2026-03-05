@@ -101,6 +101,19 @@ def call_async_from_sync(
         return run()
     future = EXECUTOR.submit(run)
     futures.wait([future], timeout=timeout or None)
+    if not future.done():
+        _logger.warning(
+            "call_async_from_sync: future not done after %.1fs timeout for %s",
+            timeout,
+            getattr(corofn, "__name__", corofn),
+        )
+        # Cancel to avoid indefinite blocking.  result() with a timeout
+        # ensures we don't park the calling thread forever.
+        future.cancel()
+        raise TimeoutError(
+            f"call_async_from_sync timed out after {timeout}s for "
+            f"{getattr(corofn, '__name__', corofn)}"
+        )
     return future.result()
 
 

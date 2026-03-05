@@ -65,7 +65,10 @@ if __name__ == '__main__':
         )
         os.environ['PORT'] = str(port)
 
-    reload_enabled = os.environ.get('FORGE_ENV', 'development') != 'production'
+    reload_enabled = (
+        os.environ.get('FORGE_ENV', 'development') != 'production'
+        and os.environ.get('FORGE_WATCH', '1') != '0'
+    )
     print(f'Starting Forge server on http://{host}:{port}')
     print('Press Ctrl+C to stop the server.\n')
 
