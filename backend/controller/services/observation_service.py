@@ -5,6 +5,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from backend.controller.state.state import AgentState
+from backend.core.logger import forge_logger as logger
 from backend.events.event import EventSource
 from backend.events.observation import Observation
 from backend.events.serialization.event import truncate_content
@@ -12,7 +13,7 @@ from backend.events.serialization.event import truncate_content
 if TYPE_CHECKING:
     from backend.controller.services.controller_context import ControllerContext
     from backend.controller.services.pending_action_service import PendingActionService
-    from backend.controller.state.context import ToolInvocationContext
+    from backend.controller.tool_pipeline import ToolInvocationContext
     from backend.engines.orchestrator.action_verifier import ActionVerifier
 
 
@@ -64,6 +65,15 @@ class ObservationService:
     ) -> None:
         pending_action = self._pending_service.get()
         if not (pending_action and pending_action.id == observation.cause):
+            # Log mismatch for debugging stuck-agent issues
+            if observation.cause is not None:
+                pending_id = getattr(pending_action, "id", None) if pending_action else None
+                logger.debug(
+                    "Observation cause=%s did not match pending action id=%s (type=%s)",
+                    observation.cause,
+                    pending_id,
+                    type(observation).__name__,
+                )
             return
 
         # Plugin hook: action_post

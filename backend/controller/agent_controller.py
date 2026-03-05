@@ -185,6 +185,14 @@ class AgentController:
         """Initializes a new instance of the AgentController class."""
         self.config = config
 
+        # Capture the main event loop so step() can schedule tasks on it
+        # even when called from EventStream's thread-pool dispatcher
+        # (which runs on throw-away event loops).
+        try:
+            self._main_loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
+        except RuntimeError:
+            self._main_loop = None
+
         # Attributes set by telemetry service during pipeline initialization
         self._planning_middleware_enabled: bool = False
         self._reflection_middleware_enabled: bool = False
@@ -204,6 +212,9 @@ class AgentController:
         # When a step is requested while another is running, this flag ensures
         # the dropped request is re-queued after the current step completes.
         self._step_pending = False
+        # Suppresses memory-pressure condensation signalling during batch drain
+        # so that pending actions are not disrupted mid-batch.
+        self._draining_batch = False
 
         # Initialize core state via lifecycle service
         self.services.lifecycle.initialize_core_attributes(
@@ -349,18 +360,42 @@ class AgentController:
         Creates an async task for step execution if one is not already running.
         Otherwise, marks the current step as pending to re-trigger after completion.
         Maintains a strong reference to the task to prevent garbage collection.
+
+        The task is always scheduled on the main event loop (captured during
+        __init__) because this method is often called from EventStream's
+        thread-pool dispatcher which runs disposable event loops.
         """
         if self._step_task and not self._step_task.done():
-            # Lock is likely held, or task is about to acquire it
             self._step_pending = True
             return
 
-        self._step_task = asyncio.create_task(self._step_with_exception_handling())
+        # Always schedule on the main event loop, not the caller's loop.
+        main_loop = self._main_loop
+        if main_loop is not None and main_loop.is_running():
+            main_loop.call_soon_threadsafe(self._create_step_task)
+        else:
+            # Fallback: we ARE on the main loop (e.g. headless / CLI mode)
+            self._create_step_task()
+
+    def _create_step_task(self) -> None:
+        """Create the step task on the current (main) running loop."""
+        # Guard: another step may have been scheduled between call_soon_threadsafe
+        # and actual execution on the main loop.
+        if self._step_task and not self._step_task.done():
+            self._step_pending = True
+            return
+        from backend.utils.async_utils import create_tracked_task
+        self._step_task = create_tracked_task(
+            self._step_with_exception_handling(),
+            name="agent-step",
+        )
 
     async def _step_with_exception_handling(self) -> None:
         """Execute agent step with comprehensive exception handling."""
         try:
             await self._step()
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             await self.exception_handler.handle_step_exception(e)
 
@@ -502,9 +537,20 @@ class AgentController:
             # streaming could kick off a second LLM call while the agent
             # state is still RUNNING.
             await asyncio.sleep(0)
-            # Drain any steps that were requested while we held the lock
-            while self._step_pending:
+            # Drain any steps that were requested while we held the lock.
+            # If _step_inner returns early (e.g. can_step() is False because
+            # a pending action exists), do NOT lose the request — keep
+            # _step_pending True so the next trigger retries correctly.
+            drain_attempts = 0
+            while self._step_pending and drain_attempts < 10:
+                drain_attempts += 1
                 self._step_pending = False
+                if not self.step_prerequisites.can_step():
+                    # Can't step right now (e.g. pending action exists).
+                    # Don't lose the request — it will be re-triggered by
+                    # observation_service.trigger_step() when the pending
+                    # action clears, or by the watchdog timer.
+                    break
                 await self._step_inner()
 
     async def _step_inner(self) -> None:
@@ -551,13 +597,19 @@ class AgentController:
         # P2-B: First, try to execute all pending read-only actions in parallel.
         # If all are reads/searches, asyncio.gather runs them concurrently,
         # saving turns on research-heavy tasks. Falls back to serial if mixed.
-        if not await self._try_parallel_read_batch():
-            while self._can_drain_pending():
-                action = await self.action_execution.get_next_action()
-                if action is None:
-                    break
-                await self.action_execution.execute_action(action)
-                await self._handle_post_execution()
+        self._draining_batch = True
+        try:
+            if not await self._try_parallel_read_batch():
+                while self._can_drain_pending():
+                    action = await self.action_execution.get_next_action()
+                    if action is None:
+                        break
+                    await self.action_execution.execute_action(action)
+                    await self._handle_post_execution()
+        finally:
+            self._draining_batch = False
+        # Deferred condensation check after batch drain completes.
+        await self._handle_post_execution()
 
     # Action types that are safe to run concurrently (pure reads, no side effects)
     _PARALLEL_SAFE_ACTION_TYPES: ClassVar[tuple[str, ...]] = (
@@ -633,8 +685,8 @@ class AgentController:
         if llm_lat and llm_lat > 0:
             self.rate_governor.record_llm_latency(llm_lat)
 
-        # Proactive condensation on memory pressure
-        if self.memory_pressure.should_condense():
+        # Proactive condensation on memory pressure (deferred during batch drain)
+        if not self._draining_batch and self.memory_pressure.should_condense():
             level = "CRITICAL" if self.memory_pressure.is_critical() else "WARNING"
             logger.warning(
                 "Memory pressure %s (RSS=%.0f MB) — signalling condensation",

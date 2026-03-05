@@ -51,7 +51,7 @@ from backend.api.otel_config import (
     get_effective_http_sample,
 )
 
-mcp_app = mcp_server.http_app(path="/mcp", stateless_http=True)
+mcp_app = mcp_server.http_app(path="/mcp", stateless_http=True, json_response=True)
 
 
 def combine_lifespans(*lifespans):
@@ -213,6 +213,11 @@ def _check_mcp_host_config(warnings: list[str]) -> None:
 @asynccontextmanager
 async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
     """Manage application-specific resources during startup/shutdown."""
+    # Register the main event loop so background threads (EventStream
+    # dispatch, etc.) can schedule coroutines on it via run_or_schedule.
+    from backend.utils.async_utils import set_main_event_loop
+    set_main_event_loop()
+
     # ── Config validation (fail fast on misconfiguration) ───────────────
     # Reload config to ensure it picks up any changes made to settings.json
     from backend.core.config.utils import load_forge_config

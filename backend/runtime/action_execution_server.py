@@ -750,6 +750,14 @@ class ActionExecutor:
 
                 servers = getattr(cfg, "servers", []) or []
                 if _is_windows_stdio_mcp_disabled():
+                    skipped = [s for s in servers if getattr(s, "type", None) == "stdio"]
+                    if skipped:
+                        names = [getattr(s, "name", "?") for s in skipped]
+                        logger.warning(
+                            "Skipping %d stdio MCP server(s) on Windows (disabled by default): %s. "
+                            "Set FORGE_ENABLE_WINDOWS_MCP=1 to enable.",
+                            len(skipped), ", ".join(names),
+                        )
                     servers = [
                         s for s in servers if getattr(s, "type", None) != "stdio"
                     ]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from backend.core.logger import forge_logger as logger
 from backend.core.exceptions import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
@@ -58,14 +59,57 @@ class ActionExecutionService:
                     # Prefer the async step path (real LLM streaming) when
                     # available; fall back to synchronous step() otherwise.
                     import asyncio as _asyncio
+
                     agent = self._context.agent
                     astep = getattr(agent, "astep", None)
                     if astep is not None and _asyncio.iscoroutinefunction(astep):
-                        action = await astep(self._context.state)
+                        logger.info(
+                            "ActionExecutionService.get_next_action: invoking astep "
+                            "for agent=%s (attempt=%d)",
+                            getattr(agent, "name", agent.__class__.__name__),
+                            attempt,
+                        )
+                        timeout = getattr(
+                            getattr(agent, "config", None),
+                            "llm_step_timeout_seconds",
+                            60,
+                        )
+                        try:
+                            action = await _asyncio.wait_for(
+                                astep(self._context.state),
+                                timeout=timeout,
+                            )
+                        except _asyncio.TimeoutError:
+                            from backend.llm.exceptions import Timeout as LLMTimeout
+
+                            model_name = None
+                            try:
+                                llm = getattr(agent, "llm", None)
+                                model_name = getattr(
+                                    getattr(llm, "config", None), "model", None
+                                )
+                            except Exception:
+                                pass
+                            logger.error(
+                                "ActionExecutionService.get_next_action: astep timed out "
+                                "after %s seconds for model=%s",
+                                timeout,
+                                model_name,
+                            )
+                            raise LLMTimeout(
+                                f"LLM step timed out after {timeout} seconds",
+                                model=model_name,
+                            )
                     else:
                         action = agent.step(self._context.state)
                 action.source = EventSource.AGENT
 
+                logger.info(
+                    "ActionExecutionService.get_next_action: obtained action=%s "
+                    "from agent=%s",
+                    getattr(action, "action", type(action).__name__),
+                    getattr(self._context.agent, "name", self._context.agent.__class__.__name__),
+                )
                 return action
 
             except (
@@ -99,7 +143,17 @@ class ActionExecutionService:
                     await asyncio.sleep(0.01)
                     continue
 
-                # If out of retries, return None (will stop the agent or trigger handle_step_exception)
+                # If out of retries, transition to ERROR so the agent doesn't
+                # stay stuck in RUNNING state indefinitely.
+                from backend.core.schemas import AgentState as _AgentState
+                controller = self._context.get_controller()
+                if controller.get_agent_state() == _AgentState.RUNNING:
+                    logger.error(
+                        "get_next_action exhausted %d repair attempts; "
+                        "transitioning to ERROR state",
+                        max_repair_attempts,
+                    )
+                    await controller.set_agent_state_to(_AgentState.ERROR)
                 return None
                 
             except (ContextWindowExceededError, BadRequestError, OpenAIError) as exc:
@@ -130,12 +184,13 @@ class ActionExecutionService:
         pipeline = self._context.tool_pipeline
         if action.runnable and pipeline:
             ctx = pipeline.create_context(action, self._context.state)
-            self._context.register_action_context(action, ctx)
-            await pipeline.run_plan(ctx)
-            await self._context.iteration_service.apply_dynamic_iterations(ctx)
-            if ctx.blocked:
-                self._context.telemetry_service.handle_blocked_invocation(action, ctx)
-                return
+            if ctx is not None:
+                self._context.register_action_context(action, ctx)
+                await pipeline.run_plan(ctx)
+                await self._context.iteration_service.apply_dynamic_iterations(ctx)
+                if ctx.blocked:
+                    self._context.telemetry_service.handle_blocked_invocation(action, ctx)
+                    return
         await self._context.run_action(action, ctx)
 
     async def _handle_context_window_error(self, exc: Exception) -> Action | None:

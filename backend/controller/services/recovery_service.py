@@ -97,8 +97,19 @@ class RecoveryService:
             APIConnectionError,
             AuthenticationError,
             RateLimitError,
+            Timeout,
         )
 
+        if isinstance(exc, Timeout):
+            return (
+                "⏱️ Request timed out\n\n"
+                "The model took too long to respond (e.g. network or overload).\n\n"
+                "**What you can do:**\n"
+                "• Try again in a moment\n"
+                "• Increase timeout via FORGE_LLM_STEP_TIMEOUT_SECONDS (default 60s)\n"
+                "• Try a different model if the current one is slow\n\n"
+                f"**Details:** {exc}"
+            )
         if isinstance(exc, APIConnectionError):
             return (
                 f"⚠️ API Connection Error\n\n"

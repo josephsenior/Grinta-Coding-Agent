@@ -70,6 +70,10 @@ export const useSessionStore = create<SessionState>()(
           if (typeof chunk === "string") {
             state.streamingContent += chunk;
           }
+          // Still track the event ID so the dedup ref in use-socket stays in sync
+          if (event.id > state.latestEventId) {
+            state.latestEventId = event.id;
+          }
           // Don't add streaming chunks to events array
           return;
         }

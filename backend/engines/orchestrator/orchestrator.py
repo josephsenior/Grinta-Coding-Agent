@@ -55,10 +55,17 @@ if TYPE_CHECKING:
     from backend.events.stream import EventStream
 
 
+def _escape_ps_path(path: str) -> str:
+    """Escape a file path for safe use in a PowerShell double-quoted string."""
+    # Backtick-escape characters special to PowerShell double-quoted strings.
+    return path.replace('`', '``').replace('"', '`"').replace('$', '`$')
+
+
 def _build_full_file_read_command(path: str, is_windows: bool) -> str:
     """Build command to read entire file."""
     if is_windows:
-        return f'Write-Output "=== FILE: {path} ===" ; Get-Content "{path}"'
+        safe = _escape_ps_path(path)
+        return f'Write-Output "=== FILE: {safe} ===" ; Get-Content "{safe}" -Encoding UTF8'
     return f'echo "=== FILE: {path} ===" && cat "{path}"'
 
 
@@ -68,11 +75,12 @@ def _build_partial_file_read_command(
     """Build command to read file lines [start, end). end=-1 means to end."""
     header = f'lines {start + 1}-{end}' if end != -1 else f'lines {start + 1}+'
     if is_windows:
-        win_header = f'Write-Output "=== FILE: {path} ({header}) ===" ; '
+        safe = _escape_ps_path(path)
+        win_header = f'Write-Output "=== FILE: {safe} ({header}) ===" ; '
         if end == -1:
-            return win_header + f'Get-Content "{path}" | Select-Object -Skip {start}'
+            return win_header + f'Get-Content "{safe}" -Encoding UTF8 | Select-Object -Skip {start}'
         count = end - start
-        return win_header + f'Get-Content "{path}" | Select-Object -Skip {start} -First {count}'
+        return win_header + f'Get-Content "{safe}" -Encoding UTF8 | Select-Object -Skip {start} -First {count}'
     unix_header = f'echo "=== FILE: {path} ({header}) ===" && '
     if end == -1:
         return unix_header + f'tail -n +{start + 1} "{path}"'
@@ -191,9 +199,10 @@ class Orchestrator(Agent):
         self.memory_manager: MemoryManagerProtocol = self._memory_manager_impl
 
         # Register vector-memory callback for the semantic_recall tool
-        orchestrator_function_calling.register_semantic_recall(
-            self.conversation_memory.recall_from_memory
-        )
+        if self.conversation_memory is not None:
+            orchestrator_function_calling.register_semantic_recall(
+                self.conversation_memory.recall_from_memory
+            )
 
         # Planner/executor wiring
         self.planner: PlannerProtocol = OrchestratorPlanner(
@@ -700,7 +709,7 @@ class Orchestrator(Agent):
             )
         )
         self.pending_actions.append(recovery_think)
-        self.pending_actions.append(build_recall_action({"key": "all"}))
+        self.pending_actions.append(build_recall_action("all"))
 
     def _maybe_inject_reflection(self, state: State | None = None) -> Action | None:
         """Inject a structured self-reflection think action every N steps.

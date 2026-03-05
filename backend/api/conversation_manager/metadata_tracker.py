@@ -13,7 +13,8 @@ from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import forge_logger as logger
-from backend.core.schemas import ObservationType
+from backend.core.schemas import EventSource, ObservationType
+from backend.events.action import MessageAction
 from backend.events.observation.commands import CmdOutputObservation
 from backend.api.constants import ROOM_KEY
 from backend.utils.async_utils import (
@@ -115,7 +116,7 @@ class ConversationMetadataTracker:
         self._update_metrics_from_event(conversation, event)
         await self._handle_git_event(conversation_id, conversation, event)
         await self._update_conversation_title(
-            conversation_id, conversation, user_id, settings, llm_registry
+            conversation_id, conversation, user_id, settings, llm_registry, event
         )
 
         await conversation_store.save_metadata(conversation)
@@ -239,6 +240,16 @@ class ConversationMetadataTracker:
     # Title auto-generation
     # ------------------------------------------------------------------ #
 
+    @staticmethod
+    def _is_user_message_event(event: Any) -> bool:
+        """True if event is a user message (triggers title generation)."""
+        if not event:
+            return False
+        if not isinstance(event, MessageAction):
+            return False
+        src = getattr(event, "source", None)
+        return src == EventSource.USER
+
     async def _update_conversation_title(
         self,
         conversation_id: str,
@@ -246,11 +257,20 @@ class ConversationMetadataTracker:
         user_id: str | None,
         settings: Settings,
         llm_registry: LLMRegistry,
+        event: Any = None,
     ) -> None:
         default_title = get_default_conversation_title(conversation_id)
 
         if conversation.title != default_title:
             return
+
+        # Only run LLM title generation for user message events to avoid
+        # 4+ concurrent Gemini calls (one per event) competing with the agent.
+        if not self._is_user_message_event(event):
+            return
+
+        # Defer 5s so the agent's first LLM call gets priority (avoids 503/throttle).
+        await asyncio.sleep(5)
 
         title = await auto_generate_title(
             conversation_id, user_id, self._file_store, settings, llm_registry

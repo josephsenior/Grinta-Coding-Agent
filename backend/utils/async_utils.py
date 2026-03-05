@@ -221,6 +221,34 @@ def _run_in_loop(
     return future.result(timeout=timeout)
 
 
+# ---------------------------------------------------------------------------
+# Main event loop registry
+# ---------------------------------------------------------------------------
+# The application's main event loop (typically uvicorn's) is registered here
+# so that ``run_or_schedule`` can dispatch coroutines to it even when called
+# from background threads (e.g. EventStream's ThreadPoolExecutor dispatch).
+# Without this, ``run_or_schedule`` would create throw-away event loops whose
+# tasks are orphaned as soon as ``run_until_complete`` finishes.
+_main_event_loop: asyncio.AbstractEventLoop | None = None
+
+
+def set_main_event_loop(loop: asyncio.AbstractEventLoop | None = None) -> None:
+    """Register the application's main event loop.
+
+    Call this once from the application startup (e.g. FastAPI lifespan).
+    If *loop* is ``None``, the currently running loop is used.
+    """
+    global _main_event_loop  # noqa: PLW0603
+    if loop is None:
+        loop = asyncio.get_running_loop()
+    _main_event_loop = loop
+
+
+def get_main_event_loop() -> asyncio.AbstractEventLoop | None:
+    """Return the registered main event loop, or ``None``."""
+    return _main_event_loop
+
+
 def get_active_loop() -> asyncio.AbstractEventLoop | None:
     """Get the currently running event loop, if any.
 
@@ -236,24 +264,49 @@ def get_active_loop() -> asyncio.AbstractEventLoop | None:
     return None
 
 
+def _schedule_on_main_loop(coro: Coroutine[Any, Any, Any]) -> None:
+    """Schedule *coro* as a tracked task on the main event loop.
+
+    Called via ``call_soon_threadsafe`` so the actual
+    ``create_tracked_task`` happens inside the main loop's thread.
+    """
+    try:
+        create_tracked_task(coro, name="run_or_schedule")
+    except RuntimeError:
+        # Loop was closed between the threadsafe call and execution.
+        _logger.debug("Main loop closed before run_or_schedule task could be created")
+
+
 def run_or_schedule(coro: Coroutine[Any, Any, Any]) -> None:
     """Execute *coro* on an event loop, creating one if necessary.
 
     This centralises a pattern that was previously duplicated across
     ``AgentController``, ``Runtime``, ``Session``, and ``Memory``:
 
-    1. If a loop is already running → schedule *coro* as a background task.
-    2. Otherwise obtain (or create) a loop and ``run_until_complete``.
+    1. If a loop is already running in the current thread → schedule
+       *coro* as a background task on that loop.
+    2. If a main loop has been registered (via :func:`set_main_event_loop`)
+       and it is still running → schedule *coro* on it via
+       ``call_soon_threadsafe``.
+    3. Otherwise fall back to a synchronous ``run_until_complete`` on a
+       fresh disposable loop.
 
     The function is intentionally fire-and-forget; callers that need the
     result should ``await`` the coroutine directly instead.
     """
+    # 1. Currently inside a running loop → create a task directly.
     loop = get_active_loop()
     if loop is not None:
         create_tracked_task(coro, name="run_or_schedule")
         return
 
-    # No running loop — fall back to synchronous execution.
+    # 2. Dispatch to the registered main loop (from a background thread).
+    main = _main_event_loop
+    if main is not None and main.is_running():
+        main.call_soon_threadsafe(_schedule_on_main_loop, coro)
+        return
+
+    # 3. No running loop — fall back to synchronous execution.
     loop = asyncio.new_event_loop()
     try:
         asyncio.set_event_loop(loop)

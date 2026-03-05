@@ -37,6 +37,7 @@ from backend.core.config.env_loader import (
 )
 from backend.core.config.env_loader import restore_environment
 from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.llm_config import LLMConfig
 from backend.core.config.model_rebuild import rebuild_config_models
 from backend.core.constants import JWT_SECRET_FILE as JWT_SECRET
 from backend.storage import get_file_store
@@ -266,36 +267,53 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
         if "security_analyzer" in data and data["security_analyzer"]:
             cfg.security.security_analyzer = data["security_analyzer"]
 
-        # LLM
-        llm = cfg.get_llm_config()
-        if "llm_model" in data and data["llm_model"]:
-            llm.model = data["llm_model"]
-        if "llm_api_key" in data and data["llm_api_key"]:
-            llm.api_key = SecretStr(data["llm_api_key"])
-        if "llm_base_url" in data and data["llm_base_url"]:
-            llm.base_url = data["llm_base_url"]
-        if "llm_temperature" in data and data["llm_temperature"] is not None:
-            llm.temperature = data["llm_temperature"]
-        if "llm_top_p" in data and data["llm_top_p"] is not None:
-            llm.top_p = data["llm_top_p"]
-        if (
-            "llm_max_output_tokens" in data
-            and data["llm_max_output_tokens"] is not None
-        ):
-            llm.max_output_tokens = data["llm_max_output_tokens"]
-        if "llm_timeout" in data and data["llm_timeout"] is not None:
-            llm.timeout = data["llm_timeout"]
-        if "llm_num_retries" in data and data["llm_num_retries"] is not None:
-            llm.num_retries = data["llm_num_retries"]
-        if (
-            "llm_custom_llm_provider" in data
-            and data["llm_custom_llm_provider"] is not None
-        ):
-            llm.custom_llm_provider = data["llm_custom_llm_provider"]
-        if "llm_caching_prompt" in data and data["llm_caching_prompt"] is not None:
-            llm.caching_prompt = data["llm_caching_prompt"]
-        if "llm_disable_vision" in data and data["llm_disable_vision"] is not None:
-            llm.disable_vision = data["llm_disable_vision"]
+        # LLM — build from data without creating an empty LLMConfig() first,
+        # so we never trigger "No API key found" during load when the key is in JSON.
+        llm_keys = ("llm_model", "llm_api_key", "llm_base_url", "llm_temperature")
+        if any(k in data for k in llm_keys) or "llm_model" in data:
+            from backend.core.constants import DEFAULT_LLM_MODEL
+
+            base = cfg.llms.get("llm")
+            llm_dict = (
+                base.model_dump(exclude_none=True)
+                if base
+                else {"model": DEFAULT_LLM_MODEL}
+            )
+            if "llm_model" in data and data["llm_model"]:
+                llm_dict["model"] = data["llm_model"]
+            if "llm_api_key" in data and data["llm_api_key"]:
+                llm_dict["api_key"] = data["llm_api_key"]
+            if "llm_base_url" in data and data["llm_base_url"]:
+                llm_dict["base_url"] = data["llm_base_url"]
+            if "llm_temperature" in data and data["llm_temperature"] is not None:
+                llm_dict["temperature"] = data["llm_temperature"]
+            if "llm_top_p" in data and data["llm_top_p"] is not None:
+                llm_dict["top_p"] = data["llm_top_p"]
+            if (
+                "llm_max_output_tokens" in data
+                and data["llm_max_output_tokens"] is not None
+            ):
+                llm_dict["max_output_tokens"] = data["llm_max_output_tokens"]
+            if "llm_timeout" in data and data["llm_timeout"] is not None:
+                llm_dict["timeout"] = data["llm_timeout"]
+            if "llm_num_retries" in data and data["llm_num_retries"] is not None:
+                llm_dict["num_retries"] = data["llm_num_retries"]
+            if (
+                "llm_custom_llm_provider" in data
+                and data["llm_custom_llm_provider"] is not None
+            ):
+                llm_dict["custom_llm_provider"] = data["llm_custom_llm_provider"]
+            if (
+                "llm_caching_prompt" in data
+                and data["llm_caching_prompt"] is not None
+            ):
+                llm_dict["caching_prompt"] = data["llm_caching_prompt"]
+            if (
+                "llm_disable_vision" in data
+                and data["llm_disable_vision"] is not None
+            ):
+                llm_dict["disable_vision"] = data["llm_disable_vision"]
+            cfg.set_llm_config(LLMConfig.model_validate(llm_dict))
 
         # Default Agent config
         agent_name = data.get("agent") or "Orchestrator"

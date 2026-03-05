@@ -17,9 +17,13 @@ export function useSocket(conversationId: string | undefined) {
     setReconnecting,
   } = useSessionStore();
 
-  // Keep latestEventId in a ref so reconnection always uses current value
+  // Keep latestEventId in a ref so reconnection always uses current value.
+  // Only allow the ref to advance forward — never regress — so that the
+  // callback's fast-path update (before React re-renders) is not overwritten.
   const latestEventIdRef = useRef(latestEventId);
-  latestEventIdRef.current = latestEventId;
+  if (latestEventId > latestEventIdRef.current) {
+    latestEventIdRef.current = latestEventId;
+  }
 
   // Track whether this is the initial mount to avoid double-connect in StrictMode
   const connectedRef = useRef(false);

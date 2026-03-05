@@ -36,6 +36,7 @@ class ModelResponse(Protocol):
 
     choices: list
     id: str
+    tool_calls: list[Any] | None  # OpenAI-style function/tool calls (optional)
 
 
 @dataclass(slots=True)
@@ -173,81 +174,59 @@ class OrchestratorExecutor:
         params: dict,
         event_stream: EventStream | None,
     ) -> ExecutionResult:
-        """Execute LLM call with real async streaming.
+        """Execute LLM call with async interface, using completion under the hood.
 
-        Uses the LLM's ``astream()`` method so tokens are emitted to
-        the event stream as they arrive from the provider, rather than
-        post-hoc chunking a completed response.
+        Runs the sync ``LLM.completion()`` in a thread so the event loop is never
+        blocked by provider SDKs (e.g. google-genai can block inside its async API).
+        Then emits streaming chunks from the final response (post-hoc streaming).
         """
-        from backend.events.action.message import StreamingChunkAction
-        from backend.events.event import EventSource
-        from backend.llm.direct_clients import LLMResponse
 
         start_time = time.time()
         error_message: str | None = None
 
         call_params = dict(params)
-        call_params.pop("stream", None)  # astream handles stream=True internally
+        call_params.pop("stream", None)
+        call_params["stream"] = False
 
         ckpt_token = self._checkpoint.begin(call_params)
 
-        accumulated_text = ""
-        tool_call_deltas: dict[int, dict[str, Any]] = {}
-        response_id = ""
-        response_model = call_params.get("model", "")
+        timeout_seconds = float(os.getenv("FORGE_LLM_STEP_TIMEOUT_SECONDS", "60"))
+
+        response: ModelResponse | None = None
+        loop = asyncio.get_running_loop()
 
         try:
-            async for chunk in self._llm.astream(**call_params):
-                choices = chunk.get("choices")
-                if not choices:
-                    continue
+            logger.info(
+                "OrchestratorExecutor.async_execute: calling LLM.completion (in thread) "
+                "with model=%s and keys=%s",
+                getattr(getattr(self._llm, "config", None), "model", None),
+                sorted(call_params.keys()),
+            )
+            thread_task = loop.run_in_executor(
+                None, lambda: self._llm.completion(**call_params)
+            )
+            response = await asyncio.wait_for(thread_task, timeout=timeout_seconds)
+        except (asyncio.TimeoutError, asyncio.CancelledError) as exc:
+            from backend.llm.exceptions import Timeout as LLMTimeout
 
-                choice = choices[0]
-                delta = choice.get("delta", {})
+            model_name = None
+            try:
+                llm_config = getattr(self._llm, "config", None)
+                model_name = getattr(llm_config, "model", None)
+            except Exception:  # pragma: no cover - best-effort metadata
+                pass
 
-                # Capture response metadata from the first chunk
-                if not response_id:
-                    response_id = chunk.get("id", "")
-                    response_model = chunk.get("model", response_model)
-
-                # --- text content ---
-                content = delta.get("content")
-                if content:
-                    accumulated_text += content
-                    if event_stream is not None:
-                        ev = StreamingChunkAction(
-                            chunk=content,
-                            accumulated=accumulated_text,
-                            is_final=False,
-                        )
-                        ev.source = EventSource.AGENT
-                        event_stream.add_event(ev, EventSource.AGENT)
-                        # Yield to the event loop so the session's
-                        # _monitor_publish_queue can flush each chunk via
-                        # Socket.IO before the next one arrives.
-                        await asyncio.sleep(0)
-
-                # --- tool call deltas ---
-                for tc_delta in delta.get("tool_calls") or []:
-                    idx = tc_delta.get("index", 0)
-                    if idx not in tool_call_deltas:
-                        tool_call_deltas[idx] = {
-                            "id": tc_delta.get("id", ""),
-                            "type": "function",
-                            "function": {
-                                "name": "",
-                                "arguments": "",
-                            },
-                        }
-                    entry = tool_call_deltas[idx]
-                    if tc_delta.get("id"):
-                        entry["id"] = tc_delta["id"]
-                    func = tc_delta.get("function") or {}
-                    if func.get("name"):
-                        entry["function"]["name"] = func["name"]
-                    if func.get("arguments"):
-                        entry["function"]["arguments"] += func["arguments"]
-
+            logger.error(
+                "OrchestratorExecutor.async_execute: LLM completion timed out "
+                "after %s seconds for model=%s (exc=%s)",
+                timeout_seconds,
+                model_name,
+                type(exc).__name__,
+            )
+            raise LLMTimeout(
+                f"LLM streaming call timed out after {timeout_seconds} seconds",
+                model=model_name,
+            ) from exc
         except Exception as exc:
             from backend.llm.exceptions import LLMError
             if isinstance(exc, LLMError):
@@ -259,30 +238,27 @@ class OrchestratorExecutor:
                 context={"error": error_message},
             ) from exc
 
-        # Emit final streaming marker
-        if accumulated_text and event_stream is not None:
-            final_ev = StreamingChunkAction(
-                chunk="", accumulated=accumulated_text, is_final=True
-            )
-            final_ev.source = EventSource.AGENT
-            event_stream.add_event(final_ev, EventSource.AGENT)
+        if response is None:
+            raise ModelProviderError("LLM returned no response")
+
+        logger.info(
+            "OrchestratorExecutor.async_execute: received response from LLM for model=%s "
+            "in %.3fs",
+            getattr(getattr(self._llm, "config", None), "model", None),
+            time.time() - start_time,
+        )
 
         self._checkpoint.commit(ckpt_token)
 
-        # Build an LLMResponse compatible with _response_to_actions()
-        tool_calls = (
-            [tool_call_deltas[i] for i in sorted(tool_call_deltas)]
-            if tool_call_deltas
-            else None
-        )
-        response = LLMResponse(
-            content=accumulated_text,
-            model=response_model,
-            usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-            id=response_id or f"stream-{int(time.time())}",
-            finish_reason="stop",
-            tool_calls=tool_calls,
-        )
+        # Emit synthetic streaming events from the final response text
+        # (post-hoc streaming), same as in the synchronous path.
+        try:
+            if response is not None and event_stream is not None:
+                response_text = self._extract_response_text(response)
+                if response_text:
+                    self._emit_streaming_actions(response_text, event_stream)
+        except Exception as exc:  # pragma: no cover - streaming is best-effort
+            logger.debug("Failed to emit streaming actions: %s", exc)
 
         execution_time = time.time() - start_time
         actions = self._response_to_actions(response)
@@ -370,14 +346,8 @@ class OrchestratorExecutor:
 
     def _extract_last_user_text(self, messages: list[dict[str, Any]]) -> str:
         for message in reversed(messages):
-            role = ""
-            content: Any = ""
-            if isinstance(message, dict):
-                role = str(message.get("role", ""))
-                content = message.get("content", "")
-            else:
-                role = str(getattr(message, "role", ""))
-                content = getattr(message, "content", "")
+            role = str(message.get("role", ""))
+            content = message.get("content", "")
             if role != "user":
                 continue
             return self._content_to_str(content).strip()
@@ -385,14 +355,8 @@ class OrchestratorExecutor:
 
     def _extract_recent_user_text(self, messages: list[dict[str, Any]]) -> str:
         for message in reversed(messages):
-            role = ""
-            content: Any = ""
-            if isinstance(message, dict):
-                role = str(message.get("role", ""))
-                content = message.get("content", "")
-            else:
-                role = str(getattr(message, "role", ""))
-                content = getattr(message, "content", "")
+            role = str(message.get("role", ""))
+            content = message.get("content", "")
             if role != "user":
                 continue
             text = self._content_to_str(content).strip()

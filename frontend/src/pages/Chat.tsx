@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   MessageSquare,
   Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -263,6 +264,30 @@ export default function Chat() {
     return () => clearTimeout(timer);
   }, [agentState]);
 
+  // Intermediate stall warning: if RUNNING for 30s with no new events/streaming,
+  // show a soft "taking longer than expected" message to reassure the user.
+  const [runningSlow, setRunningSlow] = useState(false);
+  useEffect(() => {
+    if (agentState !== AgentState.RUNNING) {
+      setRunningSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setRunningSlow(true), 30_000);
+    return () => clearTimeout(timer);
+  }, [agentState, events.length, streamingContent]);
+
+  // If agentState is RUNNING for more than 90s with no new events or streaming,
+  // allow user to send a message or stop the agent (un-stick the UI).
+  const [runningTimedOut, setRunningTimedOut] = useState(false);
+  useEffect(() => {
+    if (agentState !== AgentState.RUNNING) {
+      setRunningTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setRunningTimedOut(true), 90_000);
+    return () => clearTimeout(timer);
+  }, [agentState, events.length, streamingContent]);
+
   // Use conversation REST metadata to seed the agent state before the first socket event arrives.
   // If we've timed out waiting for events, fall back to AWAITING_USER_INPUT so the user can type.
   const effectiveAgentState: AgentState = useMemo(() => {
@@ -337,7 +362,12 @@ export default function Chat() {
     sendUserAction({ action: "change_agent_state", args: { agent_state: "running" } });
   };
 
-  const stateInfo = agentStateDisplay(effectiveAgentState);
+  // Override state display when the agent appears stuck
+  const stateInfo = runningTimedOut
+    ? { label: "May be stuck", color: "text-orange-500", pulse: false }
+    : runningSlow && effectiveAgentState === AgentState.RUNNING
+      ? { label: "Still working...", color: "text-yellow-500", pulse: true }
+      : agentStateDisplay(effectiveAgentState);
   const canSend =
     isConnected &&
     (
@@ -345,9 +375,11 @@ export default function Chat() {
       effectiveAgentState === AgentState.PAUSED ||
       effectiveAgentState === AgentState.ERROR ||
       effectiveAgentState === AgentState.FINISHED ||
-      effectiveAgentState === AgentState.STOPPED
+      effectiveAgentState === AgentState.STOPPED ||
+      effectiveAgentState === AgentState.RATE_LIMITED ||
+      runningTimedOut
     );
-  const isRunning = effectiveAgentState === AgentState.RUNNING;
+  const isRunning = effectiveAgentState === AgentState.RUNNING && !runningTimedOut;
   const isEmpty = events.length === 0 && !streamingContent;
   const needsSetup = !apiKeySet || !modelSet;
 
@@ -373,9 +405,11 @@ export default function Chat() {
             "flex items-center gap-1.5 rounded-full border px-2.5 py-1",
             effectiveAgentState === AgentState.ERROR
               ? "border-destructive/30 bg-destructive/5"
-              : effectiveAgentState === AgentState.RUNNING
-                ? "border-green-500/30 bg-green-500/5"
-                : "border-border",
+              : runningTimedOut
+                ? "border-orange-500/30 bg-orange-500/5"
+                : effectiveAgentState === AgentState.RUNNING
+                  ? "border-green-500/30 bg-green-500/5"
+                  : "border-border",
           )}>
             {effectiveAgentState === AgentState.LOADING ? (
               <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
@@ -419,6 +453,11 @@ export default function Chat() {
           {isRunning && (
             <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={handleStop}>
               <Square className="mr-1 h-3 w-3" /> Stop
+            </Button>
+          )}
+          {runningTimedOut && (
+            <Button variant="outline" size="sm" className="h-7 text-xs border-orange-500/30 text-orange-500 hover:bg-orange-500/10" onClick={handleResume}>
+              <RotateCcw className="mr-1 h-3 w-3" /> Retry
             </Button>
           )}
           {(effectiveAgentState === AgentState.PAUSED ||
@@ -483,7 +522,18 @@ export default function Chat() {
               {isRunning && !streamingContent && events.length > 0 && (
                 <div className="flex items-center gap-2 text-muted-foreground text-sm py-1">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span className="text-xs">Working...</span>
+                  <span className="text-xs">
+                    {runningSlow ? "Taking longer than expected..." : "Working..."}
+                  </span>
+                </div>
+              )}
+
+              {runningTimedOut && events.length > 0 && (
+                <div className="flex items-center gap-3 rounded-lg border border-orange-500/30 bg-orange-500/5 px-3 py-2 text-sm">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-orange-500" />
+                  <span className="text-xs text-muted-foreground">
+                    The agent hasn't responded in a while. You can send a message, retry, or stop it.
+                  </span>
                 </div>
               )}
 

@@ -437,6 +437,17 @@ class Session:
 
     async def dispatch(self, data: dict) -> None:
         """Dispatch incoming event data to appropriate handlers."""
+        # Wait for agent initialization to finish the EXECUTION phase before
+        # delivering user events.  This prevents a user message from racing
+        # against the initial ChangeAgentStateAction emitted during startup.
+        try:
+            await asyncio.wait_for(self.agent_session._init_ready.wait(), timeout=120)
+        except asyncio.TimeoutError:
+            self.logger.warning(
+                "Timed out waiting for agent initialization; delivering event anyway",
+                extra={"signal": "dispatch_init_timeout"},
+            )
+
         # Log dispatch start
         self._log_dispatch_start(data)
 

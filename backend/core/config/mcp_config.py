@@ -413,6 +413,7 @@ class ForgeMCPConfig:
             type="shttp",
             url=f"http://{normalized_host}/mcp/mcp",
             api_key=None,
+            transport="shttp",
         )
         return (shttp_servers, stdio_servers)
 

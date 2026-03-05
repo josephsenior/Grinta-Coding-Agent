@@ -6,6 +6,7 @@ import builtins
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, SecretStr
@@ -137,6 +138,37 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if provider in self.provider_api_keys:
             logger.debug("Using stored %s API key", provider)
             return self.provider_api_keys[provider]
+
+        # As a last-resort fallback (especially during early startup before full
+        # config loading), try to read the default JSON settings file directly so
+        # that file-based config can provide the first API key source.
+        try:
+            from backend.core.constants import DEFAULT_CONFIG_FILE
+
+            cfg_path = Path(DEFAULT_CONFIG_FILE)
+            if cfg_path.is_file():
+                import json
+
+                with cfg_path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                raw_key = data.get("llm_api_key")
+                if raw_key:
+                    key = SecretStr(str(raw_key))
+                    # Cache for future lookups so subsequent calls don't need to
+                    # hit the filesystem again.
+                    self.set_api_key(model, key)
+                    logger.info(
+                        "Loaded API key for provider %s from %s",
+                        provider,
+                        cfg_path.name,
+                    )
+                    return key
+        except Exception as exc:  # pragma: no cover - best-effort fallback
+            logger.debug(
+                "Failed to load API key for provider %s from settings file: %s",
+                provider,
+                exc,
+            )
 
         # Provide helpful guidance for missing API keys
         provider_config = provider_config_manager.get_provider_config(provider)

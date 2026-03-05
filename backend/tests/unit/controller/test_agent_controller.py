@@ -52,6 +52,7 @@ def _make_controller():
     ctrl._step_task = None
     ctrl._step_lock = asyncio.Lock()
     ctrl._step_pending = False
+    ctrl._main_loop = None
 
     return ctrl
 
@@ -948,6 +949,109 @@ class TestAgentControllerExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         await self.ctrl._invoke_audit_callback(callback, x=1)
         callback.assert_called_once_with(x=1)
 
+
+# ── Step dispatch (cross-thread scheduling) ─────────────────────────
+
+
+class TestStepDispatch(unittest.TestCase):
+    """Test that step() correctly dispatches to the main loop.
+
+    The core bug fix: step() is called from EventStream's ThreadPoolExecutor
+    dispatch threads which run disposable event loops. step() must schedule
+    _create_step_task on the *main* event loop via call_soon_threadsafe,
+    not on the caller's throw-away loop.
+    """
+
+    def setUp(self):
+        self.ctrl = _make_controller()
+
+    def test_step_uses_call_soon_threadsafe_when_main_loop_running(self):
+        """step() should use call_soon_threadsafe when _main_loop is set and running."""
+        mock_loop = MagicMock()
+        mock_loop.is_running.return_value = True
+        self.ctrl._main_loop = mock_loop
+        self.ctrl._step_task = None
+
+        self.ctrl.step()
+
+        mock_loop.call_soon_threadsafe.assert_called_once_with(
+            self.ctrl._create_step_task
+        )
+
+    def test_step_falls_back_to_direct_call_when_no_main_loop(self):
+        """step() should call _create_step_task directly when _main_loop is None."""
+        self.ctrl._main_loop = None
+        self.ctrl._step_task = None
+
+        with patch.object(self.ctrl, "_create_step_task") as mock_create:
+            self.ctrl.step()
+            mock_create.assert_called_once()
+
+    def test_step_falls_back_when_main_loop_not_running(self):
+        """step() should call _create_step_task directly when _main_loop is stopped."""
+        mock_loop = MagicMock()
+        mock_loop.is_running.return_value = False
+        self.ctrl._main_loop = mock_loop
+        self.ctrl._step_task = None
+
+        with patch.object(self.ctrl, "_create_step_task") as mock_create:
+            self.ctrl.step()
+            mock_create.assert_called_once()
+        mock_loop.call_soon_threadsafe.assert_not_called()
+
+    def test_step_sets_pending_when_task_already_running(self):
+        """step() should set _step_pending when a step task is in-flight."""
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        self.ctrl._step_task = mock_task
+        self.ctrl._step_pending = False
+
+        self.ctrl.step()
+
+        self.assertTrue(self.ctrl._step_pending)
+
+    def test_step_does_not_set_pending_when_task_done(self):
+        """step() should proceed normally when the previous task is done."""
+        mock_task = MagicMock()
+        mock_task.done.return_value = True
+        self.ctrl._step_task = mock_task
+        mock_loop = MagicMock()
+        mock_loop.is_running.return_value = True
+        self.ctrl._main_loop = mock_loop
+
+        self.ctrl.step()
+
+        self.assertFalse(self.ctrl._step_pending)
+        mock_loop.call_soon_threadsafe.assert_called_once()
+
+    def test_step_from_threadpool_uses_main_loop(self):
+        """Simulate the real bug: step() called from a ThreadPoolExecutor thread."""
+        import concurrent.futures
+
+        mock_loop = MagicMock()
+        mock_loop.is_running.return_value = True
+        self.ctrl._main_loop = mock_loop
+        self.ctrl._step_task = None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(self.ctrl.step)
+            future.result(timeout=5)
+
+        mock_loop.call_soon_threadsafe.assert_called_once_with(
+            self.ctrl._create_step_task
+        )
+
+    def test_create_step_task_guards_reentry(self):
+        """_create_step_task should set _step_pending if a task appeared between scheduling."""
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        self.ctrl._step_task = mock_task
+        self.ctrl._step_pending = False
+
+        self.ctrl._create_step_task()
+
+        self.assertTrue(self.ctrl._step_pending)
+
     def test_get_initial_task_no_message(self):
         """Line 701 coverage."""
         with patch.object(self.ctrl, "_first_user_message", return_value=None):
@@ -1085,8 +1189,9 @@ class TestAgentControllerExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         self.ctrl.agent.get_system_message.assert_not_called()
 
     def test_step_task_creation(self):
-        """Line 338 coverage."""
-        with patch("asyncio.create_task") as mock_create:
+        """Line 338 coverage — step() with no main loop calls _create_step_task directly."""
+        self.ctrl._main_loop = None
+        with patch.object(self.ctrl, "_create_step_task") as mock_create:
             self.ctrl.step()
             mock_create.assert_called_once()
 

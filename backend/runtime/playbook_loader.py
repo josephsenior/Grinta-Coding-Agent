@@ -151,21 +151,28 @@ class PlaybookLoaderMixin:
             "info",
             f"Selected repo: {selected_repository}, loading playbooks from {playbooks_dir} (inside runtime)",
         )
-        obs = cast(
-            Any,
-            self.read(
-                FileReadAction(path=str(self.workspace_root / ".FORGE_instructions"))
-            ),
-        )
+        obs: Any = None
+        try:
+            obs = cast(
+                Any,
+                self.read(
+                    FileReadAction(path=str(self.workspace_root / ".FORGE_instructions"))
+                ),
+            )
+        except OSError:
+            obs = ErrorObservation("File not found")
         if (isinstance(obs, ErrorObservation) or (isinstance(obs, FileReadObservation) and not obs.content)) and repo_root is not None:
             self.log(
                 "debug",
                 f".FORGE_instructions not present, trying to load from repository playbooks_dir={playbooks_dir!r}",
             )
-            obs = cast(
-                Any,
-                self.read(FileReadAction(path=str(repo_root / ".FORGE_instructions"))),
-            )
+            try:
+                obs = cast(
+                    Any,
+                    self.read(FileReadAction(path=str(repo_root / ".FORGE_instructions"))),
+                )
+            except OSError:
+                obs = ErrorObservation("File not found")
         if isinstance(obs, FileReadObservation) and obs.content:
             self.log("info", "FORGE_instructions playbook loaded.")
             loaded_playbooks.append(

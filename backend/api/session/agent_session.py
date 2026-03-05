@@ -173,6 +173,11 @@ class AgentSession:
         self._repo_directory: str | None = None
         self._selected_repository: str | None = None
         self._selected_branch: str | None = None
+        # Gate that blocks dispatch() until initialization reaches the
+        # EXECUTION phase. Without this, a user message arriving via socket
+        # before _start_agent_execution completes can be overridden by a
+        # late ChangeAgentStateAction(AWAITING_USER_INPUT).
+        self._init_ready = asyncio.Event()
 
     async def start(
         self,
@@ -272,6 +277,10 @@ class AgentSession:
                 extra={"signal": "agent_start"},
             )
             self._start_agent_execution(initial_message)
+            # Signal that initialization is complete so dispatch() can
+            # safely deliver user events without racing against the
+            # initial ChangeAgentStateAction.
+            self._init_ready.set()
 
             # Phase: PLUGIN
             ctx.phase = StartupPhase.PLUGIN
@@ -541,6 +550,9 @@ class AgentSession:
     async def _finalize_session_startup(self, ctx: StartupContext) -> None:
         """Finalize session startup and log results."""
         self._starting = False
+        # Ensure the init gate is open even on error paths so dispatch()
+        # never blocks indefinitely.
+        self._init_ready.set()
         success = ctx.finished and ctx.runtime_connected
         self._startup_failed = not success
 
