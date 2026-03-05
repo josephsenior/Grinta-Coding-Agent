@@ -76,19 +76,10 @@ def detect_capabilities(
     shutil.which("npx") is not None
     shutil.which("uvx") is not None
 
-    has_http_mcp = False
-    try:
-        servers = getattr(mcp_config, "servers", None)
-        if servers:
-            has_http_mcp = any(
-                getattr(s, "type", None) in {"sse", "shttp"} for s in servers
-            )
-    except Exception:
-        has_http_mcp = False
-
-    # Windows stdio MCP is not currently supported; only allow MCP there when
-    # an HTTP-based MCP server is configured.
-    can_mcp = has_http_mcp or (not is_windows)
+    # MCP is always enabled; the ActionExecutionServer already filters out
+    # unsupported stdio servers on Windows and wrapper tools (e.g.
+    # mcp_capabilities_status) work without any real MCP servers.
+    can_mcp = True
 
     # Collect missing tools for diagnostic logging
     expected = {"git": has_git}

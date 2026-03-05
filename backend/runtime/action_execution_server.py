@@ -732,7 +732,7 @@ class ActionExecutor:
             logger.error("Error editing file %s: %s", action.path, e, exc_info=True)
             return ErrorObservation(f"Failed to edit file {action.path}: {e}")
 
-    async def mcp(self, action: MCPAction) -> Observation:
+    async def call_tool_mcp(self, action: MCPAction) -> Observation:
         """Execute an MCP tool call using Forge's MCP client integration."""
         try:
             from backend.mcp_integration.utils import (

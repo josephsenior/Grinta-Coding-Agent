@@ -450,17 +450,10 @@ class Runtime(
         await self._export_latest_git_provider_tokens(event)
 
         if isinstance(event, MCPAction):
-            # Centralised MCP guard: if capabilities have been probed and
-            # MCP is unsupported, short-circuit with a clear error rather
-            # than letting driver-specific code fail in unpredictable ways.
-            if self.capabilities is not None and not self.capabilities.can_mcp:
-                return ErrorObservation(
-                    content=(
-                        "MCP tools are not available in this environment "
-                        f"(platform={self.capabilities.platform}).  "
-                        "Set FORGE_ENABLE_WINDOWS_MCP=1 to override on Windows."
-                    )
-                )
+            # MCP actions are always forwarded to the driver; the
+            # ActionExecutionServer already handles Windows stdio filtering
+            # and returns a graceful ErrorObservation when no servers are
+            # connected (e.g. via the mcp_capabilities_status wrapper).
             return await self.call_tool_mcp(event)
         return await call_sync_from_async(self.run_action, event)
 
