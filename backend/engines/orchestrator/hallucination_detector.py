@@ -103,7 +103,7 @@ class HallucinationDetector:
         Returns:
             List of state-inconsistency findings.
         """
-        findings = []
+        findings: list[dict[str, object]] = []
 
         # If file-editing tools were actually called (or FileEditActions exist),
         # state tracking may simply not have caught up yet — skip path checks.

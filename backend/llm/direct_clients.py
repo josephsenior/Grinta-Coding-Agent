@@ -531,16 +531,28 @@ class GeminiClient(DirectLLMClient):
             config["system_instruction"] = system_instruction
 
         logger.debug("Gemini config: %s", config)
-
+        logger.info(
+            "GeminiClient.completion: model=%s, history_len=%d, prompt_len=%d, "
+            "tools=%s, remaining_kwargs=%s",
+            model_name,
+            len(history),
+            len(prompt) if isinstance(prompt, str) else 0,
+            len(tools) if tools else 0,
+            sorted(kwargs.keys()),
+        )
+        logger.info("GeminiClient.completion: creating chat session...")
         chat = self.client.chats.create(
             model=model_name,
             config=config,
             history=cast(Any, history),
         )
+        logger.info("GeminiClient.completion: chat created, calling send_message...")
         try:
             response = chat.send_message(prompt, **kwargs)
         except Exception as e:
+            logger.error("GeminiClient.completion: send_message raised %s: %s", type(e).__name__, e)
             raise self._map_gemini_error(e) from e
+        logger.info("GeminiClient.completion: send_message returned successfully")
         tool_calls = extract_tool_calls(response)
         content = extract_text(response)
         content = ensure_non_empty_content(response, content, tool_calls)

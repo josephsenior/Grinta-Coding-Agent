@@ -184,8 +184,6 @@ class SensitiveDataFilter(logging.Filter):
         sensitive_values = []
         for key, value in os.environ.items():
             key_upper = key.upper()
-            if not isinstance(value, str):
-                continue
             if (
                 len(value) > 2
                 and value != "default"

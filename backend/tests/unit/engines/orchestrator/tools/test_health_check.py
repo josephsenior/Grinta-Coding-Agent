@@ -4,18 +4,18 @@ import pytest
 from unittest.mock import patch
 
 from backend.engines.orchestrator.tools.health_check import (
-    check_ultimate_editor_dependencies,
+    check_structure_editor_dependencies,
     check_atomic_refactor_dependencies,
     run_production_health_check,
 )
 
 
-class TestCheckUltimateEditorDependencies:
-    """Test check_ultimate_editor_dependencies()."""
+class TestCheckStructureEditorDependencies:
+    """Test check_structure_editor_dependencies()."""
 
     def test_returns_tuple_of_bool_and_str(self):
         """Test that the function returns expected types."""
-        success, message = check_ultimate_editor_dependencies()
+        success, message = check_structure_editor_dependencies()
 
         assert isinstance(success, bool)
         assert isinstance(message, str)
@@ -23,7 +23,7 @@ class TestCheckUltimateEditorDependencies:
 
     def test_message_content_indicates_status(self):
         """Test that message reflects success or failure status."""
-        success, message = check_ultimate_editor_dependencies()
+        success, message = check_structure_editor_dependencies()
 
         if success:
             # Success message should mention operational status or readiness
@@ -67,7 +67,7 @@ class TestRunProductionHealthCheck:
     def test_all_checks_pass(self):
         """Test health check when all dependencies are satisfied."""
         with patch(
-            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            "backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
             return_value=(True, "UE OK"),
         ):
             with patch(
@@ -87,7 +87,7 @@ class TestRunProductionHealthCheck:
     def test_non_critical_component_failure(self):
         """Test health check when only non-critical component fails."""
         with patch(
-            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            "backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
             return_value=(True, "UE OK"),
         ):
             with patch(
@@ -105,7 +105,7 @@ class TestRunProductionHealthCheck:
     def test_critical_component_failure(self):
         """Test health check when critical component fails."""
         with patch(
-            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            "backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
             return_value=(False, "UE failed"),
         ):
             with patch(
@@ -121,7 +121,7 @@ class TestRunProductionHealthCheck:
     def test_critical_failure_raises_with_flag(self):
         """Test that critical failure raises RuntimeError when raise_on_failure=True."""
         with patch(
-            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            "backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
             return_value=(False, "UE failed"),
         ):
             with patch(
@@ -134,7 +134,7 @@ class TestRunProductionHealthCheck:
     def test_critical_failure_no_raise_when_disabled(self):
         """Test critical failure returns result when raise_on_failure=False."""
         with patch(
-            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            "backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
             return_value=(False, "UE failed"),
         ):
             with patch(
@@ -149,7 +149,7 @@ class TestRunProductionHealthCheck:
     def test_all_components_fail(self):
         """Test health check when all components fail."""
         with patch(
-            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            "backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
             return_value=(False, "UE failed"),
         ):
             with patch(
@@ -165,7 +165,7 @@ class TestRunProductionHealthCheck:
     def test_result_structure_complete(self):
         """Test that result has complete expected structure."""
         with patch(
-            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            "backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
             return_value=(True, "OK"),
         ):
             with patch(
@@ -193,7 +193,7 @@ class TestRunProductionHealthCheck:
         """Test that overall_status has expected values."""
         # Test HEALTHY
         with patch(
-            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            "backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
             return_value=(True, "OK"),
         ):
             with patch(
@@ -205,7 +205,7 @@ class TestRunProductionHealthCheck:
 
         # Test CRITICAL_FAILURE
         with patch(
-            "backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            "backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
             return_value=(False, "FAIL"),
         ):
             with patch(

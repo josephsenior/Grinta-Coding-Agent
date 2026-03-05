@@ -74,6 +74,14 @@ class ExecutorProtocol(Protocol):
         """Stream or invoke the LLM and return parsed actions."""
         raise NotImplementedError
 
+    async def async_execute(
+        self,
+        params: dict[str, Any],
+        event_stream: EventStream | None,
+    ) -> ExecutionResultProtocol:
+        """Async: invoke the LLM and return parsed actions."""
+        raise NotImplementedError
+
 
 # ------------------------------------------------------------------ #
 # Safety manager

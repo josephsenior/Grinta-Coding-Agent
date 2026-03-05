@@ -214,6 +214,7 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
 
     # The response should have assembled the tool call from fragments
     resp = result.response
+    assert resp is not None
     assert resp.tool_calls is not None
     assert len(resp.tool_calls) == 1
     tc = resp.tool_calls[0]

@@ -68,9 +68,6 @@ enable_browsing = true
 enable_think = true
 enable_finish = true
 
-[llm]
-model = "claude-sonnet-4-20250514"
-temperature = 0.0
 ```
 
 ### Prompt Templates

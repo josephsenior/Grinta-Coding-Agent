@@ -652,9 +652,9 @@ class TestHealthCheck:
         result = run_production_health_check(raise_on_failure=False)
         assert "atomic_refactor" in result
 
-    def test_check_ultimate_editor_returns_bool_and_str(self):
-        from backend.engines.orchestrator.tools.health_check import check_ultimate_editor_dependencies
-        success, msg = check_ultimate_editor_dependencies()
+    def test_check_structure_editor_returns_bool_and_str(self):
+        from backend.engines.orchestrator.tools.health_check import check_structure_editor_dependencies
+        success, msg = check_structure_editor_dependencies()
         assert isinstance(success, bool)
         assert isinstance(msg, str)
 
@@ -667,7 +667,7 @@ class TestHealthCheck:
     def test_no_critical_failures_means_healthy(self):
         from backend.engines.orchestrator.tools.health_check import run_production_health_check
         with (
-            patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            patch("backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
                   return_value=(True, "ok")),
             patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
                   return_value=(True, "ok")),
@@ -678,7 +678,7 @@ class TestHealthCheck:
     def test_critical_failure_raises_when_requested(self):
         from backend.engines.orchestrator.tools.health_check import run_production_health_check
         with (
-            patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            patch("backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
                   return_value=(False, "missing")),
             patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
                   return_value=(True, "ok")),
@@ -689,7 +689,7 @@ class TestHealthCheck:
     def test_critical_failure_no_raise_returns_critical(self):
         from backend.engines.orchestrator.tools.health_check import run_production_health_check
         with (
-            patch("backend.engines.orchestrator.tools.health_check.check_ultimate_editor_dependencies",
+            patch("backend.engines.orchestrator.tools.health_check.check_structure_editor_dependencies",
                   return_value=(False, "missing")),
             patch("backend.engines.orchestrator.tools.health_check.check_atomic_refactor_dependencies",
                   return_value=(True, "ok")),
