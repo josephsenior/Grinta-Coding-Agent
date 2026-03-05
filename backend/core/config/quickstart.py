@@ -12,7 +12,7 @@ Usage (programmatic)::
     from backend.core.config.quickstart import generate_quickstart_config
     json_str = generate_quickstart_config(
         api_key="AIza...",
-        model="gemini-pro-latest",
+        model="gemini-2.5-flash",
     )
 
 """
@@ -29,7 +29,7 @@ from backend.llm.provider_resolver import discover_all_local_models
 def generate_quickstart_config(
     *,
     api_key: str = "",
-    model: str = "gemini-pro-latest",
+    model: str = "gemini-2.5-flash",
     base_url: str = "",
     max_budget: float = 5.0,
 ) -> str:
@@ -63,7 +63,7 @@ def _interactive_init(dest: Path) -> None:
     # 1. Detect local models
     print("\n🔍 Scanning for local LLMs (Ollama, LM Studio, etc.)...")
     local_models = discover_all_local_models()
-    suggested_model = "gemini-pro-latest"
+    suggested_model = "gemini-2.5-flash"
 
     found_any = False
     for provider, models in local_models.items():

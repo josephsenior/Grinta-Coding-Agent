@@ -419,8 +419,8 @@ class BlackboardAction(Action):
 class QueryToolboxAction(Action):
     """An action where the agent queries the full registry of tools based on semantic tags or keywords."""
     capability_query: str = ""
-    action: ClassVar[str] = "query_toolbox"
-    runnable: ClassVar[bool] = True
+    action: ClassVar[str] = ActionType.QUERY_TOOLBOX
+    runnable: ClassVar[bool] = False
 
     @property
     def message(self) -> str:

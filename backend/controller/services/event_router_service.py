@@ -25,6 +25,7 @@ from backend.events.action.agent import (
     DelegateTaskAction,
     EscalateToHumanAction,
     ProposalAction,
+    QueryToolboxAction,
     RecallAction,
     UncertaintyAction,
 )
@@ -103,6 +104,8 @@ class EventRouterService:
             await self._handle_task_tracking_action(action)
         elif isinstance(action, DelegateTaskAction):
             await self._handle_delegate_task_action(action)
+        elif isinstance(action, QueryToolboxAction):
+            await self._handle_query_toolbox_action(action)
         elif isinstance(
             action,
             (ClarificationRequestAction, ProposalAction, UncertaintyAction, EscalateToHumanAction),
@@ -503,6 +506,40 @@ class EventRouterService:
                 extra={"action_type": type(action).__name__},
             )
             await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+
+    async def _handle_query_toolbox_action(self, action: QueryToolboxAction) -> None:
+        """Handle query_toolbox: return available tools matching the query."""
+        from backend.events.observation import NullObservation
+
+        query = (action.capability_query or "").lower()
+        agent = self._ctrl.agent
+
+        results: list[str] = []
+        for tool in getattr(agent, "tools", []):
+            fn = tool.get("function", {})
+            name = fn.get("name", "")
+            desc = fn.get("description", "")
+            if not query or query in name.lower() or query in desc.lower():
+                results.append(f"- {name}: {desc[:120]}")
+
+        mcp_tools = getattr(agent, "mcp_tools", {})
+        if mcp_tools:
+            for name, tool in mcp_tools.items():
+                fn = tool.get("function", {})
+                desc = fn.get("description", "")
+                if not query or query in name.lower() or query in desc.lower():
+                    results.append(f"- {name} [MCP]: {desc[:120]}")
+
+        content = (
+            f"Found {len(results)} tool(s) matching '{action.capability_query}':\n"
+            + "\n".join(results)
+            if results
+            else f"No tools found matching '{action.capability_query}'."
+        )
+
+        obs = NullObservation(content=content)
+        obs.tool_call_metadata = action.tool_call_metadata
+        self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
 
     # ── observation dispatch ──────────────────────────────────────────
 

@@ -98,6 +98,11 @@ AGENT_LEVEL_ACTIONS: frozenset[str] = frozenset(
         "condensation",
         "condensation_request",
         "task_tracking",
+        "query_toolbox",
+        "uncertainty",
+        "proposal",
+        "clarification",
+        "escalate",
         "system",
         "streaming_chunk",
     }

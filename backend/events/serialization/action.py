@@ -11,12 +11,19 @@ from backend.events.action.action import Action
 from backend.events.action.agent import (
     AgentRejectAction,
     AgentThinkAction,
+    BlackboardAction,
     ChangeAgentStateAction,
+    ClarificationRequestAction,
     CondensationAction,
     CondensationRequestAction,
+    DelegateTaskAction,
+    EscalateToHumanAction,
     PlaybookFinishAction,
+    ProposalAction,
+    QueryToolboxAction,
     RecallAction,
     TaskTrackingAction,
+    UncertaintyAction,
 )
 from backend.events.action.commands import CmdRunAction
 from backend.events.action.empty import NullAction
@@ -50,6 +57,13 @@ actions = (
     CondensationRequestAction,
     MCPAction,
     TaskTrackingAction,
+    UncertaintyAction,
+    ProposalAction,
+    ClarificationRequestAction,
+    EscalateToHumanAction,
+    DelegateTaskAction,
+    BlackboardAction,
+    QueryToolboxAction,
 )
 ACTION_TYPE_TO_CLASS = {action_class.action: action_class for action_class in actions}
 
