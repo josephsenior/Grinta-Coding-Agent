@@ -4,8 +4,10 @@ import copy
 from typing import TYPE_CHECKING
 
 from backend.core.constants import LOG_ALL_EVENTS
+from backend.core.schemas import AgentState
 from backend.events import EventSource
 from backend.events.action import Action, NullAction
+from backend.events.action.message import MessageAction
 from backend.llm.metrics import Metrics
 
 if TYPE_CHECKING:
@@ -73,6 +75,20 @@ class ActionService:
                 return
 
         self._prepare_metrics_for_action(action)
+
+        # Set AWAITING_USER_INPUT *before* emitting the event so that the
+        # _step drain loop (which checks can_step → agent_state == RUNNING)
+        # sees the state change immediately.  Without this, the event-stream
+        # callback that normally sets AWAITING_USER_INPUT runs on a background
+        # thread and may not execute before the drain loop re-enters
+        # _step_inner, causing a duplicate LLM call and double response.
+        if (
+            isinstance(action, MessageAction)
+            and action.source == EventSource.AGENT
+            and action.wait_for_response
+        ):
+            await controller.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+
         controller.event_stream.add_event(action, action.source or EventSource.AGENT)
 
         if ctx:
