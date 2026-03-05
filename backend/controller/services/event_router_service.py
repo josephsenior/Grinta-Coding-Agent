@@ -538,6 +538,7 @@ class EventRouterService:
         )
 
         obs = NullObservation(content=content)
+        obs.cause = action.id
         obs.tool_call_metadata = action.tool_call_metadata
         self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
 
