@@ -789,7 +789,7 @@ class Orchestrator(Agent):
     def response_to_actions(self, response) -> list[Action]:
         """Convert an LLM response into executable actions."""
         return orchestrator_function_calling.response_to_actions(
-            response,
+            response, 
             mcp_tool_names=list(self.mcp_tools.keys()),
             mcp_tools=self.mcp_tools
         )

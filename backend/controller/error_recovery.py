@@ -358,12 +358,15 @@ class ErrorRecoveryStrategy:
                 ),
                 CmdRunAction(command="cargo build 2>&1 | head -20"),
                 MessageAction(
-                    content="Running cargo build to resolve missing crate. Add the dependency to Cargo.toml if prompted.",
+                    content="Running cargo build to resolve missing crate. "
+                    "Add the dependency to Cargo.toml if prompted.",
                 ),
             ]
 
         # --- Go: cannot find package / module ---
-        go_match = re.search(r"cannot find (?:package|module) ['\"]([^'\"]+)['\"]", error_str)
+        go_match = re.search(
+            r"cannot find (?:package|module) ['\"]([^'\"]+)['\"]", error_str
+        )
         if go_match:
             package = go_match.group(1)
             return [
@@ -377,7 +380,9 @@ class ErrorRecoveryStrategy:
             ]
 
         # --- Ruby: cannot load such file -- X ---
-        ruby_match = re.search(r"cannot load such file\s*--\s*([^\s'\"]+)", error_str)
+        ruby_match = re.search(
+            r"cannot load such file\s*--\s*([^\s'\"]+)", error_str
+        )
         if ruby_match:
             gem_name = ruby_match.group(1).split("/")[0]
             return [
@@ -391,13 +396,16 @@ class ErrorRecoveryStrategy:
             ]
 
         # Generic fallback — detect the project type and suggest correct tool
+        manifest_cmd = (
+            "ls package.json requirements.txt Cargo.toml go.mod Gemfile "
+            "2>/dev/null || echo 'No manifest files found'"
+        )
         return [
             AgentThinkAction(
-                thought="Module/package not found. Checking project manifests to determine package manager...",
+                thought="Module/package not found. Checking project manifests "
+                "to determine package manager...",
             ),
-            CmdRunAction(
-                command="ls package.json requirements.txt Cargo.toml go.mod Gemfile 2>/dev/null || echo 'No manifest files found'"
-            ),
+            CmdRunAction(command=manifest_cmd),
             MessageAction(
                 content="Missing dependency. Checking project manifest files to determine the correct package manager.",
             ),

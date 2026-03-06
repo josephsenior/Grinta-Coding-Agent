@@ -53,6 +53,7 @@ def _make_controller():
     ctrl._step_lock = asyncio.Lock()
     ctrl._step_pending = False
     ctrl._main_loop = None
+    ctrl._draining_batch = False
 
     return ctrl
 
@@ -310,7 +311,8 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.action_execution.execute_action.assert_awaited_once_with(
             mock_action
         )
-        mock_post.assert_awaited_once()
+        # _handle_post_execution is called after execute_action and again after batch drain
+        self.assertGreaterEqual(mock_post.await_count, 1)
 
     async def test_step_resets_retry_on_success(self):
         self.ctrl.services.step_prerequisites.can_step.return_value = True
@@ -609,6 +611,7 @@ class TestPostExecution(unittest.IsolatedAsyncioTestCase):
 
     async def test_rate_governor_check(self):
         self.ctrl.state_tracker.state.metrics = MagicMock()
+        self.ctrl.state_tracker.state.metrics.accumulated_token_usage = MagicMock()
         self.ctrl.rate_governor.check_and_wait = AsyncMock()
         self.ctrl.config.agent._last_llm_latency = None
         self.ctrl.memory_pressure.should_condense.return_value = False
@@ -618,17 +621,22 @@ class TestPostExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl.rate_governor.check_and_wait.assert_awaited_once()
 
     async def test_memory_pressure_condensation(self):
-        del self.ctrl.state_tracker.state.metrics
+        # No metrics to avoid rate governor path; trigger condensation path
+        if hasattr(self.ctrl.state_tracker.state, "metrics"):
+            del self.ctrl.state_tracker.state.metrics
         self.ctrl.config.agent._last_llm_latency = None
         self.ctrl.memory_pressure.should_condense.return_value = True
         self.ctrl.memory_pressure.is_critical.return_value = False
         self.ctrl.memory_pressure._last_rss_mb = 500.0
-        self.ctrl.state_tracker.state.extra_data = {}
-        self.ctrl.state_tracker.state.set_extra = MagicMock()
+        self.ctrl.state_tracker.state.turn_signals = MagicMock()
+        self.ctrl.state_tracker.state.set_memory_pressure = MagicMock()
 
         await self.ctrl._handle_post_execution()
 
         self.ctrl.memory_pressure.record_condensation.assert_called_once()
+        self.ctrl.state_tracker.state.set_memory_pressure.assert_called_once_with(
+            "WARNING", source="AgentController"
+        )
 
 
 # ── Action context management ────────────────────────────────────────

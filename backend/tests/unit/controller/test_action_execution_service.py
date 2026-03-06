@@ -58,6 +58,39 @@ class TestGetNextAction:
         ctx.agent.step.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_astep_path_when_agent_has_async_step(self):
+        """Uses agent.astep() when available and is coroutine."""
+        ctx = _make_context()
+        action = MagicMock()
+        async def mock_astep(state):
+            return action
+        ctx.agent.astep = mock_astep
+        ctx.agent.config = MagicMock()
+        ctx.agent.config.llm_step_timeout_seconds = 30
+        svc = ActionExecutionService(ctx)
+        result = await svc.get_next_action()
+        assert result is action
+        assert action.source == EventSource.AGENT
+        ctx.agent.step.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_astep_timeout_raises(self):
+        """astep timeout raises Timeout from llm.exceptions."""
+        import asyncio
+        from backend.llm.exceptions import Timeout
+
+        ctx = _make_context()
+        async def slow_astep(_state):
+            await asyncio.sleep(10)
+            return MagicMock()
+        ctx.agent.astep = slow_astep
+        ctx.agent.config = MagicMock()
+        ctx.agent.config.llm_step_timeout_seconds = 0.01  # 10ms
+        svc = ActionExecutionService(ctx)
+        with pytest.raises(Timeout, match="timed out"):
+            await svc.get_next_action()
+
+    @pytest.mark.asyncio
     async def test_malformed_action_returns_none(self):
         from backend.core.exceptions import LLMMalformedActionError
 
@@ -101,6 +134,19 @@ class TestGetNextAction:
         svc = ActionExecutionService(ctx)
         result = await svc.get_next_action()
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_function_call_validation_error_returns_none(self):
+        from backend.core.exceptions import FunctionCallValidationError
+
+        ctx = _make_context()
+        ctx.agent.step.side_effect = FunctionCallValidationError("invalid args")
+        svc = ActionExecutionService(ctx)
+        result = await svc.get_next_action()
+        assert result is None
+        ctx.event_stream.add_event.assert_called_once()
+        args = ctx.event_stream.add_event.call_args[0]
+        assert "Tool validation failed" in args[0].content
 
     @pytest.mark.asyncio
     async def test_api_connection_error_propagates(self):
@@ -246,3 +292,39 @@ class TestExecuteAction:
             await svc.execute_action(action)
 
         ctx.run_action.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_retry_on_malformed_succeeds_on_second_attempt(self):
+        """get_next_action retries on LLMMalformedActionError and succeeds."""
+        from backend.core.exceptions import LLMMalformedActionError
+
+        ctx = _make_context()
+        action = MagicMock()
+        ctx.agent.step.side_effect = [
+            LLMMalformedActionError("bad first"),
+            action,
+        ]
+        svc = ActionExecutionService(ctx)
+        result = await svc.get_next_action()
+        assert result is action
+        assert ctx.agent.step.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_exhausted_retries_transitions_to_error_state(self):
+        """When retries exhausted, transitions to ERROR state."""
+        from backend.core.exceptions import LLMMalformedActionError
+        from backend.core.schemas import AgentState
+
+        ctx = _make_context()
+        ctx.agent.step.side_effect = LLMMalformedActionError("bad")
+        ctx.get_controller = MagicMock()
+        ctx.get_controller.return_value.get_agent_state.return_value = AgentState.RUNNING
+        ctx.get_controller.return_value.set_agent_state_to = AsyncMock()
+
+        svc = ActionExecutionService(ctx)
+        result = await svc.get_next_action()
+
+        assert result is None
+        ctx.get_controller.return_value.set_agent_state_to.assert_awaited_once_with(
+            AgentState.ERROR
+        )

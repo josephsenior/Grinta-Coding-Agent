@@ -1,5 +1,6 @@
 """Socket.IO entrypoint that mounts the FastAPI app."""
 
+import importlib
 import socketio  # type: ignore[import-untyped]
 
 from backend.core.logger import forge_logger as logger
@@ -8,7 +9,7 @@ from backend.api.shared import sio
 
 # Import Socket.IO handlers to register them - this MUST be after sio is imported
 try:
-    import backend.api.listen_socket  # noqa: F401 - side-effect import
+    importlib.import_module("backend.api.listen_socket")
 except Exception as e:
     logger.error("Failed to import Socket.IO handlers: %s", e, exc_info=True)
 else:

@@ -17,15 +17,9 @@ from backend.events import EventSource
 from backend.events.action.agent import CondensationRequestAction
 from backend.events.observation import ErrorObservation
 from backend.llm.exceptions import (
-    APIConnectionError,
-    APIError,
-    AuthenticationError,
     BadRequestError,
     ContextWindowExceededError,
-    InternalServerError,
     OpenAIError,
-    RateLimitError,
-    ServiceUnavailableError,
     Timeout,
     is_context_window_error,
 )
@@ -69,17 +63,18 @@ class ActionExecutionService:
                             getattr(agent, "name", agent.__class__.__name__),
                             attempt,
                         )
+                        import os as _os
                         timeout = getattr(
                             getattr(agent, "config", None),
                             "llm_step_timeout_seconds",
-                            60,
+                            float(_os.getenv("FORGE_LLM_STEP_TIMEOUT_SECONDS", "180")),
                         )
                         try:
                             action = await _asyncio.wait_for(
                                 astep(self._context.state),
                                 timeout=timeout,
                             )
-                        except _asyncio.TimeoutError as timeout_exc:
+                        except _asyncio.TimeoutError as exc:
                             model_name = None
                             try:
                                 llm = getattr(agent, "llm", None)
@@ -97,7 +92,7 @@ class ActionExecutionService:
                             raise Timeout(
                                 f"LLM step timed out after {timeout} seconds",
                                 model=model_name,
-                            ) from timeout_exc
+                            ) from exc
                     else:
                         action = agent.step(self._context.state)
                 action.source = EventSource.AGENT
@@ -156,16 +151,8 @@ class ActionExecutionService:
 
             except (ContextWindowExceededError, BadRequestError, OpenAIError) as exc:
                 return await self._handle_context_window_error(exc)
-            except (
-                APIConnectionError,
-                AuthenticationError,
-                RateLimitError,
-                ServiceUnavailableError,
-                APIError,
-                InternalServerError,
-                Timeout,
-            ):
-                raise
+            # APIConnectionError, AuthenticationError, RateLimitError, ServiceUnavailableError,
+            # APIError, InternalServerError, Timeout: let propagate to caller
 
         return None
 

@@ -80,9 +80,9 @@ class RequestSizeLoggingMiddleware:
 
         body_iter = body_iterator
 
-        async def counting_aiter(stream):
+        async def counting_aiter(body_stream):
             total = 0
-            async for chunk in stream:
+            async for chunk in body_stream:
                 if isinstance(chunk, bytes | bytearray):
                     total += len(chunk)
                 yield chunk
@@ -95,7 +95,7 @@ class RequestSizeLoggingMiddleware:
             )
 
         try:
-            setattr(response, "body_iterator", counting_aiter(body_iterator))
+            setattr(response, "body_iterator", counting_aiter(body_iter))
             return True
         except Exception:
             return False

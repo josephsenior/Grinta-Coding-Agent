@@ -44,6 +44,15 @@ def convert_messages(
     return system_instruction, gemini_messages, caching_requested
 
 
+_GEMINI_ALLOWED_SCHEMA_KEYS = {
+    "defs", "maxLength", "default", "minimum", "max_length", "format", 
+    "propertyOrdering", "max_items", "min_items", "title", "min_length", 
+    "items", "max_properties", "description", "maxProperties", "any_of", 
+    "anyOf", "nullable", "property_ordering", "min_properties", "minLength", 
+    "example", "enum", "type", "pattern", "minProperties", "required", 
+    "minItems", "ref", "properties", "maxItems", "maximum"
+}
+
 def _strip_unsupported_schema_fields(schema: Any) -> Any:
     """Recursively strip fields like 'additional_properties' that Gemini rejects."""
     if not isinstance(schema, dict):
@@ -51,12 +60,17 @@ def _strip_unsupported_schema_fields(schema: Any) -> Any:
             return [_strip_unsupported_schema_fields(item) for item in schema]
         return schema
 
-    # Deep copy to avoid mutating the original
     cleaned = {}
     for k, v in schema.items():
-        if k == "additional_properties" or k == "additionalProperties":
+        if k not in _GEMINI_ALLOWED_SCHEMA_KEYS:
             continue
-        cleaned[k] = _strip_unsupported_schema_fields(v)
+            
+        if k in ("properties", "defs") and isinstance(v, dict):
+            cleaned[k] = {pk: _strip_unsupported_schema_fields(pv) for pk, pv in v.items()}
+        elif k in ("required", "enum", "default", "example"):
+            cleaned[k] = v
+        else:
+            cleaned[k] = _strip_unsupported_schema_fields(v)
     return cleaned
 
 

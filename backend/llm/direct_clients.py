@@ -101,7 +101,7 @@ class LLMResponse:
             def __init__(self, name: str, arguments: str):
                 self.name = name
                 self.arguments = arguments
-
+            
             def model_dump(self):
                 return {"name": self.name, "arguments": self.arguments}
 
@@ -118,7 +118,7 @@ class LLMResponse:
                 for k, v in tc_dict.items():
                     if k not in ["id", "type", "function"]:
                         setattr(self, k, v)
-
+            
             def model_dump(self):
                 return {
                     "id": self.id,
@@ -409,7 +409,7 @@ class GeminiClient(DirectLLMClient):
     def __init__(self, model_name: str, api_key: str):
         self._model_name = model_name
         self.api_key = api_key
-
+        
         # Add timeout to prevent infinite hanging when the API is overloaded
         from google.genai.types import HttpOptions
         http_options = HttpOptions(timeout=120000) # 2 minutes
@@ -425,14 +425,14 @@ class GeminiClient(DirectLLMClient):
         caching_requested: bool,
         model_name: str,
         system_instruction: str | None,
-        gemini_messages: list,
+        history_messages: list,
     ) -> str | None:
         """Get cache name if caching requested and there is content to cache."""
         if not caching_requested:
             return None
         from backend.llm.gemini_cache import gemini_cache_manager
 
-        history_to_cache = gemini_messages[:-1] if len(gemini_messages) > 1 else []
+        history_to_cache = history_messages if history_messages else []
         if not history_to_cache and not system_instruction:
             return None
         return gemini_cache_manager.get_or_create_cache(
@@ -441,6 +441,49 @@ class GeminiClient(DirectLLMClient):
             system_instruction=system_instruction,
             messages=history_to_cache,
         )
+
+    def _extract_gemini_text(self, message: dict[str, Any]) -> str:
+        parts = message.get("parts") or []
+        text_parts: list[str] = []
+        for part in parts:
+            if isinstance(part, dict):
+                text = part.get("text")
+                if isinstance(text, str) and text:
+                    text_parts.append(text)
+        return "\n".join(text_parts)
+
+    def _split_gemini_history_and_prompt(
+        self, gemini_messages: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], str]:
+        if not gemini_messages:
+            return [], ""
+
+        active_messages = list(gemini_messages)
+        while active_messages and active_messages[-1].get("role") != "user":
+            active_messages.pop()
+
+        if not active_messages:
+            logger.warning(
+                "GeminiClient: no trailing user message found; falling back to last message text"
+            )
+            fallback_prompt = self._extract_gemini_text(gemini_messages[-1])
+            fallback_history = gemini_messages[:-1] if len(gemini_messages) > 1 else []
+            return fallback_history, fallback_prompt
+
+        prompt_start = len(active_messages) - 1
+        while prompt_start > 0 and active_messages[prompt_start - 1].get("role") == "user":
+            prompt_start -= 1
+
+        history = active_messages[:prompt_start]
+        prompt = "\n".join(
+            text
+            for text in (
+                self._extract_gemini_text(message)
+                for message in active_messages[prompt_start:]
+            )
+            if text
+        )
+        return history, prompt
 
     def _build_gemini_chat(
         self, messages: list[dict[str, Any]], kwargs: dict[str, Any]
@@ -460,16 +503,10 @@ class GeminiClient(DirectLLMClient):
             messages
         )
 
-        prompt_part = gemini_messages[-1]["parts"][0] if gemini_messages else ""
-        prompt = (
-            prompt_part.get("text", "")
-            if isinstance(prompt_part, dict)
-            else prompt_part
-        )
-        history = gemini_messages[:-1] if gemini_messages else []
+        history, prompt = self._split_gemini_history_and_prompt(gemini_messages)
 
         cache_name = self._get_gemini_cache_name(
-            caching_requested, model_name, system_instruction, gemini_messages
+            caching_requested, model_name, system_instruction, history
         )
         return (
             model_name,
@@ -494,12 +531,12 @@ class GeminiClient(DirectLLMClient):
         import asyncio
         import aiohttp
         import httpx
-
+        
         if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
             return Timeout(str(exc), llm_provider="google", model=self.model_name)
         if isinstance(exc, (aiohttp.ClientError, httpx.RequestError)):
             return APIConnectionError(str(exc), llm_provider="google", model=self.model_name)
-
+            
         if isinstance(exc, APIError):
             error_str = str(exc).lower()
             if exc.code == 429 or "quota" in error_str or "rate limit" in error_str:

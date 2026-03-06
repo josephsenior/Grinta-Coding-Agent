@@ -54,6 +54,23 @@ interface Task {
   subtasks?: Task[];
 }
 
+const TASK_DEPTH_CLASSES = [
+  "pl-1",
+  "pl-[18px]",
+  "pl-8",
+  "pl-[46px]",
+  "pl-[60px]",
+  "pl-[74px]",
+  "pl-[88px]",
+  "pl-[102px]",
+  "pl-[116px]",
+] as const;
+
+function taskDepthClass(depth: number): string {
+  const normalizedDepth = Math.max(0, Math.min(TASK_DEPTH_CLASSES.length - 1, depth));
+  return TASK_DEPTH_CLASSES[normalizedDepth] ?? TASK_DEPTH_CLASSES[0];
+}
+
 function taskIcon(status: TaskStatus) {
   switch (status) {
     case "completed": return <CheckCircle2 className="h-3 w-3 shrink-0 text-green-500" />;
@@ -66,10 +83,7 @@ function taskIcon(status: TaskStatus) {
 function TaskRow({ task, depth = 0 }: { task: Task; depth?: number }) {
   return (
     <div>
-      <div
-        className="flex items-start gap-1.5 py-0.5"
-        style={{ paddingLeft: `${depth * 14 + 4}px` }}
-      >
+      <div className={cn("flex items-start gap-1.5 py-0.5", taskDepthClass(depth))}>
         {taskIcon(task.status)}
         <span className={cn(
           "text-xs leading-snug",
@@ -240,6 +254,13 @@ export default function Chat() {
   const [inputValue, setInputValue] = useState("");
   const [contextWidth, setContextWidth] = useState(380);
   const isDragging = useRef(false);
+  const contextPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (contextPanelRef.current) {
+      contextPanelRef.current.style.width = `${contextWidth}px`;
+    }
+  }, [contextWidth]);
 
   // Fetch settings to know if the API key / model are configured
   const { data: settings } = useQuery({
@@ -393,7 +414,7 @@ export default function Chat() {
           </Button>
           <div className="flex items-center gap-2 min-w-0">
             <MessageSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="truncate font-medium text-sm max-w-[300px]">
+            <span className="truncate font-medium text-sm max-w-75">
               {conversation?.title || "New Conversation"}
             </span>
           </div>
@@ -513,7 +534,7 @@ export default function Chat() {
               )}
 
               {events.map((event, i) => (
-                <EventCard key={event.id ?? i} event={event} />
+                <EventCard key={event.id != null ? `e-${event.id}` : `i-${i}`} event={event} />
               ))}
 
               {/* Streaming indicator */}
@@ -581,7 +602,7 @@ export default function Chat() {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={!canSend}
-                className="min-h-[40px] max-h-[150px] resize-none rounded-xl border-muted-foreground/20 bg-muted/30 text-sm"
+                className="min-h-10 max-h-37.5 resize-none rounded-xl border-muted-foreground/20 bg-muted/30 text-sm"
                 rows={1}
               />
               <Button
@@ -598,7 +619,7 @@ export default function Chat() {
 
         {/* Resizable Context Panel */}
         {contextPanelOpen && (
-          <div className="flex shrink-0 border-l" style={{ width: contextWidth }}>
+          <div ref={contextPanelRef} className="flex shrink-0 border-l">
             {/* Drag handle */}
             <div
               className="w-1 shrink-0 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors"

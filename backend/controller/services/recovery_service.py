@@ -106,7 +106,7 @@ class RecoveryService:
                 "The model took too long to respond (e.g. network or overload).\n\n"
                 "**What you can do:**\n"
                 "• Try again in a moment\n"
-                "• Increase timeout via FORGE_LLM_STEP_TIMEOUT_SECONDS (default 60s)\n"
+                "• Increase timeout via FORGE_LLM_STEP_TIMEOUT_SECONDS (default 180s)\n"
                 "• Try a different model if the current one is slow\n\n"
                 f"**Details:** {exc}"
             )

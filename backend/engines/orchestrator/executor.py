@@ -190,7 +190,7 @@ class OrchestratorExecutor:
 
         ckpt_token = self._checkpoint.begin(call_params)
 
-        timeout_seconds = float(os.getenv("FORGE_LLM_STEP_TIMEOUT_SECONDS", "60"))
+        timeout_seconds = float(os.getenv("FORGE_LLM_STEP_TIMEOUT_SECONDS", "180"))
 
         response: ModelResponse | None = None
         loop = asyncio.get_running_loop()
@@ -364,4 +364,4 @@ class OrchestratorExecutor:
                 return text
         return ""
 
-
+    

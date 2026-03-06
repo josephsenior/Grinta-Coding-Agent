@@ -46,11 +46,8 @@ class RetryService:
         async def _worker_wrapper() -> None:
             try:
                 await self._retry_worker()
-            except (
-                asyncio.CancelledError
-            ):  # pragma: no cover - expected cancellation path
-                raise
             except Exception as exc:  # pragma: no cover - logged for diagnostics
+                # CancelledError propagates; only log/handle Exception
                 logger.exception(
                     "Retry worker crashed for controller %s: %s",
                     self.controller.id,
@@ -276,9 +273,8 @@ class RetryService:
                 await self._process_retry_task(task)
                 await queue.mark_success(task)
                 self._retry_pending = False
-            except asyncio.CancelledError:
-                raise
             except Exception as exc:
+                # CancelledError propagates; only handle Exception
                 logger.exception(
                     "Retry task %s failed for controller %s: %s",
                     task.id,

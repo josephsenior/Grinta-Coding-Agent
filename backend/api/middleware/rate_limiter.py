@@ -363,8 +363,6 @@ class RedisRateLimiter(RateLimiter):
 
         """
         # 🚀 PRODUCTION FIX: Read from environment variables if not provided
-        import os
-
         if requests_per_hour is None:
             requests_per_hour = int(os.getenv("RATE_LIMIT_REQUESTS", "1000"))
         if burst_limit is None:

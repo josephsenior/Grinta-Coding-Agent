@@ -47,7 +47,7 @@ class TestL1Cache:
 
     @patch.object(cache_mod, "get_redis_client", return_value=None)
     def test_set_and_get(self, _mock_redis):
-        cache_mod.set("k1", {"data": 1}, layer="l1")
+        cache_mod.cache_set("k1", {"data": 1}, layer="l1")
         result = cache_mod.get("k1")
         assert result == {"data": 1}
 
@@ -59,7 +59,7 @@ class TestL1Cache:
     @patch.object(cache_mod, "get_redis_client", return_value=None)
     def test_expired_entry_returns_default(self, _mock_redis):
         # Set with TTL of 0.01s, then wait
-        cache_mod.set("k2", "val", ttl=1, layer="l1")
+        cache_mod.cache_set("k2", "val", ttl=1, layer="l1")
         # Manually expire it
         cache_mod._l1_cache["k2"] = ("val", time.time() - 10)
         result = cache_mod.get("k2", default="gone")
@@ -67,14 +67,14 @@ class TestL1Cache:
 
     @patch.object(cache_mod, "get_redis_client", return_value=None)
     def test_delete(self, _mock_redis):
-        cache_mod.set("k3", "val", layer="l1")
+        cache_mod.cache_set("k3", "val", layer="l1")
         cache_mod.delete("k3", layer="l1")
         assert cache_mod.get("k3") is None
 
     @patch.object(cache_mod, "get_redis_client", return_value=None)
     def test_clear(self, _mock_redis):
-        cache_mod.set("a", 1, layer="l1")
-        cache_mod.set("b", 2, layer="l1")
+        cache_mod.cache_set("a", 1, layer="l1")
+        cache_mod.cache_set("b", 2, layer="l1")
         cache_mod.clear(layer="l1")
         assert cache_mod.get("a") is None
         assert cache_mod.get("b") is None
@@ -85,14 +85,14 @@ class TestL1Cache:
         cache_mod._l1_cache_size_limit = 3
         try:
             for i in range(5):
-                cache_mod.set(f"key{i}", i, layer="l1")
+                cache_mod.cache_set(f"key{i}", i, layer="l1")
             assert len(cache_mod._l1_cache) <= 3
         finally:
             cache_mod._l1_cache_size_limit = original_limit
 
     @patch.object(cache_mod, "get_redis_client", return_value=None)
     def test_no_ttl_means_no_expiry(self, _mock_redis):
-        cache_mod.set("forever", "val", ttl=None, layer="l1")
+        cache_mod.cache_set("forever", "val", ttl=None, layer="l1")
         val, expiry = cache_mod._l1_cache["forever"]
         assert expiry == 0  # 0 means no expiration
 

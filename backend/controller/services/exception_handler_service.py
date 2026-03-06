@@ -64,7 +64,7 @@ class ExceptionHandlerService:
             "Error while running the agent (session %s): %s",
             extra={"exception_type": type(exc).__name__},
         )
-        logger.debug(
+        logger.error(
             "Agent step exception traceback (session %s): %s",
             self._ctrl.id,
             traceback.format_exc(),

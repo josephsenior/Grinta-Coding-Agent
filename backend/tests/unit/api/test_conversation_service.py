@@ -446,7 +446,9 @@ class TestBuildSessionInitArgs:
             settings, metadata, None, secrets, None, None
         )
 
-        assert result["custom_secrets"]["API_KEY"] == "secret"
+        # custom_secrets passes through CustomSecret objects (not raw values)
+        assert "API_KEY" in result["custom_secrets"]
+        assert result["custom_secrets"]["API_KEY"].secret.get_secret_value() == "secret"
 
     def test_with_mcp_config(self):
         from backend.api.services.conversation_service import (

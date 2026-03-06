@@ -71,15 +71,15 @@ def get_effective_http_sample(route_path: str) -> float:
     """Return effective sampling probability for a given HTTP route."""
     try:
         # Regex overrides take precedence
-        for cregex, sample_rate in ROUTE_SAMPLE_REGEX:
+        for cregex, rate in ROUTE_SAMPLE_REGEX:
             if cregex.search(route_path):
-                return sample_rate
+                return rate
         # Then exact/prefix patterns
-        for route_pattern, sample_rate, prefix_match in ROUTE_SAMPLE_PATTERNS:
-            if (prefix_match and route_path.startswith(route_pattern)) or (
-                not prefix_match and route_path == route_pattern
+        for pattern, rate, is_prefix in ROUTE_SAMPLE_PATTERNS:
+            if (is_prefix and route_path.startswith(pattern)) or (
+                not is_prefix and route_path == pattern
             ):
-                return sample_rate
+                return rate
     except Exception as e:
         logger.debug("Error matching custom sample rate: %s", e)
     return SAMPLE_HTTP

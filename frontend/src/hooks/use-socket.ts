@@ -18,10 +18,14 @@ export function useSocket(conversationId: string | undefined) {
   } = useSessionStore();
 
   // Keep latestEventId in a ref so reconnection always uses current value.
-  // Only allow the ref to advance forward — never regress — so that the
-  // callback's fast-path update (before React re-renders) is not overwritten.
+  // Reset to -1 when conversation changes so new-conversation events are not
+  // filtered out by stale IDs from the previous conversation.
+  const conversationIdRef = useRef(conversationId);
   const latestEventIdRef = useRef(latestEventId);
-  if (latestEventId > latestEventIdRef.current) {
+  if (conversationId !== conversationIdRef.current) {
+    conversationIdRef.current = conversationId;
+    latestEventIdRef.current = -1;
+  } else if (latestEventId > latestEventIdRef.current) {
     latestEventIdRef.current = latestEventId;
   }
 

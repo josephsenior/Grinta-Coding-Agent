@@ -84,8 +84,20 @@ class TestFilterConversationsByAge:
 
     def test_conversation_exactly_at_limit_is_kept(self):
         """Age == max_age_seconds means age is NOT strictly greater, so it is kept."""
-        exactly = _make_metadata(age_seconds=3600)
-        result = filter_conversations_by_age([exactly], max_age_seconds=3600)
+        # Freeze time so age calculation is deterministic (avoids flakiness from
+        # microseconds elapsed between metadata creation and filter execution)
+        fixed_now = datetime.now(UTC)
+        exactly = ConversationMetadata(
+            conversation_id="exactly",
+            title="Exactly at limit",
+            selected_repository=None,
+            created_at=fixed_now - timedelta(seconds=3600),
+        )
+        with patch(
+            "backend.api.services.conversation_query_service.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            result = filter_conversations_by_age([exactly], max_age_seconds=3600)
         assert len(result) == 1
 
     def test_conversation_just_under_limit_is_kept(self):

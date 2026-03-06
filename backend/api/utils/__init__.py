@@ -14,7 +14,7 @@ from backend.api.user_auth import get_user_id
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.data_models.conversation_metadata import ConversationMetadata
 
-from .error_formatter import safe_format_error as safe_format_error  # noqa: F401
+from .error_formatter import safe_format_error  # noqa: F401
 
 if TYPE_CHECKING:
     pass

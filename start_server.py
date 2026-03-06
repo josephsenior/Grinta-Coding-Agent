@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
+# mypy: disable-error-code=union-attr
 """Start the Forge backend server with correct Python path."""
 
 import os
 import socket
 import sys
 from pathlib import Path
+from typing import Any
 
 # Force UTF-8 output so emoji don't crash on Windows cp1252 terminals
 if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[attr-defined]
+    try:
+        cast_stdout: Any = sys.stdout
+        cast_stdout.reconfigure(encoding='utf-8', errors='replace')
+    except AttributeError:
+        pass
 
 # Add project root to Python path
 project_root = Path(__file__).parent

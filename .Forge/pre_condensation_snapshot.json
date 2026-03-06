@@ -1,31 +1,11 @@
 {
-  "timestamp": "2026-03-05 21:19:17",
-  "events_condensed": 8,
-  "files_touched": {
-    "-80": {
-      "action": "read_via_cmd",
-      "type": "read"
-    },
-    "-20": {
-      "action": "read_via_cmd",
-      "type": "read"
-    }
-  },
-  "recent_errors": [
-    "[exit_code=1] \u001b[31;1mOut-File: \u001b[31;1mCould not find a part of the path 'C:\\dev\\null'.\u001b[0m\n\u001b[31;1mOut-File: \u001b[31;1mCould not find a part of the path 'C:\\dev\\null'.\u001b[0m\n\u001b[31;1mhead: \u001b[31;1mThe term 'head' is not recognized as a name of a cmdlet, function, script file, or executable program.\u001b[0m\n\u001b[31;1m\u001b[31;1mCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.\u001b[0m\n\u001b[31;1mGet-ChildItem: \u001b[31;1mA parameter cannot be found that matches parameter name 'la'.\u001b[0m"
+  "timestamp": "2026-03-06 17:52:29",
+  "events_condensed": 10,
+  "files_touched": {},
+  "recent_errors": [],
+  "decisions": [
+    "WARNING: Some MCP servers failed to connect. The following tools may be unavailable:\n  - browser-use (stdio): Failed to connect to stdio server browser-use: Connection closed\nDo not attempt to call these tools. Plan accordingly."
   ],
-  "decisions": [],
-  "recent_commands": [
-    {
-      "command": "echo \"=== GIT STATUS ===\" && (git status --short 2>/dev/null || echo '(not a git repo)') && echo \"\" && echo \"=== RECENT COMMITS ===\" && (git log --oneline -5 2>/dev/null || echo '(no git history)') && echo \"\" && echo \"=== DIRECTORY TREE (depth 2) ===\" && (find . -maxdepth 2 -not -path '*/\\.*' -not -path '*/node_modules/*' -not -path '*/__pycache__/*' -not -path '*/venv/*' | head -80 || ls -la) && echo \"\" && echo \"=== BACKGROUND PROCESSES ===\" && (ps aux 2>/dev/null | head -20 || echo '(ps not av",
-      "output": "=== GIT STATUS ===\n(not a git repo)\n\n... (truncated) ...\n\u001b[31;1mhead: \u001b[31;1mThe term 'head' is not recognized as a name of a cmdlet, function, script file, or executable program.\u001b[0m\n\u001b[31;1m\u001b[31;1mCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.\u001b[0m\n\u001b[31;1mGet-ChildItem: \u001b[31;1mA parameter cannot be found that matches parameter name 'la'.\u001b[0m"
-    }
-  ],
-  "attempted_approaches": [
-    {
-      "type": "command",
-      "detail": "echo \"=== GIT STATUS ===\" && (git status --short 2>/dev/null || echo '(not a git repo)') && echo \"\" && echo \"=== RECENT COMMITS ===\" && (git log --one",
-      "outcome": "FAILED (exit=1): \u001b[31;1mGet-ChildItem: \u001b[31;1mA parameter cannot be found that matches parameter name 'la'.\u001b[0m"
-    }
-  ]
+  "recent_commands": [],
+  "attempted_approaches": []
 }

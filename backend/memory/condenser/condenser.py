@@ -217,7 +217,7 @@ class RollingCondenser(Condenser, ABC):
         """Determine if a view should be condensed."""
 
     @abstractmethod
-    def get_condensation(self, view: View) -> Condensation:
+    def get_condensation(self, view: View) -> View | Condensation:
         """Get the condensation from a view."""
 
 

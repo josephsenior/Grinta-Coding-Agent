@@ -26,7 +26,7 @@ jobs:
 
     env:
       LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_MODEL: ${{ secrets.LLM_MODEL || 'gemini-pro-latest' }}
+      LLM_MODEL: ${{ secrets.LLM_MODEL }}
       FORGE_TEST_AGENT_TIMEOUT: '120'
       PYTHONPATH: '.'
 

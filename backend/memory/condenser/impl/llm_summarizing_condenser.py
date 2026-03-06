@@ -21,21 +21,27 @@ class LLMSummarizingCondenser(BaseLLMCondenser):
     and newly forgotten events.
     """
 
-    def get_condensation(self, view: View) -> Condensation:
+    def get_condensation(self, view: View) -> View | Condensation:
         """Summarize middle of conversation using LLM while keeping initial/tail events."""
         head = view[: self.keep_first]
         target_size = self.max_size // 2
-        events_from_tail = target_size - len(head) - 1
+        events_from_tail = max(1, target_size - len(head) - 1)
+
+        has_summary = len(view) > self.keep_first
         summary_event = (
             view[self.keep_first]
-            if isinstance(view[self.keep_first], AgentCondensationObservation)
+            if has_summary and isinstance(view[self.keep_first], AgentCondensationObservation)
             else AgentCondensationObservation("No events summarized")
         )
+        end_index = max(self.keep_first, len(view) - events_from_tail)
         forgotten_events = [
             event
-            for event in view[self.keep_first : -events_from_tail]
+            for event in view[self.keep_first : end_index]
             if not isinstance(event, AgentCondensationObservation)
         ]
+        
+        if not forgotten_events:
+            return view
         prompt = (
             'You are maintaining a context-aware state summary for an interactive agent.\nYou will be given a list of events corresponding to actions taken by the agent, and the most recent previous summary if one exists.\nIf the events being summarized contain ANY task-tracking, you MUST include a TASK_TRACKING section to maintain continuity.\nWhen referencing tasks make sure to preserve exact task IDs and statuses.\n\nTrack:\n\nUSER_CONTEXT: (Preserve essential user requirements, goals, and clarifications in concise form)\n\nTASK_TRACKING: {Active tasks, their IDs and statuses - PRESERVE TASK IDs}\n\nCOMPLETED: (Tasks completed so far, with brief results)\nPENDING: (Tasks that still need to be done)\nCURRENT_STATE: (Current variables, data structures, or relevant state)\n\nFor code-specific tasks, also include:\nCODE_STATE: {File paths, function signatures, data structures}\nTESTS: {Failing cases, error messages, outputs}\nCHANGES: {Code edits, variable updates}\nDEPS: {Dependencies, imports, external calls}\nVERSION_CONTROL_STATUS: {Repository state, current branch, PR status, commit history}\n\nPRIORITIZE:\n1. Adapt tracking format to match the actual task type\n2. Capture key user requirements and goals\n3. Distinguish between completed and pending tasks\n4. Keep all sections concise and relevant\n\nSKIP: Tracking irrelevant details for the current task type\n\nExample formats:\n\nFor code tasks:\nUSER_CONTEXT: Fix FITS card float representation issue\nCOMPLETED: Modified mod_float() in card.py, all tests passing\nPENDING: Create PR, update documentation\nCODE_STATE: mod_float() in card.py updated\nTESTS: test_format() passed\nCHANGES: str(val) replaces f"{val:.16G}"\nDEPS: None modified\nVERSION_CONTROL_STATUS: Branch: fix-float-precision, Latest commit: a1b2c3d\n\nFor other tasks:\nUSER_CONTEXT: Write 20 haikus based on coin flip results\nCOMPLETED: 15 haikus written for results [T,H,T,H,T,H,T,T,H,T,H,T,H,T,H]\nPENDING: 5 more haikus needed\nCURRENT_STATE: Last flip: Heads, Haiku count: 15/20'
             "\n\n"

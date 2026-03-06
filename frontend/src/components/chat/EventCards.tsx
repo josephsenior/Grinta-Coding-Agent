@@ -3,6 +3,35 @@ import { Badge } from "@/components/ui/badge";
 import type { ActionEvent, ObservationEvent } from "@/types/events";
 import { ActionType, ActionSecurityRisk } from "@/types/agent";
 
+const CONFIDENCE_WIDTH_CLASSES = [
+  "w-[0%]",
+  "w-[5%]",
+  "w-[10%]",
+  "w-[15%]",
+  "w-[20%]",
+  "w-[25%]",
+  "w-[30%]",
+  "w-[35%]",
+  "w-[40%]",
+  "w-[45%]",
+  "w-[50%]",
+  "w-[55%]",
+  "w-[60%]",
+  "w-[65%]",
+  "w-[70%]",
+  "w-[75%]",
+  "w-[80%]",
+  "w-[85%]",
+  "w-[90%]",
+  "w-[95%]",
+  "w-[100%]",
+] as const;
+
+function confidenceWidthClass(confidence: number): string {
+  const normalized = Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0;
+  return CONFIDENCE_WIDTH_CLASSES[Math.round(normalized * 20)] ?? "w-[0%]";
+}
+
 /* ═══ Action Cards ═══ */
 
 interface ActionCardProps {
@@ -164,10 +193,7 @@ export function UncertaintyCard({ event }: ActionCardProps) {
         <div className="mt-2 flex items-center gap-2">
           <BarChart3 className="h-3.5 w-3.5" />
           <div className="h-2 flex-1 rounded-full bg-muted">
-            <div
-              className="h-2 rounded-full bg-primary transition-all"
-              style={{ width: `${Math.round(confidence * 100)}%` }}
-            />
+            <div className={`h-2 rounded-full bg-primary transition-all ${confidenceWidthClass(confidence)}`} />
           </div>
           <span className="text-xs font-mono">{Math.round(confidence * 100)}%</span>
         </div>

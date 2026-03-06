@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -186,3 +186,125 @@ class TestDefaultLinterBackendDetection:
         ):
             linter = DefaultLinter(backend="ruff")
         assert linter._detected_backend is None
+
+
+# ---------------------------------------------------------------------------
+# DefaultLinter — lint() cache hit path
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultLinterCacheHit:
+    """Test cache hit path in lint() (lines 208-211)."""
+
+    def test_lint_cache_hit_returns_cached_result(self):
+        """Second lint call with same content returns cached result (cache hit)."""
+        with patch.object(
+            DefaultLinter, "_check_backend_available", return_value=True
+        ):
+            linter = DefaultLinter(backend="ruff", enable_cache=True, cache_ttl=300)
+        with patch.object(linter, "_lint_content", return_value=LintResult([], [])):
+            r1 = linter.lint(content="x = 1")
+            r2 = linter.lint(content="x = 1")
+        assert r1 is r2
+        stats = linter.get_cache_stats()
+        assert stats["hits"] == 1
+        assert stats["misses"] == 1
+
+
+# ---------------------------------------------------------------------------
+# DefaultLinter — _lint_file (LSP and ruff paths)
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultLinterLintFile:
+    """Test _lint_file with LSP and ruff backends."""
+
+    def test_lint_file_ruff_path(self):
+        """_lint_file uses ruff when backend is ruff and file is .py."""
+        with patch.object(
+            DefaultLinter, "_check_backend_available", return_value=True
+        ):
+            linter = DefaultLinter(backend="ruff")
+        with (
+            patch(
+                "backend.engines.orchestrator.tools.lsp_client.get_lsp_client",
+                return_value=MagicMock(
+                    query=MagicMock(
+                        return_value=MagicMock(
+                            available=False, error=True, locations=[]
+                        )
+                    )
+                ),
+            ),
+            patch.object(linter, "_lint_with_ruff") as mock_ruff,
+        ):
+            mock_ruff.return_value = LintResult([], [])
+            result = linter.lint(file_path="test.py")
+        mock_ruff.assert_called_once_with(file_path="test.py")
+        assert result.errors == []
+        assert result.warnings == []
+
+    def test_lint_file_lsp_returns_errors(self):
+        """_lint_file uses LSP when available and returns errors."""
+        with patch.object(
+            DefaultLinter, "_check_backend_available", return_value=True
+        ):
+            linter = DefaultLinter(backend="ruff")
+        mock_loc = MagicMock()
+        mock_loc.line = 5
+        mock_loc.column = 3
+        with patch(
+            "backend.engines.orchestrator.tools.lsp_client.get_lsp_client",
+            return_value=MagicMock(
+                query=MagicMock(
+                    return_value=MagicMock(
+                        available=True, error=False, locations=[mock_loc]
+                    )
+                )
+            ),
+        ):
+            result = linter.lint(file_path="test.py")
+        assert len(result.errors) == 1
+        assert result.errors[0].line == 5
+        assert result.errors[0].column == 3
+        assert result.errors[0].message == "LSP Diagnostic"
+
+    def test_lint_file_non_py_returns_empty(self):
+        """_lint_file returns empty for non-.py files."""
+        with patch.object(
+            DefaultLinter, "_check_backend_available", return_value=True
+        ):
+            linter = DefaultLinter(backend="ruff")
+        with patch(
+            "backend.engines.orchestrator.tools.lsp_client.get_lsp_client",
+            return_value=MagicMock(
+                query=MagicMock(
+                    return_value=MagicMock(
+                        available=False, error=True, locations=[]
+                    )
+                )
+            ),
+        ):
+            result = linter.lint(file_path="test.txt")
+        assert result.errors == []
+        assert result.warnings == []
+
+
+# ---------------------------------------------------------------------------
+# DefaultLinter — _lint_content fallback
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultLinterLintContent:
+    """Test _lint_content with unsupported backend (line 351 fallback)."""
+
+    def test_lint_content_unsupported_backend_returns_empty(self):
+        """When backend is neither ruff nor pylint, returns empty LintResult."""
+        with patch.object(
+            DefaultLinter, "_check_backend_available", return_value=True
+        ):
+            linter = DefaultLinter(backend="tree-sitter")
+        # tree-sitter is not handled in _lint_content, falls through to line 351
+        result = linter.lint(content="x = 1")
+        assert result.errors == []
+        assert result.warnings == []

@@ -89,11 +89,11 @@ def get(key: str, default: Any = None, ttl: int | None = None) -> Any:
     redis_client = get_redis_client()
     if redis_client:
         try:
-            cached = redis_client.get(key)
-            if cached:
-                value = json.loads(cached)
+            raw_value = redis_client.get(key)
+            if raw_value:
+                value = json.loads(raw_value)
                 # Also store in L1 for faster access
-                set_value(key, value, ttl=ttl, layer="l1")
+                cache_set(key, value, ttl=ttl, layer="l1")
                 return value
         except Exception as e:
             logger.debug("Redis cache get error: %s", e)
@@ -101,7 +101,7 @@ def get(key: str, default: Any = None, ttl: int | None = None) -> Any:
     return default
 
 
-def set_value(
+def cache_set(
     key: str,
     value: Any,
     ttl: int | None = None,
@@ -223,7 +223,7 @@ def cached(
             result = await async_func(*args, **kwargs)  # type: ignore[misc]
 
             # Store in cache
-            set(cache_key, result, ttl=ttl)
+            cache_set(cache_key, result, ttl=ttl)
 
             return result
 
@@ -249,7 +249,7 @@ def cached(
             result = func(*args, **kwargs)  # type: ignore[misc]
 
             # Store in cache
-            set(cache_key, result, ttl=ttl)
+            cache_set(cache_key, result, ttl=ttl)
 
             return result  # type: ignore[return-value]
 

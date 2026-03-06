@@ -105,3 +105,31 @@ def test_gemini_client_sanitizes_kwargs():
         config = kwargs.get("config")
         assert config["temperature"] == 0.7
         assert "generation_config" not in config
+
+
+def test_gemini_client_ignores_trailing_assistant_message_when_building_prompt():
+    with patch("backend.llm.direct_clients.genai.Client") as mock_client_class:
+        mock_instance = mock_client_class.return_value
+        mock_chats = MagicMock()
+        mock_instance.chats = mock_chats
+
+        client = GeminiClient(model_name="gemini-1.5-pro", api_key="test-key")
+        messages = [
+            {"role": "system", "content": "System prompt"},
+            {"role": "user", "content": "hello how are you"},
+            {"role": "user", "content": "<RUNTIME_INFORMATION>workspace</RUNTIME_INFORMATION>"},
+            {"role": "assistant", "content": "WARNING: Some MCP servers failed to connect."},
+        ]
+
+        mock_chat_session = MagicMock()
+        mock_chats.create.return_value = mock_chat_session
+        mock_chat_session.send_message.return_value = MagicMock()
+
+        client.completion(messages)
+
+        _args, kwargs = mock_chats.create.call_args
+        history = kwargs.get("history")
+        assert history == []
+
+        send_args, _send_kwargs = mock_chat_session.send_message.call_args
+        assert send_args[0] == "hello how are you\n<RUNTIME_INFORMATION>workspace</RUNTIME_INFORMATION>"

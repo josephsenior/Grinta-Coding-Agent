@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 class ConversationInitData(Settings):
-    """Session initialization data for the web environment - a deep copy of the global config is made and then overridden with this data."""
+    """Session init data for web - deep copy of global config overridden with this."""
 
     vcs_provider_tokens: ProviderTokenType | None = Field(default=None, frozen=True)
     custom_secrets: CustomSecretsType | None = Field(default=None, frozen=True)

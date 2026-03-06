@@ -137,6 +137,8 @@ async def test_generate_prompt_multiple_tags(mock_get_manager):
 @patch("backend.api.services.prompt_service.generate_prompt")
 async def test_build_remember_prompt_partial_settings(mock_gen_prompt, mock_get_ctx_events, mock_event_store_class):
     """Test orchestration when some settings are missing."""
+    from backend.core.config.llm_config import suppress_llm_env_export
+
     mock_user_settings_store = AsyncMock()
     mock_settings = MagicMock()
     mock_settings.llm_model = None
@@ -144,17 +146,18 @@ async def test_build_remember_prompt_partial_settings(mock_gen_prompt, mock_get_
     mock_settings.llm_base_url = None
     mock_user_settings_store.load.return_value = mock_settings
 
-    await build_remember_prompt(
-        conversation_id="conv1",
-        event_id=123,
-        user_id="user1",
-        user_settings_store=mock_user_settings_store,
-        file_store=MagicMock()
-    )
+    with suppress_llm_env_export():
+        await build_remember_prompt(
+            conversation_id="conv1",
+            event_id=123,
+            user_id="user1",
+            user_settings_store=mock_user_settings_store,
+            file_store=MagicMock()
+        )
 
     llm_config = mock_gen_prompt.call_args[0][0]
     # LLMConfig should have defaults if settings were None
-    assert llm_config.model is not None # Default in LLMConfig
+    assert llm_config.model is not None  # Default in LLMConfig
     assert llm_config.api_key is None
 
 @pytest.mark.asyncio

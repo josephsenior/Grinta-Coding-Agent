@@ -151,18 +151,18 @@ class Session:
             cfg.mcp = cfg.mcp.merge(mcp_config)
             self.logger.debug("Merged custom MCP Config: %s", mcp_config)
 
-        FORGE_mcp_server, FORGE_mcp_stdio_servers = (
+        forge_mcp_server, forge_mcp_stdio_servers = (
             ForgeMCPConfig.create_default_mcp_server_config(
                 cfg.mcp_host,
                 cfg,
                 self.user_id,
             )
         )
-        if FORGE_mcp_server:
-            cfg.mcp.servers.append(FORGE_mcp_server)
+        if forge_mcp_server:
+            cfg.mcp.servers.append(forge_mcp_server)
 
-        if FORGE_mcp_stdio_servers:
-            cfg.mcp.servers.extend(FORGE_mcp_stdio_servers)
+        if forge_mcp_stdio_servers:
+            cfg.mcp.servers.extend(forge_mcp_stdio_servers)
 
         self.logger.debug(
             "MCP configuration after setup - self.config.mcp: %s", cfg.mcp
@@ -369,9 +369,11 @@ class Session:
             settings=settings,
         )
 
-    def _notify_on_llm_retry(self, retries: int, max: int) -> None:
+    def _notify_on_llm_retry(self, retries: int, max_retries: int) -> None:
         self.queue_status_message(
-            "info", RuntimeStatus.LLM_RETRY, f"Retrying LLM request, {retries} / {max}"
+            "info",
+            RuntimeStatus.LLM_RETRY,
+            f"Retrying LLM request, {retries} / {max_retries}",
         )
 
     def on_event(self, event: Event) -> None:
@@ -387,9 +389,7 @@ class Session:
             event: Event to process
 
         """
-        import asyncio as _asyncio
-
-        _asyncio.run_coroutine_threadsafe(self._on_event(event), self.loop)
+        asyncio.run_coroutine_threadsafe(self._on_event(event), self.loop)
 
     async def _on_event(self, event: Event) -> None:
         """Callback function for events that mainly come from the agent.
@@ -417,7 +417,10 @@ class Session:
             # Debug logging for agent state changes
             if isinstance(event, AgentStateChangedObservation):
                 self.logger.info(
-                    f"DEBUG: AgentStateChangedObservation received - state: {event.agent_state}, reason: {event.reason}, sending to WebSocket",
+                    "DEBUG: AgentStateChangedObservation received - "
+                    "state: %s, reason: %s, sending to WebSocket",
+                    event.agent_state,
+                    event.reason,
                     extra={"session_id": self.sid},
                 )
             await self.send(event_dict)
@@ -661,9 +664,6 @@ class Session:
                 await controller.set_agent_state_to(AgentState.ERROR)
             else:
                 # If no controller yet, manually emit state change so UI updates
-                from backend.events.observation import AgentStateChangedObservation
-                from backend.events.serialization import event_to_dict
-
                 await self.send(
                     event_to_dict(
                         AgentStateChangedObservation(
