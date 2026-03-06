@@ -394,9 +394,8 @@ class AgentController:
         """Execute agent step with comprehensive exception handling."""
         try:
             await self._step()
-        except asyncio.CancelledError:
-            raise
         except Exception as e:
+            # CancelledError (BaseException) propagates; only handle Exception
             await self.exception_handler.handle_step_exception(e)
 
     def should_step(self, event: Event) -> bool:
@@ -610,6 +609,13 @@ class AgentController:
             self._draining_batch = False
         # Deferred condensation check after batch drain completes.
         await self._handle_post_execution()
+
+        # After processing non-runnable actions (e.g. AgentThinkAction), no
+        # pending action is set and the runtime may never produce an observation
+        # that would re-trigger the step loop.  Schedule the next step so the
+        # agent can proceed to the LLM call instead of stalling indefinitely.
+        if not self._pending_action and self.get_agent_state() == AgentState.RUNNING:
+            self.step()
 
     # Action types that are safe to run concurrently (pure reads, no side effects)
     _PARALLEL_SAFE_ACTION_TYPES: ClassVar[tuple[str, ...]] = (
