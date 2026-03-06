@@ -25,8 +25,6 @@ jobs:
         python-version: ['3.12']
 
     env:
-      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_MODEL: ${{ secrets.LLM_MODEL }}
       FORGE_TEST_AGENT_TIMEOUT: '120'
       PYTHONPATH: '.'
 
@@ -53,6 +51,8 @@ jobs:
         env:
           FORGE_HOST: '127.0.0.1'
           PORT: '3000'
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
         run: |
           poetry run uvicorn backend.api.listen:app \
             --host 127.0.0.1 --port 3000 &
@@ -67,6 +67,8 @@ jobs:
         env:
           FORGE_HOST: '127.0.0.1'
           PORT: '3000'
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
         run: |
           Start-Process -NoNewWindow -FilePath "poetry" `
             -ArgumentList "run","uvicorn","backend.api.listen:app","--host","127.0.0.1","--port","3000"
@@ -79,6 +81,9 @@ jobs:
           }
 
       - name: Run agent loop E2E tests
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
         run: poetry run pytest backend/tests/e2e/test_agent_loop_e2e.py -m integration -v --timeout=180
 
       - name: Cleanup (Linux)
