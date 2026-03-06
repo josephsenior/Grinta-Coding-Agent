@@ -736,10 +736,10 @@ class ActionExecutor:
         """Execute an MCP tool call using Forge's MCP client integration."""
         try:
             from backend.mcp_integration.utils import (
-                _is_windows_stdio_mcp_disabled,
                 call_tool_mcp,
                 create_mcps,
             )
+            from backend.core.config.mcp_config import _filter_windows_stdio_servers
             from backend.core.config.utils import load_forge_config
 
             if self._mcp_clients is None:
@@ -749,18 +749,10 @@ class ActionExecutor:
                     cfg = load_forge_config().mcp
 
                 servers = getattr(cfg, "servers", []) or []
-                if _is_windows_stdio_mcp_disabled():
-                    skipped = [s for s in servers if getattr(s, "type", None) == "stdio"]
-                    if skipped:
-                        names = [getattr(s, "name", "?") for s in skipped]
-                        logger.warning(
-                            "Skipping %d stdio MCP server(s) on Windows (disabled by default): %s. "
-                            "Set FORGE_ENABLE_WINDOWS_MCP=1 to enable.",
-                            len(skipped), ", ".join(names),
-                        )
-                    servers = [
-                        s for s in servers if getattr(s, "type", None) != "stdio"
-                    ]
+                # Apply the same allowlist-based Windows filter used during
+                # config loading so that explicitly-allowed stdio servers are
+                # kept while unknown ones are still blocked.
+                servers = _filter_windows_stdio_servers(list(servers))
                 self._mcp_clients = await create_mcps(servers)
 
             observation = await call_tool_mcp(self._mcp_clients, action)  # type: ignore[arg-type]

@@ -438,10 +438,21 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
                 pass
 
         # MCP
-        if "mcp_config" in data and data["mcp_config"] is not None:
-            from backend.core.config.mcp_config import MCPConfig
+        from backend.core.config.mcp_config import (
+            MCPConfig,
+            _filter_windows_stdio_servers,
+            _load_servers_from_config_json,
+        )
 
+        if "mcp_config" in data and data["mcp_config"] is not None:
             cfg.mcp = MCPConfig(**data["mcp_config"])
+
+        # Always attempt to load servers from backend/runtime/mcp/config.json
+        # (same as the TOML path does via from_toml_section).  This covers the
+        # common case where mcp_config is null in settings.json but the user
+        # has a config.json with mcpServers entries.
+        cfg.mcp.servers = _load_servers_from_config_json(list(cfg.mcp.servers))
+        cfg.mcp.servers = _filter_windows_stdio_servers(cfg.mcp.servers)
 
     finally:
         summary.emit()
@@ -710,7 +721,7 @@ def load_forge_config(
 
     # 3. Finalize and sync
     finalize_config(config)
-
+    
     # CRITICAL: Sync the loaded config (which might have come from settings.json)
     # back to the APIKeyManager so that DirectLLMClient can find it.
     from backend.core.config.api_key_manager import api_key_manager
@@ -729,7 +740,7 @@ def load_forge_config(
                     llm_cfg.api_key = SecretStr(env_key)
                     api_key_manager.set_api_key(llm_cfg.model, llm_cfg.api_key)
                     api_key_manager.set_environment_variables(llm_cfg.model, llm_cfg.api_key)
-
+    
     # Export all keys to environment after sync
     export_llm_api_keys(config)
 
