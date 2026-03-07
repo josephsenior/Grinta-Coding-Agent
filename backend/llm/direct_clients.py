@@ -390,11 +390,40 @@ class AnthropicClient(DirectLLMClient):
         ) as stream:
             async for event in stream:
                 # Convert Anthropic events to OpenAI-like chunks for compatibility
-                if event.type == "content_block_delta":
+                if event.type == "content_block_start" and event.content_block.type == "tool_use":
+                    yield {
+                        "choices": [{
+                            "delta": {
+                                "tool_calls": [{
+                                    "index": event.index,
+                                    "id": event.content_block.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": event.content_block.name,
+                                        "arguments": ""
+                                    }
+                                }]
+                            },
+                            "finish_reason": None
+                        }]
+                    }
+                elif event.type == "content_block_delta" and event.delta.type == "input_json_delta":
+                    yield {
+                        "choices": [{
+                            "delta": {
+                                "tool_calls": [{
+                                    "index": event.index,
+                                    "function": {"arguments": getattr(event.delta, "partial_json", "")}
+                                }]
+                            },
+                            "finish_reason": None
+                        }]
+                    }
+                elif event.type == "content_block_delta":
                     yield {
                         "choices": [
                             {
-                                "delta": {"content": event.delta.text},  # type: ignore[union-attr]
+                                "delta": {"content": getattr(event.delta, "text", "")},  # type: ignore[union-attr]
                                 "finish_reason": None,
                             }
                         ]
@@ -678,6 +707,31 @@ class GeminiClient(DirectLLMClient):
         try:
             stream = await chat.send_message_stream(prompt, **kwargs)
             async for chunk in stream:
+                if getattr(chunk, "function_calls", None):
+                    for idx, fc in enumerate(chunk.function_calls):
+                        import json
+                        try:
+                            args_dict = type(fc).to_dict(fc.args) if hasattr(fc.args, "items") else fc.args
+                            if hasattr(args_dict, "items"): args_dict = dict(args_dict.items())
+                            elif hasattr(args_dict, "__dict__"): args_dict = args_dict.__dict__
+                            if hasattr(args_dict, "pb"):
+                                args_dict = {k:v for k,v in args_dict.items()} if hasattr(args_dict, "items") else {}
+                            args_str = json.dumps(args_dict) if isinstance(args_dict, dict) else json.dumps(getattr(fc, "args", {}))
+                        except Exception:
+                            args_str = "{}"
+                        yield {
+                            "choices": [{
+                                "delta": {
+                                    "tool_calls": [{
+                                        "index": idx,
+                                        "id": f"call_{fc.name}_{idx}",
+                                        "type": "function",
+                                        "function": {"name": fc.name, "arguments": args_str}
+                                    }]
+                                },
+                                "finish_reason": None
+                            }]
+                        }
                 text = chunk.text or ""
                 if text:
                     yield {"choices": [{"delta": {"content": text}, "finish_reason": None}]}
