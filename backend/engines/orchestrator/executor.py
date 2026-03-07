@@ -175,10 +175,9 @@ class OrchestratorExecutor:
     ) -> ExecutionResult:
         """Execute LLM call with async interface natively streaming tokens.
         """
-        import re
         import asyncio
         from backend.llm.direct_clients import LLMResponse
-        from backend.events.action.message import StreamingChunkAction, StreamingThoughtChunkAction
+        from backend.events.action.message import StreamingChunkAction
         from backend.events.event import EventSource
 
         start_time = time.time()
@@ -197,8 +196,6 @@ class OrchestratorExecutor:
 
         content_accumulate = ""
         tool_calls_dict = {}
-        thought_accumulate = {}
-        thought_pattern = re.compile(r'"__thought"\s*:\s*"((?:[^"\\\\]|\\\\.)*)')
         
         try:
             logger.info("OrchestratorExecutor.async_execute: calling LLM.astream")
@@ -233,35 +230,13 @@ class OrchestratorExecutor:
                                     "type": "function",
                                     "function": {"name": "", "arguments": ""}
                                 }
-                                thought_accumulate[idx] = ""
                             
                             fn = tc_chunk.get("function", {})
                             if fn.get("name"):
                                 tool_calls_dict[idx]["function"]["name"] += fn["name"]
                                 
                             if fn.get("arguments"):
-                                old_args = tool_calls_dict[idx]["function"]["arguments"]
                                 tool_calls_dict[idx]["function"]["arguments"] += fn["arguments"]
-                                new_args = tool_calls_dict[idx]["function"]["arguments"]
-                                
-                                old_match = thought_pattern.search(old_args)
-                                new_match = thought_pattern.search(new_args)
-                                old_t = old_match.group(1) if old_match else ""
-                                new_t = new_match.group(1) if new_match else ""
-                                
-                                if len(new_t) > len(old_t) and event_stream:
-                                    thought_chunk = new_t[len(old_t):]
-                                    thought_chunk = thought_chunk.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
-                                    thought_accumulate[idx] += thought_chunk
-                                    
-                                    tev = StreamingThoughtChunkAction(
-                                        chunk=thought_chunk,
-                                        accumulated=thought_accumulate[idx],
-                                        is_final=False,
-                                        tool_call_index=idx,
-                                    )
-                                    tev.source = EventSource.AGENT
-                                    event_stream.add_event(tev, EventSource.AGENT)
 
             consume_task = loop.create_task(_consume_stream())
             await asyncio.wait_for(consume_task, timeout=timeout_seconds)
@@ -271,12 +246,6 @@ class OrchestratorExecutor:
                 ev = StreamingChunkAction(chunk="", accumulated=content_accumulate, is_final=True)
                 ev.source = EventSource.AGENT
                 event_stream.add_event(ev, EventSource.AGENT)
-            if event_stream and thought_accumulate:
-                for idx, t_acc in thought_accumulate.items():
-                    if t_acc:
-                        tev = StreamingThoughtChunkAction(chunk="", accumulated=t_acc, is_final=True, tool_call_index=idx)
-                        tev.source = EventSource.AGENT
-                        event_stream.add_event(tev, EventSource.AGENT)
 
             tool_calls_list = [tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())]
             if not tool_calls_list:
