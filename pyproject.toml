@@ -65,6 +65,7 @@ dependencies = [
   "binaryornot (>=0.4.4,<0.5.0)",
   "memory-profiler (>=0.61.0,<0.62.0)",
   "tomli-w>=1.1.0,<2",
+  "aiofiles>=25.1.0",
 ]
 
 optional-dependencies.all = [
@@ -148,12 +149,6 @@ lint.select = [
   "W",
 ]
 lint.ignore = [
-  # Temporarily ignore ASYNC rules until they can be properly fixed in a separate PR
-  "ASYNC110",
-  "ASYNC220",
-  "ASYNC221",
-  "ASYNC230",
-  "ASYNC251",
   "B003",
   "B007",
   "B009",
@@ -167,6 +162,10 @@ lint.flake8-bugbear.extend-immutable-calls = [ "Depends", "fastapi.Depends", "fa
 lint.flake8-quotes.docstring-quotes = "double"
 lint.flake8-quotes.inline-quotes = "single"
 lint.pydocstyle.convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"backend/tests/*" = ["ASYNC"]
+"backend/scripts/*" = ["ASYNC"]
 
 [tool.coverage.run]
 source = [

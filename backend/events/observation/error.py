@@ -27,4 +27,3 @@ class ErrorObservation(Observation):
         """Return a readable summary of the error message."""
         return f"**ErrorObservation**\n{self.content}"
 
-    __test__ = False

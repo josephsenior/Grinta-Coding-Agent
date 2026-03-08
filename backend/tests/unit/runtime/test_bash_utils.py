@@ -104,9 +104,5 @@ class TestBashCommandStatus:
         assert BashCommandStatus.NO_CHANGE_TIMEOUT.value == "no_change_timeout"
         assert BashCommandStatus.HARD_TIMEOUT.value == "hard_timeout"
 
-    def test_test_flag_disabled(self):
-        """Enum has __test__ = False to prevent pytest collection."""
-        assert BashCommandStatus.__test__ is False
-
     def test_member_count(self):
         assert len(BashCommandStatus) == 4

@@ -1,0 +1,1 @@
+{"id": 17, "sequence": 17, "timestamp": "2026-03-07T17:43:32.246623", "source": "user", "message": "Retrieving content for: what tools you currently have access to", "action": "recall", "args": {"confirmation_state": "confirmed", "recall_type": "knowledge", "query": "what tools you currently have access to", "thought": ""}}

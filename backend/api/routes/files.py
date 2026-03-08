@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import os
-import sys
 from pathlib import Path as PathLib
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
@@ -23,7 +22,7 @@ from backend.runtime.utils.git_changes import get_git_changes
 from backend.api.dependencies import get_dependencies
 from backend.core.constants import FILES_TO_IGNORE
 from backend.api.files import POSTUploadFilesModel
-from backend.api.shared import get_conversation_manager
+from backend.api.services.shared_dependencies import require_conversation_manager
 from backend.api.utils import get_conversation, get_conversation_store
 from backend.api.utils.responses import error
 from backend.utils.async_utils import call_sync_from_async
@@ -57,55 +56,16 @@ if TYPE_CHECKING:
             ...
 
 
-sub_router: APIRouter
-if "pytest" in sys.modules:
-
-    class NoOpAPIRouter(APIRouter):
-        """Router stub used during tests to skip FastAPI registration."""
-
-        def add_api_route(self, path: str, endpoint, **kwargs):  # type: ignore[override]
-            """Return endpoint without registering to allow direct invocation in tests."""
-            return endpoint
-
-    sub_router = cast(
-        APIRouter,
-        NoOpAPIRouter(
-            prefix="/api/v1/conversations/{conversation_id}/files",
-            dependencies=get_dependencies(),
-        ),
-    )
-else:
-    sub_router = APIRouter(
-        prefix="/api/v1/conversations/{conversation_id}/files",
-        dependencies=get_dependencies(),
-    )
+sub_router = APIRouter(
+    prefix="/api/v1/conversations/{conversation_id}/files",
+    dependencies=get_dependencies(),
+    tags=["files"],
+)
 
 
 def _unlink_path(path: PathLib) -> None:
     """Background helper to remove temporary archive files."""
     path.unlink(missing_ok=True)
-
-
-# Note: _sanitize_file_path() has been replaced with direct SafePath.validate() usage
-# in route handlers where we have workspace_root context. SafePath provides
-# production-grade path validation with security boundaries.
-
-
-def _get_conversation_manager_instance():
-    try:
-        return get_conversation_manager()
-    except Exception:
-        return None
-
-
-def _require_conversation_manager():
-    manager = _get_conversation_manager_instance()
-    if manager is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Conversation manager is not initialized",
-        )
-    return manager
 
 
 async def _ensure_runtime_ready(conversation: ServerConversation) -> bool:
@@ -530,7 +490,7 @@ async def git_changes(
         Response: [{"path": "src/main.py", "status": "modified"}, ...]
 
     """
-    manager = _require_conversation_manager()
+    manager = require_conversation_manager()
     try:
         conversation = await manager.attach_to_conversation(conversation_id, "dev-user")
         if not conversation:

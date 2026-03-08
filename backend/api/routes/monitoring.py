@@ -18,9 +18,9 @@ from backend.events.stream import get_aggregated_event_stream_stats
 from backend.runtime.utils.process_manager import (
     get_process_manager_health_snapshot as _get_process_manager_health_snapshot,
 )
-from backend.api.shared import get_conversation_manager, server_config
+from backend.api.app_state import get_app_state
 
-router = APIRouter(prefix="/api/v1/monitoring")
+router = APIRouter(prefix="/api/v1/monitoring", tags=["monitoring"])
 
 # For testing monkeypatching
 conversation_manager = None
@@ -84,7 +84,7 @@ async def get_health():
 def _get_manager():
     if conversation_manager is not None:
         return conversation_manager  # type: ignore[unreachable]
-    return get_conversation_manager()
+    return get_app_state().get_conversation_manager()
 
 
 def _status_from_severity(severity: str) -> str:
@@ -169,7 +169,7 @@ async def get_metrics():
             elif hasattr(manager, "_active_conversations"):
                 active_sessions = len(getattr(manager, "_active_conversations"))
 
-        uptime = time.time() - getattr(server_config, "_start_time", time.time())
+        uptime = time.time() - getattr(get_app_state().server_config, "_start_time", time.time())
 
         # Try to get cache stats if possible
         cache_stats = {}

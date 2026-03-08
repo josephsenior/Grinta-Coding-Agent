@@ -1,0 +1,1 @@
+{"id": 16, "sequence": 16, "timestamp": "2026-03-07T17:43:32.205564", "source": "user", "message": "what tools you currently have access to", "action": "message", "args": {"confirmation_state": "confirmed", "content": "what tools you currently have access to", "file_urls": null, "image_urls": null, "wait_for_response": false, "security_risk": -1}}

@@ -28,4 +28,3 @@ class SignalProgressObservation(Observation):
     def __str__(self) -> str:
         return f"**SignalProgressObservation** acknowledged={self.acknowledged}\n{self.content}"
 
-    __test__ = False

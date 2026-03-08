@@ -28,4 +28,3 @@ class FileDownloadObservation(Observation):
         """Return a readable summary highlighting the download location."""
         return f"**FileDownloadObservation**\nLocation of downloaded file: {self.file_path}\n"
 
-    __test__ = False

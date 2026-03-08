@@ -20,4 +20,3 @@ class MCPObservation(Observation):
         """Get MCP operation result message."""
         return self.content
 
-    __test__ = False

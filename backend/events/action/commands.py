@@ -54,4 +54,3 @@ class CmdRunAction(Action):
         ret += f"COMMAND:\n{self.command}"
         return ret
 
-    __test__ = False

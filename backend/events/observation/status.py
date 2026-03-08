@@ -33,4 +33,3 @@ class StatusObservation(Observation):
         """Human-readable status message."""
         return self.content
 
-    __test__ = False

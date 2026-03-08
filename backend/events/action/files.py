@@ -33,7 +33,6 @@ class FileReadAction(Action):
         """Get file read message."""
         return f"Reading file: {self.path}"
 
-    __test__ = False
 
 
 @dataclass
@@ -64,7 +63,6 @@ class FileWriteAction(Action):
             self.end
         }]\nThought: {self.thought}\nContent:\n```\n{self.content}\n```\n"
 
-    __test__ = False
 
 
 @dataclass
@@ -141,4 +139,3 @@ class FileEditAction(Action):
                 ret += "Undo Edit\n"
         return ret
 
-    __test__ = False

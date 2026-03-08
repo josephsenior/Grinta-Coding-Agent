@@ -35,4 +35,3 @@ class SignalProgressAction(Action):
     def __str__(self) -> str:
         return f"**SignalProgressAction**\nNOTE:\n{self.progress_note}"
 
-    __test__ = False

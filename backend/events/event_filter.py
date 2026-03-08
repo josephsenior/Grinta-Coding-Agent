@@ -130,4 +130,3 @@ class EventFilter:
         """
         return not self.include(event)
 
-    __test__ = False

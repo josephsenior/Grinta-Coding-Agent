@@ -40,16 +40,10 @@ poetry install
 ### Step 2: Configure
 
 ```bash
-cp config.template.toml config.toml
+echo "LLM_API_KEY=sk-your-api-key-here" > .env
 ```
 
-Edit `config.toml` and set your LLM API key:
-
-```toml
-[llm]
-api_key = "sk-your-api-key-here"
-model = "claude-sonnet-4-20250514"
-```
+Your API keys must be set via `.env` files ensuring all subprocesses inherit credentials properly. Use the Web UI to tune the rest of your agent parameters like Models and limits!
 
 ### Step 3: Start
 
@@ -76,40 +70,46 @@ The backend starts on `http://localhost:3000`. The TUI connects automatically.
 
 ## Configuration
 
-Configuration loads with this precedence (highest wins):
+Forge uses a multi-layered configuration system based on JSON and Environment Variables to ensure flexibility across different environments and prevent UI syncing ambiguity.
 
+### Configuration Hierarchy
+Configuration loads with this exact precedence (highest wins):
+
+1. **Environment Variables**: Native shell vars, `.env.local`, and `.env` (Best for API Keys)
+2. **Local Project Override**: `<workspace_root>/settings.json` (Used for repo-specific engine toggles)
+3. **Global User Settings**: `~/.forge/settings.json` (This is the file driven by the Web UI)
+4. **Pydantic Defaults**: Internal safe fallbacks.
+
+If you ever find that changing settings in the UI does not affect your agent, ensure you don't have a conflicting `settings.json` in your local project root silently overriding the global UI configuration!
+
+### Getting Started
+
+For standard use, rely entirely on the Web UI to populate `~/.forge/settings.json`. However, strictly protect your API keys by placing them in an `.env` file at the root of your project:
+
+```bash
+LLM_API_KEY=sk-your-key
+BROWSER_USE_API_KEY=bu_your-key
+GITHUB_PERSONAL_ACCESS_TOKEN=github_pat_xxx
 ```
-1. Environment variables      (e.g. LLM_API_KEY=sk-xxx)
-2. .env.local file            (auto-generated secrets)
-3. config.toml                (your settings)
-4. config.template.toml       (defaults)
-```
 
-### Essential Settings
+This ensures MCP processes (like `browser-use` or `github`) securely inherit credentials injected via `os.environ` upon backend startup.
 
-```toml
-[core]
-# Maximum LLM spend per task (USD). Default $5.
-max_budget_per_task = 5.0
-# Maximum agent iterations per task.
-max_iterations = 500
+### Advanced Settings (`settings.json`)
 
-[llm]
-api_key = "sk-your-key"
-model = "claude-sonnet-4-20250514"
-temperature = 0.0
-
-[agent]
-enable_browsing = true
-enable_editor = true
-enable_cmd = true
-enable_circuit_breaker = true
+```json
+{
+  "llm_model": "gemini-pro-latest",
+  "llm_temperature": 0.0,
+  "max_budget_per_task": 5.0,
+  "max_iterations": 500,
+  "enable_browsing": true,
+  "enable_circuit_breaker": true
+}
 ```
 
 ### Environment Variables
 
-Any config field can be overridden via environment variable using the
-section-prefixed name in uppercase:
+Any setting can be injected. For complex setups, rely on `.env`:
 
 | Config Path | Environment Variable |
 |-------------|---------------------|

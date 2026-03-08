@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Path
 
-from backend.api.shared import config
+from backend.api.app_state import get_app_state
 from backend.storage.data_models.conversation_template import (
     ConversationTemplate,
     CreateTemplateRequest,
@@ -19,13 +19,13 @@ from backend.storage.data_models.conversation_template import (
     UpdateTemplateRequest,
 )
 
-router = APIRouter(prefix="/api/v1/templates")
+router = APIRouter(prefix="/api/v1/templates", tags=["templates"])
 logger = logging.getLogger(__name__)
 
 
 def _get_templates_dir() -> PathLib:
     """Get templates directory."""
-    workspace_base = PathLib(config.workspace_base or ".")
+    workspace_base = PathLib(get_app_state().config.workspace_base or ".")
     templates_dir = workspace_base / "templates"
     templates_dir.mkdir(parents=True, exist_ok=True)
     return templates_dir

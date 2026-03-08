@@ -1,16 +1,17 @@
 """Feature flags API endpoint for clients."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from typing import Any
 
 from backend.core.features import get_feature_flags
-from backend.api.shared import config
+from backend.api.services.shared_dependencies import get_forge_config
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter(prefix="/api/v1", tags=["features"])
 
 
 @router.get("/features")
-async def get_features() -> JSONResponse:
+async def get_features(config: Any = Depends(get_forge_config)) -> JSONResponse:
     """Get feature flags status for clients.
 
     Returns:

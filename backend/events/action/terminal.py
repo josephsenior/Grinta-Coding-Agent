@@ -30,7 +30,6 @@ class TerminalRunAction(Action):
         """Return a readable summary."""
         return f"**TerminalRunAction**\nCOMMAND:\n{self.command}"
 
-    __test__ = False
 
 
 @dataclass
@@ -56,7 +55,6 @@ class TerminalInputAction(Action):
         """Return a readable summary."""
         return f"**TerminalInputAction (session={self.session_id}, is_control={self.is_control})**\nINPUT:\n{self.input}"
 
-    __test__ = False
 
 
 @dataclass
@@ -78,4 +76,3 @@ class TerminalReadAction(Action):
         """Return a readable summary."""
         return f"**TerminalReadAction (session={self.session_id})**"
 
-    __test__ = False

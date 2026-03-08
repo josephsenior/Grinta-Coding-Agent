@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 import time
@@ -247,7 +246,7 @@ class OrchestratorExecutor:
                 ev.source = EventSource.AGENT
                 event_stream.add_event(ev, EventSource.AGENT)
 
-            tool_calls_list = [tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())]
+            tool_calls_list: list[dict[str, Any]] | None = [tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())]
             if not tool_calls_list:
                 tool_calls_list = None
                 
@@ -331,9 +330,9 @@ class OrchestratorExecutor:
 
     def _emit_thought_chunks(self, response: ModelResponse, event_stream: EventStream, chunk_size: int = 80) -> None:
         import json
-        from backend.events.action.message import StreamingThoughtChunkAction
+        from backend.events.action.message import StreamingChunkAction
         from backend.events.event import EventSource
-        from backend.llm.extractor import extract_assistant_message
+        from backend.engines.common import extract_assistant_message
 
         assistant_msg = extract_assistant_message(response)
         tool_calls = getattr(assistant_msg, "tool_calls", None)
@@ -351,17 +350,16 @@ class OrchestratorExecutor:
                         for i in range(0, len(thought_text), chunk_size):
                             chunk = thought_text[i : i + chunk_size]
                             accumulated += chunk
-                            ev = StreamingThoughtChunkAction(
+                            ev = StreamingChunkAction(
                                 chunk=chunk,
                                 accumulated=accumulated,
                                 is_final=False,
-                                tool_call_index=idx,
                             )
                             ev.source = EventSource.AGENT
                             event_stream.add_event(ev, EventSource.AGENT)
 
-                        final_ev = StreamingThoughtChunkAction(
-                            chunk="", accumulated=accumulated, is_final=True, tool_call_index=idx
+                        final_ev = StreamingChunkAction(
+                            chunk="", accumulated=accumulated, is_final=True,
                         )
                         final_ev.source = EventSource.AGENT
                         event_stream.add_event(final_ev, EventSource.AGENT)

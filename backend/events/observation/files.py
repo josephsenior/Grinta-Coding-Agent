@@ -28,7 +28,6 @@ class FileReadObservation(Observation):
         """Get a string representation of the file read observation."""
         return f"[Read from {self.path} is successful.]\n{self.content}"
 
-    __test__ = False
 
 
 @dataclass
@@ -47,7 +46,6 @@ class FileWriteObservation(Observation):
         """Get a string representation of the file write observation."""
         return f"[Write to {self.path} is successful.]\n{self.content}"
 
-    __test__ = False
 
 
 @dataclass
@@ -227,4 +225,3 @@ class FileEditObservation(Observation):
             return f"[New file {self.path} is created with the provided content.]\n"
         return self.visualize_diff().rstrip() + "\n"
 
-    __test__ = False

@@ -13,7 +13,6 @@ class TermColor(Enum):
     ERROR = "red"
     INFO = "blue"
     GREY = "dark_grey"
-    __test__ = False
 
 
 def colorize(text: str, color: TermColor = TermColor.WARNING) -> str:

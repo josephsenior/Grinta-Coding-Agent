@@ -38,4 +38,3 @@ class LspQueryObservation(Observation):
         status = "OK" if self.available else "UNAVAILABLE"
         return f"**LspQueryObservation [{status}]**\n{self.content}"
 
-    __test__ = False

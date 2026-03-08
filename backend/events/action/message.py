@@ -47,7 +47,6 @@ class MessageAction(Action):
                 ret += f"\nFILE_URL: {url}"
         return ret
 
-    __test__ = False
 
 
 @dataclass
@@ -78,7 +77,6 @@ class SystemMessageAction(Action):
             ret += f"\nAGENT_CLASS: {self.agent_class}"
         return ret
 
-    __test__ = False
 
 
 @dataclass
@@ -101,4 +99,3 @@ class StreamingChunkAction(Action):
         char_count = len(self.accumulated)
         return f"**StreamingChunkAction** ({status}) - {char_count} chars"
 
-    __test__ = False

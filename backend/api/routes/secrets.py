@@ -29,7 +29,7 @@ from backend.api.user_auth import (
 )
 from backend.storage.data_models.user_secrets import UserSecrets
 
-router = APIRouter(prefix="/api/v1", dependencies=get_dependencies())
+router = APIRouter(prefix="/api/v1", dependencies=get_dependencies(), tags=["secrets"])
 
 
 def process_token_validation_result(

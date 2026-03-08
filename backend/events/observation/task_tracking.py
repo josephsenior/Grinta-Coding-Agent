@@ -20,4 +20,3 @@ class TaskTrackingObservation(Observation):
         """Get task tracking operation result."""
         return self.content
 
-    __test__ = False

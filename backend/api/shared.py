@@ -6,6 +6,14 @@ to the centralised AppState container.
 
 **No module-level ``global`` mutations** — every accessor function reads
 directly from ``AppState``, ensuring a single source of truth.
+
+.. deprecated::
+    Route files should inject ``config``, ``file_store``, and ``server_config``
+    via FastAPI ``Depends()`` providers defined in
+    ``backend.api.services.shared_dependencies`` (``get_forge_config``,
+    ``get_file_store``, ``get_server_config``).  Direct imports from this
+    module remain supported for non-route code (CLI, tests, utilities) that
+    cannot use the DI system.
 """
 
 from __future__ import annotations

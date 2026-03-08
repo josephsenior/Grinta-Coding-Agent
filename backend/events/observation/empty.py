@@ -21,4 +21,3 @@ class NullObservation(Observation):
         """Get null observation message."""
         return "No observation"
 
-    __test__ = False

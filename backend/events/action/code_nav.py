@@ -40,4 +40,3 @@ class LspQueryAction(Action):
     def __str__(self) -> str:
         return f"**LspQueryAction** command={self.command} file={self.file} line={self.line} col={self.column}"
 
-    __test__ = False

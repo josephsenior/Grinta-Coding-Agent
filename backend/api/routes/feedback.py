@@ -16,6 +16,7 @@ from backend.utils.async_utils import call_sync_from_async
 router = APIRouter(
     prefix="/api/v1/conversations/{conversation_id}/feedback",
     dependencies=get_dependencies(),
+    tags=["feedback"],
 )
 
 

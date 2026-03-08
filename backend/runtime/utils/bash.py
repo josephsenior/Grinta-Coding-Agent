@@ -167,7 +167,6 @@ class BashCommandStatus(Enum):
     COMPLETED = "completed"
     NO_CHANGE_TIMEOUT = "no_change_timeout"
     HARD_TIMEOUT = "hard_timeout"
-    __test__ = False
 
 
 def _remove_command_prefix(command_output: str, command: str) -> str:

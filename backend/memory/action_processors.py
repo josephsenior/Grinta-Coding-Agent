@@ -81,10 +81,11 @@ def convert_action_to_messages(
 def _is_tool_based_action(action: Action) -> bool:
     """Check if action is a tool-based action."""
     src = getattr(action, "source", None)
+    src_value: str
     if isinstance(src, EventSource):
         src_value = src.value
     else:
-        src_value = src
+        src_value = src or ""
     tool_action_classes = (
         AgentThinkAction,
         FileEditAction,
@@ -336,10 +337,11 @@ def _handle_message_action(
 ) -> list[Message]:
     """Handle MessageAction with optional image content."""
     src = getattr(action, "source", None)
+    src_value: str
     if isinstance(src, EventSource):
         src_value = src.value
     else:
-        src_value = src
+        src_value = src or ""
     role_value = "user" if src_value == "user" else "assistant"
     if role_value not in {"user", "system", "assistant", "tool"}:
         role_value = "assistant"

@@ -26,4 +26,3 @@ class TerminalObservation(Observation):
         """Return a readable summary."""
         return f"**TerminalObservation (session_id={self.session_id})**\nCONTENT:\n{self.content}"
 
-    __test__ = False

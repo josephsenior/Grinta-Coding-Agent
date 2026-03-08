@@ -11,9 +11,9 @@ from backend.controller.agent import Agent
 from backend.llm.model_catalog import get_supported_llm_models
 from backend.security.options import SecurityAnalyzers
 from backend.api.dependencies import get_dependencies
-from backend.api.shared import config, server_config
+from backend.api.app_state import get_app_state
 
-router = APIRouter(prefix="/api/v1/options", dependencies=get_dependencies())
+router = APIRouter(prefix="/api/v1/options", dependencies=get_dependencies(), tags=["options"])
 
 
 @router.get("/models")
@@ -37,7 +37,7 @@ async def get_models() -> list[str]:
         - Focuses on famous, well-supported models
 
     """
-    return get_supported_llm_models(config)
+    return get_supported_llm_models(get_app_state().config)
 
 
 @router.get("/agents")
@@ -116,4 +116,4 @@ async def get_config() -> dict[str, Any]:
         - Configuration is cached in server_config singleton
 
     """
-    return server_config.get_config()
+    return get_app_state().server_config.get_config()

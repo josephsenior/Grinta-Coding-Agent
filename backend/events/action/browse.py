@@ -32,4 +32,3 @@ class BrowseInteractiveAction(Action):
     def message(self) -> str:
         return "Running interactive browser actions"
 
-    __test__ = False

@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 # Force UTF-8 output so emoji don't crash on Windows cp1252 terminals
-if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+STDOUT_ENCODING = getattr(sys.stdout, "encoding", None)  # pylint: disable=invalid-name
+if isinstance(STDOUT_ENCODING, str) and STDOUT_ENCODING.lower() != 'utf-8':  # pylint: disable=no-member
     try:
         cast_stdout: Any = sys.stdout
         cast_stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -22,14 +23,14 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 
-def _find_available_port(host: str, preferred_port: int, max_offset: int = 20) -> int:
+def _find_available_port(host_ip: str, preferred_port: int, max_offset: int = 20) -> int:
     """Return preferred_port if free, otherwise next available port within range."""
     for offset in range(max_offset + 1):
         candidate = preferred_port + offset
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
             probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
-                probe.bind((host, candidate))
+                probe.bind((host_ip, candidate))
                 return candidate
             except OSError:
                 continue

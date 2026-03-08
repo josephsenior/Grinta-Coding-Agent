@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import sys
 import json
 from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any, cast
@@ -34,7 +33,7 @@ from backend.api.services.raw_event_service import dispatch_raw_message_event
 from backend.api.services.shared_dependencies import (
     require_conversation_manager,
 )
-from backend.api.shared import file_store
+from backend.api.app_state import get_app_state
 from backend.api.user_auth import get_user_id, get_user_settings_store
 from backend.api.utils import (
     get_conversation,
@@ -49,27 +48,16 @@ if TYPE_CHECKING:
     from backend.api.session.conversation import ServerConversation
 
 
-sub_router: APIRouter
-if "pytest" in sys.modules:
-
-    class NoOpAPIRouter(APIRouter):
-        """Router stub used in tests to bypass actual FastAPI route wiring."""
-
-        def add_api_route(self, path: str, endpoint, **kwargs):  # type: ignore[override]
-            """Return endpoint unchanged so tests can call handler directly."""
-            return endpoint
-
-    sub_router = cast(APIRouter, NoOpAPIRouter())
-else:
-    sub_router = APIRouter(
-        prefix="/api/v1/conversations/{conversation_id}",
-        dependencies=get_dependencies(),
-    )
+sub_router = APIRouter(
+    prefix="/api/v1/conversations/{conversation_id}",
+    dependencies=get_dependencies(),
+    tags=["conversations"],
+)
 
 
 def _get_workspace_dir(conversation_id: str) -> str:
     """Build the workspace directory for a conversation."""
-    return os.path.join(os.path.expanduser(file_store.root), conversation_id)
+    return os.path.join(os.path.expanduser(get_app_state().file_store.root), conversation_id)
 
 
 @sub_router.get("/simple-test")
@@ -263,7 +251,7 @@ def _search_events_sync(
     """Run EventStore.search_events synchronously for threadpool execution."""
     event_store = EventStore(
         sid=conversation_id,
-        file_store=file_store,
+        file_store=get_app_state().file_store,
         user_id=user_id,
     )
     return list(

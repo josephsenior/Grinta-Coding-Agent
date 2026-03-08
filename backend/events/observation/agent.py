@@ -24,7 +24,6 @@ class AgentStateChangedObservation(Observation):
         """Get message (empty for state change observations)."""
         return ""
 
-    __test__ = False
 
 
 @dataclass
@@ -38,7 +37,6 @@ class AgentCondensationObservation(Observation):
         """Get condensation result message."""
         return self.content
 
-    __test__ = False
 
 
 @dataclass
@@ -56,7 +54,6 @@ class AgentThinkObservation(Observation):
         """Get acknowledgment message."""
         return self.content
 
-    __test__ = False
 
 
 @dataclass
@@ -73,7 +70,6 @@ class PlaybookKnowledge:
     name: str
     trigger: str
     content: str
-    __test__ = False
 
 
 @dataclass
@@ -132,7 +128,6 @@ class RecallObservation(Observation):
             )
         return f"**RecallObservation**\n{', '.join(fields)}"
 
-    __test__ = False
 
 
 @dataclass
@@ -151,7 +146,6 @@ class RecallFailureObservation(Observation):
     def message(self) -> str:
         return self.error_message or self.content
 
-    __test__ = False
 
 
 @dataclass
@@ -168,4 +162,3 @@ class DelegateTaskObservation(Observation):
             return f"Delegated task completed: {self.content}"
         return f"Delegated task failed: {self.error_message or self.content}"
 
-    __test__ = False

@@ -15,6 +15,7 @@ from backend.api.utils import get_conversation
 router = APIRouter(
     prefix="/api/v1/conversations/{conversation_id}/trajectory",
     dependencies=get_dependencies(),
+    tags=["trajectory"],
 )
 
 

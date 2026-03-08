@@ -51,7 +51,6 @@ class ContentType(str, Enum):
 
     TEXT = "text"
     IMAGE_URL = "image_url"
-    __test__ = False
 
 
 class ActionType(str, Enum):
@@ -171,7 +170,6 @@ class ExitReason(str, Enum):
     INTENTIONAL = "intentional"
     INTERRUPTED = "interrupted"
     ERROR = "error"
-    __test__ = False
 
 
 class ActionConfirmationStatus(str, Enum):
@@ -196,7 +194,6 @@ class AppMode(str, Enum):
 
     OSS = "oss"
     SAAS = "saas"
-    __test__ = False
 
 
 class EventVersion(str, Enum):
@@ -212,7 +209,6 @@ class EventSource(str, Enum):
     AGENT = "agent"
     USER = "user"
     ENVIRONMENT = "environment"
-    __test__ = False
 
 
 class FileEditSource(str, Enum):
@@ -220,7 +216,6 @@ class FileEditSource(str, Enum):
 
     LLM_BASED_EDIT = "llm_based_edit"
     FILE_EDITOR = "file_editor"
-    __test__ = False
 
 
 class FileReadSource(str, Enum):
@@ -228,7 +223,6 @@ class FileReadSource(str, Enum):
 
     FILE_EDITOR = "file_editor"
     DEFAULT = "default"
-    __test__ = False
 
 
 class RecallType(str, Enum):
@@ -236,7 +230,6 @@ class RecallType(str, Enum):
 
     WORKSPACE_CONTEXT = "workspace_context"
     KNOWLEDGE = "knowledge"
-    __test__ = False
 
 
 class RetryStrategy(str, Enum):
@@ -272,4 +265,3 @@ class RuntimeStatus(str, Enum):
     GIT_PROVIDER_AUTHENTICATION_ERROR = "STATUS$GIT_PROVIDER_AUTHENTICATION_ERROR"
     LLM_RETRY = "STATUS$LLM_RETRY"
     ERROR_MEMORY = "STATUS$ERROR_MEMORY"
-    __test__ = False

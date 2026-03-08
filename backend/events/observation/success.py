@@ -18,4 +18,3 @@ class SuccessObservation(Observation):
         """Get success message content."""
         return self.content
 
-    __test__ = False

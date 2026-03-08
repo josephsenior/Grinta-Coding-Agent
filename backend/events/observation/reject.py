@@ -18,4 +18,3 @@ class UserRejectObservation(Observation):
         """Get rejection reason message."""
         return self.content
 
-    __test__ = False

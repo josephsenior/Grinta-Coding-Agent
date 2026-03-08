@@ -9,9 +9,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from backend.api.shared import config
+from backend.api.app_state import get_app_state
 
-router = APIRouter(prefix="/api/v1/global-export")
+router = APIRouter(prefix="/api/v1/global-export", tags=["export"])
 logger = logging.getLogger(__name__)
 
 
@@ -61,7 +61,7 @@ def _load_json_files(directory: str) -> list[dict]:
         No exceptions raised; errors are logged at exception level.
 
     """
-    workspace_base = Path(config.workspace_base or ".")
+    workspace_base = Path(get_app_state().config.workspace_base or ".")
     dir_path = workspace_base / directory
 
     if not dir_path.exists():
@@ -100,7 +100,7 @@ def _save_json_files(directory: str, data: list[dict]) -> tuple[int, int]:
         No exceptions raised; errors are logged at exception level.
 
     """
-    workspace_base = Path(config.workspace_base or ".")
+    workspace_base = Path(get_app_state().config.workspace_base or ".")
     dir_path = workspace_base / directory
     dir_path.mkdir(parents=True, exist_ok=True)
 

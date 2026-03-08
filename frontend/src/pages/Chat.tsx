@@ -34,9 +34,10 @@ import { useSessionStore } from "@/stores/session-store";
 import { useAppStore } from "@/stores/app-store";
 import { sendUserAction } from "@/socket/client";
 import { toast } from "sonner";
-import { AgentState, ActionType } from "@/types/agent";
-import type { ActionEvent } from "@/types/events";
+import { AgentState, ActionType, ObservationType } from "@/types/agent";
+import type { ActionEvent, ForgeEvent } from "@/types/events";
 import { EventCard } from "@/components/chat/EventRenderer";
+import { AgentWorkflowGroup } from "@/components/chat/AgentWorkflowGroup";
 import { StreamingBubble } from "@/components/chat/StreamingBubble";
 import { ConfirmationBanner } from "@/components/chat/ConfirmationBanner";
 import { PlaybookAutocomplete } from "@/components/chat/PlaybookAutocomplete";
@@ -236,6 +237,32 @@ function WelcomeState() {
   );
 }
 
+type GroupedEventItem = 
+  | { type: "single"; event: ForgeEvent }
+  | { type: "workflow"; id: string; events: ForgeEvent[] };
+
+function isPrimaryEvent(event: ForgeEvent): boolean {
+  if ("action" in event) {
+    return [
+      ActionType.MESSAGE,
+      ActionType.CLARIFICATION,
+      ActionType.PROPOSAL,
+      ActionType.ESCALATE,
+      ActionType.UNCERTAINTY,
+      ActionType.FINISH,
+      ActionType.REJECT
+    ].includes(event.action as ActionType);
+  }
+  if ("observation" in event) {
+    return [
+      ObservationType.MESSAGE,
+      ObservationType.CHAT,
+      ObservationType.USER_REJECTED
+    ].includes(event.observation as ObservationType);
+  }
+  return false;
+}
+
 export default function Chat() {
   const { id } = useParams<{ id: string }>();
   const { data: conversation } = useConversation(id);
@@ -244,6 +271,33 @@ export default function Chat() {
   useSocket(id);
 
   const events = useSessionStore((s) => s.events);
+
+  const groupedEvents = useMemo(() => {
+    const groups: GroupedEventItem[] = [];
+    let currentWorkflow: ForgeEvent[] = [];
+
+    for (const event of events) {
+      if (isPrimaryEvent(event)) {
+        if (currentWorkflow.length > 0) {
+          groups.push({ type: "workflow", id: `wf-${currentWorkflow[0]?.id ?? groups.length}`, events: currentWorkflow });
+          currentWorkflow = [];
+        }
+        groups.push({ type: "single", event });
+      } else {
+        // Exclude completely silent internal events from the workflow group
+        // EventRenderer handles skipping but grouping them empty is weird
+        // We'll let EventRenderer internally drop them anyway, but it's fine
+        currentWorkflow.push(event);
+      }
+    }
+    
+    if (currentWorkflow.length > 0) {
+      groups.push({ type: "workflow", id: `wf-${currentWorkflow[0]?.id ?? groups.length}`, events: currentWorkflow });
+    }
+    
+    return groups;
+  }, [events]);
+
   const agentState = useSessionStore((s) => s.agentState);
   const streamingContent = useSessionStore((s) => s.streamingContent);
   const isConnected = useSessionStore((s) => s.isConnected);
@@ -533,9 +587,19 @@ export default function Chat() {
                 </div>
               )}
 
-              {events.map((event, i) => (
-                <EventCard key={event.id != null ? `e-${event.id}` : `i-${i}`} event={event} />
-              ))}
+              {groupedEvents.map((item, i) => {
+                if (item.type === "single") {
+                  return <EventCard key={item.event.id != null ? `e-${item.event.id}` : `i-${i}`} event={item.event} />;
+                } else {
+                  return (
+                    <AgentWorkflowGroup 
+                      key={`wf-${item.id || i}`} 
+                      events={item.events} 
+                      isLatest={i === groupedEvents.length - 1} 
+                    />
+                  );
+                }
+              })}
 
               {/* Streaming indicator */}
               {streamingContent && <StreamingBubble content={streamingContent} />}

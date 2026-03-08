@@ -153,14 +153,6 @@ async def test_get_update_delete_handlers() -> None:
             "backend.api.routes.manage_conversations.delete_conversation_entry",
             AsyncMock(return_value=True),
         ) as delete_impl,
-        patch(
-            "backend.api.routes.manage_conversations._resolve_conversation_store",
-            AsyncMock(return_value=store),
-        ),
-        patch(
-            "backend.api.routes.manage_conversations._get_conversation_manager_instance",
-            return_value=None,
-        ),
     ):
         get_result = await _get_conversation_route(req, conversation_id="conv-1")
         update_result = await update_conversation(

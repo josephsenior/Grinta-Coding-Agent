@@ -146,9 +146,9 @@ async def _search_files(
         List of search results matching the query
     """
     try:
-        from backend.api.shared import file_store
+        from backend.api.app_state import get_app_state
 
-        all_files = file_store.list("")
+        all_files = get_app_state().file_store.list("")
         query_lower = query.lower()
         results: list[SearchResult] = []
 

@@ -42,4 +42,3 @@ class MCPAction(Action):
         ret += f"ARGUMENTS: {self.arguments}"
         return ret
 
-    __test__ = False

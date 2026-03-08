@@ -8,9 +8,8 @@ Business logic is delegated to:
 
 from __future__ import annotations
 
-import sys
 import traceback
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
@@ -51,7 +50,7 @@ from backend.api.services.session_init_service import (
     validate_remote_api_request,
     verify_repository_access,
 )
-from backend.api.shared import file_store, get_conversation_manager
+from backend.api.services.shared_dependencies import get_file_store
 from backend.api.types import LLMAuthenticationError, MissingSettingsError
 from backend.api.user_auth import (
     get_provider_tokens,
@@ -74,49 +73,11 @@ from backend.storage.data_models.conversation_status import ConversationStatus
 from backend.storage.data_models.settings import Settings
 from backend.storage.data_models.user_secrets import UserSecrets
 
-if TYPE_CHECKING:
-    pass
-
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 
-sub_router: APIRouter
-if "pytest" in sys.modules:
-
-    class NoOpAPIRouter(APIRouter):
-        """Router stub used in tests to short-circuit FastAPI route registration."""
-
-        def add_api_route(self, path: str, endpoint, **kwargs):  # type: ignore[override]
-            return endpoint
-
-    sub_router = cast(APIRouter, NoOpAPIRouter())
-else:
-    sub_router = APIRouter(prefix="/api/v1")
-
-
-# ---------------------------------------------------------------------------
-# Compatibility shims (tests / older call sites)
-# ---------------------------------------------------------------------------
-
-
-async def _resolve_conversation_store(request: Request) -> Any:
-    """Resolve the conversation store for a request.
-
-    Older tests patch this symbol directly; keep it as a thin wrapper around
-    `get_conversation_store`.
-    """
-
-    return await get_conversation_store(request)
-
-
-def _get_conversation_manager_instance() -> Any:
-    """Return the conversation manager instance.
-
-    This is primarily used as a patch point in tests.
-    """
-
-    return get_conversation_manager()
+sub_router = APIRouter(prefix="/api/v1", tags=["conversations"])
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +175,7 @@ class UpdateConversationRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@sub_router.post("/conversations", response_model=None)
+@sub_router.post("/conversations", response_model=ConversationResponse, summary="Create or resume a conversation")
 async def new_conversation(
     request: Request,
     data: InitSessionRequest,
@@ -336,7 +297,7 @@ async def simple_conversations_endpoint() -> dict:
     return {"status": "simple_working", "count": 1}
 
 
-@sub_router.get("/conversations", response_model=None)
+@sub_router.get("/conversations", response_model=None, summary="List conversations with optional filters")
 async def search_conversations_route(
     request: Request,
     page_id: str | None = Query(None, description="Page cursor for pagination"),
@@ -389,7 +350,7 @@ async def search_conversations_route(
 search_conversations = _search_conversations_impl
 
 
-@sub_router.get("/conversations/{conversation_id}", response_model=None)
+@sub_router.get("/conversations/{conversation_id}", response_model=None, summary="Get conversation details")
 async def _get_conversation_route(
     request: Request,
     conversation_id: str = Depends(validate_conversation_id),
@@ -432,6 +393,7 @@ async def get_prompt(
     conversation_id: Annotated[str, Depends(validate_conversation_id)],
     user_settings: Annotated[Any, Depends(get_user_settings_store)],
     metadata: Annotated[ConversationMetadata, Depends(get_conversation_metadata)],
+    file_store: Annotated[Any, Depends(get_file_store)],
 ) -> JSONResponse:
     """Generate a prompt for remembering conversation context at specific event."""
     prompt = await build_remember_prompt(
@@ -444,7 +406,7 @@ async def get_prompt(
     return JSONResponse({"status": "success", "prompt": prompt})
 
 
-@sub_router.post("/conversations/{conversation_id}/start", response_model=None)
+@sub_router.post("/conversations/{conversation_id}/start", response_model=ConversationResponse, summary="Start agent loop")
 async def start_conversation(
     providers_set: ProvidersSetModel,
     conversation_id: str = Depends(validate_conversation_id),
@@ -496,7 +458,7 @@ async def start_conversation(
         )
 
 
-@sub_router.post("/conversations/{conversation_id}/stop", response_model=None)
+@sub_router.post("/conversations/{conversation_id}/stop", response_model=ConversationResponse, summary="Stop agent loop")
 async def stop_conversation(
     conversation_id: Annotated[str, Depends(validate_conversation_id)],
     user_id: Annotated[str, Depends(get_user_id)],

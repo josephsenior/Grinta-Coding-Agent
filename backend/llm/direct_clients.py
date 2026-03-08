@@ -180,6 +180,7 @@ class DirectLLMClient(ABC):
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream responses asynchronously. Returns an async iterator."""
+        pass
 
     def __init_subclass__(cls, **kwargs):
         """Ensure subclasses define model_name attribute."""
@@ -225,15 +226,65 @@ class OpenAIClient(DirectLLMClient):
 
         return extract_tool_calls(message)
 
+    def _map_openai_error(self, exc: Exception) -> Exception:
+        """Map openai SDK exceptions to Forge LLM exceptions."""
+        import openai
+        from backend.llm.exceptions import (
+            RateLimitError,
+            AuthenticationError,
+            BadRequestError,
+            ContextWindowExceededError,
+            NotFoundError,
+            APIConnectionError,
+            InternalServerError,
+            Timeout,
+            APIError as ForgeAPIError,
+            is_context_window_error,
+        )
+
+        if isinstance(exc, (openai.APITimeoutError, httpx.TimeoutException)):
+            return Timeout(str(exc), llm_provider="openai", model=self.model_name)
+        if isinstance(exc, (openai.APIConnectionError, httpx.RequestError)):
+            return APIConnectionError(str(exc), llm_provider="openai", model=self.model_name)
+        if isinstance(exc, openai.RateLimitError):
+            return RateLimitError(str(exc), llm_provider="openai", model=self.model_name)
+        if isinstance(exc, openai.AuthenticationError):
+            return AuthenticationError(str(exc), llm_provider="openai", model=self.model_name)
+        if isinstance(exc, openai.BadRequestError):
+            error_str = str(exc).lower()
+            if is_context_window_error(error_str, exc):
+                return ContextWindowExceededError(str(exc), llm_provider="openai", model=self.model_name)
+            return BadRequestError(str(exc), llm_provider="openai", model=self.model_name)
+        if isinstance(exc, openai.NotFoundError):
+            return NotFoundError(str(exc), llm_provider="openai", model=self.model_name)
+        if isinstance(exc, openai.InternalServerError):
+            return InternalServerError(str(exc), llm_provider="openai", model=self.model_name)
+        if isinstance(exc, openai.APIStatusError):
+            return ForgeAPIError(
+                str(exc),
+                llm_provider="openai",
+                model=self.model_name,
+                status_code=exc.status_code,
+            )
+        return exc
+
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
         if "model" not in kwargs:
             kwargs["model"] = self.model_name
-        response = self.client.chat.completions.create(
-            messages=messages,  # type: ignore[arg-type]
-            **kwargs,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                messages=messages,  # type: ignore[arg-type]
+                **kwargs,
+            )
+        except Exception as e:
+            raise self._map_openai_error(e) from e
         if not getattr(response, "choices", None) or len(response.choices) == 0:
-            raise ValueError("OpenAI completion returned no choices")
+            from backend.llm.exceptions import BadRequestError
+            raise BadRequestError(
+                "OpenAI completion returned no choices",
+                llm_provider="openai",
+                model=self.model_name,
+            )
         first = response.choices[0]
         msg = first.message
         tool_calls = self._extract_openai_tool_calls(msg)
@@ -256,13 +307,21 @@ class OpenAIClient(DirectLLMClient):
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
         model = kwargs.pop("model", self.model_name)
-        response = await self.async_client.chat.completions.create(
-            model=model,
-            messages=messages,  # type: ignore[arg-type]
-            **kwargs,
-        )
+        try:
+            response = await self.async_client.chat.completions.create(
+                model=model,
+                messages=messages,  # type: ignore[arg-type]
+                **kwargs,
+            )
+        except Exception as e:
+            raise self._map_openai_error(e) from e
         if not getattr(response, "choices", None) or len(response.choices) == 0:
-            raise ValueError("OpenAI completion returned no choices")
+            from backend.llm.exceptions import BadRequestError
+            raise BadRequestError(
+                "OpenAI completion returned no choices",
+                llm_provider="openai",
+                model=self.model_name,
+            )
         first = response.choices[0]
         msg = first.message
         tool_calls = self._extract_openai_tool_calls(msg)
@@ -286,13 +345,19 @@ class OpenAIClient(DirectLLMClient):
     ) -> AsyncIterator[dict[str, Any]]:
         kwargs["stream"] = True
         model = kwargs.pop("model", self.model_name)
-        stream = await self.async_client.chat.completions.create(
-            model=model,
-            messages=messages,  # type: ignore[arg-type]
-            **kwargs,
-        )
-        async for chunk in stream:  # type: ignore[attr-defined]
-            yield chunk.model_dump()
+        try:
+            stream = await self.async_client.chat.completions.create(
+                model=model,
+                messages=messages,  # type: ignore[arg-type]
+                **kwargs,
+            )
+        except Exception as e:
+            raise self._map_openai_error(e) from e
+        try:
+            async for chunk in stream:  # type: ignore[attr-defined]
+                yield chunk.model_dump()
+        except Exception as e:
+            raise self._map_openai_error(e) from e
 
 
 class AnthropicClient(DirectLLMClient):
@@ -324,14 +389,59 @@ class AnthropicClient(DirectLLMClient):
 
         return prepare_kwargs(messages, kwargs, self.model_name)
 
+    def _map_anthropic_error(self, exc: Exception) -> Exception:
+        """Map anthropic SDK exceptions to Forge LLM exceptions."""
+        import anthropic
+        from backend.llm.exceptions import (
+            RateLimitError,
+            AuthenticationError,
+            BadRequestError,
+            ContextWindowExceededError,
+            NotFoundError,
+            APIConnectionError,
+            InternalServerError,
+            Timeout,
+            APIError as ForgeAPIError,
+            is_context_window_error,
+        )
+
+        if isinstance(exc, (anthropic.APITimeoutError, httpx.TimeoutException)):
+            return Timeout(str(exc), llm_provider="anthropic", model=self.model_name)
+        if isinstance(exc, (anthropic.APIConnectionError, httpx.RequestError)):
+            return APIConnectionError(str(exc), llm_provider="anthropic", model=self.model_name)
+        if isinstance(exc, anthropic.RateLimitError):
+            return RateLimitError(str(exc), llm_provider="anthropic", model=self.model_name)
+        if isinstance(exc, anthropic.AuthenticationError):
+            return AuthenticationError(str(exc), llm_provider="anthropic", model=self.model_name)
+        if isinstance(exc, anthropic.BadRequestError):
+            error_str = str(exc).lower()
+            if is_context_window_error(error_str, exc):
+                return ContextWindowExceededError(str(exc), llm_provider="anthropic", model=self.model_name)
+            return BadRequestError(str(exc), llm_provider="anthropic", model=self.model_name)
+        if isinstance(exc, anthropic.NotFoundError):
+            return NotFoundError(str(exc), llm_provider="anthropic", model=self.model_name)
+        if isinstance(exc, anthropic.InternalServerError):
+            return InternalServerError(str(exc), llm_provider="anthropic", model=self.model_name)
+        if isinstance(exc, anthropic.APIStatusError):
+            return ForgeAPIError(
+                str(exc),
+                llm_provider="anthropic",
+                model=self.model_name,
+                status_code=exc.status_code,
+            )
+        return exc
+
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
         filtered, kwargs = self._prepare_anthropic_kwargs(messages, kwargs)
         model = kwargs.pop("model", self.model_name)
-        response = self.client.messages.create(
-            model=model,
-            messages=filtered,  # type: ignore[arg-type]
-            **kwargs,
-        )
+        try:
+            response = self.client.messages.create(
+                model=model,
+                messages=filtered,  # type: ignore[arg-type]
+                **kwargs,
+            )
+        except Exception as e:
+            raise self._map_anthropic_error(e) from e
         content, tool_calls = self._extract_anthropic_tool_calls(response.content)
         return LLMResponse(
             content=content,
@@ -352,11 +462,14 @@ class AnthropicClient(DirectLLMClient):
     ) -> LLMResponse:
         filtered, kwargs = self._prepare_anthropic_kwargs(messages, kwargs)
         model = kwargs.pop("model", self.model_name)
-        response = await self.async_client.messages.create(
-            model=model,
-            messages=filtered,  # type: ignore[arg-type]
-            **kwargs,
-        )
+        try:
+            response = await self.async_client.messages.create(
+                model=model,
+                messages=filtered,  # type: ignore[arg-type]
+                **kwargs,
+            )
+        except Exception as e:
+            raise self._map_anthropic_error(e) from e
         content, tool_calls = self._extract_anthropic_tool_calls(response.content)
         return LLMResponse(
             content=content,
@@ -383,53 +496,56 @@ class AnthropicClient(DirectLLMClient):
         if "model" not in kwargs:
             kwargs["model"] = self.model_name
 
-        async with self.async_client.messages.stream(
-            messages=filtered_messages,  # type: ignore[arg-type]
-            system=system_msg,  # type: ignore[arg-type]
-            **kwargs,
-        ) as stream:
-            async for event in stream:
-                # Convert Anthropic events to OpenAI-like chunks for compatibility
-                if event.type == "content_block_start" and event.content_block.type == "tool_use":
-                    yield {
-                        "choices": [{
-                            "delta": {
-                                "tool_calls": [{
-                                    "index": event.index,
-                                    "id": event.content_block.id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": event.content_block.name,
-                                        "arguments": ""
-                                    }
-                                }]
-                            },
-                            "finish_reason": None
-                        }]
-                    }
-                elif event.type == "content_block_delta" and event.delta.type == "input_json_delta":
-                    yield {
-                        "choices": [{
-                            "delta": {
-                                "tool_calls": [{
-                                    "index": event.index,
-                                    "function": {"arguments": getattr(event.delta, "partial_json", "")}
-                                }]
-                            },
-                            "finish_reason": None
-                        }]
-                    }
-                elif event.type == "content_block_delta":
-                    yield {
-                        "choices": [
-                            {
-                                "delta": {"content": getattr(event.delta, "text", "")},  # type: ignore[union-attr]
-                                "finish_reason": None,
-                            }
-                        ]
-                    }
-                elif event.type == "message_stop":
-                    yield {"choices": [{"delta": {}, "finish_reason": "stop"}]}
+        try:
+            async with self.async_client.messages.stream(
+                messages=filtered_messages,  # type: ignore[arg-type]
+                system=system_msg,  # type: ignore[arg-type]
+                **kwargs,
+            ) as stream:
+                async for event in stream:
+                    # Convert Anthropic events to OpenAI-like chunks for compatibility
+                    if event.type == "content_block_start" and event.content_block.type == "tool_use":
+                        yield {
+                            "choices": [{
+                                "delta": {
+                                    "tool_calls": [{
+                                        "index": event.index,
+                                        "id": event.content_block.id,
+                                        "type": "function",
+                                        "function": {
+                                            "name": event.content_block.name,
+                                            "arguments": ""
+                                        }
+                                    }]
+                                },
+                                "finish_reason": None
+                            }]
+                        }
+                    elif event.type == "content_block_delta" and event.delta.type == "input_json_delta":
+                        yield {
+                            "choices": [{
+                                "delta": {
+                                    "tool_calls": [{
+                                        "index": event.index,
+                                        "function": {"arguments": getattr(event.delta, "partial_json", "")}
+                                    }]
+                                },
+                                "finish_reason": None
+                            }]
+                        }
+                    elif event.type == "content_block_delta":
+                        yield {
+                            "choices": [
+                                {
+                                    "delta": {"content": getattr(event.delta, "text", "")},  # type: ignore[union-attr]
+                                    "finish_reason": None,
+                                }
+                            ]
+                        }
+                    elif event.type == "message_stop":
+                        yield {"choices": [{"delta": {}, "finish_reason": "stop"}]}
+        except Exception as e:
+            raise self._map_anthropic_error(e) from e
 
 
 class GeminiClient(DirectLLMClient):
@@ -552,26 +668,41 @@ class GeminiClient(DirectLLMClient):
         from google.genai.errors import APIError
         from backend.llm.exceptions import (
             RateLimitError,
+            AuthenticationError,
+            BadRequestError,
+            ContextWindowExceededError,
+            NotFoundError,
+            InternalServerError,
             ServiceUnavailableError,
             Timeout,
             APIConnectionError,
             APIError as ForgeAPIError,
+            is_context_window_error,
         )
         import asyncio
         import aiohttp
-        import httpx
-        
+
         if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
             return Timeout(str(exc), llm_provider="google", model=self.model_name)
         if isinstance(exc, (aiohttp.ClientError, httpx.RequestError)):
             return APIConnectionError(str(exc), llm_provider="google", model=self.model_name)
-            
+
         if isinstance(exc, APIError):
             error_str = str(exc).lower()
             if exc.code == 429 or "quota" in error_str or "rate limit" in error_str:
                 return RateLimitError(str(exc), llm_provider="google", model=self.model_name)
+            if exc.code == 401 or "unauthorized" in error_str or "invalid api key" in error_str:
+                return AuthenticationError(str(exc), llm_provider="google", model=self.model_name)
+            if exc.code == 404 or "not found" in error_str:
+                return NotFoundError(str(exc), llm_provider="google", model=self.model_name)
             if exc.code in (500, 502, 503, 504) or "unavailable" in error_str or "overloaded" in error_str:
                 return ServiceUnavailableError(str(exc), llm_provider="google", model=self.model_name)
+            if exc.code == 400:
+                if is_context_window_error(error_str, exc):
+                    return ContextWindowExceededError(str(exc), llm_provider="google", model=self.model_name)
+                return BadRequestError(str(exc), llm_provider="google", model=self.model_name)
+            if exc.code and exc.code >= 500:
+                return InternalServerError(str(exc), llm_provider="google", model=self.model_name)
             return ForgeAPIError(str(exc), llm_provider="google", model=self.model_name)
         return exc
 
@@ -707,16 +838,32 @@ class GeminiClient(DirectLLMClient):
         try:
             stream = await chat.send_message_stream(prompt, **kwargs)
             async for chunk in stream:
-                if getattr(chunk, "function_calls", None):
-                    for idx, fc in enumerate(chunk.function_calls):
+                fcs = getattr(chunk, "function_calls", None)
+                if fcs:
+                    for idx, fc in enumerate(fcs):
                         import json
                         try:
-                            args_dict = type(fc).to_dict(fc.args) if hasattr(fc.args, "items") else fc.args
-                            if hasattr(args_dict, "items"): args_dict = dict(args_dict.items())
-                            elif hasattr(args_dict, "__dict__"): args_dict = args_dict.__dict__
-                            if hasattr(args_dict, "pb"):
-                                args_dict = {k:v for k,v in args_dict.items()} if hasattr(args_dict, "items") else {}
-                            args_str = json.dumps(args_dict) if isinstance(args_dict, dict) else json.dumps(getattr(fc, "args", {}))
+                            _args = getattr(fc, "args", {})
+                            if hasattr(type(fc), "to_dict") and _args:
+                                _to_dict = getattr(type(fc), "to_dict")
+                                if callable(_to_dict):
+                                    args_dict = _to_dict(_args)
+                                else:
+                                    args_dict = _args
+                            elif hasattr(_args, "items"):
+                                args_dict = dict(_args.items())  # type: ignore[union-attr]
+                            elif hasattr(_args, "__dict__"):
+                                args_dict = _args.__dict__
+                            else:
+                                args_dict = _args
+
+                            if hasattr(args_dict, "pb") and hasattr(args_dict, "items"):
+                                args_dict = {k: v for k, v in args_dict.items()}  # type: ignore[union-attr]
+
+                            if isinstance(args_dict, dict):
+                                args_str = json.dumps(args_dict)
+                            else:
+                                args_str = json.dumps(getattr(fc, "args", {}))
                         except Exception:
                             args_str = "{}"
                         yield {

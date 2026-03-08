@@ -29,7 +29,6 @@ class _CachePage:
     events: list[dict[str, Any]] | None
     start: int
     end: int
-    __test__ = False
 
     def covers(self, global_index: int) -> bool:
         """Check if this cache page contains the given event index.
@@ -71,7 +70,6 @@ class EventStore(EventStoreABC):
     user_id: str | None
     cache_size: int = 25
     _cur_id: int | None = None
-    __test__ = False
 
     @property
     def cur_id(self) -> int:

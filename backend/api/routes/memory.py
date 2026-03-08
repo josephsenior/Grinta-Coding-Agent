@@ -19,7 +19,7 @@ from backend.api.user_auth import get_user_settings_store
 if TYPE_CHECKING:
     pass
 
-router = APIRouter(prefix="/api/v1/memory")
+router = APIRouter(prefix="/api/v1/memory", tags=["memory"])
 
 
 class MemoryCategory(str, Enum):

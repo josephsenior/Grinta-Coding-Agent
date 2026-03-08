@@ -8,14 +8,39 @@ instead of re-implementing these functions.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 
+from backend.api.app_state import get_app_state
 from backend.api.shared import (
     get_conversation_manager,
     get_event_service_adapter,
 )
+
+if TYPE_CHECKING:
+    from backend.core.config import ForgeConfig
+    from backend.api.config.server_config import ServerConfig
+    from backend.storage.files import FileStore
+
+
+def get_file_store() -> "FileStore":
+    """FastAPI dependency that returns the shared FileStore singleton."""
+    return get_app_state().file_store
+
+
+def get_forge_config() -> "ForgeConfig":
+    """FastAPI dependency that returns the current ForgeConfig.
+
+    Reads directly from AppState on each call to avoid the stale-snapshot
+    problem with the module-level ``config`` reference in ``shared.py``.
+    """
+    return get_app_state().config
+
+
+def get_server_config() -> "ServerConfig":
+    """FastAPI dependency that returns the ServerConfig singleton."""
+    return get_app_state().server_config
 
 
 def get_conversation_manager_instance() -> Any | None:

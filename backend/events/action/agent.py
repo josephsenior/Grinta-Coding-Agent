@@ -23,7 +23,6 @@ class ChangeAgentStateAction(Action):
         """Get human-readable message for state change."""
         return f"Agent state changed to {self.agent_state}"
 
-    __test__ = False
 
 
 @dataclass
@@ -51,7 +50,6 @@ class PlaybookFinishAction(Action):
             return self.thought
         return "All done! What's next on the agenda?"
 
-    __test__ = False
 
 
 @dataclass
@@ -72,7 +70,6 @@ class AgentThinkAction(Action):
         """Get formatted thinking message."""
         return f"I am thinking...: {self.thought}"
 
-    __test__ = False
 
 
 @dataclass
@@ -91,7 +88,6 @@ class AgentRejectAction(Action):
             msg += " Reason: " + self.outputs["reason"]
         return msg
 
-    __test__ = False
 
 
 @dataclass
@@ -114,7 +110,6 @@ class RecallAction(Action):
         ret += f"QUERY: {self.query[:50]}"
         return ret
 
-    __test__ = False
 
 
 @dataclass
@@ -268,7 +263,6 @@ class UncertaintyAction(Action):
         )
         return f"Uncertainty ({self.uncertainty_level:.0%} confidence): {concerns}"
 
-    __test__ = False
 
 
 @dataclass
@@ -300,7 +294,6 @@ class ProposalAction(Action):
             return f"Proposing options: {self.rationale}"
         return f"Proposing {len(self.options)} options for consideration"
 
-    __test__ = False
 
 
 @dataclass
@@ -330,7 +323,6 @@ class ClarificationRequestAction(Action):
         """Get clarification request message."""
         return f"Requesting clarification: {self.question}"
 
-    __test__ = False
 
 
 @dataclass
@@ -360,7 +352,6 @@ class EscalateToHumanAction(Action):
         """Get escalation message."""
         return f"Requesting human assistance: {self.reason}"
 
-    __test__ = False
 
 
 @dataclass
@@ -386,7 +377,6 @@ class DelegateTaskAction(Action):
         """Get delegation message."""
         return f"Delegating task: {self.task_description[:50]}..."
 
-    __test__ = False
 
 
 @dataclass
@@ -412,7 +402,6 @@ class BlackboardAction(Action):
             return "Blackboard keys"
         return f"Blackboard get {self.key or 'all'}"
 
-    __test__ = False
 
 
 @dataclass
@@ -426,4 +415,3 @@ class QueryToolboxAction(Action):
     def message(self) -> str:
         return f"Querying toolbox for: {self.capability_query}"
 
-    __test__ = False

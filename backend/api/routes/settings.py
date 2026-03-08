@@ -18,7 +18,7 @@ from backend.core.provider_types import ProviderTokenType, ProviderType
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.api.dependencies import get_dependencies
 from backend.api.settings import GETSettingsModel
-from backend.api.shared import config
+from backend.api.app_state import get_app_state
 from backend.api.user_auth import (
     get_provider_tokens,
     get_secrets_store,
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 # Rebuild GETSettingsModel to resolve forward references
 GETSettingsModel.model_rebuild()
 
-router = APIRouter(prefix="/api/v1", dependencies=get_dependencies())
+router = APIRouter(prefix="/api/v1", dependencies=get_dependencies(), tags=["settings"])
 
 # 🚀 PERFORMANCE FIX: Global cache for settings to avoid repeated database calls
 #   Cache key: user_id (or 'default' for single-tenant), Cache value: (settings_response, timestamp)
@@ -308,18 +308,19 @@ def _process_llm_model_configuration(settings: Settings) -> None:
 
 
 def _apply_runtime_and_git_overrides(settings: Settings) -> None:
+    forge_config = get_app_state().config
     git_config_updated = False
     if settings.vcs_user_name is not None:
-        config.vcs_user_name = settings.vcs_user_name
+        forge_config.vcs_user_name = settings.vcs_user_name
         git_config_updated = True
     if settings.vcs_user_email is not None:
-        config.vcs_user_email = settings.vcs_user_email
+        forge_config.vcs_user_email = settings.vcs_user_email
         git_config_updated = True
     if git_config_updated:
         logger.info(
             "Updated global git configuration: name=%s, email=%s",
-            config.vcs_user_name,
-            config.vcs_user_email,
+            forge_config.vcs_user_name,
+            forge_config.vcs_user_email,
         )
 
 

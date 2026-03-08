@@ -190,4 +190,3 @@ class NestedEventStore(EventStoreABC):
         event = self.get_latest_event()
         return event.id
 
-    __test__ = False

@@ -18,4 +18,3 @@ class NullAction(Action):
         """Get null action message."""
         return "No action"
 
-    __test__ = False
