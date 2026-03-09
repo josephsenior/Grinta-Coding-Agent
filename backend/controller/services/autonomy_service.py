@@ -54,7 +54,7 @@ class AutonomyService:
             from backend.controller.safety_validator import SafetyValidator
 
             controller.safety_validator = SafetyValidator(agent.config.safety)
-            logger.info("SafetyValidator enabled for production safety")
+            logger.debug("SafetyValidator enabled for production safety")
 
     def _initialize_task_validator(self, agent: Agent) -> None:
         controller = self._controller
@@ -77,7 +77,7 @@ class AutonomyService:
                 require_all_pass=False,
                 fail_open_on_empty=False,
             )
-            logger.info("TaskValidator enabled for completion checking")
+            logger.debug("TaskValidator enabled for completion checking")
 
         controller.PENDING_ACTION_TIMEOUT = 120.0
         controller._add_system_message()

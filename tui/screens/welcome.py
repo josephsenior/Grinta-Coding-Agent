@@ -17,9 +17,9 @@ class WelcomeScreen(Screen[bool]):
 
     def compose(self) -> ComposeResult:
         yield Vertical(
-            Static("🚀 Welcome to Forge", id="welcome-title"),
+            Static("🚀 Initialize Forge Workspace", id="welcome-title"),
             Static(
-                "Forge is a local-first AI coding agent. Let's get you set up in 30 seconds.",
+                "Forge is your autonomous AI engineering environment. Let's calibrate your setup.",
                 id="welcome-subtitle"
             ),
             Vertical(
@@ -47,7 +47,7 @@ class WelcomeScreen(Screen[bool]):
                 classes="setup-step"
             ),
             Horizontal(
-                Button("Finish Setup", variant="success", id="btn-finish"),
+                Button("Initialize Systems", variant="success", id="btn-finish"),
                 id="welcome-actions"
             ),
             id="welcome-container"
@@ -79,18 +79,26 @@ class WelcomeScreen(Screen[bool]):
     def _save_config(self, provider: str, api_key: str, workspace: str) -> None:
         settings_path = Path.cwd() / "settings.json"
 
-        # Start with defaults (flat format for load_from_json compatibility)
-        config_data: dict[str, Any] = {
-            "workspace_base": workspace,
-            "max_budget_per_task": 5.0,
-            "llm_model": "gpt-4o" if provider == "openai" else "claude-3-5-sonnet-20240620" if provider == "anthropic" else "ollama/llama3.2",
-            "llm_api_key": api_key,
-            "llm_base_url": "",
-            "model_aliases": {},
-        }
+        # Load existing config (may have been pre-created by bootstrap scripts
+        # with model_aliases from auto-discovery) so we merge, not overwrite.
+        existing: dict[str, Any] = {}
+        if settings_path.exists():
+            try:
+                with open(settings_path, encoding="utf-8") as f:
+                    existing = json.load(f)
+            except Exception:
+                existing = {}
+
+        # Apply wizard choices on top of whatever already exists
+        existing["workspace_base"] = workspace
+        existing["max_budget_per_task"] = existing.get("max_budget_per_task", 5.0)
+        existing["llm_model"] = "gpt-4o" if provider == "openai" else "claude-3-5-sonnet-20240620" if provider == "anthropic" else "ollama/llama3.2"
+        existing["llm_api_key"] = api_key
+        if not existing.get("llm_base_url"):
+            existing["llm_base_url"] = ""
 
         with open(settings_path, "w", encoding="utf-8") as f:
-            json.dump(config_data, f, indent=2)
+            json.dump(existing, f, indent=2)
         
         # Create workspace dir if missing
         w_path = Path(workspace)

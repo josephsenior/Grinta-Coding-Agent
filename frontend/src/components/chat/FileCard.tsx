@@ -65,7 +65,7 @@ export function FileCard({ event }: FileCardProps) {
           className="w-full rounded-lg border p-1.5 text-xs text-left text-muted-foreground hover:bg-accent transition-colors"
         >
           <CardSectionLabel
-            label="File Read"
+            label="Analyze Asset"
             icon={<FileText className="h-3.5 w-3.5 shrink-0" />}
           />
           <span>
@@ -83,7 +83,7 @@ export function FileCard({ event }: FileCardProps) {
           className="w-full rounded-lg border p-1.5 text-xs text-left text-muted-foreground hover:bg-accent transition-colors"
         >
           <CardSectionLabel
-            label="File Create"
+            label="Generate Asset"
             icon={<FilePlus className="h-3.5 w-3.5 shrink-0 text-green-500" />}
           />
           <span>
@@ -102,7 +102,7 @@ export function FileCard({ event }: FileCardProps) {
               className="text-left text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <CardSectionLabel
-                label="File Edit"
+                label="Mutate Asset"
                 icon={<Pencil className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
                 className="mb-0"
               />
@@ -120,13 +120,13 @@ export function FileCard({ event }: FileCardProps) {
             <div className="mt-1.5 space-y-1 text-xs font-mono">
               <div className="rounded bg-red-500/10 p-1 text-red-600 dark:text-red-400">
                 <CardCollapsibleSection
-                  label="removed lines"
+                  label="Lines Excised"
                   lines={oldText.split("\n").map((line) => `- ${line}`)}
                 />
               </div>
               <div className="rounded bg-green-500/10 p-1 text-green-600 dark:text-green-400">
                 <CardCollapsibleSection
-                  label="added lines"
+                  label="Lines Injected"
                   lines={newText.split("\n").map((line) => `+ ${line}`)}
                 />
               </div>

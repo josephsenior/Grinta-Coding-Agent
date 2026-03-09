@@ -21,7 +21,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--port",
         type=int,
-        default=3001,
+        default=3000,
         help="Forge backend port (default: 3000)",
     )
     parser.add_argument(

@@ -150,7 +150,7 @@ class ChatScreen(Screen[None]):
                         prompt="Model",
                         allow_blank=True,
                     )
-                    yield Input(placeholder="Type a message…", id="chat-input")
+                    yield Input(placeholder="Describe what we are building today...", id="chat-input")
             yield AgentBrain(id="agent-brain", classes="width-32")
         yield AgentStatusBar(id="agent-status-bar")
         yield Footer()
@@ -478,7 +478,7 @@ class ChatScreen(Screen[None]):
             playbooks = extras.get("playbooks", [])
             if isinstance(playbooks, list) and playbooks:
                 self._brain_set_playbooks(playbooks)
-                self._add_system_message(f"Loaded playbooks: {', '.join(str(p) for p in playbooks)}")
+                self._add_system_message(f"Applied strategies: {', '.join(str(p) for p in playbooks)}")
             return
 
         msg_list = self.query_one("#message-list", MessageList)
@@ -658,7 +658,7 @@ class ChatScreen(Screen[None]):
     async def action_stop_agent(self) -> None:
         try:
             await self.client.send_stop()
-            self.notify("Stop requested")
+            self.notify("Agent HALT signal broadcasted")
         except Exception as e:
             self.notify(f"Stop failed: {e}", severity="error")
 

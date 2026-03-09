@@ -427,23 +427,54 @@ detailed examples.
 
 ## Playbooks
 
-Forge includes 19 built-in playbooks that provide specialized behavior
-for common workflows:
+Forge includes 16 built-in playbooks that activate automatically when your message matches
+their trigger phrases, injecting specialist guidance into the agent's context window.
 
-- **Code Review**: Analyze code quality, suggest improvements
-- **Bug Fix**: Systematic debugging approach
-- **Feature Implementation**: Structured feature development
-- **Testing**: Comprehensive test generation
-- **Refactoring**: Safe restructuring patterns
-- **Documentation**: Generate and update docs
+### Context Playbooks (auto-triggered)
 
-Playbooks are loaded automatically based on context. Disable specific
-playbooks in config:
+| Playbook | Trigger phrases |
+|---|---|
+| **Debug** | `bug fix`, `debug`, `traceback`, `exception`, `error fix` |
+| **Feature** | `implement feature`, `add feature`, `new feature`, `build feature` |
+| **Refactoring** | `refactor`, `clean up code`, `restructure`, `technical debt` |
+| **Documentation** | `document`, `add docs`, `write documentation`, `docstring` |
+| **Testing** | `test`, `testing`, `pytest`, `jest`, `unittest`, `vitest` |
+| **Code Review** | `/codereview`, `code review`, `review code`, `review pr` |
+| **API** | `api`, `rest api`, `endpoint` |
+| **Database** | `database`, `sql`, `migration` |
+| **React** | `react`, `component`, `hooks` |
+| **SSH** | `ssh`, `remote server`, `deploy` |
+| **Add Agent** | `new agent`, `create playbook`, `add playbook` |
 
-```toml
-[agent]
-disabled_playbooks = ["playbook_name"]
+### Task Playbooks (invoked by `/command`)
+
+Task playbooks collect variables from you before running:
+
+| Command | What it does |
+|---|---|
+| `/address_pr_comments` | Reads PR URL + branch and resolves all reviewer comments |
+| `/update_test` | Runs a test command on a branch and fixes failures |
+| `/update_pr_description` | Rewrites the PR description to reflect the current diff |
+
+Run a task playbook by typing the `/command` directly in the chat.
+
+### Disabling Playbooks
+
+Suppress specific playbooks for a session by setting `disabled_playbooks` in `settings.json`:
+
+```json
+{
+  "disabled_playbooks": ["react", "ssh"]
+}
 ```
+
+You can also pass them via the API when creating a conversation.
+
+### Custom Playbooks
+
+Create your own playbooks in `~/.Forge/playbooks/` (user-level) or `.Forge/playbooks/`
+(repo-level) using the same Markdown + frontmatter format. Type
+`add playbook` in chat for a guided template.
 
 ---
 

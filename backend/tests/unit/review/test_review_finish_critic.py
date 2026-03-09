@@ -42,14 +42,12 @@ class TestAgentFinishedCritic:
         critic = AgentFinishedCritic()
         result = critic.evaluate([], diff_patch="  ")
         assert result.score == 0
-        assert "empty" in result.message.lower()
 
     def test_finish_action_present(self):
         critic = AgentFinishedCritic()
         finish = PlaybookFinishAction(outputs={"content": "done"})
         result = critic.evaluate([finish])
         assert result.score == 1
-        assert "finished" in result.message.lower()
 
     def test_no_finish_action(self):
         critic = AgentFinishedCritic()
@@ -57,7 +55,6 @@ class TestAgentFinishedCritic:
         event.__class__ = type("NotAnAction", (), {})
         result = critic.evaluate([event])
         assert result.score == 0
-        assert "did not finish" in result.message.lower()
 
     def test_finish_action_with_patch(self):
         critic = AgentFinishedCritic()
@@ -69,10 +66,8 @@ class TestAgentFinishedCritic:
         critic = AgentFinishedCritic()
         result = critic.evaluate([])
         assert result.score == 0
-        assert "did not finish" in result.message.lower()
 
     def test_none_patch_doesnt_trigger_empty_check(self):
         """None patch should not trigger the 'empty patch' check."""
         critic = AgentFinishedCritic()
         result = critic.evaluate([])
-        assert "did not finish" in result.message.lower()

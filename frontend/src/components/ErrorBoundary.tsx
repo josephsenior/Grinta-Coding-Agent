@@ -33,9 +33,9 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background p-8 text-center">
           <AlertTriangle className="h-10 w-10 text-destructive" />
-          <h1 className="text-lg font-semibold">Something went wrong</h1>
+          <h1 className="text-lg font-semibold">Fatal Render Exception</h1>
           <p className="max-w-md text-sm text-muted-foreground">
-            An unexpected error occurred. You can try again or reload the page.
+            A critical interface error has compromised the UI loop. Re-initialize the viewport or attempt a soft refresh.
           </p>
           {this.state.error && (
             <pre className="max-w-lg overflow-auto rounded-md bg-muted p-3 text-left text-xs">

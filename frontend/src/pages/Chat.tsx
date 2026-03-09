@@ -217,14 +217,13 @@ function WelcomeState() {
         <Sparkles className="h-7 w-7 text-primary" />
       </div>
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold">Ready when you are</h2>
+        <h2 className="text-lg font-semibold">Systems Online</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Type a message below to give the agent a task. You can ask it to write
-          code, fix bugs, run commands, or explore your codebase.
+          Input mission parameters below to deploy an agent. It can synthesize code, resolve exceptions, execute workflows, or analyze the workspace structure.
         </p>
       </div>
       <div className="flex flex-wrap justify-center gap-2">
-        {["Fix the failing tests", "Refactor this module", "Explain this code"].map((hint) => (
+        {["Resolve test pipeline exceptions", "Architectural refactoring", "Decompile logic intent"].map((hint) => (
           <span
             key={hint}
             className="rounded-full border bg-muted/50 px-3 py-1 text-xs text-muted-foreground"
@@ -655,12 +654,12 @@ export default function Chat() {
               <Textarea
                 placeholder={
                   !isConnected
-                    ? "Connecting to backend..."
+                    ? "Establishing secure uplink..."
                     : needsSetup
-                      ? "Configure your API key in Settings first..."
+                      ? "Awaiting API telemetry configuration..."
                       : canSend
-                        ? "Type a message... (/ for playbooks)"
-                        : "Agent is working..."
+                        ? "Provide directive... (/ for playbooks)"
+                        : "Agent sequence active..."
                 }
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}

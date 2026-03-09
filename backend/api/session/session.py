@@ -318,6 +318,8 @@ class Session:
             else self.config.max_budget_per_task
         )
         agent_config = self.config.get_agent_config(agent_cls)
+        if settings.disabled_playbooks is not None:
+            agent_config.disabled_playbooks = list(settings.disabled_playbooks)
         agent_name = agent_cls if agent_cls is not None else "agent"
         llm_config = self.config.get_llm_config_from_agent(agent_name)
 
@@ -337,6 +339,8 @@ class Session:
             agent_cls = fallback_agent
             settings.agent = fallback_agent
             agent_config = self.config.get_agent_config(agent_cls)
+            if settings.disabled_playbooks is not None:
+                agent_config.disabled_playbooks = list(settings.disabled_playbooks)
             agent_name = agent_cls if agent_cls is not None else "agent"
             llm_config = self.config.get_llm_config_from_agent(agent_name)
             self._apply_condenser(settings, agent_config, llm_config)

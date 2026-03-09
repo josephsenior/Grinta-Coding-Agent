@@ -19,7 +19,7 @@ import time
 from collections import OrderedDict
 from typing import Any
 
-from .local_vector_store import ChromaDBBackend
+from .local_vector_store import ChromaDBBackend, SQLiteBM25Backend
 
 logger = logging.getLogger(__name__)
 
@@ -184,6 +184,7 @@ class EnhancedVectorStore:
 
         """
         self.backend: ChromaDBBackend = ChromaDBBackend(collection_name)
+        self.bm25_backend = SQLiteBM25Backend(collection_name)
 
         # Initialize cache
         self.cache: QueryCache | None = (
@@ -223,7 +224,10 @@ class EnhancedVectorStore:
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Add a document to the vector store."""
-        return self.backend.add(
+        self.backend.add(
+            step_id, role, artifact_hash, rationale, content_text, metadata
+        )
+        self.bm25_backend.add(
             step_id, role, artifact_hash, rationale, content_text, metadata
         )
 
@@ -289,9 +293,19 @@ class EnhancedVectorStore:
         elif not isinstance(initial_k_raw, int):
             initial_k_raw = int(initial_k_raw)
         initial_k = max(initial_k_raw, k * 2)
-        candidates = self.backend.search(
+        semantic_candidates = self.backend.search(
             query, k=initial_k, filter_metadata=filter_metadata
         )
+        lexical_candidates = self.bm25_backend.search(
+            query, k=initial_k, filter_metadata=filter_metadata
+        )
+        
+        seen_ids = set()
+        candidates = []
+        for doc in semantic_candidates + lexical_candidates:
+            if doc["step_id"] not in seen_ids:
+                seen_ids.add(doc["step_id"])
+                candidates.append(doc)
 
         if not candidates:
             return []
@@ -334,7 +348,9 @@ class EnhancedVectorStore:
 
         Also clears relevant cache entries to prevent stale results.
         """
-        deleted_count = self.backend.delete_by_metadata(filter_metadata)
+        c1 = self.backend.delete_by_metadata(filter_metadata)
+        c2 = self.bm25_backend.delete_by_metadata(filter_metadata)
+        deleted_count = max(c1, c2)
 
         # Clear cache since results may have changed
         if self.cache:
@@ -348,7 +364,9 @@ class EnhancedVectorStore:
 
         Also clears relevant cache entries to prevent stale results.
         """
-        deleted_count = self.backend.delete_by_ids(ids)
+        c1 = self.backend.delete_by_ids(ids)
+        c2 = self.bm25_backend.delete_by_ids(ids)
+        deleted_count = max(c1, c2)
 
         # Clear cache since results may have changed
         if self.cache:

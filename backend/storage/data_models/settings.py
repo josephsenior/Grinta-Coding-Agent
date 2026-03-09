@@ -71,6 +71,7 @@ class Settings(BaseModel):
     enable_sound_notifications: bool = False
     enable_proactive_conversation_starters: bool = True
     enable_solvability_analysis: bool = True
+    enable_review_critics: bool = True
     user_consents_to_analytics: bool | None = None
     mcp_config: MCPConfig | None = None
     # Knowledge Base Configuration
@@ -145,6 +146,10 @@ class Settings(BaseModel):
     graph_rag_persistence_path: str | None = None
     graph_rag_graph_depth: int | None = None
     graph_rag_max_seed_results: int | None = None
+
+    # Playbook Configuration
+    disabled_playbooks: list[str] | None = None
+    """Names of built-in or user playbooks to suppress for this session."""
 
     model_config = ConfigDict(validate_assignment=True)
 

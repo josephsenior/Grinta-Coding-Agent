@@ -5,20 +5,24 @@
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-**Forge** is a high-performance, open-source AI coding platform built for deep, autonomous coding sessions.
-It pairs a **Textual TUI** with a **FastAPI + Socket.IO** backend, shipping with
-event-sourced session resilience, 12 context condensers, and a 23-tool agent engine.
+> **Aider edits files. Forge finishes tasks.**
+
+**Forge** is an open-source autonomous coding agent that plans, implements, tests, and validates work end-to-end — not just edits files and hands back control.
+
+Give it a task like *"Add Stripe payment support"* and Forge will: read the codebase, write a multi-step plan, implement the changes across files, run the tests, check the budget, and only declare done when everything checks out.
 
 ---
 
 ## Why Forge?
 
-- **Built for Scale:** Handles thousands of events per session with an event-sourced backbone.
-- **Resilient by Design:** Write-Ahead Logging (WAL) and backpressure-aware streams ensure zero event loss, even on process crashes.
-- **Expert Memory:** 12 distinct [context condenser](docs/CONDENSERS.md) strategies (Smart, Semantic, LLM, etc.) and an auto-selector pick the right memory for every task.
-- **Safety First:** Multi-trip circuit breakers, 6-strategy stuck detection, and per-task cost caps keep your budget and system safe.
-- **Local-First:** Native Ollama and OpenAI-compatible support for zero-cost, private coding.
-- **No-Node TUI:** A full-featured terminal interface built entirely in Python (Textual) — zero JavaScript required.
+Most AI coding tools stop at the file edit. Forge keeps going:
+
+- **Task Completion, Not File Edits:** A structured planner breaks work into steps; a critic system scores the result before declaring done. You get a finished task, not a pile of edits to review.
+- **Self-Correcting:** If tests fail after an edit, Forge detects it and tries again. If it gets stuck in a loop, a 6-strategy circuit breaker pauses it for your review — not silently burns your budget.
+- **Built for Long Tasks:** Event-sourced session persistence, Write-Ahead Logging, and 12 context condensers mean a 500-step session stays coherent as a 50-step one.
+- **Budget-Aware:** Per-task cost caps and a `BudgetCritic` on every completion keep spend predictable — ideal for unattended overnight runs.
+- **Safety First:** Per-action risk assessment, rollback checkpoints (no git required), and multi-trip circuit breakers before any destructive action.
+- **Local-First:** Native Ollama and OpenAI-compatible support. Zero cloud required.
 
 ---
 
@@ -26,38 +30,43 @@ event-sourced session resilience, 12 context condensers, and a 23-tool agent eng
 
 ```mermaid
 graph TB
-    subgraph TUI["TUI (Textual)"]
-        Screens[Screens]
-        Client[ForgeClient]
-    end
+    User([User / API]) -->|task| Server
 
-    subgraph Server["Server (FastAPI)"]
-        APP[FastAPI App/Socket.IO]
+    subgraph Server["Server (FastAPI + Socket.IO)"]
         SM[Session Manager]
     end
 
     subgraph Controller["Agent Controller"]
         AC[AgentController]
-        Services[21 Services]
+        Planner[Task Planner]
+        Critics[Critics: Finish · Budget · SuitePass]
         Safety[Circuit Breaker / Stuck Detector]
     end
 
     subgraph Engine["Agent Engine"]
         ORCH[Orchestrator]
-        Tools[23 Tools]
+        Tools["23 Tools (edit · test · browse · db)"]
     end
 
-    subgraph Events["Event System"]
-        ES[EventStream]
-        WAL[WAL / Persistence]
+    subgraph Memory["Memory"]
+        Condensers["12 Condensers"]
+        GraphRAG[GraphRAG]
     end
 
-    UI <-->|Socket.IO| Server
+    subgraph Persistence["Persistence"]
+        ES[EventStream / WAL]
+        Checkpoints[Rollback Checkpoints]
+    end
+
     Server --> AC
-    AC --> Engine
-    Engine --> Tools
+    AC --> Planner
+    AC --> ORCH
+    ORCH --> Tools
+    AC --> Memory
+    AC --> Critics
+    AC --> Safety
     AC --> ES
-    ES --> WAL
+    ES --> Checkpoints
 ```
 
 See the [Architecture Deep Dive](docs/ARCHITECTURE.md) for a full walkthrough of the 21 services and 23 tools.
@@ -85,8 +94,7 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 1. **Prerequisites:** Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 2. **Install:** `uv sync`
 3. **Setup Config:** `cp settings.template.json settings.json`
-4. **Start Backend:** `uv run python start_server.py`
-5. **Start TUI:** `uv run forge-tui`
+4. **Start:** `uv run forge all`
 
 ---
 
@@ -121,18 +129,34 @@ Then use `llm_model = "coding"` in your settings or agent config.
 
 ## 🛠️ Key Concepts
 
+### The Full Task Loop
+Forge doesn't just edit files — it runs a complete loop: **plan → implement → test → review → done**.
+
+The orchestrator writes a structured plan, tracks step completion, and before marking a task finished it runs three critics:
+- **`AgentFinishedCritic`** — Did the agent actually emit a finish action, or did it wander off?
+- **`SuitePassCritic`** — Do the tests for touched files still pass?
+- **`BudgetCritic`** — Was the spend below the configured cap?
+
+All three scores are logged at completion. If tests fail, the task validation layer can reject the finish and send the agent back to fix things.
+
+### Playbook Engine
+Tasks can be codified as [Playbooks](docs/USER_GUIDE.md) — YAML files that define goals, constraints, and step templates. Forge matches incoming requests to playbooks by keyword and semantic similarity, then executes the plan with full autonomy mode controls.
+
 ### 12 Context Condensers
 Stop running out of tokens. Forge uses specialized "condensers" to compress conversation history:
 - **Smart/Auto**: Dynamically switches strategies based on task signals.
 - **LLM Summary**: Uses a cheaper model to intelligently summarize history.
 - **Observation Masking**: Keeps the event structure but hides bulky command outputs.
-- **Semantic**: Uses embeddings to find and keep relevant past interactions.
+- **Semantic**: Uses heuristics to keep relevant past interactions without heavyweight models.
 
 ### 23 Specialized Tools
 From `str_replace_editor` (tree-sitter aware) to `browser` automation and `database` access, the agent has everything it needs to build complex apps.
 
 ### 6-Strategy Stuck Detection
 Forge detects if the agent is looping by analyzing action patterns, semantic intent, cost acceleration, and token repetition. The circuit breaker then safely pauses the agent for your review.
+
+### Rollback Without Git
+`checkpoint` and `revert_to_safe_state` save per-file backups to `.forge/checkpoints.json` — sub-commit granularity rollback that works even if the project has no git history.
 
 ---
 

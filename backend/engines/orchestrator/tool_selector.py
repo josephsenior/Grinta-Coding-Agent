@@ -188,11 +188,19 @@ def _compute_allowed_tools(
 def _filter_tools_by_allowed(
     all_tools: list[dict[str, Any]], allowed: set[str]
 ) -> list[dict[str, Any]]:
-    """Filter tools to only those in allowed set (or with unknown name)."""
+    """Filter tools to only those in allowed set (or with unknown name), and remove duplicates."""
     selected = []
     excluded_names = []
+    seen_names = set()
     for tool in all_tools:
         name = _get_tool_name(tool)
+        
+        # Deduplicate tools by name
+        if name is not None:
+            if name in seen_names:
+                continue
+            seen_names.add(name)
+            
         if name is None or name in allowed:
             selected.append(tool)
         else:

@@ -552,6 +552,7 @@ class GeminiClient(DirectLLMClient):
     """Client for Google Gemini."""
 
     def __init__(self, model_name: str, api_key: str):
+        logger.error(f"INITIALIZING GEMINI CLIENT WITH KEY: {repr(api_key[:10])}...{repr(api_key[-5:])} (len={len(api_key)})")
         self._model_name = model_name
         self.api_key = api_key
         
@@ -681,6 +682,13 @@ class GeminiClient(DirectLLMClient):
         )
         import asyncio
         import aiohttp
+
+        logger.error("=" * 80)
+        logger.error(f"GOOGLE GENAI EXCEPTION: {type(exc)} {exc}")
+        if hasattr(exc, "code"): logger.error(f"CODE: {exc.code}")
+        if hasattr(exc, "message"): logger.error(f"MESSAGE: {exc.message}")
+        if hasattr(exc, "details"): logger.error(f"DETAILS: {exc.details}")
+        logger.error("=" * 80)
 
         if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
             return Timeout(str(exc), llm_provider="google", model=self.model_name)

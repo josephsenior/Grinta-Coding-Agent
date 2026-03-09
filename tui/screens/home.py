@@ -196,18 +196,18 @@ class HomeScreen(Screen[None]):
                     value="",
                 )
                 yield Input(
-                    placeholder="🔍  Search conversations…",
+                    placeholder="🔍 Query task log…",
                     id="search-input",
                 )
             with Vertical(id="list-area"):
                 yield ListView(id="conversation-list-view")
                 yield Static(
-                    "No conversations yet.\nType a task below and press Enter to begin.",
+                    "No initialized tasks.\nInput a mission parameter below to start exploring.",
                     id="empty-state",
                 )
             with Horizontal(id="new-bar"):
                 yield Input(
-                    placeholder="✦  Task… prefix with [project] and #tags  e.g. [myapp] #bug fix login",
+                    placeholder="✦ Input Directive… prefix with [project] and #tags e.g. [nexus] #refactor core",
                     id="new-input",
                 )
         yield Footer()
@@ -309,14 +309,14 @@ class HomeScreen(Screen[None]):
         if not filtered and self._conversations:
             label = f'No conversations match "{self._search_query}"'
             if self._active_project:
-                label = f"No conversations in project [{self._active_project}]"
+                label = f"No active tasks in project [{self._active_project}]"
                 if self._search_query:
                     label += f' matching "{self._search_query}"'
             self._show_empty(label)
             return
 
         if not filtered:
-            self._show_empty("No conversations yet — type below to start one.")
+            self._show_empty("No initialized tasks — enter a directive below to begin.")
             return
 
         # Hide empty state, show list
@@ -423,7 +423,7 @@ class HomeScreen(Screen[None]):
 
     async def _create_and_open(self, initial_message: str | None) -> None:
         """Parse tags/project from input, create a conversation, then push the chat screen."""
-        self.notify("Creating conversation…", severity="information")
+        self.notify("Initializing session…", severity="information")
         task = initial_message or ""
         project = ""
         tags: list[str] = []
@@ -476,7 +476,7 @@ class HomeScreen(Screen[None]):
     async def action_refresh_list(self) -> None:
         await self._load_conversations()
         self._refresh_project_selector()
-        self.notify("Refreshed", severity="information")
+        self.notify("State synchronized", severity="information")
 
     async def action_delete_selected(self) -> None:
         list_view = self.query_one("#conversation-list-view", ListView)

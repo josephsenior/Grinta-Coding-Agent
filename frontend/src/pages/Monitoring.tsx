@@ -107,7 +107,7 @@ export default function Monitoring() {
 
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
-          Checking backend health&hellip;
+          Interrogating backend telemetry&hellip;
         </div>
       ) : isError || !data ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
@@ -116,7 +116,7 @@ export default function Monitoring() {
             Backend unreachable
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Make sure the backend is running on port 3000.
+            Verify API engine is active on port 3000.
           </p>
         </div>
       ) : (

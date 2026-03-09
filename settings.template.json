@@ -1,0 +1,12 @@
+{
+  "//_readme": "Minimal config — only set what you need. All other options have sensible defaults.",
+  "//_readme2": "See docs/USER_GUIDE.md for the full configuration reference.",
+
+  "//_llm": "LLM — set your model and API key (or use env vars: OPENAI_API_KEY, ANTHROPIC_API_KEY)",
+  "llm_model": "claude-sonnet-4-20250514",
+  "llm_api_key": null,
+  "llm_base_url": null,
+
+  "//_budget": "Cost guardrails (USD). null = unlimited.",
+  "max_budget_per_task": 5.0
+}

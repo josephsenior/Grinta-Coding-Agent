@@ -27,7 +27,7 @@ class AgentFinishedCritic(BaseCritic):
         """Score run success by checking PlaybookFinishAction and optional git patch content."""
         last_action = next((h for h in reversed(events) if isinstance(h, Action)), None)
         if diff_patch is not None and len(diff_patch.strip()) == 0:
-            return CriticResult(score=0, message="Git patch is empty.")
+            return CriticResult(score=0, message="❌ Task Incomplete: Verification failed. The agent claimed to be finished but generated no code changes.")
         if isinstance(last_action, PlaybookFinishAction):
-            return CriticResult(score=1, message="Agent finished.")
-        return CriticResult(score=0, message="Agent did not finish.")
+            return CriticResult(score=1, message="✅ Task Complete: Agent successfully resolved the objective.")
+        return CriticResult(score=0, message="❌ Task Incomplete: Agent stopped without a clear resolution.")

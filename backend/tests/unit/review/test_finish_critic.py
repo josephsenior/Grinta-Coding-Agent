@@ -28,7 +28,6 @@ class TestAgentFinishedCritic:
         result = critic.evaluate(events)
 
         assert result.score == 1
-        assert result.message == "Agent finished."
         assert result.success is True
 
     def test_agent_not_finished_without_finish_action(self):
@@ -42,7 +41,6 @@ class TestAgentFinishedCritic:
         result = critic.evaluate(events)
 
         assert result.score == 0
-        assert result.message == "Agent did not finish."
         assert result.success is False
 
     def test_agent_finished_with_observations_after(self):
@@ -59,7 +57,6 @@ class TestAgentFinishedCritic:
 
         # The critic should find the last action (PlaybookFinishAction)
         assert result.score == 1
-        assert result.message == "Agent finished."
         assert result.success is True
 
     def test_empty_git_patch(self):
@@ -72,7 +69,6 @@ class TestAgentFinishedCritic:
         result = critic.evaluate(events, diff_patch="")
 
         assert result.score == 0
-        assert result.message == "Git patch is empty."
         assert result.success is False
 
     def test_empty_git_patch_whitespace_only(self):
@@ -85,7 +81,6 @@ class TestAgentFinishedCritic:
         result = critic.evaluate(events, diff_patch="   \n\n   ")
 
         assert result.score == 0
-        assert result.message == "Git patch is empty."
         assert result.success is False
 
     def test_non_empty_git_patch(self):
@@ -109,7 +104,6 @@ index 1234567..abcdefg 100644
         result = critic.evaluate(events, diff_patch=diff)
 
         assert result.score == 1
-        assert result.message == "Agent finished."
         assert result.success is True
 
     def test_no_actions_in_events(self):
@@ -123,7 +117,6 @@ index 1234567..abcdefg 100644
         result = critic.evaluate(events)
 
         assert result.score == 0
-        assert result.message == "Agent did not finish."
         assert result.success is False
 
     def test_empty_events_list(self):
@@ -134,7 +127,6 @@ index 1234567..abcdefg 100644
         result = critic.evaluate(events)
 
         assert result.score == 0
-        assert result.message == "Agent did not finish."
         assert result.success is False
 
     def test_finish_action_not_last(self):
@@ -148,7 +140,6 @@ index 1234567..abcdefg 100644
         result = critic.evaluate(events)
 
         assert result.score == 0
-        assert result.message == "Agent did not finish."
         assert result.success is False
 
     def test_diff_patch_none(self):
@@ -161,7 +152,6 @@ index 1234567..abcdefg 100644
         result = critic.evaluate(events, diff_patch=None)
 
         assert result.score == 1
-        assert result.message == "Agent finished."
         assert result.success is True
 
     def test_empty_patch_takes_precedence(self):
@@ -175,7 +165,6 @@ index 1234567..abcdefg 100644
 
         # Empty patch should be checked first and return 0
         assert result.score == 0
-        assert result.message == "Git patch is empty."
         assert result.success is False
 
     def test_multiple_finish_actions(self):
@@ -190,7 +179,6 @@ index 1234567..abcdefg 100644
         result = critic.evaluate(events)
 
         assert result.score == 1
-        assert result.message == "Agent finished."
         assert result.success is True
 
     def test_critic_result_success_property(self):

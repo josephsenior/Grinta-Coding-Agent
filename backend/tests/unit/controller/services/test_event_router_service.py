@@ -34,6 +34,8 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.observation_service.handle_observation = AsyncMock()
         self.mock_controller.state = MagicMock()
         self.mock_controller.state.start_id = 0
+        self.mock_controller.state.history = []
+        self.mock_controller.state.extra_data = {}
         self.mock_controller.event_stream = MagicMock()
         self.mock_controller.get_agent_state = MagicMock(
             return_value=AgentState.RUNNING
@@ -326,6 +328,72 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         # Should schedule the background task
         mock_run_schedule.assert_called_once()
+
+
+    # ── critic wiring ─────────────────────────────────────────────────────
+
+    async def test_run_critics_logs_results(self):
+        """Test _run_critics logs a score line for each critic and stores scores in extra_data."""
+        with patch("backend.review.AgentFinishedCritic.evaluate") as m_fin, \
+             patch("backend.review.BudgetCritic.evaluate") as m_bud, \
+             patch("backend.review.SuitePassCritic.evaluate") as m_suite:
+            from backend.review import CriticResult
+            m_fin.return_value = CriticResult(score=1.0, message="Agent finished.")
+            m_bud.return_value = CriticResult(score=0.8, message="acceptable usage")
+            m_suite.return_value = CriticResult(score=1.0, message="All tests pass.")
+
+            await self.service._run_critics()
+
+        # One log call per critic
+        assert self.mock_controller.log.call_count == 3
+        logged_messages = [call.args[1] for call in self.mock_controller.log.call_args_list]
+        assert any("AgentFinishedCritic" in m for m in logged_messages)
+        assert any("BudgetCritic" in m for m in logged_messages)
+        assert any("SuitePassCritic" in m for m in logged_messages)
+
+        # Scores must be persisted in state.extra_data
+        scores = self.mock_controller.state.extra_data["critic_scores"]
+        assert scores["AgentFinishedCritic"]["score"] == 1.0
+        assert scores["BudgetCritic"]["score"] == 0.8
+        assert scores["SuitePassCritic"]["score"] == 1.0
+
+    async def test_run_critics_tolerates_exceptions(self):
+        """A crashing critic must not prevent the others from running."""
+        with patch("backend.review.AgentFinishedCritic.evaluate",
+                   side_effect=RuntimeError("boom")):
+            with patch("backend.review.BudgetCritic.evaluate") as m_bud, \
+                 patch("backend.review.SuitePassCritic.evaluate") as m_suite:
+                from backend.review import CriticResult
+                m_bud.return_value = CriticResult(score=1.0, message="ok")
+                m_suite.return_value = CriticResult(score=1.0, message="ok")
+
+                await self.service._run_critics()  # must not raise
+
+        # warning for the bad critic, info for the other two
+        levels = [call.args[0] for call in self.mock_controller.log.call_args_list]
+        assert "warning" in levels
+
+    async def test_handle_finish_action_calls_run_critics(self):
+        """_handle_finish_action must invoke critics after audit log."""
+        action = PlaybookFinishAction(outputs={})
+        with patch.object(self.service, "_run_critics", new_callable=AsyncMock) as m:
+            await self.service._handle_finish_action(action)
+        m.assert_called_once()
+
+    async def test_run_critics_skipped_when_disabled(self):
+        """When FORGE_ENABLE_CRITICS=false, critics must not run and no scores are stored."""
+        import os
+        with patch.dict(os.environ, {"FORGE_ENABLE_CRITICS": "false"}):
+            with patch("backend.review.AgentFinishedCritic.evaluate") as m_fin, \
+                 patch("backend.review.BudgetCritic.evaluate") as m_bud, \
+                 patch("backend.review.SuitePassCritic.evaluate") as m_suite:
+                await self.service._run_critics()
+                m_fin.assert_not_called()
+                m_bud.assert_not_called()
+                m_suite.assert_not_called()
+
+        # No critic_scores written to extra_data
+        assert "critic_scores" not in self.mock_controller.state.extra_data
 
 
 if __name__ == "__main__":

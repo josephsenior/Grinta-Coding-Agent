@@ -148,7 +148,7 @@ export function FilesTree({ conversationId }: FilesTreeProps) {
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           ) : files.length === 0 ? (
-            <p className="px-3 py-4 text-xs text-muted-foreground">No files found</p>
+            <p className="px-3 py-4 text-xs text-muted-foreground">Zero structural files identified</p>
           ) : (
             files.map((node) => (
               <TreeNode key={node.path} node={node} depth={0} conversationId={conversationId} />

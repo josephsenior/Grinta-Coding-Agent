@@ -53,9 +53,6 @@ Write-Host "✅ Model aliases updated in settings.json" -ForegroundColor Green
 Write-Host "✅ Dependencies synced!" -ForegroundColor Green
 Write-Host ""
 
-# Wait for server to start
-Start-Sleep -Seconds 2
-
 # Step 2: Launch Unified Interface (Backend + TUI)
 Write-Host "🚀 Step 2: Launching Unified Interface..." -ForegroundColor Yellow
 Write-Host "   This runs the server in the background and TUI in the foreground." -ForegroundColor Cyan

@@ -53,8 +53,8 @@ echo -e "${YELLOW}🤖 Step 3: Discovering local models (Ollama/LM Studio/vLLM).
 uv run python3 -m backend.llm.discover_models aliases
 echo -e "${GREEN}✅ Model discovery complete.${NC}"
 
-echo -e "\n${GREEN}✅ Forge is ready!${NC}"
-echo -e "${CYAN}💡 To start Forge:${NC}"
-echo -e "   1. Start the server: ${YELLOW}uv run forge serve${NC}"
-echo -e "   2. Start the TUI:    ${YELLOW}uv run forge-tui${NC}"
-echo -e "\nOr just run: ${CYAN}make run${NC}"
+echo -e "\n${GREEN}✅ Setup complete! Launching Forge...${NC}"
+echo -e "${CYAN}   (server starts in the background, TUI in the foreground)${NC}"
+echo ""
+
+uv run forge all

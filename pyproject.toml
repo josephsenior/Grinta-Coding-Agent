@@ -55,6 +55,7 @@ dependencies = [
   "textual (>=3.0,<4)",
   "chromadb>=1.4,<2",
   "sentence-transformers>=5.2,<6",
+  "transformers<4.47.0",
   "redis>=5.2,<7",
   "python-docx>=1.1,<2",
   "PyPDF2>=3.0,<4",
@@ -200,4 +201,4 @@ fail_under = 95
 # B603: subprocess call — controlled by SecurityAnalyzer
 # B607: partial path — acceptable for tool invocations
 skips = ["B101", "B110", "B404", "B603", "B607"]
-exclude_dirs = ["backend/tests", "tests"]
+exclude_dirs = ["backend/tests"]

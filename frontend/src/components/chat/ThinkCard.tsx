@@ -50,7 +50,7 @@ export function ThinkCard({ event }: ThinkCardProps) {
           )}
         />
         <CardSectionLabel
-          label="Thinking"
+          label="Logico-Semantic Analysis"
           icon={<Brain className="h-3.5 w-3.5 shrink-0" />}
           className="mb-0 text-sm normal-case tracking-normal"
         />

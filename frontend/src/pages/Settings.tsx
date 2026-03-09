@@ -457,7 +457,7 @@ function MCPSection({
           className="flex w-full flex-col items-center gap-2 rounded-lg border border-dashed py-8 text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
         >
           <Server className="h-8 w-8 opacity-30" />
-          <span className="text-sm">No MCP servers configured</span>
+          <span className="text-sm">Zero MCP protocols multiplexed</span>
           <span className="text-xs opacity-70">Click to add one</span>
         </button>
       ) : (
@@ -569,7 +569,7 @@ export default function Settings() {
   const mutation = useMutation({
     mutationFn: saveSettings,
     onSuccess: () => {
-      toast.success("Settings saved");
+      toast.success("Configuration locked");
       queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
     onError: () => toast.error("Failed to save settings"),

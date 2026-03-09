@@ -60,7 +60,7 @@ class CircuitBreakerService:
 
         self._circuit_breaker = CircuitBreaker(cb_config)
         setattr(self.controller, "circuit_breaker", self._circuit_breaker)
-        logger.info("CircuitBreaker enabled for anomaly detection")
+        logger.debug("Circuit breaker enabled for anomaly detection")
 
     # ------------------------------------------------------------------ #
     # Circuit breaker interactions

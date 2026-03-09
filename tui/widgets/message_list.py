@@ -63,7 +63,7 @@ class MessageList(Widget):
     """
 
     def compose(self) -> ComposeResult:
-        yield Static("Welcome to Forge TUI", classes="system-msg")
+        yield Static("Forge terminal online. Awaiting directives.", classes="system-msg")
 
     # ── public API ────────────────────────────────────────────────
 

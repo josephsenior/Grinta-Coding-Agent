@@ -256,7 +256,7 @@ class ForgeClient:
 
     async def start_agent(self, conversation_id: str) -> dict[str, Any]:
         """POST /api/conversations/{id}/start."""
-        return await self._post(f"/conversations/{conversation_id}/start")
+        return await self._post(f"/conversations/{conversation_id}/start", json={"providers_set": []})
 
     async def stop_agent(self, conversation_id: str) -> dict[str, Any]:
         """POST /api/conversations/{id}/stop."""
@@ -361,11 +361,13 @@ class ForgeClient:
     # ── health ────────────────────────────────────────────────────
 
     async def health_check(self) -> bool:
-        """Quick liveness probe — GET /alive."""
+        """Quick liveness probe \u2014 GET /alive."""
         try:
             resp = await self._http.get("/alive")
+            print("HEALTH STATUS CODE:", resp.status_code)
             return resp.is_success
-        except httpx.HTTPError:
+        except Exception as e:
+            print("HEALTHCHECK HTTPX EXCEPTION:", type(e), e)
             return False
 
     # =================================================================

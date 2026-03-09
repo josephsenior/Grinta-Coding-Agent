@@ -177,7 +177,7 @@ class SummaryScreen(Screen[None]):
         if not entries:
             await scroll.mount(
                 Static(
-                    "No activity recorded yet.\nStart a session and come back!",
+                    "Telemetry databanks empty.\nDeploy an agent to begin logging activity.",
                     classes="sum-row",
                 )
             )

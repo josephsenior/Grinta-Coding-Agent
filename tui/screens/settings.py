@@ -230,7 +230,7 @@ class SettingsScreen(Screen[None]):
 
         try:
             await self.client.save_settings(payload)
-            self.notify("Settings saved", severity="information")
+            self.notify("Configuration locked", severity="information")
         except Exception as e:
             self.notify(f"Save failed: {e}", severity="error")
 

@@ -13,6 +13,62 @@ if TYPE_CHECKING:
     pass
 
 
+_SUMMARIZING_PROMPT = """\
+You are maintaining a context-aware state summary for an interactive agent.
+You will be given a list of events corresponding to actions taken by the agent, \
+and the most recent previous summary if one exists.
+CRITICAL: You MUST strictly enforce that the *original user objective* is always preserved verbatim at the very top of every compressed state summary. Never allow the core goal to be lost or diluted.
+If the events being summarized contain ANY task-tracking, you MUST include a \
+TASK_TRACKING section to maintain continuity.
+When referencing tasks make sure to preserve exact task IDs and statuses.
+
+Track:
+
+ORIGINAL_OBJECTIVE: (Preserve the original user objective verbatim. Do not summarize or dilute it)
+
+USER_CONTEXT: (Preserve essential user requirements, goals, and clarifications in concise form)
+
+TASK_TRACKING: {Active tasks, their IDs and statuses - PRESERVE TASK IDs}
+
+COMPLETED: (Tasks completed so far, with brief results)
+PENDING: (Tasks that still need to be done)
+CURRENT_STATE: (Current variables, data structures, or relevant state)
+
+For code-specific tasks, also include:
+CODE_STATE: {File paths, function signatures, data structures}
+TESTS: {Failing cases, error messages, outputs}
+CHANGES: {Code edits, variable updates}
+DEPS: {Dependencies, imports, external calls}
+VERSION_CONTROL_STATUS: {Repository state, current branch, PR status, commit history}
+
+PRIORITIZE:
+1. Adapt tracking format to match the actual task type
+2. Capture key user requirements and goals
+3. Distinguish between completed and pending tasks
+4. Keep all sections concise and relevant
+
+SKIP: Tracking irrelevant details for the current task type
+
+Example formats:
+
+For code tasks:
+USER_CONTEXT: Fix FITS card float representation issue
+COMPLETED: Modified mod_float() in card.py, all tests passing
+PENDING: Create PR, update documentation
+CODE_STATE: mod_float() in card.py updated
+TESTS: test_format() passed
+CHANGES: str(val) replaces f"{val:.16G}"
+DEPS: None modified
+VERSION_CONTROL_STATUS: Branch: fix-float-precision, Latest commit: a1b2c3d
+
+For other tasks:
+USER_CONTEXT: Write 20 haikus based on coin flip results
+COMPLETED: 15 haikus written for results [T,H,T,H,T,H,T,T,H,T,H,T,H,T,H]
+PENDING: 5 more haikus needed
+CURRENT_STATE: Last flip: Heads, Haiku count: 15/20
+"""
+
+
 class LLMSummarizingCondenser(BaseLLMCondenser):
     """A condenser that summarizes forgotten events.
 
@@ -42,10 +98,7 @@ class LLMSummarizingCondenser(BaseLLMCondenser):
         
         if not forgotten_events:
             return view
-        prompt = (
-            'You are maintaining a context-aware state summary for an interactive agent.\nYou will be given a list of events corresponding to actions taken by the agent, and the most recent previous summary if one exists.\nIf the events being summarized contain ANY task-tracking, you MUST include a TASK_TRACKING section to maintain continuity.\nWhen referencing tasks make sure to preserve exact task IDs and statuses.\n\nTrack:\n\nUSER_CONTEXT: (Preserve essential user requirements, goals, and clarifications in concise form)\n\nTASK_TRACKING: {Active tasks, their IDs and statuses - PRESERVE TASK IDs}\n\nCOMPLETED: (Tasks completed so far, with brief results)\nPENDING: (Tasks that still need to be done)\nCURRENT_STATE: (Current variables, data structures, or relevant state)\n\nFor code-specific tasks, also include:\nCODE_STATE: {File paths, function signatures, data structures}\nTESTS: {Failing cases, error messages, outputs}\nCHANGES: {Code edits, variable updates}\nDEPS: {Dependencies, imports, external calls}\nVERSION_CONTROL_STATUS: {Repository state, current branch, PR status, commit history}\n\nPRIORITIZE:\n1. Adapt tracking format to match the actual task type\n2. Capture key user requirements and goals\n3. Distinguish between completed and pending tasks\n4. Keep all sections concise and relevant\n\nSKIP: Tracking irrelevant details for the current task type\n\nExample formats:\n\nFor code tasks:\nUSER_CONTEXT: Fix FITS card float representation issue\nCOMPLETED: Modified mod_float() in card.py, all tests passing\nPENDING: Create PR, update documentation\nCODE_STATE: mod_float() in card.py updated\nTESTS: test_format() passed\nCHANGES: str(val) replaces f"{val:.16G}"\nDEPS: None modified\nVERSION_CONTROL_STATUS: Branch: fix-float-precision, Latest commit: a1b2c3d\n\nFor other tasks:\nUSER_CONTEXT: Write 20 haikus based on coin flip results\nCOMPLETED: 15 haikus written for results [T,H,T,H,T,H,T,T,H,T,H,T,H,T,H]\nPENDING: 5 more haikus needed\nCURRENT_STATE: Last flip: Heads, Haiku count: 15/20'
-            "\n\n"
-        )
+        prompt = _SUMMARIZING_PROMPT + "\n\n"
         summary_event_content = self._truncate(summary_event.message or "")
         prompt += f"<PREVIOUS SUMMARY>\n{summary_event_content}\n</PREVIOUS SUMMARY>\n"
         prompt += "\n\n"

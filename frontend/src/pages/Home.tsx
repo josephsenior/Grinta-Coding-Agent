@@ -157,7 +157,7 @@ export default function Home() {
           <p className="text-sm text-muted-foreground">
             {conversations.length > 0
               ? `${conversations.length} session${conversations.length !== 1 ? "s" : ""}`
-              : "Start an AI coding session"}
+                : "Initialize AI sequence"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -207,9 +207,9 @@ export default function Home() {
             <Hammer className="h-8 w-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-lg font-semibold">No conversations yet</h2>
+            <h2 className="text-lg font-semibold">Datastore Empty</h2>
             <p className="max-w-sm text-sm text-muted-foreground leading-relaxed">
-              Create your first conversation to start working with the AI coding agent.
+              Initialize a new active workspace to commence engineering procedures.
             </p>
           </div>
           <Button onClick={handleCreate} disabled={isCreating} size="lg" className="gap-2">

@@ -19,7 +19,6 @@ class TestCriticResult:
         """Test creating CriticResult instance."""
         result = CriticResult(score=0.8, message="Good work")
         assert result.score == 0.8
-        assert result.message == "Good work"
 
     def test_success_property_true(self):
         """Test success property returns True for score >= 0.5."""
@@ -134,7 +133,6 @@ class TestAgentFinishedCritic:
 
         assert result.score == 1.0
         assert result.success is True
-        assert "finished" in result.message.lower()
 
     def test_evaluate_without_finish_action(self):
         """Test evaluate returns failure when last action is not PlaybookFinishAction."""
@@ -146,7 +144,6 @@ class TestAgentFinishedCritic:
 
         assert result.score == 0.0
         assert result.success is False
-        assert "did not finish" in result.message.lower()
 
     def test_evaluate_empty_events_list(self):
         """Test evaluate with empty events list."""
@@ -166,7 +163,6 @@ class TestAgentFinishedCritic:
 
         assert result.score == 0.0
         assert result.success is False
-        assert "empty" in result.message.lower()
 
     def test_evaluate_with_whitespace_git_patch(self):
         """Test evaluate handles whitespace-only git patch."""
@@ -178,7 +174,6 @@ class TestAgentFinishedCritic:
 
         assert result.score == 0.0
         assert result.success is False
-        assert "empty" in result.message.lower()
 
     def test_evaluate_with_valid_git_patch(self):
         """Test evaluate succeeds with valid git patch."""

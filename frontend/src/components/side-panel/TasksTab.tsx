@@ -100,7 +100,7 @@ export function TasksTab() {
         <div className="p-1">
           {tasks.length === 0 ? (
             <p className="px-3 py-4 text-xs text-muted-foreground">
-              No tasks yet
+              Sub-task queue empty
             </p>
           ) : (
             tasks.map((task) => <TaskRow key={task.id} task={task} />)

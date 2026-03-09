@@ -98,7 +98,7 @@ class TestApplyPassthrough:
         actions = [NullAction()]
         ok, out = mgr.apply("response", actions)
         assert ok is True
-        assert out is actions
+        assert out == actions
 
     def test_valid_response_passes_through(self):
         ah = _mock_anti()

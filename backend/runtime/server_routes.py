@@ -154,7 +154,7 @@ def register_routes(
         )
 
     @app.post("/upload_file")
-    async def upload_file(
+    def upload_file(
         file: UploadFile, destination: str = "/", recursive: bool = False
     ):
         client = get_client()

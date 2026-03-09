@@ -91,7 +91,7 @@ export function AgentWorkflowGroup({ events, isLatest }: AgentWorkflowGroupProps
             <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
           )}
           <span className={cn("text-muted-foreground font-medium", isLatest && isRunning && "text-foreground")}>
-            Agent working... <span className="text-xs font-normal opacity-70 ml-1">({visibleEvents.length} step{visibleEvents.length === 1 ? '' : 's'})</span>
+            Agent process active... <span className="text-xs font-normal opacity-70 ml-1">({visibleEvents.length} step{visibleEvents.length === 1 ? '' : 's'})</span>
           </span>
         </div>
         <div className="text-muted-foreground">

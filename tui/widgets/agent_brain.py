@@ -17,20 +17,20 @@ from textual.widgets import ProgressBar, Static
 
 # Map agent states to display labels
 _STATE_LABELS: dict[str, str] = {
-    "loading": "Loading",
-    "running": "Running",
-    "thinking": "Thinking",
-    "executing": "Executing",
-    "observing": "Observing",
-    "validating": "Validating",
-    "condensed": "Condensed",
-    "awaiting_user_input": "Awaiting Input",
-    "awaiting_user_confirmation": "Needs Confirm",
-    "paused": "Paused",
-    "stopped": "Stopped",
-    "finished": "Finished",
+    "loading": "Booting Workspace",
+    "running": "Processing",
+    "thinking": "Synthesizing",
+    "executing": "Executing Tools",
+    "observing": "Analyzing Reality",
+    "validating": "Running Verifications",
+    "condensed": "Consolidating Context",
+    "awaiting_user_input": "Ready for Guidance",
+    "awaiting_user_confirmation": "Needs Approval",
+    "paused": "Session Paused",
+    "stopped": "Terminated",
+    "finished": "Accomplished",
     "rejected": "Rejected",
-    "error": "Error",
+    "error": "System Error",
     "rate_limited": "Rate Limited",
 }
 
@@ -139,7 +139,7 @@ class AgentBrain(Widget):
             yield Static("(none)", id="ab-thoughts", classes="ab-thoughts")
 
             yield Static("─" * 28, classes="ab-divider")
-            yield Static("PLAYBOOKS", classes="ab-heading")
+            yield Static("TASK STRAT.", classes="ab-heading")
             yield Static("(none)", id="ab-playbooks", classes="ab-playbooks")
 
     def update_state(self, state: str) -> None:

@@ -147,6 +147,53 @@ class EventRouterService:
         self._ctrl.state.set_outputs(action.outputs, source="EventRouterService.finish")
         await self._ctrl.set_agent_state_to(AgentState.FINISHED)
         await self._ctrl.log_task_audit(status="success")
+        await self._run_critics()
+
+    async def _run_critics(self) -> None:
+        """Run all critics against the completed task's event history and log scores.
+
+        Scores are stored in ``state.extra_data["critic_scores"]`` and logged.
+        Critics are informational — a failure here must never prevent task completion.
+        Disabled when the environment variable ``FORGE_ENABLE_CRITICS`` is set to
+        any value other than ``"true"`` (case-insensitive).
+        """
+        # User defaults: Critics are ON by default as an opinionated choice
+        if os.environ.get("FORGE_ENABLE_CRITICS", "true").lower() != "true":
+            self._ctrl.log("debug", "Review critics skipped (FORGE_ENABLE_CRITICS=false)")
+            return
+
+        from backend.review import AgentFinishedCritic, BudgetCritic, SuitePassCritic
+
+        events = list(self._ctrl.state.history)
+        critics = [
+            AgentFinishedCritic(),
+            BudgetCritic(),
+            SuitePassCritic(),
+        ]
+        scores: dict[str, dict] = {}
+        for critic in critics:
+            name = type(critic).__name__
+            try:
+                result = critic.evaluate(events)
+                scores[name] = {"score": result.score, "message": result.message}
+                if result.message:
+                    self._ctrl.log(
+                        "info",
+                        f"Critic [{name}]: score={result.score:.2f} — {result.message}",
+                        extra={
+                            "critic": name,
+                            "critic_score": result.score,
+                        },
+                    )
+            except Exception as exc:
+                scores[name] = {"score": None, "message": f"error: {exc}"}
+                self._ctrl.log(
+                    "warning",
+                    f"Critic [{name}] failed: {exc}",
+                )
+
+        # Persist scores on the session state so the API / audit can surface them.
+        self._ctrl.state.extra_data["critic_scores"] = scores
 
     async def _handle_reject_action(self, action: AgentRejectAction) -> None:
         """Handle agent reject action."""

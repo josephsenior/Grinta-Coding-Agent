@@ -1,0 +1,583 @@
+C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+{"asctime": "2026-03-09 16:21:53,039", "message": "Using config class None", "level": "INFO", "timestamp": "2026-03-09T15:21:53.039340+00:00"}
+{"asctime": "2026-03-09 16:21:53,190", "message": "No API key found for provider: google", "level": "ERROR", "timestamp": "2026-03-09T15:21:53.190412+00:00"}
+{"asctime": "2026-03-09 16:21:53,192", "message": "To fix this, set the GEMINI_API_KEY environment variable with your google API key", "level": "INFO", "timestamp": "2026-03-09T15:21:53.192417+00:00"}
+{"asctime": "2026-03-09 16:21:53,246", "message": "No API key available for model: gemini-2.5-flash", "level": "WARNING", "timestamp": "2026-03-09T15:21:53.246234+00:00"}
+{"asctime": "2026-03-09 16:21:53,257", "message": "Invalid condenser configuration: Unknown condenser type: truncate. Using NoOpCondenserConfig.", "level": "WARNING", "timestamp": "2026-03-09T15:21:53.257605+00:00"}
+Loaded MCP server 'browser-use' from backend\runtime\mcp\config.json
+Loaded MCP server 'context7' from backend\runtime\mcp\config.json
+Loaded MCP server 'shadcn' from backend\runtime\mcp\config.json
+Loaded MCP server 'github' from backend\runtime\mcp\config.json
+Loaded MCP server 'fetch' from backend\runtime\mcp\config.json
+Loaded MCP server 'duckduckgo' from backend\runtime\mcp\config.json
+Loaded MCP server 'magic' from backend\runtime\mcp\config.json
+Loaded MCP server 'rigour' from backend\runtime\mcp\config.json
+{"asctime": "2026-03-09 16:21:57,418", "message": "Rate limiting configured: 1000 req/hour, 100 burst", "level": "INFO", "timestamp": "2026-03-09T15:21:57.418268+00:00"}
+{"asctime": "2026-03-09 16:22:03,095", "message": "Socket.IO event handlers registered", "level": "INFO", "timestamp": "2026-03-09T15:22:03.095683+00:00"}
+{"asctime": "2026-03-09 16:22:03,096", "message": "  handler: connect", "level": "INFO", "timestamp": "2026-03-09T15:22:03.096764+00:00"}
+{"asctime": "2026-03-09 16:22:03,097", "message": "  handler: forge_user_action", "level": "INFO", "timestamp": "2026-03-09T15:22:03.097664+00:00"}
+{"asctime": "2026-03-09 16:22:03,097", "message": "  handler: forge_action", "level": "INFO", "timestamp": "2026-03-09T15:22:03.097664+00:00"}
+{"asctime": "2026-03-09 16:22:03,098", "message": "  handler: disconnect", "level": "INFO", "timestamp": "2026-03-09T15:22:03.098773+00:00"}
+{"asctime": "2026-03-09 16:22:03,099", "message": "  handler: test_event", "level": "INFO", "timestamp": "2026-03-09T15:22:03.099764+00:00"}
+INFO:     Started server process [30628]
+INFO:     Waiting for application startup.
+{"asctime": "2026-03-09 16:22:03,104", "message": "Request size limiting enabled: max 10.0MB", "level": "INFO", "timestamp": "2026-03-09T15:22:03.104307+00:00"}
+{"asctime": "2026-03-09 16:22:03,105", "message": "Request timeout protection enabled: default 30s, endpoint-specific timeouts configured for 6 endpoints", "level": "INFO", "timestamp": "2026-03-09T15:22:03.105407+00:00"}
+{"asctime": "2026-03-09 16:22:03,108", "message": "No API key found for provider: google", "level": "ERROR", "timestamp": "2026-03-09T15:22:03.108435+00:00"}
+{"asctime": "2026-03-09 16:22:03,108", "message": "To fix this, set the GEMINI_API_KEY environment variable with your google API key", "level": "INFO", "timestamp": "2026-03-09T15:22:03.108435+00:00"}
+{"asctime": "2026-03-09 16:22:03,109", "message": "No API key available for model: gemini-2.5-flash", "level": "WARNING", "timestamp": "2026-03-09T15:22:03.109446+00:00"}
+{"asctime": "2026-03-09 16:22:03,111", "message": "Invalid condenser configuration: Unknown condenser type: truncate. Using NoOpCondenserConfig.", "level": "WARNING", "timestamp": "2026-03-09T15:22:03.111341+00:00"}
+Loaded MCP server 'browser-use' from backend\runtime\mcp\config.json
+Loaded MCP server 'context7' from backend\runtime\mcp\config.json
+Loaded MCP server 'shadcn' from backend\runtime\mcp\config.json
+Loaded MCP server 'github' from backend\runtime\mcp\config.json
+Loaded MCP server 'fetch' from backend\runtime\mcp\config.json
+Loaded MCP server 'duckduckgo' from backend\runtime\mcp\config.json
+Loaded MCP server 'magic' from backend\runtime\mcp\config.json
+Loaded MCP server 'rigour' from backend\runtime\mcp\config.json
+{"asctime": "2026-03-09 16:22:03,132", "message": "============================================================", "level": "WARNING", "timestamp": "2026-03-09T15:22:03.132591+00:00"}
+{"asctime": "2026-03-09 16:22:03,133", "message": "STARTUP CONFIG WARNINGS", "level": "WARNING", "timestamp": "2026-03-09T15:22:03.133539+00:00"}
+{"asctime": "2026-03-09 16:22:03,134", "message": "============================================================", "level": "WARNING", "timestamp": "2026-03-09T15:22:03.134486+00:00"}
+{"asctime": "2026-03-09 16:22:03,135", "message": "  tmux is not installed or not on PATH. Some agent terminal features may not work.", "level": "WARNING", "timestamp": "2026-03-09T15:22:03.135111+00:00"}
+{"asctime": "2026-03-09 16:22:03,135", "message": "============================================================", "level": "WARNING", "timestamp": "2026-03-09T15:22:03.135111+00:00"}
+{"asctime": "2026-03-09 16:22:03,136", "message": "Starting Forge server...", "level": "INFO", "timestamp": "2026-03-09T15:22:03.136127+00:00"}
+{"asctime": "2026-03-09 16:22:03,156", "message": "No API key found for provider: google", "level": "ERROR", "timestamp": "2026-03-09T15:22:03.156338+00:00"}
+{"asctime": "2026-03-09 16:22:03,157", "message": "To fix this, set the GEMINI_API_KEY environment variable with your google API key", "level": "INFO", "timestamp": "2026-03-09T15:22:03.157337+00:00"}
+{"asctime": "2026-03-09 16:22:03,158", "message": "No API key available for model: gemini-2.5-flash", "level": "WARNING", "timestamp": "2026-03-09T15:22:03.158340+00:00"}
+{"asctime": "2026-03-09 16:22:03,160", "message": "Invalid condenser configuration: Unknown condenser type: truncate. Using NoOpCondenserConfig.", "level": "WARNING", "timestamp": "2026-03-09T15:22:03.160338+00:00"}
+Loaded MCP server 'browser-use' from backend\runtime\mcp\config.json
+Loaded MCP server 'context7' from backend\runtime\mcp\config.json
+Loaded MCP server 'shadcn' from backend\runtime\mcp\config.json
+Loaded MCP server 'github' from backend\runtime\mcp\config.json
+Loaded MCP server 'fetch' from backend\runtime\mcp\config.json
+Loaded MCP server 'duckduckgo' from backend\runtime\mcp\config.json
+Loaded MCP server 'magic' from backend\runtime\mcp\config.json
+Loaded MCP server 'rigour' from backend\runtime\mcp\config.json
+{"asctime": "2026-03-09 16:22:04,605", "message": "Forge server started successfully", "level": "INFO", "timestamp": "2026-03-09T15:22:04.605995+00:00"}
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:3005 (Press CTRL+C to quit)
+{"asctime": "2026-03-09 16:22:23,651", "message": "Request started: GET /api/health/live", "level": "INFO", "request_id": "1b1cf8f4-a362-46b7-8f08-80ccafed7ada", "method": "GET", "path": "/api/health/live", "client_host": "127.0.0.1", "user_agent": "python-httpx/0.28.1", "timestamp": "2026-03-09T15:22:23.651675+00:00"}
+{"asctime": "2026-03-09 16:22:23,655", "message": "Request completed: GET /api/health/live", "level": "INFO", "request_id": "1b1cf8f4-a362-46b7-8f08-80ccafed7ada", "method": "GET", "path": "/api/health/live", "status_code": 200, "duration_ms": 4.752635955810547, "timestamp": "2026-03-09T15:22:23.655439+00:00"}
+INFO:     127.0.0.1:59217 - "GET /api/health/live HTTP/1.1" 200 OK
+{"asctime": "2026-03-09 16:22:24,087", "message": "Request started: POST /api/v1/conversations", "level": "INFO", "request_id": "189d2ee7-8c5e-4419-a4f6-d96b61086087", "method": "POST", "path": "/api/v1/conversations", "client_host": "127.0.0.1", "user_agent": "python-httpx/0.28.1", "timestamp": "2026-03-09T15:22:24.087739+00:00"}
+{"asctime": "2026-03-09 16:22:24,264", "message": "initializing_new_conversation - parsed data: repository=None vcs_provider=None selected_branch=None initial_user_msg='Multi-file Audit App' image_urls=None replay_json=None suggested_task=None create_playbook=None conversation_instructions=None mcp_config=None conversation_id=None", "level": "INFO", "timestamp": "2026-03-09T15:22:24.264780+00:00"}
+{"asctime": "2026-03-09 16:22:24,322", "message": "New conversation ID: 174f45c323c1470bb51a6b409a2fb0b5", "level": "INFO", "user_id": "oss_user", "session_id": "174f45c323c1470bb51a6b409a2fb0b5", "timestamp": "2026-03-09T15:22:24.322503+00:00"}
+{"asctime": "2026-03-09 16:22:24,324", "message": "Saving metadata for conversation 174f45c323c1470bb51a6b409a2fb0b5", "level": "INFO", "timestamp": "2026-03-09T15:22:24.324137+00:00"}
+{"asctime": "2026-03-09 16:22:24,344", "message": "Creating conversation", "level": "INFO", "signal": "create_conversation", "user_id": "oss_user", "trigger": "gui", "timestamp": "2026-03-09T15:22:24.344667+00:00"}
+{"asctime": "2026-03-09 16:22:24,345", "message": "Loading settings", "level": "INFO", "timestamp": "2026-03-09T15:22:24.345780+00:00"}
+{"asctime": "2026-03-09 16:22:24,347", "message": "Settings loaded", "level": "INFO", "timestamp": "2026-03-09T15:22:24.347811+00:00"}
+{"asctime": "2026-03-09 16:22:24,348", "message": "Starting agent loop for conversation 174f45c323c1470bb51a6b409a2fb0b5", "level": "INFO", "user_id": "oss_user", "session_id": "174f45c323c1470bb51a6b409a2fb0b5", "timestamp": "2026-03-09T15:22:24.348810+00:00"}
+{"asctime": "2026-03-09 16:22:24,352", "message": "maybe_start_agent_loop:174f45c323c1470bb51a6b409a2fb0b5", "level": "INFO", "session_id": "174f45c323c1470bb51a6b409a2fb0b5", "timestamp": "2026-03-09T15:22:24.352796+00:00"}
+{"asctime": "2026-03-09 16:22:24,354", "message": "starting_agent_loop:174f45c323c1470bb51a6b409a2fb0b5", "level": "INFO", "session_id": "174f45c323c1470bb51a6b409a2fb0b5", "timestamp": "2026-03-09T15:22:24.354427+00:00"}
+{"asctime": "2026-03-09 16:22:24,414", "message": "[LLM registry 09e378cd-216b-45ad-a9cb-08639dae931c]: Registering service for agent", "level": "INFO", "timestamp": "2026-03-09T15:22:24.414753+00:00"}
+{"asctime": "2026-03-09 16:22:24,422", "message": "Loaded model aliases from settings.json", "level": "INFO", "timestamp": "2026-03-09T15:22:24.422861+00:00"}
+{"asctime": "2026-03-09 16:22:24,426", "message": "No API key found for provider: google", "level": "ERROR", "timestamp": "2026-03-09T15:22:24.426617+00:00"}
+{"asctime": "2026-03-09 16:22:24,427", "message": "To fix this, set the GEMINI_API_KEY environment variable with your google API key", "level": "INFO", "timestamp": "2026-03-09T15:22:24.427597+00:00"}
+{"asctime": "2026-03-09 16:22:24,428", "message": "No API key available for model: gemini-pro-latest", "level": "ERROR", "timestamp": "2026-03-09T15:22:24.428605+00:00"}
+{"asctime": "2026-03-09 16:22:24,430", "message": "Failed to initialize conversation: No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.", "level": "ERROR", "exc_info": "Traceback (most recent call last):\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\routes\\manage_conversations.py\", line 254, in new_conversation\n    agent_loop_info = await handle_regular_conversation(\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\session_init_service.py\", line 198, in handle_regular_conversation\n    return await create_new_conversation(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 407, in create_new_conversation\n    return await start_conversation(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 341, in start_conversation\n    agent_loop_info = await manager.maybe_start_agent_loop(\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 460, in maybe_start_agent_loop\n    ) or await self._start_agent_loop(\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 522, in _start_agent_loop\n    create_registry_and_conversation_stats(\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\utils\\utils.py\", line 59, in create_registry_and_conversation_stats\n    llm_registry = LLMRegistry(user_config, agent_cls)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 76, in __init__\n    self.active_agent_llm = self.get_llm(\"agent\", llm_config)\n                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 185, in get_llm\n    return self._create_new_llm(config=config, service_id=service_id)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 93, in _create_new_llm\n    llm = LLM(\n          ^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 314, in __init__\n    _validate_api_key_or_local(api_key_value, self.config, resolver)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 232, in _validate_api_key_or_local\n    raise AuthenticationError(\nbackend.llm.exceptions.AuthenticationError: No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.", "timestamp": "2026-03-09T15:22:24.430601+00:00"}
+{"asctime": "2026-03-09 16:22:24,454", "message": "Request failed: POST /api/v1/conversations", "level": "ERROR", "exc_info": "  + Exception Group Traceback (most recent call last):\n  |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 79, in collapse_excgroups\n  |     yield\n  |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 192, in __call__\n  |     async with anyio.create_task_group() as task_group:\n  |                ^^^^^^^^^^^^^^^^^^^^^^^^^\n  |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\anyio\\_backends\\_asyncio.py\", line 783, in __aexit__\n  |     raise BaseExceptionGroup(\n  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)\n  +-+---------------- 1 ----------------\n    | Traceback (most recent call last):\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_tracing.py\", line 71, in __call__\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_id.py\", line 26, in dispatch\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\cors.py\", line 85, in __call__\n    |     await self.app(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\exceptions.py\", line 63, in __call__\n    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 53, in wrapped_app\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 42, in wrapped_app\n    |     await app(scope, receive, sender)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\middleware\\asyncexitstack.py\", line 18, in __call__\n    |     await self.app(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 716, in __call__\n    |     await self.middleware_stack(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 736, in app\n    |     await route.handle(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 290, in handle\n    |     await self.app(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 130, in app\n    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 53, in wrapped_app\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 42, in wrapped_app\n    |     await app(scope, receive, sender)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 116, in app\n    |     response = await f(request)\n    |                ^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 670, in app\n    |     raw_response = await run_endpoint_function(\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 324, in run_endpoint_function\n    |     return await dependant.call(**values)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\routes\\manage_conversations.py\", line 280, in new_conversation\n    |     return handle_conversation_errors(e)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\session_init_service.py\", line 237, in handle_conversation_errors\n    |     raise e\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\routes\\manage_conversations.py\", line 254, in new_conversation\n    |     agent_loop_info = await handle_regular_conversation(\n    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\session_init_service.py\", line 198, in handle_regular_conversation\n    |     return await create_new_conversation(\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 407, in create_new_conversation\n    |     return await start_conversation(\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 341, in start_conversation\n    |     agent_loop_info = await manager.maybe_start_agent_loop(\n    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 460, in maybe_start_agent_loop\n    |     ) or await self._start_agent_loop(\n    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 522, in _start_agent_loop\n    |     create_registry_and_conversation_stats(\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\utils\\utils.py\", line 59, in create_registry_and_conversation_stats\n    |     llm_registry = LLMRegistry(user_config, agent_cls)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 76, in __init__\n    |     self.active_agent_llm = self.get_llm(\"agent\", llm_config)\n    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 185, in get_llm\n    |     return self._create_new_llm(config=config, service_id=service_id)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 93, in _create_new_llm\n    |     llm = LLM(\n    |           ^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 314, in __init__\n    |     _validate_api_key_or_local(api_key_value, self.config, resolver)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 232, in _validate_api_key_or_local\n    |     raise AuthenticationError(\n    | backend.llm.exceptions.AuthenticationError: No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.\n    +------------------------------------\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_tracing.py\", line 71, in __call__\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_id.py\", line 26, in dispatch\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\cors.py\", line 85, in __call__\n    await self.app(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\exceptions.py\", line 63, in __call__\n    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 53, in wrapped_app\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 42, in wrapped_app\n    await app(scope, receive, sender)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\middleware\\asyncexitstack.py\", line 18, in __call__\n    await self.app(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 716, in __call__\n    await self.middleware_stack(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 736, in app\n    await route.handle(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 290, in handle\n    await self.app(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 130, in app\n    await wrap_app_handling_exceptions(app, request)(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 53, in wrapped_app\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 42, in wrapped_app\n    await app(scope, receive, sender)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 116, in app\n    response = await f(request)\n               ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 670, in app\n    raw_response = await run_endpoint_function(\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 324, in run_endpoint_function\n    return await dependant.call(**values)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\routes\\manage_conversations.py\", line 280, in new_conversation\n    return handle_conversation_errors(e)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\session_init_service.py\", line 237, in handle_conversation_errors\n    raise e\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\routes\\manage_conversations.py\", line 254, in new_conversation\n    agent_loop_info = await handle_regular_conversation(\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\session_init_service.py\", line 198, in handle_regular_conversation\n    return await create_new_conversation(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 407, in create_new_conversation\n    return await start_conversation(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 341, in start_conversation\n    agent_loop_info = await manager.maybe_start_agent_loop(\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 460, in maybe_start_agent_loop\n    ) or await self._start_agent_loop(\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 522, in _start_agent_loop\n    create_registry_and_conversation_stats(\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\utils\\utils.py\", line 59, in create_registry_and_conversation_stats\n    llm_registry = LLMRegistry(user_config, agent_cls)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 76, in __init__\n    self.active_agent_llm = self.get_llm(\"agent\", llm_config)\n                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 185, in get_llm\n    return self._create_new_llm(config=config, service_id=service_id)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 93, in _create_new_llm\n    llm = LLM(\n          ^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 314, in __init__\n    _validate_api_key_or_local(api_key_value, self.config, resolver)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 232, in _validate_api_key_or_local\n    raise AuthenticationError(\nbackend.llm.exceptions.AuthenticationError: No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.", "request_id": "189d2ee7-8c5e-4419-a4f6-d96b61086087", "method": "POST", "path": "/api/v1/conversations", "duration_ms": 367.0070171356201, "error": "No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.", "timestamp": "2026-03-09T15:22:24.454746+00:00"}
+{"asctime": "2026-03-09 16:22:24,524", "message": "Unhandled exception: AuthenticationError", "level": "ERROR", "exc_info": "  + Exception Group Traceback (most recent call last):\n  |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 79, in collapse_excgroups\n  |     yield\n  |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 192, in __call__\n  |     async with anyio.create_task_group() as task_group:\n  |                ^^^^^^^^^^^^^^^^^^^^^^^^^\n  |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\anyio\\_backends\\_asyncio.py\", line 783, in __aexit__\n  |     raise BaseExceptionGroup(\n  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)\n  +-+---------------- 1 ----------------\n    | Traceback (most recent call last):\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\errors.py\", line 164, in __call__\n    |     await self.app(scope, receive, _send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\rate_limiter.py\", line 291, in __call__\n    |     return await call_next(request)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\security_headers.py\", line 35, in __call__\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\compression.py\", line 67, in __call__\n    |     response: Response = await call_next(request)\n    |                          ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\timeout.py\", line 108, in dispatch\n    |     return await asyncio.wait_for(call_next(request), timeout=timeout)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\tasks.py\", line 520, in wait_for\n    |     return await fut\n    |            ^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_limits.py\", line 113, in dispatch\n    |     return await call_next(request)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\versioning.py\", line 94, in version_middleware\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\audit_logger.py\", line 47, in dispatch\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_tracing.py\", line 71, in __call__\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    |     with recv_stream, send_stream, collapse_excgroups():\n    |                                    ^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    |     self.gen.throw(value)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    |     response = await self.dispatch_func(request, call_next)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_id.py\", line 26, in dispatch\n    |     response = await call_next(request)\n    |                ^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    |     raise app_exc from app_exc.__cause__ or app_exc.__context__\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    |     await self.app(scope, receive_or_disconnect, send_no_error)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\cors.py\", line 85, in __call__\n    |     await self.app(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\exceptions.py\", line 63, in __call__\n    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 53, in wrapped_app\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 42, in wrapped_app\n    |     await app(scope, receive, sender)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\middleware\\asyncexitstack.py\", line 18, in __call__\n    |     await self.app(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 716, in __call__\n    |     await self.middleware_stack(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 736, in app\n    |     await route.handle(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 290, in handle\n    |     await self.app(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 130, in app\n    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 53, in wrapped_app\n    |     raise exc\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 42, in wrapped_app\n    |     await app(scope, receive, sender)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 116, in app\n    |     response = await f(request)\n    |                ^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 670, in app\n    |     raw_response = await run_endpoint_function(\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 324, in run_endpoint_function\n    |     return await dependant.call(**values)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\routes\\manage_conversations.py\", line 280, in new_conversation\n    |     return handle_conversation_errors(e)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\session_init_service.py\", line 237, in handle_conversation_errors\n    |     raise e\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\routes\\manage_conversations.py\", line 254, in new_conversation\n    |     agent_loop_info = await handle_regular_conversation(\n    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\session_init_service.py\", line 198, in handle_regular_conversation\n    |     return await create_new_conversation(\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 407, in create_new_conversation\n    |     return await start_conversation(\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 341, in start_conversation\n    |     agent_loop_info = await manager.maybe_start_agent_loop(\n    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 460, in maybe_start_agent_loop\n    |     ) or await self._start_agent_loop(\n    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 522, in _start_agent_loop\n    |     create_registry_and_conversation_stats(\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\utils\\utils.py\", line 59, in create_registry_and_conversation_stats\n    |     llm_registry = LLMRegistry(user_config, agent_cls)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 76, in __init__\n    |     self.active_agent_llm = self.get_llm(\"agent\", llm_config)\n    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 185, in get_llm\n    |     return self._create_new_llm(config=config, service_id=service_id)\n    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 93, in _create_new_llm\n    |     llm = LLM(\n    |           ^^^^\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 314, in __init__\n    |     _validate_api_key_or_local(api_key_value, self.config, resolver)\n    |   File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 232, in _validate_api_key_or_local\n    |     raise AuthenticationError(\n    | backend.llm.exceptions.AuthenticationError: No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.\n    +------------------------------------\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\errors.py\", line 164, in __call__\n    await self.app(scope, receive, _send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\rate_limiter.py\", line 291, in __call__\n    return await call_next(request)\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\security_headers.py\", line 35, in __call__\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\compression.py\", line 67, in __call__\n    response: Response = await call_next(request)\n                         ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\timeout.py\", line 108, in dispatch\n    return await asyncio.wait_for(call_next(request), timeout=timeout)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_limits.py\", line 113, in dispatch\n    return await call_next(request)\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\versioning.py\", line 94, in version_middleware\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\audit_logger.py\", line 47, in dispatch\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_tracing.py\", line 71, in __call__\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 191, in __call__\n    with recv_stream, send_stream, collapse_excgroups():\n                                   ^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_utils.py\", line 85, in collapse_excgroups\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 193, in __call__\n    response = await self.dispatch_func(request, call_next)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\middleware\\request_id.py\", line 26, in dispatch\n    response = await call_next(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 168, in call_next\n    raise app_exc from app_exc.__cause__ or app_exc.__context__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\base.py\", line 144, in coro\n    await self.app(scope, receive_or_disconnect, send_no_error)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\cors.py\", line 85, in __call__\n    await self.app(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\middleware\\exceptions.py\", line 63, in __call__\n    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 53, in wrapped_app\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 42, in wrapped_app\n    await app(scope, receive, sender)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\middleware\\asyncexitstack.py\", line 18, in __call__\n    await self.app(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 716, in __call__\n    await self.middleware_stack(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 736, in app\n    await route.handle(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\routing.py\", line 290, in handle\n    await self.app(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 130, in app\n    await wrap_app_handling_exceptions(app, request)(scope, receive, send)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 53, in wrapped_app\n    raise exc\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\starlette\\_exception_handler.py\", line 42, in wrapped_app\n    await app(scope, receive, sender)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 116, in app\n    response = await f(request)\n               ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 670, in app\n    raw_response = await run_endpoint_function(\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastapi\\routing.py\", line 324, in run_endpoint_function\n    return await dependant.call(**values)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\routes\\manage_conversations.py\", line 280, in new_conversation\n    return handle_conversation_errors(e)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\session_init_service.py\", line 237, in handle_conversation_errors\n    raise e\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\routes\\manage_conversations.py\", line 254, in new_conversation\n    agent_loop_info = await handle_regular_conversation(\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\session_init_service.py\", line 198, in handle_regular_conversation\n    return await create_new_conversation(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 407, in create_new_conversation\n    return await start_conversation(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\services\\conversation_service.py\", line 341, in start_conversation\n    agent_loop_info = await manager.maybe_start_agent_loop(\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 460, in maybe_start_agent_loop\n    ) or await self._start_agent_loop(\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\api\\conversation_manager\\local_conversation_manager.py\", line 522, in _start_agent_loop\n    create_registry_and_conversation_stats(\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\utils\\utils.py\", line 59, in create_registry_and_conversation_stats\n    llm_registry = LLMRegistry(user_config, agent_cls)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 76, in __init__\n    self.active_agent_llm = self.get_llm(\"agent\", llm_config)\n                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 185, in get_llm\n    return self._create_new_llm(config=config, service_id=service_id)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm_registry.py\", line 93, in _create_new_llm\n    llm = LLM(\n          ^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 314, in __init__\n    _validate_api_key_or_local(api_key_value, self.config, resolver)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\llm\\llm.py\", line 232, in _validate_api_key_or_local\n    raise AuthenticationError(\nbackend.llm.exceptions.AuthenticationError: No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.", "timestamp": "2026-03-09T15:22:24.524473+00:00"}
+{"asctime": "2026-03-09 16:22:24,579", "message": "Error occurred: AuthenticationError - No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.", "level": "ERROR", "context": {"path": "/api/v1/conversations"}, "timestamp": "2026-03-09T15:22:24.579401+00:00"}
+INFO:     127.0.0.1:59218 - "POST /api/v1/conversations HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+  + Exception Group Traceback (most recent call last):
+  |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 79, in collapse_excgroups
+  |     yield
+  |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 192, in __call__
+  |     async with anyio.create_task_group() as task_group:
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 783, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\uvicorn\protocols\http\httptools_impl.py", line 416, in run_asgi
+    |     result = await app(  # type: ignore[func-returns-value]
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 60, in __call__
+    |     return await self.app(scope, receive, send)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\engineio\async_drivers\asgi.py", line 75, in __call__
+    |     await self.other_asgi_app(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\applications.py", line 1160, in __call__
+    |     await super().__call__(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    |     await self.app(scope, receive, _send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\rate_limiter.py", line 291, in __call__
+    |     return await call_next(request)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\security_headers.py", line 35, in __call__
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\compression.py", line 67, in __call__
+    |     response: Response = await call_next(request)
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\timeout.py", line 108, in dispatch
+    |     return await asyncio.wait_for(call_next(request), timeout=timeout)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py", line 520, in wait_for
+    |     return await fut
+    |            ^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\request_limits.py", line 113, in dispatch
+    |     return await call_next(request)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\versioning.py", line 94, in version_middleware
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\audit_logger.py", line 47, in dispatch
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\request_tracing.py", line 71, in __call__
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |                                    ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\request_id.py", line 26, in dispatch
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    |     raise app_exc from app_exc.__cause__ or app_exc.__context__
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    |     await self.app(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    |     await self.app(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\routing.py", line 716, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\routing.py", line 736, in app
+    |     await route.handle(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\routing.py", line 290, in handle
+    |     await self.app(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\routing.py", line 130, in app
+    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\routing.py", line 116, in app
+    |     response = await f(request)
+    |                ^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\routing.py", line 670, in app
+    |     raw_response = await run_endpoint_function(
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\routing.py", line 324, in run_endpoint_function
+    |     return await dependant.call(**values)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\routes\manage_conversations.py", line 280, in new_conversation
+    |     return handle_conversation_errors(e)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\services\session_init_service.py", line 237, in handle_conversation_errors
+    |     raise e
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\routes\manage_conversations.py", line 254, in new_conversation
+    |     agent_loop_info = await handle_regular_conversation(
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\services\session_init_service.py", line 198, in handle_regular_conversation
+    |     return await create_new_conversation(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\services\conversation_service.py", line 407, in create_new_conversation
+    |     return await start_conversation(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\services\conversation_service.py", line 341, in start_conversation
+    |     agent_loop_info = await manager.maybe_start_agent_loop(
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\conversation_manager\local_conversation_manager.py", line 460, in maybe_start_agent_loop
+    |     ) or await self._start_agent_loop(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\conversation_manager\local_conversation_manager.py", line 522, in _start_agent_loop
+    |     create_registry_and_conversation_stats(
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\utils\utils.py", line 59, in create_registry_and_conversation_stats
+    |     llm_registry = LLMRegistry(user_config, agent_cls)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm_registry.py", line 76, in __init__
+    |     self.active_agent_llm = self.get_llm("agent", llm_config)
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm_registry.py", line 185, in get_llm
+    |     return self._create_new_llm(config=config, service_id=service_id)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm_registry.py", line 93, in _create_new_llm
+    |     llm = LLM(
+    |           ^^^^
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm.py", line 314, in __init__
+    |     _validate_api_key_or_local(api_key_value, self.config, resolver)
+    |   File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm.py", line 232, in _validate_api_key_or_local
+    |     raise AuthenticationError(
+    | backend.llm.exceptions.AuthenticationError: No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.
+    +------------------------------------
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\uvicorn\protocols\http\httptools_impl.py", line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\engineio\async_drivers\asgi.py", line 75, in __call__
+    await self.other_asgi_app(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\applications.py", line 1160, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\rate_limiter.py", line 291, in __call__
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\security_headers.py", line 35, in __call__
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\compression.py", line 67, in __call__
+    response: Response = await call_next(request)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\timeout.py", line 108, in dispatch
+    return await asyncio.wait_for(call_next(request), timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\request_limits.py", line 113, in dispatch
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\versioning.py", line 94, in version_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\audit_logger.py", line 47, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\request_tracing.py", line 71, in __call__
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\middleware\request_id.py", line 26, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\routing.py", line 130, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\routing.py", line 116, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\routing.py", line 670, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\fastapi\routing.py", line 324, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\routes\manage_conversations.py", line 280, in new_conversation
+    return handle_conversation_errors(e)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\services\session_init_service.py", line 237, in handle_conversation_errors
+    raise e
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\routes\manage_conversations.py", line 254, in new_conversation
+    agent_loop_info = await handle_regular_conversation(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\services\session_init_service.py", line 198, in handle_regular_conversation
+    return await create_new_conversation(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\services\conversation_service.py", line 407, in create_new_conversation
+    return await start_conversation(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\services\conversation_service.py", line 341, in start_conversation
+    agent_loop_info = await manager.maybe_start_agent_loop(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\conversation_manager\local_conversation_manager.py", line 460, in maybe_start_agent_loop
+    ) or await self._start_agent_loop(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\conversation_manager\local_conversation_manager.py", line 522, in _start_agent_loop
+    create_registry_and_conversation_stats(
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\utils\utils.py", line 59, in create_registry_and_conversation_stats
+    llm_registry = LLMRegistry(user_config, agent_cls)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm_registry.py", line 76, in __init__
+    self.active_agent_llm = self.get_llm("agent", llm_config)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm_registry.py", line 185, in get_llm
+    return self._create_new_llm(config=config, service_id=service_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm_registry.py", line 93, in _create_new_llm
+    llm = LLM(
+          ^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm.py", line 314, in __init__
+    _validate_api_key_or_local(api_key_value, self.config, resolver)
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\llm\llm.py", line 232, in _validate_api_key_or_local
+    raise AuthenticationError(
+backend.llm.exceptions.AuthenticationError: No API key provided for model 'gemini-pro-latest'. Please set it in Settings -> Models -> API Keys.

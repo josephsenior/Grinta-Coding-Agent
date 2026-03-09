@@ -42,7 +42,7 @@ export function PlaybooksTab({ conversationId }: PlaybooksTabProps) {
             </div>
           ) : playbooks.length === 0 ? (
             <p className="px-2 py-4 text-xs text-muted-foreground">
-              No playbooks available
+              Zero executable playbooks identified
             </p>
           ) : (
             playbooks.map((pb) => (

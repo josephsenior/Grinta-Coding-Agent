@@ -44,7 +44,7 @@ Think → Act → Observe → Repeat
 | **Reasoning** | `think`, `finish`, `task_tracker`, `condensation_request` |
 | **Code quality** | `smart_errors`, `health_check` |
 | **Security** | `security_utils` |
-| **Utilities** | `prompt`, `server_readiness_helper`, `iframe_helper`, `database` |
+| **Utilities** | `prompt`, `server_readiness_helper`, `database` |
 
 ### Key Components
 

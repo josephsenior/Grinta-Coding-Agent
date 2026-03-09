@@ -22,6 +22,8 @@ class ServerConfig(ServerConfigInterface):
     enable_jira: bool = os.environ.get("ENABLE_JIRA", "true") == "true"
     enable_jira_dc: bool = os.environ.get("ENABLE_JIRA_DC", "true") == "true"
     enable_linear: bool = os.environ.get("ENABLE_LINEAR", "true") == "true"
+    enable_review_critics: bool = os.environ.get("FORGE_ENABLE_CRITICS", "true") == "true"
+    """Set FORGE_ENABLE_CRITICS=false to disable post-task critic scoring."""
     settings_store_class: str = (
         "backend.storage.settings.file_settings_store.FileSettingsStore"
     )
@@ -59,6 +61,7 @@ class ServerConfig(ServerConfigInterface):
                 "ENABLE_JIRA": self.enable_jira,
                 "ENABLE_JIRA_DC": self.enable_jira_dc,
                 "ENABLE_LINEAR": self.enable_linear,
+                "FORGE_ENABLE_CRITICS": self.enable_review_critics,
             },
         }
 

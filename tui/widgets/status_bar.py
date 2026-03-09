@@ -9,16 +9,16 @@ from textual.widgets import Label
 
 # Map agent states to display indicators
 _STATE_DISPLAY: dict[str, tuple[str, str]] = {
-    "loading": ("⏳", "Loading"),
-    "running": ("🔄", "Running"),
-    "awaiting_user_input": ("💬", "Awaiting Input"),
-    "awaiting_user_confirmation": ("⚠️", "Needs Confirmation"),
-    "paused": ("⏸", "Paused"),
-    "stopped": ("⏹", "Stopped"),
-    "finished": ("✅", "Finished"),
-    "rejected": ("❌", "Rejected"),
-    "error": ("💥", "Error"),
-    "rate_limited": ("🕐", "Rate Limited"),
+    "loading": ("⏳", "Initializing Workspace"),
+    "running": ("⚡", "Agent Executing"),
+    "awaiting_user_input": ("💡", "Ready for Guidance"),
+    "awaiting_user_confirmation": ("✋", "Action Requires Approval"),
+    "paused": ("⏸️", "Session Paused"),
+    "stopped": ("🛑", "Session Terminated"),
+    "finished": ("🚀", "Task Accomplished"),
+    "rejected": ("⛔", "Task Rejected"),
+    "error": ("💥", "System Error"),
+    "rate_limited": ("🕐", "API Rate Limited"),
 }
 
 

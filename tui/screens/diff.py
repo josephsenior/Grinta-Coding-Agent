@@ -95,7 +95,7 @@ class DiffScreen(Screen[None]):
         with Horizontal(id="diff-outer"):
             yield ListView(id="file-list")
             yield VerticalScroll(
-                Static("Select a file to view its diff", classes="empty-diff"),
+                Static("Target an asset to analyze deltas", classes="empty-diff"),
                 id="diff-content",
             )
         yield Footer()
@@ -115,7 +115,7 @@ class DiffScreen(Screen[None]):
             return
 
         if not self._changes:
-            await file_list.mount(Static("No workspace changes", classes="empty-diff"))
+            await file_list.mount(Static("Workspace state: Unmodified", classes="empty-diff"))
             return
 
         for change in self._changes:
@@ -143,7 +143,7 @@ class DiffScreen(Screen[None]):
         diff_text: str = str(diff_data.get("diff", diff_data.get("content", "")))
         if not diff_text:
             await container.mount(
-                Static("No diff content available", classes="empty-diff")
+                Static("Zero delta detected across file.", classes="empty-diff")
             )
             return
 
@@ -167,4 +167,4 @@ class DiffScreen(Screen[None]):
 
     async def action_refresh(self) -> None:
         await self._load_changes()
-        self.notify("Refreshed")
+        self.notify("State synchronized")

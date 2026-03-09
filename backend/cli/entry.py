@@ -37,18 +37,6 @@ def _launch_all_in_one() -> None:
     from tui.app import ForgeApp
     from tui.client import ForgeClient
 
-    # 0. Check for Redis (Mandatory dependency)
-    try:
-        import redis
-
-        r = redis.Redis(host="localhost", port=6379, socket_connect_timeout=1)
-        r.ping()
-        print("[OK] Redis connection verified.")
-    except Exception as e:
-        print("[WARNING] Redis connection failed. Some features may be limited.")
-        print("   If you are running locally, please ensure redis-server is running.")
-        print(f"   Error: {e}")
-
     # 1. Start backend server in background
     env = os.environ.copy()
     env["FORGE_RUNTIME"] = "local"
@@ -61,7 +49,7 @@ def _launch_all_in_one() -> None:
         "--host",
         "127.0.0.1",
         "--port",
-        "3001",
+        "3000",
         "--log-level",
         "warning",  # Keep logs quiet so they don't corrupt TUI
     ]
@@ -108,7 +96,7 @@ def _launch_all_in_one() -> None:
 
         try:
             with httpx.Client() as client:
-                response = client.get("http://localhost:3001/api/health/ready")
+                response = client.get("http://localhost:3000/api/health/ready")
                 if response.status_code == 200:
                     ready = True
                     break
@@ -126,7 +114,7 @@ def _launch_all_in_one() -> None:
     # 3. Launch TUI in foreground
     print("[OK] Backend ready! Launching TUI...")
     try:
-        forge_client = ForgeClient(base_url="http://localhost:3001")
+        forge_client = ForgeClient(base_url="http://localhost:3000")
         app = ForgeApp(forge_client)
         app.run()
     finally:

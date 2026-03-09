@@ -300,7 +300,7 @@ class ActionExecutor:
         """
         try:
             if action.is_background:
-                return self._run_background_cmd(action)
+                return await self._run_background_cmd(action)
 
             observation = await self._run_foreground_cmd(action)
             if isinstance(observation, ErrorObservation):
@@ -323,7 +323,7 @@ class ActionExecutor:
             logger.error("Error running command: %s", e)
             return ErrorObservation(str(e))
 
-    def _run_background_cmd(self, action: CmdRunAction) -> TerminalObservation:
+    async def _run_background_cmd(self, action: CmdRunAction) -> TerminalObservation:
         """Start a background command in a new session.
 
         Creates a dedicated session, writes the command, waits briefly for
@@ -342,7 +342,8 @@ class ActionExecutor:
             "Starting background task in session %s: %s", session_id, action.command
         )
         session.write_input(action.command + "\n")
-        time.sleep(0.5)
+        import asyncio
+        await asyncio.sleep(0.5)
         content = session.read_output()
         return TerminalObservation(
             session_id=session_id,
@@ -484,7 +485,8 @@ class ActionExecutor:
 
             session.write_input(write_content, is_control=action.is_control)
             # Wait briefly for output to appear
-            await call_sync_from_async(time.sleep, 0.2)
+            import asyncio
+            await asyncio.sleep(0.2)
             content = session.read_output()
             return TerminalObservation(session_id=action.session_id, content=content)
         except Exception as e:

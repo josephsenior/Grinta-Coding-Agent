@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import sqlite3
+import json
+import sqlite3
 import asyncio
 import logging
 import os
@@ -74,12 +78,12 @@ class ChromaDBBackend(VectorBackend):
             settings=Settings(anonymized_telemetry=False),
         )
 
-        # Use lightweight model for local development
-        model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+        # Use a high-quality code-centric embedding model for software contexts
+        model_name = os.getenv("EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
         logger.info("Loading local embedding model: %s", model_name)
         from sentence_transformers import SentenceTransformer
 
-        self.model = SentenceTransformer(model_name)
+        self.model = SentenceTransformer(model_name, trust_remote_code=True)
 
         try:
             self.collection = self.client.get_collection(name=collection_name)
@@ -217,4 +221,140 @@ class ChromaDBBackend(VectorBackend):
         return "\n".join(parts)
 
 
-__all__ = ["ChromaDBBackend"]
+
+class SQLiteBM25Backend(VectorBackend):
+    """Local SQLite FTS5 backend for BM25 lexical search."""
+
+    def __init__(
+        self,
+        collection_name: str = "FORGE_memory",
+        persist_directory: Path | None = None,
+    ) -> None:
+        if persist_directory is None:
+            persist_directory = Path.home() / ".Forge" / "memory" / "sqlite"
+        persist_directory.mkdir(parents=True, exist_ok=True)
+        self.db_path = persist_directory / f"{collection_name}_fts.db"
+        self._init_db()
+
+    def _init_db(self) -> None:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5(
+                    step_id UNINDEXED,
+                    role UNINDEXED,
+                    content,
+                    metadata UNINDEXED
+                )
+            """)
+
+    def add(
+        self,
+        step_id: str,
+        role: str,
+        artifact_hash: str | None,
+        rationale: str | None,
+        content_text: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        text = self._prepare_text(rationale, content_text)
+        
+        doc_metadata = {
+            "step_id": step_id,
+            "role": role,
+            "timestamp": time.time(),
+            **(metadata or {}),
+        }
+        if artifact_hash:
+            doc_metadata["artifact_hash"] = artifact_hash
+            
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM docs WHERE step_id = ?", (step_id,))
+            conn.execute(
+                "INSERT INTO docs (step_id, role, content, metadata) VALUES (?, ?, ?, ?)",
+                (step_id, role, text[:2000], json.dumps(doc_metadata))
+            )
+
+    def search(
+        self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
+        cleaned_query = "".join(c if c.isalnum() else " " for c in query).strip()
+        words = [w for w in cleaned_query.split() if w and len(w) > 2]
+        if not words:
+            return []
+            
+        match_query = " OR ".join(words)
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT step_id, content, metadata, bm25(docs) as score
+                    FROM docs 
+                    WHERE docs MATCH ? 
+                    ORDER BY score ASC 
+                    LIMIT ?
+                    """,
+                    (match_query, k * 2)
+                )
+                
+                results = []
+                for step_id, content, meta_json, score in cursor:
+                    meta = {}
+                    try:
+                        meta = json.loads(meta_json)
+                    except Exception:
+                        pass
+                        
+                    if filter_metadata:
+                        match = True
+                        for fk, fv in filter_metadata.items():
+                            if meta.get(fk) != fv:
+                                match = False
+                                break
+                        if not match:
+                            continue
+                            
+                    results.append({
+                        "step_id": step_id,
+                        "score": -score,
+                        "excerpt": content,
+                        **meta
+                    })
+                    
+                    if len(results) >= k:
+                        break
+                        
+                return results
+        except sqlite3.OperationalError as e:
+            logger.warning("SQLite FTS search failed for query '%s': %s", query, e)
+            return []
+
+    def delete_by_metadata(self, filter_metadata: dict[str, Any]) -> int:
+         return 0
+
+    def delete_by_ids(self, ids: list[str]) -> int:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.executemany("DELETE FROM docs WHERE step_id = ?", [(i,) for i in ids])
+            return cursor.rowcount
+
+    def stats(self) -> dict[str, Any]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT count(*) FROM docs")
+            count = cursor.fetchone()[0]
+        return {
+            "backend": "SQLite FTS5 (BM25)",
+            "num_documents": count,
+        }
+
+    @staticmethod
+    def _prepare_text(rationale: str | None, content: str) -> str:
+        parts = []
+        if rationale:
+            parts.append(rationale)
+        if content:
+            parts.append(content[:2000])
+        return "\n".join(parts)
+
+
+__all__ = ["ChromaDBBackend", "SQLiteBM25Backend"]

@@ -211,7 +211,7 @@ function CollectionRow({
             </div>
           ) : documents.length === 0 ? (
             <p className="py-4 text-sm text-muted-foreground">
-              No documents yet. Upload a file or paste text to get started.
+              Datastore empty. Index local files or inject raw blocks to commence.
             </p>
           ) : (
             <ul className="divide-y">
@@ -548,7 +548,7 @@ export default function KnowledgeBase() {
         ) : collections.length === 0 ? (
           <div className="py-16 text-center text-muted-foreground">
             <BookOpen className="mx-auto mb-4 h-10 w-10 opacity-30" />
-            <p className="text-sm">No collections yet.</p>
+            <p className="text-sm">Vault empty.</p>
             <p className="text-xs mt-1">
               Create a collection, then upload documents for the agent to
               search.

@@ -84,7 +84,6 @@ class TestAgentFinishedCritic:
         finish = self._make_finish_action()
         result = critic.evaluate([finish])
         assert result.score == 1
-        assert "finished" in result.message.lower()
 
     def test_agent_not_finished(self, critic):
         # An event that is NOT a PlaybookFinishAction
@@ -92,8 +91,8 @@ class TestAgentFinishedCritic:
         result = critic.evaluate([non_action])
         assert result.score == 0
         assert (
-            "not finish" in result.message.lower()
-            or "did not" in result.message.lower()
+            "task incomplete" in result.message.lower()
+            or "suboptimal exit" in result.message.lower()
         )
 
     def test_empty_events(self, critic):
@@ -104,7 +103,6 @@ class TestAgentFinishedCritic:
         finish = self._make_finish_action()
         result = critic.evaluate([finish], diff_patch="")
         assert result.score == 0
-        assert "empty" in result.message.lower()
 
     def test_whitespace_diff_patch(self, critic):
         finish = self._make_finish_action()

@@ -645,7 +645,7 @@ class TestHealthCheck:
     def test_ultimate_editor_check_present(self):
         from backend.engines.orchestrator.tools.health_check import run_production_health_check
         result = run_production_health_check(raise_on_failure=False)
-        assert "ultimate_editor" in result
+        assert "structure_editor" in result
 
     def test_atomic_refactor_check_present(self):
         from backend.engines.orchestrator.tools.health_check import run_production_health_check

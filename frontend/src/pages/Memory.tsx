@@ -8,7 +8,7 @@ export default function Memory() {
         <h1 className="text-2xl font-bold">Memory</h1>
       </div>
       <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        Memory page — Phase 6
+        Synaptic buffers offline. (Phase 6)
       </div>
     </div>
   );

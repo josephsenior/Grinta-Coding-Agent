@@ -100,7 +100,7 @@ export function GitChanges({ conversationId }: GitChangesProps) {
             </div>
           ) : changes.length === 0 ? (
             <p className="px-3 py-4 text-xs text-muted-foreground">
-              No git changes
+              Source tree strictly unmodified
             </p>
           ) : (
             changes.map((change) => {

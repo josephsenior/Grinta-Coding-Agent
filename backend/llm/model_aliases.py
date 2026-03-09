@@ -35,20 +35,23 @@ class ModelAliasManager:
         # Try multiple locations
         search_paths = []
 
+        # Highest priority: explicit path passed by caller
         if config_path:
             search_paths.append(config_path)
+
+        # Explicit env var override — checked before filesystem defaults so
+        # that FORGE_CONFIG=<path> reliably takes effect even when the default
+        # locations already exist.
+        env_config = os.getenv("FORGE_CONFIG")
+        if env_config:
+            search_paths.append(Path(env_config))
 
         # Check current directory
         search_paths.append(Path("settings.json"))
 
-        # Check home directory
+        # Check home directory (lowest precedence)
         home_config = Path.home() / ".forge" / "settings.json"
         search_paths.append(home_config)
-
-        # Check environment variable
-        env_config = os.getenv("FORGE_CONFIG")
-        if env_config:
-            search_paths.append(Path(env_config))
 
         for path in search_paths:
             if path.exists():

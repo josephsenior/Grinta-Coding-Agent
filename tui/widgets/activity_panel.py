@@ -72,7 +72,7 @@ class ActivityPanel(Widget):
             yield Static("◈ SESSION", classes="ap-heading")
             yield Static("💰 $0.0000   🔁 0 steps", id="ap-stats", classes="ap-stat")
             yield Static("─" * 26, classes="ap-divider")
-            yield Static("PLAYBOOKS", classes="ap-heading")
+            yield Static("TASK STRATEGIES", classes="ap-heading")
             yield Static("(loading…)", id="ap-playbooks", classes="ap-playbooks")
             yield Static("─" * 26, classes="ap-divider")
             yield Static("FILES TOUCHED", classes="ap-heading")

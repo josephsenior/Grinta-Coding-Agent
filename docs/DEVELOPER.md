@@ -350,22 +350,19 @@ not in the root `unit/` directory.
 
 ```bash
 # All tests
-poetry run pytest
+uv run pytest
 
 # Unit tests only (fast)
-poetry run pytest backend/tests/unit/ -v
+uv run pytest backend/tests/unit/ -v
 
 # Integration tests
-poetry run pytest backend/tests/integration/ -v
+uv run pytest backend/tests/integration/ -v
 
 # With coverage
-poetry run pytest --cov=backend --cov-report=html
+uv run pytest --cov=backend --cov-report=html
 
 # Specific test file
-poetry run pytest backend/tests/unit/test_circuit_breaker.py -v
-
-# Windows-specific
-poetry run pytest -c pytest-windows.ini
+uv run pytest backend/tests/unit/utils/test_circuit_breaker.py -v
 ```
 
 ### Writing Good Tests
@@ -411,8 +408,7 @@ from `backend.mcp_integration` (not `mcp`) when using Forge's specific client or
 registry utilities. The bare `mcp` package refers to the official SDK.
 
 ### 2. Event Loop Management
-Tests use a custom `pytest_pyfunc_call` hook for async tests instead of
-`pytest-asyncio`. Use the `event_loop` fixture for explicit loop control.
+Async tests use `pytest-asyncio` in **STRICT mode** — every async test must be decorated with `@pytest.mark.asyncio`. The asyncio mode is set globally via `pytest.ini`; do not override it per-file.
 
 ### 3. Circuit Breaker State
 Circuit breaker state persists across iterations within a session. If testing

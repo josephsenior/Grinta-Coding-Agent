@@ -23,6 +23,10 @@ if TYPE_CHECKING:
 class StateSummary(BaseModel):
     """A structured representation summarizing the state of the agent and the task."""
 
+    original_objective: str = Field(
+        default="",
+        description="The EXACT, VERBATIM original user objective. Do not summarize or dilute it.",
+    )
     user_context: str = Field(
         default="",
         description="Essential user requirements, goals, and clarifications in concise form.",
@@ -102,11 +106,11 @@ class StateSummary(BaseModel):
             "type": "function",
             "function": {
                 "name": "create_state_summary",
-                "description": "Creates a comprehensive summary of the current state of the interaction to preserve context when history grows too large. You must include non-empty values for user_context, completed_tasks, and pending_tasks.",
+                "description": "Creates a comprehensive summary of the current state of the interaction to preserve context when history grows too large. You must include non-empty values for original_objective, user_context, completed_tasks, and pending_tasks.",
                 "parameters": {
                     "type": "object",
                     "properties": properties,
-                    "required": ["user_context", "completed_tasks", "pending_tasks"],
+                    "required": ["original_objective", "user_context", "completed_tasks", "pending_tasks"],
                 },
             },
         }
@@ -116,6 +120,7 @@ class StateSummary(BaseModel):
         sections = [
             "# State Summary",
             "## Core Information",
+            f"**Original Objective**: {self.original_objective}",
             f"**User Context**: {self.user_context}",
             f"**Completed Tasks**: {self.completed_tasks}",
             f"**Pending Tasks**: {self.pending_tasks}",
@@ -209,10 +214,12 @@ class StructuredSummaryCondenser(BaseLLMCondenser):
             "1. Preserves essential context when conversation history grows too large\n"
             "2. Prevents lost work when the session length exceeds token limits\n"
             "3. Helps maintain continuity across multiple interactions\n\n"
+            "CRITICAL: You MUST strictly enforce that the *original user objective* is always preserved verbatim at the very top of every compressed state summary. Never allow the core goal to be lost or diluted.\n\n"
             "You will be given:\n"
             "- A list of events (actions taken by the agent)\n"
             "- The most recent previous summary (if one exists)\n\n"
             "Capture all relevant information, especially:\n"
+            "- The verbatim original user objective (this is non-negotiable)\n"
             "- User requirements that were explicitly stated\n"
             "- Work that has been completed\n"
             "- Tasks that remain pending\n"

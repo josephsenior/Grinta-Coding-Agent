@@ -445,8 +445,8 @@ class KnowledgeBaseManager:
         Each boundary is (byte_start, byte_end). Segments exceeding max_chunk_bytes
         are split via sliding window. Small adjacent segments are merged with overlap.
         """
-        max_chunk_bytes = 1500
-        overlap_bytes = 200
+        max_chunk_bytes = 4000
+        overlap_bytes = 800
         chunks: list[DocumentChunk] = []
         chunk_index = 0
         current_start = 0
@@ -488,8 +488,8 @@ class KnowledgeBaseManager:
         content: str,
         document_id: str,
         metadata: dict[str, Any] | None = None,
-        chunk_size: int = 1000,
-        chunk_overlap: int = 200,
+        chunk_size: int = 4000,
+        chunk_overlap: int = 800,
         start_index: int = 0,
     ) -> list[DocumentChunk]:
         """Character-based sliding window chunking (fallback)."""

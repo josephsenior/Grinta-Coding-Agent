@@ -20,6 +20,7 @@ from backend.core.config.condenser_config import (
     ObservationMaskingCondenserConfig,
     RecentEventsCondenserConfig,
     SmartCondenserConfig,
+    StructuredSummaryCondenserConfig,
 )
 
 if TYPE_CHECKING:
@@ -116,6 +117,7 @@ def select_condenser_config(
     *,
     llm_config_name: str | None = None,
     fallback: CondenserConfig | None = None,
+    supports_function_calling: bool = False,
 ) -> CondenserConfig:
     """Pick the best condenser config for the current task context.
 
@@ -163,9 +165,19 @@ def select_condenser_config(
             keep_first=3, max_events=min(sig.total_events, 80)
         )
 
-    # 4. Long session with LLM available → smart or LLM summarizing
+    # 4. Long session with LLM available → structured summary (if function-calling) or smart
     if sig.total_events >= _LONG_SESSION:
         if llm_config_name:
+            if supports_function_calling:
+                logger.info(
+                    "Auto-select condenser: structured (long session + function calling, %d events)",
+                    sig.total_events,
+                )
+                return StructuredSummaryCondenserConfig(
+                    llm_config=llm_config_name,
+                    max_size=200,
+                    keep_first=5,
+                )
             logger.info(
                 "Auto-select condenser: smart (long session, %d events)",
                 sig.total_events,

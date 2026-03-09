@@ -32,7 +32,7 @@ class ForgeApp(App[None]):
     """
 
     TITLE = "Forge"
-    SUB_TITLE = "AI-Powered Development"
+    SUB_TITLE = "Autonomous Engineering Environment"
     CSS_PATH = str(_STYLES_DIR / "forge.tcss")
 
     BINDINGS = [
@@ -49,18 +49,62 @@ class ForgeApp(App[None]):
         if self._client_provided:
             self._start_main_flow()
             return
-        settings_path = Path.cwd() / "settings.json"
-        if not settings_path.exists():
+        if self._needs_onboarding():
             self.push_screen(WelcomeScreen(), self._on_welcome_finished)
         else:
             self._start_main_flow()
+
+    # Common provider env-var names that the config system reads (pattern: {PROVIDER}_API_KEY).
+    _KNOWN_API_KEY_ENV_VARS: tuple[str, ...] = (
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_AI_API_KEY",
+        "XAI_API_KEY",
+        "MISTRAL_API_KEY",
+        "OPENROUTER_API_KEY",
+        "GROQ_API_KEY",
+        "FORGE_LLM_API_KEY",
+    )
+
+    @classmethod
+    def _needs_onboarding(cls) -> bool:
+        """Return True when the welcome wizard should be shown.
+
+        Returns False if an API key is already available via:
+        - settings.json (llm_api_key is set and non-empty)
+        - Any well-known provider environment variable
+
+        This prevents the wizard from firing when a developer already has
+        their API keys in the shell environment, while still showing it for
+        fresh users whose bootstrap script copied the minimal template.
+        """
+        import json
+        import os
+
+        # 1. Check environment variables first — fastest, no I/O
+        for var in cls._KNOWN_API_KEY_ENV_VARS:
+            if os.environ.get(var, "").strip():
+                return False
+
+        # 2. Fall back to settings.json
+        settings_path = Path.cwd() / "settings.json"
+        if not settings_path.exists():
+            return True
+        try:
+            with open(settings_path, encoding="utf-8") as f:
+                data = json.load(f)
+            key = data.get("llm_api_key")
+            return not key  # None, empty string, or missing → needs onboarding
+        except Exception:
+            return True
 
     def _on_welcome_finished(self, setup_completed: bool | None) -> None:
         """Called when user finishes the onboarding wizard."""
         if not setup_completed:
             self.exit()
             return
-        self.notify("Setup complete! Welcome to Forge.", severity="information")
+        self.notify("Systems initialized. Welcome to the Forge.", severity="information")
         self._start_main_flow()
 
     def _start_main_flow(self) -> None:

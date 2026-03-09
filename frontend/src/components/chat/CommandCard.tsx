@@ -32,7 +32,7 @@ export function CommandCard({ event }: CommandCardProps) {
       className="w-full rounded-lg border bg-zinc-950 p-2.5 text-left hover:bg-zinc-900 transition-colors"
     >
       <CardSectionLabel
-        label="Command"
+        label="System Command"
         icon={<Terminal className="h-3.5 w-3.5 shrink-0" />}
       />
       <div className="text-xs font-mono text-green-400">
@@ -80,7 +80,7 @@ export function CommandOutputCard({ event }: CommandOutputCardProps) {
           className="w-full rounded-t-lg border bg-zinc-950 px-2.5 pt-2.5 text-left hover:bg-zinc-900 transition-colors"
         >
           <CardSectionLabel
-            label="Command Output"
+            label="Terminal STDOUT"
             icon={<Terminal className="h-3.5 w-3.5 shrink-0" />}
           />
           <pre className="max-h-60 overflow-auto whitespace-pre-wrap font-mono text-xs text-zinc-300">
@@ -115,7 +115,7 @@ export function CommandOutputCard({ event }: CommandOutputCardProps) {
       className="w-full rounded-lg border bg-zinc-950 p-2.5 text-left hover:bg-zinc-900 transition-colors"
     >
       <CardSectionLabel
-        label="Command Output"
+        label="Terminal STDOUT"
         icon={<Terminal className="h-3.5 w-3.5 shrink-0" />}
       />
       <pre className="max-h-60 overflow-auto whitespace-pre-wrap font-mono text-xs text-zinc-300">

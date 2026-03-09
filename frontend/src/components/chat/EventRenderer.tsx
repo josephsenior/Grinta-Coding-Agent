@@ -162,7 +162,7 @@ export function EventCard({ event }: EventCardProps) {
         return (
           <div className="flex justify-center py-1">
             <span className="rounded-full bg-muted px-3 py-0.5 text-[11px] text-muted-foreground">
-              Context condensed
+              Telemetry compacted
             </span>
           </div>
         );
