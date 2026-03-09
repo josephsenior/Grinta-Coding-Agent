@@ -1,11 +1,149 @@
 {
-  "timestamp": "2026-03-09 09:07:59",
-  "events_condensed": 10,
+  "timestamp": "2026-03-10 00:29:53",
+  "events_condensed": 62,
   "files_touched": {},
-  "recent_errors": [],
-  "decisions": [
-    "WARNING: Some MCP servers failed to connect. The following tools may be unavailable:\n  - http://localhost:3000/mcp/mcp (shttp): Error connecting to http://localhost:3000/mcp/mcp: Client failed to connect: All connection attempts failed\nDo not attempt to call these tools. Plan accordingly."
+  "recent_errors": [
+    "[exit_code=1] [ERROR STREAM]\n\u001b[31;1mNew-Item: \u001b[31;1mAn item with the specified name C:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2\\auth_api\\routes already exists.\u001b[0m",
+    "[exit_code=1] [ERROR STREAM]\n\u001b[31;1mGet-ChildItem: \u001b[31;1mA parameter cannot be found that matches parameter name 'la'.\u001b[0m",
+    "[exit_code=1] [ERROR STREAM]\n\u001b[31;1mGet-ChildItem: \u001b[31;1mA parameter cannot be found that matches parameter name 'la'.\u001b[0m"
   ],
-  "recent_commands": [],
-  "attempted_approaches": []
+  "decisions": [],
+  "recent_commands": [
+    {
+      "command": "mkdir -p auth_api/routes",
+      "output": "Directory: C:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2\\auth_api\n\n\u001b[32;1mMode   \u001b[0m\u001b[32;1m              LastWriteTime\u001b[0m \u001b[32;1;3m        Length\u001b[0m\u001b[32;1m Name\u001b[0m\n\u001b[32;1m----   \u001b[0m \u001b[32;1m             -------------\u001b[0m \u001b[32;1m        ------\u001b[0m \u001b[32;1m----\u001b[0m\nd----          10/03/2026    00:28                \u001b[44;1mroutes\u001b[0m"
+    },
+    {
+      "command": "Get-ChildItem -Path auth_api -Recurse -File",
+      "output": "<FORGE_RESULT_VALIDATION>\nwarnings: Tool returned empty result\n</FORGE_RESULT_VALIDATION>"
+    },
+    {
+      "command": "mkdir -p auth_api/routes",
+      "output": "[ERROR STREAM]\n\u001b[31;1mNew-Item: \u001b[31;1mAn item with the specified name C:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2\\auth_api\\routes already exists.\u001b[0m"
+    },
+    {
+      "command": "Get-ChildItem -Recurse auth_api",
+      "output": "Directory: C:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2\\auth_api\n\n\u001b[32;1mMode   \u001b[0m\u001b[32;1m              LastWriteTime\u001b[0m \u001b[32;1;3m        Length\u001b[0m\u001b[32;1m Name\u001b[0m\n\u001b[32;1m----   \u001b[0m \u001b[32;1m             -------------\u001b[0m \u001b[32;1m        ------\u001b[0m \u001b[32;1m----\u001b[0m\nd----          10/03/2026    00:28                \u001b[44;1mroutes\u001b[0m"
+    },
+    {
+      "command": "Get-ChildItem -Path auth_api -Recurse | Select-Object FullName",
+      "output": "\u001b[32;1mFullName\u001b[0m\n\u001b[32;1m--------\u001b[0m\nC:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2\\auth_api\\routes"
+    },
+    {
+      "command": "Get-ChildItem -Recurse auth_api | Select-Object FullName",
+      "output": "\u001b[32;1mFullName\u001b[0m\n\u001b[32;1m--------\u001b[0m\nC:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2\\auth_api\\routes"
+    },
+    {
+      "command": "Get-ChildItem -Recurse auth_api | Select-Object FullName",
+      "output": "\u001b[32;1mFullName\u001b[0m\n\u001b[32;1m--------\u001b[0m\nC:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2\\auth_api\\routes"
+    },
+    {
+      "command": "Get-ChildItem -Recurse auth_api",
+      "output": "Directory: C:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2\\auth_api\n\n\u001b[32;1mMode   \u001b[0m\u001b[32;1m              LastWriteTime\u001b[0m \u001b[32;1;3m        Length\u001b[0m\u001b[32;1m Name\u001b[0m\n\u001b[32;1m----   \u001b[0m \u001b[32;1m             -------------\u001b[0m \u001b[32;1m        ------\u001b[0m \u001b[32;1m----\u001b[0m\nd----          10/03/2026    00:28                \u001b[44;1mroutes\u001b[0m"
+    },
+    {
+      "command": "Get-ChildItem -Path auth_api -Recurse | Select-Object FullName",
+      "output": "\u001b[32;1mFullName\u001b[0m\n\u001b[32;1m--------\u001b[0m\nC:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2\\auth_api\\routes"
+    },
+    {
+      "command": "Get-ChildItem -Recurse auth_api"
+    }
+  ],
+  "attempted_approaches": [
+    {
+      "type": "command",
+      "detail": "mkdir -p auth_api/routes",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Path auth_api -Recurse -File",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "mkdir -p auth_api/routes",
+      "outcome": "FAILED (exit=1): \u001b[31;1mNew-Item: \u001b[31;1mAn item with the specified name C:\\Users\\GIGABYTE\\AppData\\Local\\Temp\\FORGE_workspace_6bb8f12acb094abda0f4ea2b95e00a7a_2aslbim2"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Recurse auth_api",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Path auth_api -Recurse | Select-Object FullName",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Recurse auth_api | Select-Object FullName",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Recurse auth_api | Select-Object FullName",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Recurse auth_api",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Path auth_api -Recurse | Select-Object FullName",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Recurse auth_api",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Recurse auth_api",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "ls -la",
+      "outcome": "FAILED (exit=1): \u001b[31;1mGet-ChildItem: \u001b[31;1mA parameter cannot be found that matches parameter name 'la'.\u001b[0m"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Recurse",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Recurse auth_api",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Path auth_api -Recurse",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Path auth_api -Recurse -File | Select-Object FullName",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Recurse auth_api | Select-Object FullName",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "Get-ChildItem -Path auth_api -Recurse | Select-Object FullName",
+      "outcome": "SUCCESS"
+    },
+    {
+      "type": "command",
+      "detail": "ls -la auth_api",
+      "outcome": "FAILED (exit=1): \u001b[31;1mGet-ChildItem: \u001b[31;1mA parameter cannot be found that matches parameter name 'la'.\u001b[0m"
+    }
+  ]
 }

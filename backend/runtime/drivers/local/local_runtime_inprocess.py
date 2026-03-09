@@ -206,6 +206,12 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             # Instead, the workspace path is passed to ActionExecutor's
             # work_dir parameter and each command runs in that directory.
             logger.info("Using workspace: %s", self._temp_workspace)
+            # Initialize git repository for workspace change tracking
+            import subprocess
+            try:
+                subprocess.run(['git', 'init'], cwd=self._temp_workspace, check=True, capture_output=True)
+            except Exception as e:
+                logger.warning("Failed to init git in temp workspace: %s", e)
             return
 
         self.config.workspace_mount_path_in_runtime = self._temp_workspace

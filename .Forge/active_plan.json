@@ -1,9 +1,57 @@
 [
   {
     "id": "1",
-    "description": "Output 'Hello World'",
-    "status": "completed",
-    "result": "Hello World",
+    "description": "Create directory structure",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "2",
+    "description": "Create requirements.txt",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "3",
+    "description": "Create models.py",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "4",
+    "description": "Create auth.py",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "5",
+    "description": "Create routes/users.py",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "6",
+    "description": "Create main.py",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "7",
+    "description": "Verify files",
+    "status": "pending",
+    "result": null,
     "tags": [],
     "subtasks": []
   }

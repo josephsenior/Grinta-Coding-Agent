@@ -128,24 +128,6 @@ input_price_per_m = 0.10
 output_price_per_m = 0.40
 supports_function_calling = true
 
-[models."gpt-4-turbo"]
-provider = "openai"
-max_input_tokens = 128_000
-max_output_tokens = 4_096
-input_price_per_m = 10.00
-output_price_per_m = 30.00
-supports_function_calling = true
-supports_response_schema = true
-supports_vision = true
-
-[models."gpt-4-32k"]
-provider = "openai"
-max_input_tokens = 32_768
-max_output_tokens = 4_096
-input_price_per_m = 60.00
-output_price_per_m = 120.00
-verified = true
-
 [models."o1-mini"]
 provider = "openai"
 aliases = ["openai/o1-mini"]
@@ -297,35 +279,43 @@ strip_reasoning_effort = true
 thinking_mode = "disabled"
 strip_top_p = true
 
-[models."claude-2.1"]
-provider = "anthropic"
-max_input_tokens = 200_000
-max_output_tokens = 4_096
-input_price_per_m = 8.00
-output_price_per_m = 24.00
-verified = true
-
-[models."claude-2"]
-provider = "anthropic"
-max_input_tokens = 100_000
-max_output_tokens = 4_096
-input_price_per_m = 8.00
-output_price_per_m = 24.00
-verified = true
-
 # ── Google Gemini ───────────────────────────────────────────────────────────────
-[models."gemini-pro-latest"]
+
+[models."gemini-3.1-pro-preview"]
 provider = "google"
-aliases = ["google/gemini-pro-latest", "gemini-pro"]
-max_input_tokens = 32_768
-max_output_tokens = 8_192
-input_price_per_m = 0.50
-output_price_per_m = 1.50
+aliases = ["google/gemini-3.1-pro-preview", "gemini-3.1-pro"]
+max_input_tokens = 1_000_000
+max_output_tokens = 65_536
+input_price_per_m = 1.25
+output_price_per_m = 5.00
 verified = true
 featured = true
 supports_function_calling = true
 supports_vision = true
 
+[models."gemini-3.1-flash-lite-preview"]
+provider = "google"
+aliases = ["google/gemini-3.1-flash-lite-preview", "gemini-3.1-flash-lite"]
+max_input_tokens = 1_000_000
+max_output_tokens = 65_536
+input_price_per_m = 0.10
+output_price_per_m = 0.30
+verified = true
+featured = true
+supports_function_calling = true
+supports_vision = true
+
+[models."gemini-3-flash-preview"]
+provider = "google"
+aliases = ["google/gemini-3-flash-preview", "gemini-3-flash"]
+max_input_tokens = 1_000_000
+max_output_tokens = 65_536
+input_price_per_m = 0.10
+output_price_per_m = 0.40
+verified = true
+featured = true
+supports_function_calling = true
+supports_vision = true
 
 [models."gemini-3-deep-think"]
 provider = "google"
@@ -340,23 +330,11 @@ supports_function_calling = true
 supports_reasoning_effort = true
 supports_vision = true
 
-[models."gemini-3-flash"]
-provider = "google"
-aliases = ["google/gemini-3-flash"]
-max_input_tokens = 1_000_000
-max_output_tokens = 16_384
-input_price_per_m = 0.10
-output_price_per_m = 0.40
-verified = true
-featured = true
-supports_function_calling = true
-supports_vision = true
-
 [models."gemini-2.5-pro"]
 provider = "google"
 aliases = ["google/gemini-2.5-pro"]
 max_input_tokens = 1_000_000
-max_output_tokens = 8_192
+max_output_tokens = 65_536
 input_price_per_m = 1.25
 output_price_per_m = 10.00
 verified = true
@@ -372,7 +350,7 @@ strip_top_p = true
 provider = "google"
 aliases = ["google/gemini-2.5-flash"]
 max_input_tokens = 1_000_000
-max_output_tokens = 8_192
+max_output_tokens = 65_536
 input_price_per_m = 0.15
 output_price_per_m = 0.60
 verified = true
@@ -380,49 +358,16 @@ featured = true
 supports_function_calling = true
 supports_vision = true
 
-[models."gemini-2.5-pro-preview-06-05"]
+[models."gemini-2.5-flash-lite"]
 provider = "google"
-aliases = ["google/gemini-2.5-pro"]
+aliases = ["google/gemini-2.5-flash-lite"]
 max_input_tokens = 1_000_000
-max_output_tokens = 8_192
-input_price_per_m = 1.25
-output_price_per_m = 10.00
-supports_function_calling = true
-supports_reasoning_effort = true
-supports_vision = true
-
-[models."gemini-2.5-flash-preview-05-20"]
-provider = "google"
-aliases = ["google/gemini-2.5-flash"]
-max_input_tokens = 1_000_000
-max_output_tokens = 8_192
-input_price_per_m = 0.15
-output_price_per_m = 0.60
-supports_function_calling = true
-supports_reasoning_effort = true
-supports_vision = true
-
-[models."gemini-2.0-flash"]
-provider = "google"
-aliases = ["google/gemini-2.0-flash-exp"]
-max_input_tokens = 1_000_000
-max_output_tokens = 8_192
+max_output_tokens = 65_536
 input_price_per_m = 0.10
-output_price_per_m = 0.40
+output_price_per_m = 0.30
+verified = true
 featured = true
 supports_function_calling = true
-supports_vision = true
-
-[models."gemini-2.0-flash-thinking-exp"]
-provider = "google"
-aliases = ["google/gemini-2.0-flash-thinking-exp"]
-max_input_tokens = 1_000_000
-max_output_tokens = 8_192
-input_price_per_m = 0.10
-output_price_per_m = 0.40
-featured = true
-supports_function_calling = true
-supports_reasoning_effort = true
 supports_vision = true
 
 # ── xAI / Grok ──────────────────────────────────────────────────────────────────
@@ -470,25 +415,6 @@ verified = true
 featured = true
 supports_function_calling = true
 supports_vision = true
-
-[models."grok-3"]
-provider = "xai"
-aliases = ["xai/grok-3"]
-max_input_tokens = 128_000
-max_output_tokens = 4_096
-input_price_per_m = 3.00
-output_price_per_m = 15.00
-supports_function_calling = true
-supports_vision = true
-
-[models."grok-3-mini"]
-provider = "xai"
-aliases = ["xai/grok-3-mini"]
-max_input_tokens = 128_000
-max_output_tokens = 4_096
-input_price_per_m = 0.30
-output_price_per_m = 0.50
-supports_function_calling = true
 
 # ── DeepSeek ────────────────────────────────────────────────────────────────────
 
@@ -579,10 +505,11 @@ supports_function_calling = true
 "claude-4.6"     = { input = 15.00, output = 75.00 }
 "claude-4.5"     = { input = 3.00, output = 15.00 }
 "claude-sonnet-4"   = { input = 3.00, output = 15.00 }
-"gemini-3"          = { input = 2.00, output = 8.00 }
+"gemini-3.1-pro"    = { input = 1.25, output = 5.00 }
+"gemini-3.1-flash"  = { input = 0.10, output = 0.30 }
+"gemini-3"          = { input = 0.10, output = 0.40 }
 "gemini-2.5-pro"    = { input = 1.25, output = 10.00 }
 "gemini-2.5-flash"  = { input = 0.15, output = 0.60 }
-"gemini-2.0-flash"  = { input = 0.10, output = 0.40 }
 "grok-4.1"          = { input = 3.00, output = 15.00 }
 "grok-4"            = { input = 3.00, output = 15.00 }
 "grok-3-mini"       = { input = 0.30, output = 0.50 }

@@ -343,7 +343,7 @@ class ForgeClient:
     async def get_workspace_changes(self, conversation_id: str) -> list[dict[str, Any]]:
         """GET /api/git/changes?conversation_id=...."""
         data = await self._get(
-            "/git/changes", params={"conversation_id": conversation_id}
+            f"/conversations/{conversation_id}/files/git/changes"
         )
         return data if isinstance(data, list) else data.get("changes", [])
 

@@ -845,10 +845,14 @@ class GeminiClient(DirectLLMClient):
 
         try:
             stream = await chat.send_message_stream(prompt, **kwargs)
+            # Use a global counter across all chunks so that function calls
+            # arriving in separate streaming chunks (one call per chunk) get
+            # unique indices rather than all defaulting to 0 via enumerate().
+            fc_idx_counter = 0
             async for chunk in stream:
                 fcs = getattr(chunk, "function_calls", None)
                 if fcs:
-                    for idx, fc in enumerate(fcs):
+                    for fc in fcs:
                         import json
                         try:
                             _args = getattr(fc, "args", {})
@@ -878,8 +882,8 @@ class GeminiClient(DirectLLMClient):
                             "choices": [{
                                 "delta": {
                                     "tool_calls": [{
-                                        "index": idx,
-                                        "id": f"call_{fc.name}_{idx}",
+                                        "index": fc_idx_counter,
+                                        "id": f"call_{fc.name}_{fc_idx_counter}",
                                         "type": "function",
                                         "function": {"name": fc.name, "arguments": args_str}
                                     }]
@@ -887,6 +891,7 @@ class GeminiClient(DirectLLMClient):
                                 "finish_reason": None
                             }]
                         }
+                        fc_idx_counter += 1
                 text = chunk.text or ""
                 if text:
                     yield {"choices": [{"delta": {"content": text}, "finish_reason": None}]}
