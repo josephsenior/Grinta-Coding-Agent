@@ -240,14 +240,17 @@ class OrchestratorPlanner:
 
             tools.append(create_web_search_tool())
 
-        # New core tools
-        tools.append(create_lsp_query_tool())
-        tools.append(create_signal_progress_tool())
-        if getattr(self._config, "enable_swarming", True):
+        # New core tools — gated by flags (default off to reduce tool bloat)
+        if getattr(self._config, "enable_lsp_query", False):
+            tools.append(create_lsp_query_tool())
+        if getattr(self._config, "enable_signal_progress", False):
+            tools.append(create_signal_progress_tool())
+        if getattr(self._config, "enable_swarming", False):
             tools.append(create_delegate_task_tool())
 
         from backend.engines.orchestrator.tools.blackboard import create_blackboard_tool
-        tools.append(create_blackboard_tool())
+        if getattr(self._config, "enable_blackboard", False):
+            tools.append(create_blackboard_tool())
         if getattr(self._config, "enable_rollback", True):
             tools.append(create_revert_to_safe_state_tool())
         self._add_lazy_import_tools(
@@ -323,8 +326,8 @@ class OrchestratorPlanner:
             # We now rely on external MCP (like browser-use)
             pass
 
-        # We always add verify_ui_change to make visual verification easy when working with frontends
-        tools.append(create_verify_ui_change_tool())
+        if getattr(self._config, "enable_verify_ui_change", False):
+            tools.append(create_verify_ui_change_tool())
 
     def _add_editor_tools(self, tools: list, use_short_tool_desc: bool) -> None:
         if getattr(self._config, "enable_editor", True):

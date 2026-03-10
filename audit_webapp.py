@@ -21,17 +21,22 @@ import httpx
 
 from tui.client import ForgeClient
 
-# ─── ONE-SENTENCE VAGUE PROMPT ───────────────────────────────────────────────
+# ─── MULTI-FILE PROMPT ────────────────────────────────────────────────────────
 PROMPT = (
-    "Build a task management web app where users can register, log in, "
-    "create tasks with priorities and due dates, and mark them as done."
+    "Build a Flask task management web app. "
+    "Create SEPARATE files: requirements.txt, app.py (Flask factory with DB and login), "
+    "models.py (User and Task SQLAlchemy models), "
+    "routes.py (all URL routes/views), "
+    "templates/base.html (base layout), "
+    "templates/index.html (task list), "
+    "templates/login.html, and templates/register.html."
 )
 # ─────────────────────────────────────────────────────────────────────────────
 
 BASE           = "http://127.0.0.1:3000"
 POLL_INTERVAL  = 5     # seconds between /files/git/changes polls
 MAX_POLL_TIME  = 600   # 10 minutes total
-IDLE_THRESHOLD = 90    # stop if no new files for this many seconds
+IDLE_THRESHOLD = 120    # stop if no new files for this many seconds
 PREVIEW_LINES  = 80    # lines to show per file in audit
 
 

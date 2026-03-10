@@ -155,50 +155,13 @@ class FileVerificationGuard:
     def inject_verification_commands(
         self, actions: list[Action], turn: int
     ) -> list[Action]:
-        """Automatically inject verification commands after file operations.
+        """Pass-through: returns actions unchanged.
 
-        Also detects stale reads and prepends a re-read before edits on
-        files that haven't been read recently or that were modified since
-        the last read.
-
-        Args:
-            actions: List of actions from LLM
-            turn: Current turn number
-
-        Returns:
-            Modified actions list with verification commands injected
-
+        Auto-injected stale-read and auto-verify reads were tripling the
+        event count per file operation (3 events instead of 1). The LLM
+        can request its own reads when needed.
         """
-        enhanced_actions = []
-
-        for action in actions:
-            # Stale-read prevention: if this is a file edit and the file
-            # hasn't been read recently, inject a read before the edit.
-            # Skip for "create" commands — the file doesn't exist yet so a
-            # pre-read would always fail and generate a spurious ErrorObservation.
-            if self._is_file_operation(action):
-                is_create = getattr(action, "command", None) == "create" or (
-                    not getattr(action, "old_str", None)
-                    and getattr(action, "file_text", None) is not None
-                )
-                file_path = self._safe_file_path(action)
-                if file_path and not is_create and self.is_stale_read(file_path, turn):
-                    read_action = self._create_stale_read_action(file_path)
-                    if read_action:
-                        enhanced_actions.append(read_action)
-                        self.record_file_read(file_path, turn)
-                        self.stats["stale_reads_prevented"] += 1
-                        logger.info(
-                            "🔄 Stale-read prevention: forced re-read of %s",
-                            file_path,
-                        )
-
-            enhanced_actions.append(action)
-            if not self._is_file_operation(action):
-                continue
-            self._append_verification_action(enhanced_actions, action, turn)
-
-        return enhanced_actions
+        return actions
 
     # ------------------------------------------------------------------ #
     # Stale-read prevention

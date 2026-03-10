@@ -550,6 +550,10 @@ class AgentController:
                     # observation_service.trigger_step() when the pending
                     # action clears, or by the watchdog timer.
                     break
+                # Yield between outer-drain iterations so _on_event background
+                # tasks from the previous _step_inner() update state.history
+                # before the next step's condense_history() check.
+                await asyncio.sleep(0)
                 await self._step_inner()
 
     async def _step_inner(self) -> None:
@@ -604,6 +608,13 @@ class AgentController:
                     if action is None:
                         break
                     await self.action_execution.execute_action(action)
+                    # Yield to the event loop so that _on_event background tasks
+                    # (which add events to state.history) run before the next
+                    # get_next_action() → astep() → condense_history() check.
+                    # Without this, state.history may be stale (missing the just-
+                    # executed CondensationAction), causing the condenser to see
+                    # the pre-condensation view and fire again — creating a loop.
+                    await asyncio.sleep(0)
                     await self._handle_post_execution()
         finally:
             self._draining_batch = False

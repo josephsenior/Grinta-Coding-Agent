@@ -234,7 +234,7 @@ class Orchestrator(Agent):
         )
         self._last_llm_latency: float = 0.0
         self._reflection_interval: int = int(
-            getattr(self.config, "reflection_interval", 30)
+            getattr(self.config, "reflection_interval", 8)
         )
         self._steps_since_reflection: int = 0
         self._run_production_health_check()
@@ -677,63 +677,23 @@ class Orchestrator(Agent):
             return ""
 
     def _queue_post_condensation_recovery(self, task_text: str = "") -> None:
-        """Inject recovery actions after condensation so the agent re-orients.
+        """No-op: post-condensation recovery injection is disabled.
 
-        This enforces the recovery sequence described in SELF_REGULATION.
-        All steps are system-injected — the agent does NOT need to call them
-        explicitly, removing reliance on prompt-compliance:
-        1. Inject restored context from pre-condensation snapshot
-        2. Inject working memory (structured cognitive workspace)
-        3. Auto semantic recall against the task description
-        4. Recall all scratchpad notes
-        5. Auto-inject task_tracker state (system-enforced, not prompt-reliant)
-        6. Inject lessons.md content if available
+        The LLMSummarizingCondenser already produces a summary that preserves
+        sufficient context. System-injected recovery thinks were wasting
+        2+ events per condensation cycle (think + observation) without
+        improving agent productivity.
         """
-        from backend.engines.orchestrator.tools.note import build_recall_action
-        from backend.engines.orchestrator.tools.working_memory import get_full_working_memory
-
-        restored = self._memory_manager_impl.get_restored_context()
-        restored_block = f"\n\n{restored}" if restored else ""
-        wm = get_full_working_memory()
-        wm_block = f"\n\n{wm}" if wm else ""
-
-        semantic_block = self._build_semantic_recall_block(task_text)
-        lessons_block = self._build_lessons_block()
-        task_tracker_block = self._build_task_tracker_block()
-
-        recovery_think = AgentThinkAction(
-            thought=(
-                "⚡ CONTEXT CONDENSED — recovery complete. "
-                "Restored context:"
-                f"{restored_block}{wm_block}{semantic_block}{lessons_block}{task_tracker_block}\n\n"
-                "Continue creating files immediately. Do NOT re-explore or call task_tracker."
-            )
-        )
-        self.pending_actions.append(recovery_think)
+        pass
 
     def _maybe_inject_reflection(self, state: State | None = None) -> Action | None:
-        """Inject a structured self-reflection think action every N steps.
+        """Disabled: reflection injection is no longer used.
 
-        Provides concrete session metrics: turn progress, token usage,
-        files modified, error count, and original user request.
-
-        Returns an AgentThinkAction if the interval has elapsed, else None.
+        System-injected reflection thinks were promoting meta-tool loops
+        (e.g. "Should I update the task tracker?") and wasting 2 events
+        per injection without improving agent productivity.
         """
-        if self._reflection_interval <= 0 or self._steps_since_reflection < self._reflection_interval:
-            return None
-
-        self._steps_since_reflection = 0
-        data_parts = self._build_reflection_data_parts(state) if state else []
-        data_block = "\n".join(data_parts) if data_parts else "  (no metrics available)"
-
-        return AgentThinkAction(
-            thought=(
-                "🔍 SELF-REFLECTION CHECKPOINT — Session metrics:\n"
-                f"{data_block}\n\n"
-                "Assess: Am I writing files or just exploring? "
-                "If no files created recently, start creating one NOW."
-            )
-        )
+        return None
 
     def _build_reflection_data_parts(self, state: State) -> list[str]:
         """Build structured reflection data parts from state."""

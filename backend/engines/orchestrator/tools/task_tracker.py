@@ -14,8 +14,8 @@ from backend.llm.tool_names import TASK_TRACKER_TOOL_NAME
 
 _TASK_TRACKER_DESCRIPTION = (
     "Maintain a structured plan to track progress. "
-    "Use `view` to see the current plan steps and `update` to overwrite the plan."
-    "Always `view` if unsure, then `update` to keep the plan current."
+    "Use `update` (or `plan`) with a task_list to create or overwrite the plan. "
+    "Use `view` (without a task_list) to read the current plan."
 )
 
 
@@ -52,8 +52,8 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
         description=_TASK_TRACKER_DESCRIPTION,
         properties={
             "command": get_command_param(
-                "The command to execute. `view` shows the current plan. `update` overwrites the entire plan with the new list.",
-                ["view", "update"],
+                "The command to execute. `view` shows the current plan. `update` (or `plan`) overwrites the entire plan with the new list.",
+                ["view", "update", "plan"],
             ),
             "task_list": {
                 "type": "array",

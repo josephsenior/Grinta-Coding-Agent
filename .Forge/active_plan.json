@@ -1,23 +1,23 @@
 [
   {
     "id": "1",
-    "description": "Initialize project structure and configuration files (package.json, tsconfig.json, tailwind.config.ts, etc.)",
-    "status": "in_progress",
+    "description": "Create database.py",
+    "status": "done",
     "result": null,
     "tags": [],
     "subtasks": []
   },
   {
     "id": "2",
-    "description": "Set up SQLite database and lib/db.ts",
-    "status": "pending",
+    "description": "Create models.py",
+    "status": "done",
     "result": null,
     "tags": [],
     "subtasks": []
   },
   {
     "id": "3",
-    "description": "Implement JWT authentication and middleware",
+    "description": "Create schemas.py",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -25,7 +25,7 @@
   },
   {
     "id": "4",
-    "description": "Create API routes for tasks and auth",
+    "description": "Create crud.py",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -33,7 +33,7 @@
   },
   {
     "id": "5",
-    "description": "Build UI components and pages (Dashboard, Login, Register)",
+    "description": "Create routes.py",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -41,7 +41,15 @@
   },
   {
     "id": "6",
-    "description": "Final audit and testing",
+    "description": "Create main.py",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "7",
+    "description": "Create templates/index.html",
     "status": "pending",
     "result": null,
     "tags": [],

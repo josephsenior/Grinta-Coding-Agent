@@ -67,10 +67,7 @@ When encountering secrets: STOP → Refuse → Explain security risk → Offer s
 </SECURITY>
 
 <SELF_REGULATION>
-Every 30 steps, briefly assess: Am I writing files or just planning? If no files created recently, create one NOW.
-
-After context condensation (⚡ CONTEXT CONDENSED):
-The system auto-restores your context. Just continue where you left off.
+After context condensation the system provides a summary. Just continue where you left off — do NOT re-explore or call status tools.
 </SELF_REGULATION>
 
 {% include 'security_risk_assessment.j2' %}
@@ -119,7 +116,7 @@ Your primary role is to assist users by executing commands, modifying code, and 
 </ROLE>
 
 <TASK_MANAGEMENT>
-Use task_tracker to maintain a lightweight plan for multi-step tasks. Keep plans short (key milestones only). Prioritize creating files over updating plans.
+For multi-step tasks, plan in a think step, then execute immediately. Prioritize creating files over planning.
 </TASK_MANAGEMENT>
 
 <ERROR_RECOVERY>
@@ -340,7 +337,7 @@ Explain changes in conversation, not separate doc files. Never create multiple d
 </DOCUMENTATION>
 
 <PATTERNS>
-✅ DO: Direct file modification | THINK→ACT→OBSERVE→VERIFY | Batch read-only bash commands | search_code for lookups | preview:true for dry-run | view_and_replace for read+edit | Explore before operating | Clean up temp files | Update existing PRs | Use task_tracker for multi-phase work
+✅ DO: Direct file modification | THINK→ACT→OBSERVE→VERIFY | Batch read-only bash commands | search_code for lookups | preview:true for dry-run | view_and_replace for read+edit | Explore before operating | Clean up temp files | Update existing PRs
 ❌ DON'T: Multiple file versions | Text-only claims without tools | Broad pkill | Assume paths | Repeat failing approaches | Create temp files without cleanup | Commit .env/node_modules
 </PATTERNS>
 

@@ -425,7 +425,13 @@ class BaseLLMCondenser(RollingCondenser, ABC):
         compacted = self._compactor.compact(view.events)
         if len(compacted) < len(view.events):
             view = View(events=compacted)
-        if self.should_condense(view) or self._exceeds_token_budget(view):
+        should = self.should_condense(view)
+        budget = self._exceeds_token_budget(view)
+        logger.debug(
+            "condense check: len(view)=%d max_size=%d should_condense=%s token_budget=%s exceeds_budget=%s",
+            len(view), self.max_size, should, self.token_budget, budget,
+        )
+        if should or budget:
             return self.get_condensation(view)
         return view
 

@@ -132,6 +132,23 @@ class Settings(BaseModel):
     # Parallel sub-agents: shared blackboard for coordination (off by default)
     delegate_task_blackboard_enabled: bool = False
 
+    # Tool-level enable/disable flags (used by OrchestratorPlanner.build_toolset)
+    enable_task_tracker: bool | None = None
+    enable_check_tool_status: bool | None = None
+    enable_swarming: bool | None = None
+    enable_rollback: bool | None = None
+    enable_workspace_status: bool | None = None
+    enable_error_patterns: bool | None = None
+    enable_project_map: bool | None = None
+    enable_session_diff: bool | None = None
+    enable_working_memory: bool | None = None
+    enable_verify_state: bool | None = None
+    enable_meta_cognition: bool | None = None
+    enable_lsp_query: bool | None = None
+    enable_signal_progress: bool | None = None
+    enable_blackboard: bool | None = None
+    enable_verify_ui_change: bool | None = None
+
     # Condenser Customization
     condenser_type: str | None = None
     condenser_keep_first: int | None = None
