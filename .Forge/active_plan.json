@@ -1,7 +1,7 @@
 [
   {
     "id": "1",
-    "description": "Create directory structure",
+    "description": "Create auth_api directory and requirements.txt",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -9,7 +9,7 @@
   },
   {
     "id": "2",
-    "description": "Create requirements.txt",
+    "description": "Create auth_api/models.py",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -17,7 +17,7 @@
   },
   {
     "id": "3",
-    "description": "Create models.py",
+    "description": "Create auth_api/auth.py",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -25,7 +25,7 @@
   },
   {
     "id": "4",
-    "description": "Create auth.py",
+    "description": "Create auth_api/routes/users.py",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -33,23 +33,7 @@
   },
   {
     "id": "5",
-    "description": "Create routes/users.py",
-    "status": "pending",
-    "result": null,
-    "tags": [],
-    "subtasks": []
-  },
-  {
-    "id": "6",
-    "description": "Create main.py",
-    "status": "pending",
-    "result": null,
-    "tags": [],
-    "subtasks": []
-  },
-  {
-    "id": "7",
-    "description": "Verify files",
+    "description": "Create auth_api/main.py",
     "status": "pending",
     "result": null,
     "tags": [],

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Sequence
 
 from backend.core.logger import forge_logger as logger
 from backend.events.action.action import Action
+from backend.events.action.agent import AgentThinkAction
 from backend.events.action.commands import CmdRunAction
 from backend.events.action.empty import NullAction
 from backend.events.action.message import MessageAction
@@ -153,6 +154,10 @@ class StuckDetector:
 
         # NEW: Check for cost acceleration
         if self._is_stuck_cost_acceleration(filtered_history):
+            return True
+
+        # Check for think-only loops (model calls think repeatedly, no real actions)
+        if self._is_stuck_think_only_loop(filtered_history):
             return True
 
         return False
@@ -624,6 +629,34 @@ class StuckDetector:
             if recent_growth > 1000:
                 logger.warning("High context window with continued growth detected")
                 return True
+
+        return False
+
+    def _is_stuck_think_only_loop(self, filtered_history: list[Event]) -> bool:
+        """Detect when agent calls think repeatedly without any real actions.
+
+        Flash/lite models sometimes fall into a loop where they keep calling
+        the 'think' tool without ever executing file edits, bash commands, or
+        finishing the task.  Six or more consecutive AgentThinkActions with no
+        non-think action between them is a clear signal of this pattern.
+        """
+        # Collect only Action events (ignore Observations, NullActions, etc.)
+        recent_actions = [
+            e
+            for e in filtered_history[-30:]
+            if isinstance(e, Action) and not isinstance(e, NullAction)
+        ]
+
+        if len(recent_actions) < 6:
+            return False
+
+        # Check if the last 6 actions are ALL AgentThinkAction
+        if all(isinstance(a, AgentThinkAction) for a in recent_actions[-6:]):
+            logger.warning(
+                "Think-only loop detected: last 6+ actions are all AgentThinkAction "
+                "with no real tool use."
+            )
+            return True
 
         return False
 

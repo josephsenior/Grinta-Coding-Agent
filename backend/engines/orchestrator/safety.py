@@ -176,14 +176,12 @@ class OrchestratorSafetyManager:
         missing_tools: list[str],
     ) -> str:
         claimed_lines = "\n".join(f"  - {op}" for op in claimed_operations)
-        missing_section = (
-            "\n\nRequired tools not called: " + ", ".join(missing_tools)
-            if missing_tools
-            else ""
-        )
+        tool_hint = ", ".join(missing_tools) if missing_tools else "str_replace_editor"
         return (
-            "⚠️ RELIABILITY WARNING: You claimed operations without executing tools:\n"
+            "⚠️ CRITICAL ERROR — You described operations in plain text but called NO tools:\n"
             + claimed_lines
-            + missing_section
-            + "\n\nPlease execute the actual tools to complete this action."
+            + f"\n\nRequired tools that were NOT called: {tool_hint}"
+            + "\n\nMANDATORY: Do NOT call 'think'. Do NOT explain what you will do."
+            " IMMEDIATELY call str_replace_editor (command=\"create\") for each file."
+            " One tool call per file. Start NOW."
         )

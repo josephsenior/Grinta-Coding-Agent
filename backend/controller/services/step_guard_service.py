@@ -8,7 +8,6 @@ from backend.core.exceptions import AgentStuckInLoopError
 from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
 from backend.events import EventSource
-from backend.events.action import AgentThinkAction
 from backend.events.observation import ErrorObservation
 
 if TYPE_CHECKING:
@@ -121,20 +120,23 @@ class StepGuardService:
         return False
 
     def _inject_replan_directive(self, controller) -> None:
-        """Inject a think action that forces the LLM to reassess its approach."""
-        replan_think = AgentThinkAction(
-            thought=(
-                "🚨 STUCK LOOP DETECTED — Your last several actions achieved no progress. "
+        """Inject a system directive that forces the LLM to take real action."""
+        # Use SystemMessageAction so the directive lands as a system prompt entry
+        # rather than another AgentThinkAction (which would worsen a think-only loop).
+        from backend.events.action import SystemMessageAction
+
+        directive = SystemMessageAction(
+            content=(
+                "STUCK LOOP DETECTED — Your last several actions achieved no progress. "
                 "MANDATORY RECOVERY PROTOCOL:\n"
-                "1. STOP repeating the same approach\n"
-                "2. Analyze what went wrong — what error or non-progress pattern do you see?\n"
-                "3. List 2-3 ALTERNATIVE strategies you haven't tried\n"
-                "4. Pick the most promising one and execute it\n"
-                "5. If the file you're editing has changed, use view to see current content first\n\n"
-                "DO NOT repeat any action you've already tried. Change your strategy completely."
+                "1. STOP calling 'think'. STOP repeating the same approach.\n"
+                "2. If you need to create files, call str_replace_editor with command=\"create\" NOW.\n"
+                "3. If you need to run code, call execute_bash NOW.\n"
+                "4. Do NOT describe what you will do — execute it immediately with a tool call.\n"
+                "5. If truly blocked, call escalate_to_human or uncertainty."
             )
         )
-        controller.event_stream.add_event(replan_think, EventSource.AGENT)
+        controller.event_stream.add_event(directive, EventSource.ENVIRONMENT)
 
         # Set a planning directive so the planner also nudges the LLM
         state = getattr(controller, "state", None)

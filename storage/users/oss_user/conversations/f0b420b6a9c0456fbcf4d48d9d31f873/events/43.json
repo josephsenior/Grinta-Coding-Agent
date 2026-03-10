@@ -1,0 +1,1 @@
+{"id": 43, "timestamp": "2026-03-10T02:05:11.940476", "source": "agent", "message": "AgentStuckInLoopError: Agent got stuck in a loop", "observation": "error", "content": "AgentStuckInLoopError: Agent got stuck in a loop", "extras": {"truncation_strategy": null, "error_id": "UNKNOWN_ERROR"}}
