@@ -287,8 +287,6 @@ class OrchestratorPlanner:
                 ),
             ],
         )
-        if getattr(self._agent, "blackboard", None) is not None:
-            tools.append(create_blackboard_tool())
 
     def _add_lazy_import_tools(
         self, tools: list, specs: list[tuple[str, bool, str, str]]

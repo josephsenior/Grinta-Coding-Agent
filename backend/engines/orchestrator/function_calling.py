@@ -56,10 +56,6 @@ from backend.engines.orchestrator.tools.web_search import (
 from backend.engines.orchestrator.tools.check_tool_status import (
     build_check_tool_status_action,
 )
-from backend.engines.orchestrator.tools.web_reader import (
-    build_web_reader_action,
-    WEB_READER_TOOL_NAME,
-)
 from backend.engines.orchestrator.tools.workspace_status import (
     build_workspace_status_action,
     WORKSPACE_STATUS_TOOL_NAME,
@@ -338,16 +334,6 @@ def _handle_web_search_tool(arguments: dict) -> CmdRunAction:
         )
     num_results = int(arguments.get("num_results", 5))
     return build_web_search_action(query=query, num_results=num_results)
-
-
-def _handle_web_reader_tool(arguments: dict) -> CmdRunAction:
-    """Handle WEB_READER_TOOL: read webpage content."""
-    url = arguments.get("url", "")
-    if not url:
-        raise FunctionCallValidationError(
-            'Missing required argument "url" in tool call web_reader'
-        )
-    return build_web_reader_action(url=url)
 
 
 def _handle_workspace_status_tool(arguments: dict) -> CmdRunAction:
@@ -1201,7 +1187,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         create_apply_patch_tool()["function"]["name"]: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,
-        WEB_READER_TOOL_NAME: _handle_web_reader_tool,
         "check_tool_status": lambda args: _handle_check_tool_status_tool(
             args, {}
         ),  # Simplified for static map

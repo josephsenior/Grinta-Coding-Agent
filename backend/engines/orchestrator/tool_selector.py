@@ -24,34 +24,40 @@ _CORE_TOOLS = frozenset(
         # Execution
         "execute_bash",
         "bash",
-        # File editing
+        # File editing — all editing tools are essential for productive work
         "str_replace_editor",
         "structure_editor",
+        "apply_patch",
+        "batch_edit",
         # Search & navigation
         "search_code",
+        "explore_tree_structure",
+        "get_entity_contents",
         "project_map",
         # Reasoning
         "think",
         "finish",
-        # Memory — lightweight
+        # Memory — both flat and structured memory survive condensation
         "note",
         "recall",
         "semantic_recall",
+        "working_memory",
         # Testing
         "run_tests",
         # Verification
         "verify_state",
+        "verify_ui_change",
         # Task tracking
         "task_tracker",
-        # Meta-cognition — always available for expressing uncertainty and seeking guidance
+        # Meta-cognition — always available for expressing uncertainty
         "uncertainty",
         "clarification",
         "proposal",
         "escalate_to_human",
-        # Tool inquiry
-        "query_toolbox",
-        # Swarm coordination
-        "blackboard",
+        # Progress signaling for long-running tasks
+        "signal_progress",
+        # MCP gateway
+        "call_mcp_tool",
     }
 )
 
@@ -165,17 +171,25 @@ def _compute_allowed_tools(
     allowed: set[str] = set(_CORE_TOOLS)
     allowed.add("browser")
 
+    # Terminal tools — always available when terminal is enabled
+    allowed.update(["terminal_open", "terminal_input", "terminal_read"])
+
+    # LSP query — always available for code intelligence
+    allowed.add("lsp_query")
+
     unlocks: list[tuple[bool, list[str]]] = [
-        (turn >= 3 or is_complex_task, ["working_memory"]),
-        (error_count >= 2, ["error_patterns"]),
+        # Contextual tools — unlocked by specific conditions
+        (turn >= 3 or is_complex_task, ["delegate_task", "blackboard"]),
+        (error_count >= 2, ["error_patterns", "revert_to_safe_state"]),
         (turn >= 5, ["checkpoint"]),
         (edit_count >= 3, ["session_diff"]),
         (turn <= 1 or post_condensation, ["workspace_status"]),
         (token_pct > 0.5, ["condensation_request"]),
         (bool(_MULTI_FILE_KEYWORDS.search(user_text)), ["apply_patch"]),
+        (error_count >= 1, ["check_tool_status", "query_toolbox"]),
         (
             bool(_RESEARCH_KEYWORDS.search(user_text)),
-            ["web_search", "web_reader"],
+            ["web_search"],
         ),
     ]
     for condition, names in unlocks:
