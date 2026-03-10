@@ -72,15 +72,7 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
                         "status": {
                             "type": "string",
                             "description": "Current status.",
-                            "enum": ["pending", "in_progress", "completed", "failed", "skipped"],
-                        },
-                        "result": {
-                            "type": "string",
-                            "description": "Result or output of the step.",
-                        },
-                        "tags": {
-                            "type": "array",
-                            "items": {"type": "string"},
+                            "enum": ["pending", "in_progress", "done"],
                         },
                     },
                     "required": ["id", "description", "status"],

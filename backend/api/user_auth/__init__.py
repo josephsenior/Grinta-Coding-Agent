@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 from backend.storage import get_file_store
@@ -6,6 +7,11 @@ from backend.storage.secrets.file_secrets_store import FileSecretsStore
 from backend.storage.settings.file_settings_store import FileSettingsStore
 from backend.storage.data_models.settings import Settings
 from backend.storage.data_models.user_secrets import UserSecrets
+
+
+def _get_project_root() -> str:
+    """Return the project root directory (where the server was started)."""
+    return os.getcwd()
 
 
 def get_user_id(request: Any | None = None) -> str:
@@ -18,14 +24,18 @@ def get_user_id(request: Any | None = None) -> str:
 
 
 def get_user_settings_store(request: Any | None = None) -> FileSettingsStore:
-    """Return a local-disk-backed settings store persisted under ~/.Forge."""
+    """Return a settings store backed by settings.json in the project root.
+
+    This makes the project-root settings.json the single source of truth
+    for all settings (startup config + runtime API).
+    """
     return FileSettingsStore(
-        file_store=get_file_store("local", file_store_path=get_file_store_path())
+        file_store=get_file_store("local", file_store_path=_get_project_root())
     )
 
 
 def get_user_secret_store(request: Any | None = None) -> FileSecretsStore:
-    """Return a local-disk-backed secret store persisted under ~/.Forge."""
+    """Return a local-disk-backed secret store persisted under the file store path."""
     return FileSecretsStore(
         file_store=get_file_store("local", file_store_path=get_file_store_path())
     )

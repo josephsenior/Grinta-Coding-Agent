@@ -121,8 +121,7 @@ class ActionExecutor:
 
         self.tool_registry = tool_registry
 
-        # Initialize SessionManager
-        # We pass None for cancellation_service so it creates its own scoped to sessions
+        # Initialize SessionManager — uses the same work_dir as FileEditor
         self.session_manager = SessionManager(
             work_dir=work_dir,
             username=username,

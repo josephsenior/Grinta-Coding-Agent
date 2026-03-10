@@ -35,6 +35,7 @@ class TaskTrackingMixin:
         """Handle task tracking actions (plan/view)."""
         if self.event_stream is None:
             return ErrorObservation("Task tracking requires an event stream")
+
         conversation_dir = get_conversation_dir(self.sid, self.event_stream.user_id)
         task_file_path = f"{conversation_dir}TASKS.md"
 

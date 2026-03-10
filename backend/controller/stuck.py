@@ -8,6 +8,7 @@ from backend.core.logger import forge_logger as logger
 from backend.events.action.action import Action
 from backend.events.action.agent import AgentThinkAction
 from backend.events.action.commands import CmdRunAction
+from backend.events.action.files import FileEditAction, FileWriteAction
 from backend.events.action.empty import NullAction
 from backend.events.action.message import MessageAction
 from backend.events.event import Event, EventSource

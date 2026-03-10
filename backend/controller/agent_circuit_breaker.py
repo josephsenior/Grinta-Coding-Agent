@@ -133,11 +133,8 @@ class CircuitBreaker:
             config.adaptive,
         )
 
-    def check(self, state: State) -> CircuitBreakerResult:
+    def check(self, state: State | None = None) -> CircuitBreakerResult:
         """Check if circuit breaker should trip.
-
-        Args:
-            state: Current agent state
 
         Returns:
             CircuitBreakerResult indicating if breaker tripped
@@ -149,9 +146,6 @@ class CircuitBreaker:
                 reason="Circuit breaker disabled",
                 action="continue",
             )
-
-        # Update metrics from state
-        self._update_metrics(state)
 
         # Check various trip conditions
 

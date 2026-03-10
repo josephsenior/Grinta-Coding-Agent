@@ -1,15 +1,15 @@
 [
   {
     "id": "1",
-    "description": "Create auth_api directory and requirements.txt",
-    "status": "pending",
+    "description": "Initialize project structure and configuration files (package.json, tsconfig.json, tailwind.config.ts, etc.)",
+    "status": "in_progress",
     "result": null,
     "tags": [],
     "subtasks": []
   },
   {
     "id": "2",
-    "description": "Create auth_api/models.py",
+    "description": "Set up SQLite database and lib/db.ts",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -17,7 +17,7 @@
   },
   {
     "id": "3",
-    "description": "Create auth_api/auth.py",
+    "description": "Implement JWT authentication and middleware",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -25,7 +25,7 @@
   },
   {
     "id": "4",
-    "description": "Create auth_api/routes/users.py",
+    "description": "Create API routes for tasks and auth",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -33,7 +33,15 @@
   },
   {
     "id": "5",
-    "description": "Create auth_api/main.py",
+    "description": "Build UI components and pages (Dashboard, Login, Register)",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "6",
+    "description": "Final audit and testing",
     "status": "pending",
     "result": null,
     "tags": [],

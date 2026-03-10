@@ -129,11 +129,13 @@ class StepGuardService:
             content=(
                 "STUCK LOOP DETECTED — Your last several actions achieved no progress. "
                 "MANDATORY RECOVERY PROTOCOL:\n"
-                "1. STOP calling 'think'. STOP repeating the same approach.\n"
-                "2. If you need to create files, call str_replace_editor with command=\"create\" NOW.\n"
-                "3. If you need to run code, call execute_bash NOW.\n"
+                "1. STOP calling 'think'. STOP calling 'task_tracker' to reorganize tasks "
+                "you have already planned. STOP repeating the same approach.\n"
+                "2. You have been planning long enough. You MUST create files NOW.\n"
+                "3. Call str_replace_editor with command=\"create\" IMMEDIATELY to create your first file.\n"
                 "4. Do NOT describe what you will do — execute it immediately with a tool call.\n"
-                "5. If truly blocked, call escalate_to_human or uncertainty."
+                "5. If truly blocked on what to write, produce a minimal working skeleton first.\n"
+                "6. If you cannot proceed, call escalate_to_human or uncertainty."
             )
         )
         controller.event_stream.add_event(directive, EventSource.ENVIRONMENT)
@@ -142,8 +144,8 @@ class StepGuardService:
         state = getattr(controller, "state", None)
         if state and hasattr(state, "set_planning_directive"):
             state.set_planning_directive(
-                "STUCK RECOVERY: Your previous approach failed repeatedly. "
-                "You MUST change strategy. Review errors with error_patterns() "
-                "and update your plan with task_tracker(command='plan').",
+                "STUCK RECOVERY: You have been planning for too long without creating any files. "
+                "IMMEDIATELY start creating files with str_replace_editor. "
+                "Do NOT use task_tracker or think — use str_replace_editor(command='create') right now.",
                 source="StepGuardService",
             )

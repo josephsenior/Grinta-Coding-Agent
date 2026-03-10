@@ -74,7 +74,7 @@ class CircuitBreakerService:
         """Run circuit breaker check for current controller state."""
         if not self._circuit_breaker:
             return None
-        return self._circuit_breaker.check(self.controller.state)
+        return self._circuit_breaker.check()
 
     def record_error(self, error: Exception) -> None:
         """Record an error with the circuit breaker."""

@@ -113,6 +113,12 @@ def _handle_tool_based_action(
     if isinstance(action, _META_COGNITION_ACTION_TYPES):
         return _build_meta_cognition_message(action)
 
+    # Synthetic/injected actions (e.g. stale-read prevention) carry no LLM
+    # tool-call metadata.  They were handled transparently by the runtime and
+    # should not appear in the message history sent back to the LLM.
+    if getattr(action, "tool_call_metadata", None) is None:
+        return []
+
     tool_metadata = _require_tool_metadata(action)
     llm_response = _extract_llm_response(tool_metadata)
     if llm_response is None:

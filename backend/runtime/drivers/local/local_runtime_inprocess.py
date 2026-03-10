@@ -150,10 +150,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         logger.info("Creating ActionExecutor in-process...")
         if self._temp_workspace is None:
             self._setup_workspace_directory()
-        work_dir = self._temp_workspace
-        # Ensure workspace directory exists
-        if work_dir is None:
+        if self._temp_workspace is None:
             raise ValueError("Workspace directory must be set")
+        work_dir = self._temp_workspace
         os.makedirs(work_dir, exist_ok=True)
 
         self._executor = ActionExecutor(
@@ -200,11 +199,6 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                     prefix=f"FORGE_workspace_{self.sid}_"
                 )
             self.config.workspace_mount_path_in_runtime = self._temp_workspace
-            # NOTE: We intentionally do NOT call os.chdir() here.
-            # Mutating the process-global cwd is unsafe when multiple
-            # sessions or concurrent operations share the same process.
-            # Instead, the workspace path is passed to ActionExecutor's
-            # work_dir parameter and each command runs in that directory.
             logger.info("Using workspace: %s", self._temp_workspace)
             # Initialize git repository for workspace change tracking
             import subprocess

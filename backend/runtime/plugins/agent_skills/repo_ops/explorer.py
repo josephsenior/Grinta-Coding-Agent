@@ -192,7 +192,12 @@ def get_entity_contents(
             file_path = entity_name
             symbol_path = None
 
-        full_path = Path(workspace_root) / file_path.lstrip("/")
+        stripped = file_path.lstrip("/")
+        if stripped.startswith("workspace/") or stripped.startswith("workspace\\"):
+            stripped = stripped[len("workspace/"):]
+        elif stripped == "workspace":
+            stripped = "."
+        full_path = Path(workspace_root) / stripped
 
         if not full_path.exists():
             results[entity_name] = f"Error: File not found: {file_path}"

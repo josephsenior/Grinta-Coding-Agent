@@ -239,6 +239,13 @@ def _resolve_path(
                 raise PathValidationError("workspace_root required for relative paths", path)
             workspace = Path(workspace_root).resolve()
             normalized = posixpath.normpath(path.lstrip("/"))
+            # Strip the virtual /workspace prefix that the LLM uses in tool
+            # calls.  Without this, "/workspace/file.py" becomes a literal
+            # "workspace/" subdirectory inside the workspace root.
+            if normalized.startswith("workspace/"):
+                normalized = normalized[len("workspace/"):]
+            elif normalized == "workspace":
+                normalized = "."
             full_path = (workspace / normalized).resolve()
             try:
                 rel_parts = full_path.relative_to(workspace).parts

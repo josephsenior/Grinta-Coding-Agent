@@ -271,6 +271,23 @@ class Runtime(
             )
 
     @property
+    def workspace_root(self) -> Path:
+        """Absolute path to the active workspace directory.
+
+        Subclasses (e.g. LocalRuntimeInProcess) override this to expose their
+        internal workspace tracking attribute.  The base implementation falls
+        back to ``workspace_base`` when set, and ``Path.cwd()`` otherwise so
+        that every call-site can rely on a single, always-valid property.
+        """
+        if self.workspace_base:
+            return Path(self.workspace_base)
+        return Path.cwd()
+
+    @workspace_root.setter
+    def workspace_root(self, value: Path) -> None:
+        self.workspace_base = str(value)
+
+    @property
     def runtime_initialized(self) -> bool:
         """Check if runtime has completed initialization.
 
@@ -643,7 +660,19 @@ class Runtime(
 
         try:
             file_path = action.path
-            file_on_disk = Path(file_path)
+            # Normalize Unix-style absolute paths (e.g. /workspace/app.py) to
+            # workspace-relative so they resolve correctly on Windows, where
+            # PurePosixPath-style leading slashes confuse pathlib joins.
+            normalized = file_path.lstrip("/\\")
+            # Strip the virtual /workspace prefix the LLM uses in paths.
+            if normalized.startswith("workspace/") or normalized.startswith("workspace\\"):
+                normalized = normalized[len("workspace/"):]
+            elif normalized == "workspace":
+                normalized = "."
+            file_on_disk = Path(normalized)
+
+            if not file_on_disk.is_absolute():
+                file_on_disk = self.workspace_root / file_on_disk
 
             if not file_on_disk.is_file():
                 logger.error(

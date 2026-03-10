@@ -234,7 +234,7 @@ class Orchestrator(Agent):
         )
         self._last_llm_latency: float = 0.0
         self._reflection_interval: int = int(
-            getattr(self.config, "reflection_interval", 10)
+            getattr(self.config, "reflection_interval", 30)
         )
         self._steps_since_reflection: int = 0
         self._run_production_health_check()
@@ -703,13 +703,13 @@ class Orchestrator(Agent):
 
         recovery_think = AgentThinkAction(
             thought=(
-                "⚡ CONTEXT CONDENSED — mandatory recovery sequence complete (system-enforced). "
-                "The following context has been automatically restored:"
-                f"{restored_block}{wm_block}{semantic_block}{lessons_block}{task_tracker_block}"
+                "⚡ CONTEXT CONDENSED — recovery complete. "
+                "Restored context:"
+                f"{restored_block}{wm_block}{semantic_block}{lessons_block}{task_tracker_block}\n\n"
+                "Continue creating files immediately. Do NOT re-explore or call task_tracker."
             )
         )
         self.pending_actions.append(recovery_think)
-        self.pending_actions.append(build_recall_action("all"))
 
     def _maybe_inject_reflection(self, state: State | None = None) -> Action | None:
         """Inject a structured self-reflection think action every N steps.
@@ -730,11 +730,8 @@ class Orchestrator(Agent):
             thought=(
                 "🔍 SELF-REFLECTION CHECKPOINT — Session metrics:\n"
                 f"{data_block}\n\n"
-                "Based on these metrics, assess:\n"
-                "1. Am I making progress toward the original goal?\n"
-                "2. Should I change strategy (too many errors, repeated edits)?\n"
-                "3. Should I update the task tracker with current progress?\n"
-                "4. Is there a simpler path I'm overlooking?"
+                "Assess: Am I writing files or just exploring? "
+                "If no files created recently, start creating one NOW."
             )
         )
 

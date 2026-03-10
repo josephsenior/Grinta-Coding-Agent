@@ -173,10 +173,16 @@ class FileVerificationGuard:
 
         for action in actions:
             # Stale-read prevention: if this is a file edit and the file
-            # hasn't been read recently, inject a read before the edit
+            # hasn't been read recently, inject a read before the edit.
+            # Skip for "create" commands — the file doesn't exist yet so a
+            # pre-read would always fail and generate a spurious ErrorObservation.
             if self._is_file_operation(action):
+                is_create = getattr(action, "command", None) == "create" or (
+                    not getattr(action, "old_str", None)
+                    and getattr(action, "file_text", None) is not None
+                )
                 file_path = self._safe_file_path(action)
-                if file_path and self.is_stale_read(file_path, turn):
+                if file_path and not is_create and self.is_stale_read(file_path, turn):
                     read_action = self._create_stale_read_action(file_path)
                     if read_action:
                         enhanced_actions.append(read_action)
