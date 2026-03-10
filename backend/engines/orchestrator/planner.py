@@ -116,6 +116,7 @@ class OrchestratorPlanner:
         self._add_core_tools(tools, use_short_desc)
         self._add_browsing_tool(tools)
         self._add_editor_tools(tools, use_short_desc)
+        self._add_mcp_gateway_tool(tools)
 
         # Invalidate cached checked-tools when toolset is rebuilt
         self._checked_tools_cache = None
@@ -344,6 +345,18 @@ class OrchestratorPlanner:
             tools.append(
                 create_structure_editor_tool(use_short_description=use_short_tool_desc)
             )
+
+    def _add_mcp_gateway_tool(self, tools: list) -> None:
+        """Add the MCP gateway proxy tool when MCP is enabled.
+
+        The gateway replaces injecting 50+ individual MCP tool schemas.
+        Available MCP tool names are listed in the system prompt instead.
+        """
+        if getattr(self._config, "enable_mcp", True):
+            from backend.engines.orchestrator.tools.mcp_gateway import (
+                create_mcp_gateway_tool,
+            )
+            tools.append(create_mcp_gateway_tool())
 
     def record_tool_used(self, tool_name: str) -> None:
         """Record that a tool was used this session (for description tiers)."""

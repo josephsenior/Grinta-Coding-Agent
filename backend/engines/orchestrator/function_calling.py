@@ -123,6 +123,7 @@ from backend.engines.orchestrator.tools.meta_cognition import (
     ESCALATE_TOOL_NAME,
     PROPOSAL_TOOL_NAME,
 )
+from backend.engines.orchestrator.tools.mcp_gateway import MCP_GATEWAY_TOOL_NAME
 from backend.engines.common import (
     common_response_to_actions,
 )
@@ -854,6 +855,20 @@ def _handle_mcp_tool(
     return MCPAction(name=tool_call_name, arguments=normalized_args)
 
 
+def _handle_mcp_gateway_tool(arguments: dict[str, Any]) -> MCPAction:
+    """Handle the call_mcp_tool gateway — route to the real MCP tool."""
+    tool_name = arguments.get("tool_name", "")
+    if not tool_name:
+        raise FunctionCallValidationError(
+            'Missing required argument "tool_name" in call_mcp_tool'
+        )
+    inner_args = arguments.get("arguments", {})
+    if not isinstance(inner_args, Mapping):
+        inner_args = {}
+    logger.info("MCP gateway routing to tool: %s", tool_name)
+    return MCPAction(name=tool_name, arguments=dict(inner_args))
+
+
 def _validate_structure_editor_args(arguments: dict, tool_name: str) -> tuple[str, str]:
     """Validate required arguments for structure editor.
 
@@ -1214,6 +1229,8 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         CLARIFICATION_TOOL_NAME: _handle_clarification_tool,
         PROPOSAL_TOOL_NAME: _handle_proposal_tool,
         ESCALATE_TOOL_NAME: _handle_escalate_tool,
+        # MCP gateway
+        MCP_GATEWAY_TOOL_NAME: _handle_mcp_gateway_tool,
     }
 
 

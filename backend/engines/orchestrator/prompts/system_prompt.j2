@@ -292,23 +292,27 @@ When killing processes:
 - `{{ name }}`
 {% endif %}
 {% endfor %}
-Use these tools by calling them by name. They are provided by connected MCP servers.
+
+To call any of these tools, use the `call_mcp_tool` function:
+  call_mcp_tool(tool_name="<tool_name>", arguments={...})
+
+Example: call_mcp_tool(tool_name="create_issue", arguments={"title": "Bug fix", "body": "Details..."})
 {% else %}
 No external MCP tools are currently connected.
 {% endif %}
 
 **Quick Guide:**
-- Need browser interaction? → use `browser_use` MCP tools if available.
-- Have URL? → use `fetch` tool if available.
-- Need search? → use `duckduckgo` tool if available.
-- Need UI components/blocks? → use `magic` or `shadcn` tools if available.
-- Need up-to-date documentation/examples? → use `context7` if available.
-- Need quality/security/linting? → use `rigour` (agnostic quality gate).
-- Need GitHub operations? → use `github` MCP tools if available.
+- Need browser interaction? → use `call_mcp_tool` with `browser_use` tools if available.
+- Have URL? → use `call_mcp_tool` with `fetch` tool if available.
+- Need search? → use `call_mcp_tool` with `duckduckgo` tool if available.
+- Need UI components/blocks? → use `call_mcp_tool` with `magic` or `shadcn` tools if available.
+- Need up-to-date documentation/examples? → use `call_mcp_tool` with `context7` if available.
+- Need quality/security/linting? → use `call_mcp_tool` with `rigour` (agnostic quality gate).
+- Need GitHub operations? → use `call_mcp_tool` with `github` MCP tools if available.
 
 **Specific Tool Instructions:**
-- **Visual Debugging**: Use `verify_ui_change` to quickly capture screenshots after modifying UI components. Use 'browser_use' tool for deeper interactive debugging or complex flows.
-- **Quality Gates**: Use 'rigour' tool to check your code for quality and security issues before finishing a task.
+- **Visual Debugging**: Use `verify_ui_change` to quickly capture screenshots after modifying UI components. Use `call_mcp_tool` with 'browser_use' tool for deeper interactive debugging or complex flows.
+- **Quality Gates**: Use `call_mcp_tool` with 'rigour' tool to check your code for quality and security issues before finishing a task.
 </MCP_TOOLS>
 
 {% if config.enable_permissions %}

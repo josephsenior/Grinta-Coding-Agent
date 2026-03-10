@@ -235,7 +235,9 @@ class Agent(ABC):
 
     def _register_tool(self, tool_param: dict, tool_name: str) -> None:
         self.mcp_tools[tool_name] = tool_param
-        self.tools.append(tool_param)
+        # NOTE: MCP tools are NOT appended to self.tools.
+        # They are routed through the call_mcp_tool gateway instead.
+        # This keeps the LLM tool count low for model-agnostic behavior.
 
     def _log_tool_update_end(self) -> None:
         logger.info(
