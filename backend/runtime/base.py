@@ -698,7 +698,7 @@ class Runtime(
             if line_count is not None:
                 enhanced_content = (
                     f"{observation.content}\n\n"
-                    f"✅ VERIFICATION: File {file_path} confirmed to exist ({line_count} lines)"
+                    f"File written: {file_path} ({line_count} lines)"
                 )
                 return FileWriteObservation(content=enhanced_content, path=file_path)
 

@@ -19,7 +19,6 @@ class TelemetryService:
     def initialize_tool_pipeline(self) -> None:
         """Create the default tool invocation pipeline for the controller."""
         from backend.controller.file_state_tracker import FileStateMiddleware
-        from backend.controller.idempotency import IdempotencyMiddleware
         from backend.controller.pre_exec_diff import PreExecDiffMiddleware
         from backend.controller.rollback_middleware import RollbackMiddleware
         from backend.controller.tool_pipeline import (
@@ -59,7 +58,6 @@ class TelemetryService:
         middlewares = [
             SafetyValidatorMiddleware(controller),
             BlackboardMiddleware(controller),
-            IdempotencyMiddleware(),
             CircuitBreakerMiddleware(controller),
             CostQuotaMiddleware(controller),
             ContextWindowMiddleware(controller),

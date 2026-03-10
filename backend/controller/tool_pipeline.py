@@ -743,139 +743,22 @@ class ConflictDetectionMiddleware(ToolInvocationMiddleware):
         self._unverified_edits: dict[str, int] = {}
 
     async def verify(self, ctx: ToolInvocationContext) -> None:
-        """Block repeated edits without any read/verify in between."""
-        from backend.events.action import FileEditAction, FileWriteAction
-        from backend.events.event import EventSource
-        from backend.events.observation import ErrorObservation
-
-        action = ctx.action
-        if not isinstance(action, (FileEditAction, FileWriteAction)):
-            return
-
-        command = getattr(action, "command", None)
-        if command == "view":
-            return
-
-        path = getattr(action, "path", None)
-        if not path:
-            return
-
-        threshold = int(os.getenv("FORGE_CONFLICT_BLOCK_THRESHOLD", "2"))
-        prev_count = self._unverified_edits.get(path, 0)
-        if prev_count < threshold:
-            return
-
-        ctx.block("conflict_detection_repeated_unverified_edits")
-        ctx.metadata["handled"] = True
-        error_obs = ErrorObservation(
-            content=(
-                "ACTION BLOCKED: Repeated edits without verification were detected.\n"
-                f"File: {path}\n"
-                f"Unverified edit streak: {prev_count}\n"
-                "Read/verify the file state before applying more edits."
-            ),
-            error_id="CONFLICT_DETECTION_BLOCKED",
-        )
-        error_obs.cause = getattr(ctx.action, "id", None)
-        ctx.controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
-        ctx.controller._pending_action = None
+        """No-op: conflict blocking removed to prevent verification loops."""
+        return
 
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None
     ) -> None:
-        from backend.events.action import FileEditAction, FileReadAction, FileWriteAction
-        from backend.events.observation import ErrorObservation
-
-        action = ctx.action
-
-        # Track reads — reset unverified count for the file
-        if isinstance(action, FileReadAction):
-            path = getattr(action, "path", None)
-            if path:
-                self._unverified_edits.pop(path, None)
-            return
-
-        if not isinstance(action, (FileEditAction, FileWriteAction)):
-            return
-
-        # Skip view commands (they don't modify files)
-        command = getattr(action, "command", None)
-        if command == "view":
-            return
-
-        path = getattr(action, "path", None)
-        if not path:
-            return
-
-        prev_count = self._unverified_edits.get(path, 0)
-        self._unverified_edits[path] = prev_count + 1
-
-        if observation is None:
-            return
-
-        # Only warn after first repeat edit without a verified read in between
-        if prev_count >= 1 and not isinstance(observation, ErrorObservation):
-            content = getattr(observation, "content", "") or ""
-            observation.content = (
-                f"<CONFLICT_WARNING>\n"
-                f"You have edited '{path}' {prev_count + 1} times without reading it back.\n"
-                "Use verify_state or str_replace_editor(view) to confirm the current "
-                "file state before making further edits.\n"
-                "</CONFLICT_WARNING>\n\n"
-                + content
-            )
+        return  # No-op: conflict warnings removed to prevent verification loops
 
 
 class EditVerifyMiddleware(ToolInvocationMiddleware):
-    """Appends a verify-after-edit hint to file edit observations.
-
-    After a FileEditAction or FileWriteAction completes, this middleware
-    appends a short reminder telling the LLM to read the affected lines
-    to confirm the edit was applied correctly.  This prevents silent
-    drift where the agent assumes an edit succeeded without checking.
-
-    Selective: ``str_replace`` and ``insert`` commands already include a
-    diff-style snippet in their observation, so the hint is skipped for
-    those — requesting a redundant ``cat`` wastes a turn.
-    """
-
-    # Commands whose observations already contain enough verification context.
-    _SELF_VERIFYING_COMMANDS = frozenset({"str_replace", "insert", "undo_edit"})
+    """No-op: verify-after-edit hints removed to prevent verification loops."""
 
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None
     ) -> None:
-        if observation is None:
-            return
-        from backend.events.action import FileEditAction, FileWriteAction
-
-        action = ctx.action
-        if not isinstance(action, (FileEditAction, FileWriteAction)):
-            return
-
-        content = getattr(observation, "content", None)
-        if content is None or not isinstance(content, str):
-            return
-
-        # Only add hint for successful edits (no error markers)
-        from backend.events.observation import ErrorObservation
-        if isinstance(observation, ErrorObservation):
-            return
-
-        # Skip hint for commands that already show diff/context in output.
-        command = getattr(action, "command", None)
-        if command in self._SELF_VERIFYING_COMMANDS:
-            return
-
-        path = getattr(action, "path", "unknown")
-        observation.content = (
-            content
-            + "\n\n<VERIFY_HINT>"
-            + f"\nFile {path} was modified. Consider reading the affected "
-            + "lines to confirm the edit was applied correctly before "
-            + "moving on."
-            + "\n</VERIFY_HINT>"
-        )
+        return  # The editor tool already confirms success; extra hints cause loops
 
 
 def _get_syntax_check_cmd(path: str) -> list[str] | None:

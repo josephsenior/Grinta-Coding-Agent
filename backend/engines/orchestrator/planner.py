@@ -188,7 +188,7 @@ class OrchestratorPlanner:
         if getattr(self._config, "enable_apply_patch", True):
             tools.append(create_apply_patch_tool())
             tools.append(create_batch_edit_tool())
-        if getattr(self._config, "enable_task_tracker", True):
+        if getattr(self._config, "enable_task_tracker", False):
             tools.append(create_query_toolbox_tool())
             tools.append(create_task_tracker_tool())
         if getattr(self._config, "enable_search_code", True):
@@ -231,7 +231,7 @@ class OrchestratorPlanner:
             create_signal_progress_tool,
         )
 
-        if getattr(self._config, "enable_check_tool_status", True):
+        if getattr(self._config, "enable_check_tool_status", False):
             tools.append(create_check_tool_status_tool())
         if getattr(self._config, "enable_web_search", False):
             from backend.engines.orchestrator.tools.web_search import (
@@ -251,40 +251,40 @@ class OrchestratorPlanner:
         from backend.engines.orchestrator.tools.blackboard import create_blackboard_tool
         if getattr(self._config, "enable_blackboard", False):
             tools.append(create_blackboard_tool())
-        if getattr(self._config, "enable_rollback", True):
+        if getattr(self._config, "enable_rollback", False):
             tools.append(create_revert_to_safe_state_tool())
         self._add_lazy_import_tools(
             tools,
             [
                 (
                     "enable_workspace_status",
-                    True,
+                    False,
                     "workspace_status",
                     "create_workspace_status_tool",
                 ),
                 (
                     "enable_error_patterns",
-                    True,
+                    False,
                     "error_patterns",
                     "create_error_patterns_tool",
                 ),
-                ("enable_checkpoints", True, "checkpoint", "create_checkpoint_tool"),
-                ("enable_project_map", True, "project_map", "create_project_map_tool"),
+                ("enable_checkpoints", False, "checkpoint", "create_checkpoint_tool"),
+                ("enable_project_map", False, "project_map", "create_project_map_tool"),
                 (
                     "enable_session_diff",
-                    True,
+                    False,
                     "session_diff",
                     "create_session_diff_tool",
                 ),
                 (
                     "enable_working_memory",
-                    True,
+                    False,
                     "working_memory",
                     "create_working_memory_tool",
                 ),
                 (
                     "enable_verify_state",
-                    True,
+                    False,
                     "verify_state",
                     "create_verify_state_tool",
                 ),
@@ -308,7 +308,7 @@ class OrchestratorPlanner:
 
     def _add_meta_cognition_tools(self, tools: list) -> None:
         """Add uncertainty, clarification, escalate, proposal tools when meta-cognition is enabled."""
-        if getattr(self._config, "enable_meta_cognition", True):
+        if getattr(self._config, "enable_meta_cognition", False):
             from backend.engines.orchestrator.tools.meta_cognition import (
                 create_uncertainty_tool,
                 create_clarification_tool,

@@ -182,13 +182,12 @@ class CircuitBreaker:
                     reason=f"Stuck loop detected ({self.stuck_detection_count})",
                     action="switch_context",
                     recommendation=(
-                        "You are stuck in a loop. You are no longer allowed to use edit tools. "
-                        "You MUST use the escalate tool to ask the user for help, or the project_map tool "
-                        "to re-evaluate the architecture."
+                        "You are stuck in a loop. Stop repeating the same actions. "
+                        "Try a different approach, or call finish() if the task is done."
                     ),
                     system_message=(
-                        "SYSTEM INTERVENTION: You are stuck in a loop. Stop repeating the same actions. "
-                        "Switch context immediately: use escalate() or project_map()."
+                        "SYSTEM INTERVENTION: You are stuck in a loop. "
+                        "Try a different approach or call finish()."
                     ),
                 )
 

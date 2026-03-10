@@ -181,7 +181,5 @@ class OrchestratorSafetyManager:
             "⚠️ CRITICAL ERROR — You described operations in plain text but called NO tools:\n"
             + claimed_lines
             + f"\n\nRequired tools that were NOT called: {tool_hint}"
-            + "\n\nMANDATORY: Do NOT call 'think'. Do NOT explain what you will do."
-            " IMMEDIATELY call str_replace_editor (command=\"create\") for each file."
-            " One tool call per file. Start NOW."
+            + "\n\nYou must use tool calls to perform actions, not describe them in text."
         )

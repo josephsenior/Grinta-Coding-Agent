@@ -287,6 +287,23 @@ class ActionExecutor:
             action_type = action.action
             return await getattr(self, action_type)(action)
 
+    def _normalize_workspace_path(self, path: str) -> str:
+        """Translate /workspace/... virtual paths to the actual workspace directory.
+
+        On Windows, /workspace resolves to C:\\workspace which is a completely
+        different directory from the actual FORGE_workspace_<sid>_... temp folder.
+        This strips the /workspace prefix and returns an absolute path inside the
+        real workspace root.
+        """
+        import os as _os
+        norm = path.replace("\\", "/")
+        if norm == "/workspace":
+            return self._initial_cwd
+        if norm.startswith("/workspace/"):
+            rel = norm[len("/workspace/"):]
+            return _os.path.join(self._initial_cwd, rel)
+        return path
+
     async def run(
         self, action: CmdRunAction
     ) -> CmdOutputObservation | ErrorObservation | TerminalObservation:
@@ -298,6 +315,17 @@ class ActionExecutor:
         observation extras when relevant.
         """
         try:
+            # Replace /workspace virtual path with the real workspace directory.
+            # On Windows /workspace resolves to C:\workspace (wrong location).
+            if action.command and "/workspace" in action.command:
+                ws = self._initial_cwd.replace("\\", "/")
+                import re as _re
+                action.command = _re.sub(
+                    r"/workspace(?=/|$)",
+                    ws,
+                    action.command,
+                )
+
             if action.is_background:
                 return await self._run_background_cmd(action)
 
@@ -529,6 +557,9 @@ class ActionExecutor:
         if bash_session is None:
             return ErrorObservation("Default shell session not initialized")
 
+        # Translate /workspace/ virtual paths to the actual workspace directory.
+        action.path = self._normalize_workspace_path(action.path)
+
         # Check for binary files
         if is_binary(action.path):
             return ErrorObservation("ERROR_BINARY_FILE")
@@ -558,6 +589,9 @@ class ActionExecutor:
         bash_session = self.session_manager.get_session("default")
         if bash_session is None:
             return ErrorObservation("Default shell session not initialized")
+
+        # Translate /workspace/ virtual paths to the actual workspace directory.
+        action.path = self._normalize_workspace_path(action.path)
 
         working_dir = bash_session.cwd
         filepath = resolve_path(action.path, working_dir)
@@ -717,6 +751,8 @@ class ActionExecutor:
         bash_session = self.session_manager.get_session("default")
         if bash_session is None:
             return ErrorObservation("Default shell session not initialized")
+        # Translate /workspace/ virtual paths to the actual workspace directory.
+        action.path = self._normalize_workspace_path(action.path)
         working_dir = bash_session.cwd
         filepath = resolve_path(action.path, working_dir)
 

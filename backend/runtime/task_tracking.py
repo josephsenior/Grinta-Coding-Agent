@@ -75,10 +75,7 @@ class TaskTrackingMixin:
                 f"Failed to write task list to session directory {task_file_path}: {e!s}"
             )
 
-        msg = (
-            f"✅ Plan created with {n} tasks. "
-            "Now begin implementing: create the first code file immediately."
-        )
+        msg = f"✅ Plan created with {n} tasks. Now begin implementing the first task."
 
         return TaskTrackingObservation(
             content=msg,
@@ -104,8 +101,7 @@ class TaskTrackingMixin:
                 "\n\n⚠️ LOOP DETECTED: You have viewed your task list "
                 f"{view_count} times without making progress. "
                 "STOP calling task_tracker view. "
-                "Pick the first pending task, mark it in_progress with command=update, "
-                "then immediately create the file using write_file or str_replace_based_edit."
+                "Pick the first pending task and start working on it."
             )
             return TaskTrackingObservation(
                 content=content + intervention,

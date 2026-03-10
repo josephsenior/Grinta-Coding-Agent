@@ -18,7 +18,7 @@ class StepGuardService:
     """Ensures controller steps are safe w.r.t. circuit breaker and stuck detection."""
 
     _replan_attempts: int = 0
-    _MAX_REPLAN_ATTEMPTS: int = 2
+    _MAX_REPLAN_ATTEMPTS: int = 1
 
     def __init__(self, context: ControllerContext) -> None:
         self._context = context
@@ -128,14 +128,10 @@ class StepGuardService:
         directive = SystemMessageAction(
             content=(
                 "STUCK LOOP DETECTED — Your last several actions achieved no progress. "
-                "MANDATORY RECOVERY PROTOCOL:\n"
-                "1. STOP calling 'think'. STOP calling 'task_tracker' to reorganize tasks "
-                "you have already planned. STOP repeating the same approach.\n"
-                "2. You have been planning long enough. You MUST create files NOW.\n"
-                "3. Call str_replace_editor with command=\"create\" IMMEDIATELY to create your first file.\n"
-                "4. Do NOT describe what you will do — execute it immediately with a tool call.\n"
-                "5. If truly blocked on what to write, produce a minimal working skeleton first.\n"
-                "6. If you cannot proceed, call escalate_to_human or uncertainty."
+                "RECOVERY:\n"
+                "1. STOP repeating the same action. Try a DIFFERENT approach.\n"
+                "2. If the task is done, call finish() with a summary.\n"
+                "3. If you are blocked, state what is blocking you."
             )
         )
         controller.event_stream.add_event(directive, EventSource.ENVIRONMENT)
@@ -144,8 +140,6 @@ class StepGuardService:
         state = getattr(controller, "state", None)
         if state and hasattr(state, "set_planning_directive"):
             state.set_planning_directive(
-                "STUCK RECOVERY: You have been planning for too long without creating any files. "
-                "IMMEDIATELY start creating files with str_replace_editor. "
-                "Do NOT use task_tracker or think — use str_replace_editor(command='create') right now.",
+                "STUCK RECOVERY: Stop repeating the same action. Try something different or call finish().",
                 source="StepGuardService",
             )

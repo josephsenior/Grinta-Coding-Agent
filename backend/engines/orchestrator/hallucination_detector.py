@@ -162,15 +162,11 @@ class HallucinationDetector:
         )
         if exec_h:
             findings.append(exec_h)
-        claimed_paths = self._extract_claimed_paths(llm_response_text)
-        state_findings = self._check_state_consistency(
-            claimed_paths, exec_h is not None,
-            tools_called=tools_called, actions=actions,
-        )
-        existing = {f["claim"] for f in findings}
-        for f in state_findings:
-            if f["claim"] not in existing:
-                findings.append(f)
+        # State-based path checking disabled: _extract_claimed_paths matches
+        # ANY filename in the model's text (including planning/future tense
+        # like "I will create database.py"), creating false-positive CRITICAL
+        # ERROR messages that prime the model into verification loops.
+        # The text pattern detectors above (past-tense only) are sufficient.
         return findings
 
     def detect_text_hallucination(

@@ -19,7 +19,6 @@ class TestTelemetryService(unittest.TestCase):
         self.service = TelemetryService(self.mock_context)
 
     @patch("backend.controller.tool_pipeline.SafetyValidatorMiddleware")
-    @patch("backend.controller.idempotency.IdempotencyMiddleware")
     @patch("backend.controller.tool_pipeline.CircuitBreakerMiddleware")
     @patch("backend.controller.tool_pipeline.CostQuotaMiddleware")
     @patch("backend.controller.rollback_middleware.RollbackMiddleware")
@@ -36,7 +35,6 @@ class TestTelemetryService(unittest.TestCase):
         mock_rollback,
         mock_cost,
         mock_circuit,
-        mock_idempotency,
         mock_safety,
     ):
         """Test initialize_tool_pipeline creates default middleware stack."""
@@ -47,7 +45,6 @@ class TestTelemetryService(unittest.TestCase):
 
         # Check all default middlewares were created
         mock_safety.assert_called_once_with(self.mock_controller)
-        mock_idempotency.assert_called_once()
         mock_circuit.assert_called_once_with(self.mock_controller)
         mock_cost.assert_called_once_with(self.mock_controller)
         mock_rollback.assert_called_once()
@@ -61,7 +58,6 @@ class TestTelemetryService(unittest.TestCase):
 
     @patch("backend.controller.tool_pipeline.PlanningMiddleware")
     @patch("backend.controller.tool_pipeline.SafetyValidatorMiddleware")
-    @patch("backend.controller.idempotency.IdempotencyMiddleware")
     @patch("backend.controller.tool_pipeline.CircuitBreakerMiddleware")
     @patch("backend.controller.tool_pipeline.CostQuotaMiddleware")
     @patch("backend.controller.rollback_middleware.RollbackMiddleware")
@@ -78,7 +74,6 @@ class TestTelemetryService(unittest.TestCase):
         mock_rollback,
         mock_cost,
         mock_circuit,
-        mock_idempotency,
         mock_safety,
         mock_planning,
     ):
@@ -93,7 +88,6 @@ class TestTelemetryService(unittest.TestCase):
 
     @patch("backend.controller.tool_pipeline.ReflectionMiddleware")
     @patch("backend.controller.tool_pipeline.SafetyValidatorMiddleware")
-    @patch("backend.controller.idempotency.IdempotencyMiddleware")
     @patch("backend.controller.tool_pipeline.CircuitBreakerMiddleware")
     @patch("backend.controller.tool_pipeline.CostQuotaMiddleware")
     @patch("backend.controller.rollback_middleware.RollbackMiddleware")
@@ -110,7 +104,6 @@ class TestTelemetryService(unittest.TestCase):
         mock_rollback,
         mock_cost,
         mock_circuit,
-        mock_idempotency,
         mock_safety,
         mock_reflection,
     ):
@@ -124,7 +117,6 @@ class TestTelemetryService(unittest.TestCase):
         mock_reflection.assert_called_once_with(self.mock_controller)
 
     @patch("backend.controller.tool_pipeline.SafetyValidatorMiddleware")
-    @patch("backend.controller.idempotency.IdempotencyMiddleware")
     @patch("backend.controller.tool_pipeline.CircuitBreakerMiddleware")
     @patch("backend.controller.tool_pipeline.CostQuotaMiddleware")
     @patch("backend.controller.rollback_middleware.RollbackMiddleware")
@@ -141,7 +133,6 @@ class TestTelemetryService(unittest.TestCase):
         mock_rollback,
         mock_cost,
         mock_circuit,
-        mock_idempotency,
         mock_safety,
     ):
         """Test initialize_tool_pipeline handles None config."""
