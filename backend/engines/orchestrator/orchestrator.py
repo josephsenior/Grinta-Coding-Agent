@@ -224,7 +224,7 @@ class Orchestrator(Agent):
             llm=self.llm,
             safety_manager=self.safety_manager,
             planner=self.planner,
-            mcp_tool_name_provider=lambda: self.mcp_tools.keys(),
+            mcp_tool_name_provider=lambda: self.mcp_tools.keys(),  # pylint: disable=unnecessary-lambda
         )
 
         # Production health checks
@@ -497,12 +497,12 @@ class Orchestrator(Agent):
         self.llm = llm
         if hasattr(self, "planner") and hasattr(self.planner, "_llm"):
             try:
-                self.planner._llm = llm  # type: ignore[attr-defined]
+                self.planner._llm = llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
             except Exception:
                 pass
         if hasattr(self, "executor") and hasattr(self.executor, "_llm"):
             try:
-                self.executor._llm = llm  # type: ignore[attr-defined]
+                self.executor._llm = llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
             except Exception:
                 pass
 
@@ -562,7 +562,7 @@ class Orchestrator(Agent):
             and getattr(self.executor, "_llm", None) is not self.llm
         ):
             try:  # pragma: no cover - defensive assignment
-                self.executor._llm = self.llm  # type: ignore[attr-defined]
+                self.executor._llm = self.llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
             except Exception:
                 pass
 
@@ -599,7 +599,6 @@ class Orchestrator(Agent):
         them into a single command that processes all requested operations,
         cutting round-trips.
         """
-        import os
         from backend.events.action.commands import CmdRunAction
 
         batch = self._collect_file_read_batch()
@@ -647,9 +646,8 @@ class Orchestrator(Agent):
     def _build_lessons_block(self) -> str:
         """Load lessons.md content for recovery. Returns empty on failure."""
         try:
-            import os as _os
             lessons_path = "/memories/repo/lessons.md"
-            if not _os.path.exists(lessons_path):
+            if not os.path.exists(lessons_path):
                 return ""
             with open(lessons_path, encoding="utf-8") as _f:
                 content = _f.read(2000)
@@ -677,14 +675,25 @@ class Orchestrator(Agent):
             return ""
 
     def _queue_post_condensation_recovery(self, task_text: str = "") -> None:
-        """No-op: post-condensation recovery injection is disabled.
+        """Queue a brief think action after condensation to break the re-condensation loop.
 
-        The LLMSummarizingCondenser already produces a summary that preserves
-        sufficient context. System-injected recovery thinks were wasting
-        2+ events per condensation cycle (think + observation) without
-        improving agent productivity.
+        The agent_controller drain loop calls astep() immediately after dispatching
+        a CondensationAction. The event-delivery pipeline (background thread →
+        ThreadPoolExecutor → call_soon_threadsafe → ensure_future) needs at least
+        2 event-loop ticks before state.history reflects the CondensationAction.
+
+        With only asyncio.sleep(0) (1 tick) in the drain loop, the next astep()
+        call sees stale state, condense_history() concludes condensation is still
+        needed, and returns another CondensationAction — an infinite loop.
+
+        Queuing an AgentThinkAction here ensures _consume_pending_action() returns
+        it on the very next astep() call, skipping condense_history() entirely.
+        By the time the ThinkAction's observation triggers the following step,
+        state.history already contains the original CondensationAction.
         """
-        pass
+        self.pending_actions.append(
+            AgentThinkAction(thought="Memory condensed. Resuming task.")
+        )
 
     def _maybe_inject_reflection(self, state: State | None = None) -> Action | None:
         """Disabled: reflection injection is no longer used.
@@ -707,7 +716,7 @@ class Orchestrator(Agent):
         parts.extend(metrics_parts)
 
         files_part = _format_reflection_modified_files(
-            list(self.anti_hallucination._file_modified_turns.keys())
+            list(self.anti_hallucination._file_modified_turns.keys())  # pylint: disable=protected-access
         )
         if files_part:
             parts.append(files_part)
@@ -746,7 +755,7 @@ class Orchestrator(Agent):
     def response_to_actions(self, response) -> list[Action]:
         """Convert an LLM response into executable actions."""
         return orchestrator_function_calling.response_to_actions(
-            response, 
+            response,
             mcp_tool_names=list(self.mcp_tools.keys()),
             mcp_tools=self.mcp_tools
         )

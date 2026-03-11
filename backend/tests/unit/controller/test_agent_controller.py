@@ -1,4 +1,5 @@
 """Tests for AgentController — the main agent orchestration controller."""
+# pylint: disable=protected-access,too-many-lines
 
 import asyncio
 import unittest
@@ -1221,22 +1222,22 @@ class TestStepDispatch(unittest.TestCase):
         with patch.object(self.ctrl, "pending_action_service", None), \
              patch.object(self.ctrl, "action_service", None):
 
-             # Setter
-             act = MagicMock()
-             self.ctrl._pending_action = act
-             # Check internal attr
-             self.assertEqual(getattr(self.ctrl, "_pending_action_val", None), None)
-             # Wait, where does it store it if no service?
-             # Ah, looking at code:
-             # service = getattr(self, "action_service", None)
-             # if service: service.set_pending_action(action)
-             # return None !! It doesn't store it in fallback! LOL.
-             # So we just test it doesn't crash.
-             self.ctrl._pending_action = act
+            # Setter
+            act = MagicMock()
+            self.ctrl._pending_action = act
+            # Check internal attr
+            self.assertEqual(getattr(self.ctrl, "_pending_action_val", None), None)
+            # Wait, where does it store it if no service?
+            # Ah, looking at code:
+            # service = getattr(self, "action_service", None)
+            # if service: service.set_pending_action(action)
+            # return None !! It doesn't store it in fallback! LOL.
+            # So we just test it doesn't crash.
+            self.ctrl._pending_action = act
 
-             # Getter
-             val = self.ctrl._pending_action
-             self.assertIsNone(val)
+            # Getter
+            val = self.ctrl._pending_action
+            self.assertIsNone(val)
 
     def test_first_user_message_with_list(self):
         """Line 678 coverage."""

@@ -14,7 +14,7 @@ from typing import (
 
 from backend.core.errors import ModelProviderError
 from backend.core.logger import forge_logger as logger
-from backend.engines.orchestrator import function_calling as _function_calling_module  # noqa: F401 - ensures module is in sys.modules for the proxy
+from backend.engines.orchestrator import function_calling as _function_calling_module  # noqa: F401
 from backend.engines.orchestrator.streaming_checkpoint import StreamingCheckpoint
 
 if TYPE_CHECKING:
@@ -195,11 +195,11 @@ class OrchestratorExecutor:
 
         content_accumulate = ""
         tool_calls_dict = {}
-        
+
         try:
             logger.info("OrchestratorExecutor.async_execute: calling LLM.astream")
             stream_iter = self._llm.astream(**call_params)
-            
+
             async def _consume_stream():
                 nonlocal content_accumulate
                 async for chunk in stream_iter:
@@ -207,7 +207,7 @@ class OrchestratorExecutor:
                     if not choices:
                         continue
                     delta = choices[0].get("delta", {})
-                    
+
                     if "content" in delta and delta["content"]:
                         text_chunk = delta["content"]
                         content_accumulate += text_chunk
@@ -219,7 +219,7 @@ class OrchestratorExecutor:
                             )
                             ev.source = EventSource.AGENT
                             event_stream.add_event(ev, EventSource.AGENT)
-                            
+
                     if "tool_calls" in delta and delta["tool_calls"]:
                         for tc_chunk in delta["tool_calls"]:
                             idx = tc_chunk.get("index", 0)
@@ -229,7 +229,7 @@ class OrchestratorExecutor:
                                     "type": "function",
                                     "function": {"name": "", "arguments": ""}
                                 }
-                            
+
                             fn = tc_chunk.get("function", {})
                             if fn.get("name"):
                                 tool_calls_dict[idx]["function"]["name"] += fn["name"]
@@ -239,17 +239,19 @@ class OrchestratorExecutor:
 
             consume_task = loop.create_task(_consume_stream())
             await asyncio.wait_for(consume_task, timeout=timeout_seconds)
-            
+
             # finalize streams
             if event_stream and content_accumulate:
                 ev = StreamingChunkAction(chunk="", accumulated=content_accumulate, is_final=True)
                 ev.source = EventSource.AGENT
                 event_stream.add_event(ev, EventSource.AGENT)
 
-            tool_calls_list: list[dict[str, Any]] | None = [tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())]
+            tool_calls_list: list[dict[str, Any]] | None = [
+                tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())
+            ]
             if not tool_calls_list:
                 tool_calls_list = None
-                
+
             model_name = getattr(getattr(self._llm, "config", None), "model", "unknown")
             response = LLMResponse(
                 content=content_accumulate,
@@ -300,7 +302,7 @@ class OrchestratorExecutor:
         # Keep event volume bounded. UI-side coalescing exists, but we still
         # avoid emitting thousands of tiny events for long responses.
         chunk_size = 80
-        
+
         # Stream text response if any
         if text:
             accumulated = ""
@@ -336,7 +338,7 @@ class OrchestratorExecutor:
 
         assistant_msg = extract_assistant_message(response)
         tool_calls = getattr(assistant_msg, "tool_calls", None)
-        
+
         if not tool_calls:
             return
 
@@ -430,4 +432,3 @@ class OrchestratorExecutor:
                 return text
         return ""
 
-    

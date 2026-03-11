@@ -343,8 +343,6 @@ class Runtime(
         self._run_cleanup_synchronously(loop, created)
 
     def _resolve_event_loop(self) -> tuple[asyncio.AbstractEventLoop | None, bool]:
-        import asyncio
-
         try:
             loop = asyncio.get_running_loop()
             return loop, False
@@ -361,8 +359,6 @@ class Runtime(
     def _run_cleanup_synchronously(
         self, loop: asyncio.AbstractEventLoop | None, created: bool
     ) -> None:
-        import asyncio
-
         if loop is None:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -375,8 +371,6 @@ class Runtime(
     def _close_loop_if_needed(
         self, loop: asyncio.AbstractEventLoop, created: bool
     ) -> None:
-        import asyncio
-
         if not created:
             return
         try:

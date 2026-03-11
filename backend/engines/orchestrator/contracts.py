@@ -124,14 +124,14 @@ class MemoryManagerProtocol(Protocol):
 
     def condense_history(self, state: State) -> CondensedHistoryResult:
         """Return condensed events and an optional pending action."""
-        raise NotImplementedError
+        ...
 
     def get_initial_user_message(
         self,
         events: list[Event],
     ) -> MessageAction:
         """Locate the first user message from the event history."""
-        raise NotImplementedError
+        ...
 
     def build_messages(
         self,
@@ -140,4 +140,4 @@ class MemoryManagerProtocol(Protocol):
         llm_config: Any,
     ) -> list[Message]:
         """Convert condensed events into an LLM-ready message list."""
-        raise NotImplementedError
+        ...
