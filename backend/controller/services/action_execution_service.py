@@ -69,30 +69,40 @@ class ActionExecutionService:
                             "llm_step_timeout_seconds",
                             float(_os.getenv("FORGE_LLM_STEP_TIMEOUT_SECONDS", "180")),
                         )
-                        try:
-                            action = await _asyncio.wait_for(
-                                astep(self._context.state),
-                                timeout=timeout,
-                            )
-                        except _asyncio.TimeoutError as exc:
-                            model_name = None
+                        # Retry once on timeout before propagating
+                        for _timeout_attempt in range(2):
                             try:
-                                llm = getattr(agent, "llm", None)
-                                model_name = getattr(
-                                    getattr(llm, "config", None), "model", None
+                                action = await _asyncio.wait_for(
+                                    astep(self._context.state),
+                                    timeout=timeout,
                                 )
-                            except Exception:
-                                pass
-                            logger.error(
-                                "ActionExecutionService.get_next_action: astep timed out "
-                                "after %s seconds for model=%s",
-                                timeout,
-                                model_name,
-                            )
-                            raise Timeout(
-                                f"LLM step timed out after {timeout} seconds",
-                                model=model_name,
-                            ) from exc
+                                break  # success
+                            except _asyncio.TimeoutError as exc:
+                                if _timeout_attempt == 0:
+                                    logger.warning(
+                                        "ActionExecutionService.get_next_action: "
+                                        "astep timed out after %s seconds, retrying once",
+                                        timeout,
+                                    )
+                                    continue
+                                model_name = None
+                                try:
+                                    llm = getattr(agent, "llm", None)
+                                    model_name = getattr(
+                                        getattr(llm, "config", None), "model", None
+                                    )
+                                except Exception:
+                                    pass
+                                logger.error(
+                                    "ActionExecutionService.get_next_action: astep timed out "
+                                    "after %s seconds for model=%s (after retry)",
+                                    timeout,
+                                    model_name,
+                                )
+                                raise Timeout(
+                                    f"LLM step timed out after {timeout} seconds",
+                                    model=model_name,
+                                ) from exc
                     else:
                         action = agent.step(self._context.state)
                 action.source = EventSource.AGENT

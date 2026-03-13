@@ -126,11 +126,14 @@ def _get_token_usage_pct(state: State) -> float:
     metrics = getattr(state, "metrics", None)
     if not metrics:
         return 0.0
-    atu = getattr(metrics, "accumulated_token_usage", None)
-    if not atu:
+    # Use last turn's prompt_tokens (= actual current context size) rather
+    # than accumulated totals which sum every turn and quickly exceed 1.0.
+    token_usages = getattr(metrics, "token_usages", None)
+    if not token_usages:
         return 0.0
-    prompt_tok = getattr(atu, "prompt_tokens", 0)
-    ctx_window = getattr(atu, "context_window", 0)
+    last = token_usages[-1]
+    prompt_tok = getattr(last, "prompt_tokens", 0)
+    ctx_window = getattr(last, "context_window", 0)
     if not ctx_window:
         return 0.0
     try:

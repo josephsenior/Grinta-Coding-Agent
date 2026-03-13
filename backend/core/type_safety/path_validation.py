@@ -10,6 +10,7 @@ Provides production-grade path validation that:
 from __future__ import annotations
 
 import posixpath
+import re
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -18,7 +19,9 @@ from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
 
 # Security constants
 DANGEROUS_CHARS = ["<", ">", "|", "&", ";", "`", "$", "(", ")", "\n", "\r", "\x00"]
-PATH_TRAVERSAL_PATTERNS = ["..", "../", "..\\", "..%2F", "..%5C"]
+PATH_TRAVERSAL_PATTERNS = ["../", "..\\", "..%2F", "..%5C"]
+# Regex to match ".." as a standalone path segment (not inside brackets like [...nextauth])
+_DOTDOT_SEGMENT_RE = re.compile(r'(^|/)\.\.(/|$)')
 
 
 class PathValidationError(Exception):
@@ -226,6 +229,10 @@ def _validate_path_string(path: str) -> str:
     for pattern in PATH_TRAVERSAL_PATTERNS:
         if pattern in normalized_input:
             raise PathValidationError(f"Path traversal detected: {pattern}", path)
+    # Check for ".." as a standalone path segment (avoids false positives on
+    # bracket patterns like Next.js catch-all routes:  [...nextauth])
+    if _DOTDOT_SEGMENT_RE.search(normalized_input):
+        raise PathValidationError("Path traversal detected: ..", path)
     return path
 
 

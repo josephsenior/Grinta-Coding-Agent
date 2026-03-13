@@ -17,6 +17,7 @@ from backend.core.config.security_config import SecurityConfig
 from backend.core.exceptions import AgentRuntimeDisconnectedError
 from backend.core.logger import forge_logger as logger
 from backend.events.action import (
+    Action,
     ActionSecurityRisk,
     CmdRunAction,
     FileEditAction,
@@ -228,6 +229,105 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             logger.warning("Security analysis failed: %s", e)
 
         return await self._executor.run_action(action)
+
+    def run_action(self, action: Action) -> Observation:
+        """Run an action and denormalize workspace paths in the observation.
+
+        Calls the base-class run_action (which includes post-action verification)
+        then replaces the real temp-workspace path with /workspace so the LLM
+        sees consistent virtual paths.
+        """
+        obs = super().run_action(action)
+        return self._denormalize_observation(obs)
+
+    def _denormalize_observation(self, obs: Observation) -> Observation:
+        """Replace filesystem workspace path with /workspace in observation fields.
+
+        Also strips ANSI escape codes from terminal output.
+        The ``message`` attribute on most Observation subclasses is a read-only
+        @property derived from ``path`` or ``command``, so we denormalize those
+        source fields instead.
+
+        Handles terminal output line-wrapping: long paths in formatted output
+        may have newlines inserted in the middle (common with PowerShell on
+        Windows, but can happen on any OS with narrow terminals).
+        """
+        import re
+
+        ws = self._temp_workspace
+        if not ws:
+            return obs
+        ws_fwd = ws.replace("\\", "/")
+        ws_back = ws.replace("/", "\\")
+        # Double-backslash variant produced by shell_utils / metadata serialization.
+        ws_dbl = ws_back.replace("\\", "\\\\")
+
+        def _replace(val: str) -> str:
+            # Strip ANSI escape codes from terminal output.
+            val = re.sub(r"\x1b\[[0-9;]*m", "", val)
+            # Un-wrap lines that split the temp path across terminal width.
+            # Terminals can wrap at ANY column, inserting \n (and sometimes
+            # leading whitespace on the continuation).  Join consecutive
+            # lines when the whitespace-stripped join contains the path.
+            # Paths may span 3+ lines in narrow terminals, so we greedily
+            # extend the join window until the full path is found.
+            if "FORGE_workspace" in val:
+                lines = val.split("\n")
+                i = 0
+                while i < len(lines) - 1:
+                    # Try joining 2, 3, ... consecutive lines.
+                    merged = False
+                    for span in range(2, min(len(lines) - i + 1, 8)):
+                        joined = lines[i] + "".join(
+                            l.lstrip() for l in lines[i + 1 : i + span]
+                        )
+                        if ws_back in joined or ws_fwd in joined or ws_dbl in joined:
+                            lines[i] = joined
+                            del lines[i + 1 : i + span]
+                            merged = True
+                            break
+                    if not merged:
+                        i += 1
+                val = "\n".join(lines)
+            # Replace double-backslash variant first (longer match).
+            val = val.replace(ws_dbl, "/workspace")
+            # Replace both slash variants of the temp path.
+            val = val.replace(ws_back, "/workspace")
+            val = val.replace(ws_fwd, "/workspace")
+            # Last resort: catch paths containing FORGE_workspace that
+            # weren't matched above (e.g. truncated/wrapped by terminal).
+            # Matches both Windows (C:\...\FORGE_workspace...) and
+            # Unix (/tmp/FORGE_workspace...) paths.
+            if "FORGE_workspace" in val:
+                val = re.sub(
+                    r"(?:[A-Za-z]:[/\\]|/)\S*FORGE_workspace\S*",
+                    "/workspace",
+                    val,
+                )
+            # Fix mixed-slash leftovers: /workspace\foo → /workspace/foo
+            val = val.replace("/workspace\\", "/workspace/")
+            return val
+
+        # Denormalize the underlying data fields — NOT the message @property.
+        for attr in ("content", "path", "command"):
+            val = getattr(obs, attr, None)
+            if not isinstance(val, str):
+                continue
+            try:
+                setattr(obs, attr, _replace(val))
+            except (AttributeError, TypeError):
+                pass
+
+        # Also denormalize metadata.working_dir on CmdOutputObservation —
+        # to_agent_observation() appends "[Current working directory: ...]"
+        # to the text sent to the LLM.
+        md = getattr(obs, "metadata", None)
+        if md is not None:
+            wd = getattr(md, "working_dir", None)
+            if isinstance(wd, str) and wd:
+                md.working_dir = _replace(wd)
+
+        return obs
 
     def hard_kill(self) -> None:
         """Best-effort immediate termination of processes started by this runtime."""

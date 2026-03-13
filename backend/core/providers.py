@@ -65,6 +65,7 @@ PROVIDER_PREFIX_PATTERNS = {
     "anthropic": ["anthropic/", "claude-"],
     "google": ["google/", "gemini/"],
     "xai": ["xai/", "grok-"],
+    "openrouter": ["openrouter/"],
 }
 
 PROVIDER_KEYWORD_PATTERNS = {
@@ -163,6 +164,27 @@ PROVIDER_CONFIGURATIONS: dict[str, dict[str, Any]] = {
         },
         "forbidden_params": {"custom_llm_provider"},
         "api_key_prefixes": ["xai-"],
+        "api_key_min_length": 20,
+        "handles_own_routing": False,
+        "requires_custom_llm_provider": False,
+    },
+    "openrouter": {
+        "name": "openrouter",
+        "env_var": "OPENROUTER_API_KEY",
+        "requires_protocol": True,
+        "supports_streaming": True,
+        "required_params": {"api_key", "model"},
+        "optional_params": {
+            "base_url",
+            "timeout",
+            "temperature",
+            "max_tokens",
+            "top_p",
+            "seed",
+            "drop_params",
+        },
+        "forbidden_params": {"custom_llm_provider"},
+        "api_key_prefixes": ["sk-or-"],
         "api_key_min_length": 20,
         "handles_own_routing": False,
         "requires_custom_llm_provider": False,

@@ -349,7 +349,6 @@ Original user request: {original_request}
 Please RETRY with ACTUAL tool execution:
 1. Call the required tool (e.g., edit_file, execute_bash)
 2. Wait for the observation/result
-3. Verify the result with a second tool call
-4. Report the ACTUAL verification output
+3. Proceed to the next step immediately
 
 Do this NOW."""

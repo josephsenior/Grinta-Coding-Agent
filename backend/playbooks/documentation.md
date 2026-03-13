@@ -85,12 +85,14 @@ project-name run "do something"
 ## What to Document vs. What to Skip
 
 **Document:**
+
 - Public API and non-obvious parameters
 - Why a non-obvious decision was made (`# Using X instead of Y because Z`)
 - Module/class level overview: what it is, what it is NOT
 - Configuration options and their defaults
 
 **Skip:**
+
 - What the code obviously does (`i += 1  # increment i`)
 - Redundant type restatement (`param (str): a string`)
 - Auto-generated files

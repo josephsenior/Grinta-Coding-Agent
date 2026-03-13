@@ -285,15 +285,26 @@ class ActionExecutor:
         """Execute any action through action execution server."""
         async with self.lock:
             action_type = action.action
-            return await getattr(self, action_type)(action)
+            obs = await getattr(self, action_type)(action)
+
+        # Replace the real workspace temp path with /workspace in all
+        # observation text so the LLM's perspective stays consistent.
+        if hasattr(obs, "content") and isinstance(obs.content, str):
+            obs.content = self._denormalize_obs_text(obs.content)
+        if hasattr(obs, "path") and isinstance(obs.path, str):
+            obs.path = self._denormalize_obs_text(obs.path)
+        if hasattr(obs, "message") and isinstance(obs.message, str):
+            obs.message = self._denormalize_obs_text(obs.message)
+        return obs
 
     def _normalize_workspace_path(self, path: str) -> str:
         """Translate /workspace/... virtual paths to the actual workspace directory.
 
-        On Windows, /workspace resolves to C:\\workspace which is a completely
-        different directory from the actual FORGE_workspace_<sid>_... temp folder.
-        This strips the /workspace prefix and returns an absolute path inside the
-        real workspace root.
+        When running outside a container the real workspace is a temp directory
+        (e.g. /tmp/FORGE_workspace_<sid>_... on Linux/macOS or under %%TEMP%%
+        on Windows).  The LLM always uses the /workspace virtual prefix, so
+        this method strips it and returns the corresponding absolute path
+        inside the real workspace root.
         """
         import os as _os
         norm = path.replace("\\", "/")
@@ -303,6 +314,37 @@ class ActionExecutor:
             rel = norm[len("/workspace/"):]
             return _os.path.join(self._initial_cwd, rel)
         return path
+
+    def _denormalize_obs_text(self, text: str) -> str:
+        """Replace the real workspace temp path with /workspace in observation text.
+
+        This keeps the LLM's perspective consistent: it always sees /workspace
+        paths regardless of the underlying temp directory location.
+        Without this, the LLM sees path mismatches (it sends /workspace/foo but
+        gets back the real FORGE_workspace temp path) and loops trying to
+        reconcile them.
+
+        Also strips ANSI color codes so terminal output is clean for the LLM.
+        """
+        if not text:
+            return text
+        # Strip ANSI escape codes from PowerShell / terminal output.
+        import re as _re
+        text = _re.sub(r"\x1b\[[0-9;]*m", "", text)
+        if not self._initial_cwd:
+            return text
+        # Replace both forward-slash and backslash variants of the temp path.
+        ws = self._initial_cwd.replace("\\", "/")
+        ws_back = self._initial_cwd.replace("/", "\\")
+        text = text.replace(ws_back, "/workspace")
+        text = text.replace(ws, "/workspace")
+        # Also replace any mixed-slash variant: normalize then replace.
+        text = _re.sub(
+            _re.escape(self._initial_cwd).replace("\\\\", r"[/\\]"),
+            "/workspace",
+            text,
+        )
+        return text
 
     async def run(
         self, action: CmdRunAction
@@ -316,7 +358,7 @@ class ActionExecutor:
         """
         try:
             # Replace /workspace virtual path with the real workspace directory.
-            # On Windows /workspace resolves to C:\workspace (wrong location).
+            # Outside containers /workspace doesn't point at the temp workspace.
             if action.command and "/workspace" in action.command:
                 ws = self._initial_cwd.replace("\\", "/")
                 import re as _re
@@ -324,6 +366,14 @@ class ActionExecutor:
                     r"/workspace(?=/|$)",
                     ws,
                     action.command,
+                )
+
+            # On Windows, python3 is not on PATH — only python exists.
+            import sys as _sys
+            if _sys.platform == "win32" and action.command:
+                import re as _re
+                action.command = _re.sub(
+                    r"\bpython3\b", "python", action.command
                 )
 
             if action.is_background:
@@ -640,6 +690,8 @@ class ActionExecutor:
             insert_line=action.insert_line,
             enable_linting=enable_lint,
         )
+        if result_str.startswith("ERROR:"):
+            return ErrorObservation(result_str)
         max_chars = get_max_edit_observation_chars()
         result_str = truncate_large_text(result_str, max_chars, label="edit")
         # P1-B: Append a short unified diff to the observation so the LLM can

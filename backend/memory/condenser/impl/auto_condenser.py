@@ -1,0 +1,72 @@
+"""Condenser that automatically selects the best strategy for the current session."""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.core.config.condenser_config import AutoCondenserConfig
+    from backend.llm.llm_registry import LLMRegistry
+
+from backend.memory.condenser.condenser import Condensation, Condenser
+from backend.memory.condenser.impl.auto_selector import select_condenser_config
+from backend.memory.view import View
+
+logger = logging.getLogger(__name__)
+
+
+class AutoCondenser(Condenser):
+    """Analyses the event stream and delegates to the most appropriate condenser.
+
+    On each ``condense()`` call the auto-selector inspects the current events
+    and picks a strategy (noop, observation_masking, structured_summary, etc.).
+    A delegate condenser is then instantiated from the selected config and the
+    actual condensation is forwarded to it.
+    """
+
+    def __init__(
+        self,
+        llm_config_name: str | None,
+        llm_registry: LLMRegistry,
+    ) -> None:
+        super().__init__()
+        self._llm_config_name = llm_config_name
+        self._llm_registry = llm_registry
+
+    def condense(self, view: View) -> View | Condensation:
+        """Select the best condenser for the current event stream and delegate."""
+        events = list(view.events)
+        config = select_condenser_config(
+            events,
+            llm_config_name=self._llm_config_name,
+        )
+        logger.info(
+            "AutoCondenser selected strategy: %s for %d events",
+            config.type,
+            len(events),
+        )
+        delegate = Condenser.from_config(config, self._llm_registry)
+        return delegate.condense(view)
+
+    @classmethod
+    def from_config(
+        cls, config: AutoCondenserConfig, llm_registry: LLMRegistry
+    ) -> AutoCondenser:
+        llm_config_name: str | None = None
+        if config.llm_config is not None:
+            llm_config_name = (
+                config.llm_config
+                if isinstance(config.llm_config, str)
+                else config.llm_config.model
+            )
+        return cls(llm_config_name=llm_config_name, llm_registry=llm_registry)
+
+
+def _register_config():
+    from backend.core.config.condenser_config import AutoCondenserConfig
+
+    AutoCondenser.register_config(AutoCondenserConfig)
+
+
+_register_config()

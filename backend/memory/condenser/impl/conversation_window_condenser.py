@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from backend.core.config.condenser_config import ConversationWindowCondenserConfig
 from backend.core.logger import forge_logger as logger
 from backend.events.action.agent import CondensationAction, RecallAction
+from backend.events.action.files import FileEditAction, FileWriteAction
 from backend.events.action.message import MessageAction, SystemMessageAction
 from backend.events.event import EventSource
 from backend.events.observation import Observation
@@ -21,9 +22,10 @@ if TYPE_CHECKING:
 class ConversationWindowCondenser(RollingCondenser):
     """Condenser that trims conversation history while preserving critical first events."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_events: int = 100) -> None:
         """Initialize the rolling condenser base state."""
         super().__init__()
+        self._max_events = max_events
 
     def condense(self, view: View) -> View | Condensation:
         """Compact, then condense if thresholds are exceeded."""
@@ -137,16 +139,42 @@ class ConversationWindowCondenser(RollingCondenser):
         essential_events: list[int],
         first_valid_event_index: int,
     ) -> set[int]:
-        """Build the set of event IDs to keep."""
+        """Build the set of event IDs to keep.
+
+        In addition to essential + recent events, file write/edit actions and
+        their paired observations are preserved so the agent retains awareness
+        of every file it has created or modified.
+        """
         events_to_keep: set[int] = set(essential_events)
 
         for i in range(first_valid_event_index, len(events)):
             events_to_keep.add(events[i].id)
 
+        # Importance-weighted: preserve file action events that would otherwise
+        # be forgotten, plus their paired observations.
+        file_action_ids: set[int] = set()
+        for ev in events:
+            if ev.id not in events_to_keep and isinstance(
+                ev, (FileEditAction, FileWriteAction)
+            ):
+                events_to_keep.add(ev.id)
+                file_action_ids.add(ev.id)
+
+        if file_action_ids:
+            for ev in events:
+                cause = getattr(ev, "cause", None)
+                if (
+                    cause is not None
+                    and cause in file_action_ids
+                    and isinstance(ev, Observation)
+                ):
+                    events_to_keep.add(ev.id)
+
         return events_to_keep
 
     def _create_condensation_action(
-        self, forgotten_event_ids: list[int]
+        self,
+        forgotten_event_ids: list[int],
     ) -> CondensationAction:
         """Create the appropriate CondensationAction based on forgotten event IDs."""
         if not forgotten_event_ids:
@@ -162,7 +190,9 @@ class ConversationWindowCondenser(RollingCondenser):
                 forgotten_events_start_id=forgotten_event_ids[0],
                 forgotten_events_end_id=forgotten_event_ids[-1],
             )
-        return CondensationAction(forgotten_event_ids=forgotten_event_ids)
+        return CondensationAction(
+            forgotten_event_ids=forgotten_event_ids,
+        )
 
     def get_condensation(self, view: View) -> Condensation:
         """Apply conversation window truncation similar to _apply_conversation_window.
@@ -267,8 +297,19 @@ class ConversationWindowCondenser(RollingCondenser):
         return recall_action, recall_observation
 
     def should_condense(self, view: View) -> bool:
-        """Condense when view indicates a pending condensation request."""
-        return view.unhandled_condensation_request
+        """Condense proactively when event count exceeds threshold, or reactively on request."""
+        if view.unhandled_condensation_request:
+            return True
+        # Proactive: condense before hitting the context window limit
+        if len(view.events) > self._max_events:
+            logger.info(
+                "ConversationWindowCondenser: proactive condensation triggered "
+                "(%d events > %d threshold)",
+                len(view.events),
+                self._max_events,
+            )
+            return True
+        return False
 
     @classmethod
     def from_config(
@@ -276,8 +317,10 @@ class ConversationWindowCondenser(RollingCondenser):
         _config: ConversationWindowCondenserConfig,
         llm_registry: LLMRegistry,
     ) -> ConversationWindowCondenser:
-        """Create a condenser instance from config (config currently unused)."""
-        return ConversationWindowCondenser()
+        """Create a condenser instance from config."""
+        return ConversationWindowCondenser(
+            max_events=getattr(_config, "max_events", 100),
+        )
 
 
 # Lazy registration to avoid circular imports

@@ -77,6 +77,19 @@ class LLMSummarizingCondenser(BaseLLMCondenser):
     and newly forgotten events.
     """
 
+    @staticmethod
+    def _extract_user_objective(head_events: list) -> str | None:
+        """Extract the user's original objective from the kept head events."""
+        from backend.events.action.message import MessageAction
+        from backend.events.event import EventSource
+
+        for event in head_events:
+            if isinstance(event, MessageAction) and event.source == EventSource.USER:
+                content = getattr(event, "content", None)
+                if content and isinstance(content, str) and content.strip():
+                    return content.strip()
+        return None
+
     def get_condensation(self, view: View) -> View | Condensation:
         """Summarize middle of conversation using LLM while keeping initial/tail events."""
         head = view[: self.keep_first]
@@ -99,6 +112,18 @@ class LLMSummarizingCondenser(BaseLLMCondenser):
         if not forgotten_events:
             return view
         prompt = _SUMMARIZING_PROMPT + "\n\n"
+
+        # Inject the user's original objective so the LLM cannot hallucinate it
+        user_objective = self._extract_user_objective(list(head))
+        if user_objective:
+            prompt += (
+                "<ORIGINAL_USER_OBJECTIVE>\n"
+                f"{self._truncate(user_objective)}\n"
+                "</ORIGINAL_USER_OBJECTIVE>\n"
+                "CRITICAL: The ORIGINAL_OBJECTIVE field in your summary MUST match the objective above verbatim. "
+                "Do NOT invent or substitute a different objective.\n\n"
+            )
+
         summary_event_content = self._truncate(summary_event.message or "")
         prompt += f"<PREVIOUS SUMMARY>\n{summary_event_content}\n</PREVIOUS SUMMARY>\n"
         prompt += "\n\n"

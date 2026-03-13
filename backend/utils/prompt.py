@@ -128,7 +128,12 @@ class PromptManager:
         """Render system prompt with optional context and apply refinement helpers."""
         from backend.engines.orchestrator.tools.prompt import refine_prompt
 
-        context.setdefault("is_windows", sys.platform == "win32")
+        # On Windows, set is_windows=False when bash is available so the
+        # system prompt teaches bash (not PowerShell) — matching the shell
+        # that will actually execute commands.
+        import shutil
+        _on_windows = sys.platform == "win32"
+        context.setdefault("is_windows", _on_windows and not shutil.which("bash"))
         system_message = self.system_template.render(**context).strip()
         return refine_prompt(system_message)
 
@@ -246,7 +251,11 @@ class OrchestratorPromptManager(PromptManager):
             context.setdefault("config", self._config)
             context.setdefault("cli_mode", getattr(self._config, "cli_mode", False))
 
-        context.setdefault("is_windows", sys.platform == "win32")
+        # On Windows with bash available, tell the prompt to use bash
+        # instructions (is_windows=False) since Git Bash is the active shell.
+        import shutil
+        _on_windows = sys.platform == "win32"
+        context.setdefault("is_windows", _on_windows and not shutil.which("bash"))
         context.setdefault("mcp_tool_names", self.mcp_tool_names)
         context.setdefault("mcp_tool_descriptions", self.mcp_tool_descriptions)
         content = super().get_system_message(**context)

@@ -32,7 +32,7 @@ class CircuitBreakerConfig:
     max_high_risk_actions: int = (
         5  # Reduced from 10 — 5 high-risk actions warrants intervention
     )
-    max_stuck_detections: int = 3
+    max_stuck_detections: int = 8
     max_error_rate: float = 0.5  # 50% of last N actions
     error_rate_window: int = 10  # Look at last 10 actions
 
@@ -174,31 +174,16 @@ class CircuitBreaker:
             )
 
         # 3. Stuck detections
+        # The step_guard_service already emits targeted recovery messages.
+        # The circuit breaker only decides when to finally stop the agent.
         if self.stuck_detection_count >= self.config.max_stuck_detections:
-            # Instead of stopping, try to force a context switch first if not maxed out
-            if self.stuck_detection_count < self.config.max_stuck_detections + 2:
-                return CircuitBreakerResult(
-                    tripped=True,
-                    reason=f"Stuck loop detected ({self.stuck_detection_count})",
-                    action="switch_context",
-                    recommendation=(
-                        "You are stuck in a loop. Stop repeating the same actions. "
-                        "Try a different approach, or call finish() if the task is done."
-                    ),
-                    system_message=(
-                        "SYSTEM INTERVENTION: You are stuck in a loop. "
-                        "Try a different approach or call finish()."
-                    ),
-                )
-
             return CircuitBreakerResult(
                 tripped=True,
-                reason=f"Multiple stuck loop detections ({self.stuck_detection_count})",
+                reason=f"Too many stuck loop detections ({self.stuck_detection_count})",
                 action="stop",
                 recommendation=(
                     f"The agent has been detected stuck in loops {self.stuck_detection_count} times. "
-                    f"This indicates a fundamental issue with the approach. Consider restarting with "
-                    f"a different strategy."
+                    f"Stopping to prevent further wasted computation."
                 ),
             )
 

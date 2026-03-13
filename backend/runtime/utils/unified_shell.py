@@ -245,11 +245,20 @@ def create_shell_session(
         "cancellation_service": cancellation_service,
     }
 
-    # Windows: Use PowerShell session
+    # Windows: Prefer Git Bash (SimpleBashSession) when available.
+    # LLMs generate bash commands natively; running them in bash eliminates
+    # the need for fragile PowerShell translation regexes.
     if os.name == "nt":
+        if tools.has_bash:
+            from backend.runtime.utils.simple_bash import SimpleBashSession
+
+            logger.info("Using SimpleBashSession (Git Bash on Windows)")
+            return SimpleBashSession(**session_kwargs)
+
+        # Fallback: no bash found — use PowerShell
         from backend.runtime.utils.windows_bash import WindowsPowershellSession
 
-        logger.info("Using WindowsPowershellSession")
+        logger.info("Using WindowsPowershellSession (no bash found)")
         return WindowsPowershellSession(
             **session_kwargs,  # type: ignore[arg-type]
             powershell_exe=tools.shell_type if tools.has_powershell else None,

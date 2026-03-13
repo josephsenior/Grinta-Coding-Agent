@@ -20,12 +20,10 @@ class TestSettingsDefaults:
         assert s.max_iterations is None
         assert s.llm_model is None
         assert s.llm_api_key is None
-        assert s.enable_default_condenser is True
         assert s.enable_sound_notifications is False
         assert s.enable_proactive_conversation_starters is True
         assert s.enable_solvability_analysis is True
         assert s.mcp_config is None
-        assert s.condenser_max_size is None
 
     def test_custom_fields(self):
         s = Settings(
@@ -48,28 +46,6 @@ class TestSettingsDefaults:
     def test_legacy_agent_names_are_normalized(self, legacy_name: str):
         s = Settings(agent=legacy_name)
         assert s.agent == "Orchestrator"
-
-
-class TestCondenserMaxSize:
-    def test_none_allowed(self):
-        s = Settings(condenser_max_size=None)
-        assert s.condenser_max_size is None
-
-    def test_valid_value(self):
-        s = Settings(condenser_max_size=20)
-        assert s.condenser_max_size == 20
-
-    def test_large_value(self):
-        s = Settings(condenser_max_size=1000)
-        assert s.condenser_max_size == 1000
-
-    def test_below_20_rejected(self):
-        with pytest.raises(ValidationError, match="at least 20"):
-            Settings(condenser_max_size=19)
-
-    def test_zero_rejected(self):
-        with pytest.raises(ValidationError, match="at least 20"):
-            Settings(condenser_max_size=0)
 
 
 class TestKnowledgeBaseProperty:

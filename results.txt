@@ -1,0 +1,28 @@
+         CID |        State |   Files | Errors | Events
+------------------------------------------------------------
+81a39f355178 |      stopped |  0/24   |     7  |    22
+a774b2131920 |      stopped |  0/24   |     0  |    12
+795f34b3de0c |      stopped |  0/24   |     0  |    12
+3d30fb2c54fe |      stopped |  0/24   |     0  |    12
+d264508c35e3 |      stopped |  0/24   |     0  |    12
+3134d00e35ea |      stopped |  0/24   |     0  |    12
+6b759a7e93fe |      stopped | 24/24   |     0  |    90
+8a1f4b1c36d2 |      stopped | 24/24   |     2  |    82
+e12569532fb9 |      stopped | 31/24   |     2  |   177
+f4bd9ce11d62 |      stopped |  0/24   |     5  |    19
+6d1e3c7f71ca |      stopped | 24/24   |     2  |    86
+a91b101ead17 |      stopped | 31/24   |     2  |   238
+8045ae7b14d5 |      stopped |  0/24   |     5  |    19
+baaafdc82959 |      stopped | 24/24   |     2  |    87
+1b8ae4cfa38b |      stopped |  0/24   |     0  |    12
+a3087fcf0e51 |      stopped | 24/24   |     0  |    60
+e50d1004e536 |      stopped | 24/24   |     0  |    60
+55d757a367f8 |      stopped | 23/24   |     2  |   242
+4e5ad887f8a4 |      stopped | 31/24   |     2  |   283
+d17e47582c48 |      stopped | 16/24   |     1  |   184
+
+Legend:
+  Rate-limited runs: 0/24 files, 0 errors, ~12 events
+  Crashed runs: 0/24 files, 5+ errors, ~19 events
+  Pre-fix runs: 12-16/24 files
+  Post-fix runs: 24+/24 files (31 = file re-creates counted)

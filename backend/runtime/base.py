@@ -538,9 +538,8 @@ class Runtime(
         )
         self._set_action_timeout(event)
 
-        assert event.timeout is not None or (
-            isinstance(event, CmdRunAction)
-            and self._is_long_running_command(event.command)
+        assert event.timeout is not None, (
+            f"Action {action_type} (id={action_id}) has no timeout after _set_action_timeout"
         )
 
         try:

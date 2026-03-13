@@ -27,7 +27,7 @@ from backend.code_quality import DefaultLinter, LintResult
 CURRENT_FILE: str | None = None
 CURRENT_LINE = 1
 WINDOW = 100
-MSG_FILE_UPDATED = "[File updated (edited at line {line_number}). Please review the changes and make sure they are correct (correct indentation, no duplicate lines, etc). Edit the file again if necessary.]"
+MSG_FILE_UPDATED = "[File updated (edited at line {line_number}).]"
 LINTER_ERROR_MSG = "[Your proposed edit has introduced new syntax error(s). Please understand the errors and retry your edit command.]\n"
 
 

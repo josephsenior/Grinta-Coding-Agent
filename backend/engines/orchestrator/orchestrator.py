@@ -29,6 +29,7 @@ from backend.core.errors import (
 )
 from backend.core.logger import forge_logger as logger
 from backend.core.message import Message
+from backend.llm.exceptions import LLMError
 from backend.events.action import AgentThinkAction, MessageAction, PlaybookFinishAction
 from backend.events.action.files import FileReadAction
 from backend.events.event import EventSource
@@ -318,7 +319,7 @@ class Orchestrator(Agent):
                 thought=f"I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.",
             )
 
-        except ModelProviderError:
+        except (ModelProviderError, LLMError):
             raise
 
         except Exception as e:
@@ -367,7 +368,7 @@ class Orchestrator(Agent):
                 thought=f"I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.",
             )
 
-        except ModelProviderError:
+        except (ModelProviderError, LLMError):
             raise
 
         except Exception as e:

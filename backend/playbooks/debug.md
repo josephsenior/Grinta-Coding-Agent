@@ -30,6 +30,7 @@ Never attempt a fix you can't verify works.
 ## 2. Read the Full Traceback
 
 Work from the **bottom up**:
+
 - Last frame = where the crash happened
 - First frame = the entry point
 - Look for your own code (not library internals) first

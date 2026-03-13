@@ -382,6 +382,20 @@
       "supports_function_calling": true,
       "supports_vision": true
     },
+    "gemini-3.1-flash-lite-preview": {
+      "provider": "google",
+      "aliases": [
+        "google/gemini-3.1-flash-lite-preview"
+      ],
+      "max_input_tokens": 1000000,
+      "max_output_tokens": 8192,
+      "input_price_per_m": 0.05,
+      "output_price_per_m": 0.2,
+      "verified": false,
+      "featured": false,
+      "supports_function_calling": true,
+      "supports_vision": true
+    },
     "gemini-2.5-pro": {
       "provider": "google",
       "aliases": [

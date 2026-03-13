@@ -142,12 +142,85 @@ class EventRouterService:
 
     async def _handle_finish_action(self, action: PlaybookFinishAction) -> None:
         """Handle agent finish action with completion validation."""
+        # Reject premature finish if task files are not all created
+        if not getattr(action, "force_finish", False):
+            missing = self._get_missing_task_files()
+            if missing:
+                from backend.events.observation.error import ErrorObservation
+
+                msg = (
+                    f"FINISH BLOCKED: {len(missing)} files from your task "
+                    f"have not been created yet:\n"
+                    + "\n".join(f"  - {f}" for f in sorted(missing))
+                    + "\n\nCreate the remaining files before finishing."
+                )
+                error_obs = ErrorObservation(content=msg)
+                error_obs.error_id = "INCOMPLETE_TASK"
+                self._ctrl.event_stream.add_event(
+                    error_obs, EventSource.ENVIRONMENT
+                )
+                return
         if not await self._ctrl.task_validation_service.handle_finish(action):
             return
         self._ctrl.state.set_outputs(action.outputs, source="EventRouterService.finish")
         await self._ctrl.set_agent_state_to(AgentState.FINISHED)
         await self._ctrl.log_task_audit(status="success")
         await self._run_critics()
+
+    def _get_missing_task_files(self) -> set[str]:
+        """Return task files that haven't been created yet."""
+        import re
+
+        from backend.events.action.files import FileEditAction, FileWriteAction
+
+        state = self._ctrl.state
+        history = list(state.history) if state else []
+
+        # Collect created file paths (normalized)
+        created: set[str] = set()
+        for e in history:
+            if isinstance(e, (FileWriteAction, FileEditAction)):
+                p = getattr(e, "path", "") or ""
+                if p:
+                    p = p.replace("\\", "/").strip("/")
+                    if p.startswith("workspace/"):
+                        p = p[len("workspace/"):]
+                    created.add(p)
+
+        # Extract expected files from user task
+        task_files: set[str] = set()
+        for e in history:
+            if isinstance(e, MessageAction) and getattr(e, "source", None) == EventSource.USER:
+                text = getattr(e, "content", "") or ""
+                if text:
+                    pattern = r'(?<![.\w])[\w./\[\]]+\.(?:py|html|css|js|jsx|ts|tsx|json|txt|md|yaml|yml|toml|cfg|ini|sh|sql|prisma|env|mjs|cjs|svelte|vue|example)\b'
+                    paths = set(re.findall(pattern, text))
+                    # Also match dotfiles
+                    dotfiles = set(re.findall(r'(?:^|\s)(\.[\w]+\.[\w]+)', text, re.MULTILINE))
+                    paths.update(dotfiles)
+                    task_files = {
+                        p.replace("\\", "/").strip("/").strip()
+                        for p in paths if p.strip()
+                    }
+                    # Remove false positives (framework names like Next.js)
+                    task_files = {
+                        f for f in task_files
+                        if "/" in f or not any(
+                            f.lower().startswith(fw)
+                            for fw in ("next.js", "node.js", "vue.js", "react.js")
+                        )
+                    }
+                break
+
+        if not task_files:
+            return set()
+
+        # Find missing using suffix match
+        missing: set[str] = set()
+        for tf in task_files:
+            if not any(cf == tf or cf.endswith("/" + tf) for cf in created):
+                missing.add(tf)
+        return missing
 
     async def _run_critics(self) -> None:
         """Run all critics against the completed task's event history and log scores.

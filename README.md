@@ -76,7 +76,9 @@ See the [Architecture Deep Dive](docs/ARCHITECTURE.md) for a full walkthrough of
 ## 🚀 Quick Start
 
 ### 🐳 Docker (Recommended)
+
 Run the helper script to setup config and launch:
+
 ```bash
 ./docker_start.sh   # Linux/macOS
 # or
@@ -84,6 +86,7 @@ Run the helper script to setup config and launch:
 ```
 
 ### 🪟 Windows (Local)
+
 Run the bootstrap script at the repository root. It installs dependencies, sets up the environment, and starts the app:
 
 ```powershell
@@ -91,6 +94,7 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 ```
 
 ### 🐧 Linux / macOS / Manual
+
 1. **Prerequisites:** Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 2. **Install:** `uv sync`
 3. **Setup Config:** `cp settings.template.json settings.json`
@@ -103,19 +107,25 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 Forge features an **Intelligent Provider Resolver** that handles routing, local discovery, and model aliases automatically.
 
 ### Cloud Models
+
 Configure in `settings.json`. Forge auto-resolves providers (OpenAI, Anthropic, Gemini, etc.):
+
 - **Anthropic**: `claude-3-7-sonnet` (Native SDK, no prefix needed)
 - **OpenAI**: `gpt-4o`, `gpt-4o-mini`
 - **Google**: `gemini-2.0-pro-exp`
 
 ### Local Models & Auto-Discovery
+
 Forge automatically discovers running local providers (Ollama, LM Studio, vLLM):
+
 1. Start your local provider (e.g., `ollama serve`).
 2. Set `llm_model = "ollama/llama3.2"` (or `lmstudio/...`) in `settings.json`.
 3. Forge probes localhost ports (:11434, :1234, :8000) and routes locally with ZERO manual configuration.
 
 ### Model Aliases
+
 Define semantic aliases in `settings.json` to swap models without changing code:
+
 ```json
 "model_aliases": {
   "coding": "claude-3-7-sonnet",
@@ -123,6 +133,7 @@ Define semantic aliases in `settings.json` to swap models without changing code:
   "local": "ollama/qwen2.5-coder"
 }
 ```
+
 Then use `llm_model = "coding"` in your settings or agent config.
 
 ---
@@ -130,9 +141,11 @@ Then use `llm_model = "coding"` in your settings or agent config.
 ## 🛠️ Key Concepts
 
 ### The Full Task Loop
+
 Forge doesn't just edit files — it runs a complete loop: **plan → implement → test → review → done**.
 
 The orchestrator writes a structured plan, tracks step completion, and before marking a task finished it runs three critics:
+
 - **`AgentFinishedCritic`** — Did the agent actually emit a finish action, or did it wander off?
 - **`SuitePassCritic`** — Do the tests for touched files still pass?
 - **`BudgetCritic`** — Was the spend below the configured cap?
@@ -140,22 +153,28 @@ The orchestrator writes a structured plan, tracks step completion, and before ma
 All three scores are logged at completion. If tests fail, the task validation layer can reject the finish and send the agent back to fix things.
 
 ### Playbook Engine
+
 Tasks can be codified as [Playbooks](docs/USER_GUIDE.md) — YAML files that define goals, constraints, and step templates. Forge matches incoming requests to playbooks by keyword and semantic similarity, then executes the plan with full autonomy mode controls.
 
 ### 12 Context Condensers
+
 Stop running out of tokens. Forge uses specialized "condensers" to compress conversation history:
+
 - **Smart/Auto**: Dynamically switches strategies based on task signals.
 - **LLM Summary**: Uses a cheaper model to intelligently summarize history.
 - **Observation Masking**: Keeps the event structure but hides bulky command outputs.
 - **Semantic**: Uses heuristics to keep relevant past interactions without heavyweight models.
 
 ### 23 Specialized Tools
+
 From `str_replace_editor` (tree-sitter aware) to `browser` automation and `database` access, the agent has everything it needs to build complex apps.
 
 ### 6-Strategy Stuck Detection
+
 Forge detects if the agent is looping by analyzing action patterns, semantic intent, cost acceleration, and token repetition. The circuit breaker then safely pauses the agent for your review.
 
 ### Rollback Without Git
+
 `checkpoint` and `revert_to_safe_state` save per-file backups to `.forge/checkpoints.json` — sub-commit granularity rollback that works even if the project has no git history.
 
 ---

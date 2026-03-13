@@ -261,6 +261,11 @@ class Memory:
             working_dir = self.runtime_info.working_dir
             date = self.runtime_info.date
 
+        # Present /workspace as the working directory so the LLM uses
+        # virtual paths. The runtime normalizes /workspace → real temp path.
+        if working_dir and "FORGE_workspace" in working_dir:
+            working_dir = "/workspace"
+
         return {
             "runtime_hosts": runtime_hosts,
             "additional_agent_instructions": additional_instructions,

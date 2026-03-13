@@ -351,6 +351,7 @@ class BaseLLMCondenser(RollingCondenser, ABC):
         self, forgotten_events: list[Event], summary: str
     ) -> Condensation:
         """Create a condensation result from forgotten events and a summary string."""
+        summary = self._sanitize_workspace_paths(summary)
         return Condensation(
             action=CondensationAction(
                 forgotten_events_start_id=min(event.id for event in forgotten_events),
@@ -359,6 +360,24 @@ class BaseLLMCondenser(RollingCondenser, ABC):
                 summary_offset=self.keep_first,
             ),
         )
+
+    @staticmethod
+    def _sanitize_workspace_paths(text: str) -> str:
+        """Strip real workspace temp paths that may appear in LLM-generated summaries."""
+        import re
+
+        if "FORGE_workspace" not in text:
+            return text
+        # Full paths with drive letter or Unix root.
+        text = re.sub(
+            r"(?:[A-Za-z]:[/\\]|/)\S*FORGE_workspace\S*",
+            "/workspace",
+            text,
+        )
+        # Bare references without a leading path root.
+        if "FORGE_workspace" in text:
+            text = re.sub(r"FORGE_workspace\S*", "/workspace", text)
+        return text
 
     def _truncate(self, content: str) -> str:
         """Truncate the content to fit within the specified maximum event length."""

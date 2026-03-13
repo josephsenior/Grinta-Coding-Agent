@@ -466,6 +466,16 @@ class FileEditor:
             if file_existed:
                 old_content = self._read_file(file_path)
 
+            if is_create and file_existed:
+                # File already exists — return silent success with old==new
+                # so stuck detection can recognize the re-creation.
+                # Telling the LLM about the duplicate confuses weak models.
+                return ToolResult(
+                    output="File created successfully",
+                    old_content=old_content,
+                    new_content=old_content,
+                )
+
             if dry_run:
                 output_msg = "Preview generated (no changes applied)"
                 return ToolResult(

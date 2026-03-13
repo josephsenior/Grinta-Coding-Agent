@@ -767,8 +767,9 @@ def _get_syntax_check_cmd(path: str) -> list[str] | None:
     ext = ext.lower()
     if ext == ".py":
         return ["python", "-m", "py_compile", path]
-    if ext in (".js", ".ts"):
-        return ["node", "--check", path]
+    # node --check cannot parse TypeScript (.ts/.tsx) and fails on JS files
+    # that import from uninstalled packages, producing false SYNTAX_CHECK_FAILED
+    # noise that derails the agent.  Skip syntax checking for JS/TS entirely.
     return None
 
 

@@ -41,11 +41,6 @@ class TaskValidationService:
         # Save any lessons learned before finishing
         await self._save_lessons_learned(action)
 
-        # Lightweight check: if code was edited, ensure tests were run recently
-        if not getattr(action, "force_finish", False):
-            if not await self._check_test_coverage(action):
-                return False
-
         if not await self._ensure_completion_validator_available(action):
             return False
 
@@ -107,15 +102,28 @@ class TaskValidationService:
             return True
 
         tail = list(history)[-80:]
+
+        # Auto-allow finish if the agent has already been blocked once.
+        # The first block gives the LLM a chance to run tests; if it can't
+        # or doesn't, the second attempt goes through to prevent loops.
+        from backend.events.observation import ErrorObservation
+        block_count = sum(
+            1 for e in tail
+            if isinstance(e, ErrorObservation)
+            and getattr(e, "error_id", "") in ("TESTS_NOT_RUN", "TESTS_NOT_PASSING")
+        )
+        if block_count >= 1:
+            logger.info("Auto-allowing finish after %d prior test-coverage blocks", block_count)
+            return True
+
         coverage = self._analyze_test_coverage(tail)
 
         if coverage.has_file_edits and not coverage.has_test_run:
             logger.info("Finish blocked: file edits detected without recent test run")
             return await self._emit_finish_block(
                 "⚠️ FINISH BLOCKED: You made file edits but haven't run tests in this session.\n"
-                "Please run tests with run_tests() to verify your changes before finishing.\n"
-                "If tests are genuinely not applicable, provide outputs.tests_not_applicable=true and "
-                "outputs.tests_not_applicable_reason, then try finish again.",
+                "Run relevant tests to verify your changes, then call finish again.\n"
+                "If no tests exist or tests are not applicable, just call finish again immediately.",
                 error_id="TESTS_NOT_RUN",
             )
 

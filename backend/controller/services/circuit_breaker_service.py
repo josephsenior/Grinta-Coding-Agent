@@ -45,7 +45,7 @@ class CircuitBreakerService:
             "enabled": True,
             "max_consecutive_errors": getattr(agent_config, "max_consecutive_errors", 5),
             "max_high_risk_actions": getattr(agent_config, "max_high_risk_actions", 10),
-            "max_stuck_detections": getattr(agent_config, "max_stuck_detections", 3),
+            "max_stuck_detections": getattr(agent_config, "max_stuck_detections", 15),
         }
 
         max_error_rate = getattr(agent_config, "max_error_rate", None)

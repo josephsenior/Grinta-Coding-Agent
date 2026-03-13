@@ -21,7 +21,6 @@ from backend.core.constants import (
     DEFAULT_CACHE_DIR,
     DEFAULT_CONVERSATION_MAX_AGE_SECONDS,
     DEFAULT_ENABLE_BROWSER,
-    DEFAULT_ENABLE_DEFAULT_CONDENSER,
     DEFAULT_FILE_STORE,
     DEFAULT_VCS_USER_EMAIL,
     DEFAULT_VCS_USER_NAME,
@@ -131,7 +130,6 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     conversation_max_age_seconds: int = Field(
         default=DEFAULT_CONVERSATION_MAX_AGE_SECONDS
     )
-    enable_default_condenser: bool = Field(default=DEFAULT_ENABLE_DEFAULT_CONDENSER)
     max_concurrent_conversations: int = Field(
         default=DEFAULT_MAX_CONCURRENT_CONVERSATIONS
     )

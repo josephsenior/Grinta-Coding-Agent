@@ -48,6 +48,7 @@ Your API keys must be set via `.env` files ensuring all subprocesses inherit cre
 ### Step 3: Start
 
 **Windows (recommended):**
+
 ```powershell
 .\START_HERE.ps1
 ```
@@ -55,11 +56,13 @@ Your API keys must be set via `.env` files ensuring all subprocesses inherit cre
 **Manual start (any OS):**
 
 Terminal 1 — Backend:
+
 ```bash
 python start_server.py
 ```
 
 Terminal 2 — TUI:
+
 ```bash
 python -m tui
 ```
@@ -73,6 +76,7 @@ The backend starts on `http://localhost:3000`. The TUI connects automatically.
 Forge uses a multi-layered configuration system based on JSON and Environment Variables to ensure flexibility across different environments and prevent UI syncing ambiguity.
 
 ### Configuration Hierarchy
+
 Configuration loads with this exact precedence (highest wins):
 
 1. **Environment Variables**: Native shell vars, `.env.local`, and `.env` (Best for API Keys)
@@ -148,6 +152,7 @@ handling and type hints.
 ### 4. Watch the Agent Work
 
 The agent will:
+
 1. **Think** about the approach
 2. **Create** the file with your function
 3. **Test** it by running the code
@@ -157,6 +162,7 @@ The agent will:
 ### 5. Review Changes
 
 The agent shows each action as it executes. You can:
+
 - **Review diffs** in the diff viewer (press `d`)
 - **Approve/reject** actions in confirmation mode
 - **Interrupt** the agent at any time
@@ -196,6 +202,7 @@ The agent shows each action as it executes. You can:
 ### Status Bar
 
 The bottom status bar shows:
+
 - **Agent state**: Running, Paused, Awaiting Input, Finished
 - **Model**: Current LLM model name
 - **Cost**: Running cost for the current session
@@ -291,6 +298,7 @@ model = "ollama/llama3.2"
 ```
 
 **Setup Ollama:**
+
 ```bash
 # Install from https://ollama.ai
 ollama serve           # Start server
@@ -363,6 +371,7 @@ max_iterations = 500        # Maximum agent steps
 ### Circuit Breaker
 
 Automatically pauses the agent after:
+
 - 5 consecutive errors
 - 3 stuck detections (repeating actions)
 - 10 high-risk actions
@@ -375,6 +384,7 @@ enable_circuit_breaker = true   # Highly recommended
 ### Stuck Detection
 
 The agent detects 6 types of stuck behavior:
+
 1. Repeating identical actions
 2. Repeating identical errors
 3. Monologue loops (thinking without acting)
@@ -510,6 +520,7 @@ enable_condensation_request = false  # Agent-initiated condensation
 ### Reduce Cost
 
 1. **Use a cheaper model for condensation:**
+
    ```toml
    [llm.condenser]
    model = "gpt-4o-mini"
@@ -520,18 +531,21 @@ enable_condensation_request = false  # Agent-initiated condensation
    ```
 
 2. **Enable prompt caching** (35% cost reduction):
+
    ```toml
    [llm]
    caching_prompt = true
    ```
 
 3. **Lower context size:**
+
    ```toml
    [llm]
    max_message_chars = 20000
    ```
 
 4. **Use faster models for simple tasks:**
+
    ```toml
    [llm]
    model = "claude-haiku-4-5-20251001"   # 3x cheaper than Sonnet
@@ -540,18 +554,21 @@ enable_condensation_request = false  # Agent-initiated condensation
 ### Reduce Latency
 
 1. **Use Ollama for zero-latency local inference:**
+
    ```toml
    [llm]
    model = "ollama/llama3.2"
    ```
 
 2. **Increase timeout for complex tasks:**
+
    ```toml
    [runtime]
    timeout = 300
    ```
 
 3. **Enable observation masking** (less data to process):
+
    ```toml
    [condenser]
    type = "observation_masking"
@@ -561,6 +578,7 @@ enable_condensation_request = false  # Agent-initiated condensation
 ### Improve Quality
 
 1. **Use the best model:**
+
    ```toml
    [llm]
    model = "claude-sonnet-4-20250514"
@@ -568,6 +586,7 @@ enable_condensation_request = false  # Agent-initiated condensation
    ```
 
 2. **Keep more context:**
+
    ```toml
    [llm]
    max_message_chars = 50000
@@ -575,6 +594,7 @@ enable_condensation_request = false  # Agent-initiated condensation
    ```
 
 3. **Use smart condenser:**
+
    ```toml
    [condenser]
    type = "smart"

@@ -67,7 +67,6 @@ class Settings(BaseModel):
     secrets_store: UserSecrets = Field(
         default_factory=lambda: UserSecrets(), frozen=True
     )
-    enable_default_condenser: bool = True
     enable_sound_notifications: bool = False
     enable_proactive_conversation_starters: bool = True
     enable_solvability_analysis: bool = True
@@ -82,7 +81,6 @@ class Settings(BaseModel):
     kb_auto_search: bool = True
     kb_search_strategy: str = "hybrid"  # "hybrid", "semantic", "keyword"
     max_budget_per_task: float | None = None
-    condenser_max_size: int | None = None
     email: str | None = None
     email_verified: bool | None = None
     vcs_user_name: str | None = None
@@ -148,15 +146,6 @@ class Settings(BaseModel):
     enable_signal_progress: bool | None = None
     enable_blackboard: bool | None = None
     enable_verify_ui_change: bool | None = None
-
-    # Condenser Customization
-    condenser_type: str | None = None
-    condenser_keep_first: int | None = None
-    condenser_max_events: int | None = None
-    condenser_attention_window: int | None = None
-    condenser_llm_config: str | None = None
-    condenser_max_event_length: int | None = None
-    condenser_token_budget: int | None = None
 
     # Graph RAG Configurations
     graph_rag_enabled: bool | None = None
@@ -225,28 +214,6 @@ class Settings(BaseModel):
             )
         data["secret_store"] = secret_store
         return data
-
-    @field_validator("condenser_max_size")
-    @classmethod
-    def validate_condenser_max_size(cls, v: int | None) -> int | None:
-        """Validate condenser max size is at least 20 events.
-
-        Args:
-            v: Max size value to validate
-
-        Returns:
-            Validated value
-
-        Raises:
-            ValueError: If value less than 20
-
-        """
-        if v is None:
-            return v
-        if v < 20:
-            msg = "condenser_max_size must be at least 20"
-            raise ValueError(msg)
-        return v
 
     @field_validator("agent", mode="before")
     @classmethod

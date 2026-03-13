@@ -8,7 +8,7 @@ from backend.core.logger import forge_logger as logger
 from backend.events.action.action import Action
 from backend.events.action.agent import AgentThinkAction
 from backend.events.action.commands import CmdRunAction
-from backend.events.action.files import FileEditAction, FileWriteAction
+from backend.events.action.files import FileEditAction, FileReadAction, FileWriteAction
 from backend.events.action.empty import NullAction
 from backend.events.action.message import MessageAction
 from backend.events.event import Event, EventSource
@@ -16,6 +16,7 @@ from backend.events.observation import CmdOutputObservation
 from backend.events.observation.agent import AgentCondensationObservation
 from backend.events.observation.empty import NullObservation
 from backend.events.observation.error import ErrorObservation
+from backend.events.observation.files import FileEditObservation
 from backend.events.observation.observation import Observation
 
 if TYPE_CHECKING:
@@ -63,13 +64,27 @@ class StuckDetector:
         return self.state.history[last_user_msg_idx + 1 :]
 
     def _filter_relevant_history(self, history: Sequence[Event]) -> list[Event]:
-        """Filter history to remove irrelevant events."""
+        """Filter history to remove irrelevant events.
+
+        Excludes user messages, null events, and error observations injected
+        by the stuck detector itself (STUCK_LOOP_RECOVERY) to prevent a
+        feedback loop where stuck-recovery errors trigger further stuck
+        detections.
+        """
         return [
             event
             for event in history
             if not (
                 (isinstance(event, MessageAction) and event.source == EventSource.USER)
                 or isinstance(event, NullAction | NullObservation)
+                or (
+                    isinstance(event, ErrorObservation)
+                    and getattr(event, "error_id", None) in (
+                        "STUCK_LOOP_RECOVERY",
+                        "CIRCUIT_BREAKER_TRIPPED",
+                        "INCOMPLETE_TASK",
+                    )
+                )
             )
         ]
 
@@ -159,6 +174,10 @@ class StuckDetector:
 
         # Check for think-only loops (model calls think repeatedly, no real actions)
         if self._is_stuck_think_only_loop(filtered_history):
+            return True
+
+        # Check for read-only verification loops (ls, cat, Get-Content with no writes)
+        if self._is_stuck_readonly_inspection_loop(filtered_history):
             return True
 
         return False
@@ -509,7 +528,7 @@ class StuckDetector:
         # Command categories with their patterns
         categories = [
             (["pytest", "npm test", "cargo test", "go test"], "run_test"),
-            (["cat", "ls", "pwd", "find"], "inspect_filesystem"),
+            (["cat", "ls", "pwd", "find", "get-content", "get-childitem", "dir", "type", "tree"], "inspect_filesystem"),
             (["git clone", "git pull", "git fetch"], "fetch_code"),
             (["pip install", "npm install", "cargo build"], "install_dependency"),
             (["mkdir", "touch", "echo >"], "create_file"),
@@ -537,6 +556,17 @@ class StuckDetector:
             return "error"
         if isinstance(observation, CmdOutputObservation):
             return self._categorize_cmd_output(observation)
+        # Detect file-create-already-exists (SKIPPED) as no_change
+        content = getattr(observation, "content", "") or ""
+        if content.startswith("SKIPPED:") or "already exists" in content:
+            return "no_change"
+        # Detect silent-success re-creation: old_content == new_content means
+        # the file already existed and nothing was actually written.
+        if isinstance(observation, FileEditObservation):
+            old = getattr(observation, "old_content", None)
+            new = getattr(observation, "new_content", None)
+            if old is not None and old == new:
+                return "no_change"
         return "unknown"
 
     def _categorize_cmd_output(self, observation: CmdOutputObservation) -> str:
@@ -739,6 +769,77 @@ class StuckDetector:
         scores = [s for s in scores if s > 0]
 
         return round(max(scores), 2) if scores else 0.0
+
+    _READONLY_COMMANDS = frozenset([
+        "ls", "dir", "cat", "get-content", "type", "find", "pwd",
+        "head", "tail", "more", "less", "wc", "file", "stat", "tree",
+        "get-childitem", "get-item", "test-path", "resolve-path",
+        "select-string", "get-location",
+    ])
+
+    def _is_readonly_command(self, command: str) -> bool:
+        """Check if a command is read-only (listing, reading, inspecting)."""
+        cmd_lower = command.strip().lower()
+        # Strip leading powershell call if present
+        for prefix in ("powershell -c ", "powershell.exe -c ", "cmd /c "):
+            if cmd_lower.startswith(prefix):
+                cmd_lower = cmd_lower[len(prefix):].strip().strip('"').strip("'")
+                break
+        first_token = cmd_lower.split()[0] if cmd_lower.split() else ""
+        # Also handle piped/chained commands — check if ALL parts are read-only
+        # For simplicity, check the first token and common patterns
+        return first_token in self._READONLY_COMMANDS or first_token.startswith("ls") or first_token.startswith("dir")
+
+    def _is_stuck_readonly_inspection_loop(self, filtered_history: list[Event]) -> bool:
+        """Detect when agent only runs read-only commands without any writes.
+
+        This catches verification loops where the agent repeatedly does
+        ls/dir, cat/Get-Content, or file reads without creating new content.
+        Any write (even to an existing path) counts as progress to avoid
+        false positives during multi-file creation tasks.
+
+        To avoid false positives on legitimate research/exploration, we only
+        trigger when the agent repeats the SAME readonly command multiple
+        times (low diversity).  Diverse exploration (different directories)
+        is considered progress.
+        """
+        # Use a window of last 20 events — only trigger if overwhelmingly read-only
+        window = filtered_history[-20:]
+        readonly_commands: list[str] = []
+        write_count = 0
+
+        for e in window:
+            if isinstance(e, CmdRunAction) and self._is_readonly_command(e.command):
+                readonly_commands.append(e.command.strip())
+            elif isinstance(e, FileReadAction):
+                readonly_commands.append(f"__read__{getattr(e, 'path', '')}")
+            elif isinstance(e, (FileWriteAction, FileEditAction)):
+                write_count += 1
+
+        readonly_count = len(readonly_commands)
+        if readonly_count < 5 or write_count > 0:
+            return False
+
+        # Check diversity: if commands are diverse (exploring different paths),
+        # that's legitimate research, not a loop
+        unique_commands = len(set(readonly_commands))
+        diversity = unique_commands / readonly_count if readonly_count else 1.0
+
+        # Low diversity (< 50% unique) = stuck loop
+        # High diversity = legitimate exploration
+        if diversity < 0.5:
+            logger.warning(
+                "Read-only inspection loop detected: %d read-only actions "
+                "(%d unique, %.0f%% diversity), %d writes in last %d events",
+                readonly_count,
+                unique_commands,
+                diversity * 100,
+                write_count,
+                len(window),
+            )
+            return True
+
+        return False
 
     def _eq_no_pid(self, obj1: Event, obj2: Event) -> bool:
         if isinstance(obj1, CmdRunAction) and isinstance(obj2, CmdRunAction):

@@ -71,12 +71,14 @@ Context window management via the **Condenser** system:
 ### Configuration (`backend/core/config/`)
 
 Pydantic v2 Settings cascading dynamically from:
+
 1. Environment variables (`.env`, `.env.local`)
 2. Local Project Settings (`<workspace_root>/settings.json`)
 3. Global User Settings (`~/.forge/settings.json`)
 4. Internal Defaults
 
 Provides safe merging.
+
 - `ForgeConfig` — server-level: budget ($5 default), API keys
 - `AgentConfig` — per-agent: circuit breaker (ON), graceful shutdown (ON)
 - Startup warnings for insecure defaults (dev API key, unlimited budget)
@@ -84,6 +86,7 @@ Provides safe merging.
 ### Storage (`backend/storage/`)
 
 Abstract `FileStore` interface with implementations:
+
 - Local filesystem
 - In-memory (testing)
 - S3

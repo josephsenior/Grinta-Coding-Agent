@@ -169,35 +169,11 @@ class Session:
         )
 
     def _apply_condenser(self, settings: Settings, agent_config, llm_config) -> None:
-        """Configure agent condenser if enabled."""
-        if settings.enable_default_condenser:
-            max_events_for_condenser = settings.condenser_max_size or 120
-            from backend.core.config.condenser_config import (
-                BrowserOutputCondenserConfig,
-                CondenserPipelineConfig,
-                ConversationWindowCondenserConfig,
-                LLMSummarizingCondenserConfig,
-            )
+        """Configure agent condenser — always uses automatic selection."""
+        from backend.core.config.condenser_config import AutoCondenserConfig
 
-            default_condenser_config = CondenserPipelineConfig(
-                condensers=[
-                    ConversationWindowCondenserConfig(),
-                    BrowserOutputCondenserConfig(attention_window=2),
-                    LLMSummarizingCondenserConfig(
-                        llm_config=llm_config,
-                        keep_first=4,
-                        max_size=max_events_for_condenser,
-                    ),
-                ],
-            )
-            self.logger.info(
-                f'Enabling pipeline condenser with: browser_output_masking(attention_window=2), llm(model="{
-                    llm_config.model
-                }", base_url="{llm_config.base_url}", keep_first=4, max_size={
-                    max_events_for_condenser
-                })',
-            )
-            agent_config.condenser_config = default_condenser_config
+        agent_config.condenser_config = AutoCondenserConfig(llm_config=llm_config)
+        self.logger.info("Condenser: auto-selection enabled (adapts to session length and patterns)")
 
     def _extract_conversation_data(
         self,

@@ -87,6 +87,15 @@ class ToolRegistry:
                     available=True,
                     path=shutil.which("cmd"),
                 )
+            # Also detect bash availability (Git Bash / WSL) on Windows
+            bash_path = shutil.which("bash")
+            if bash_path and self._check_command("bash", ["--version"]):
+                self._tools["bash"] = ToolInfo(
+                    name="bash",
+                    available=True,
+                    path=bash_path,
+                    version=self._get_bash_version(),
+                )
         else:
             # Unix-like: try bash (should always be available)
             bash_path = shutil.which("bash")
@@ -291,8 +300,11 @@ class ToolRegistry:
 
     @property
     def has_bash(self) -> bool:
-        """Check if bash is available."""
-        return self._tools.get("shell", ToolInfo("", False)).name == "bash"
+        """Check if bash is available (as primary shell or as a separate tool on Windows)."""
+        if self._tools.get("shell", ToolInfo("", False)).name == "bash":
+            return True
+        # On Windows, bash may be available as a separate tool (Git Bash / WSL)
+        return self._tools.get("bash", ToolInfo("", False)).available
 
     @property
     def has_powershell(self) -> bool:

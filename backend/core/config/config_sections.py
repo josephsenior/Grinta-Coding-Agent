@@ -165,7 +165,12 @@ def process_mcp_section(
 def process_condenser_section(
     toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
-    """Process the [condenser] section of the TOML config."""
+    """Process the [condenser] section of the TOML config.
+
+    If a [condenser] section exists in the TOML, it is respected.
+    Otherwise the system defaults to auto-selection which adapts to the
+    session dynamically.
+    """
     if "condenser" in toml_config:
         try:
             from backend.core.config.condenser_config import (
@@ -188,16 +193,15 @@ def process_condenser_section(
             )
             if summary:
                 summary.record("condenser", "invalid", str(e))
-    elif cfg.enable_default_condenser:
-        from backend.core.config.condenser_config import LLMSummarizingCondenserConfig
+    else:
+        from backend.core.config.condenser_config import AutoCondenserConfig
 
         default_agent_config = cfg.get_agent_config()
-        default_condenser = LLMSummarizingCondenserConfig(
-            llm_config=cfg.get_llm_config(), type="llm"
+        default_agent_config.condenser_config = AutoCondenserConfig(
+            llm_config=cfg.get_llm_config(),
         )
-        default_agent_config.condenser_config = default_condenser
         logger.debug(
-            "Default LLM summarizing condenser assigned to default agent (no condenser in config)",
+            "Auto condenser assigned to default agent (adapts to session dynamically)",
         )
 
 

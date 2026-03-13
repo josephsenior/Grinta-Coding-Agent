@@ -178,8 +178,6 @@ class OrchestratorSafetyManager:
         claimed_lines = "\n".join(f"  - {op}" for op in claimed_operations)
         tool_hint = ", ".join(missing_tools) if missing_tools else "str_replace_editor"
         return (
-            "⚠️ CRITICAL ERROR — You described operations in plain text but called NO tools:\n"
-            + claimed_lines
-            + f"\n\nRequired tools that were NOT called: {tool_hint}"
-            + "\n\nYou must use tool calls to perform actions, not describe them in text."
+            "You described operations in text but did not call the required tools.\n"
+            "Call the tool now, then move to the next step."
         )

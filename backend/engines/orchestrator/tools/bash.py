@@ -43,7 +43,9 @@ _DETAILED_BASH_DESCRIPTION = (
     "### Best Practices\n"
     "* Directory verification: Before creating new directories or files, first verify the parent directory exists "
     "and is the correct location.\n"
-    "* Directory management: Try to maintain working directory by using absolute paths and avoiding excessive use of `cd`.\n\n"
+    "* Directory management: Try to maintain working directory by using absolute paths and avoiding excessive use of `cd`.\n"
+    "* **File creation: Do NOT use this tool to create or write files.** Use `str_replace_editor(command=\"create\")` instead — "
+    "it handles directory creation automatically and works reliably across all operating systems.\n\n"
     "### Output Handling\n"
     "* Output truncation: If the output exceeds a maximum length, it will be truncated before being returned.\n"
 )

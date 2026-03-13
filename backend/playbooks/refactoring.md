@@ -38,6 +38,7 @@ pytest -x --tb=short 2>&1 | tee /tmp/before_refactor.txt
 ## 2. Small, Atomic Commits
 
 Each commit should do exactly one thing:
+
 - Extract a function
 - Rename a variable
 - Move a module
@@ -124,6 +125,7 @@ If tests break after a "pure refactor", you changed behaviour — revert and red
 ## 6. What NOT to Refactor Today
 
 Avoid touching code that:
+
 - Has no tests
 - Is about to be deleted
 - Is owned by another in-progress PR

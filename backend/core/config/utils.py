@@ -202,11 +202,6 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
         ):
             cfg.conversation_max_age_seconds = data["conversation_max_age_seconds"]
         if (
-            "enable_default_condenser" in data
-            and data["enable_default_condenser"] is not None
-        ):
-            cfg.enable_default_condenser = data["enable_default_condenser"]
-        if (
             "max_concurrent_conversations" in data
             and data["max_concurrent_conversations"] is not None
         ):
@@ -358,54 +353,6 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
                 "agent_enable_condensation_request"
             ]
 
-        # Condenser Mapping
-        if "condenser_type" in data and data["condenser_type"]:
-            from backend.core.config.condenser_config import (
-                condenser_config_from_toml_section,
-            )
-
-            cond_type = data["condenser_type"]
-            cond_data = {"type": cond_type}
-            if (
-                "condenser_keep_first" in data
-                and data["condenser_keep_first"] is not None
-            ):
-                cond_data["keep_first"] = data["condenser_keep_first"]
-            if (
-                "condenser_max_events" in data
-                and data["condenser_max_events"] is not None
-            ):
-                cond_data["max_events"] = data["condenser_max_events"]
-            if (
-                "condenser_attention_window" in data
-                and data["condenser_attention_window"] is not None
-            ):
-                cond_data["attention_window"] = data["condenser_attention_window"]
-            if "condenser_llm_config" in data and data["condenser_llm_config"]:
-                cond_data["llm_config"] = data["condenser_llm_config"]
-            if (
-                "condenser_max_event_length" in data
-                and data["condenser_max_event_length"] is not None
-            ):
-                cond_data["max_event_length"] = data["condenser_max_event_length"]
-            if (
-                "condenser_token_budget" in data
-                and data["condenser_token_budget"] is not None
-            ):
-                cond_data["token_budget"] = data["condenser_token_budget"]
-            parsed_condenser = condenser_config_from_toml_section(cond_data, cfg.llms)
-            if "condenser" in parsed_condenser:
-                cfg.extended = cfg.extended or ExtendedConfig.from_dict({})
-                # We update the dictionary directly as ExtendedConfig isn't assignment friendly on all attributes dynamically
-                ext_dict = (
-                    dict(cfg.extended.model_dump())
-                    if hasattr(cfg.extended, "model_dump")
-                    else {}
-                )
-                ext_dict["condensers"] = {"default": parsed_condenser["condenser"]}
-                cfg.extended = ExtendedConfig.from_dict(ext_dict)
-                agent_config.condenser_config = parsed_condenser["condenser"]
-
         # Graph RAG
         if "graph_rag_enabled" in data and data["graph_rag_enabled"]:
             cfg.extended = cfg.extended or ExtendedConfig.from_dict({})
@@ -548,6 +495,8 @@ def _validate_condenser_section(
     condenser_dict = {"type": json_config.get("condenser_type")}
     if json_config.get("condenser_max_events") is not None:
         condenser_dict["max_events"] = json_config.get("condenser_max_events")
+    if json_config.get("condenser_keep_first") is not None:
+        condenser_dict["keep_first"] = json_config.get("condenser_keep_first")
     if json_config.get("condenser_llm_config") is not None:
         condenser_dict["llm_config"] = json_config.get("condenser_llm_config")
 

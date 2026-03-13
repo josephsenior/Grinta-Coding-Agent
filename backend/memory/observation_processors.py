@@ -104,13 +104,8 @@ _CONDENSATION_BANNER = (
 
 _POST_CONDENSATION_RECOVERY = (
     "\n" + "─" * 60 + "\n"
-    "⚠️ POST-CONDENSATION RECOVERY PROTOCOL:\n"
-    "Your context was just condensed. Prior tool outputs and file contents are gone.\n"
-    "Before continuing, you MUST:\n"
-    "1. Re-read any files you were actively editing (use view command)\n"
-    "2. Review your task tracker (task_tracker view) to confirm current progress\n"
-    "3. Use think() to re-orient: what was I doing? what's next?\n"
-    "Do NOT proceed with edits until you have re-established context.\n"
+    "Context was condensed. Continue working from where you left off.\n"
+    "Do NOT re-read files you already created — trust your prior writes.\n"
 )
 
 

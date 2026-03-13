@@ -1,0 +1,84 @@
+WARNING:  Current configuration will not reload as not all conditions are met, please refer to documentation.
+INFO:     Started server process [4084]
+INFO:     Waiting for application startup.
+C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\site-packages\asttokens\util.py:202: DeprecationWarning: importing 'Const' from 'astroid' is deprecated and will be removed in v5, import it from 'astroid.nodes' instead
+  from astroid import Const
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:3000 (Press CTRL+C to quit)
+GitHub MCP Server running on stdio
+[INFO] DuckDuckGo Search MCP Server running on stdio
+Context7 Documentation MCP Server v2.1.4 running on stdio
+INFO: Starting Shadcn UI MCP Server...
+INFO: Framework set to 'react' via command line argument
+INFO: Framework set to 'react' via command line argument
+INFO: MCP Server configured for REACT framework
+INFO: Repository: shadcn-ui/ui
+INFO: File extension: .tsx
+INFO: Description: React components from shadcn/ui v4
+INFO: To switch frameworks: set FRAMEWORK=svelte|vue|react-native or use --framework svelte|vue|react-native
+INFO: Framework set to 'react' via command line argument
+WARN: No GitHub API key provided. Rate limited to 60 requests/hour.
+INFO: Setting up request handlers...
+INFO: Handlers setup complete
+INFO: Transport initialized: stdio
+INFO: Server connected via stdio
+INFO: Server started successfully - Mode: stdio
+Rigour MCP server v4.0.0 running on stdio
+INFO: Starting Shadcn UI MCP Server...
+INFO: Framework set to 'react' via command line argument
+INFO: Framework set to 'react' via command line argument
+INFO: MCP Server configured for REACT framework
+INFO: Repository: shadcn-ui/ui
+INFO: File extension: .tsx
+INFO: Description: React components from shadcn/ui v4
+INFO: To switch frameworks: set FRAMEWORK=svelte|vue|react-native or use --framework svelte|vue|react-native
+INFO: Framework set to 'react' via command line argument
+WARN: No GitHub API key provided. Rate limited to 60 requests/hour.
+INFO: Setting up request handlers...
+INFO: Handlers setup complete
+INFO: Transport initialized: stdio
+INFO: Server connected via stdio
+INFO: Server started successfully - Mode: stdio
+[INFO] DuckDuckGo Search MCP Server running on stdio
+GitHub MCP Server running on stdio
+Context7 Documentation MCP Server v2.1.4 running on stdio
+Rigour MCP server v4.0.0 running on stdio
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 678, in run_until_complete
+    self.run_forever()
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\windows_events.py", line 322, in run_forever
+    super().run_forever()
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 645, in run_forever
+    self._run_once()
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 1961, in _run_once
+    event_list = self._selector.select(timeout)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\windows_events.py", line 445, in select
+    self._poll(timeout)
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\windows_events.py", line 774, in _poll
+    status = _overlapped.GetQueuedCompletionStatus(self._iocp, ms)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\utils\shutdown_listener.py", line 57, in handler
+    fallback_handler(signum, frame)
+  File "C:\Users\GIGABYTE\Desktop\Forge\backend\api\graceful_shutdown.py", line 82, in signal_handler
+    sys.exit(0)
+SystemExit: 0
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 701, in lifespan
+    await receive()
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\site-packages\uvicorn\lifespan\on.py", line 137, in receive
+    return await self.receive_queue.get()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\GIGABYTE\AppData\Local\Programs\Python\Python312\Lib\asyncio\queues.py", line 158, in get
+    await getter
+asyncio.exceptions.CancelledError
+

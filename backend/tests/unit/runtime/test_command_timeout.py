@@ -5,8 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-
-from backend.runtime.command_timeout import CommandTimeoutMixin, _LONG_RUNNING_PATTERNS
+from backend.runtime.command_timeout import CommandTimeoutMixin, _SAFETY_NET_TIMEOUT
 
 
 # ── helper: concrete class that uses the mixin ───────────────────────
@@ -17,26 +16,6 @@ class _FakeRuntime(CommandTimeoutMixin):
         self.sid = "test-sid"
         self.config = SimpleNamespace(runtime_config=SimpleNamespace(timeout=120))
         self.process_manager = MagicMock()
-
-
-# ── _is_long_running_command ─────────────────────────────────────────
-
-
-class TestIsLongRunning:
-    def test_server_commands(self):
-        rt = _FakeRuntime()
-        assert rt._is_long_running_command("npm run dev")
-        assert rt._is_long_running_command("uvicorn main:app")
-        assert rt._is_long_running_command("python -m http.server 8000")
-        assert rt._is_long_running_command("gunicorn app:main")
-        assert rt._is_long_running_command("flask run --port 5000")
-
-    def test_normal_commands(self):
-        rt = _FakeRuntime()
-        assert not rt._is_long_running_command("ls -la")
-        assert not rt._is_long_running_command("echo hello")
-        assert not rt._is_long_running_command("python test.py")
-        assert not rt._is_long_running_command("cat file.txt")
 
 
 # ── _set_action_timeout ──────────────────────────────────────────────
@@ -53,30 +32,27 @@ class TestSetActionTimeout:
         # Should keep the explicit timeout
         assert action.timeout == 30
 
-    def test_long_running_gets_none_timeout(self):
+    def test_all_commands_get_safety_net_timeout(self):
         from backend.events.action.commands import CmdRunAction
 
         rt = _FakeRuntime()
-        action = CmdRunAction(command="npm start")
-        # timeout defaults to None for new actions
-        rt._set_action_timeout(action)
-        assert action.timeout is None  # set to None for long-running
+        for cmd in ["npm install", "npm run dev", "ls -la", "prisma generate", "cargo build"]:
+            action = CmdRunAction(command=cmd)
+            rt._set_action_timeout(action)
+            assert action.timeout == _SAFETY_NET_TIMEOUT, f"Expected {_SAFETY_NET_TIMEOUT} for '{cmd}', got {action.timeout}"
 
-    def test_normal_command_gets_config_timeout(self):
+    def test_commands_are_non_blocking(self):
         from backend.events.action.commands import CmdRunAction
 
         rt = _FakeRuntime()
-        action = CmdRunAction(command="ls -la")
-        # timeout defaults to None for new actions
+        action = CmdRunAction(command="npm install")
         rt._set_action_timeout(action)
-        assert action.timeout == 120
+        assert not action.blocking
 
 
-# ── patterns constant ────────────────────────────────────────────────
+# ── safety net constant ──────────────────────────────────────────────
 
 
-class TestPatterns:
-    def test_has_common_patterns(self):
-        assert "npm run dev" in _LONG_RUNNING_PATTERNS
-        assert "uvicorn" in _LONG_RUNNING_PATTERNS
-        assert "flask run" in _LONG_RUNNING_PATTERNS
+class TestSafetyNet:
+    def test_safety_net_is_generous(self):
+        assert _SAFETY_NET_TIMEOUT >= 300

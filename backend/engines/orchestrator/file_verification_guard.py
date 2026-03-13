@@ -334,11 +334,8 @@ class FileVerificationGuard:
 
             if not (has_file_edit or has_file_write or has_file_read):
                 # Claimed file operation but no tools called!
-                error = "⚠️ HALLUCINATION PREVENTED: Response claims file operations but no tools called.\n"
-                error += "Claimed operations:\n"
-                for claim in file_op_claims:
-                    error += f"  - {claim}\n"
-                error += "\nYou MUST call the actual tools to perform these operations."
+                error = "You described file operations in text but did not call the required tools.\n"
+                error += "Call the actual tool (str_replace_editor or execute_bash) now, then move to the next step."
 
                 self.stats["hallucinations_prevented"] += 1
                 return False, error

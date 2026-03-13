@@ -742,8 +742,6 @@ def _build_default_settings_response() -> GETSettingsModel:
         language="en",
         confirmation_mode=False,
         security_analyzer="llm",
-        enable_default_condenser=True,
-        condenser_max_size=120,
         enable_sound_notifications=False,
         user_consents_to_analytics=False,
         enable_proactive_conversation_starters=False,

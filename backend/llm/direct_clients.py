@@ -269,8 +269,7 @@ class OpenAIClient(DirectLLMClient):
         return exc
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
-        if "model" not in kwargs:
-            kwargs["model"] = self.model_name
+        kwargs["model"] = self.model_name
         try:
             response = self.client.chat.completions.create(
                 messages=messages,  # type: ignore[arg-type]
@@ -306,10 +305,10 @@ class OpenAIClient(DirectLLMClient):
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
-        model = kwargs.pop("model", self.model_name)
+        kwargs.pop("model", None)
         try:
             response = await self.async_client.chat.completions.create(
-                model=model,
+                model=self.model_name,
                 messages=messages,  # type: ignore[arg-type]
                 **kwargs,
             )
@@ -344,10 +343,10 @@ class OpenAIClient(DirectLLMClient):
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
         kwargs["stream"] = True
-        model = kwargs.pop("model", self.model_name)
+        kwargs.pop("model", None)
         try:
             stream = await self.async_client.chat.completions.create(
-                model=model,
+                model=self.model_name,
                 messages=messages,  # type: ignore[arg-type]
                 **kwargs,
             )

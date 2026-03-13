@@ -209,6 +209,14 @@ class ConversationWindowCondenserConfig(BaseModel, metaclass=CanonicalModelMetac
     """
 
     type: Literal["conversation_window"] = Field(default="conversation_window")
+    max_events: int = Field(
+        default=100,
+        description=(
+            "Proactive condensation threshold. When the event count exceeds "
+            "this value the condenser trims history BEFORE hitting the "
+            "context window limit."
+        ),
+    )
     model_config = ConfigDict(extra="forbid")
 
 

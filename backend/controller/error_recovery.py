@@ -197,6 +197,13 @@ class ErrorRecoveryStrategy:
             return ErrorType.PERMISSION_ERROR
         if isinstance(error, TimeoutError):
             return ErrorType.TIMEOUT_ERROR
+        # LLM Timeout is a separate hierarchy from built-in TimeoutError
+        try:
+            from backend.llm.exceptions import Timeout as LLMTimeout
+            if isinstance(error, LLMTimeout):
+                return ErrorType.TIMEOUT_ERROR
+        except ImportError:
+            pass
         if isinstance(
             error, FileNotFoundError | IsADirectoryError | NotADirectoryError
         ):

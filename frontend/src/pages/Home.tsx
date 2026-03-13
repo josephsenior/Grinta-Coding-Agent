@@ -63,7 +63,7 @@ function ConversationCard({
       className={cn(
         "group relative flex cursor-pointer items-center gap-4 rounded-xl border p-4 transition-all",
         "hover:bg-accent/50 hover:border-accent-foreground/10 hover:shadow-sm",
-        conversation.status === ConversationStatus.RUNNING && "border-green-500/20 bg-green-500/[0.02]",
+        conversation.status === ConversationStatus.RUNNING && "border-green-500/20 bg-green-500/2",
       )}
       onClick={() => navigate(`/chat/${conversation.conversation_id}`)}
       role="button"
@@ -85,7 +85,7 @@ function ConversationCard({
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           {conversation.selected_repository && (
-            <span className="flex items-center gap-1 truncate max-w-[200px]">
+            <span className="flex items-center gap-1 truncate max-w-50">
               <GitBranch className="h-3 w-3 shrink-0" />
               {conversation.selected_repository}
               {conversation.selected_branch && `:${conversation.selected_branch}`}

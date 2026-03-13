@@ -367,23 +367,16 @@ class TestProcessMcpSection:
 
 
 class TestProcessCondenserSection:
-    def test_default_condenser_assigned_when_missing(self):
+    def test_auto_condenser_assigned_when_missing(self):
+        """When no [condenser] section exists, auto condenser is used."""
         cfg = ForgeConfig()
-        cfg.enable_default_condenser = True
         summary = DummySummary()
 
-        class DummyCondenser:
-            def __init__(self, llm_config, type):
-                self.llm_config = llm_config
-                self.type = type
+        process_condenser_section({}, cfg, summary)
 
-        with patch(
-            "backend.core.config.condenser_config.LLMSummarizingCondenserConfig",
-            DummyCondenser,
-        ):
-            process_condenser_section({}, cfg, summary)
-
-        assert cfg.get_agent_config().condenser_config is not None
+        condenser_cfg = cfg.get_agent_config().condenser_config
+        assert condenser_cfg is not None
+        assert condenser_cfg.type == "auto"
 
     def test_condenser_mapping_applied(self):
         cfg = ForgeConfig()
@@ -408,16 +401,6 @@ class TestProcessCondenserSection:
         ):
             process_condenser_section({"condenser": {"bad": True}}, cfg, summary)
         assert summary.records
-
-    def test_condenser_no_default_when_disabled(self):
-        """Test that no default condenser is assigned when disabled."""
-        cfg = ForgeConfig()
-        cfg.enable_default_condenser = False
-        summary = DummySummary()
-        # Don't create default condenser
-        process_condenser_section({}, cfg, summary)
-        # Original config should be unchanged (no condenser added)
-        # This just tests the path doesn't crash
 
 
 class TestProcessExtendedSection:
