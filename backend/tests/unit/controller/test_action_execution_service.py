@@ -92,7 +92,7 @@ class TestGetNextAction:
 
     @pytest.mark.asyncio
     async def test_malformed_action_returns_none(self):
-        from backend.core.exceptions import LLMMalformedActionError
+        from backend.core.errors import LLMMalformedActionError
 
         ctx = _make_context()
         ctx.agent.step.side_effect = LLMMalformedActionError("bad")
@@ -107,7 +107,7 @@ class TestGetNextAction:
 
     @pytest.mark.asyncio
     async def test_no_action_error_returns_none(self):
-        from backend.core.exceptions import LLMNoActionError
+        from backend.core.errors import LLMNoActionError
 
         ctx = _make_context()
         ctx.agent.step.side_effect = LLMNoActionError("no action")
@@ -117,7 +117,7 @@ class TestGetNextAction:
 
     @pytest.mark.asyncio
     async def test_response_error_returns_none(self):
-        from backend.core.exceptions import LLMResponseError
+        from backend.core.errors import LLMResponseError
 
         ctx = _make_context()
         ctx.agent.step.side_effect = LLMResponseError("bad response")
@@ -127,7 +127,7 @@ class TestGetNextAction:
 
     @pytest.mark.asyncio
     async def test_function_call_errors_return_none(self):
-        from backend.core.exceptions import FunctionCallNotExistsError
+        from backend.core.errors import FunctionCallNotExistsError
 
         ctx = _make_context()
         ctx.agent.step.side_effect = FunctionCallNotExistsError("no func")
@@ -137,7 +137,7 @@ class TestGetNextAction:
 
     @pytest.mark.asyncio
     async def test_function_call_validation_error_returns_none(self):
-        from backend.core.exceptions import FunctionCallValidationError
+        from backend.core.errors import FunctionCallValidationError
 
         ctx = _make_context()
         ctx.agent.step.side_effect = FunctionCallValidationError("invalid args")
@@ -191,7 +191,7 @@ class TestHandleContextWindowError:
 
     @pytest.mark.asyncio
     async def test_context_window_without_truncation_raises(self):
-        from backend.core.exceptions import LLMContextWindowExceedError
+        from backend.core.errors import LLMContextWindowExceedError
 
         ctx = _make_context()
         ctx.agent.config.enable_history_truncation = False
@@ -296,7 +296,7 @@ class TestExecuteAction:
     @pytest.mark.asyncio
     async def test_retry_on_malformed_succeeds_on_second_attempt(self):
         """get_next_action retries on LLMMalformedActionError and succeeds."""
-        from backend.core.exceptions import LLMMalformedActionError
+        from backend.core.errors import LLMMalformedActionError
 
         ctx = _make_context()
         action = MagicMock()
@@ -312,7 +312,7 @@ class TestExecuteAction:
     @pytest.mark.asyncio
     async def test_exhausted_retries_transitions_to_error_state(self):
         """When retries exhausted, transitions to ERROR state."""
-        from backend.core.exceptions import LLMMalformedActionError
+        from backend.core.errors import LLMMalformedActionError
         from backend.core.schemas import AgentState
 
         ctx = _make_context()

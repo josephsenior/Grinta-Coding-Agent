@@ -83,7 +83,7 @@ def create_lsp_query_tool() -> dict[str, Any]:
 
 def build_lsp_query_action(arguments: dict) -> LspQueryAction:
     """Build an LspQueryAction from tool call arguments."""
-    from backend.core.exceptions import FunctionCallValidationError
+    from backend.core.errors import FunctionCallValidationError
 
     command = arguments.get("command", "")
     file = arguments.get("file", "")

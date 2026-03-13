@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.core.exceptions import (
+from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
 )

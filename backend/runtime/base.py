@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 import httpx
 
-from backend.core.exceptions import AgentRuntimeDisconnectedError
+from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logger import forge_logger as logger
 from backend.events import EventSource, EventStream, EventStreamSubscriber
 from backend.events.action import (

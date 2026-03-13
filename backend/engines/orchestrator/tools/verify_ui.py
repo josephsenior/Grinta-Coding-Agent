@@ -39,7 +39,7 @@ def create_verify_ui_change_tool() -> ChatCompletionToolParam:
 
 def build_verify_ui_change_action(arguments: dict) -> MCPAction:
     """Build the composite MCP action to verify the UI."""
-    from backend.core.exceptions import FunctionCallValidationError
+    from backend.core.errors import FunctionCallValidationError
 
     url = arguments.get("url")
     if not url:

@@ -7,7 +7,7 @@ from typing import Any
 from json_repair import repair_json
 from pydantic import BaseModel
 
-from backend.core.exceptions import LLMResponseError
+from backend.core.errors import LLMResponseError
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.events.event import Event
 from backend.events.observation import CmdOutputMetadata

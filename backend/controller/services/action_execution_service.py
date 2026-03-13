@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.core.logger import forge_logger as logger
-from backend.core.exceptions import (
+from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
     LLMContextWindowExceedError,

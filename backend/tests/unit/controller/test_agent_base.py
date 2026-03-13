@@ -8,7 +8,7 @@ import pytest
 
 from backend.controller.agent import Agent
 from backend.core.config.agent_config import AgentConfig
-from backend.core.exceptions import (
+from backend.core.errors import (
     AgentAlreadyRegisteredError,
     AgentNotRegisteredError,
 )

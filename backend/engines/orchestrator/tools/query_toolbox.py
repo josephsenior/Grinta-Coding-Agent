@@ -30,7 +30,7 @@ def create_query_toolbox_tool() -> ChatCompletionToolParam:
 
 def build_query_toolbox_action(arguments: dict) -> QueryToolboxAction:
     """Build the action for the query_toolbox tool call."""
-    from backend.core.exceptions import FunctionCallValidationError
+    from backend.core.errors import FunctionCallValidationError
 
     if "capability_query" not in arguments:
         raise FunctionCallValidationError(

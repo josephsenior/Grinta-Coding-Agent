@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
-from backend.core.exceptions import (
+from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
 )

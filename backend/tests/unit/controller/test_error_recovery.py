@@ -6,7 +6,7 @@ from backend.controller.error_recovery import (
     ErrorRecoveryStrategy,
     ErrorType,
 )
-from backend.core.exceptions import (
+from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
 )

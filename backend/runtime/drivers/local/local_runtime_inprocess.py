@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from backend.core.config.security_config import SecurityConfig
-from backend.core.exceptions import AgentRuntimeDisconnectedError
+from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logger import forge_logger as logger
 from backend.events.action import (
     Action,

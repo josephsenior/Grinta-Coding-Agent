@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
-from backend.core.exceptions import (
+from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
 )
@@ -252,7 +252,7 @@ def _handle_note_tool(arguments: dict) -> AgentThinkAction:
     key = arguments.get("key", "")
     value = arguments.get("value", "")
     if not key:
-        from backend.core.exceptions import FunctionCallValidationError as _E
+        from backend.core.errors import FunctionCallValidationError as _E
 
         raise _E('Missing required argument "key" in tool call note')
     return build_note_action(key, value)
@@ -306,7 +306,7 @@ def _handle_run_tests_tool(arguments: dict) -> CmdRunAction:
 def _handle_apply_patch_tool(arguments: dict) -> CmdRunAction:
     """Handle APPLY_PATCH_TOOL: apply a unified diff to the workspace."""
     if "patch" not in arguments:
-        from backend.core.exceptions import FunctionCallValidationError as _E
+        from backend.core.errors import FunctionCallValidationError as _E
 
         raise _E('Missing required argument "patch" in tool call apply_patch')
     check_only = arguments.get("check_only", "false") == "true"

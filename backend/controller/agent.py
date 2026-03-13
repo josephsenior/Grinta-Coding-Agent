@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from backend.utils.prompt import PromptManager
 from backend.controller.agent_tools import build_tool
 from backend.core.config.agent_config import AgentConfig
-from backend.core.exceptions import (
+from backend.core.errors import (
     AgentAlreadyRegisteredError,
     AgentNotRegisteredError,
 )

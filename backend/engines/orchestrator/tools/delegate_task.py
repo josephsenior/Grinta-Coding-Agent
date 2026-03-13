@@ -75,7 +75,7 @@ def create_delegate_task_tool() -> dict:
 
 def build_delegate_task_action(arguments: dict) -> DelegateTaskAction:
     """Build the action for the delegate_task tool call."""
-    from backend.core.exceptions import FunctionCallValidationError
+    from backend.core.errors import FunctionCallValidationError
 
     parallel_tasks = arguments.get("parallel_tasks", [])
     run_in_background = arguments.get("run_in_background", False)

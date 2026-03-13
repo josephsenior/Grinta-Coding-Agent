@@ -15,7 +15,7 @@ from backend.core.errors import (
     ReplayError,
     SessionInvariantError,
 )
-from backend.core.exceptions import (
+from backend.core.errors import (
     AgentRuntimeUnavailableError,
     AgentStuckInLoopError,
     FunctionCallValidationError,

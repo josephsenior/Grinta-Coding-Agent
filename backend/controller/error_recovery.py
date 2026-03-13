@@ -19,7 +19,7 @@ import re
 import sys
 from enum import Enum
 
-from backend.core.exceptions import (
+from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
 )

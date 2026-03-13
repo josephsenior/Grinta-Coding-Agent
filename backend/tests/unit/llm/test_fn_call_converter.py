@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.core.exceptions import (
+from backend.core.errors import (
     FunctionCallConversionError,
     FunctionCallValidationError,
 )

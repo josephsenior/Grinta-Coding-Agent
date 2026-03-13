@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from backend.core.exceptions import AgentRuntimeUnavailableError
+from backend.core.errors import AgentRuntimeUnavailableError
 from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
 from backend.events.stream import EventStreamSubscriber, session_exists

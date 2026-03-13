@@ -20,7 +20,7 @@ from backend.controller import AgentController
 from backend.controller.agent import Agent
 from backend.controller.state.state import State
 from backend.core.constants import GENERAL_TIMEOUT
-from backend.core.exceptions import AgentNotRegisteredError
+from backend.core.errors import AgentNotRegisteredError
 from backend.core.logger import forge_logger as logger
 from backend.events import EventStream
 from backend.memory.agent_memory import Memory

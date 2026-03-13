@@ -18,7 +18,7 @@ from backend.core.constants import (
     DEFAULT_RUNTIME_MAX_MEMORY_MB,
     DEFAULT_RUNTIME_MAX_NETWORK_REQUESTS_PER_MINUTE,
 )
-from backend.core.exceptions import ResourceLimitExceededError
+from backend.core.errors import ResourceLimitExceededError
 from backend.core.logger import forge_logger as logger
 
 

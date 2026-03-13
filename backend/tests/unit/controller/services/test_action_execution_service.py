@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from backend.controller.services.action_execution_service import ActionExecutionService
-from backend.core.exceptions import (
+from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
     LLMContextWindowExceedError,

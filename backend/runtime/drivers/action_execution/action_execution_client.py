@@ -238,7 +238,7 @@ class ActionExecutionClient(Runtime):
         return self._execute_action_on_server(action)
 
     def send_action_for_execution(self, action: Any) -> Any:
-        from backend.core.exceptions import AgentRuntimeTimeoutError
+        from backend.core.errors import AgentRuntimeTimeoutError
 
         try:
             self._validate_action_type(action)

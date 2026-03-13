@@ -12,7 +12,7 @@ from backend.controller.agent import Agent
 if TYPE_CHECKING:
     pass
 from backend.core.config.mcp_config import ForgeMCPConfig
-from backend.core.exceptions import AgentNotRegisteredError, PlaybookValidationError
+from backend.core.errors import AgentNotRegisteredError, PlaybookValidationError
 from backend.core.logger import ForgeLoggerAdapter
 from backend.core.schemas import AgentState
 from backend.events.action import MessageAction, NullAction

@@ -12,7 +12,7 @@ from typing import ClassVar
 import frontmatter
 from pydantic import BaseModel, ValidationError
 
-from backend.core.exceptions import PlaybookValidationError
+from backend.core.errors import PlaybookValidationError
 from backend.core.logger import forge_logger as logger
 from backend.playbook_engine.types import InputMetadata, PlaybookMetadata, PlaybookType
 

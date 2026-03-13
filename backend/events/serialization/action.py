@@ -6,7 +6,7 @@ import inspect
 from typing import Any, cast
 
 from backend.core.enums import ActionSecurityRisk
-from backend.core.exceptions import LLMMalformedActionError
+from backend.core.errors import LLMMalformedActionError
 from backend.events.action.action import Action
 from backend.events.action.agent import (
     AgentRejectAction,

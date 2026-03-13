@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 import pytest
 
-from backend.core.exceptions import FunctionCallValidationError
+from backend.core.errors import FunctionCallValidationError
 from backend.engines.orchestrator.function_calling import (
     _handle_cmd_run_tool,
     _handle_finish_tool,

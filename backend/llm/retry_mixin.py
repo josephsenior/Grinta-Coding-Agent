@@ -11,7 +11,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from backend.core.exceptions import LLMNoResponseError
+from backend.core.errors import LLMNoResponseError
 from backend.core.logger import forge_logger as logger
 from backend.utils.tenacity_metrics import (
     tenacity_after_factory,

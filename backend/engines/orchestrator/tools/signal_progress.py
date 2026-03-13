@@ -50,7 +50,7 @@ def create_signal_progress_tool() -> dict[str, Any]:
 
 def build_signal_progress_action(arguments: dict) -> SignalProgressAction:
     """Build a SignalProgressAction from tool call arguments."""
-    from backend.core.exceptions import FunctionCallValidationError
+    from backend.core.errors import FunctionCallValidationError
 
     note = arguments.get("progress_note", "")
     if not note:

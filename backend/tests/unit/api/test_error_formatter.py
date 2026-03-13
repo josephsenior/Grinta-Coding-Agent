@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 from backend.core.enums import ErrorCategory, ErrorSeverity
-from backend.core.exceptions import (
+from backend.core.errors import (
     AgentRuntimeUnavailableError,
     AgentStuckInLoopError,
     LLMContextWindowExceedError,

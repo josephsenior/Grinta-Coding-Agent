@@ -7,7 +7,7 @@ from backend.controller.services.exception_handler_service import (
     ExceptionHandlerService,
 )
 from backend.core.errors import ModelProviderError
-from backend.core.exceptions import LLMContextWindowExceedError
+from backend.core.errors import LLMContextWindowExceedError
 from backend.llm.exceptions import (
     APIConnectionError,
     APIError,

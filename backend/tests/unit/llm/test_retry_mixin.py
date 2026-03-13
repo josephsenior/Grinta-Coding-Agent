@@ -7,7 +7,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 
-from backend.core.exceptions import LLMNoResponseError
+from backend.core.errors import LLMNoResponseError
 from backend.llm.retry_mixin import RetryMixin
 
 

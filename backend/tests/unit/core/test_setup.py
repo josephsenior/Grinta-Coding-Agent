@@ -182,7 +182,7 @@ def test_create_agent_retry(mock_get_cls, mock_import):
     mock_config.default_agent = "my_agent"
     mock_config.get_agent_config.return_value = MagicMock()
 
-    from backend.core.exceptions import AgentNotRegisteredError
+    from backend.core.errors import AgentNotRegisteredError
 
     # 1. create_agent -> exc
     # 2. _ensure... -> exc
@@ -204,7 +204,7 @@ def test_create_agent_retry(mock_get_cls, mock_import):
 @patch("backend.controller.agent.Agent.get_cls")
 def test_ensure_agent_class_available_fatal(mock_get_cls):
     from backend.core.setup import _ensure_agent_class_available
-    from backend.core.exceptions import AgentNotRegisteredError
+    from backend.core.errors import AgentNotRegisteredError
 
     mock_get_cls.side_effect = AgentNotRegisteredError("any")
 

@@ -51,7 +51,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
 
     async def test_ensure_can_step_stuck_detection_blocks(self):
         """Test ensure_can_step eventually blocks when stuck persists."""
-        from backend.core.exceptions import AgentStuckInLoopError
+        from backend.core.errors import AgentStuckInLoopError
 
         self.mock_controller.circuit_breaker_service = None
 
@@ -211,7 +211,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
 
     async def test_handle_stuck_detection_stuck_calls_react_to_exception(self):
         """Test _handle_stuck_detection calls _react_to_exception with AgentStuckInLoopError."""
-        from backend.core.exceptions import AgentStuckInLoopError
+        from backend.core.errors import AgentStuckInLoopError
 
         mock_stuck_service = MagicMock()
         mock_stuck_service.is_stuck.return_value = True

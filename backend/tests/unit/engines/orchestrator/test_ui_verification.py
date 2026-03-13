@@ -6,7 +6,7 @@ from backend.engines.orchestrator.tools.verify_ui import (
     BROWSER_SERVER_NAME,
 )
 from backend.events.action.mcp import MCPAction
-from backend.core.exceptions import FunctionCallValidationError
+from backend.core.errors import FunctionCallValidationError
 
 
 def test_create_verify_ui_change_tool():

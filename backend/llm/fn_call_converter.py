@@ -12,7 +12,7 @@ import sys
 from collections.abc import Iterable
 from typing import Any
 
-from backend.core.exceptions import (
+from backend.core.errors import (
     FunctionCallConversionError,
     FunctionCallValidationError,
 )

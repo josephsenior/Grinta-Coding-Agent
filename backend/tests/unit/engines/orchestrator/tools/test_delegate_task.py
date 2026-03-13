@@ -4,7 +4,7 @@ import pytest
 
 from backend.events.action.agent import DelegateTaskAction
 from backend.events.observation.agent import DelegateTaskObservation
-from backend.core.exceptions import FunctionCallValidationError
+from backend.core.errors import FunctionCallValidationError
 from backend.engines.orchestrator.tools.delegate_task import (
     create_delegate_task_tool,
     build_delegate_task_action,

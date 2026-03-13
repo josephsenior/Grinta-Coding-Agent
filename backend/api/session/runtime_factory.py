@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping
 from types import MappingProxyType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.exceptions import AgentRuntimeUnavailableError
+from backend.core.errors import AgentRuntimeUnavailableError
 from backend.core.main import _setup_runtime_and_repo
 from backend.core.setup import initialize_repository_for_runtime
 from backend.events.stream import EventStream

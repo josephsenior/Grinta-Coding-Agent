@@ -9,7 +9,7 @@ import pytest
 from pydantic import BaseModel
 
 from backend.adapters.json import ForgeJSONEncoder, dumps, loads
-from backend.core.exceptions import LLMResponseError
+from backend.core.errors import LLMResponseError
 
 
 # ---------------------------------------------------------------------------

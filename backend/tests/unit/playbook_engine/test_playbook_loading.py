@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.core.exceptions import PlaybookValidationError
+from backend.core.errors import PlaybookValidationError
 from backend.playbook_engine.playbook import (
     BasePlaybook,
     KnowledgePlaybook,

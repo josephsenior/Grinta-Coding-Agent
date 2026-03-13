@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from backend.core.exceptions import LLMMalformedActionError
+from backend.core.errors import LLMMalformedActionError
 from backend.events.action import (
     CmdRunAction,
     MessageAction,

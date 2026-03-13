@@ -17,7 +17,7 @@ from typing import (
     Any,
 )
 
-from backend.core.exceptions import LLMNoResponseError
+from backend.core.errors import LLMNoResponseError
 from backend.core.logger import forge_logger as logger
 from backend.core.message import Message
 from backend.llm.debug_mixin import DebugMixin
