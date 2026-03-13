@@ -175,9 +175,12 @@ class OrchestratorSafetyManager:
         claimed_operations: list[str],
         missing_tools: list[str],
     ) -> str:
-        claimed_lines = "\n".join(f"  - {op}" for op in claimed_operations)
-        tool_hint = ", ".join(missing_tools) if missing_tools else "str_replace_editor"
-        return (
-            "You described operations in text but did not call the required tools.\n"
-            "Call the tool now, then move to the next step."
-        )
+        parts = ["⚠️ RELIABILITY WARNING: Potential hallucination detected."]
+        if claimed_operations:
+            claimed_lines = "\n".join(f"  - {op}" for op in claimed_operations)
+            parts.append(f"\nClaimed operations:\n{claimed_lines}")
+        if missing_tools:
+            tool_hint = ", ".join(missing_tools)
+            parts.append(f"\nRequired tools not called: {tool_hint}")
+        parts.append("\nCall the actual tool now, then move to the next step.")
+        return "\n".join(parts)

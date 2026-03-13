@@ -414,11 +414,38 @@ class TreeSitterEditor:
                 message=f"Could not locate function body for '{function_name}'",
             )
 
+        # Expand body range to include comments/decorators between ':'
+        # and the block node.  Tree-sitter places comments as siblings of
+        # the block, so _get_function_body_node returns only the block.
+        body_start = body_node.start_byte
+        body_end = body_node.end_byte
+        colon_end: int | None = None
+        for child in func_node.children:
+            if child.type == ":":
+                colon_end = child.end_byte
+                break
+        if colon_end is not None:
+            for child in func_node.children:
+                if child.start_byte >= colon_end and child.type not in (
+                    ":",
+                    "NEWLINE",
+                    "INDENT",
+                    "DEDENT",
+                    "newline",
+                ):
+                    body_start = min(body_start, child.start_byte)
+                    body_end = max(body_end, child.end_byte)
+
         # Replace the body
         try:
-            # Build new content
+            # Build new content using expanded body range
+            from types import SimpleNamespace
+
+            effective_body = SimpleNamespace(
+                start_byte=body_start, end_byte=body_end
+            )
             new_code = self._replace_node_content(
-                original_code, body_node, new_body, preserve_indentation=True
+                original_code, effective_body, new_body, preserve_indentation=True
             )
 
             # Validate if requested
@@ -431,6 +458,11 @@ class TreeSitterEditor:
                         syntax_valid=False,
                         original_code=original_code,
                     )
+
+            # Normalize \r\n → \n before writing in text mode to
+            # prevent doubling (original_code from binary read has \r\n,
+            # text-mode write would add another \r).
+            new_code = new_code.replace("\r\n", "\n").replace("\r", "\n")
 
             # Write back
             with open(file_path, "w", encoding="utf-8") as f:
@@ -501,6 +533,11 @@ class TreeSitterEditor:
                 syntax_valid=False,
                 original_code=original_code,
             )
+
+        # Normalize \r\n → \n before writing in text mode to
+        # prevent doubling (original_code from binary read has \r\n,
+        # text-mode write would add another \r).
+        new_code = new_code.replace("\r\n", "\n").replace("\r", "\n")
 
         # Write back
         with open(file_path, "w", encoding="utf-8") as f:

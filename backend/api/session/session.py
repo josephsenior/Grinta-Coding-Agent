@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 from typing import TYPE_CHECKING
 
@@ -117,6 +118,8 @@ class Session:
         self.is_alive = False
         await self.agent_session.close()
         self._monitor_publish_queue_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await self._monitor_publish_queue_task
 
     # ------------------------------------------------------------------ #
     # Settings consolidation                                              #

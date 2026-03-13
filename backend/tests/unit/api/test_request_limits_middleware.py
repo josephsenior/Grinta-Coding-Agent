@@ -101,12 +101,23 @@ class TestDispatch:
         assert exc_info.value.status_code == 413
 
     @pytest.mark.asyncio
-    async def test_missing_content_length_passes(self):
+    async def test_missing_content_length_small_body_passes(self):
         limiter = RequestSizeLimiter(_make_app(), max_request_size=100, enabled=True)
         req = _make_request(method="POST")
+        req.body = AsyncMock(return_value=b"small")
         call_next = AsyncMock(return_value=MagicMock())
         await limiter.dispatch(req, call_next)
         call_next.assert_awaited_once_with(req)
+
+    @pytest.mark.asyncio
+    async def test_missing_content_length_large_body_rejected(self):
+        limiter = RequestSizeLimiter(_make_app(), max_request_size=100, enabled=True)
+        req = _make_request(method="POST")
+        req.body = AsyncMock(return_value=b"x" * 200)
+        call_next = AsyncMock(return_value=MagicMock())
+        with pytest.raises(HTTPException) as exc_info:
+            await limiter.dispatch(req, call_next)
+        assert exc_info.value.status_code == 413
 
     @pytest.mark.asyncio
     async def test_invalid_content_length_passes(self):

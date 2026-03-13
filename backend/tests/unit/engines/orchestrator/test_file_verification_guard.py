@@ -274,11 +274,10 @@ class TestSafeFilePath:
 # ---------------------------------------------------------------------------
 
 class TestInjectVerificationCommands:
+    """inject_verification_commands is now a pass-through (returns actions unchanged)."""
+
     def setup_method(self):
         self.g = FileVerificationGuard()
-        # Mock is_stale_read to False by default to avoid stale-read re-read injection
-        # in these tests, as they focus on verification injection.
-        cast(Any, self.g).is_stale_read = MagicMock(return_value=False)
 
     def test_non_file_action_not_duplicated(self):
         action = _make_action_no_path()
@@ -287,52 +286,36 @@ class TestInjectVerificationCommands:
         assert result[0] is action
 
     def test_file_action_gets_verification_appended(self):
-        """A file action should produce a CmdRunAction appended after it."""
+        """Pass-through: file actions are returned unchanged."""
         action = _make_action(path="/tmp/test.py")
-        with patch(
-            "backend.engines.orchestrator.file_verification_guard.FileVerificationGuard._create_verification_command"
-        ) as mock_create:
-            mock_create.return_value = MagicMock(name="VerifyCmd")
-            result = self.g.inject_verification_commands([action], turn=2)
-        # Original + injected verification
-        assert len(result) == 2
-        mock_create.assert_called_once_with("/tmp/test.py")
+        result = self.g.inject_verification_commands([action], turn=2)
+        assert len(result) == 1
+        assert result[0] is action
 
     def test_stats_incremented_after_file_op(self):
+        """Pass-through: no verifications are injected."""
         action = _make_action(path="/tmp/file.py")
-        with patch(
-            "backend.engines.orchestrator.file_verification_guard.FileVerificationGuard._create_verification_command"
-        ) as mock_create:
-            mock_create.return_value = MagicMock(name="VerifyCmd")
-            self.g.inject_verification_commands([action], turn=1)
-        assert self.g.stats["verifications_injected"] == 1
+        self.g.inject_verification_commands([action], turn=1)
+        assert self.g.stats["verifications_injected"] == 0
 
     def test_pending_operations_registered(self):
+        """Pass-through: no pending operations registered."""
         action = _make_action(path="/project/main.py")
-        with patch(
-            "backend.engines.orchestrator.file_verification_guard.FileVerificationGuard._create_verification_command"
-        ) as mock_create:
-            mock_create.return_value = MagicMock(name="VerifyCmd")
-            self.g.inject_verification_commands([action], turn=3)
-        assert len(self.g.pending_file_operations) == 1
-        assert "/project/main.py" in self.g.pending_file_operations[0].file_paths
-        assert self.g.pending_file_operations[0].turn_started == 3
+        self.g.inject_verification_commands([action], turn=3)
+        assert len(self.g.pending_file_operations) == 0
 
     def test_no_verification_when_create_returns_none(self):
-        """If _create_verification_command returns None, no extra action added."""
+        """Pass-through: returns input unchanged."""
         action = _make_action(path="/tmp/file.py")
-        with patch.object(self.g, "_create_verification_command", return_value=None):
-            result = self.g.inject_verification_commands([action], turn=1)
+        result = self.g.inject_verification_commands([action], turn=1)
         assert len(result) == 1
 
     def test_multiple_file_actions_all_get_verification(self):
+        """Pass-through: multiple actions returned unchanged."""
         a1 = _make_action(path="/tmp/a.py")
         a2 = _make_action(path="/tmp/b.py")
-        with patch.object(
-            self.g, "_create_verification_command", return_value=MagicMock(name="VC")
-        ):
-            result = self.g.inject_verification_commands([a1, a2], turn=1)
-        assert len(result) == 4  # each action + its verification
+        result = self.g.inject_verification_commands([a1, a2], turn=1)
+        assert len(result) == 2  # pass-through, no extras
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +342,7 @@ class TestValidateResponse:
         valid, err = self.g.validate_response(text, [])
         assert valid is False
         assert err is not None
-        assert "HALLUCINATION" in err.upper() or "hallucination" in err.lower() or "HALLUCINATION" in err
+        assert "did not call the required tools" in err.lower()
 
     def test_hallucination_increments_stat(self):
         text = "I wrote utils/helpers.py to disk."

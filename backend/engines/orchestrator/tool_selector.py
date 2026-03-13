@@ -37,6 +37,8 @@ _CORE_TOOLS = frozenset(
         # Reasoning
         "think",
         "finish",
+        # Task tracking — always available for planning multi-step work
+        "task_tracker",
         # Memory — both flat and structured memory survive condensation
         "note",
         "recall",
@@ -181,7 +183,7 @@ def _compute_allowed_tools(
     unlocks: list[tuple[bool, list[str]]] = [
         # Contextual tools — unlocked by specific conditions
         (turn >= 3 or is_complex_task, ["delegate_task", "blackboard"]),
-        (turn >= 5, ["task_tracker"]),
+
         (error_count >= 2, ["error_patterns", "revert_to_safe_state"]),
         (turn >= 5, ["checkpoint"]),
         (edit_count >= 3, ["session_diff"]),

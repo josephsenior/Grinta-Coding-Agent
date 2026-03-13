@@ -33,6 +33,8 @@ class AutoCondenser(Condenser):
         super().__init__()
         self._llm_config_name = llm_config_name
         self._llm_registry = llm_registry
+        self._cached_delegate: Condenser | None = None
+        self._cached_config_type: str | None = None
 
     def condense(self, view: View) -> View | Condensation:
         """Select the best condenser for the current event stream and delegate."""
@@ -46,8 +48,11 @@ class AutoCondenser(Condenser):
             config.type,
             len(events),
         )
-        delegate = Condenser.from_config(config, self._llm_registry)
-        return delegate.condense(view)
+        # Reuse cached delegate when the strategy type hasn't changed.
+        if config.type != self._cached_config_type:
+            self._cached_delegate = Condenser.from_config(config, self._llm_registry)
+            self._cached_config_type = config.type
+        return self._cached_delegate.condense(view)
 
     @classmethod
     def from_config(

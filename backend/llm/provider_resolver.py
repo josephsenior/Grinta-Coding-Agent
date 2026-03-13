@@ -7,8 +7,8 @@ to the correct provider without manual configuration.
 
 from __future__ import annotations
 
-import functools
 import socket
+import time
 
 import httpx
 
@@ -142,9 +142,13 @@ class ProviderResolver:
         Returns:
             Discovered endpoint URL or None
         """
-        # Check cache first
+        # Check cache first, respecting TTL
+        now = time.monotonic()
         if provider in self._discovered_endpoints:
-            return self._discovered_endpoints[provider]
+            if now - self._last_discovery < self._discovery_cache_ttl:
+                return self._discovered_endpoints[provider]
+            # TTL expired — re-probe
+            del self._discovered_endpoints[provider]
 
         endpoints = LOCAL_ENDPOINTS.get(provider, [])
 
@@ -152,6 +156,7 @@ class ProviderResolver:
             if self._probe_endpoint(url):
                 logger.info("Discovered %s endpoint at %s", provider, url)
                 self._discovered_endpoints[provider] = url
+                self._last_discovery = now
                 return url
 
         logger.debug("No local endpoint found for %s", provider)
@@ -199,24 +204,21 @@ class ProviderResolver:
             True if endpoint responds to /v1/models or similar
         """
         try:
-            client = httpx.Client(timeout=timeout, follow_redirects=True)
-            test_urls = [
-                f"{url}/v1/models",
-                f"{url}/models",
-                f"{url}/api/tags",  # Ollama specific
-            ]
+            with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+                test_urls = [
+                    f"{url}/v1/models",
+                    f"{url}/models",
+                    f"{url}/api/tags",  # Ollama specific
+                ]
 
-            for test_url in test_urls:
-                try:
-                    response = client.get(test_url)
-                    if response.status_code in (200, 401, 403):
-                        # 200 = success, 401/403 = auth required but endpoint exists
-                        client.close()
-                        return True
-                except Exception:
-                    continue
-
-            client.close()
+                for test_url in test_urls:
+                    try:
+                        response = client.get(test_url)
+                        if response.status_code in (200, 401, 403):
+                            # 200 = success, 401/403 = auth required but endpoint exists
+                            return True
+                    except Exception:
+                        continue
         except Exception:
             pass
 
@@ -236,26 +238,19 @@ class ProviderResolver:
             return []
 
         try:
-            client = httpx.Client(timeout=5.0)
-
-            if provider == "ollama":
-                # Ollama API
-                response = client.get(f"{endpoint.replace('/v1', '')}/api/tags")
-                if response.status_code == 200:
-                    data = response.json()
-                    models = [m["name"] for m in data.get("models", [])]
-                    client.close()
-                    return models
-            else:
-                # OpenAI-compatible /v1/models
-                response = client.get(f"{endpoint}/v1/models")
-                if response.status_code == 200:
-                    data = response.json()
-                    models = [m["id"] for m in data.get("data", [])]
-                    client.close()
-                    return models
-
-            client.close()
+            with httpx.Client(timeout=5.0) as client:
+                if provider == "ollama":
+                    # Ollama API
+                    response = client.get(f"{endpoint.replace('/v1', '')}/api/tags")
+                    if response.status_code == 200:
+                        data = response.json()
+                        return [m["name"] for m in data.get("models", [])]
+                else:
+                    # OpenAI-compatible /v1/models
+                    response = client.get(f"{endpoint}/v1/models")
+                    if response.status_code == 200:
+                        data = response.json()
+                        return [m["id"] for m in data.get("data", [])]
         except Exception as e:
             logger.debug("Failed to query %s models: %s", provider, e)
 
@@ -295,7 +290,6 @@ class ProviderResolver:
 _resolver: ProviderResolver | None = None
 
 
-@functools.lru_cache(maxsize=1)
 def get_resolver() -> ProviderResolver:
     """Get the global provider resolver instance."""
     global _resolver

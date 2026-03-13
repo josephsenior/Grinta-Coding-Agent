@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import inspect
 import os
-import subprocess
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -254,35 +253,22 @@ class CircuitBreakerMiddleware(ToolInvocationMiddleware):
 
     async def execute(self, ctx: ToolInvocationContext) -> None:
         service = getattr(self.controller, "circuit_breaker_service", None)
-        security_risk = getattr(ctx.action, "security_risk", None)
         if service:
+            security_risk = getattr(ctx.action, "security_risk", None)
             service.record_high_risk_action(security_risk)
-            return
-        circuit_breaker = getattr(self.controller, "circuit_breaker", None)
-        if circuit_breaker and security_risk is not None:
-            circuit_breaker.record_high_risk_action(security_risk)
 
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None
     ) -> None:
         service = getattr(self.controller, "circuit_breaker_service", None)
-        if service and observation is not None:
-            from backend.events.observation import ErrorObservation
-
-            if isinstance(observation, ErrorObservation):
-                service.record_error(RuntimeError(observation.content))
-            else:
-                service.record_success()
-            return
-        circuit_breaker = getattr(self.controller, "circuit_breaker", None)
-        if not circuit_breaker or observation is None:
+        if not service or observation is None:
             return
         from backend.events.observation import ErrorObservation
 
         if isinstance(observation, ErrorObservation):
-            circuit_breaker.record_error(RuntimeError(observation.content))
+            service.record_error(RuntimeError(observation.content))
         else:
-            circuit_breaker.record_success()
+            service.record_success()
 
 
 class CostQuotaMiddleware(ToolInvocationMiddleware):
@@ -761,38 +747,88 @@ class EditVerifyMiddleware(ToolInvocationMiddleware):
         return  # The editor tool already confirms success; extra hints cause loops
 
 
-def _get_syntax_check_cmd(path: str) -> list[str] | None:
-    """Return syntax check command for path, or None if unsupported."""
+def _treesitter_syntax_check(path: str, content: bytes | None = None) -> tuple[bool, str] | None:
+    """Check syntax using tree-sitter.
+
+    Args:
+        path: File path (used to determine language from extension).
+        content: File content as bytes.  When provided the file is NOT read
+            from disk — this is critical because the path may only exist
+            inside a sandbox / container.
+
+    Returns:
+        (is_valid, error_detail) or None if language not supported.
+    """
+    from backend.utils.treesitter_editor import (
+        LANGUAGE_EXTENSIONS,
+        TREE_SITTER_AVAILABLE,
+        _get_parser,
+    )
+
+    if not TREE_SITTER_AVAILABLE or _get_parser is None:
+        return None
+
     _, ext = os.path.splitext(path)
     ext = ext.lower()
-    if ext == ".py":
-        return ["python", "-m", "py_compile", path]
-    # node --check cannot parse TypeScript (.ts/.tsx) and fails on JS files
-    # that import from uninstalled packages, producing false SYNTAX_CHECK_FAILED
-    # noise that derails the agent.  Skip syntax checking for JS/TS entirely.
-    return None
+    language = LANGUAGE_EXTENSIONS.get(ext)
+    if not language:
+        return None
+
+    try:
+        parser = _get_parser(language)
+    except Exception:
+        return None
+    if not parser:
+        return None
+
+    # If no content supplied, try reading from disk (local-runtime case).
+    if content is None:
+        try:
+            with open(path, "rb") as f:
+                content = f.read()
+        except (OSError, IOError):
+            return None
+
+    tree = parser.parse(content)
+    errors = _collect_syntax_errors(tree.root_node, content, max_errors=5)
+    if not errors:
+        return (True, "")
+    detail = "; ".join(errors)
+    return (False, detail)
 
 
-def _append_syntax_check_result(
-    observation: Observation,
-    result: subprocess.CompletedProcess[Any] | None,
-    exc: BaseException | None,
-) -> None:
-    """Append syntax check result to observation content."""
-    current = getattr(observation, "content", "") or ""
-    if exc is not None:
-        observation.content = current + (
-            f"\n<SYNTAX_CHECK_FAILED>\nMiddleware execution error: {exc}\n</SYNTAX_CHECK_FAILED>"
-        )
-    elif result is not None and result.returncode != 0:
-        stderr = (result.stderr or "").strip() or (result.stdout or "").strip()
-        observation.content = current + f"\n<SYNTAX_CHECK_FAILED>\n{stderr}\n</SYNTAX_CHECK_FAILED>"
-    else:
-        observation.content = current + "\n<SYNTAX_CHECK_PASSED />"
+def _collect_syntax_errors(
+    node: Any, source: bytes, max_errors: int = 5
+) -> list[str]:
+    """Walk tree-sitter AST and collect ERROR/MISSING node descriptions."""
+    errors: list[str] = []
+
+    def _walk(n: Any) -> None:
+        if len(errors) >= max_errors:
+            return
+        if n.type == "ERROR" or n.is_missing:
+            row = n.start_point[0] + 1
+            col = n.start_point[1] + 1
+            # Extract the problematic source snippet
+            snippet = source[n.start_byte : n.end_byte].decode("utf-8", errors="replace")
+            if len(snippet) > 60:
+                snippet = snippet[:60] + "..."
+            kind = "missing node" if n.is_missing else "syntax error"
+            errors.append(f"line {row}:{col} {kind}: {snippet!r}")
+            return  # don't recurse into ERROR subtrees
+        for child in n.children:
+            _walk(child)
+
+    _walk(node)
+    return errors
 
 
 class AutoCheckMiddleware(ToolInvocationMiddleware):
-    """Automatically checks syntax of files after editing."""
+    """Automatically checks syntax of files after editing.
+
+    Uses tree-sitter for language-agnostic syntax validation (45+ languages).
+    No subprocess overhead, no false positives from unresolved imports.
+    """
 
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None
@@ -809,12 +845,24 @@ class AutoCheckMiddleware(ToolInvocationMiddleware):
         path = getattr(ctx.action, "path", None)
         if not path:
             return
-        cmd = _get_syntax_check_cmd(path)
-        if not cmd:
-            return
 
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            _append_syntax_check_result(observation, result, None)
-        except Exception as e:
-            _append_syntax_check_result(observation, None, e)
+        # Extract content from the action so we don't need filesystem access
+        # (the file may only exist inside a sandbox/container).
+        raw = None
+        if isinstance(ctx.action, FileEditAction):
+            raw = getattr(ctx.action, "file_text", None) or getattr(ctx.action, "content", None)
+        elif isinstance(ctx.action, FileWriteAction):
+            raw = getattr(ctx.action, "content", None)
+
+        content = raw.encode("utf-8") if raw else None
+
+        result = _treesitter_syntax_check(path, content)
+        if result is None:
+            return  # unsupported language or tree-sitter unavailable
+
+        current = getattr(observation, "content", "") or ""
+        is_valid, detail = result
+        if is_valid:
+            observation.content = current + "\n<SYNTAX_CHECK_PASSED />"
+        else:
+            observation.content = current + f"\n<SYNTAX_CHECK_FAILED>\n{detail}\n</SYNTAX_CHECK_FAILED>"

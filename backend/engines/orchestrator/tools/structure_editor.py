@@ -267,8 +267,9 @@ class StructureEditor:
                 success=False, message=f"Cannot detect language for {file_path}"
             )
 
-        # Auto-indent new body if requested
-        new_body = self._handle_auto_indent(file_path, language, new_body)
+        # Skip auto-indent: the tree-sitter _replace_node_content already
+        # handles indentation via preserve_indentation=True, so adding
+        # auto-indent here would double-indent the result.
 
         # Perform edit
         result = self.universal.edit_function(

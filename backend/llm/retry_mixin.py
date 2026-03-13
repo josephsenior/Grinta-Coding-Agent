@@ -35,7 +35,10 @@ class RetryMixin:
 
         """
         num_retries = kwargs.get("num_retries", 3)
-        retry_exceptions: tuple = kwargs.get("retry_exceptions", ())
+        retry_exceptions: tuple = kwargs.get(
+            "retry_exceptions",
+            (RuntimeError, TimeoutError, ConnectionError),
+        )
         retry_min_wait = kwargs.get("retry_min_wait", 1)
         retry_max_wait = kwargs.get("retry_max_wait", 10)
         retry_multiplier = kwargs.get("retry_multiplier", 1)

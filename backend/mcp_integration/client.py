@@ -66,8 +66,10 @@ class MCPClient(BaseModel):
         if self.client is not None and self._session_active:
             try:
                 await self.client.__aexit__(None, None, None)
-            except Exception:
-                pass
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("MCP session close failed: %s", exc, exc_info=True)
             self._session_active = False
 
     async def _populate_tools(self) -> None:

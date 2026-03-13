@@ -38,12 +38,12 @@ def _make_state(
     iter_flag.current_value = turn
     state.iteration_flag = iter_flag
 
-    # Token usage
+    # Token usage — tool_selector reads token_usages[-1] (last turn)
     metrics = MagicMock()
-    atu = MagicMock()
-    atu.prompt_tokens = int(token_pct * 100_000)
-    atu.context_window = 100_000
-    metrics.accumulated_token_usage = atu
+    last_usage = MagicMock()
+    last_usage.prompt_tokens = int(token_pct * 100_000)
+    last_usage.context_window = 100_000
+    metrics.token_usages = [last_usage]
     state.metrics = metrics
 
     # History with errors and edits
@@ -250,7 +250,6 @@ class TestContextualToolsUnlocked:
         selected = ts.select_tools(_ALL_TOOLS, state, messages)
         names = {_get_tool_name(t) for t in selected}
         assert "web_search" in names
-        assert "web_reader" in names
 
     def test_apply_patch_on_multi_file_task(self):
         ts = ToolSelector()

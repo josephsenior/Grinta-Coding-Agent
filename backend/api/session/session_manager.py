@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from backend.core.logger import forge_logger as logger
@@ -29,6 +30,7 @@ class SessionManager:
     def __init__(self):
         """Initialize the active session registry."""
         self._active_sessions: dict[str, Session] = {}
+        self._lock = threading.Lock()
         logger.info("SessionManager initialized")
 
     def get_active_sessions(self) -> dict[str, Session]:
@@ -38,7 +40,8 @@ class SessionManager:
             Dictionary of active sessions keyed by session ID
 
         """
-        return self._active_sessions.copy()
+        with self._lock:
+            return self._active_sessions.copy()
 
     def add_session(self, session: Session) -> None:
         """Add a session to the active sessions.
@@ -47,7 +50,8 @@ class SessionManager:
             session: The session to add
 
         """
-        self._active_sessions[session.sid] = session
+        with self._lock:
+            self._active_sessions[session.sid] = session
         logger.info("Added session %s", session.sid)
 
     def remove_session(self, session_id: str) -> None:
@@ -57,8 +61,9 @@ class SessionManager:
             session_id: The ID of the session to remove
 
         """
-        if session_id in self._active_sessions:
-            del self._active_sessions[session_id]
+        with self._lock:
+            removed = self._active_sessions.pop(session_id, None)
+        if removed is not None:
             logger.info("Removed session %s", session_id)
 
     def get_session(self, session_id: str) -> Session | None:
@@ -71,7 +76,8 @@ class SessionManager:
             The session if found, None otherwise
 
         """
-        return self._active_sessions.get(session_id)
+        with self._lock:
+            return self._active_sessions.get(session_id)
 
     def get_session_count(self) -> int:
         """Get the number of active sessions.
@@ -80,4 +86,5 @@ class SessionManager:
             Number of active sessions
 
         """
-        return len(self._active_sessions)
+        with self._lock:
+            return len(self._active_sessions)

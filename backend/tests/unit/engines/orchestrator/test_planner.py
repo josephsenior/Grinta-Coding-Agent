@@ -8,8 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.engines.orchestrator.planner import (
-    ACTION_PATTERNS,
-    QUESTION_PATTERNS,
     OrchestratorPlanner,
 )
 
@@ -88,17 +86,7 @@ def _make_state() -> MagicMock:
 
 
 class TestPatternConstants:
-    def test_question_patterns_not_empty(self):
-        assert len(QUESTION_PATTERNS) > 0
-
-    def test_action_patterns_not_empty(self):
-        assert len(ACTION_PATTERNS) > 0
-
-    def test_question_patterns_are_strings(self):
-        assert all(isinstance(p, str) for p in QUESTION_PATTERNS)
-
-    def test_action_patterns_are_strings(self):
-        assert all(isinstance(p, str) for p in ACTION_PATTERNS)
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -217,75 +205,6 @@ class TestGetLastUserMessage:
 
 
 # ---------------------------------------------------------------------------
-# _is_question / _is_action
-# ---------------------------------------------------------------------------
-
-
-class TestIsQuestion:
-    def setup_method(self):
-        self.p = _make_planner()
-
-    def test_why_is_question(self):
-        assert self.p._is_question("why does this happen?") is True
-
-    def test_how_does_is_question(self):
-        assert self.p._is_question("how does the caching work?") is True
-
-    def test_what_is_is_question(self):
-        assert self.p._is_question("what is the timeout?") is True
-
-    def test_what_are_is_question(self):
-        assert self.p._is_question("what are the supported models?") is True
-
-    def test_explain_is_question(self):
-        assert self.p._is_question("explain what this does") is True
-
-    def test_tell_me_is_question(self):
-        assert self.p._is_question("tell me about it") is True
-
-    def test_trailing_question_mark(self):
-        assert self.p._is_question("do you understand?") is True
-
-    def test_action_not_question(self):
-        assert self.p._is_question("create a new file") is False
-
-    def test_plain_statement_not_question(self):
-        assert self.p._is_question("go ahead with the plan") is False
-
-
-class TestIsAction:
-    def setup_method(self):
-        self.p = _make_planner()
-
-    def test_create_is_action(self):
-        assert self.p._is_action("create a file") is True
-
-    def test_make_is_action(self):
-        assert self.p._is_action("make a script") is True
-
-    def test_fix_is_action(self):
-        assert self.p._is_action("fix the bug") is True
-
-    def test_implement_is_action(self):
-        assert self.p._is_action("implement the feature") is True
-
-    def test_delete_is_action(self):
-        assert self.p._is_action("delete this module") is True
-
-    def test_update_is_action(self):
-        assert self.p._is_action("update the config") is True
-
-    def test_install_is_action(self):
-        assert self.p._is_action("install dependencies") is True
-
-    def test_build_is_action(self):
-        assert self.p._is_action("build the project") is True
-
-    def test_question_not_action(self):
-        assert self.p._is_action("how does this work?") is False
-
-
-# ---------------------------------------------------------------------------
 # _determine_tool_choice
 # ---------------------------------------------------------------------------
 
@@ -304,24 +223,22 @@ class TestDetermineToolChoice:
         messages = [{"role": "user", "content": "what is this?"}]
         assert p._determine_tool_choice(messages, self.state) == "auto"
 
-    def test_action_returns_required(self):
+    def test_action_returns_auto(self):
+        """Actions now return 'auto' — LLM decides tool usage."""
         p = _make_planner()
         messages = [{"role": "user", "content": "create a file"}]
-        assert p._determine_tool_choice(messages, self.state) == "required"
+        assert p._determine_tool_choice(messages, self.state) == "auto"
 
     def test_plain_chat_returns_none(self):
         p = _make_planner()
         messages = [{"role": "user", "content": "say hello back please"}]
         assert p._determine_tool_choice(messages, self.state) == "none"
 
-    def test_unknown_message_delegates_to_safety(self):
-        safety = _make_safety()
-        safety.should_enforce_tools.return_value = "none"
-        p = _make_planner(safety=safety)
+    def test_generic_message_returns_auto(self):
+        """Messages that aren't plain chat default to 'auto'."""
+        p = _make_planner()
         messages = [{"role": "user", "content": "go ahead"}]
-        result = p._determine_tool_choice(messages, self.state)
-        assert result == "none"
-        safety.should_enforce_tools.assert_called_once()
+        assert p._determine_tool_choice(messages, self.state) == "auto"
 
 
 # ---------------------------------------------------------------------------
@@ -524,7 +441,7 @@ class TestBuildLlmParams:
         with patch("backend.engines.orchestrator.planner.check_tools", return_value=[]):
             params = p.build_llm_params(messages, state, [])
         assert "tool_choice" in params
-        assert params["tool_choice"] == "required"
+        assert params["tool_choice"] == "auto"
 
     def test_plain_chat_disables_tools_for_turn(self):
         p = _make_planner(llm=_make_llm("google/gemini-3-flash"))

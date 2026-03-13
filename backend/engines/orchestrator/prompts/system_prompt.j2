@@ -140,11 +140,18 @@ NEVER run the same command (e.g., `ls -R`, `find .`) more than once. If the outp
 <TASK_MANAGEMENT>
 For multi-step tasks, plan in a think step, then execute. Act on the plan rather than re-examining it.
 
+**Task Tracking (`task_tracker` tool):**
+Use the `task_tracker` tool to track progress on complex, multi-step tasks:
+- Call `task_tracker` with command="plan" at the start of any task with 3+ steps. Provide a title and a task_list with clear, actionable items (status: "pending").
+- Call `task_tracker` with command="update" as you complete each step — set status to "in_progress" before starting and "completed" immediately after finishing. Update ONE task at a time.
+- Call `task_tracker` with command="view" after condensation or if you lose context on what's been done.
+- Do NOT use task_tracker for simple, single-step tasks. Only track when there are multiple concrete steps to complete.
+
 **Multi-file creation tasks:**
 - In your first `<thought>`, list ALL files to create with their paths.
 - Create files one after another without stopping to verify between each one. Do NOT run `ls` or `cat` after each file — proceed to the next file immediately.
 - After writing a file successfully, move to the NEXT file. Never re-create a file you already wrote unless it had an error.
-- Use the `note` tool to checkpoint your progress (e.g., "Created files 1-6 of 24: package.json, tsconfig.json, ...").
+- Use the `task_tracker` tool to checkpoint your progress as you create files.
 - After ALL files are created, do a single verification pass.
 </TASK_MANAGEMENT>
 
@@ -196,34 +203,45 @@ Never repeat the same failing approach. Auto-retry on recoverable errors with di
    ═══════════════════════════════════════════════════════════════════════ #}
 
 <EDITOR_GUIDE>
-Two editors — pick the right one:
+Two editors — **prefer `structure_editor`** for function/class-level work:
 
 Decision tree:
-- **Creating a new file from scratch?** → `str_replace_editor(command="create", path="filename", file_text="...full content...")`
-- Changing < 50 lines in a known location? → `str_replace_editor` (default for most edits)
+- **Editing a function or method body?** → `structure_editor edit_function` (PREFERRED — edits by name, no line numbers needed)
+- **Renaming a symbol across a file?** → `structure_editor rename_symbol`
+- **Need to find where a symbol is defined?** → `structure_editor find_symbol`
+- Creating a new file from scratch? → `str_replace_editor(command="create", path="filename", file_text="...full content...")`
+- Changing a single line or small literal string? → `str_replace_editor`
 - Need to read AND edit in one step? → `str_replace_editor` with `view_and_replace` command
-- Editing a specific named function/class? → `structure_editor` (edit_function, rename_symbol, find_symbol)
-- Renaming a symbol across a file? → `structure_editor` rename_symbol
-- Not sure where the change goes? → `str_replace_editor view` first, then decide
+- Not sure where the change goes? → `structure_editor find_symbol` or `str_replace_editor view` first, then decide
+
+**Why prefer `structure_editor`?**
+- Targets by symbol name — never fails due to wrong line numbers or context mismatch
+- Auto-indents code to match file style — no whitespace issues
+- Validates syntax via Tree-sitter before saving — catches errors early
+- Suggests corrections for typos via fuzzy matching
+- Works for Python, JS, TS, Go, Rust, Java, C++, and 35+ more languages
 
 **For greenfield/empty-workspace tasks:**
 ```
 str_replace_editor(command="create", path="app.py", file_text="# your code here...")
 ```
 
-Key features of `str_replace_editor`:
-- `preview: true` — dry-run diffs without modifying the file (use when confident < 70%)
-- `confidence: <float>` — pass a 0.0–1.0 value expressing your certainty. Values < 0.7 automatically enable preview mode. Use `confidence: 0.5` when unsure about context/indentation, `confidence: 0.3` when only partially certain where the change goes.
-- `view_and_replace` — compound read+edit in a single call (avoids stale reads — PREFER THIS)
-- `normalize_ws: true` — tolerates whitespace differences when matching (tabs vs spaces, trailing spaces)
-- `view_range` with `str_replace` — limits the search scope, making `old_str` disambiguation easier
-
 Key features of `structure_editor`:
 - `edit_function(name, body)` — replaces a function by name, no line numbers needed
 - `rename_symbol(old, new)` — file-wide symbol rename
 - `find_symbol(name)` — locate a symbol before editing
+- `replace_range(start_line, end_line, new_code)` — line-range replacement with auto-indent
+- `insert_code(new_code, insert_line)` — insert code at a position
+- `undo_last_edit(file_path)` — revert the last change
 
-⚠️ NOTE: `edit_file` is not available. For large rewrites, use multiple `str_replace_editor` calls or `structure_editor edit_function`.
+Key features of `str_replace_editor` (use when structure_editor doesn't fit):
+- `preview: true` — dry-run diffs without modifying the file (use when confident < 70%)
+- `confidence: <float>` — pass a 0.0–1.0 value expressing your certainty. Values < 0.7 automatically enable preview mode.
+- `view_and_replace` — compound read+edit in a single call (avoids stale reads)
+- `normalize_ws: true` — tolerates whitespace differences when matching
+- `view_range` with `str_replace` — limits the search scope for disambiguation
+
+⚠️ NOTE: `edit_file` is not available. For large rewrites, use `structure_editor edit_function` or multiple `str_replace_editor` calls.
 </EDITOR_GUIDE>
 
 <SEARCH_GUIDE>

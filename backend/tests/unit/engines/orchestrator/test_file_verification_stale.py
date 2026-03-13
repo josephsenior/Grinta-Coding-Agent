@@ -106,43 +106,31 @@ class TestRecordTracking:
 
 
 class TestStaleReadInjection:
+    """inject_verification_commands is now a pass-through, so stale-read
+    injection no longer occurs."""
+
     def setup_method(self):
         self.g = FileVerificationGuard()
 
     def test_stale_file_gets_read_injected_before_edit(self):
-        """Editing a never-read file should inject a read before the edit."""
+        """Pass-through: no stale-read injection."""
         action = _make_edit_action("/src/main.py")
-        with patch.object(
-            self.g, "_create_verification_command", return_value=MagicMock()
-        ):
-            result = self.g.inject_verification_commands([action], turn=5)
-        # Should have: stale-read action + original action + verification
-        assert len(result) >= 2
-        # First action should be the stale-read (it has "STALE-READ" in thought)
-        first = result[0]
-        assert "STALE-READ" in getattr(first, "thought", "")
+        result = self.g.inject_verification_commands([action], turn=5)
+        assert len(result) == 1
+        assert result[0] is action
 
     def test_recently_read_file_no_extra_read(self):
-        """Editing a recently-read file should NOT inject an extra read."""
+        """Pass-through: no extra actions regardless of read status."""
         self.g.record_file_read("/src/main.py", turn=4)
         action = _make_edit_action("/src/main.py")
-        with patch.object(
-            self.g, "_create_verification_command", return_value=MagicMock()
-        ):
-            result = self.g.inject_verification_commands([action], turn=5)
-        # Should only have: original action + verification (no stale-read)
-        # Check that no action has "STALE-READ" in its thought
-        stale_reads = [a for a in result if "STALE-READ" in getattr(a, "thought", "")]
-        assert len(stale_reads) == 0
+        result = self.g.inject_verification_commands([action], turn=5)
+        assert len(result) == 1
 
     def test_stale_reads_prevented_stat_incremented(self):
-        """Stale-read prevention should increment the stat counter."""
+        """Pass-through: no stale reads prevented."""
         action = _make_edit_action("/src/new.py")
-        with patch.object(
-            self.g, "_create_verification_command", return_value=MagicMock()
-        ):
-            self.g.inject_verification_commands([action], turn=3)
-        assert self.g.stats["stale_reads_prevented"] >= 1
+        self.g.inject_verification_commands([action], turn=3)
+        assert self.g.stats["stale_reads_prevented"] == 0
 
 
 # ---------------------------------------------------------------------------

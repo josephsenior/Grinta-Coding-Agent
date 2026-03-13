@@ -103,11 +103,20 @@ class RequestSizeLimiter(BaseHTTPMiddleware):
             except ValueError:
                 # Invalid Content-Length header, continue to body check
                 pass
-
-        # If Content-Length header was valid and within limit, proceed
-        # (FastAPI will handle body reading)
-        # Note: We rely on Content-Length header check above for most cases.
-        # If Content-Length is missing or invalid, FastAPI will handle it.
-        # For streaming requests, the Content-Length check is sufficient.
+        else:
+            # No Content-Length header — read and verify actual body size.
+            # This covers chunked transfer-encoding and missing headers.
+            body = await request.body()
+            if len(body) > self.max_request_size:
+                logger.warning(
+                    "Request rejected: actual body size %s exceeds limit %s (path: %s)",
+                    len(body),
+                    self.max_request_size,
+                    request.url.path,
+                )
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Request body too large. Maximum size is {self.max_request_size / (1024 * 1024):.1f}MB",
+                )
 
         return await call_next(request)

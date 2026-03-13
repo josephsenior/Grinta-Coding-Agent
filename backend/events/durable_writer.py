@@ -69,7 +69,7 @@ class DurableEventWriter:
         try:
             self._queue.join()
         except Exception:
-            logger.warning(
+            logger.error(
                 "DurableEventWriter: queue.join() failed during stop; pending events may be lost",
                 exc_info=True,
             )

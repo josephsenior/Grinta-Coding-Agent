@@ -69,8 +69,9 @@ class TestInjectVerification:
         action.path = "/tmp/x.py"
         action.action = "edit"
         result = guard.inject_verification_commands([action], turn=1)
-        assert len(result) >= 2
-        assert guard.stats["verifications_injected"] >= 1
+        # inject_verification_commands is now a pass-through
+        assert len(result) == 1
+        assert result[0] is action
 
 
 # ── validate_response ────────────────────────────────────────────────

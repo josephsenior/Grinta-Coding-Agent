@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import logging
 import re
+from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
+
 from backend.llm.llm_utils import check_tools
 from backend.llm.catalog_loader import (
     prefers_short_tool_descriptions,
@@ -17,17 +21,6 @@ if TYPE_CHECKING:
 
     from .safety import OrchestratorSafetyManager
 
-
-QUESTION_PATTERNS = [
-    r"\bwhy\b",
-    r"\bhow does\b",
-    r"\bwhat is\b",
-    r"\bwhat are\b",
-    r"\bexplain\b",
-    r"\btell me\b",
-    r"\b\?\s*$",
-    r"\bcan you explain\b",
-]
 
 PLAIN_CHAT_PATTERNS = [
     r"^\s*(hi|hello|hey)\b",
@@ -47,23 +40,168 @@ _INJECTED_MSG_MARKERS = (
     "<EXTRA_INFO>",
 )
 
-ACTION_PATTERNS = [
-    r"\bcreate\b",
-    r"\bmake\b",
-    r"\bwrite\b",
-    r"\bedit\b",
-    r"\bmodify\b",
-    r"\bdelete\b",
-    r"\bremove\b",
-    r"\bfix\b",
-    r"\bimplement\b",
-    r"\badd\b",
-    r"\bupdate\b",
-    r"\bchange\b",
-    r"\bbuild\b",
-    r"\brun\b",
-    r"\binstall\b",
+logger = logging.getLogger(__name__)
+
+# ── Recovery suggestions: (tool_name, error_substring) → hint ──────────
+_RECOVERY_MAP: list[tuple[str, str, str]] = [
+    (
+        "str_replace_editor",
+        "no match",
+        "Use view_file first to see current content, or use structure_editor's "
+        "find_symbol to locate the target by name.",
+    ),
+    (
+        "str_replace_editor",
+        "multiple occurrences",
+        "Add more surrounding context lines to make the match unique, "
+        "or use structure_editor's edit_function to target by symbol name.",
+    ),
+    (
+        "structure_editor",
+        "not found",
+        "Use structure_editor's find_symbol to list available symbols, "
+        "or check the file path is correct.",
+    ),
+    (
+        "cmd_run",
+        "not found",
+        "Check working directory and PATH. Use workspace_status() to confirm.",
+    ),
+    (
+        "cmd_run",
+        "permission denied",
+        "The command lacks permissions. Try a different approach or check file ownership.",
+    ),
+    (
+        "bash",
+        "not found",
+        "Check working directory and PATH. Use workspace_status() to confirm.",
+    ),
+    (
+        "file_editor",
+        "not found",
+        "Use find_file or project_map to locate the correct file path.",
+    ),
+    (
+        "web_search",
+        "timeout",
+        "Network may be unreliable. Try again or use local codebase search instead.",
+    ),
 ]
+
+
+@dataclass
+class ToolFailure:
+    """A single recorded tool call failure within the current session."""
+
+    tool_name: str
+    error_summary: str  # first 200 chars of error, lowered
+    turn_index: int
+
+
+class SessionErrorLearner:
+    """Tracks tool failures within a conversation and generates actionable hints.
+
+    Lives on the Planner — session-scoped, no cross-session persistence.
+    Designed to be lightweight and LLM-agnostic.
+    """
+
+    def __init__(self) -> None:
+        self._failures: list[ToolFailure] = []
+        self._resolved: set[str] = set()  # hypothesis keys that were resolved
+        self._success_after_failure: dict[str, int] = {}  # tool_name → turn of success
+
+    def record_failure(
+        self, tool_name: str, error_msg: str, turn_index: int
+    ) -> None:
+        """Record a tool call failure."""
+        summary = error_msg[:200].lower().strip()
+        self._failures.append(
+            ToolFailure(tool_name=tool_name, error_summary=summary, turn_index=turn_index)
+        )
+
+    def record_success(self, tool_name: str, turn_index: int) -> None:
+        """Record a tool call success — may resolve an active hypothesis."""
+        key = f"repeated:{tool_name}"
+        if key not in self._resolved and self._count_failures(tool_name) >= 2:
+            self._resolved.add(key)
+            self._success_after_failure[tool_name] = turn_index
+
+    def get_hypotheses(self, max_hints: int = 3) -> list[str]:
+        """Analyze recorded failures and return actionable hypothesis hints."""
+        if not self._failures:
+            return []
+
+        hints: list[str] = []
+
+        # Group failures by tool name
+        by_tool: dict[str, list[ToolFailure]] = defaultdict(list)
+        for f in self._failures:
+            by_tool[f.tool_name].append(f)
+
+        # ── Hypothesis 1: Same tool, same/similar error ≥ 2x ──────────
+        for tool, fails in by_tool.items():
+            key = f"repeated:{tool}"
+            if key in self._resolved:
+                continue
+            if len(fails) < 2:
+                continue
+
+            # Check if errors are similar (share first 60 chars)
+            error_groups: dict[str, int] = defaultdict(int)
+            for f in fails:
+                prefix = f.error_summary[:60]
+                error_groups[prefix] += 1
+
+            for prefix, count in error_groups.items():
+                if count >= 2:
+                    recovery = self._lookup_recovery(tool, prefix)
+                    base = (
+                        f"'{tool}' has failed {count}x with similar errors."
+                    )
+                    hint = f"LEARNED: {base} {recovery}" if recovery else f"LEARNED: {base} Try a different approach or tool."
+                    hints.append(hint)
+                    break  # one hint per tool
+
+        # ── Hypothesis 2: Multiple tools fail on the same file ─────────
+        file_failures: dict[str, set[str]] = defaultdict(set)
+        for f in self._failures:
+            # Extract file paths from error messages
+            for token in f.error_summary.split():
+                if "/" in token or "\\" in token:
+                    cleaned = token.strip("':\"(),")
+                    if cleaned:
+                        file_failures[cleaned].add(f.tool_name)
+        for path, tools in file_failures.items():
+            if len(tools) >= 2:
+                hints.append(
+                    f"LEARNED: Multiple tools ({', '.join(sorted(tools))}) "
+                    f"failed on '{path}'. Check if the file exists and is readable."
+                )
+                break  # one hint for file issues
+
+        # ── Hypothesis 3: All command executions failing → env issue ───
+        cmd_tools = {"cmd_run", "bash", "execute_bash", "run_command"}
+        cmd_fails = sum(1 for f in self._failures if f.tool_name in cmd_tools)
+        if cmd_fails >= 3 and "env_issue" not in self._resolved:
+            hints.append(
+                "LEARNED: Multiple command executions have failed. "
+                "This may indicate an environment issue (wrong directory, "
+                "missing dependency, network). Use workspace_status() to diagnose."
+            )
+
+        return hints[:max_hints]
+
+    def _count_failures(self, tool_name: str) -> int:
+        """Count failures for a specific tool."""
+        return sum(1 for f in self._failures if f.tool_name == tool_name)
+
+    def _lookup_recovery(self, tool_name: str, error_prefix: str) -> str:
+        """Look up a recovery suggestion from the static recovery map."""
+        for map_tool, map_pattern, suggestion in _RECOVERY_MAP:
+            if map_tool == tool_name and map_pattern in error_prefix:
+                return suggestion
+        return ""
 
 
 def _get_last_user_text_from_messages(messages: list) -> str:
@@ -105,6 +243,8 @@ class OrchestratorPlanner:
 
         self._tool_selector = ToolSelector()
         self._tools_used_this_session: set[str] = set()
+        # Within-conversation error learning
+        self._error_learner = SessionErrorLearner()
 
     # ------------------------------------------------------------------ #
     # Tool assembly
@@ -188,7 +328,7 @@ class OrchestratorPlanner:
         if getattr(self._config, "enable_apply_patch", True):
             tools.append(create_apply_patch_tool())
             tools.append(create_batch_edit_tool())
-        if getattr(self._config, "enable_task_tracker", False):
+        if getattr(self._config, "enable_internal_task_tracker", True):
             tools.append(create_query_toolbox_tool())
             tools.append(create_task_tracker_tool())
         if getattr(self._config, "enable_search_code", True):
@@ -682,7 +822,7 @@ class OrchestratorPlanner:
         ),
         (
             ["edit", "fix", "change", "modify", "update", "refactor"],
-            "Pick the right editor: str_replace_editor for targeted edits, structure_editor for function-level, edit_file for large rewrites. Use verify_state to confirm line contents before str_replace.",
+            "Prefer structure_editor for function/class-level edits (edit_function, rename_symbol). Use str_replace_editor only for single-line fixes or file creation. Use verify_state to confirm line contents before str_replace.",
         ),
         (
             ["test", "testing", "pytest", "unittest"],
@@ -714,17 +854,13 @@ class OrchestratorPlanner:
         if behavioral:
             hints.extend(behavioral)
 
-        # P2-C: Think() usage reminder for complex multi-step tasks
-        if self._detect_no_think_pattern(messages) and self._is_complex_task(text):
-            hints.append(
-                "You haven't used think() in 5+ turns. For complex tasks, "
-                "pausing to reason with think() before acting reduces errors."
-            )
-
         return " ".join(hints) if hints else ""
 
     def _get_behavioral_hints(self, messages: list) -> list[str]:
         """Analyze recent agent messages to detect behavioral patterns and generate hints."""
+        # Scan tool results for error learning (full message list)
+        self._scan_tool_results_for_learning(messages)
+
         recent = self._collect_recent_assistant_messages(messages, max_messages=15)
         if len(recent) < 3:
             return []
@@ -745,6 +881,30 @@ class OrchestratorPlanner:
         recent.reverse()
         return recent
 
+    def _scan_tool_results_for_learning(self, messages: list) -> None:
+        """Scan tool response messages to record failures/successes for error learning."""
+        if not hasattr(self, "_error_learner"):
+            return
+        seen: set[str] = getattr(self, "_seen_tool_call_ids", set())
+
+        for i, msg in enumerate(messages):
+            if not isinstance(msg, dict) or msg.get("role") != "tool":
+                continue
+            tc_id = msg.get("tool_call_id", "")
+            if not tc_id or tc_id in seen:
+                continue
+            seen.add(tc_id)
+            tool_name = msg.get("name", "")
+            content = str(msg.get("content", ""))
+            content_lower = content.lower()
+            is_error = "[error" in content_lower or "error occurred" in content_lower
+            if is_error:
+                self._error_learner.record_failure(tool_name, content, i)
+            else:
+                self._error_learner.record_success(tool_name, i)
+
+        self._seen_tool_call_ids = seen
+
     def _extract_tool_patterns(
         self, recent_assistant: list
     ) -> tuple[dict[str, int], int, bool]:
@@ -752,6 +912,7 @@ class OrchestratorPlanner:
         edited_files: dict[str, int] = {}
         error_count = 0
         has_test_run = False
+        self._str_replace_count = 0
 
         for msg in recent_assistant:
             tc_list = msg.get("tool_calls", [])
@@ -768,6 +929,8 @@ class OrchestratorPlanner:
                     path = self._extract_edit_path(args_raw)
                     if path:
                         edited_files[path] = edited_files.get(path, 0) + 1
+                    if name == "str_replace_editor":
+                        self._str_replace_count += 1
                 elif name == "run_tests":
                     has_test_run = True
 
@@ -807,6 +970,14 @@ class OrchestratorPlanner:
                 )
                 break
 
+        str_replace_count = getattr(self, "_str_replace_count", 0)
+        if str_replace_count >= 2:
+            hints.append(
+                "You've used str_replace_editor multiple times. Consider switching to "
+                "structure_editor (edit_function, rename_symbol) for function/class-level edits — "
+                "it targets by symbol name and avoids context-matching issues."
+            )
+
         total_edits = sum(edited_files.values())
         if total_edits >= 4 and not has_test_run:
             hints.append(
@@ -827,26 +998,13 @@ class OrchestratorPlanner:
                 "to find callers that may need updating."
             )
 
-        return hints
+        # Within-conversation error learning hypotheses
+        if hasattr(self, "_error_learner"):
+            learned = self._error_learner.get_hypotheses(max_hints=3)
+            hints.extend(learned)
 
-    def _detect_no_think_pattern(self, messages: list) -> bool:
-        """Return True if agent hasn't called think() in the last 5+ assistant turns."""
-        think_turns_ago = 0
-        assistant_turns = 0
-        for msg in reversed(messages):
-            if not isinstance(msg, dict) or msg.get("role") != "assistant":
-                continue
-            assistant_turns += 1
-            tc_list = msg.get("tool_calls", [])
-            if isinstance(tc_list, list) and any(
-                isinstance(tc, dict) and tc.get("function", {}).get("name") == "think"
-                for tc in tc_list
-            ):
-                break  # Found a think() call
-            think_turns_ago += 1
-            if assistant_turns >= 8:
-                break
-        return think_turns_ago >= 5
+        # Cap total hints to prevent prompt bloat
+        return hints[:5]
 
     def _determine_tool_choice(self, messages: list, state: State) -> str | dict | None:
         last_user_msg = self._get_last_user_message(messages)
@@ -856,29 +1014,9 @@ class OrchestratorPlanner:
         if self._is_plain_chat_request(last_user_msg):
             return "none"
 
-        # Force think on complex tasks when the agent hasn't thought recently.
-        # This covers both first-turn planning AND mid-session topic switches
-        # (e.g., "now refactor the entire auth module" on turn 15).
-        if self._is_complex_task(last_user_msg) and self._detect_no_think_pattern(messages):
-            return {"type": "function", "function": {"name": "think"}}
-
-        if self._is_question(last_user_msg):
-            return "auto"
-        if self._is_action(last_user_msg):
-            return "required"
-
-        return self._safety.should_enforce_tools(
-            last_user_msg, state, default="required"
-        )
-
-    def _is_complex_task(self, message: str) -> bool:
-        """Heuristic: task has multiple action verbs or conjunctions indicating multi-step work."""
-        msg_lower = message.lower()
-        action_count = sum(1 for p in ACTION_PATTERNS if re.search(p, msg_lower))
-        conjunction_count = len(
-            re.findall(r"\b(and|plus|also|then|after that|additionally)\b", msg_lower)
-        )
-        return action_count >= 3 or conjunction_count >= 2 or len(message) > 500
+        # Let the LLM decide whether to use tools — "auto" is more robust
+        # than brittle regex-based question/action classification.
+        return "auto"
 
     def _llm_supports_tool_choice(self) -> bool:
         try:
@@ -900,21 +1038,18 @@ class OrchestratorPlanner:
                 return content
         return None
 
-    def _is_question(self, message: str) -> bool:
-        return any(re.search(pattern, message.lower()) for pattern in QUESTION_PATTERNS)
-
-    def _is_action(self, message: str) -> bool:
-        return any(re.search(pattern, message.lower()) for pattern in ACTION_PATTERNS)
-
     def _is_plain_chat_request(self, message: str) -> bool:
         text = (message or "").strip().lower()
         if not text:
             return False
         # Semantic check: matches a conversational pattern AND has no action verbs.
-        # This replaces the old brittle 120-char length cutoff — "hi, what's the
-        # overall architecture of this project?" is now correctly recognized as
-        # needing tools even though it looks conversational.
+        # This replaces the old brittle 120-char length cutoff.
+        action_patterns = [
+            r"\bcreate\b", r"\bmake\b", r"\bwrite\b", r"\bedit\b", r"\bmodify\b",
+            r"\bdelete\b", r"\bremove\b", r"\bfix\b", r"\bimplement\b", r"\badd\b",
+            r"\bupdate\b", r"\bchange\b", r"\bbuild\b", r"\brun\b", r"\binstall\b"
+        ]
         if any(re.search(pattern, text) for pattern in PLAIN_CHAT_PATTERNS):
-            if not any(re.search(p, text) for p in ACTION_PATTERNS):
+            if not any(re.search(p, text) for p in action_patterns):
                 return True
         return False

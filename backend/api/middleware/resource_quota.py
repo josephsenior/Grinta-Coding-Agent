@@ -162,6 +162,17 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
     ) -> JSONResponse | None:
         """Check if user has exceeded rate limits."""
         now = time.time()
+
+        # Periodic sweep: remove stale user entries (no calls in last hour)
+        if len(_quota_store) > 100:
+            stale = [
+                uid
+                for uid, uq in _quota_store.items()
+                if uq.get("api_calls") and now - uq["api_calls"][-1] > 3600
+            ]
+            for uid in stale:
+                del _quota_store[uid]
+
         user_quota = _quota_store[user_id]
 
         # Initialize tracking if needed
@@ -172,6 +183,11 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
 
         # Clean old calls (older than 1 hour)
         api_calls[:] = [call_time for call_time in api_calls if now - call_time < 3600]
+
+        # Remove user entry if no calls remain
+        if not api_calls and user_id != "anonymous":
+            _quota_store.pop(user_id, None)
+            return None
 
         # Check hourly limit
         if len(api_calls) >= quota.max_api_calls_per_hour:

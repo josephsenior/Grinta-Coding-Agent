@@ -168,8 +168,11 @@ class TestProviderResolver(TestCase):
                 self.assertEqual(result, "http://localhost:11434/v1")
 
     def test_discover_local_endpoint_cached(self):
-        """Test discover_local_endpoint returns cached result."""
+        """Test discover_local_endpoint returns cached result within TTL."""
+        import time as _time
+
         self.resolver._discovered_endpoints["ollama"] = "http://localhost:11434"
+        self.resolver._last_discovery = _time.monotonic()  # recent
 
         result = self.resolver.discover_local_endpoint("ollama")
 
@@ -235,12 +238,13 @@ class TestProviderResolver(TestCase):
         with patch.object(httpx, "Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client.get.return_value = mock_response
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=False)
             mock_client_class.return_value = mock_client
 
             result = self.resolver._verify_llm_endpoint("http://localhost:11434")
 
             self.assertTrue(result)
-            mock_client.close.assert_called_once()
 
     def test_verify_llm_endpoint_auth_required(self):
         """Test _verify_llm_endpoint accepts 401/403 as valid endpoints."""
@@ -250,6 +254,8 @@ class TestProviderResolver(TestCase):
         with patch.object(httpx, "Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client.get.return_value = mock_response
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=False)
             mock_client_class.return_value = mock_client
 
             result = self.resolver._verify_llm_endpoint("http://localhost:11434")
@@ -297,12 +303,13 @@ class TestProviderResolver(TestCase):
             with patch.object(httpx, "Client") as mock_client_class:
                 mock_client = MagicMock()
                 mock_client.get.return_value = mock_response
+                mock_client.__enter__ = MagicMock(return_value=mock_client)
+                mock_client.__exit__ = MagicMock(return_value=False)
                 mock_client_class.return_value = mock_client
 
                 result = self.resolver.get_available_local_models("ollama")
 
                 self.assertEqual(result, ["llama3.2", "codellama"])
-                mock_client.close.assert_called_once()
 
     def test_get_available_local_models_openai_compatible(self):
         """Test get_available_local_models for OpenAI-compatible endpoints."""
@@ -318,6 +325,8 @@ class TestProviderResolver(TestCase):
             with patch.object(httpx, "Client") as mock_client_class:
                 mock_client = MagicMock()
                 mock_client.get.return_value = mock_response
+                mock_client.__enter__ = MagicMock(return_value=mock_client)
+                mock_client.__exit__ = MagicMock(return_value=False)
                 mock_client_class.return_value = mock_client
 
                 result = self.resolver.get_available_local_models("lm_studio")
@@ -397,23 +406,16 @@ class TestGetResolver(TestCase):
         resolver2 = get_resolver()
         self.assertIs(resolver1, resolver2)
 
-    def test_lru_cache_behavior(self):
-        """Test that get_resolver is cached with lru_cache."""
-        # Clear cache
-        get_resolver.cache_clear()
+    def test_global_singleton_reset(self):
+        """Test that resetting _resolver produces a new instance."""
+        import backend.llm.provider_resolver as mod
 
         resolver1 = get_resolver()
-        cache_info = get_resolver.cache_info()
-
-        # First call should be a miss
-        self.assertEqual(cache_info.misses, 1)
-
+        mod._resolver = None
         resolver2 = get_resolver()
-        cache_info = get_resolver.cache_info()
 
-        # Second call should be a hit
-        self.assertEqual(cache_info.hits, 1)
-        self.assertIs(resolver1, resolver2)
+        self.assertIsNot(resolver1, resolver2)
+        self.assertIsInstance(resolver2, ProviderResolver)
 
 
 class TestDiscoverAllLocalModels(TestCase):

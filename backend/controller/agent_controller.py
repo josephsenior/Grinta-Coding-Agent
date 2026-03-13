@@ -326,6 +326,10 @@ class AgentController:
         Note that it's fairly important that this closes properly, otherwise the state is incomplete.
         """
         self._lifecycle = LifecyclePhase.CLOSING
+        if self._step_task is not None and not self._step_task.done():
+            self._step_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._step_task
         if set_stop_state:
             await self.set_agent_state_to(AgentState.STOPPED)
         self.state_tracker.close(self.event_stream)

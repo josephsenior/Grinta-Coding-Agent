@@ -356,11 +356,12 @@ class TestNewPolicyMiddlewares:
         ctrl.event_stream.add_event.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_conflict_detection_blocks_repeated_unverified_edits(self):
+    async def test_conflict_detection_is_noop(self):
+        """ConflictDetectionMiddleware.verify() is a no-op (blocking removed to prevent loops)."""
         ctrl = _mock_controller()
         mw = ConflictDetectionMiddleware()
 
-        # Simulate repeated prior unverified edits.
+        # Even with prior unverified edits, verify should not block.
         mw._unverified_edits["src/main.py"] = 2
 
         ctx = ToolInvocationContext(
@@ -371,6 +372,5 @@ class TestNewPolicyMiddlewares:
 
         await mw.verify(ctx)
 
-        assert ctx.blocked is True
-        assert "conflict_detection" in (ctx.block_reason or "")
-        ctrl.event_stream.add_event.assert_called_once()
+        assert ctx.blocked is False
+        assert ctx.block_reason is None

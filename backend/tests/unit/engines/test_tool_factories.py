@@ -61,7 +61,7 @@ class TestCreateTaskTrackerTool:
         params = tool["function"]["parameters"]
         assert "command" in params["properties"]
         assert "command" in params["required"]
-        assert params["properties"]["command"]["enum"] == ["view", "update"]
+        assert params["properties"]["command"]["enum"] == ["view", "update", "plan"]
 
     def test_has_task_list_param(self):
         tool = create_task_tracker_tool()

@@ -93,7 +93,7 @@ class TestCreateTaskTrackerTool:
         status_enum = status_prop.get("enum", [])
         assert "pending" in status_enum
         assert "in_progress" in status_enum
-        assert "completed" in status_enum
+        assert "done" in status_enum
 
     def test_task_list_not_in_required(self):
         # task_list is optional (only required for plan command)

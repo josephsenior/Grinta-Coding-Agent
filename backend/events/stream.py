@@ -257,6 +257,7 @@ class EventStream(EventStore):
                     self.sid,
                 )
         self._subscribers.clear()
+        self._activity_listeners.clear()
         self._persist.close()
 
     def get_backpressure_snapshot(self) -> dict[str, int]:

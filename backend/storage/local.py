@@ -46,16 +46,13 @@ class LocalFileStore(FileStore):
             )
             return str(safe_path.path)
         except ImportError as imp_err:
-            # SafePath module not available — fall back to manual validation
-            logger.warning(
-                "SafePath module not available, using manual path validation"
+            # Fail closed: do not fall back to weaker manual validation
+            logger.error(
+                "SafePath module not available; cannot safely validate paths"
             )
-            path = path.removeprefix("/")
-            full = os.path.normpath(os.path.join(self.root, path))
-            # Ensure the resolved path is still under root
-            if not full.startswith(os.path.normpath(self.root)):
-                raise ValueError(f"Path '{path}' escapes storage root") from imp_err
-            return full
+            raise RuntimeError(
+                "Path validation module unavailable. Cannot safely access file storage."
+            ) from imp_err
         except Exception as e:
             # Fail CLOSED — do NOT fall back to naive join on security rejection
             raise ValueError(f"Path validation rejected '{path}': {e}") from e

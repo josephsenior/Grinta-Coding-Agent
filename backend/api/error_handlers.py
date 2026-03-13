@@ -70,8 +70,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         """Handle request validation errors with user-friendly messages."""
         try:
             body = await request.body()
+            body_str = body.decode("utf-8", errors="replace")[:500] if body else "empty"
             logger.error("Validation error for %s: %s", request.url.path, exc.errors())
-            logger.error("Request body: %s", body.decode("utf-8") if body else "empty")
+            logger.error("Request body (truncated): %s", body_str)
         except Exception as e:
             logger.error("Could not read request body: %s", e)
 

@@ -91,6 +91,8 @@ class InMemoryRateLimiter:
         now = datetime.now()
         cutoff = now - timedelta(seconds=self.seconds)
         self.history[key] = [ts for ts in self.history[key] if ts > cutoff]
+        if not self.history[key]:
+            del self.history[key]
 
     async def __call__(self, request: Request) -> bool:
         """Return True if request should proceed (may sleep), False if rejected."""

@@ -352,6 +352,11 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
             agent_config.enable_condensation_request = data[
                 "agent_enable_condensation_request"
             ]
+        if (
+            "enable_task_tracker" in data
+            and data["enable_task_tracker"] is not None
+        ):
+            agent_config.enable_internal_task_tracker = data["enable_task_tracker"]
 
         # Graph RAG
         if "graph_rag_enabled" in data and data["graph_rag_enabled"]:
