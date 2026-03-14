@@ -227,7 +227,7 @@ class TestDefaultLinterLintFile:
             linter = DefaultLinter(backend="ruff")
         with (
             patch(
-                "backend.engines.orchestrator.tools.lsp_client.get_lsp_client",
+                "backend.utils.lsp_client.get_lsp_client",
                 return_value=MagicMock(
                     query=MagicMock(
                         return_value=MagicMock(
@@ -254,7 +254,7 @@ class TestDefaultLinterLintFile:
         mock_loc.line = 5
         mock_loc.column = 3
         with patch(
-            "backend.engines.orchestrator.tools.lsp_client.get_lsp_client",
+            "backend.utils.lsp_client.get_lsp_client",
             return_value=MagicMock(
                 query=MagicMock(
                     return_value=MagicMock(
@@ -276,7 +276,7 @@ class TestDefaultLinterLintFile:
         ):
             linter = DefaultLinter(backend="ruff")
         with patch(
-            "backend.engines.orchestrator.tools.lsp_client.get_lsp_client",
+            "backend.utils.lsp_client.get_lsp_client",
             return_value=MagicMock(
                 query=MagicMock(
                     return_value=MagicMock(

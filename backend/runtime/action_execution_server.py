@@ -707,16 +707,11 @@ class ActionExecutor:
         # If the edit is successful and there's new content, check symbol references
         if old_content is not None and new_content is not None and command != "view":
             try:
-                from backend.engines.orchestrator.tools.structure_editor import (
-                    StructureEditor,
-                )
+                from backend.utils.blast_radius import check_blast_radius_from_code
 
-                editor_instance = StructureEditor()
-                dummy_result = type("DummyResult", (), {"message": result_str})()
-                editor_instance._check_blast_radius_from_code(
-                    action.path, new_content, dummy_result
-                )  # type: ignore
-                result_str = dummy_result.message
+                warning = check_blast_radius_from_code(action.path, new_content)
+                if warning:
+                    result_str += warning
             except Exception as e:
                 logger.debug("Failed to check blast radius: %s", e)
 
@@ -752,16 +747,11 @@ class ActionExecutor:
             # Blast Radius Hook
             if command != "view":
                 try:
-                    from backend.engines.orchestrator.tools.structure_editor import (
-                        StructureEditor,
-                    )
+                    from backend.utils.blast_radius import check_blast_radius_from_code
 
-                    editor_instance = StructureEditor()
-                    dummy_result = type("DummyResult", (), {"message": diff})()
-                    editor_instance._check_blast_radius_from_code(
-                        action.path, new_content, dummy_result
-                    )  # type: ignore
-                    diff = dummy_result.message
+                    warning = check_blast_radius_from_code(action.path, new_content)
+                    if warning:
+                        diff += warning
                 except Exception as e:
                     logger.debug("Failed to check blast radius: %s", e)
 
@@ -776,16 +766,11 @@ class ActionExecutor:
         # Blast Radius Hook
         if old_content is not None and new_content is not None and command != "view":
             try:
-                from backend.engines.orchestrator.tools.structure_editor import (
-                    StructureEditor,
-                )
+                from backend.utils.blast_radius import check_blast_radius_from_code
 
-                editor_instance = StructureEditor()
-                dummy_result = type("DummyResult", (), {"message": result_str})()
-                editor_instance._check_blast_radius_from_code(
-                    action.path, new_content, dummy_result
-                )  # type: ignore
-                result_str = dummy_result.message
+                warning = check_blast_radius_from_code(action.path, new_content)
+                if warning:
+                    result_str += warning
             except Exception as e:
                 logger.debug("Failed to check blast radius: %s", e)
 
@@ -867,7 +852,7 @@ class ActionExecutor:
 
     async def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute an LSP query using the lsp_client."""
-        from backend.engines.orchestrator.tools.lsp_client import LspClient
+        from backend.utils.lsp_client import LspClient
 
         try:
             client = LspClient()

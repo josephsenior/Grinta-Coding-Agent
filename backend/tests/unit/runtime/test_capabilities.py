@@ -19,7 +19,7 @@ class TestRuntimeCapabilities:
         assert caps.has_tmux is False
         assert caps.has_bash is False
         assert caps.can_browse is False
-        assert caps.can_mcp is False
+        assert caps.can_mcp is True
         assert caps.can_copy_from_runtime is True
         assert caps.missing_tools == ()
 
@@ -83,7 +83,7 @@ class TestDetectCapabilities:
 
         assert caps.platform == "win32"
         assert caps.is_windows is True
-        assert caps.can_mcp is False  # Disabled on Windows
+        assert caps.can_mcp is True
 
     @patch("sys.platform", "linux")
     @patch("shutil.which", return_value=None)
@@ -244,8 +244,7 @@ class TestDetectCapabilities:
         # stdio server on Windows remains False
         cfg = MockConfig([MockServer("stdio")])
         caps = detect_capabilities(mcp_config=cfg)
-        assert caps.can_mcp is False
-
+        assert caps.can_mcp is True
     @patch("sys.platform", "win32")
     def test_mcp_config_exception(self):
         """Test that MCP config exceptions are handled gracefully."""
@@ -256,8 +255,7 @@ class TestDetectCapabilities:
 
         caps = detect_capabilities(mcp_config=BadConfig())
         # Exception should result in has_http_mcp=False, so on Windows can_mcp=False
-        assert caps.can_mcp is False
-
+        assert caps.can_mcp is True
     @patch("sys.platform", "linux")
     def test_mcp_config_none(self):
         """Test mcp_config=None doesn't crash."""

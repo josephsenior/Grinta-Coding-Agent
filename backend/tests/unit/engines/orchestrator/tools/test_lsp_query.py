@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from backend.engines.orchestrator.tools.lsp_query import create_lsp_query_tool
-from backend.engines.orchestrator.tools.lsp_client import (
+from backend.utils.lsp_client import (
     LspClient,
     LspResult,
 )

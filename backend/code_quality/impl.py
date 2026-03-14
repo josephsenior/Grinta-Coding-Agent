@@ -300,7 +300,7 @@ class DefaultLinter:
     def _lint_file(self, file_path: str) -> LintResult:
         """Lint a file using the detected backend."""
         # Try LSP first for all supported languages
-        from backend.engines.orchestrator.tools.lsp_client import get_lsp_client
+        from backend.utils.lsp_client import get_lsp_client
         lsp = get_lsp_client()
         lsp_res = lsp.query("diagnostics", file_path)
 
