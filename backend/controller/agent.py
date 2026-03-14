@@ -113,32 +113,7 @@ class Agent(ABC):
                 tools=tools,
                 agent_class=self.name,
             )
-            # Defensive normalization: if the created instance fails a direct
-            # isinstance check against the freshly imported class (edge case
-            # of module duplication), rebuild via attribute dict on the currently
-            # imported class to unify the identity.
-            if (
-                type(system_message_action).__name__ != "SystemMessageAction"
-            ):  # pragma: no cover - defensive
-                system_message_action = SystemMessageAction(
-                    content=getattr(system_message_action, "content", system_message),
-                    tools=getattr(system_message_action, "tools", tools),
-                    agent_class=getattr(
-                        system_message_action, "agent_class", self.name
-                    ),
-                )
             system_message_action.source = EventSource.AGENT
-            try:  # pragma: no cover - diagnostic instrumentation
-                logger.debug(
-                    "[get_system_message] created instance class=%s module=%s id=%s isinstance=%s ref_equal=%s",
-                    system_message_action.__class__.__name__,
-                    system_message_action.__class__.__module__,
-                    id(system_message_action.__class__),
-                    isinstance(system_message_action, SystemMessageAction),
-                    system_message_action.__class__ is SystemMessageAction,
-                )
-            except Exception:
-                pass
             return system_message_action
         except Exception as e:
             logger.warning("[%s] Failed to generate system message: %s", self.name, e)

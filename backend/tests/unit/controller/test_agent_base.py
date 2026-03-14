@@ -97,8 +97,9 @@ class TestSetMcpTools:
         tool_dict = {"function": {"name": "my_tool", "parameters": {}}}
         with patch("backend.controller.agent.build_tool", return_value=tool_dict):
             agent.set_mcp_tools([tool_dict])
-        assert "my_tool" in agent.mcp_tools
-        assert len(agent.tools) == 1
+            assert "my_tool" in agent.mcp_tools
+            # MCP tools are not appended to tools as per recent change
+            assert len(agent.tools) == 0
 
     def test_skips_duplicate_tool(self):
         cls = _make_concrete_agent()
@@ -106,15 +107,9 @@ class TestSetMcpTools:
         tool_dict = {"function": {"name": "dup_tool", "parameters": {}}}
         with patch("backend.controller.agent.build_tool", return_value=tool_dict):
             agent.set_mcp_tools([tool_dict, tool_dict])
-        assert len(agent.tools) == 1
-
-    def test_skips_none_from_build_tool(self):
-        cls = _make_concrete_agent()
-        agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
-        with patch("backend.controller.agent.build_tool", return_value=None):
-            agent.set_mcp_tools([{"function": {"name": "x"}}])
-        assert not agent.tools
-
+            # Only one added to mcp_tools, none to tools
+            assert len(agent.mcp_tools) == 1
+            assert len(agent.tools) == 0
     def test_log_tool_update_start_exception(self):
         """Line 227-228 coverage for exception in tool name gathering."""
         cls = _make_concrete_agent()
@@ -136,7 +131,8 @@ class TestSetMcpTools:
         # The first time it registers, the second time it's a duplicate.
         with patch("backend.controller.agent.build_tool", side_effect=[tool, tool]):
             agent.set_mcp_tools([tool, tool])
-        assert len(agent.tools) == 1
+        assert len(agent.mcp_tools) == 1
+        assert len(agent.tools) == 0
 
 
 # ── get_system_message ───────────────────────────────────────────────

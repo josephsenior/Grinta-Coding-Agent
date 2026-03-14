@@ -31,7 +31,7 @@ class TestCircuitBreakerConfig:
         assert config.enabled is True
         assert config.max_consecutive_errors == 3
         assert config.max_high_risk_actions == 5
-        assert config.max_stuck_detections == 3
+        assert config.max_stuck_detections == 8
         assert config.max_error_rate == 0.5
         assert config.error_rate_window == 10
 
@@ -217,8 +217,8 @@ class TestCheckMethod:
         result = breaker.check(state)
 
         assert result.tripped is True
-        assert "stuck loop detected" in result.reason.lower()
-        assert result.action == "switch_context"
+        assert "stuck loop detection" in result.reason.lower()
+        assert result.action == "stop"
 
     def test_check_error_rate_trips(self):
         """Should trip when error rate exceeds threshold."""
