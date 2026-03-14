@@ -5,6 +5,9 @@ from __future__ import annotations
 
 from backend.engines.orchestrator.planner import (
     OrchestratorPlanner,
+)
+from backend.engines.orchestrator.behavioral_hints import BehavioralHintsBuilder
+from backend.engines.orchestrator.error_learner import (
     SessionErrorLearner,
 )
 
@@ -187,7 +190,7 @@ class TestBuildBehavioralHintsWithLearner:
         planner._error_learner.record_failure("str_replace_editor", "[ERROR] no match", 1)
         planner._error_learner.record_failure("str_replace_editor", "[ERROR] no match", 3)
         planner._str_replace_count = 0
-        hints = planner._build_behavioral_hints({}, 0, False)
+        hints = BehavioralHintsBuilder(planner._error_learner)._build_behavioral_hints({}, 0, False, planner._str_replace_count)
         assert any("LEARNED" in h for h in hints)
 
     def test_total_hints_capped_at_five(self):
@@ -199,7 +202,5 @@ class TestBuildBehavioralHintsWithLearner:
             planner._error_learner.record_failure(tool, "[ERROR] fail", 2)
         planner._str_replace_count = 5
         # Also trigger static hints
-        hints = planner._build_behavioral_hints(
-            {"a.py": 4, "b.py": 3}, 4, False
-        )
+        hints = BehavioralHintsBuilder(planner._error_learner)._build_behavioral_hints({"a.py": 4, "b.py": 3}, 4, False, planner._str_replace_count)
         assert len(hints) <= 5
