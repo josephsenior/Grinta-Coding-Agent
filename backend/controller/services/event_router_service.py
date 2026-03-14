@@ -406,8 +406,8 @@ class EventRouterService:
                         parent_context_lines.append(
                             f"\n\nPARENT WORKING MEMORY (read-only context):\n{wm}"
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    self._ctrl.log("warning", f"Failed to inherit parent working memory: {e}")
 
                 # --- inherit parent notes ---
                 try:
@@ -422,8 +422,8 @@ class EventRouterService:
                         parent_context_lines.append(
                             f"\n\nPARENT NOTES (key-value context):\n{notes_text}"
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    self._ctrl.log("warning", f"Failed to inherit parent notes: {e}")
 
                 # --- inherit parent task plan ---
                 try:
@@ -442,8 +442,8 @@ class EventRouterService:
                                 f" ({t.get('status', 'pending')})"
                             )
                         parent_context_lines.append("\n\n" + "\n".join(task_lines))
-                except Exception:
-                    pass
+                except Exception as e:
+                    self._ctrl.log("warning", f"Failed to inherit parent task plan: {e}")
 
                 # We need to reuse the same file store/workspace as the parent
                 llm_registry = getattr(self._ctrl.agent, "llm_registry", None)

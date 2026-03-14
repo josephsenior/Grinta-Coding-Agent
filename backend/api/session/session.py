@@ -518,8 +518,13 @@ class Session:
     async def _monitor_publish_queue(self) -> None:
         try:
             while True:
-                data: dict = await self._publish_queue.get()
-                await self._send(data)
+                try:
+                    data: dict = await self._publish_queue.get()
+                    await self._send(data)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self.logger.error("Error in publish queue handler: %s", getattr(e, 'message', str(e)))
         except asyncio.CancelledError:
             return
 

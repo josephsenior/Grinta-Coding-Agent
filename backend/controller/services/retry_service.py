@@ -221,10 +221,16 @@ class RetryService:
 
         try:
             while not controller._closed:
-                tasks = await self._fetch_ready_tasks(controller, poll_interval)
-                if not tasks:
-                    continue
-                await self._process_tasks(tasks)
+                try:
+                    tasks = await self._fetch_ready_tasks(controller, poll_interval)
+                    if not tasks:
+                        continue
+                    await self._process_tasks(tasks)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as loop_exc:
+                    logger.error("Error inside retry worker loop: %s", loop_exc)
+                    await asyncio.sleep(poll_interval)
         except asyncio.CancelledError:  # pragma: no cover - cooperative cancellation
             logger.debug("Retry worker cancelled for controller %s", controller.id)
             raise

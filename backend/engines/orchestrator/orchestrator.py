@@ -49,110 +49,13 @@ from .contracts import (
 from .executor import OrchestratorExecutor
 from .memory_manager import ConversationMemoryManager
 from .planner import OrchestratorPlanner
+from . import message_serializer
+
 from .safety import OrchestratorSafetyManager
 
 if TYPE_CHECKING:
     from backend.events.action import Action
     from backend.events.stream import EventStream
-
-
-def _escape_ps_path(path: str) -> str:
-    """Escape a file path for safe use in a PowerShell double-quoted string."""
-    # Backtick-escape characters special to PowerShell double-quoted strings.
-    return path.replace('`', '``').replace('"', '`"').replace('$', '`$')
-
-
-def _build_full_file_read_command(path: str, is_windows: bool) -> str:
-    """Build command to read entire file."""
-    if is_windows:
-        safe = _escape_ps_path(path)
-        return f'Write-Output "=== FILE: {safe} ===" ; Get-Content "{safe}" -Encoding UTF8'
-    return f'echo "=== FILE: {path} ===" && cat "{path}"'
-
-
-def _build_partial_file_read_command(
-    path: str, start: int, end: int, is_windows: bool
-) -> str:
-    """Build command to read file lines [start, end). end=-1 means to end."""
-    header = f'lines {start + 1}-{end}' if end != -1 else f'lines {start + 1}+'
-    if is_windows:
-        safe = _escape_ps_path(path)
-        win_header = f'Write-Output "=== FILE: {safe} ({header}) ===" ; '
-        if end == -1:
-            return win_header + f'Get-Content "{safe}" -Encoding UTF8 | Select-Object -Skip {start}'
-        count = end - start
-        return win_header + f'Get-Content "{safe}" -Encoding UTF8 | Select-Object -Skip {start} -First {count}'
-    unix_header = f'echo "=== FILE: {path} ({header}) ===" && '
-    if end == -1:
-        return unix_header + f'tail -n +{start + 1} "{path}"'
-    return unix_header + f'sed -n "{start + 1},{end}p" "{path}"'
-
-
-def _build_file_read_command(fr: FileReadAction, is_windows: bool) -> str:
-    """Build a shell command for one file read (full or partial, Windows or Unix)."""
-    path = fr.path
-    start, end = fr.start, fr.end
-    if fr.view_range:
-        start = fr.view_range[0] - 1 if len(fr.view_range) > 0 else 0
-        end = fr.view_range[1] if len(fr.view_range) > 1 else -1
-
-    if start == 0 and end == -1 and not fr.view_range:
-        return _build_full_file_read_command(path, is_windows)
-    return _build_partial_file_read_command(path, start, end, is_windows)
-
-
-def _format_reflection_progress(state: State) -> str:
-    """Format progress line from iteration_flag."""
-    iter_flag = getattr(state, "iteration_flag", None)
-    current = getattr(iter_flag, "current_value", 0) if iter_flag else 0
-    max_val = getattr(iter_flag, "max_value", 0) if iter_flag else 0
-    if not current:
-        return ""
-    progress = f"Turn {current}"
-    if max_val:
-        progress += f"/{max_val} ({int(current / max_val * 100)}% of budget)"
-    return f"  • Progress: {progress}"
-
-
-def _format_reflection_metrics(state: State) -> list[str]:
-    """Format context usage and cost lines from metrics."""
-    parts: list[str] = []
-    metrics = getattr(state, "metrics", None)
-    if not metrics:
-        return parts
-    atu = getattr(metrics, "accumulated_token_usage", None)
-    if atu:
-        prompt_tok = getattr(atu, "prompt_tokens", 0)
-        ctx_window = getattr(atu, "context_window", 0)
-        if prompt_tok and ctx_window:
-            pct = int(prompt_tok / ctx_window * 100)
-            parts.append(f"  • Context usage: {pct}% ({prompt_tok}/{ctx_window} tokens)")
-    cost = getattr(metrics, "accumulated_cost", 0.0)
-    if cost > 0:
-        parts.append(f"  • Cost so far: ${cost:.4f}")
-    return parts
-
-
-def _format_reflection_modified_files(modified_files: list[str]) -> str:
-    """Format modified files line."""
-    if not modified_files:
-        return ""
-    files_str = ", ".join(modified_files[-5:])
-    if len(modified_files) > 5:
-        files_str += f" (+{len(modified_files) - 5} more)"
-    return f"  • Files modified: {files_str}"
-
-
-def _format_reflection_initial_request(
-    memory_manager: Any, history: list
-) -> str:
-    """Format original request line from initial user message."""
-    try:
-        initial_msg = memory_manager.get_initial_user_message(history)
-        task_text = getattr(initial_msg, "content", "")[:200]
-        return f'  • Original request: "{task_text}"' if task_text else ""
-    except Exception:
-        return ""
 
 
 class Orchestrator(Agent):
@@ -237,7 +140,6 @@ class Orchestrator(Agent):
         self._reflection_interval: int = int(
             getattr(self.config, "reflection_interval", 8)
         )
-        self._steps_since_reflection: int = 0
         self._run_production_health_check()
 
     # ------------------------------------------------------------------ #
@@ -285,16 +187,10 @@ class Orchestrator(Agent):
 
             pending = self._consume_pending_action()
             if pending:
-                self._steps_since_reflection += 1
                 return pending
 
-            # Periodic self-reflection checkpoint
-            reflection = self._maybe_inject_reflection(state)
-            if reflection:
-                return reflection
 
             condensed = self.memory_manager.condense_history(state)
-            self._steps_since_reflection += 1
             return self._execute_llm_step(state, condensed)
 
         except ContextLimitError:
@@ -336,15 +232,10 @@ class Orchestrator(Agent):
 
             pending = self._consume_pending_action()
             if pending:
-                self._steps_since_reflection += 1
                 return pending
 
-            reflection = self._maybe_inject_reflection(state)
-            if reflection:
-                return reflection
 
             condensed = self.memory_manager.condense_history(state)
-            self._steps_since_reflection += 1
             return await self._execute_llm_step_async(state, condensed)
 
         except ContextLimitError:
@@ -420,7 +311,7 @@ class Orchestrator(Agent):
             initial_user_message=initial_user_message,
             llm_config=self.llm.config,
         )
-        serialized_messages = self._serialize_messages(messages)
+        serialized_messages = message_serializer.serialize_messages(messages)
         params = self.planner.build_llm_params(serialized_messages, state, self.tools)
         self._sync_executor_llm()
 
@@ -460,7 +351,7 @@ class Orchestrator(Agent):
             initial_user_message=initial_user_message,
             llm_config=self.llm.config,
         )
-        serialized_messages = self._serialize_messages(messages)
+        serialized_messages = message_serializer.serialize_messages(messages)
         params = self.planner.build_llm_params(serialized_messages, state, self.tools)
         self._sync_executor_llm()
 
@@ -511,51 +402,11 @@ class Orchestrator(Agent):
         if not self.pending_actions:
             return None
         # Try to batch consecutive read-only file reads into one action
-        batched = self._try_batch_file_reads()
+        from .file_reads import try_batch_file_reads
+        batched = try_batch_file_reads(self.pending_actions)
         if batched:
             return batched
         return self.pending_actions.popleft()
-
-    def _serialize_messages(self, messages: list[Message]) -> list[dict]:
-        serialized: list[dict] = []
-        for msg in messages:
-            serialized.append(self._serialize_single_message(msg))
-        return serialized
-
-    def _serialize_single_message(self, msg: Message) -> dict:
-        raw = self._serialize_message_with_fallback(msg)
-        content_val = raw.get("content", "")
-        if isinstance(content_val, list):
-            raw["content"] = self._flatten_content_list(content_val)
-        return raw
-
-    def _serialize_message_with_fallback(self, msg: Message) -> dict:
-        try:
-            return msg.serialize_model()  # type: ignore[attr-defined]
-        except Exception:
-            fallback_lines = self._extract_text_chunks(msg)
-            return {
-                "role": msg.role,
-                "content": "\n".join(fallback_lines),
-            }
-
-    def _extract_text_chunks(self, msg: Message) -> list[str]:
-        fallback_lines: list[str] = []
-        for chunk in getattr(msg, "content", []) or []:
-            value = getattr(chunk, "text", None)
-            if value is None and isinstance(chunk, dict):
-                value = chunk.get("text")
-            if value:
-                fallback_lines.append(str(value))
-        return fallback_lines
-
-    def _flatten_content_list(self, content_val: list[Any]) -> str:
-        texts = [
-            str(item["text"])
-            for item in content_val
-            if isinstance(item, dict) and "text" in item
-        ]
-        return "\n".join(texts)
 
     def _sync_executor_llm(self) -> None:
         if (
@@ -592,89 +443,6 @@ class Orchestrator(Agent):
         for pending in actions:
             self.pending_actions.append(pending)
 
-    def _try_batch_file_reads(self) -> Action | None:
-        """Batch consecutive read-only actions into a single CmdRunAction.
-
-        When the LLM emits multiple file reads or search actions in one
-        response, executing them one-per-step is wasteful.  This collapses
-        them into a single command that processes all requested operations,
-        cutting round-trips.
-        """
-        from backend.events.action.commands import CmdRunAction
-
-        batch = self._collect_file_read_batch()
-        if len(batch) < 2:
-            return None
-
-        for _ in batch:
-            self.pending_actions.popleft()
-
-        is_windows = os.name == "nt"
-        parts = [_build_file_read_command(fr, is_windows) for fr in batch]
-        sep = " ; " if is_windows else " && "
-        return CmdRunAction(command=sep.join(parts), thought="Batched parallel file reads")
-
-    def _collect_file_read_batch(self) -> list[FileReadAction]:
-        """Collect leading run of FileReadAction from pending_actions."""
-        batch: list[FileReadAction] = []
-        for action in self.pending_actions:
-            if isinstance(action, FileReadAction):
-                batch.append(action)
-            else:
-                break
-        return batch
-
-    def _build_semantic_recall_block(self, task_text: str) -> str:
-        """Build semantic recall block from task text. Returns empty on failure."""
-        if not task_text:
-            return ""
-        recall_fn = orchestrator_function_calling.get_semantic_recall_fn()
-        if not recall_fn:
-            return ""
-        try:
-            results = recall_fn(task_text, 3)
-            if not results:
-                return ""
-            parts = ["\n\n<SEMANTIC_RECALL_RECOVERY>"]
-            for i, item in enumerate(results, 1):
-                content = item.get("content_text", item.get("content", ""))
-                parts.append(f"  [{i}] {content[:300]}")
-            parts.append("</SEMANTIC_RECALL_RECOVERY>")
-            return "\n".join(parts)
-        except Exception:
-            return ""
-
-    def _build_lessons_block(self) -> str:
-        """Load lessons.md content for recovery. Returns empty on failure."""
-        try:
-            lessons_path = "/memories/repo/lessons.md"
-            if not os.path.exists(lessons_path):
-                return ""
-            with open(lessons_path, encoding="utf-8") as _f:
-                content = _f.read(2000)
-            return f"\n\n<LESSONS_MD_RECOVERY>\n{content}\n</LESSONS_MD_RECOVERY>" if content.strip() else ""
-        except Exception:
-            return ""
-
-    def _build_task_tracker_block(self) -> str:
-        """Build task tracker state block. Returns empty on failure."""
-        try:
-            from backend.engines.orchestrator.tools.task_tracker import TaskTracker
-            tracker = TaskTracker()
-            tasks = tracker.load_from_file()
-            if not tasks:
-                return ""
-            status_icons = {"completed": "✓", "in_progress": "O", "failed": "X"}
-            lines = ["<TASK_TRACKER_RECOVERY>"]
-            for t in tasks:
-                icon = status_icons.get(t.get("status", ""), "-")
-                desc = t.get("description", t.get("title", ""))
-                lines.append(f"  [{icon}] {t.get('id', '?')} — {desc} ({t.get('status', 'pending')})")
-            lines.append("</TASK_TRACKER_RECOVERY>")
-            return "\n\n" + "\n".join(lines)
-        except Exception:
-            return ""
-
     def _queue_post_condensation_recovery(self, task_text: str = "") -> None:
         """Queue a brief think action after condensation to break the re-condensation loop.
 
@@ -695,54 +463,6 @@ class Orchestrator(Agent):
         self.pending_actions.append(
             AgentThinkAction(thought="Memory condensed. Resuming task.")
         )
-
-    def _maybe_inject_reflection(self, state: State | None = None) -> Action | None:
-        """Disabled: reflection injection is no longer used.
-
-        System-injected reflection thinks were promoting meta-tool loops
-        (e.g. "Should I update the task tracker?") and wasting 2 events
-        per injection without improving agent productivity.
-        """
-        return None
-
-    def _build_reflection_data_parts(self, state: State) -> list[str]:
-        """Build structured reflection data parts from state."""
-        parts: list[str] = []
-
-        progress = _format_reflection_progress(state)
-        if progress:
-            parts.append(progress)
-
-        metrics_parts = _format_reflection_metrics(state)
-        parts.extend(metrics_parts)
-
-        files_part = _format_reflection_modified_files(
-            list(self.anti_hallucination._file_modified_turns.keys())  # pylint: disable=protected-access
-        )
-        if files_part:
-            parts.append(files_part)
-
-        error_count = self._count_recent_errors(state)
-        if error_count:
-            parts.append(f"  • Errors encountered: {error_count}")
-
-        request_part = _format_reflection_initial_request(
-            self.memory_manager, state.history
-        )
-        if request_part:
-            parts.append(request_part)
-
-        return parts
-
-    def _count_recent_errors(self, state: State) -> int:
-        """Count ErrorObservations in recent history, capped at 20."""
-        count = 0
-        for event in reversed(list(getattr(state, "history", []))):
-            if type(event).__name__ == "ErrorObservation":
-                count += 1
-                if count >= 20:
-                    break
-        return count
 
     # ------------------------------------------------------------------ #
     # Convenience helpers

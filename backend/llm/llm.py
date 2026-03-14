@@ -527,8 +527,8 @@ class LLM(RetryMixin, DebugMixin):
             from backend.core.plugin import get_plugin_registry
 
             messages = await get_plugin_registry().dispatch_llm_pre(messages)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Error in LLM pre-plugin dispatch: %s", e)
 
         # Merge default kwargs
         call_kwargs = self._get_call_kwargs(is_stream=False, **kwargs)
@@ -557,8 +557,8 @@ class LLM(RetryMixin, DebugMixin):
                 from backend.core.plugin import get_plugin_registry
 
                 response = await get_plugin_registry().dispatch_llm_post(response)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Error in LLM post-plugin dispatch: %s", e)
 
             return response
 

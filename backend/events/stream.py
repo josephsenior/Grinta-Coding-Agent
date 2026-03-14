@@ -533,12 +533,17 @@ class EventStream(EventStore):
                 event = await queue.get()
             except asyncio.CancelledError:
                 break
+            except Exception as e:
+                logger.error("Error retrieving event from queue: %s", e)
+                continue
             if event is self._stop_sentinel:
                 queue.task_done()
                 break
             try:
                 if not self._stop_flag.is_set():
                     await self._dispatch_event(cast(Event, event))
+            except Exception as e:
+                logger.error("Error dispatching event: %s", e)
             finally:
                 queue.task_done()
                 self._bp.queue_size = queue.qsize()
