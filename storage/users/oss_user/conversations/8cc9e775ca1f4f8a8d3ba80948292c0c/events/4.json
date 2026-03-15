@@ -1,0 +1,1 @@
+{"id": 4, "sequence": 4, "timestamp": "2026-03-15T12:13:39.861852", "source": "user", "message": "Say exactly: Hello World", "action": "message", "args": {"confirmation_state": "confirmed", "content": "Say exactly: Hello World", "file_urls": null, "image_urls": [], "wait_for_response": false, "security_risk": -1}}

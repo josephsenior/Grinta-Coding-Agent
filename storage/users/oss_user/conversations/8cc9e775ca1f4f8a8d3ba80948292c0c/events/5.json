@@ -1,0 +1,1 @@
+{"id": 5, "sequence": 5, "timestamp": "2026-03-15T12:13:40.020695", "source": "user", "message": "Retrieving content for: Say exactly: Hello World", "action": "recall", "args": {"confirmation_state": "confirmed", "recall_type": "workspace_context", "query": "Say exactly: Hello World", "thought": ""}}

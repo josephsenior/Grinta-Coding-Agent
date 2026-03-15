@@ -197,12 +197,16 @@ class OrchestratorExecutor:
         tool_calls_dict = {}
 
         try:
+            print("!!! OrchestratorExecutor.async_execute: entering try block", flush=True)
             logger.info("OrchestratorExecutor.async_execute: calling LLM.astream")
             stream_iter = self._llm.astream(**call_params)
+            print("!!! OrchestratorExecutor.async_execute: got stream_iter", flush=True)
 
             async def _consume_stream():
                 nonlocal content_accumulate
+                print("!!! _consume_stream started", flush=True)
                 async for chunk in stream_iter:
+                    print("!!! _consume_stream got chunk", flush=True)
                     choices = chunk.get("choices", [])
                     if not choices:
                         continue

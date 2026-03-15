@@ -1,23 +1,23 @@
 [
   {
     "id": "1",
-    "description": "Create app.py",
-    "status": "done",
-    "result": null,
-    "tags": [],
-    "subtasks": []
-  },
-  {
-    "id": "2",
-    "description": "Create index.ts",
+    "description": "Query the worldtimeapi for the current time.",
     "status": "in_progress",
     "result": null,
     "tags": [],
     "subtasks": []
   },
   {
+    "id": "2",
+    "description": "Create a Python script that logs the retrieved time.",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
     "id": "3",
-    "description": "Create utils.js",
+    "description": "Run the Python script and capture its output.",
     "status": "pending",
     "result": null,
     "tags": [],
@@ -25,23 +25,7 @@
   },
   {
     "id": "4",
-    "description": "Create config.json",
-    "status": "pending",
-    "result": null,
-    "tags": [],
-    "subtasks": []
-  },
-  {
-    "id": "5",
-    "description": "Create styles.css",
-    "status": "pending",
-    "result": null,
-    "tags": [],
-    "subtasks": []
-  },
-  {
-    "id": "6",
-    "description": "Create README.md",
+    "description": "Create SUMMARY.md with the process details and a mermaid diagram.",
     "status": "pending",
     "result": null,
     "tags": [],
