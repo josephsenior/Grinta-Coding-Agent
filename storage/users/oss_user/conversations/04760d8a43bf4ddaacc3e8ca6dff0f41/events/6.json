@@ -1,1 +1,0 @@
-{"id": 6, "timestamp": "2026-03-15T00:56:45.537112", "source": "environment", "message": "", "observation": "agent_state_changed", "content": "", "extras": {"truncation_strategy": null, "agent_state": "running", "reason": ""}}

@@ -1,1 +1,0 @@
-{"id": 60, "timestamp": "2026-03-11T19:14:40.105804", "source": "environment", "message": "[Recovery] stage=halted retry=0 payload={'next_state': 'error'}", "observation": "think", "content": "[Recovery] stage=halted retry=0 payload={'next_state': 'error'}", "extras": {"truncation_strategy": null}}
