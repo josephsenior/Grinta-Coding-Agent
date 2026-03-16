@@ -5,9 +5,6 @@ version: 2.0.0
 agent: Orchestrator
 triggers:
   - /codereview
-  - code review
-  - review code
-  - review pr
 ---
 
 # Code Review Guide

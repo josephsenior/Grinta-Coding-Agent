@@ -4,13 +4,9 @@ type: knowledge
 version: 1.0.0
 agent: Orchestrator
 triggers:
-  - react
-  - component
-  - hooks
-  - useState
-  - useEffect
-  - jsx
-  - tsx
+  - /react
+  - useState(
+  - useEffect(
 ---
 
 # React Best Practices

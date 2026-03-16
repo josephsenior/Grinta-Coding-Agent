@@ -4,12 +4,11 @@ type: knowledge
 version: 1.0.0
 agent: Orchestrator
 triggers:
-  - test
-  - testing
-  - pytest
-  - jest
-  - unittest
-  - vitest
+    - /testing
+    - pytest
+    - jest
+    - unittest
+    - vitest
 ---
 
 # Testing Best Practices

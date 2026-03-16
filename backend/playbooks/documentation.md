@@ -4,13 +4,11 @@ type: knowledge
 version: 1.0.0
 agent: Orchestrator
 triggers:
-  - document
-  - add docs
-  - generate documentation
-  - write documentation
-  - docstring
-  - update readme
-  - update docs
+    - /docs
+    - add docs
+    - docstring
+    - update readme
+    - update docs
 ---
 
 # Documentation Best Practices

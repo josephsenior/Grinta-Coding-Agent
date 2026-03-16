@@ -4,11 +4,8 @@ type: knowledge
 version: 1.0.0
 agent: Orchestrator
 triggers:
-  - implement feature
-  - add feature
-  - new feature
-  - feature implementation
-  - build feature
+    - /feature
+    - implement feature
 ---
 
 # Structured Feature Development

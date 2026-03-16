@@ -4,12 +4,7 @@ type: knowledge
 version: 1.0.0
 agent: Orchestrator
 triggers:
-  - new agent
-  - new playbook
-  - create agent
-  - create playbook
-  - add agent
-  - add playbook
+  - /add_agent
 ---
 
 # Creating Playbooks

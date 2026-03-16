@@ -5,12 +5,8 @@ version: 1.0.0
 agent: Orchestrator
 triggers:
   - postgresql
-  - postgres
-  - mysql
   - mongodb
-  - redis
-  - database
-  - sql
+  - /database
 ---
 
 # Database Setup

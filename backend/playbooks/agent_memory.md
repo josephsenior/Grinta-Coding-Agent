@@ -5,8 +5,6 @@ version: 2.0.0
 agent: Orchestrator
 triggers:
   - /remember
-  - repository memory
-  - repo memory
 ---
 
 # Agent Memory System

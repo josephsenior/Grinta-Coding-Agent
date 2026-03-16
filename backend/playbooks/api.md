@@ -4,9 +4,7 @@ type: knowledge
 version: 1.0.0
 agent: Orchestrator
 triggers:
-  - api
-  - rest
-  - endpoint
+  - /api
   - fastapi
   - express
   - flask

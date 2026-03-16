@@ -4,13 +4,9 @@ type: knowledge
 version: 1.0.0
 agent: Orchestrator
 triggers:
-  - refactor
-  - refactoring
-  - restructure
-  - clean up code
-  - improve code quality
-  - code quality
-  - technical debt
+    - /refactor
+    - refactor
+    - refactoring
 ---
 
 # Safe Refactoring Patterns
