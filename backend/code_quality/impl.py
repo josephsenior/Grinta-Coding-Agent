@@ -1,7 +1,7 @@
 """Production-grade code quality and validation implementation.
 
 Provides advanced code validation and linting capabilities using multiple
-backends (ruff, pylint) with proper error formatting and reporting.
+backends with proper error formatting and reporting.
 """
 
 from __future__ import annotations
@@ -89,8 +89,6 @@ class DefaultLinter:
     """Production-grade code quality validator with multiple backend support.
 
     Part of the backend.code_quality module, this class handles:
-    - Ruff (primary, fast, modern)
-    - Pylint (fallback, comprehensive)
     - Tree-sitter syntax validation (optional)
 
     Features:
@@ -102,7 +100,7 @@ class DefaultLinter:
 
     def __init__(
         self,
-        backend: str = "auto",  # "auto", "ruff", "pylint", "tree-sitter"
+        backend: str = "auto",  # "auto", "tree-sitter"
         config_path: str | None = None,
         enable_cache: bool = True,
         cache_ttl: int = 300,  # 5 minutes default
@@ -143,35 +141,19 @@ class DefaultLinter:
 
     def _detect_best_backend(self) -> str | None:
         """Detect the best available linter backend."""
-        # Try ruff first (fastest, most modern)
-        if self._check_backend_available("ruff"):
-            return "ruff"
-        # Try pylint as fallback
-        if self._check_backend_available("pylint"):
-            return "pylint"
+        # Removed ruff & pylint. Default to tree-sitter.
+        if self._check_backend_available("tree-sitter"):
+            return "tree-sitter"
         return None
 
     def _check_backend_available(self, backend: str) -> bool:
         """Check if a linter backend is available."""
-        try:
-            if backend == "ruff":
-                result = subprocess.run(
-                    ["ruff", "--version"],
-                    capture_output=True,
-                    timeout=2,
-                    check=False,
-                )
-                return result.returncode == 0
-            if backend == "pylint":
-                result = subprocess.run(
-                    ["pylint", "--version"],
-                    capture_output=True,
-                    timeout=2,
-                    check=False,
-                )
-                return result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            return False
+        if backend == "tree-sitter":
+            try:
+                import tree_sitter
+                return True
+            except ImportError:
+                return False
         return False
 
     def lint(
@@ -317,13 +299,6 @@ class DefaultLinter:
             if errors:
                 return LintResult(errors=errors, warnings=[])
 
-        # Fallback to existing logic for Python if LSP failed or returned nothing
-        if file_path.endswith(".py"):
-            if self._detected_backend == "ruff":
-                return self._lint_with_ruff(file_path=file_path)
-            if self._detected_backend == "pylint":
-                return self._lint_with_pylint(file_path=file_path)
-
         return LintResult(errors=[], warnings=[])
 
     def _lint_content(self, content: str, file_path: str | None = None) -> LintResult:
@@ -337,10 +312,7 @@ class DefaultLinter:
             tmp_path = tmp_file.name
 
         try:
-            if self._detected_backend == "ruff":
-                return self._lint_with_ruff(file_path=tmp_path)
-            if self._detected_backend == "pylint":
-                return self._lint_with_pylint(file_path=tmp_path)
+            pass
         finally:
             # Clean up temp file
             try:
@@ -350,139 +322,3 @@ class DefaultLinter:
 
         return LintResult(errors=[], warnings=[])
 
-    def _lint_with_ruff(self, file_path: str) -> LintResult:
-        """Lint using ruff backend."""
-        errors: list[LintError] = []
-        warnings: list[LintError] = []
-
-        try:
-            cmd = self._build_ruff_cmd(file_path)
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-            )
-
-            if result.returncode not in (0, 1):
-                logger.warning("Ruff linting failed: %s", result.stderr)
-                return LintResult(errors=[], warnings=[])
-
-            errs, warns = self._parse_ruff_output(result.stdout, file_path)
-            errors.extend(errs)
-            warnings.extend(warns)
-        except subprocess.TimeoutExpired:
-            logger.error("Ruff linting timed out")
-        except FileNotFoundError:
-            logger.debug("Ruff not found, skipping linting")
-        except Exception as e:
-            logger.error("Error running ruff: %s", e)
-
-        return LintResult(errors=errors, warnings=warnings)
-
-    def _build_ruff_cmd(self, file_path: str) -> list[str]:
-        """Build ruff check command."""
-        cmd = [
-            "ruff", "check", file_path,
-            "--select", "E,F,W",
-            "--format", "json",
-        ]
-        if self.config_path:
-            cmd.extend(["--config", self.config_path])
-        return cmd
-
-    def _parse_ruff_output(
-        self, stdout: str, file_path: str
-    ) -> tuple[list[LintError], list[LintError]]:
-        """Parse ruff JSON output into errors and warnings."""
-        errors: list[LintError] = []
-        warnings: list[LintError] = []
-        try:
-            ruff_output = json.loads(stdout)
-        except json.JSONDecodeError:
-            logger.error("Failed to parse ruff JSON output: %s", stdout)
-            return (errors, warnings)
-        for violation in ruff_output:
-            loc = violation.get("location", {})
-            line = loc.get("row", 1)
-            column = loc.get("column")
-            code = violation.get("code")
-            message = violation.get("message", "")
-            severity = "error" if code and code.startswith(("E", "F")) else "warning"
-            lint_error = LintError(
-                line=line,
-                column=column,
-                message=message,
-                code=code,
-                severity=severity,
-                file_path=file_path,
-            )
-            if severity == "error":
-                errors.append(lint_error)
-            else:
-                warnings.append(lint_error)
-        return (errors, warnings)
-
-    def _lint_with_pylint(self, file_path: str) -> LintResult:
-        """Lint using pylint backend (fallback)."""
-        errors: list[LintError] = []
-        warnings: list[LintError] = []
-
-        try:
-            cmd = ["pylint", file_path, "--output-format=json"]
-
-            if self.config_path:
-                cmd.extend(["--rcfile", self.config_path])
-
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                check=False,
-            )
-
-            # Pylint returns non-zero even on success, so we parse output
-            try:
-                pylint_output = json.loads(result.stdout)
-                for violation in pylint_output:
-                    line = violation.get("line", 1)
-                    column = violation.get("column", None)
-                    message = violation.get("message", "")
-                    code = violation.get("message-id", None)
-                    severity_map = {
-                        "error": "error",
-                        "fatal": "error",
-                        "warning": "warning",
-                        "convention": "warning",
-                        "refactor": "warning",
-                    }
-                    severity = severity_map.get(
-                        violation.get("type", "warning").lower(), "warning"
-                    )
-
-                    lint_error = LintError(
-                        line=line,
-                        column=column,
-                        message=message,
-                        code=code,
-                        severity=severity,
-                        file_path=file_path,
-                    )
-
-                    if severity == "error":
-                        errors.append(lint_error)
-                    else:
-                        warnings.append(lint_error)
-            except json.JSONDecodeError:
-                logger.error("Failed to parse pylint JSON output: %s", result.stdout)
-
-        except subprocess.TimeoutExpired:
-            logger.error("Pylint linting timed out")
-        except FileNotFoundError:
-            logger.debug("Pylint not found, skipping linting")
-        except Exception as e:
-            logger.error("Error running pylint: %s", e)
-
-        return LintResult(errors=errors, warnings=warnings)
