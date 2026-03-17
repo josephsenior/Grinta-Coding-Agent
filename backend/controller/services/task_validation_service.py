@@ -154,15 +154,13 @@ class TaskValidationService:
                 if self._is_test_command(event):
                     has_test_run = True
                     has_passing_test_run |= self._has_passing_output_after(tail, idx)
-                if self._is_run_tests_tool(event):
-                    has_test_run = True
 
         return _TestCoverageResult(has_file_edits, has_test_run, has_passing_test_run)
 
     def _is_test_command(self, event: Any) -> bool:
-        """Return True if the command appears to run tests (pytest, run_tests, unittest)."""
+        """Return True if the command appears to run tests (pytest, unittest)."""
         cmd = (getattr(event, "command", "") or "").lower()
-        return any(tok in cmd for tok in ("pytest", "run_tests", "unittest"))
+        return any(tok in cmd for tok in ("pytest", "unittest"))
 
     def _has_passing_output_after(self, tail: list, idx: int) -> bool:
         """Return True if the next CmdOutputObservation (within 5 events) has exit_code 0."""
@@ -172,11 +170,6 @@ class TaskValidationService:
             if isinstance(next_event, CmdOutputObservation):
                 return getattr(next_event, "exit_code", None) == 0
         return False
-
-    def _is_run_tests_tool(self, event: Any) -> bool:
-        """Return True if event's tool_call_metadata indicates run_tests was invoked."""
-        meta = getattr(event, "tool_call_metadata", None)
-        return bool(meta and getattr(meta, "function_name", "") == "run_tests")
 
     def _has_explicit_test_skip(self, action: PlaybookFinishAction) -> bool:
         outputs = getattr(action, "outputs", {})

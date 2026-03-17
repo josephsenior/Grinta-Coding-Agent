@@ -52,7 +52,10 @@ class AutoCondenser(Condenser):
         if config.type != self._cached_config_type:
             self._cached_delegate = Condenser.from_config(config, self._llm_registry)
             self._cached_config_type = config.type
-        return self._cached_delegate.condense(view)
+        delegate = self._cached_delegate
+        if delegate is None:
+            raise RuntimeError("Condenser.from_config returned None")
+        return delegate.condense(view)
 
     @classmethod
     def from_config(

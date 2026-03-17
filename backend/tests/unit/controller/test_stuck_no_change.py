@@ -30,7 +30,7 @@ class TestExtractObservationOutcome(unittest.TestCase):
     def test_file_edit_same_content_returns_no_change(self):
         """Re-creation: old_content == new_content → 'no_change'."""
         obs = MagicMock(spec=FileEditObservation)
-        obs.__class__ = FileEditObservation
+        obs.__class__ = FileEditObservation  # type: ignore[assignment]
         obs.content = "File created successfully"
         obs.old_content = "export default function Page() {}"
         obs.new_content = "export default function Page() {}"
@@ -40,7 +40,7 @@ class TestExtractObservationOutcome(unittest.TestCase):
     def test_file_edit_different_content_returns_unknown(self):
         """Genuine edit: old != new → 'unknown' (not no_change)."""
         obs = MagicMock(spec=FileEditObservation)
-        obs.__class__ = FileEditObservation
+        obs.__class__ = FileEditObservation  # type: ignore[assignment]
         obs.content = "File created successfully"
         obs.old_content = "old version"
         obs.new_content = "new version"
@@ -50,7 +50,7 @@ class TestExtractObservationOutcome(unittest.TestCase):
     def test_file_edit_none_old_content(self):
         """New file creation: old_content is None → 'unknown'."""
         obs = MagicMock(spec=FileEditObservation)
-        obs.__class__ = FileEditObservation
+        obs.__class__ = FileEditObservation  # type: ignore[assignment]
         obs.content = "File created successfully"
         obs.old_content = None
         obs.new_content = "new file content"

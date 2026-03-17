@@ -17,6 +17,8 @@ which eliminates latency, encoding concerns, and sandbox permission issues.
 """
 
 from __future__ import annotations
+from backend.core.config.utils import load_forge_config
+
 
 import json
 import os
@@ -127,7 +129,7 @@ def create_semantic_recall_tool() -> ChatCompletionToolParam:
 # ---------------------------------------------------------------------------
 
 # Workspace root can be overridden via env for testing; defaults to cwd.
-_WORKSPACE_ROOT = os.environ.get("FORGE_WORKSPACE_DIR", ".")
+_WORKSPACE_ROOT = load_forge_config(set_logging_levels=False).workspace_base or "."
 _NOTES_RELPATH = os.path.join(".forge", "agent_notes.json")
 
 

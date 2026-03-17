@@ -7,19 +7,34 @@ import sys
 import httpx
 import socketio
 
-BASE = "http://127.0.0.1:3000"
-AGENT_TIMEOUT = 300
-_INIT_TIMEOUT = 60
-_IDLE_CUTOFF = 60
+BASE = os.getenv("FORGE_BASE_URL", "http://127.0.0.1:3000")
+AGENT_TIMEOUT = 600
+_INIT_TIMEOUT = 120
+_IDLE_CUTOFF = 120
+_CONNECT_RETRIES = 5
+_CREATE_CONV_RETRIES = 8
 
 def _create_conversation() -> str:
     print("Creating conversation...")
-    r = httpx.post(f"{BASE}/api/v1/conversations", json={}, timeout=30.0)
-    r.raise_for_status()
-    data = r.json()
-    cid = data.get("conversation_id") or data.get("id")
-    print(f"Conversation ID: {cid}")
-    return cid
+    last_error: Exception | None = None
+    for attempt in range(1, _CREATE_CONV_RETRIES + 1):
+        try:
+            r = httpx.post(f"{BASE}/api/v1/conversations", json={}, timeout=120.0)
+            r.raise_for_status()
+            data = r.json()
+            cid = data.get("conversation_id") or data.get("id")
+            if not cid:
+                raise RuntimeError(f"Conversation id missing in response: {data}")
+            print(f"Conversation ID: {cid}")
+            return cid
+        except Exception as exc:
+            last_error = exc
+            print(f"Create conversation attempt {attempt}/{_CREATE_CONV_RETRIES} failed: {exc}")
+            if attempt < _CREATE_CONV_RETRIES:
+                time.sleep(2)
+    raise RuntimeError(
+        f"Could not create conversation after {_CREATE_CONV_RETRIES} attempts: {last_error}"
+    )
 
 class EventCollector:
     def __init__(self) -> None:
@@ -46,15 +61,22 @@ class EventCollector:
 
             msg = data.get("message")
             if msg:
-                print(f"[AGENT MESSAGE]: {msg}")
+                snippet = str(msg).replace("\n", " ")[:220]
+                print(f"[AGENT MESSAGE]: {snippet}")
             
             content = data.get("content")
             if content:
-                print(f"[AGENT CONTENT]: {content}")
+                snippet = str(content).replace("\n", " ")[:220]
+                print(f"[AGENT CONTENT]: {snippet}")
                 
             tool_call = data.get("args")
             if action:
-                print(f"[AGENT ACTION]: {action} args={tool_call}")
+                if action != "system":
+                    if isinstance(tool_call, dict):
+                        keys = ",".join(sorted(tool_call.keys()))
+                        print(f"[AGENT ACTION]: {action} args_keys=[{keys}]")
+                    else:
+                        print(f"[AGENT ACTION]: {action}")
             if obs:
                 print(f"[AGENT OBSERVATION]: {str(obs)[:200]}...")
             if agent_state:
@@ -71,7 +93,20 @@ class EventCollector:
 
     def connect_to(self, conversation_id: str) -> None:
         url = f"{BASE}?conversation_id={conversation_id}&latest_event_id=-1"
-        self.sio.connect(url, transports=["websocket"], wait_timeout=15)
+        last_error: Exception | None = None
+        for attempt in range(1, _CONNECT_RETRIES + 1):
+            try:
+                # Let engine.io negotiate transports (polling -> websocket upgrade)
+                # because websocket-only can fail during transient startup pressure.
+                self.sio.connect(url, wait_timeout=20)
+                return
+            except Exception as exc:
+                last_error = exc
+                if attempt < _CONNECT_RETRIES:
+                    time.sleep(1.5)
+        raise RuntimeError(
+            f"Could not connect Socket.IO after {_CONNECT_RETRIES} attempts: {last_error}"
+        )
 
     def wait_for_ready(self, timeout: float = _INIT_TIMEOUT) -> None:
         if not self._initialized.wait(timeout=timeout):

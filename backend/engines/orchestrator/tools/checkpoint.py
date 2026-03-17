@@ -7,6 +7,8 @@ durable progress snapshot that survives condensation.
 """
 
 from __future__ import annotations
+from backend.core.config.utils import load_forge_config
+
 
 import json
 import os
@@ -17,7 +19,7 @@ from backend.events.action.agent import AgentThinkAction
 
 CHECKPOINT_TOOL_NAME = "checkpoint"
 
-_WORKSPACE_ROOT = os.environ.get("FORGE_WORKSPACE_DIR", ".")
+_WORKSPACE_ROOT = load_forge_config(set_logging_levels=False).workspace_base or "."
 _CHECKPOINTS_FILE = ".forge/checkpoints.json"
 
 

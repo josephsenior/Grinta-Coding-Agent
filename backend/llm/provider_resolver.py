@@ -18,6 +18,7 @@ from backend.llm.catalog_loader import lookup
 # (keywords, provider) for heuristic fallback when model not in catalog
 _PROVIDER_KEYWORDS: list[tuple[list[str], str]] = [
     (["openrouter"], "openrouter"),
+    (["groq", "kimi-k2", "moonshotai"], "groq"),
     (["claude", "anthropic"], "anthropic"),
     (["gemini", "google"], "google"),
     (["grok", "xai"], "xai"),
@@ -27,6 +28,7 @@ _PROVIDER_KEYWORDS: list[tuple[list[str], str]] = [
 ]
 
 _PROVIDER_DEFAULT_URLS: dict[str, str] = {
+    "groq": "https://api.groq.com/openai/v1",
     "xai": "https://api.x.ai/v1",
     "deepseek": "https://api.deepseek.com/v1",
     "openrouter": "https://openrouter.ai/api/v1",

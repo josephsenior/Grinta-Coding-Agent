@@ -147,6 +147,11 @@ class ActionExecutor:
         # Ensure downloads directory exists
         os.makedirs(self.downloads_directory, exist_ok=True)
 
+        # Track repeated identical command failures to nudge strategy pivots
+        # before the circuit breaker is the only recovery mechanism.
+        self._last_cmd_failure_signature: tuple[str, int, str] | None = None
+        self._same_cmd_failure_count: int = 0
+
         # MCP clients are created lazily on first use.
         self._mcp_config = mcp_config
         self._mcp_clients: list[Any] | None = None
@@ -346,6 +351,70 @@ class ActionExecutor:
         )
         return text
 
+    def _should_rewrite_python3_to_python(self) -> bool:
+        """Return True only when running in Windows PowerShell mode.
+
+        On Windows with Git Bash available, commands should remain bash-native,
+        and python3 should not be rewritten.
+        """
+        if sys.platform != "win32":
+            return False
+
+        tool_registry = getattr(self.session_manager, "tool_registry", None)
+        if tool_registry is not None:
+            has_bash = bool(getattr(tool_registry, "has_bash", False))
+            if has_bash:
+                return False
+            has_powershell = bool(getattr(tool_registry, "has_powershell", False))
+            if has_powershell:
+                return True
+
+        # Fallback when tool registry details are unavailable in tests/mocks.
+        default_session = self.session_manager.get_session("default")
+        session_name = default_session.__class__.__name__.lower() if default_session else ""
+        return "powershell" in session_name
+
+    @staticmethod
+    def _extract_failure_signature(content: str) -> str:
+        """Build a compact error signature for repeated-failure detection."""
+        if not content:
+            return ""
+        lines = [line.strip().lower() for line in content.splitlines() if line.strip()]
+        if not lines:
+            return ""
+        # Prefer the tail where shell errors usually appear.
+        tail = " | ".join(lines[-3:])
+        return tail[:300]
+
+    def _maybe_mark_repeated_cmd_failure(
+        self, action: CmdRunAction, observation: CmdOutputObservation
+    ) -> None:
+        """Annotate repeated identical command failures to force a strategy pivot."""
+        exit_code = int(getattr(observation.metadata, "exit_code", 0) or 0)
+        if exit_code == 0:
+            self._last_cmd_failure_signature = None
+            self._same_cmd_failure_count = 0
+            return
+
+        signature = (
+            action.command.strip(),
+            exit_code,
+            self._extract_failure_signature(observation.content),
+        )
+        if signature == self._last_cmd_failure_signature:
+            self._same_cmd_failure_count += 1
+        else:
+            self._last_cmd_failure_signature = signature
+            self._same_cmd_failure_count = 1
+
+        if self._same_cmd_failure_count >= 2:
+            observation.content += (
+                "\n\n[REPEATED_COMMAND_FAILURE] "
+                f"The same command failed {self._same_cmd_failure_count} times with the same error signature. "
+                "Do NOT retry unchanged. Pivot now: inspect available tools/interpreters, "
+                "adjust environment, or choose a different command/tool."
+            )
+
     async def run(
         self, action: CmdRunAction
     ) -> CmdOutputObservation | ErrorObservation | TerminalObservation:
@@ -368,9 +437,8 @@ class ActionExecutor:
                     action.command,
                 )
 
-            # On Windows, python3 is not on PATH — only python exists.
-            import sys as _sys
-            if _sys.platform == "win32" and action.command:
+            # Rewrite python3->python only in Windows PowerShell mode.
+            if self._should_rewrite_python3_to_python() and action.command:
                 import re as _re
                 action.command = _re.sub(
                     r"\bpython3\b", "python", action.command
@@ -382,6 +450,8 @@ class ActionExecutor:
             observation = await self._run_foreground_cmd(action)
             if isinstance(observation, ErrorObservation):
                 return observation
+
+            self._maybe_mark_repeated_cmd_failure(action, observation)
 
             if action.grep_pattern and isinstance(observation.content, str):
                 observation.content = self._apply_grep_filter(

@@ -42,8 +42,10 @@ class BehavioralHintsBuilder:
                         edited_files[path] = edited_files.get(path, 0) + 1
                     if name == "str_replace_editor":
                         str_replace_count += 1
-                elif name == "run_tests":
-                    has_test_run = True
+                elif name in ("execute_bash", "bash"):
+                    args_str = str(args_raw).lower()
+                    if "pytest" in args_str or "unittest" in args_str:
+                        has_test_run = True
 
             content = str(msg.get("content", ""))
             if "error" in content.lower() or "failed" in content.lower():
@@ -91,7 +93,7 @@ class BehavioralHintsBuilder:
         total_edits = sum(edited_files.values())
         if total_edits >= 4 and not has_test_run:
             hints.append(
-                "Multiple file edits without running tests — consider run_tests to verify changes."
+                "Multiple file edits without running tests — consider running the relevant test suite to verify changes."
             )
 
         if error_count >= 3:

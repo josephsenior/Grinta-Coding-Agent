@@ -445,7 +445,7 @@ class TreeSitterEditor:
                 start_byte=body_start, end_byte=body_end
             )
             new_code = self._replace_node_content(
-                original_code, effective_body, new_body, preserve_indentation=True
+                original_code, cast(NodeType, effective_body), new_body, preserve_indentation=True
             )
 
             # Validate if requested

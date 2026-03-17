@@ -21,7 +21,6 @@ from backend.engines.orchestrator.tools import (
     create_llm_based_edit_tool,
     create_note_tool,
     create_recall_tool,
-    create_run_tests_tool,
     create_semantic_recall_tool,
     create_str_replace_editor_tool,
     create_structure_editor_tool,
@@ -44,7 +43,6 @@ from backend.engines.orchestrator.tools.note import (
     build_note_action,
     build_recall_action,
 )
-from backend.engines.orchestrator.tools.run_tests import build_run_tests_action
 from backend.engines.orchestrator.tools.search_code import (
     build_search_code_action,
     SEARCH_CODE_TOOL_NAME,
@@ -294,13 +292,6 @@ def _handle_semantic_recall_tool(arguments: dict) -> AgentThinkAction:
         score_str = f" (score={score:.3f})" if isinstance(score, float) else ""
         parts.append(f"  [{i}] ({role}{score_str}) {content[:500]}")
     return AgentThinkAction(thought="\n".join(parts))
-
-
-def _handle_run_tests_tool(arguments: dict) -> CmdRunAction:
-    """Handle RUN_TESTS_TOOL: run pytest and return structured JSON results."""
-    filter_str = arguments.get("filter", "")
-    extra_flags = arguments.get("extra_flags", "")
-    return build_run_tests_action(filter_str=filter_str, extra_flags=extra_flags)
 
 
 def _handle_apply_patch_tool(arguments: dict) -> CmdRunAction:
@@ -787,7 +778,7 @@ def _normalize_task_tracker_list(raw_list: list) -> list[dict]:
         raise FunctionCallValidationError(f"Invalid task list structure: {e}") from e
 
 
-def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
+def _handle_task_tracker_tool(arguments: dict) -> Action:
     """Handle TASK_TRACKER_TOOL tool call."""
     if "command" not in arguments:
         raise FunctionCallValidationError(
@@ -805,9 +796,18 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
 
     tracker = TaskTracker()
 
+    existing_normalized_task_list: list[dict] = []
     if command == "view":
         raw_task_list = tracker.load_from_file()
     else:
+        # Capture the current persisted plan so we can detect no-op updates
+        # that otherwise create tool-call loops without advancing execution.
+        existing_raw = tracker.load_from_file()
+        if isinstance(existing_raw, list):
+            try:
+                existing_normalized_task_list = _normalize_task_tracker_list(existing_raw)
+            except FunctionCallValidationError:
+                existing_normalized_task_list = []
         raw_task_list = arguments.get("task_list", [])
 
     if not isinstance(raw_task_list, list):
@@ -816,6 +816,20 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
         )
 
     normalized_task_list = _normalize_task_tracker_list(raw_task_list)
+
+    if (
+        command == "update"
+        and normalized_task_list
+        and normalized_task_list == existing_normalized_task_list
+    ):
+        logger.info("Ignoring no-op task_tracker update: unchanged task_list")
+        return AgentThinkAction(
+            thought=(
+                "[TASK_TRACKER] Update skipped because the plan is unchanged. "
+                "Do a concrete next action now (edit, run command/tests, or read a targeted file), "
+                "and refresh tracking only after status/result changes."
+            )
+        )
 
     if command == "update":
         tracker.save_to_file(normalized_task_list)
@@ -1183,7 +1197,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         create_note_tool()["function"]["name"]: _handle_note_tool,
         create_recall_tool()["function"]["name"]: _handle_recall_tool,
         create_semantic_recall_tool()["function"]["name"]: _handle_semantic_recall_tool,
-        create_run_tests_tool()["function"]["name"]: _handle_run_tests_tool,
         create_apply_patch_tool()["function"]["name"]: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,

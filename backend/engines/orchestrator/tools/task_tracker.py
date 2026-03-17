@@ -1,3 +1,4 @@
+from backend.core.config.utils import load_forge_config
 """Structured task tracking tool definition for Orchestrator runs."""
 
 import json
@@ -25,7 +26,7 @@ class TaskTracker:
     def __init__(self, workspace_root: str | Path | None = None):
         """Initialize the task tracker with a workspace root."""
         if workspace_root is None:
-            workspace_root = os.environ.get("FORGE_WORKSPACE_DIR", ".")
+            workspace_root = load_forge_config(set_logging_levels=False).workspace_base or "."
         self.file_path = Path(workspace_root) / ".forge" / "active_plan.json"
 
     def load_from_file(self) -> List[dict[str, Any]]:

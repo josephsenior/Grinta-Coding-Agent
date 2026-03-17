@@ -48,7 +48,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
 
         # Verify
         self.assertTrue(result)
-        self.assertEqual(self.service._replan_attempts, 1)
+        self.assertEqual(self.service._replan_attempts, 1)  # type: ignore[attr-defined]
 
         # Check event emitted
         self.controller.event_stream.add_event.assert_called()
@@ -65,12 +65,12 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.controller._react_to_exception = AsyncMock()
 
         # Set attempts to max
-        self.service._replan_attempts = 2
+        self.service._replan_attempts = 2  # type: ignore[attr-defined]
 
         # Run
         result = await self.service._handle_stuck_detection(self.controller)
 
         # Verify
         self.assertFalse(result)
-        self.assertEqual(self.service._replan_attempts, 0)
+        self.assertEqual(self.service._replan_attempts, 0)  # type: ignore[attr-defined]
         self.controller._react_to_exception.assert_awaited_once()

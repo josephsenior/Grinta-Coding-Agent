@@ -44,8 +44,6 @@ _CORE_TOOLS = frozenset(
         "recall",
         "semantic_recall",
         "working_memory",
-        # Testing
-        "run_tests",
         # Verification
         "verify_state",
         "verify_ui_change",

@@ -84,17 +84,28 @@ class PromptManager:
             raise ValueError(msg)
         self.prompt_dir: str = prompt_dir
 
-        # We always include a shared prompts directory as a fallback
+        # We include orchestrator prompts as a shared fallback for common templates.
+        # IMPORTANT: system prompts must always come from the engine's own prompt_dir,
+        # otherwise a missing engine prompt could accidentally fall back to the
+        # orchestrator's system prompt.
         shared_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "engines", "shared", "prompts"
+            os.path.dirname(os.path.dirname(__file__)),
+            "engines",
+            "orchestrator",
+            "prompts",
         )
         search_paths = [prompt_dir]
-        if os.path.isdir(shared_dir):
+        if os.path.isdir(shared_dir) and shared_dir not in search_paths:
             search_paths.append(shared_dir)
 
         # nosec B701 - Template rendering for prompts (not HTML), autoescape enabled
         self.env = Environment(loader=FileSystemLoader(search_paths), autoescape=True)
-        self.system_template: Template = self._load_template(system_prompt_filename)
+        self._system_env = Environment(
+            loader=FileSystemLoader([prompt_dir]), autoescape=True
+        )
+        self.system_template = self._load_template(
+            system_prompt_filename, env=self._system_env, template_dir=prompt_dir
+        )
         self.user_template: Template = self._load_template("user_prompt.j2")
         self.additional_info_template: Template = self._load_template(
             "additional_info.j2"
@@ -104,7 +115,13 @@ class PromptManager:
             "knowledge_base_info.j2"
         )
 
-    def _load_template(self, template_name: str) -> Template:
+    def _load_template(
+        self,
+        template_name: str,
+        *,
+        env: Environment | None = None,
+        template_dir: str | None = None,
+    ) -> Template:
         """Load a template from the prompt directory.
 
         Args:
@@ -117,12 +134,15 @@ class PromptManager:
             FileNotFoundError: If the template file is not found.
 
         """
+        env = env or self.env
+        template_dir = template_dir or self.prompt_dir
         try:
-            return self.env.get_template(template_name)
+            return env.get_template(template_name)
         except Exception as e:
-            template_path = os.path.join(self.prompt_dir, template_name)
+            template_path = os.path.join(template_dir, template_name)
             msg = f"Prompt file {template_path} not found"
             raise FileNotFoundError(msg) from e
+
 
     def get_system_message(self, **context) -> str:
         """Render system prompt with optional context and apply refinement helpers."""

@@ -87,7 +87,7 @@ class TestFileEventsPreserved(unittest.TestCase):
         sys_msg = MagicMock(spec=SystemMessageAction)
         sys_msg.id = 0
         sys_msg.source = EventSource.USER
-        sys_msg.__class__ = SystemMessageAction
+        sys_msg.__class__ = SystemMessageAction  # type: ignore[assignment]
         events.append(sys_msg)
 
         user_msg = MagicMock(spec=MessageAction)
@@ -103,7 +103,7 @@ class TestFileEventsPreserved(unittest.TestCase):
                 fa.id = i
                 fa.source = EventSource.AGENT
                 fa.path = file_actions[i]
-                fa.__class__ = FileWriteAction
+                fa.__class__ = FileWriteAction  # type: ignore[assignment]
                 fa.content = f"content-{i}"
                 fa.cause = None
                 events.append(fa)
@@ -129,7 +129,7 @@ class TestFileEventsPreserved(unittest.TestCase):
         action = condensation.action
 
         forgotten = set(action.forgotten_event_ids or [])
-        if action.forgotten_events_start_id is not None:
+        if action.forgotten_events_start_id is not None and action.forgotten_events_end_id is not None:
             forgotten = set(range(
                 action.forgotten_events_start_id,
                 action.forgotten_events_end_id + 1,

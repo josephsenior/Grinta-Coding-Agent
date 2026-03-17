@@ -5,6 +5,8 @@ especially when hitting errors after CmdRunAction or FileEditAction.
 """
 
 from __future__ import annotations
+from backend.core.config.utils import load_forge_config
+
 
 import os
 
@@ -13,7 +15,7 @@ from backend.core.rollback.rollback_manager import RollbackManager
 
 REVERT_TO_SAFE_STATE_TOOL_NAME = "revert_to_safe_state"
 
-_WORKSPACE_ROOT = os.environ.get("FORGE_WORKSPACE_DIR", ".")
+_WORKSPACE_ROOT = load_forge_config(set_logging_levels=False).workspace_base or "."
 
 
 def create_revert_to_safe_state_tool() -> dict:
@@ -24,7 +26,7 @@ def create_revert_to_safe_state_tool() -> dict:
             "name": REVERT_TO_SAFE_STATE_TOOL_NAME,
             "description": (
                 "Revert the entire workspace to a previously saved safe state. "
-                "Use this immediately after a command (like run_tests) fails due to a bad file edit, "
+                    "Use this immediately after a command fails due to a bad file edit, "
                 "to instantly undo all changes and start fresh without wasting turns manually fixing syntax errors."
             ),
             "parameters": {

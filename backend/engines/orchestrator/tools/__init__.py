@@ -23,7 +23,6 @@ from .delegate_task import create_delegate_task_tool
 from .revert_to_safe_state import create_revert_to_safe_state_tool
 from .note import create_note_tool, create_recall_tool, create_semantic_recall_tool
 from .project_map import create_project_map_tool
-from .run_tests import create_run_tests_tool
 from .search_code import create_search_code_tool
 from .session_diff import create_session_diff_tool
 from .batch_edit import create_batch_edit_tool
@@ -59,7 +58,6 @@ __all__ = [
     "create_proposal_tool",
     "create_recall_tool",
     "create_semantic_recall_tool",
-    "create_run_tests_tool",
     "create_search_code_tool",
     "create_session_diff_tool",
     "create_signal_progress_tool",

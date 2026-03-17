@@ -119,7 +119,7 @@ class OrchestratorPlanner:
         self._add_terminal_and_special_tools(tools)
 
     def _add_basic_tools(self, tools: list, use_short_tool_desc: bool) -> None:
-        """Add cmd, think, finish, condensation_request, note, recall, run_tests tools."""
+        """Add cmd, think, finish, condensation_request, note, recall tools."""
         from backend.engines.orchestrator.tools.bash import create_cmd_run_tool
         from backend.engines.orchestrator.tools.condensation_request import (
             create_condensation_request_tool,
@@ -131,7 +131,6 @@ class OrchestratorPlanner:
             create_recall_tool,
             create_semantic_recall_tool,
         )
-        from backend.engines.orchestrator.tools.run_tests import create_run_tests_tool
 
         if getattr(self._config, "enable_cmd", True):
             tools.append(create_cmd_run_tool(use_short_description=use_short_tool_desc))
@@ -145,8 +144,6 @@ class OrchestratorPlanner:
             tools.append(create_note_tool())
             tools.append(create_recall_tool())
             tools.append(create_semantic_recall_tool())
-        if getattr(self._config, "enable_run_tests", True):
-            tools.append(create_run_tests_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
         """Add apply_patch, batch_edit, task_tracker, search_code, explore_code tools."""
@@ -547,7 +544,7 @@ class OrchestratorPlanner:
                         f"\n⚠️ CONTEXT PRESSURE: {remaining_pct}% of context window remaining. "
                         "Condensation will occur soon. To preserve context AND work efficiently:\n"
                         "1. note(key, value) — persist important findings and decisions\n"
-                        "2. task_tracker(update) — ensure plan reflects current progress\n"
+                        "2. If plan changed, update tracking once (never repeat unchanged updates)\n"
                         "3. working_memory(update) — save current hypothesis and blockers\n"
                         "4. Prefer targeted reads: use view_range instead of reading full files\n"
                         "5. Prefer search_code over cat/grep for lookups — it returns only relevant lines\n"
@@ -575,7 +572,8 @@ class OrchestratorPlanner:
                 "Your recent actions show a repeating pattern. You MUST change strategy:\n"
                 "1. STOP and use think() to analyze why your current approach isn't working\n"
                 "2. Try a fundamentally different approach\n"
-                "3. If editing files, re-read the file first with view command"
+                "3. If editing files, re-read the file first with view command\n"
+                "4. Do not repeat unchanged tracking updates"
             ).format(rep_score)
         elif rep_score >= 0.45:
             status += (
@@ -669,7 +667,7 @@ class OrchestratorPlanner:
         ),
         (
             ["test", "testing", "pytest", "unittest"],
-            "Use run_tests to execute tests with structured output.",
+            "Use bash/execute_bash to run tests (e.g., `pytest -q`).",
         ),
         (
             ["git", "commit", "branch", "merge", "diff"],

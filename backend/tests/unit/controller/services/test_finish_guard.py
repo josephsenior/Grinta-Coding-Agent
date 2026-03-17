@@ -42,7 +42,7 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
         action = PlaybookFinishAction(outputs={"result": "done"})
 
         # Mock _get_missing_task_files to return missing files
-        self.service._get_missing_task_files = MagicMock(
+        self.service._get_missing_task_files = MagicMock(  # type: ignore[method-assign]
             return_value={"src/app/page.tsx", "src/app/layout.tsx"}
         )
 
@@ -83,7 +83,7 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
         """Finish allowed when all task files are created."""
         action = PlaybookFinishAction(outputs={"result": "done"})
 
-        self.service._get_missing_task_files = MagicMock(return_value=set())
+        self.service._get_missing_task_files = MagicMock(return_value=set())  # type: ignore[method-assign]
 
         await self.service._handle_finish_action(action)
 
@@ -96,7 +96,7 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
     async def test_blocked_finish_does_not_log_audit(self):
         """Blocked finish should not log a success audit."""
         action = PlaybookFinishAction(outputs={"result": "done"})
-        self.service._get_missing_task_files = MagicMock(
+        self.service._get_missing_task_files = MagicMock(  # type: ignore[method-assign]
             return_value={"src/missing.tsx"}
         )
 
@@ -107,7 +107,7 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
     async def test_error_observation_source_is_environment(self):
         """INCOMPLETE_TASK error should come from ENVIRONMENT source."""
         action = PlaybookFinishAction(outputs={"result": "done"})
-        self.service._get_missing_task_files = MagicMock(
+        self.service._get_missing_task_files = MagicMock(  # type: ignore[method-assign]
             return_value={"src/page.tsx"}
         )
 

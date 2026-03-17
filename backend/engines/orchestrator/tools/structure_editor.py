@@ -286,7 +286,7 @@ class StructureEditor:
         from backend.utils.blast_radius import check_blast_radius
         # Blast Radius Hook: if successful, checking symbol references
         if result.success:
-            check_blast_radius(file_path, function_name, result)
+            check_blast_radius(file_path, function_name, 10)
 
         return result
 
@@ -519,7 +519,7 @@ class StructureEditor:
 
             from backend.utils.blast_radius import check_blast_radius_from_code
             # Blast Radius Hook: best-effort check using the first few symbols found in the new code
-            check_blast_radius_from_code(file_path, new_code, result)
+            check_blast_radius_from_code(file_path, new_code, 10)
 
             return result
 

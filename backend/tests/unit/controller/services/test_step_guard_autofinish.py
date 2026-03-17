@@ -118,14 +118,14 @@ class TestTryAutoFinish(unittest.IsolatedAsyncioTestCase):
 
     def _make_user_message(self, text: str) -> MessageAction:
         msg = MagicMock(spec=MessageAction)
-        msg.__class__ = MessageAction
+        msg.__class__ = MessageAction  # type: ignore[assignment]
         type(msg).content = text
         type(msg).source = EventSource.USER
         return msg
 
     def _make_file_write(self, path: str) -> FileWriteAction:
         action = MagicMock(spec=FileWriteAction)
-        action.__class__ = FileWriteAction
+        action.__class__ = FileWriteAction  # type: ignore[assignment]
         type(action).path = path
         return action
 
@@ -230,7 +230,7 @@ class TestCheckRecreationAutoFinish(unittest.IsolatedAsyncioTestCase):
 
     def _make_file_edit_obs(self, old: str, new: str) -> FileEditObservation:
         obs = MagicMock(spec=FileEditObservation)
-        obs.__class__ = FileEditObservation
+        obs.__class__ = FileEditObservation  # type: ignore[assignment]
         type(obs).old_content = old
         type(obs).new_content = new
         return obs

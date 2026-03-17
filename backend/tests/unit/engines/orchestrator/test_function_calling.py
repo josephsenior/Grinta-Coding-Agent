@@ -297,15 +297,31 @@ class TestHandleTaskTrackerTool:
             "command": "plan",
             "task_list": [{"description": "My task"}],  # missing id, status
         }
-        action = _handle_task_tracker_tool(args)
+        action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
         task = action.task_list[0]
         assert task["id"] == "step-1"
         assert task["status"] == "pending"
 
     def test_non_plan_command_with_empty_task_list(self):
         args = {"command": "update", "task_list": []}
-        action = _handle_task_tracker_tool(args)
+        action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
         assert action.command == "update"
+
+    def test_duplicate_update_returns_think_action(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("FORGE_WORKSPACE_DIR", str(tmp_path))
+        args = {
+            "command": "update",
+            "task_list": [
+                {"id": "1", "description": "step", "status": "in_progress"}
+            ],
+        }
+
+        first = _handle_task_tracker_tool(args)
+        assert isinstance(first, TaskTrackingAction)
+
+        second = _handle_task_tracker_tool(args)
+        assert isinstance(second, AgentThinkAction)
+        assert "unchanged" in second.thought.lower()
 
 
 # ---------------------------------------------------------------------------
