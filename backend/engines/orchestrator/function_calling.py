@@ -16,32 +16,24 @@ from backend.core.logger import forge_logger as logger
 from backend.engines.orchestrator.tools import (
     create_apply_patch_tool,
     create_cmd_run_tool,
-    create_condensation_request_tool,
+    create_summarize_context_tool,
     create_finish_tool,
     create_llm_based_edit_tool,
-    create_note_tool,
-    create_recall_tool,
-    create_semantic_recall_tool,
     create_str_replace_editor_tool,
     create_structure_editor_tool,
     create_think_tool,
 )
-from backend.engines.orchestrator.tools.terminal import (
-    TERMINAL_OPEN_TOOL_NAME,
-    TERMINAL_INPUT_TOOL_NAME,
-    TERMINAL_READ_TOOL_NAME,
-    build_terminal_open_action,
-    build_terminal_input_action,
-    build_terminal_read_action,
+from backend.engines.orchestrator.tools.terminal_manager import (
+    TERMINAL_MANAGER_TOOL_NAME,
+    handle_terminal_manager_tool,
 )
 from backend.engines.orchestrator.tools.apply_patch import build_apply_patch_action
 from backend.engines.orchestrator.tools.batch_edit import (
     build_batch_edit_action,
     BATCH_EDIT_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.note import (
-    build_note_action,
-    build_recall_action,
+from backend.engines.orchestrator.tools.memory_manager import (
+    MEMORY_MANAGER_TOOL_NAME,
 )
 from backend.engines.orchestrator.tools.search_code import (
     build_search_code_action,
@@ -64,7 +56,7 @@ from backend.engines.orchestrator.tools.error_patterns import (
 )
 from backend.engines.orchestrator.tools.explore_code import (
     build_explore_tree_structure_action,
-    build_get_entity_contents_action,
+    build_read_symbol_definition_action,
 )
 from backend.engines.orchestrator.tools.checkpoint import (
     build_checkpoint_action,
@@ -81,10 +73,6 @@ from backend.engines.orchestrator.tools.session_diff import (
 from backend.engines.orchestrator.tools.verify_state import (
     build_verify_state_action,
     VERIFY_STATE_TOOL_NAME,
-)
-from backend.engines.orchestrator.tools.working_memory import (
-    build_working_memory_action,
-    WORKING_MEMORY_TOOL_NAME,
 )
 from backend.engines.orchestrator.tools.revert_to_safe_state import (
     build_revert_to_safe_state_action,
@@ -111,12 +99,7 @@ from backend.engines.orchestrator.tools.blackboard import (
     BLACKBOARD_TOOL_NAME,
 )
 from backend.engines.orchestrator.tools.query_toolbox import QUERY_TOOLBOX_TOOL_NAME, build_query_toolbox_action
-from backend.engines.orchestrator.tools.meta_cognition import (
-    UNCERTAINTY_TOOL_NAME,
-    CLARIFICATION_TOOL_NAME,
-    ESCALATE_TOOL_NAME,
-    PROPOSAL_TOOL_NAME,
-)
+from backend.engines.orchestrator.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engines.orchestrator.tools.mcp_gateway import MCP_GATEWAY_TOOL_NAME
 from backend.engines.common import (
     common_response_to_actions,
@@ -245,53 +228,61 @@ def _handle_finish_tool(arguments: dict) -> PlaybookFinishAction:
     return PlaybookFinishAction(final_thought=arguments["message"], outputs=outputs)
 
 
-def _handle_note_tool(arguments: dict) -> AgentThinkAction:
-    """Handle NOTE_TOOL: store key→value in .forge/agent_notes.json (native)."""
-    key = arguments.get("key", "")
-    value = arguments.get("value", "")
-    if not key:
-        from backend.core.errors import FunctionCallValidationError as _E
+def _handle_memory_manager_tool(arguments: dict) -> AgentThinkAction:
+    """Handle unified memory ops: note, recall, semantic_recall, working_memory."""
+    action = arguments.get("action")
+    if not action:
+        raise FunctionCallValidationError("Missing 'action' in memory_manager tool.")
 
-        raise _E('Missing required argument "key" in tool call note')
-    return build_note_action(key, value)
-
-
-def _handle_recall_tool(arguments: dict) -> AgentThinkAction:
-    """Handle RECALL_TOOL: retrieve key from .forge/agent_notes.json (native)."""
-    key = arguments.get("key", "all")
-    return build_recall_action(key)
-
-
-def _handle_semantic_recall_tool(arguments: dict) -> AgentThinkAction:
-    """Handle SEMANTIC_RECALL_TOOL: query vector memory for related context.
-
-    Returns results tagged as [SEMANTIC_RECALL_RESULT] so the LLM can
-    distinguish retrieved data from its own reasoning.
-    """
-    query = arguments.get("query", "")
-    if not query:
-        raise FunctionCallValidationError(
-            'Missing required argument "query" in tool call semantic_recall'
-        )
-    k = min(int(arguments.get("k", 5)), 10)
-    recall_fn = _semantic_recall_registry.get("fn")
-    if recall_fn is None:
-        return AgentThinkAction(
-            thought="[SEMANTIC_RECALL_RESULT] Vector memory is not available in this session."
-        )
-    results = recall_fn(query, k)
-    if not results:
-        return AgentThinkAction(
-            thought=f"[SEMANTIC_RECALL_RESULT] No results found for query: {query!r}"
-        )
-    parts = [f"[SEMANTIC_RECALL_RESULT] {len(results)} results for query: {query!r}\n"]
-    for i, item in enumerate(results, 1):
-        content = item.get("content_text", item.get("content", ""))
-        role = item.get("role", "unknown")
-        score = item.get("score", "")
-        score_str = f" (score={score:.3f})" if isinstance(score, float) else ""
-        parts.append(f"  [{i}] ({role}{score_str}) {content[:500]}")
-    return AgentThinkAction(thought="\n".join(parts))
+    if action == "note":
+        from backend.engines.orchestrator.tools.note import build_note_action
+        key = arguments.get("key", "")
+        value = arguments.get("value", "")
+        if not key:
+            raise FunctionCallValidationError('Missing "key" in memory_manager (note)')
+        return build_note_action(key, value)
+        
+    elif action == "recall":
+        from backend.engines.orchestrator.tools.note import build_recall_action
+        key = arguments.get("key", "all")
+        return build_recall_action(key)
+        
+    elif action == "semantic_recall":
+        query = arguments.get("key", "")
+        if not query:
+            raise FunctionCallValidationError('Missing search phrase "key" in memory_manager (semantic_recall)')
+        k = 5
+        recall_fn = _semantic_recall_registry.get("fn")
+        if recall_fn is None:
+            return AgentThinkAction(
+                thought="[SEMANTIC_RECALL_RESULT] Vector memory is not available in this session."
+            )
+        results = recall_fn(query, k)
+        if not results:
+            return AgentThinkAction(
+                thought=f"[SEMANTIC_RECALL_RESULT] No results found for query: {query!r}"
+            )
+        parts = [f"[SEMANTIC_RECALL_RESULT] {len(results)} results for query: {query!r}\n"]
+        for i, item in enumerate(results, 1):
+            content = item.get("content_text", item.get("content", ""))
+            role = item.get("role", "unknown")
+            score = item.get("score", "")
+            score_str = f" (score={score:.3f})" if isinstance(score, float) else ""
+            parts.append(f"  [{i}] ({role}{score_str}) {content[:500]}")
+        return AgentThinkAction(thought="\n".join(parts))
+        
+    elif action == "working_memory":
+        from backend.engines.orchestrator.tools.working_memory import build_working_memory_action
+        # Map arguments back to what build_working_memory_action expects
+        wm_args = {
+            "command": arguments.get("update_type", "get"),
+            "section": arguments.get("section", "all"),
+            "content": arguments.get("content", "")
+        }
+        return build_working_memory_action(wm_args)
+        
+    else:
+        raise FunctionCallValidationError(f"Unknown memory_manager action: {action}")
 
 
 def _handle_apply_patch_tool(arguments: dict) -> CmdRunAction:
@@ -355,11 +346,6 @@ def _handle_session_diff_tool(arguments: dict) -> CmdRunAction:
 def _handle_verify_state_tool(arguments: dict) -> AgentThinkAction:
     """Handle verify_state tool: validate file assertions before editing."""
     return build_verify_state_action(arguments)
-
-
-def _handle_working_memory_tool(arguments: dict) -> AgentThinkAction:
-    """Handle working_memory tool: structured cognitive workspace."""
-    return build_working_memory_action(arguments)
 
 
 def _handle_llm_based_file_edit_tool(arguments: dict) -> FileEditAction:
@@ -741,8 +727,8 @@ def _handle_think_tool(arguments: dict) -> AgentThinkAction:
     return AgentThinkAction(thought=arguments["thought"])
 
 
-def _handle_condensation_request_tool(arguments: dict) -> CondensationRequestAction:
-    """Handle CondensationRequestTool tool call."""
+def _handle_summarize_context_tool(arguments: dict) -> CondensationRequestAction:
+    """Handle Summarize Context tool call."""
     return CondensationRequestAction()
 
 
@@ -869,7 +855,7 @@ def _handle_mcp_gateway_tool(arguments: dict[str, Any]) -> MCPAction:
     return MCPAction(name=tool_name, arguments=dict(inner_args))
 
 
-def _validate_structure_editor_args(arguments: dict, tool_name: str) -> tuple[str, str]:
+def _validate_ast_code_editor_args(arguments: dict, tool_name: str) -> tuple[str, str]:
     """Validate required arguments for structure editor.
 
     Args:
@@ -1030,12 +1016,12 @@ def _handle_undo_last_edit_command(file_path: str) -> Action:
     )
 
 
-def _handle_structure_editor_tool(arguments: dict) -> Action:
+def _handle_ast_code_editor_tool(arguments: dict) -> Action:
     """Handle StructureEditor tool call."""
     tool_name = create_structure_editor_tool()["function"]["name"]
 
     # Validate arguments
-    command, file_path = _validate_structure_editor_args(arguments, tool_name)
+    command, file_path = _validate_ast_code_editor_args(arguments, tool_name)
 
     # Initialize editor
     try:
@@ -1074,7 +1060,7 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
         else:
             all_cmds = list(editor_command_handlers) + list(simple_command_handlers)
             raise FunctionCallValidationError(
-                f"Unknown command '{command}' for structure_editor tool. "
+                f"Unknown command '{command}' for ast_code_editor tool. "
                 f"Valid commands: {all_cmds}"
             )
 
@@ -1082,58 +1068,51 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
         return MessageAction(content=f"❌ Structure Editor error: {str(e)}")
 
 
-def _handle_uncertainty_tool(arguments: dict) -> Action:
-    """Handle uncertainty tool — let the LLM flag doubt rather than guess."""
-    from backend.events.action.agent import UncertaintyAction
-
-    level = arguments.get("uncertainty_level", 0.5)
-    thought = arguments.get("thought", "")
-    concerns = arguments.get("specific_concerns", [])
-    requested = arguments.get("requested_information", "")
-    return UncertaintyAction(
-        uncertainty_level=float(level),
-        thought=thought,
-        specific_concerns=list(concerns) if concerns else [],
-        requested_information=requested or "",
-    )
-
-
-def _handle_clarification_tool(arguments: dict) -> Action:
-    """Handle clarification tool — pause and surface question to user."""
-    from backend.events.action.agent import ClarificationRequestAction
-
-    question = arguments.get("question", "")
+def _handle_communicate_tool(arguments: dict) -> Action:
+    """Route the unified communicate tool to the specific Action class based on intent."""
+    intent = arguments.get("intent", "clarification")
+    message = arguments.get("message", "")
+    options = arguments.get("options", [])
     context = arguments.get("context", "")
-    options = arguments.get("options", [])
-    if not question:
-        raise FunctionCallValidationError(
-            'Missing required argument "question" in tool call clarification'
+    thought = arguments.get("thought", "")
+
+    if intent == "uncertainty":
+        from backend.events.action.agent import UncertaintyAction
+        return UncertaintyAction(
+            uncertainty_level=0.5,
+            specific_concerns=[message],
+            requested_information=context,
+            thought=thought,
         )
-    return ClarificationRequestAction(
-        question=question,
-        context=context or "",
-        options=list(options) if options else [],
-        thought=question,
-    )
-
-
-def _handle_proposal_tool(arguments: dict) -> Action:
-    """Handle proposal tool — present options before committing."""
-    from backend.events.action.agent import ProposalAction
-
-    options = arguments.get("options", [])
-    rationale = arguments.get("rationale", "")
-    recommended = arguments.get("recommended")
-    if not options:
-        raise FunctionCallValidationError(
-            'Missing required argument "options" in tool call proposal'
+        
+    elif intent == "proposal":
+        from backend.events.action.agent import ProposalAction
+        # Format the options cleanly for the existing UI
+        formatted_options = [{"approach": opt, "pros": [], "cons": []} for opt in options] if options else [{"approach": message}]
+        return ProposalAction(
+            options=formatted_options,
+            rationale=context or message,
+            thought=thought,
+            recommended=0
         )
-    return ProposalAction(
-        options=list(options),
-        recommended=int(recommended) if recommended is not None else 0,
-        rationale=rationale or "",
-        thought=rationale or "",
-    )
+        
+    elif intent == "escalate":
+        from backend.events.action.agent import EscalateToHumanAction
+        return EscalateToHumanAction(
+            reason=message,
+            attempts_made=[context] if context else [],
+            specific_help_needed="",
+            thought=thought,
+        )
+        
+    else: # Default to clarification
+        from backend.events.action.agent import ClarificationRequestAction
+        return ClarificationRequestAction(
+            question=message,
+            options=options,
+            context=context,
+            thought=thought,
+        )
 
 
 def _handle_batch_edit_tool(arguments: dict) -> CmdRunAction:
@@ -1145,26 +1124,6 @@ def _handle_batch_edit_tool(arguments: dict) -> CmdRunAction:
         )
     preview = arguments.get("preview", False)
     return build_batch_edit_action(edits, preview=bool(preview))
-
-
-def _handle_escalate_tool(arguments: dict) -> Action:
-    """Handle escalate_to_human tool — request human intervention."""
-    from backend.events.action.agent import EscalateToHumanAction
-
-    reason = arguments.get("reason", "")
-    attempts = arguments.get("attempts_made", [])
-    help_needed = arguments.get("specific_help_needed", "")
-    if not reason:
-        raise FunctionCallValidationError(
-            'Missing required argument "reason" in tool call escalate_to_human'
-        )
-    return EscalateToHumanAction(
-        reason=reason,
-        attempts_made=list(attempts) if attempts else [],
-        specific_help_needed=help_needed or "",
-        thought=reason,
-    )
-
 
 
 def _handle_query_toolbox_tool(
@@ -1188,15 +1147,13 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         ]: _handle_str_replace_editor_tool,
         create_structure_editor_tool()["function"][
             "name"
-        ]: _handle_structure_editor_tool,
+        ]: _handle_ast_code_editor_tool,
         create_think_tool()["function"]["name"]: _handle_think_tool,
-        create_condensation_request_tool()["function"][
+        create_summarize_context_tool()["function"][
             "name"
-        ]: _handle_condensation_request_tool,
+        ]: _handle_summarize_context_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
-        create_note_tool()["function"]["name"]: _handle_note_tool,
-        create_recall_tool()["function"]["name"]: _handle_recall_tool,
-        create_semantic_recall_tool()["function"]["name"]: _handle_semantic_recall_tool,
+        MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
         create_apply_patch_tool()["function"]["name"]: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,
@@ -1210,23 +1167,17 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         REVERT_TO_SAFE_STATE_TOOL_NAME: build_revert_to_safe_state_action,
         SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,
         VERIFY_STATE_TOOL_NAME: _handle_verify_state_tool,
-        WORKING_MEMORY_TOOL_NAME: _handle_working_memory_tool,
         DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
         LSP_QUERY_TOOL_NAME: build_lsp_query_action,
         SIGNAL_PROGRESS_TOOL_NAME: build_signal_progress_action,
         VERIFY_UI_CHANGE_TOOL_NAME: build_verify_ui_change_action,
         BLACKBOARD_TOOL_NAME: build_blackboard_action,
         BATCH_EDIT_TOOL_NAME: _handle_batch_edit_tool,
-        TERMINAL_OPEN_TOOL_NAME: build_terminal_open_action,
-        TERMINAL_INPUT_TOOL_NAME: build_terminal_input_action,
-        TERMINAL_READ_TOOL_NAME: build_terminal_read_action,
+        TERMINAL_MANAGER_TOOL_NAME: handle_terminal_manager_tool,
         "explore_tree_structure": build_explore_tree_structure_action,
-        "get_entity_contents": build_get_entity_contents_action,
+        "read_symbol_definition": build_read_symbol_definition_action,
         # Meta-cognition tools
-        UNCERTAINTY_TOOL_NAME: _handle_uncertainty_tool,
-        CLARIFICATION_TOOL_NAME: _handle_clarification_tool,
-        PROPOSAL_TOOL_NAME: _handle_proposal_tool,
-        ESCALATE_TOOL_NAME: _handle_escalate_tool,
+        COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
         # MCP gateway
         MCP_GATEWAY_TOOL_NAME: _handle_mcp_gateway_tool,
     }

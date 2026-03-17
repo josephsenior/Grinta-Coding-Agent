@@ -23,35 +23,28 @@ _CORE_TOOLS = frozenset(
     {
         # Execution
         "execute_bash",
-        "bash",
         # File editing — all editing tools are essential for productive work
         "str_replace_editor",
-        "structure_editor",
+        "ast_code_editor",
         "apply_patch",
         "batch_edit",
         # Search & navigation
         "search_code",
         "explore_tree_structure",
-        "get_entity_contents",
+        "read_symbol_definition",
         "project_map",
         # Reasoning
         "think",
         "finish",
         # Task tracking — always available for planning multi-step work
         "task_tracker",
-        # Memory — both flat and structured memory survive condensation
-        "note",
-        "recall",
-        "semantic_recall",
-        "working_memory",
+        # Memory — structured and unstructured memory mapped into one tool
+        "memory_manager",
         # Verification
         "verify_state",
         "verify_ui_change",
-        # Meta-cognition — always available for expressing uncertainty
-        "uncertainty",
-        "clarification",
-        "proposal",
-        "escalate_to_human",
+        # Meta-cognition — always available for expressing uncertainty and collaborating
+        "communicate_with_user",
         # Progress signaling for long-running tasks
         "signal_progress",
         # MCP gateway
@@ -173,20 +166,20 @@ def _compute_allowed_tools(
     allowed.add("browser")
 
     # Terminal tools — always available when terminal is enabled
-    allowed.update(["terminal_open", "terminal_input", "terminal_read"])
+    allowed.update(["terminal_manager"])
 
     # LSP query — always available for code intelligence
     allowed.add("lsp_query")
 
     unlocks: list[tuple[bool, list[str]]] = [
         # Contextual tools — unlocked by specific conditions
-        (turn >= 3 or is_complex_task, ["delegate_task", "blackboard"]),
+        (turn >= 3 or is_complex_task, ["delegate_task", "shared_task_board"]),
 
         (error_count >= 2, ["error_patterns", "revert_to_safe_state"]),
         (turn >= 5, ["checkpoint"]),
         (edit_count >= 3, ["session_diff"]),
         (turn <= 1 or post_condensation, ["workspace_status"]),
-        (token_pct > 0.5, ["condensation_request"]),
+        (token_pct > 0.5, ["summarize_context"]),
         (bool(_MULTI_FILE_KEYWORDS.search(user_text)), ["apply_patch"]),
         (error_count >= 1, ["check_tool_status", "query_toolbox"]),
         (

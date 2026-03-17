@@ -119,17 +119,15 @@ class OrchestratorPlanner:
         self._add_terminal_and_special_tools(tools)
 
     def _add_basic_tools(self, tools: list, use_short_tool_desc: bool) -> None:
-        """Add cmd, think, finish, condensation_request, note, recall tools."""
+        """Add cmd, think, finish, summarize_context, memory tools."""
         from backend.engines.orchestrator.tools.bash import create_cmd_run_tool
         from backend.engines.orchestrator.tools.condensation_request import (
-            create_condensation_request_tool,
+            create_summarize_context_tool,
         )
         from backend.engines.orchestrator.tools.finish import create_finish_tool
         from backend.engines.orchestrator.tools.think import create_think_tool
-        from backend.engines.orchestrator.tools.note import (
-            create_note_tool,
-            create_recall_tool,
-            create_semantic_recall_tool,
+        from backend.engines.orchestrator.tools.memory_manager import (
+            create_memory_manager_tool,
         )
 
         if getattr(self._config, "enable_cmd", True):
@@ -139,11 +137,9 @@ class OrchestratorPlanner:
         if getattr(self._config, "enable_finish", True):
             tools.append(create_finish_tool())
         if getattr(self._config, "enable_condensation_request", False):
-            tools.append(create_condensation_request_tool())
-        if getattr(self._config, "enable_note", True):
-            tools.append(create_note_tool())
-            tools.append(create_recall_tool())
-            tools.append(create_semantic_recall_tool())
+            tools.append(create_summarize_context_tool())
+        if getattr(self._config, "enable_note", True) or getattr(self._config, "enable_working_memory", False):
+            tools.append(create_memory_manager_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
         """Add apply_patch, batch_edit, task_tracker, search_code, explore_code tools."""
@@ -162,7 +158,7 @@ class OrchestratorPlanner:
         )
         from backend.engines.orchestrator.tools.explore_code import (
             create_explore_tree_structure_tool,
-            create_get_entity_contents_tool,
+            create_read_symbol_definition_tool,
         )
 
         if getattr(self._config, "enable_apply_patch", True):
@@ -174,7 +170,7 @@ class OrchestratorPlanner:
         if getattr(self._config, "enable_search_code", True):
             tools.append(create_search_code_tool())
             tools.append(create_explore_tree_structure_tool())
-            tools.append(create_get_entity_contents_tool())
+            tools.append(create_read_symbol_definition_tool())
 
     def _add_terminal_and_special_tools(self, tools: list) -> None:
         """Add terminal, optional feature tools (web search, delegate, etc.), and meta-cognition tools."""
@@ -183,17 +179,13 @@ class OrchestratorPlanner:
         self._add_meta_cognition_tools(tools)
 
     def _add_terminal_tools(self, tools: list) -> None:
-        """Add terminal open/input/read tools when terminal support is enabled."""
+        """Add terminal manager tool when terminal support is enabled."""
         if getattr(self._config, "enable_terminal", True):
-            from backend.engines.orchestrator.tools.terminal import (
-                create_terminal_open_tool,
-                create_terminal_input_tool,
-                create_terminal_read_tool,
+            from backend.engines.orchestrator.tools.terminal_manager import (
+                create_terminal_manager_tool,
             )
 
-            tools.append(create_terminal_open_tool())
-            tools.append(create_terminal_input_tool())
-            tools.append(create_terminal_read_tool())
+            tools.append(create_terminal_manager_tool())
 
     def _add_optional_feature_tools(self, tools: list) -> None:
         """Add check_tool_status, web_search, delegate, rollback, workspace_status, etc."""
@@ -257,12 +249,6 @@ class OrchestratorPlanner:
                     "create_session_diff_tool",
                 ),
                 (
-                    "enable_working_memory",
-                    False,
-                    "working_memory",
-                    "create_working_memory_tool",
-                ),
-                (
                     "enable_verify_state",
                     False,
                     "verify_state",
@@ -290,16 +276,10 @@ class OrchestratorPlanner:
         """Add uncertainty, clarification, escalate, proposal tools when meta-cognition is enabled."""
         if getattr(self._config, "enable_meta_cognition", False):
             from backend.engines.orchestrator.tools.meta_cognition import (
-                create_uncertainty_tool,
-                create_clarification_tool,
-                create_escalate_tool,
-                create_proposal_tool,
+                create_communicate_tool,
             )
 
-            tools.append(create_uncertainty_tool())
-            tools.append(create_clarification_tool())
-            tools.append(create_escalate_tool())
-            tools.append(create_proposal_tool())
+            tools.append(create_communicate_tool())
 
     def _add_browsing_tool(self, tools: list) -> None:
         if getattr(self._config, "enable_browsing", False):
@@ -543,9 +523,9 @@ class OrchestratorPlanner:
                     context_pressure_warning = (
                         f"\n⚠️ CONTEXT PRESSURE: {remaining_pct}% of context window remaining. "
                         "Condensation will occur soon. To preserve context AND work efficiently:\n"
-                        "1. note(key, value) — persist important findings and decisions\n"
+                        "1. memory_manager(note) — persist important findings and decisions\n"
                         "2. If plan changed, update tracking once (never repeat unchanged updates)\n"
-                        "3. working_memory(update) — save current hypothesis and blockers\n"
+                        "3. memory_manager(working_memory) — save current hypothesis and blockers\n"
                         "4. Prefer targeted reads: use view_range instead of reading full files\n"
                         "5. Prefer search_code over cat/grep for lookups — it returns only relevant lines\n"
                         "6. Keep responses concise — avoid restating what the code does\n"
@@ -553,7 +533,7 @@ class OrchestratorPlanner:
                     )
                 elif usage_pct >= 0.85 and not memory_pressure:
                     context_pressure_warning += (
-                        "\n🔴 CRITICAL: Consider calling condensation_request() NOW to control "
+                        "\n🔴 CRITICAL: Consider calling summarize_context() NOW to control "
                         "what context survives before automatic condensation forces a reset."
                     )
         except Exception:
@@ -675,7 +655,7 @@ class OrchestratorPlanner:
         ),
         (
             ["remember", "note", "save", "persist"],
-            "Use working_memory(update) for structured cognitive state, note(record) for quick key-value pairs.",
+            "Use memory_manager(action='working_memory') for structured cognitive state, memory_manager(action='note') for quick key-value pairs.",
         ),
     ]
 

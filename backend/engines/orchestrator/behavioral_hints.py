@@ -36,7 +36,7 @@ class BehavioralHintsBuilder:
                 name = fn.get("name", "")
                 args_raw = fn.get("arguments", "{}")
 
-                if name in ("str_replace_editor", "edit_file", "structure_editor"):
+                if name in ("str_replace_editor", "edit_file", "ast_code_editor"):
                     path = self._extract_edit_path(args_raw)
                     if path:
                         edited_files[path] = edited_files.get(path, 0) + 1
@@ -86,7 +86,7 @@ class BehavioralHintsBuilder:
         if str_replace_count >= 2:
             hints.append(
                 "You've used str_replace_editor multiple times. Consider switching to "
-                "structure_editor (edit_function, rename_symbol) for function/class-level edits — "
+                "ast_code_editor (edit_function, rename_symbol) for function/class-level edits — "
                 "it targets by symbol name and avoids context-matching issues."
             )
 

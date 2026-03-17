@@ -102,14 +102,14 @@ def run_production_health_check(raise_on_failure: bool = True) -> dict[str, Any]
     logger.info("=" * 60)
 
     results: dict[str, Any] = {
-        "structure_editor": None,
+        "ast_code_editor": None,
         "atomic_refactor": None,
         "overall_status": "UNKNOWN",
     }
 
     # Check Structure Editor (CRITICAL)
     ue_success, ue_msg = check_structure_editor_dependencies()
-    results["structure_editor"] = {
+    results["ast_code_editor"] = {
         "status": "PASS" if ue_success else "FAIL",
         "message": ue_msg,
         "critical": True,

@@ -510,7 +510,7 @@ enable_cmd = true                    # Shell command execution
 enable_think = true                  # Think tool for reasoning
 enable_finish = true                 # Task completion tool
 enable_history_truncation = true     # Truncate on context overflow
-enable_condensation_request = false  # Agent-initiated condensation
+enable_summarize_context = false  # Agent-initiated condensation
 ```
 
 ---

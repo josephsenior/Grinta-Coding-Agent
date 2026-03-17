@@ -103,7 +103,7 @@ def create_structure_editor_tool(
     )
 
     return create_tool_definition(
-        name="structure_editor",
+        name="ast_code_editor",
         description=description,
         properties={
             "command": get_command_param(

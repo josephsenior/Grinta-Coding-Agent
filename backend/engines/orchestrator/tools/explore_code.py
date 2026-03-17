@@ -74,27 +74,27 @@ def create_explore_tree_structure_tool():
         required=["start_entities"],
     )
 
-_GET_ENTITY_CONTENTS_DESCRIPTION = """
+_READ_SYMBOL_DEFINITION_DESCRIPTION = """
 Searches the codebase to retrieve the complete implementations of specified entities based on the provided entity names.
 The tool can handle specific entity queries such as function names, class names, or file paths.
 
 Usage Example:
 # Search for a specific function implementation
-get_entity_contents(['src/my_file.py:MyClass.func_name'])
+read_symbol_definition(['src/my_file.py:MyClass.func_name'])
 
 # Search for a file's complete content
-get_entity_contents(['src/my_file.py'])
+read_symbol_definition(['src/my_file.py'])
 
 Entity Name Format:
 - To specify a function or class, use the format: `file_path:QualifiedName` (e.g., 'src/helpers/math_helpers.py:MathUtils.calculate_sum').
 - To search for a file's content, use only the file path (e.g., 'src/my_file.py').
 """
 
-def create_get_entity_contents_tool():
-    """Create the get_entity_contents tool definition."""
+def create_read_symbol_definition_tool():
+    """Create the read_symbol_definition tool definition."""
     return create_tool_definition(
-        name="get_entity_contents",
-        description=_GET_ENTITY_CONTENTS_DESCRIPTION,
+        name="read_symbol_definition",
+        description=_READ_SYMBOL_DEFINITION_DESCRIPTION,
         properties={
             "entity_names": {
                 "type": "array",
@@ -129,8 +129,8 @@ def build_explore_tree_structure_action(arguments: dict) -> "AgentThinkAction":
     except Exception as e:
         return AgentThinkAction(thought=f"[EXPLORE_TREE_STRUCTURE] Error: {e}")
 
-def build_get_entity_contents_action(arguments: dict) -> "AgentThinkAction":
-    """Build action for get_entity_contents tool."""
+def build_read_symbol_definition_action(arguments: dict) -> "AgentThinkAction":
+    """Build action for read_symbol_definition tool."""
     from backend.events.action import AgentThinkAction
     from backend.runtime.plugins.agent_skills.repo_ops.explorer import get_entity_contents
     import json
@@ -139,6 +139,6 @@ def build_get_entity_contents_action(arguments: dict) -> "AgentThinkAction":
 
     try:
         result = get_entity_contents(entity_names=entity_names)
-        return AgentThinkAction(thought=f"[GET_ENTITY_CONTENTS]\n{json.dumps(result, indent=2)}")
+        return AgentThinkAction(thought=f"[READ_SYMBOL_DEFINITION]\n{json.dumps(result, indent=2)}")
     except Exception as e:
-        return AgentThinkAction(thought=f"[GET_ENTITY_CONTENTS] Error: {e}")
+        return AgentThinkAction(thought=f"[READ_SYMBOL_DEFINITION] Error: {e}")

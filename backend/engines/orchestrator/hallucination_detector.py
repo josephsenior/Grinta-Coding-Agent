@@ -107,7 +107,7 @@ class HallucinationDetector:
 
         # If file-editing tools were actually called (or FileEditActions exist),
         # state tracking may simply not have caught up yet — skip path checks.
-        file_tools = {"edit_file", "str_replace_editor", "structure_editor"}
+        file_tools = {"edit_file", "str_replace_editor", "ast_code_editor"}
         if tools_called and any(t in file_tools for t in tools_called):
             return findings
         if actions and any(isinstance(a, FileEditAction) for a in actions):
@@ -133,7 +133,7 @@ class HallucinationDetector:
                     "type": "state_mismatch",
                     "claim": f"claimed operation on '{clean}'",
                     "confidence": confidence,
-                    "missing_tools": ["str_replace_editor", "structure_editor"],
+                    "missing_tools": ["str_replace_editor", "ast_code_editor"],
                     "detail": f"'{clean}' does not appear in tracked tool operations this session.",
                 })
 

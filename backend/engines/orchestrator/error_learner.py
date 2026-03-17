@@ -8,19 +8,19 @@ _RECOVERY_MAP: list[tuple[str, str, str]] = [
     (
         "str_replace_editor",
         "no match",
-        "Use view_file first to see current content, or use structure_editor's "
+        "Use view_file first to see current content, or use ast_code_editor's "
         "find_symbol to locate the target by name.",
     ),
     (
         "str_replace_editor",
         "multiple occurrences",
         "Add more surrounding context lines to make the match unique, "
-        "or use structure_editor's edit_function to target by symbol name.",
+        "or use ast_code_editor's edit_function to target by symbol name.",
     ),
     (
-        "structure_editor",
+        "ast_code_editor",
         "not found",
-        "Use structure_editor's find_symbol to list available symbols, "
+        "Use ast_code_editor's find_symbol to list available symbols, "
         "or check the file path is correct.",
     ),
     (

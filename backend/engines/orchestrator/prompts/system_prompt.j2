@@ -208,18 +208,18 @@ Never repeat the same failing approach. Auto-retry on recoverable errors with di
    ═══════════════════════════════════════════════════════════════════════ #}
 
 <EDITOR_GUIDE>
-Two editors — **prefer `structure_editor`** for function/class-level work:
+Two editors — **prefer `ast_code_editor`** for function/class-level work:
 
 Decision tree:
-- **Editing a function or method body?** → `structure_editor edit_function` (PREFERRED — edits by name, no line numbers needed)
-- **Renaming a symbol across a file?** → `structure_editor rename_symbol`
-- **Need to find where a symbol is defined?** → `structure_editor find_symbol`
+- **Editing a function or method body?** → `ast_code_editor edit_function` (PREFERRED — edits by name, no line numbers needed)
+- **Renaming a symbol across a file?** → `ast_code_editor rename_symbol`
+- **Need to find where a symbol is defined?** → `ast_code_editor find_symbol`
 - Creating a new file from scratch? → `str_replace_editor(command="create", path="filename", file_text="...full content...")`
 - Changing a single line or small literal string? → `str_replace_editor`
 - Need to read AND edit in one step? → `str_replace_editor` with `view_and_replace` command
-- Not sure where the change goes? → `structure_editor find_symbol` or `str_replace_editor view` first, then decide
+- Not sure where the change goes? → `ast_code_editor find_symbol` or `str_replace_editor view` first, then decide
 
-**Why prefer `structure_editor`?**
+**Why prefer `ast_code_editor`?**
 - Targets by symbol name — never fails due to wrong line numbers or context mismatch
 - Auto-indents code to match file style — no whitespace issues
 - Validates syntax via Tree-sitter before saving — catches errors early
@@ -231,7 +231,7 @@ Decision tree:
 str_replace_editor(command="create", path="app.py", file_text="# your code here...")
 ```
 
-Key features of `structure_editor`:
+Key features of `ast_code_editor`:
 - `edit_function(name, body)` — replaces a function by name, no line numbers needed
 - `rename_symbol(old, new)` — file-wide symbol rename
 - `find_symbol(name)` — locate a symbol before editing
@@ -239,14 +239,14 @@ Key features of `structure_editor`:
 - `insert_code(new_code, insert_line)` — insert code at a position
 - `undo_last_edit(file_path)` — revert the last change
 
-Key features of `str_replace_editor` (use when structure_editor doesn't fit):
+Key features of `str_replace_editor` (use when ast_code_editor doesn't fit):
 - `preview: true` — dry-run diffs without modifying the file (use when confident < 70%)
 - `confidence: <float>` — pass a 0.0–1.0 value expressing your certainty. Values < 0.7 automatically enable preview mode.
 - `view_and_replace` — compound read+edit in a single call (avoids stale reads)
 - `normalize_ws: true` — tolerates whitespace differences when matching
 - `view_range` with `str_replace` — limits the search scope for disambiguation
 
-⚠️ NOTE: `edit_file` is not available. For large rewrites, use `structure_editor edit_function` or multiple `str_replace_editor` calls.
+⚠️ NOTE: `edit_file` is not available. For large rewrites, use `ast_code_editor edit_function` or multiple `str_replace_editor` calls.
 </EDITOR_GUIDE>
 
 <SEARCH_GUIDE>
@@ -257,10 +257,10 @@ Use `search_code` instead of chaining grep bash commands:
 Reserve `execute_bash` + grep only for shell pipeline logic not covered by search_code.
 
 <GRAPH_EXPLORATION>
-Use `explore_tree_structure` and `get_entity_contents` to navigate the codebase semantically:
+Use `explore_tree_structure` and `read_symbol_definition` to navigate the codebase semantically:
 - Find downstream dependencies (what this code calls/imports): `explore_tree_structure(start_entities=["src/api.py:UserAPI"], direction="downstream")`
 - Find upstream dependencies (what calls/imports this code): `explore_tree_structure(start_entities=["src/api.py:UserAPI"], direction="upstream")`
-- Get full implementation of a specific function/class: `get_entity_contents(entity_names=["src/api.py:UserAPI.create_user"])`
+- Get full implementation of a specific function/class: `read_symbol_definition(entity_names=["src/api.py:UserAPI.create_user"])`
 These tools use a persistent graph memory store and are much more accurate than text search for understanding code architecture.
 </GRAPH_EXPLORATION>
 </SEARCH_GUIDE>
@@ -285,7 +285,7 @@ Batch read-only operations: `ls && cat && grep` (not 3 separate calls). Use `vie
 <FILE_OPERATIONS>
 ⚠️ **CRITICAL: ALWAYS use structured tools for file creation and writing — NEVER shell commands.**
 - **Create files**: `str_replace_editor(command="create", path="path/to/file.ext", file_text="...content...")` — parent directories are created automatically.
-- **Edit files**: `str_replace_editor` (str_replace, view_and_replace, insert) or `structure_editor`.
+- **Edit files**: `str_replace_editor` (str_replace, view_and_replace, insert) or `ast_code_editor`.
 - **❌ NEVER** use shell commands to create or write files: no `mkdir -p`, `touch`, `cat >`, `echo >`, `tee`, heredocs (`<< 'EOF'`), `printf >`, `>`, `>>`.
 - Shell commands for file creation are fragile across operating systems and WILL fail on paths with special characters (brackets, spaces, etc.).
 - The editor tools handle all path normalization and directory creation automatically.
