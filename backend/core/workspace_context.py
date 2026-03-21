@@ -5,9 +5,9 @@ Three responsibilities
 1. **Project memory**: reads/writes ``.forge/context.md`` — a human-editable
    file the agent receives at the start of every session.
 2. **Workspace fingerprinting**: detects the project type by probing well-known
-   sentinel files so the TUI can display it and pre-populate the context template.
+   sentinel files so the UI can display it and pre-populate the context template.
 3. **Agent changelog**: appends newline-delimited JSON entries to
-   ``.forge/changelog.jsonl`` so the TUI can render an end-of-day summary.
+   ``.forge/changelog.jsonl`` for optional end-of-day / summary tooling.
 
 The ``.forge/`` directory is created automatically on first write.
 A ``.gitignore`` inside it excludes ``changelog.jsonl`` by default
@@ -172,7 +172,7 @@ def append_changelog(
 ) -> None:
     """Append a structured entry to ``.forge/changelog.jsonl``.
 
-    Failures are silently swallowed — the changelog must never crash the TUI.
+    Failures are silently swallowed — the changelog must never crash the app.
     """
     try:
         forge_dir = ensure_forge_dir(cwd)

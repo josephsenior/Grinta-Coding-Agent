@@ -41,13 +41,30 @@ def check_blast_radius_from_code(
 ) -> str | None:
     """Extract a primary symbol from the snippet and check its blast radius."""
     try:
-        match = re.search(
-            r"^\s*(?:async\s+)?(?:def|class)\s+([a-zA-Z_]\w*)",
-            code_snippet,
-            re.MULTILINE,
-        )
-        if match:
-            symbol_name = match.group(1)
+        editor = TreeSitterEditor()
+        lang = editor.detect_language(file_path)
+        if not lang:
+            return None
+            
+        parser = editor.get_parser(lang)
+        if not parser:
+            return None
+            
+        tree = parser.parse(code_snippet.encode("utf-8"))
+        
+        def _find_first_symbol(node):
+            if any(k in node.type for k in ["function", "class", "method", "declaration", "declarator"]):
+                name_node = editor._get_name_node(node)
+                if name_node:
+                    return name_node.text.decode("utf-8")
+            for child in node.children:
+                res = _find_first_symbol(child)
+                if res:
+                    return res
+            return None
+
+        symbol_name = _find_first_symbol(tree.root_node)
+        if symbol_name:
             return check_blast_radius(file_path, symbol_name, threshold)
     except Exception:
         pass

@@ -147,7 +147,7 @@ class TaskValidationService:
 
         for idx, event in enumerate(tail):
             if isinstance(event, (FileEditAction, FileWriteAction)):
-                if getattr(event, "command", None) != "view":
+                if getattr(event, "command", None) != "view_file":
                     has_file_edits = True
 
             if isinstance(event, CmdRunAction):

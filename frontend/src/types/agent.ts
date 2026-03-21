@@ -41,6 +41,7 @@ export enum ActionType {
   SEND_PR = "send_pr",
   RECALL = "recall",
   CONDENSATION = "condensation",
+  CONDENSATION_REQUEST = "condensation_request",
   SUMMARIZE_CONTEXT = "summarize_context",
   TASK_TRACKING = "task_tracking",
   STREAMING_CHUNK = "streaming_chunk",

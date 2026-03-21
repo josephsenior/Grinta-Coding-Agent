@@ -131,20 +131,6 @@ class Session:
         """
         cfg = self.config
 
-        # Security
-        if settings.confirmation_mode is not None:
-            cfg.security.confirmation_mode = settings.confirmation_mode
-        if settings.security_analyzer is not None:
-            cfg.security.security_analyzer = settings.security_analyzer
-
-        # Git
-        vcs_user_name = getattr(settings, "vcs_user_name", None)
-        if vcs_user_name is not None:
-            cfg.vcs_user_name = vcs_user_name
-        vcs_user_email = getattr(settings, "vcs_user_email", None)
-        if vcs_user_email is not None:
-            cfg.vcs_user_email = vcs_user_email
-
         # MCP
         self.logger.debug(
             "MCP configuration before setup - self.config.mcp_config: %s", cfg.mcp
@@ -259,9 +245,15 @@ class Session:
             return
         except Exception as e:
             self.logger.exception("Error creating agent_session: %s", e)
-            await self.send_error(
-                f"Failed to create agent session: {e.__class__.__name__}"
-            )
+            detail = str(e).strip()
+            if detail:
+                await self.send_error(
+                    f"Failed to create agent session: {e.__class__.__name__}: {detail}"
+                )
+            else:
+                await self.send_error(
+                    f"Failed to create agent session: {e.__class__.__name__}"
+                )
             return
 
     async def initialize_agent(
@@ -278,7 +270,7 @@ class Session:
         )
 
         # Get agent class
-        agent_cls = settings.agent or self.config.default_agent
+        agent_cls = getattr(settings, "agent", None) or self.config.default_agent
         legacy_agent_aliases = {
             "CodeActAgent": "Orchestrator",
             "CodeAct": "Orchestrator",
@@ -290,15 +282,17 @@ class Session:
         self._apply_settings(settings)
 
         # Derive agent config and budget limits
-        max_iterations = settings.max_iterations or self.config.max_iterations
+        max_iterations = getattr(settings, "max_iterations", None) or self.config.max_iterations
+        settings_budget = getattr(settings, "max_budget_per_task", None)
         max_budget_per_task = (
-            settings.max_budget_per_task
-            if settings.max_budget_per_task is not None
+            settings_budget
+            if settings_budget is not None
             else self.config.max_budget_per_task
         )
         agent_config = self.config.get_agent_config(agent_cls)
-        if settings.disabled_playbooks is not None:
-            agent_config.disabled_playbooks = list(settings.disabled_playbooks)
+        settings_playbooks = getattr(settings, "disabled_playbooks", None)
+        if settings_playbooks is not None:
+            agent_config.disabled_playbooks = list(settings_playbooks)
         agent_name = agent_cls if agent_cls is not None else "agent"
         llm_config = self.config.get_llm_config_from_agent(agent_name)
 
@@ -316,7 +310,6 @@ class Session:
                 fallback_agent,
             )
             agent_cls = fallback_agent
-            settings.agent = fallback_agent
             agent_config = self.config.get_agent_config(agent_cls)
             if settings.disabled_playbooks is not None:
                 agent_config.disabled_playbooks = list(settings.disabled_playbooks)
@@ -479,17 +472,19 @@ class Session:
         if not controller:
             return False
 
-        # Check if vision is disabled
         if controller.agent.llm.config.disable_vision:
             await self.send_error(
-                "Support for images is disabled for this model, try without an image."
+                "Images are turned off for this model. Enable vision in Settings or remove the image."
             )
             return True
 
-        # Check if model supports vision
-        if not controller.agent.llm.vision_is_active():
+        from backend.llm.catalog_loader import lookup
+
+        model_name = getattr(controller.agent.llm.config, "model", None) or ""
+        entry = lookup(str(model_name)) if model_name else None
+        if not entry or not entry.supports_vision:
             await self.send_error(
-                "Model does not support image upload, change to a different model or try without an image.",
+                "This model doesn't accept images. Choose a vision-capable model in Settings or remove the image."
             )
             return True
 

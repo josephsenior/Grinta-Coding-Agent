@@ -38,7 +38,7 @@ _DESCRIPTION = (
     "The `patch` parameter should be a valid unified diff string "
     "(the output of `git diff` or `diff -u old new`).\n\n"
     "After applying, the tool shows which files were modified. "
-    "Use `str_replace_editor view` to confirm the result."
+    "Use `str_replace_editor command='view_file'` to confirm the result."
 )
 
 

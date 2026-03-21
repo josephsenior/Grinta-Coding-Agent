@@ -59,7 +59,7 @@ class BehavioralHintsBuilder:
             import json as _json
 
             args = _json.loads(args_raw) if isinstance(args_raw, str) else args_raw
-            path = args.get("path", args.get("file_path", ""))
+            path = args.get("path", "")
             return path if path and args.get("command") != "view" else None
         except Exception:
             return None
@@ -79,7 +79,7 @@ class BehavioralHintsBuilder:
             if count >= 3:
                 hints.append(
                     f"You've edited '{path}' {count} times recently — "
-                    "use verify_state to confirm line contents before your next edit."
+                    "use verify_file_lines to confirm line contents before your next edit."
                 )
                 break
 
@@ -99,7 +99,7 @@ class BehavioralHintsBuilder:
         if error_count >= 3:
             hints.append(
                 "Multiple errors detected — consider working_memory(update, hypothesis) "
-                "to reassess, or error_patterns(query) for known fixes."
+                "to reassess, or query_error_solutions(query) for known fixes."
             )
 
         # Cross-file impact warning: when any file was edited, suggest checking callers

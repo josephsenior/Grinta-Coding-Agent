@@ -525,14 +525,21 @@ export default function KnowledgeBase() {
   });
 
   return (
-    <div className="mx-auto flex h-full max-w-4xl flex-col px-6 py-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">Knowledge Base</h1>
+    <div className="mx-auto flex h-full min-w-0 max-w-4xl flex-col px-6 pb-8 pt-6 pr-14 sm:px-8">
+      {/* Header: stack on narrow widths; reserve pr so dialog close (absolute top-right) never collides */}
+      <div className="mb-6 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <BookOpen className="h-6 w-6 shrink-0 text-muted-foreground" />
+          <h1 className="min-w-0 text-xl font-bold leading-tight sm:text-2xl">
+            Knowledge Base
+          </h1>
         </div>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
+        <Button
+          type="button"
+          size="sm"
+          className="w-full shrink-0 sm:w-auto"
+          onClick={() => setCreateOpen(true)}
+        >
           <Plus className="mr-1.5 h-4 w-4" />
           New Collection
         </Button>

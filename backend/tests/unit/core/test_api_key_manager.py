@@ -229,7 +229,7 @@ class TestSetEnvironmentVariables:
             )
             pcm.get_environment_variable.return_value = "OPENAI_API_KEY"
             pcm.validate_api_key_format.return_value = None
-            with patch.dict(os.environ, {}, clear=False):
+            with patch.dict(os.environ, {}, clear=True):
                 mgr.set_environment_variables("gpt-4", key)
                 assert os.environ.get("OPENAI_API_KEY") == "sk-test-env-var"
                 assert os.environ.get("LLM_API_KEY") == "sk-test-env-var"
@@ -247,7 +247,7 @@ class TestSetEnvironmentVariables:
             )
             pcm.get_environment_variable.return_value = "GEMINI_API_KEY"
             pcm.validate_api_key_format.return_value = None
-            with patch.dict(os.environ, {}, clear=False):
+            with patch.dict(os.environ, {}, clear=True):
                 mgr.set_environment_variables("google/gemini-pro", key)
                 # Should set both provider env var AND GOOGLE_API_KEY
                 assert os.environ.get("GEMINI_API_KEY") == "AIzaSyTest123"
@@ -268,7 +268,9 @@ class TestSetEnvironmentVariables:
             pcm.validate_api_key_format.return_value = None
             # Set env var so it's found by _get_provider_key_from_env
             with patch.dict(
-                os.environ, {"OPENAI_API_KEY": "env-fallback-key"}, clear=False
+                os.environ,
+                {"OPENAI_API_KEY": "env-fallback-key"},
+                clear=True,
             ):
                 mgr.set_environment_variables("gpt-4", None)
                 # Should have set env vars with fallback key

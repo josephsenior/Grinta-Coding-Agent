@@ -102,7 +102,7 @@ class RecoveryService:
 
         if isinstance(exc, Timeout):
             return (
-                "⏱️ Request timed out\n\n"
+                "Request timed out\n\n"
                 "The model took too long to respond (e.g. network or overload).\n\n"
                 "**What you can do:**\n"
                 "• Try again in a moment\n"
@@ -112,31 +112,115 @@ class RecoveryService:
             )
         if isinstance(exc, APIConnectionError):
             return (
-                f"⚠️ API Connection Error\n\n"
-                f"Unable to connect to the AI service. This usually means:\n\n"
-                f"• The AI service is temporarily unavailable\n"
-                f"• There's a network connectivity issue\n"
-                f"• The service is experiencing high load\n\n"
-                f"**What you can do:**\n"
-                f"• Wait a moment and try again\n"
-                f"• Check your internet connection\n"
-                f"• Try using a different AI model\n\n"
+                "API Connection Error\n\n"
+                "Unable to connect to the AI service. This usually means:\n\n"
+                "• The AI service is temporarily unavailable\n"
+                "• There's a network connectivity issue\n"
+                "• The service is experiencing high load\n\n"
+                "**What you can do:**\n"
+                "• Wait a moment and try again\n"
+                "• Check your internet connection\n"
+                "• Try using a different AI model\n\n"
                 f"**Technical details:** {exc}"
             )
         if isinstance(exc, AuthenticationError):
+            if self._is_billing_or_quota_error(exc):
+                return (
+                    "Billing / Quota Exceeded\n\n"
+                    "Your API key appears to be accepted, but your account has no available quota/credits for this model.\n\n"
+                    "**What you can do:**\n"
+                    "• Add credits / enable billing with your provider\n"
+                    "• Check your provider usage & limits dashboard\n"
+                    "• Try a different model/provider with available quota\n\n"
+                    f"**Technical details:** {exc}"
+                )
             return (
-                f"🔒 Authentication Error\n\n"
-                f"There's an issue with your API key configuration.\n\n"
-                f"**What you can do:**\n"
-                f"• Check that your API key is correct in settings\n"
-                f"• Verify the API key has the necessary permissions\n"
-                f"• Ensure the API key hasn't expired or been revoked\n"
-                f"• Try regenerating your API key\n\n"
+                "Authentication Error\n\n"
+                "There's an issue with your API key configuration.\n\n"
+                "**What you can do:**\n"
+                "• Check that your API key is correct in settings\n"
+                "• Verify the API key has the necessary permissions\n"
+                "• Ensure the API key hasn't expired or been revoked\n"
+                "• Try regenerating your API key\n\n"
                 f"**Technical details:** {exc}"
             )
         if isinstance(exc, RateLimitError):
+            # Some providers report billing/quota exhaustion as HTTP 429.
+            # This is not transient and should not be treated as a retryable
+            # rate limit.
+            if self._is_billing_or_quota_error(exc):
+                return (
+                    "Billing / Quota Exceeded\n\n"
+                    "Your API key appears to be accepted, but your account has no available quota/credits for this model.\n\n"
+                    "**What you can do:**\n"
+                    "• Add credits / enable billing with your provider\n"
+                    "• Check your provider usage & limits dashboard\n"
+                    "• Try a different model/provider with available quota\n\n"
+                    f"**Technical details:** {exc}"
+                )
             return self._format_rate_limit_error(exc)
         return None
+
+    def _is_billing_or_quota_error(self, exc: Exception) -> bool:
+        """Best-effort detection for billing/quota exhaustion.
+
+        Some providers return quota exhaustion (e.g. OpenAI "insufficient_quota")
+        but it's not fixable by retries and should be shown as out-of-credits.
+        """
+        if self._check_structured_billing_error(exc):
+            return True
+        return self._check_message_billing_patterns(str(exc).lower())
+
+    def _check_structured_billing_error(self, exc: Exception) -> bool:
+        """Check structured provider hints (kwargs, body, code)."""
+        kwargs = self._get_exc_kwargs(exc)
+        if self._is_insufficient_quota_code(
+            kwargs.get("code") or getattr(exc, "code", None)
+        ):
+            return True
+        body = kwargs.get("body") or getattr(exc, "body", None)
+        return self._check_error_body_for_billing(body)
+
+    @staticmethod
+    def _is_insufficient_quota_code(code: Any) -> bool:
+        return isinstance(code, str) and code.lower() == "insufficient_quota"
+
+    def _check_error_body_for_billing(self, body: Any) -> bool:
+        """Check error body dict for billing/quota indicators."""
+        if not isinstance(body, dict):
+            return False
+        err = body.get("error")
+        if not isinstance(err, dict):
+            return False
+        err_code = err.get("code") or err.get("type")
+        if self._is_insufficient_quota_code(err_code):
+            return True
+        err_message = err.get("message")
+        return (
+            isinstance(err_message, str)
+            and err_message
+            and self._check_message_billing_patterns(err_message.lower())
+        )
+
+    @staticmethod
+    def _get_exc_kwargs(exc: Exception) -> dict[str, Any]:
+        """Extract kwargs from exception (LLMError stores extras there)."""
+        try:
+            raw = getattr(exc, "kwargs", None)
+            return raw if isinstance(raw, dict) else {}
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _check_message_billing_patterns(lowered: str) -> bool:
+        """Check if message contains billing/quota exhaustion patterns."""
+        return (
+            "insufficient_quota" in lowered
+            or "exceeded your current quota" in lowered
+            or "billing details" in lowered
+            or "check your plan" in lowered
+            or ("billing" in lowered and "quota" in lowered)
+        )
 
     def _format_rate_limit_error(self, exc: Exception) -> str:
         """Format an LLM rate limit or quota exceeded error."""
@@ -144,31 +228,37 @@ class RecoveryService:
         time_until_reset = self._extract_retry_delay(error_str)
 
         # Detect if it's a quota vs rate limit issue
-        is_quota = "quota" in error_str.lower() or "free_tier" in error_str.lower()
+        lowered = error_str.lower()
+        is_quota = (
+            "quota" in lowered
+            or "free_tier" in lowered
+            or "insufficient_quota" in lowered
+            or "exceededbudget" in lowered
+        )
 
         if is_quota:
             return (
-                f"💰 API Quota Exceeded\n\n"
+                "API Quota Exceeded\n\n"
                 f"You've reached your API quota limit for this AI model.\n\n"
                 f"**Your quota resets in:** {time_until_reset}\n\n"
-                f"**What you can do:**\n"
+                "**What you can do:**\n"
                 f"• Wait {time_until_reset} for the quota to reset\n"
-                f"• Use a different AI model (if available)\n"
-                f"• Upgrade your API plan for higher limits\n"
-                f"• Check your API provider's usage dashboard\n\n"
-                f"**Note:** This is an API provider limit, not a Forge limit."
+                "• Use a different AI model (if available)\n"
+                "• Upgrade your API plan for higher limits\n"
+                "• Check your API provider's usage dashboard\n\n"
+                "**Note:** This is an API provider limit, not a Forge limit."
             )
 
         return (
-            f"⏰ Rate Limit Exceeded\n\n"
-            f"You're sending requests too quickly. The AI service has rate limits to ensure fair usage.\n\n"
+            "Rate Limit Exceeded\n\n"
+            "You're sending requests too quickly. The AI service has rate limits to ensure fair usage.\n\n"
             f"**Retry in:** {time_until_reset}\n\n"
-            f"**What you can do:**\n"
+            "**What you can do:**\n"
             f"• Wait {time_until_reset} before trying again\n"
-            f"• Slow down your request rate\n"
-            f"• Use a different AI model (if available)\n"
-            f"• Upgrade your API plan for higher rate limits\n\n"
-            f"**Note:** This is an API provider rate limit, not a Forge limit."
+            "• Slow down your request rate\n"
+            "• Use a different AI model (if available)\n"
+            "• Upgrade your API plan for higher rate limits\n\n"
+            "**Note:** This is an API provider rate limit, not a Forge limit."
         )
 
     def _extract_retry_delay(self, error_str: str) -> str:
@@ -316,18 +406,21 @@ class RecoveryService:
         if controller.status_callback is not None:
             runtime_status = self._determine_runtime_status(exc)
             if runtime_status == RuntimeStatus.ERROR_LLM_OUT_OF_CREDITS:
-                await self._handle_rate_limit_error(exc)
-                return
+                # Fail fast: out-of-credits requires user intervention and
+                # should not enter rate-limited retry state.
+                controller.status_callback(
+                    "error", runtime_status, controller.state.last_error
+                )
+            else:
+                # Check if it's a RateLimitError that should be handled
+                from backend.llm.exceptions import RateLimitError
 
-            # Check if it's a RateLimitError that should be handled
-            from backend.llm.exceptions import RateLimitError
-
-            if isinstance(exc, RateLimitError):
-                await self._handle_rate_limit_error(exc)
-                return
-            controller.status_callback(
-                "error", runtime_status, controller.state.last_error
-            )
+                if isinstance(exc, RateLimitError):
+                    await self._handle_rate_limit_error(exc)
+                    return
+                controller.status_callback(
+                    "error", runtime_status, controller.state.last_error
+                )
         else:
             runtime_status = self._determine_runtime_status(exc)
 
@@ -338,7 +431,10 @@ class RecoveryService:
             user_message=controller.state.last_error,
         )
 
-        if await self._retry_service.schedule_retry_after_failure(exc):
+        if (
+            runtime_status != RuntimeStatus.ERROR_LLM_OUT_OF_CREDITS
+            and await self._retry_service.schedule_retry_after_failure(exc)
+        ):
             await controller.set_agent_state_to(AgentState.PAUSED)
             self._emit_recovery_event(
                 "retry_deferred", next_state=AgentState.PAUSED.value
@@ -353,9 +449,11 @@ class RecoveryService:
         # Log to audit store
         await controller.log_task_audit("FAILURE", error_message=error_message)
 
+        notify_ui_only = self._format_llm_error(exc) is not None
         error_obs = ErrorObservation(
             content=error_message,
             error_id=error_type.value.upper() if error_type else "UNKNOWN_ERROR",
+            notify_ui_only=notify_ui_only,
         )
         controller.event_stream.add_event(error_obs, EventSource.AGENT)
 
@@ -375,6 +473,8 @@ class RecoveryService:
         )
 
         if isinstance(exc, AuthenticationError):
+            if self._is_billing_or_quota_error(exc):
+                return RuntimeStatus.ERROR_LLM_OUT_OF_CREDITS
             return RuntimeStatus.ERROR_LLM_AUTHENTICATION
         if isinstance(exc, ServiceUnavailableError | APIConnectionError | APIError):
             return RuntimeStatus.ERROR_LLM_SERVICE_UNAVAILABLE
@@ -388,6 +488,8 @@ class RecoveryService:
         ):
             return RuntimeStatus.ERROR_LLM_CONTENT_POLICY_VIOLATION
         if isinstance(exc, RateLimitError):
+            if self._is_billing_or_quota_error(exc):
+                return RuntimeStatus.ERROR_LLM_OUT_OF_CREDITS
             return RuntimeStatus.LLM_RETRY
         return RuntimeStatus.ERROR
 
@@ -411,6 +513,7 @@ class RecoveryService:
             error_obs = ErrorObservation(
                 content=error_message,
                 error_id="RATE_LIMIT_EXCEEDED",
+                notify_ui_only=True,
             )
             controller.event_stream.add_event(error_obs, EventSource.AGENT)
 
@@ -421,6 +524,14 @@ class RecoveryService:
             await controller.set_agent_state_to(AgentState.ERROR)
             self._emit_recovery_event("halted", next_state=AgentState.ERROR.value)
         else:
+            # Provide a user-visible status update while in RATE_LIMITED so the
+            # UI / harness can surface the cause (retry-after, quota messaging, etc.).
+            try:
+                msg = self._format_llm_error(exc) or str(exc)
+                if controller.status_callback is not None:
+                    controller.status_callback("info", RuntimeStatus.LLM_RETRY, msg)
+            except Exception:
+                pass
             await controller.set_agent_state_to(AgentState.RATE_LIMITED)
             self._emit_recovery_event(
                 "rate_limited", next_state=AgentState.RATE_LIMITED.value

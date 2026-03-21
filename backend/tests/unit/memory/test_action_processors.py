@@ -87,6 +87,27 @@ class TestHandleMessageAction:
         # Should have text + image label + image content
         assert len(msgs[0].content) >= 2
 
+    def test_user_message_with_file_urls_appends_paths(self):
+        action = MessageAction(
+            content="read these",
+            file_urls=["notes.txt", "src/app.py"],
+        )
+        action._source = EventSource.USER
+        msgs = _handle_message_action(action, vision_is_active=False)
+        assert len(msgs) == 1
+        text = msgs[0].content[0]
+        assert isinstance(text, TextContent)
+        assert "read these" in text.text
+        assert "notes.txt" in text.text
+        assert "src/app.py" in text.text
+
+    def test_user_message_file_urls_only(self):
+        action = MessageAction(content="", file_urls=["a.md"])
+        action._source = EventSource.USER
+        msgs = _handle_message_action(action, vision_is_active=False)
+        part = msgs[0].content[0]
+        assert isinstance(part, TextContent) and "a.md" in part.text
+
 
 # ── _handle_user_cmd_action ─────────────────────────────────────────
 

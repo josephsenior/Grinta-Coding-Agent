@@ -1,4 +1,4 @@
-"""Tests for backend.memory.condenser.impl.smart_condenser — SmartCondenser."""
+"""Tests for backend.memory.condenser.strategies.smart_condenser — SmartCondenser."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from backend.events.event import Event, EventSource
 from backend.events.observation import ErrorObservation
 from backend.events.observation.empty import NullObservation
 from backend.memory.condenser.condenser import Condensation
-from backend.memory.condenser.impl.smart_condenser import SmartCondenser
+from backend.memory.condenser.strategies.smart_condenser import SmartCondenser
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

@@ -63,6 +63,12 @@ UNINITIALIZED_PROMPT_MANAGER = _UninitializedPromptManager()
 """Module-level sentinel instance — import this instead of duplicating the class."""
 
 
+def _content_has_forge_identity(content: str) -> bool:
+    """True when the rendered system prompt already identifies as Forge (skip duplicate prefix)."""
+    head = content.lstrip()[:80].lower()
+    return head.startswith("you are forge")
+
+
 class PromptManager:
     """Manages prompt templates and includes information from the user's workspace micro-agents and global micro-agents.
 
@@ -279,7 +285,8 @@ class OrchestratorPromptManager(PromptManager):
         context.setdefault("mcp_tool_names", self.mcp_tool_names)
         context.setdefault("mcp_tool_descriptions", self.mcp_tool_descriptions)
         content = super().get_system_message(**context)
-        if self._IDENTITY_PREFIX.strip() not in content:
+        # Avoid duplicating identity: system_prompt.j2 already opens with "You are Forge, ..."
+        if not _content_has_forge_identity(content):
             content = self._IDENTITY_PREFIX + content
         content = self._inject_scratchpad(content)
         tier = getattr(self, "_prompt_tier", "base")

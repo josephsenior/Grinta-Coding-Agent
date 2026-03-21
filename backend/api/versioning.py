@@ -64,37 +64,45 @@ _EXCLUDED_PATHS = (
 )
 
 
-async def version_middleware(request: Request, call_next: Callable) -> Response:
-    """Lightweight middleware: attach ``API-Version`` header to every /api/ response.
+def _is_version_excluded_path(path: str) -> bool:
+    """True if path skips versioning (health, docs, ws, etc)."""
+    return any(path.startswith(p) for p in _EXCLUDED_PATHS)
 
-    When ``ENFORCE_API_VERSIONING`` is enabled (future), non-versioned ``/api/…``
-    requests will be rejected with a 400 suggesting the correct path.
-    """
+
+def _reject_missing_version(path: str) -> JSONResponse:
+    """Return 400 when versioned path is required but missing."""
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": "missing_api_version",
+            "message": f"Use /api/{CURRENT_VERSION.value}/… format.",
+            "current_version": CURRENT_VERSION.value,
+            "suggested_path": path.replace("/api/", f"/api/{CURRENT_VERSION.value}/", 1),
+        },
+    )
+
+
+def _requires_version_rejection(path: str, version: str | None) -> bool:
+    """True if request should be rejected for missing API version."""
+    return (
+        not version
+        and path.startswith("/api/")
+        and ENFORCE_API_VERSIONING
+    )
+
+
+async def version_middleware(request: Request, call_next: Callable) -> Response:
+    """Lightweight middleware: attach ``API-Version`` header to every /api/ response."""
     path = request.url.path
 
-    if any(path.startswith(p) for p in _EXCLUDED_PATHS):
+    if _is_version_excluded_path(path):
         return await call_next(request)
 
     version = get_api_version_from_path(path)
-
-    # Enforce versioned paths if policy is enabled
-    if not version and path.startswith("/api/") and ENFORCE_API_VERSIONING:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": "missing_api_version",
-                "message": f"Use /api/{CURRENT_VERSION.value}/… format.",
-                "current_version": CURRENT_VERSION.value,
-                "suggested_path": path.replace(
-                    "/api/", f"/api/{CURRENT_VERSION.value}/", 1
-                ),
-            },
-        )
+    if _requires_version_rejection(path, version):
+        return _reject_missing_version(path)
 
     response = await call_next(request)
-
-    # Always stamp the version header on API responses
     if path.startswith("/api/"):
         response.headers["API-Version"] = version or CURRENT_VERSION.value
-
     return response

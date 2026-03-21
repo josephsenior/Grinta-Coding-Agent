@@ -54,7 +54,7 @@ uv run python3 -m backend.llm.discover_models aliases
 echo -e "${GREEN}✅ Model discovery complete.${NC}"
 
 echo -e "\n${GREEN}✅ Setup complete! Launching Forge...${NC}"
-echo -e "${CYAN}   (server starts in the background, TUI in the foreground)${NC}"
+echo -e "${CYAN}   Open http://localhost:3000 when the server is ready.${NC}"
 echo ""
 
-uv run forge all
+uv run forge serve

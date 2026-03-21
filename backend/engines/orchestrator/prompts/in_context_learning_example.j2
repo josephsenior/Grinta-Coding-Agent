@@ -22,7 +22,7 @@ A: <thought>
 The directory is empty. I will create `app.py` with a simple Flask web server returning the numbers 1 to 10.
 </thought>
 <function=str_replace_editor>
-<parameter=command>create</parameter>
+<parameter=command>create_file</parameter>
 <parameter=path>/workspace/app.py</parameter>
 <parameter=file_text>
 from flask import Flask
@@ -144,7 +144,7 @@ A: <thought>
 Now I will use ast_code_editor to modify the `index` function directly instead of using a brittle string replacement.
 </thought>
 <function=ast_code_editor>
-<parameter=command>edit_function</parameter>
+<parameter=command>edit_symbol_body</parameter>
 <parameter=path>/workspace/app.py</parameter>
 <parameter=symbol_name>index</parameter>
 <parameter=new_code>

@@ -180,7 +180,6 @@ class Orchestrator(Agent):
         self.pending_actions.clear()
 
     def step(self, state: State) -> Action:
-        print("!!! step called", flush=True)
         try:
             exit_action = self._check_exit_command(state)
             if exit_action:
@@ -226,7 +225,6 @@ class Orchestrator(Agent):
 
     async def astep(self, state: State) -> Action:
         """Async version of step() that uses real LLM streaming."""
-        print("!!! astep called", flush=True)
         try:
             exit_action = self._check_exit_command(state)
             if exit_action:
@@ -339,7 +337,6 @@ class Orchestrator(Agent):
 
     async def _execute_llm_step_async(self, state: State, condensed: Any) -> Action:
         """Async variant of _execute_llm_step using real LLM streaming."""
-        print("!!! _execute_llm_step_async called", flush=True)
         pending = self._handle_pending_action_from_condensation(state, condensed)
         if pending is not None:
             return pending
@@ -514,7 +511,7 @@ class Orchestrator(Agent):
         # Surface any MCP connection failures before the first user response so the
         # agent immediately knows which tools are unavailable, avoiding wasted turns
         # diagnosing connectivity issues at call-time.
-        from backend.mcp_integration.error_collector import mcp_error_collector
+        from backend.mcp_client.error_collector import mcp_error_collector
 
         errors = mcp_error_collector.get_errors()
         if errors:

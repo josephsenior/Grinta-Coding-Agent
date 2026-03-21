@@ -20,18 +20,29 @@ class ForgeJSONEncoder(json.JSONEncoder):
 
     def default(self, obj: Any) -> Any:
         """Serialize Forge-specific objects when dumping JSON."""
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        if isinstance(obj, Event):
-            return event_to_dict(obj)
-        if isinstance(obj, Metrics):
-            return obj.get()
-        if isinstance(obj, BaseModel | CmdOutputMetadata):
-            return model_dump_with_options(obj)
-        # Handle dict-like objects that might have been ModelResponse or similar
-        if hasattr(obj, "model_dump"):
-            return obj.model_dump()
+        result = _try_serialize_forge_object(obj)
+        if result is not _NOT_SERIALIZED:
+            return result
         return super().default(obj)
+
+
+_NOT_SERIALIZED = object()
+
+
+def _try_serialize_forge_object(obj: Any) -> Any:
+    """Serialize Forge-specific types; return _NOT_SERIALIZED if not handled."""
+    handlers = (
+        (datetime, lambda o: o.isoformat()),
+        (Event, event_to_dict),
+        (Metrics, lambda o: o.get()),
+        ((BaseModel, CmdOutputMetadata), model_dump_with_options),
+    )
+    for types_or_type, fn in handlers:
+        if isinstance(obj, types_or_type):
+            return fn(obj)
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    return _NOT_SERIALIZED
 
 
 _json_encoder = ForgeJSONEncoder()
@@ -53,27 +64,41 @@ def loads(json_str: str, **kwargs: Any) -> Any:
         return json.loads(json_str, **kwargs)
     except json.JSONDecodeError:
         pass
+    extracted = _extract_first_json_object(json_str)
+    if extracted is not None:
+        return _repair_and_load(extracted, kwargs)
+    raise LLMResponseError("No valid JSON object found in response.")
+
+
+def _extract_first_json_object(json_str: str) -> str | None:
+    """Extract first complete {...} object from string using brace matching."""
     depth = 0
     start = -1
     for i, char in enumerate(json_str):
-        if char == "{":
-            if depth == 0:
-                start = i
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0 and start != -1:
-                response = json_str[start : i + 1]
-                try:
-                    json_str = repair_json(response)
-                    return json.loads(json_str, **kwargs)
-                except (json.JSONDecodeError, ValueError, TypeError) as e:
-                    msg = "Invalid JSON in response. Please make sure the response is a valid JSON object."
-                    raise LLMResponseError(
-                        msg,
-                    ) from e
-    msg = "No valid JSON object found in response."
-    raise LLMResponseError(msg)
+        depth, start = _update_brace_depth(char, depth, start, i)
+        if depth == 0 and start >= 0:
+            return json_str[start : i + 1]
+    return None
+
+
+def _update_brace_depth(char: str, depth: int, start: int, i: int) -> tuple[int, int]:
+    """Update depth and start index when scanning for JSON object."""
+    if char == "{":
+        return depth + 1, i if depth == 0 else start
+    if char == "}":
+        return depth - 1, start
+    return depth, start
+
+
+def _repair_and_load(extracted: str, kwargs: dict) -> Any:
+    """Attempt to repair malformed JSON and load."""
+    try:
+        repaired = repair_json(extracted)
+        return json.loads(repaired, **kwargs)
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
+        raise LLMResponseError(
+            "Invalid JSON in response. Please make sure the response is a valid JSON object."
+        ) from e
 
 
 __all__ = ["ForgeJSONEncoder", "dumps", "loads"]

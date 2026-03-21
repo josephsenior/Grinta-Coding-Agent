@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 
-from backend.controller.tool_pipeline import (
+from backend.controller.middleware.auto_check import (
     _collect_syntax_errors,
     _treesitter_syntax_check,
 )
@@ -290,7 +290,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
     def _run(self, coro):
         import asyncio
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def _make_pipeline_and_ctx(self, action):
         from unittest.mock import MagicMock
@@ -314,7 +314,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
         action = FileEditAction(
             path="/workspace/app.py",
-            command="create",
+            command="create_file",
             file_text="def hello():\n    return 42\n",
         )
         obs = FileEditObservation(content="File created successfully", path="/workspace/app.py")
@@ -329,7 +329,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
         action = FileEditAction(
             path="/workspace/app.py",
-            command="create",
+            command="create_file",
             file_text="def hello(\n    return 42\n",
         )
         obs = FileEditObservation(content="File created successfully", path="/workspace/app.py")
@@ -365,14 +365,14 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
         self._run(pipeline.run_observe(ctx, obs))
         self.assertIn("<SYNTAX_CHECK_FAILED>", obs.content)
 
-    def test_file_edit_str_replace_uses_content_fallback(self):
-        """FileEditAction str_replace — uses content attr as file content."""
+    def test_file_edit_replace_text_uses_content_fallback(self):
+        """FileEditAction replace_text — uses content attr as file content."""
         from backend.events.action.files import FileEditAction
         from backend.events.observation import FileEditObservation
 
         action = FileEditAction(
             path="/workspace/app.py",
-            command="str_replace",
+            command="replace_text",
             old_str="old",
             new_str="new",
             content="def hello():\n    return 42\n",
@@ -389,7 +389,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
         action = FileEditAction(
             path="/workspace/app.py",
-            command="create",
+            command="create_file",
             file_text="def hello():\n",
         )
         obs = ErrorObservation(content="Command failed")
@@ -404,7 +404,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
         action = FileEditAction(
             path="/workspace/data.xyz",
-            command="create",
+            command="create_file",
             file_text="some data",
         )
         obs = FileEditObservation(content="File created", path="/workspace/data.xyz")

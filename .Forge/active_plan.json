@@ -1,7 +1,7 @@
 [
   {
     "id": "1",
-    "description": "Explore the repository to identify the best location for a utility script.",
+    "description": "Create a file named 'agent_capability_test.txt' with the content 'Initial state'.",
     "status": "done",
     "result": null,
     "tags": [],
@@ -9,7 +9,7 @@
   },
   {
     "id": "2",
-    "description": "Create a utility script to fetch and normalize data from a public API.",
+    "description": "Create a checkpoint of this state using the checkpoint tool.",
     "status": "done",
     "result": null,
     "tags": [],
@@ -17,7 +17,7 @@
   },
   {
     "id": "3",
-    "description": "Run the script and verify the output.",
+    "description": "Update 'agent_capability_test.txt' to contain 'State updated'.",
     "status": "in_progress",
     "result": null,
     "tags": [],
@@ -25,7 +25,15 @@
   },
   {
     "id": "4",
-    "description": "Create a markdown summary of the results.",
+    "description": "Add a note to your working memory saying 'Test completed successfully'.",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "5",
+    "description": "Use the rollback tool to restore the checkpoint, putting the file back to 'Initial state'.",
     "status": "pending",
     "result": null,
     "tags": [],

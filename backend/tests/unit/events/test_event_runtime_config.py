@@ -19,7 +19,7 @@ class TestEventRuntimeDefaults:
         assert defaults.hwm_ratio == 0.8
         assert defaults.block_timeout == 0.1
         assert defaults.rate_window_seconds == 60
-        assert defaults.workers == 8
+        assert defaults.workers == 1
         assert defaults.async_write is False
         assert defaults.coalesce is False
         assert defaults.coalesce_window_ms == 100.0
@@ -75,7 +75,7 @@ class TestGetEventRuntimeDefaults:
                 result = get_event_runtime_defaults()
                 assert result.max_queue_size == 2000
                 assert result.drop_policy == "drop_oldest"
-                assert result.workers == 8
+                assert result.workers == 1
 
     @patch(
         "backend.core.config.utils.load_forge_config", side_effect=RuntimeError("fail")

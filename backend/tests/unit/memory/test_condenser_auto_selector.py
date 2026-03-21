@@ -1,4 +1,4 @@
-"""Tests for backend.memory.condenser.impl.auto_selector — task-aware condenser selection."""
+"""Tests for backend.memory.condenser.strategies.auto_selector — task-aware condenser selection."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from backend.events.action import CmdRunAction, MessageAction
 from backend.events.event import Event
 from backend.events.event import EventSource
 from backend.events.observation import ErrorObservation, CmdOutputObservation
-from backend.memory.condenser.impl.auto_selector import (
+from backend.memory.condenser.strategies.auto_selector import (
     TaskSignals,
     compute_signals,
     select_condenser_config,

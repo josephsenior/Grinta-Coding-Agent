@@ -55,7 +55,6 @@ def user_settings() -> Settings:
     settings.llm_model = "gpt-4-turbo"
     settings.llm_api_key = "user-api-key"
     settings.llm_base_url = "https://custom-api.example.com/v1"
-    settings.agent = "claude"
     return settings
 
 
@@ -66,7 +65,6 @@ def minimal_settings() -> Settings:
     settings.llm_model = None
     settings.llm_api_key = "user-api-key"
     settings.llm_base_url = None
-    settings.agent = None
     return settings
 
 
@@ -381,8 +379,7 @@ class TestCreateRegistryAndStats:
 
         # Check that LLMRegistry was initialized with the agent class
         call_args = mock_registry_class.call_args
-        # Second argument should be agent_cls from user_settings
-        assert call_args[0][1] == "claude"
+        assert call_args[0][1] is None
 
     @patch("backend.utils.utils.get_file_store")
     @patch("backend.utils.utils.LLMRegistry")
@@ -457,7 +454,6 @@ class TestConfigComplexity:
         settings.llm_model = 'gpt-4 "special"'
         settings.llm_api_key = "key with spaces & symbols"
         settings.llm_base_url = "https://api.example.com:8080/v1/api?version=2"
-        settings.agent = None
 
         setup_llm_config(base_config, settings)
 

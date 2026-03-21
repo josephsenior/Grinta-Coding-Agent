@@ -14,7 +14,10 @@ class EventRuntimeDefaults:
     hwm_ratio: float = 0.8
     block_timeout: float = 0.1
     rate_window_seconds: int = 60
-    workers: int = 8
+    # Single worker preserves FIFO delivery to WebSocket subscribers. With >1,
+    # parallel dispatch can reorder events (e.g. final MESSAGE before earlier
+    # STREAMING_CHUNK), and the UI drops "stale" ids — so streaming looks instant.
+    workers: int = 1
     async_write: bool = False
     coalesce: bool = False
     coalesce_window_ms: float = 100.0
@@ -36,7 +39,7 @@ def get_event_runtime_defaults() -> EventRuntimeDefaults:
                 hwm_ratio=float(getattr(event_cfg, "hwm_ratio", 0.8)),
                 block_timeout=float(getattr(event_cfg, "block_timeout", 0.1)),
                 rate_window_seconds=int(getattr(event_cfg, "rate_window_seconds", 60)),
-                workers=max(1, int(getattr(event_cfg, "workers", 8))),
+                workers=max(1, int(getattr(event_cfg, "workers", 1))),
                 async_write=bool(getattr(event_cfg, "async_write", False)),
                 coalesce=bool(getattr(event_cfg, "coalesce", False)),
                 coalesce_window_ms=float(
@@ -58,7 +61,7 @@ def get_event_runtime_defaults() -> EventRuntimeDefaults:
         rate_window_seconds=int(
             os.getenv("FORGE_EVENTSTREAM_RATE_WINDOW_SECONDS", "60")
         ),
-        workers=max(1, int(os.getenv("FORGE_EVENTSTREAM_WORKERS", "8"))),
+        workers=max(1, int(os.getenv("FORGE_EVENTSTREAM_WORKERS", "1"))),
         async_write=os.getenv("FORGE_EVENTSTREAM_ASYNC_WRITE", "false").lower()
         in ("1", "true", "yes"),
         coalesce=os.getenv("FORGE_EVENT_COALESCE", "false").lower()

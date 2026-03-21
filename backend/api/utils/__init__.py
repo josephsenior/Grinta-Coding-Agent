@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from fastapi import Depends, HTTPException, Request, status
 
 from backend.core.logger import forge_logger as logger
-from backend.api.shared import ConversationStoreImpl, config
+from backend.api.app_accessors import ConversationStoreImpl, config
 from backend.api.store_factory import get_conversation_store_instance
 from backend.api.user_auth import get_user_id
 from backend.storage.conversation.conversation_store import ConversationStore
@@ -163,7 +163,7 @@ async def get_conversation(
     # Resolve the conversation manager lazily to avoid relying on a module-level
     # snapshot (some modules import the value at import-time and won't see
     # updates). Import locally to avoid circular import problems.
-    from backend.api.shared import get_conversation_manager
+    from backend.api.app_accessors import get_conversation_manager
 
     try:
         # Always resolve via accessor to ensure we obtain the live singleton

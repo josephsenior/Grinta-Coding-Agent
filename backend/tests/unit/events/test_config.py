@@ -24,7 +24,7 @@ class TestEventRuntimeDefaults:
         assert defaults.hwm_ratio == 0.8
         assert defaults.block_timeout == 0.1
         assert defaults.rate_window_seconds == 60
-        assert defaults.workers == 8
+        assert defaults.workers == 1
         assert defaults.async_write is False
         assert defaults.coalesce is False
         assert defaults.coalesce_window_ms == 100.0

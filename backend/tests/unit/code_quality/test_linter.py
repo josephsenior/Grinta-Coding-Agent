@@ -1,4 +1,4 @@
-"""Unit tests for backend.code_quality.impl — LintError, LintResult, DefaultLinter."""
+"""Unit tests for backend.code_quality.linter — LintError, LintResult, DefaultLinter."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.code_quality.impl import DefaultLinter, LintError, LintResult
+from backend.code_quality.linter import DefaultLinter, LintError, LintResult
 
 
 # ---------------------------------------------------------------------------
@@ -153,20 +153,14 @@ class TestDefaultLinterCache:
 
 
 class TestDefaultLinterBackendDetection:
-    def test_auto_selects_ruff_if_available(self):
+    def test_auto_selects_tree_sitter_if_available(self):
         with patch.object(
-            DefaultLinter, "_check_backend_available", side_effect=lambda b: b == "ruff"
+            DefaultLinter,
+            "_check_backend_available",
+            side_effect=lambda b: b == "tree-sitter",
         ):
             linter = DefaultLinter(backend="auto")
-        assert linter._detected_backend == "ruff"
-
-    def test_auto_selects_pylint_as_fallback(self):
-        def avail(b):
-            return b == "pylint"
-
-        with patch.object(DefaultLinter, "_check_backend_available", side_effect=avail):
-            linter = DefaultLinter(backend="auto")
-        assert linter._detected_backend == "pylint"
+        assert linter._detected_backend == "tree-sitter"
 
     def test_auto_none_if_nothing_available(self):
         with patch.object(
@@ -177,14 +171,14 @@ class TestDefaultLinterBackendDetection:
 
     def test_explicit_backend_available(self):
         with patch.object(DefaultLinter, "_check_backend_available", return_value=True):
-            linter = DefaultLinter(backend="ruff")
-        assert linter._detected_backend == "ruff"
+            linter = DefaultLinter(backend="tree-sitter")
+        assert linter._detected_backend == "tree-sitter"
 
     def test_explicit_backend_unavailable(self):
         with patch.object(
             DefaultLinter, "_check_backend_available", return_value=False
         ):
-            linter = DefaultLinter(backend="ruff")
+            linter = DefaultLinter(backend="tree-sitter")
         assert linter._detected_backend is None
 
 
@@ -201,7 +195,9 @@ class TestDefaultLinterCacheHit:
         with patch.object(
             DefaultLinter, "_check_backend_available", return_value=True
         ):
-            linter = DefaultLinter(backend="ruff", enable_cache=True, cache_ttl=300)
+            linter = DefaultLinter(
+                backend="tree-sitter", enable_cache=True, cache_ttl=300
+            )
         with patch.object(linter, "_lint_content", return_value=LintResult([], [])):
             r1 = linter.lint(content="x = 1")
             r2 = linter.lint(content="x = 1")
@@ -217,30 +213,25 @@ class TestDefaultLinterCacheHit:
 
 
 class TestDefaultLinterLintFile:
-    """Test _lint_file with LSP and ruff backends."""
+    """Test _lint_file with LSP backend."""
 
-    def test_lint_file_ruff_path(self):
-        """_lint_file uses ruff when backend is ruff and file is .py."""
+    def test_lint_file_lsp_unavailable_returns_empty(self):
+        """_lint_file returns empty when LSP is unavailable."""
         with patch.object(
             DefaultLinter, "_check_backend_available", return_value=True
         ):
-            linter = DefaultLinter(backend="ruff")
-        with (
-            patch(
-                "backend.utils.lsp_client.get_lsp_client",
-                return_value=MagicMock(
-                    query=MagicMock(
-                        return_value=MagicMock(
-                            available=False, error=True, locations=[]
-                        )
+            linter = DefaultLinter(backend="tree-sitter")
+        with patch(
+            "backend.utils.lsp_client.get_lsp_client",
+            return_value=MagicMock(
+                query=MagicMock(
+                    return_value=MagicMock(
+                        available=False, error=True, locations=[]
                     )
-                ),
+                )
             ),
-            patch.object(linter, "_lint_with_ruff") as mock_ruff,
         ):
-            mock_ruff.return_value = LintResult([], [])
             result = linter.lint(file_path="test.py")
-        mock_ruff.assert_called_once_with(file_path="test.py")
         assert result.errors == []
         assert result.warnings == []
 
@@ -249,7 +240,7 @@ class TestDefaultLinterLintFile:
         with patch.object(
             DefaultLinter, "_check_backend_available", return_value=True
         ):
-            linter = DefaultLinter(backend="ruff")
+            linter = DefaultLinter(backend="tree-sitter")
         mock_loc = MagicMock()
         mock_loc.line = 5
         mock_loc.column = 3

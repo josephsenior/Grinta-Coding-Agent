@@ -50,7 +50,14 @@ def _load_dotenv_local() -> None:
             key, _, val = line.partition("=")
             key = key.strip()
             val = val.strip().strip('"').strip("'")
-            if key and key not in os.environ:  # never overwrite existing env vars
+            if not key:
+                continue
+
+            # Only write when missing OR currently empty/whitespace.
+            # This lets operators provide real values via .env.local even if
+            # a hosting environment pre-defines empty placeholders.
+            existing = os.environ.get(key)
+            if existing is None or not str(existing).strip():
                 os.environ[key] = val
 
 

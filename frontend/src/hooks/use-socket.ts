@@ -1,8 +1,18 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useSessionStore } from "@/stores/session-store";
 import { useContextPanelStore } from "@/stores/context-panel-store";
-import { connectSocket, disconnectSocket, onForgeEvent } from "@/socket/client";
+import {
+  connectSocket,
+  disconnectSocket,
+  registerForgeEventListener,
+} from "@/socket/client";
+import {
+  fetchAllConversationEvents,
+  fetchConversationEventsAfter,
+} from "@/api/conversation-events";
+import { queryClient } from "@/lib/query-client";
 import { toast } from "sonner";
+import { SUSTAINED_DISCONNECT_NOTICE_MS } from "@/lib/constants";
 
 /**
  * Manages the Socket.IO lifecycle for a conversation.
@@ -15,6 +25,8 @@ export function useSocket(conversationId: string | undefined) {
     addEvent,
     setConnected,
     setReconnecting,
+    clearStreaming,
+    mergeHistoricalEvents,
   } = useSessionStore();
 
   // Keep latestEventId in a ref so reconnection always uses current value.
@@ -32,11 +44,30 @@ export function useSocket(conversationId: string | undefined) {
   // Track whether this is the initial mount to avoid double-connect in StrictMode
   const connectedRef = useRef(false);
 
+  const disconnectToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userNotifiedDisconnectRef = useRef(false);
+
   const connect = useCallback(
     (convId: string, fromEventId: number) => {
       const socket = connectSocket({
         conversationId: convId,
         latestEventId: fromEventId,
+      });
+
+      const offForge = registerForgeEventListener(socket, (event) => {
+        if (event.id < 0) return;
+
+        if (event.id <= latestEventIdRef.current) return;
+
+        const gap = event.id - latestEventIdRef.current;
+        if (latestEventIdRef.current >= 0 && gap > 50) {
+          console.warn(
+            `[forge] Event gap detected: expected ~${latestEventIdRef.current + 1}, got ${event.id} (gap=${gap}). Some history may be missing.`,
+          );
+        }
+
+        latestEventIdRef.current = event.id;
+        addEvent(event);
       });
 
       socket.on("connect", () => {
@@ -46,9 +77,26 @@ export function useSocket(conversationId: string | undefined) {
 
       socket.on("disconnect", (reason) => {
         setConnected(false);
-        if (reason === "io server disconnect") {
-          toast.error("Disconnected by server");
+        // Intentional client teardown (e.g. leaving the chat) — no toast.
+        if (reason === "io client disconnect") return;
+
+        if (disconnectToastTimerRef.current) {
+          clearTimeout(disconnectToastTimerRef.current);
         }
+        userNotifiedDisconnectRef.current = false;
+
+        const retryHint =
+          "Forge will retry automatically. If this keeps happening, ensure the API backend is running, then refresh this page.";
+
+        disconnectToastTimerRef.current = setTimeout(() => {
+          disconnectToastTimerRef.current = null;
+          userNotifiedDisconnectRef.current = true;
+          if (reason === "io server disconnect") {
+            toast.error("Disconnected by server", { description: retryHint });
+          } else {
+            toast.error("Connection lost", { description: retryHint });
+          }
+        }, SUSTAINED_DISCONNECT_NOTICE_MS);
       });
 
       socket.io.on("reconnect_attempt", () => {
@@ -58,38 +106,54 @@ export function useSocket(conversationId: string | undefined) {
       socket.io.on("reconnect", () => {
         setReconnecting(false);
         setConnected(true);
-        toast.success("Reconnected");
+
+        if (disconnectToastTimerRef.current) {
+          clearTimeout(disconnectToastTimerRef.current);
+          disconnectToastTimerRef.current = null;
+        }
+        const showRecoveryToast = userNotifiedDisconnectRef.current;
+        userNotifiedDisconnectRef.current = false;
+
+        void (async () => {
+          const convId = conversationIdRef.current;
+          const afterId = useSessionStore.getState().latestEventId;
+          if (convId) {
+            try {
+              const batch = await fetchConversationEventsAfter(convId, afterId);
+              if (batch.length > 0) {
+                mergeHistoricalEvents(batch);
+                latestEventIdRef.current = useSessionStore.getState().latestEventId;
+              }
+            } catch (err) {
+              console.warn("[forge] Reconnect REST catch-up failed", err);
+            }
+            useSessionStore.getState().pruneRecoverableTransientErrors();
+            void queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
+          }
+          if (showRecoveryToast) {
+            toast.success("Back online", {
+              description: "Live updates and sending messages work again.",
+            });
+          }
+        })();
       });
 
       socket.io.on("reconnect_failed", () => {
         setReconnecting(false);
-        toast.error("Failed to reconnect");
-      });
-
-      const unsubscribe = onForgeEvent((event) => {
-        if (typeof event.id === "number" && event.id >= 0) {
-          // Skip exact duplicates (replay after reconnection).
-          if (event.id <= latestEventIdRef.current) return;
-
-          // Detect replay gaps: if event ID jumps by more than a small
-          // tolerance, the server may have pruned intermediate events.
-          const gap = event.id - latestEventIdRef.current;
-          if (latestEventIdRef.current >= 0 && gap > 50) {
-            console.warn(
-              `[forge] Event gap detected: expected ~${latestEventIdRef.current + 1}, got ${event.id} (gap=${gap}). Some history may be missing.`,
-            );
-          }
-
-          // Update ref immediately — don't wait for React re-render — to
-          // block duplicate events that arrive before the next render cycle.
-          latestEventIdRef.current = event.id;
+        if (disconnectToastTimerRef.current) {
+          clearTimeout(disconnectToastTimerRef.current);
+          disconnectToastTimerRef.current = null;
         }
-        addEvent(event);
+        userNotifiedDisconnectRef.current = false;
+        toast.error("Could not reconnect", {
+          description:
+            "Check your network and that the Forge backend is up. Refresh this page to try again.",
+        });
       });
 
-      return unsubscribe;
+      return offForge;
     },
-    [addEvent, setConnected, setReconnecting],
+    [addEvent, setConnected, setReconnecting, mergeHistoricalEvents],
   );
 
   useEffect(() => {
@@ -97,14 +161,45 @@ export function useSocket(conversationId: string | undefined) {
     if (connectedRef.current) return;
     connectedRef.current = true;
 
+    const previousConversationId = useSessionStore.getState().conversationId;
     setConversation(conversationId);
-    useContextPanelStore.getState().resetPanel();
-    const unsubscribe = connect(conversationId, -1);
+    if (previousConversationId !== conversationId) {
+      useContextPanelStore.getState().resetPanel();
+    }
+    clearStreaming();
+
+    let cancelled = false;
+    let offForge: (() => void) | null = null;
+
+    void (async () => {
+      if (useSessionStore.getState().events.length === 0) {
+        try {
+          const batch = await fetchAllConversationEvents(conversationId);
+          if (!cancelled && batch.length > 0) {
+            mergeHistoricalEvents(batch);
+          }
+        } catch (err) {
+          console.warn("[forge] Failed to hydrate events from API", err);
+        }
+      }
+
+      if (cancelled) return;
+
+      const replayAfterId = useSessionStore.getState().latestEventId;
+      latestEventIdRef.current = replayAfterId;
+      offForge = connect(conversationId, replayAfterId);
+    })();
 
     return () => {
-      unsubscribe();
+      cancelled = true;
+      if (disconnectToastTimerRef.current) {
+        clearTimeout(disconnectToastTimerRef.current);
+        disconnectToastTimerRef.current = null;
+      }
+      userNotifiedDisconnectRef.current = false;
+      offForge?.();
       disconnectSocket();
       connectedRef.current = false;
     };
-  }, [conversationId, setConversation, connect]);
+  }, [conversationId, setConversation, connect, clearStreaming, mergeHistoricalEvents]);
 }

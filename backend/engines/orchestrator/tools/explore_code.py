@@ -86,7 +86,7 @@ read_symbol_definition(['src/my_file.py:MyClass.func_name'])
 read_symbol_definition(['src/my_file.py'])
 
 Entity Name Format:
-- To specify a function or class, use the format: `file_path:QualifiedName` (e.g., 'src/helpers/math_helpers.py:MathUtils.calculate_sum').
+- To specify a function or class, use the format: `path:QualifiedName` (e.g., 'src/helpers/math_helpers.py:MathUtils.calculate_sum').
 - To search for a file's content, use only the file path (e.g., 'src/my_file.py').
 """
 
@@ -99,7 +99,7 @@ def create_read_symbol_definition_tool():
             "entity_names": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "A list of entity names to query. Format: 'file_path:QualifiedName' or 'file_path'.",
+                "description": "A list of entity names to query. Format: 'path:QualifiedName' or 'path'.",
             },
         },
         required=["entity_names"],

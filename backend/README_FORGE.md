@@ -19,7 +19,7 @@ The key classes in Forge are:
     - Observation: represents information collected from the environment, e.g. file contents or command output
 - Runtime: responsible for performing Actions, and sending back Observations
   - Runtime Environment: the part of the runtime responsible for running commands in an isolated local workspace
-- Server: brokers Forge sessions over HTTP, e.g. to drive the TUI
+- Server: brokers Forge sessions over HTTP/WebSocket (web UI and API clients)
   - Session: holds a single EventStream, a single AgentController, and a single Runtime. Generally represents a single task (but potentially including several user prompts)
   - ConversationManager: keeps a list of active sessions, and ensures requests are routed to the correct Session
 
@@ -47,7 +47,7 @@ flowchart LR
   EventStream--Observations-->AgentController
   Runtime--Observations-->EventStream
   EventStream--Actions-->Runtime
-  TUI--Actions-->EventStream
+  Clients--Actions-->EventStream
 ```
 
 ## Runtime

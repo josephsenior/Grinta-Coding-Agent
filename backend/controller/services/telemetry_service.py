@@ -31,7 +31,6 @@ class TelemetryService:
             EditVerifyMiddleware,
             ErrorPatternMiddleware,
             LoggingMiddleware,
-            PlanningMiddleware,
             ReflectionMiddleware,
             SafetyValidatorMiddleware,
             TelemetryMiddleware,
@@ -41,19 +40,11 @@ class TelemetryService:
         context = self._context
         controller = context.get_controller()
         config = context.agent_config
-        planning_enabled = bool(
-            config
-            and (
-                getattr(config, "enable_planning_middleware", False)
-                or getattr(config, "enable_auto_planning", False)
-            )
-        )
         reflection_enabled = bool(
             config
             and getattr(config, "enable_reflection", True)
             and getattr(config, "enable_reflection_middleware", False)
         )
-        controller._planning_middleware_enabled = planning_enabled
         controller._reflection_middleware_enabled = reflection_enabled
         middlewares = [
             SafetyValidatorMiddleware(controller),
@@ -62,8 +53,6 @@ class TelemetryService:
             CostQuotaMiddleware(controller),
             ContextWindowMiddleware(controller),
         ]
-        if planning_enabled:
-            middlewares.append(PlanningMiddleware(controller))
         if reflection_enabled:
             middlewares.append(ReflectionMiddleware(controller))
         # Rollback checkpoint before risky actions
@@ -76,7 +65,7 @@ class TelemetryService:
         middlewares.append(AutoCheckMiddleware())
         # Warn when re-editing a file without verifying in between
         middlewares.append(ConflictDetectionMiddleware())
-        # Auto-query error_patterns DB when errors arrive
+        # Auto-query query_error_solutions DB when errors arrive
         middlewares.append(ErrorPatternMiddleware())
         # File state tracking (records files read/modified/created)
         file_state_mw = FileStateMiddleware()

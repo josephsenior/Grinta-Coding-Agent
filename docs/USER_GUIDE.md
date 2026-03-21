@@ -7,7 +7,7 @@
 1. [Installation](#installation)
 2. [Configuration](#configuration)
 3. [Your First Session](#your-first-session)
-4. [Working with the TUI](#working-with-the-tui)
+4. [Working with the Web UI](#working-with-the-web-ui)
 5. [Working with the API](#working-with-the-api)
 6. [LLM Providers](#llm-providers)
 7. [Memory & Condensers](#memory--condensers)
@@ -61,13 +61,7 @@ Terminal 1 — Backend:
 python start_server.py
 ```
 
-Terminal 2 — TUI:
-
-```bash
-python -m tui
-```
-
-The backend starts on `http://localhost:3000`. The TUI connects automatically.
+Open the web UI at **http://localhost:3000** (or run `python forge.py` to start the server and open a browser tab automatically).
 
 ---
 
@@ -130,14 +124,13 @@ Any setting can be injected. For complex setups, rely on `.env`:
 
 ```bash
 python start_server.py
-# In another terminal:
-python -m tui
 ```
+
+Then open **http://localhost:3000** in a browser.
 
 ### 2. Create a Conversation
 
-The TUI opens on the **Home** screen. Press `n` or click "New Conversation"
-to create a session.
+From the web UI home screen, start a **new conversation** (or resume an existing one).
 
 ### 3. Describe Your Task
 
@@ -179,34 +172,12 @@ The agent shows each action as it executes. You can:
 
 ---
 
-## Working with the TUI
+## Working with the Web UI
 
-### Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `n` | New conversation |
-| `Enter` | Send message / Select |
-| `d` | Open diff viewer |
-| `Escape` | Go back / Cancel |
-| `Ctrl+C` | Interrupt agent |
-| `q` | Quit |
-
-### Screens
-
-- **Home**: List conversations, create new ones, resume existing
-- **Chat**: Main interaction — send messages, watch agent work
-- **Settings**: Configure LLM model, API key, agent behavior
-- **Diff**: Side-by-side workspace diff viewer
-
-### Status Bar
-
-The bottom status bar shows:
-
-- **Agent state**: Running, Paused, Awaiting Input, Finished
-- **Model**: Current LLM model name
-- **Cost**: Running cost for the current session
-- **Iterations**: Current / maximum iterations
+The primary interface is the React app served with the backend (default **http://localhost:3000**).
+Use it to manage conversations, settings, confirmations, and workspace changes. The same REST and
+Socket.IO APIs power automation via the Python package `forge_client` (see tests under
+`backend/tests/unit/forge_client/` and `scripts/test_agent_via_sockets.py`).
 
 ---
 

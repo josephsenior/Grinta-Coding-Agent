@@ -270,24 +270,24 @@ class TestFileEditAction(unittest.TestCase):
         self.assertIn("new code", r)
 
     def test_repr_file_editor_create(self):
-        f = FileEditAction(path="y.py", command="create", file_text="hello")
+        f = FileEditAction(path="y.py", command="create_file", file_text="hello")
         r = repr(f)
-        self.assertIn("Command: create", r)
+        self.assertIn("Command: create_file", r)
         self.assertIn("hello", r)
 
-    def test_repr_str_replace(self):
-        f = FileEditAction(path="z.py", command="str_replace", old_str="a", new_str="b")
+    def test_repr_replace_text(self):
+        f = FileEditAction(path="z.py", command="replace_text", old_str="a", new_str="b")
         r = repr(f)
         self.assertIn("Old String", r)
         self.assertIn("New String", r)
 
-    def test_repr_insert(self):
-        f = FileEditAction(path="w.py", command="insert", insert_line=5, new_str="line")
+    def test_repr_insert_text(self):
+        f = FileEditAction(path="w.py", command="insert_text", insert_line=5, new_str="line")
         r = repr(f)
         self.assertIn("Insert Line: 5", r)
 
     def test_repr_undo(self):
-        f = FileEditAction(path="u.py", command="undo_edit")
+        f = FileEditAction(path="u.py", command="undo_last_edit")
         r = repr(f)
         self.assertIn("Undo Edit", r)
 

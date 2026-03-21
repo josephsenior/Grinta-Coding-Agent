@@ -1,4 +1,5 @@
 """Tests for backend.controller.agent (Agent base class)."""
+# pylint: disable=abstract-class-instantiated,protected-access
 
 from __future__ import annotations
 
@@ -34,10 +35,10 @@ def _llm_registry():
 class TestAgentRegistry:
     def setup_method(self):
         """Snapshot and restore the registry between tests."""
-        self._original = dict(Agent._registry)
+        self._original = dict(Agent._registry)  # pylint: disable=protected-access
 
     def teardown_method(self):
-        Agent._registry = self._original
+        Agent._registry = self._original  # pylint: disable=protected-access
 
     def test_register_and_get(self):
         cls = _make_concrete_agent("RegTestAgent")
@@ -70,13 +71,13 @@ class TestAgentInit:
         agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
         assert agent.name == "BasicInitAgent"
         assert agent.complete is False
-        assert agent.tools == []
-        assert agent.mcp_tools == {}
+        assert not agent.tools
+        assert not agent.mcp_tools
 
     def test_reset(self):
         cls = _make_concrete_agent()
         agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
-        agent._complete = True
+        agent._complete = True  # pylint: disable=protected-access
         agent.reset()
         assert agent.complete is False
 
@@ -144,7 +145,7 @@ class TestGetSystemMessage:
         agent = cls(config=AgentConfig(), llm_registry=_llm_registry())
         pm = MagicMock()
         pm.get_system_message.return_value = "You are an assistant."
-        agent._prompt_manager = pm
+        agent._prompt_manager = pm  # pylint: disable=protected-access
 
         msg = agent.get_system_message()
         assert msg is not None

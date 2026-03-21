@@ -1,11 +1,11 @@
-"""Tests for backend.adapters.io — command-line input/task helpers."""
+"""Tests for backend.adapters.cli_input — command-line input/task helpers."""
 
 import argparse
 from unittest.mock import mock_open, patch
 
 import pytest
 
-from backend.adapters.io import read_input, read_task, read_task_from_file
+from backend.adapters.cli_input import read_input, read_task, read_task_from_file
 
 
 class TestReadInput:
@@ -109,7 +109,7 @@ class TestReadTask:
         """Test reading task from file argument."""
         args = argparse.Namespace(file="task.txt", task=None)
 
-        with patch("backend.adapters.io.read_task_from_file", return_value="File task"):
+        with patch("backend.adapters.cli_input.read_task_from_file", return_value="File task"):
             result = read_task(args, cli_multiline_input=False)
             assert result == "File task"
 
@@ -123,12 +123,12 @@ class TestReadTask:
         """Test file argument takes precedence over task."""
         args = argparse.Namespace(file="task.txt", task="Direct task")
 
-        with patch("backend.adapters.io.read_task_from_file", return_value="File task"):
+        with patch("backend.adapters.cli_input.read_task_from_file", return_value="File task"):
             result = read_task(args, cli_multiline_input=False)
             assert result == "File task"
 
     @patch("sys.stdin.isatty", return_value=False)
-    @patch("backend.adapters.io.read_input", return_value="Input task")
+    @patch("backend.adapters.cli_input.read_input", return_value="Input task")
     def test_read_from_stdin_when_piped(self, mock_read_input, mock_isatty):
         """Test reading from stdin when not a tty."""
         args = argparse.Namespace(file=None, task=None)
@@ -147,12 +147,12 @@ class TestReadTask:
         """Test empty file returns empty task."""
         args = argparse.Namespace(file="empty.txt", task=None)
 
-        with patch("backend.adapters.io.read_task_from_file", return_value=""):
+        with patch("backend.adapters.cli_input.read_task_from_file", return_value=""):
             result = read_task(args, cli_multiline_input=False)
             assert result == ""
 
     @patch("sys.stdin.isatty", return_value=False)
-    @patch("backend.adapters.io.read_input", return_value="Multi\nLine\nTask")
+    @patch("backend.adapters.cli_input.read_input", return_value="Multi\nLine\nTask")
     def test_multiline_stdin(self, mock_read_input, mock_isatty):
         """Test multiline input from stdin."""
         args = argparse.Namespace(file=None, task=None)
@@ -166,7 +166,7 @@ class TestReadTask:
         assert result == "Task line 1\nTask line 2"
 
     @patch("sys.stdin.isatty", return_value=False)
-    @patch("backend.adapters.io.read_input", return_value="")
+    @patch("backend.adapters.cli_input.read_input", return_value="")
     def test_empty_stdin(self, mock_read_input, mock_isatty):
         """Test empty stdin input."""
         args = argparse.Namespace(file=None, task=None)

@@ -99,9 +99,12 @@ export function TasksTab() {
       <ScrollArea className="flex-1">
         <div className="p-1">
           {tasks.length === 0 ? (
-            <p className="px-3 py-4 text-xs text-muted-foreground">
-              Sub-task queue empty
-            </p>
+            <div className="space-y-1.5 px-3 py-4">
+              <p className="text-xs text-muted-foreground">No task list from the agent yet.</p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground/90">
+                When the agent publishes task tracking for this session, steps and statuses will show here.
+              </p>
+            </div>
           ) : (
             tasks.map((task) => <TaskRow key={task.id} task={task} />)
           )}

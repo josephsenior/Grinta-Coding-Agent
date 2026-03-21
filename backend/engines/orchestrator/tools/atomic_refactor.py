@@ -26,6 +26,15 @@ class FileEdit:
     new_content: str | None = None
     new_path: str | None = None  # For renames
 
+    @property
+    def path(self) -> str:
+        """Canonical alias for file path."""
+        return self.file_path
+
+    @path.setter
+    def path(self, value: str) -> None:
+        self.file_path = value
+
 
 RefactorEdit = FileEdit
 
@@ -115,7 +124,7 @@ class AtomicRefactor:
     def add_file_edit(
         self,
         transaction: RefactorTransaction,
-        file_path: str,
+        path: str,
         new_content: str,
         operation: str = "modify",
     ) -> None:
@@ -123,7 +132,7 @@ class AtomicRefactor:
 
         Args:
             transaction: Transaction to add edit to
-            file_path: Path to the file
+            path: Path to the file
             new_content: New file content
             operation: Edit operation ("modify", "create", "delete")
 
@@ -135,15 +144,15 @@ class AtomicRefactor:
 
         # Read original content for rollback
         original_content = None
-        if os.path.exists(file_path) and operation != "create":
+        if os.path.exists(path) and operation != "create":
             try:
-                with open(file_path, encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     original_content = f.read()
             except Exception as e:
-                logger.warning("Could not read %s for backup: %s", file_path, e)
+                logger.warning("Could not read %s for backup: %s", path, e)
 
         edit = FileEdit(
-            file_path=file_path,
+            file_path=path,
             operation=operation,
             original_content=original_content,
             new_content=new_content,
@@ -153,7 +162,7 @@ class AtomicRefactor:
         logger.debug(
             "Added %s edit for %s to transaction %s",
             operation,
-            file_path,
+            path,
             transaction.transaction_id,
         )
 
@@ -246,7 +255,7 @@ class AtomicRefactor:
         for edit in transaction.edits:
             if edit.original_content and transaction.backup_dir:
                 # Preserve directory structure to avoid basename collisions
-                safe_rel = os.path.relpath(edit.file_path).replace("..", "__parent__")
+                safe_rel = os.path.relpath(edit.path).replace("..", "__parent__")
                 backup_path = os.path.join(transaction.backup_dir, safe_rel)
                 os.makedirs(os.path.dirname(backup_path), exist_ok=True)
                 try:
@@ -254,7 +263,7 @@ class AtomicRefactor:
                         f.write(edit.original_content)
                 except Exception as e:
                     logger.warning(
-                        "Failed to create backup for %s: %s", edit.file_path, e
+                        "Failed to create backup for %s: %s", edit.path, e
                     )
 
     def _apply_modify_or_create(
@@ -268,16 +277,16 @@ class AtomicRefactor:
             validator: Validation function
 
         """
-        os.makedirs(os.path.dirname(edit.file_path), exist_ok=True)
+        os.makedirs(os.path.dirname(edit.path), exist_ok=True)
 
-        with open(edit.file_path, "w", encoding="utf-8") as f:
+        with open(edit.path, "w", encoding="utf-8") as f:
             f.write(edit.new_content or "")
 
         # Validation is now done separately in _apply_all_edits
         # This allows proper rollback if validation fails
         if validate and validator:
-            if not validator(edit.file_path, edit.new_content or ""):
-                raise ValueError(f"Validation failed for {edit.file_path}")
+            if not validator(edit.path, edit.new_content or ""):
+                raise ValueError(f"Validation failed for {edit.path}")
 
     def _apply_delete(self, edit: RefactorEdit) -> None:
         """Apply delete operation.
@@ -286,8 +295,8 @@ class AtomicRefactor:
             edit: Edit to apply
 
         """
-        if os.path.exists(edit.file_path):
-            os.remove(edit.file_path)
+        if os.path.exists(edit.path):
+            os.remove(edit.path)
 
     def _apply_rename(self, edit: RefactorEdit) -> None:
         """Apply rename operation.
@@ -296,14 +305,14 @@ class AtomicRefactor:
             edit: Edit to apply
 
         """
-        if os.path.exists(edit.file_path) and edit.new_path:
+        if os.path.exists(edit.path) and edit.new_path:
             os.makedirs(os.path.dirname(edit.new_path), exist_ok=True)
-            shutil.move(edit.file_path, edit.new_path)
+            shutil.move(edit.path, edit.new_path)
 
     def _write_edit_content(self, edit: RefactorEdit) -> None:
         """Write file content for modify/create."""
-        os.makedirs(os.path.dirname(edit.file_path), exist_ok=True)
-        with open(edit.file_path, "w", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(edit.path), exist_ok=True)
+        with open(edit.path, "w", encoding="utf-8") as f:
             f.write(edit.new_content or "")
 
     def _apply_modify_create_impl(self, edit: RefactorEdit) -> None:
@@ -312,14 +321,14 @@ class AtomicRefactor:
 
     def _apply_delete_impl(self, edit: RefactorEdit) -> None:
         """Apply delete: remove file if exists."""
-        if os.path.exists(edit.file_path):
-            os.remove(edit.file_path)
+        if os.path.exists(edit.path):
+            os.remove(edit.path)
 
     def _apply_rename_impl(self, edit: RefactorEdit) -> None:
         """Apply rename: move file to new path."""
-        if edit.new_path and os.path.exists(edit.file_path):
+        if edit.new_path and os.path.exists(edit.path):
             os.makedirs(os.path.dirname(edit.new_path), exist_ok=True)
-            shutil.move(edit.file_path, edit.new_path)
+            shutil.move(edit.path, edit.new_path)
 
     def _apply_single_edit(
         self,
@@ -336,8 +345,8 @@ class AtomicRefactor:
             self._apply_rename_impl(edit)
 
         if validate and validator and edit.operation in ("modify", "create"):
-            if not validator(edit.file_path, edit.new_content or ""):
-                raise ValueError(f"Validation failed for {edit.file_path}")
+            if not validator(edit.path, edit.new_content or ""):
+                raise ValueError(f"Validation failed for {edit.path}")
 
     def _apply_all_edits(
         self,
@@ -368,7 +377,7 @@ class AtomicRefactor:
             except Exception as e:
                 error_msg = (
                     f"Failed to apply edit {i + 1}/{total} "
-                    f"({edit.operation} {edit.file_path}): {e}"
+                    f"({edit.operation} {edit.path}): {e}"
                 )
                 errors.append(error_msg)
                 logger.error(error_msg)
@@ -389,7 +398,7 @@ class AtomicRefactor:
         Args:
             transaction: Transaction to commit
             validate: Whether to validate files after editing
-            validator: Optional custom validator function(file_path, content) -> bool
+            validator: Optional custom validator function(path, content) -> bool
 
         Returns:
             RefactorResult with success status
@@ -502,9 +511,9 @@ class AtomicRefactor:
 
         """
         if edit.original_content is not None:
-            with open(edit.file_path, "w", encoding="utf-8") as f:
+            with open(edit.path, "w", encoding="utf-8") as f:
                 f.write(edit.original_content)
-            logger.debug("Restored %s", edit.file_path)
+            logger.debug("Restored %s", edit.path)
 
     def _rollback_create_edit(self, edit: FileEdit) -> None:
         """Rollback a CREATE edit.
@@ -513,9 +522,9 @@ class AtomicRefactor:
             edit: Edit to rollback
 
         """
-        if os.path.exists(edit.file_path):
-            os.remove(edit.file_path)
-            logger.debug("Removed created file %s", edit.file_path)
+        if os.path.exists(edit.path):
+            os.remove(edit.path)
+            logger.debug("Removed created file %s", edit.path)
 
     def _rollback_delete_edit(
         self, edit: FileEdit, transaction: RefactorTransaction
@@ -528,9 +537,9 @@ class AtomicRefactor:
 
         """
         if edit.original_content and transaction.backup_dir:
-            with open(edit.file_path, "w", encoding="utf-8") as f:
+            with open(edit.path, "w", encoding="utf-8") as f:
                 f.write(edit.original_content)
-            logger.debug("Restored deleted file %s", edit.file_path)
+            logger.debug("Restored deleted file %s", edit.path)
 
     def _rollback_rename_edit(self, edit: FileEdit) -> None:
         """Rollback a RENAME edit.
@@ -540,8 +549,8 @@ class AtomicRefactor:
 
         """
         if edit.new_path and os.path.exists(edit.new_path):
-            shutil.move(edit.new_path, edit.file_path)
-            logger.debug("Reversed rename %s → %s", edit.new_path, edit.file_path)
+            shutil.move(edit.new_path, edit.path)
+            logger.debug("Reversed rename %s → %s", edit.new_path, edit.path)
 
     def _rollback_single_edit(
         self, edit: FileEdit, transaction: RefactorTransaction
@@ -570,7 +579,7 @@ class AtomicRefactor:
             try:
                 self._rollback_single_edit(edit, transaction)
             except Exception as e:
-                logger.error("Failed to rollback edit for %s: %s", edit.file_path, e)
+                logger.error("Failed to rollback edit for %s: %s", edit.path, e)
 
     def dry_run(self, transaction: RefactorTransaction) -> RefactorResult:
         """Simulate transaction without actually applying edits.
@@ -587,17 +596,17 @@ class AtomicRefactor:
         # Check if files exist and are writable
         for edit in transaction.edits:
             if edit.operation in ("modify", "delete", "rename"):
-                if not os.path.exists(edit.file_path):
-                    errors.append(f"File does not exist: {edit.file_path}")
-                elif not os.access(edit.file_path, os.W_OK):
-                    errors.append(f"File is not writable: {edit.file_path}")
+                if not os.path.exists(edit.path):
+                    errors.append(f"File does not exist: {edit.path}")
+                elif not os.access(edit.path, os.W_OK):
+                    errors.append(f"File is not writable: {edit.path}")
 
             if edit.operation == "create":
-                if os.path.exists(edit.file_path):
-                    errors.append(f"File already exists: {edit.file_path}")
+                if os.path.exists(edit.path):
+                    errors.append(f"File already exists: {edit.path}")
 
                 # Check if directory is writable
-                dir_path = os.path.dirname(edit.file_path)
+                dir_path = os.path.dirname(edit.path)
                 if dir_path and not os.access(dir_path, os.W_OK):
                     errors.append(f"Directory is not writable: {dir_path}")
 

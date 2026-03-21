@@ -47,6 +47,7 @@ from backend.controller.services import (
     TelemetryService,
 )
 from backend.controller.state.state import State
+from backend.core.constants import DEFAULT_PENDING_ACTION_TIMEOUT
 from backend.events import EventStream
 
 
@@ -72,6 +73,7 @@ class ControllerConfig:
     security_analyzer: SecurityAnalyzer | None = None
     delegate_task_blackboard_enabled: bool = False
     blackboard: Any = None  # Shared blackboard for worker agents when delegate_task_blackboard_enabled
+    pending_action_timeout: float = DEFAULT_PENDING_ACTION_TIMEOUT
 
 
 class ControllerServices:

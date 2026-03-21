@@ -15,6 +15,10 @@ from backend.memory.graph_store import GraphMemoryStore
 from backend.memory.memory_types import ContextAnchor, Decision, DecisionType
 from backend.memory.vector_store import EnhancedVectorStore
 
+# Caps for text injected into the leading system message (token control).
+_CONTEXT_SUMMARY_MAX_ANCHORS = 5
+_CONTEXT_SUMMARY_MAX_DECISIONS = 5
+
 
 class ContextTracker:
     """Manages decisions, context anchors, and optional vector memory.
@@ -108,18 +112,19 @@ class ContextTracker:
 
         if self.anchors:
             summary_parts.append("## Critical Context (Anchors)")
-            for anchor in sorted(
+            ranked = sorted(
                 self.anchors.values(), key=lambda x: x.importance, reverse=True
-            ):
+            )[:_CONTEXT_SUMMARY_MAX_ANCHORS]
+            for anchor in ranked:
                 summary_parts.append(f"- [{anchor.category.upper()}] {anchor.content}")
 
         if self.decisions:
             summary_parts.append("## Recent Decisions")
             recent = sorted(
                 self.decisions.values(), key=lambda x: x.timestamp, reverse=True
-            )[:5]
+            )[:_CONTEXT_SUMMARY_MAX_DECISIONS]
             for d in recent:
-                summary_parts.append(f"- {d.description} (Rationale: {d.rationale})")
+                summary_parts.append(f"- {d.description}")
 
         return "\n".join(summary_parts)
 

@@ -21,6 +21,8 @@ export interface SettingsResponse {
   llm_temperature?: number | null;
   llm_top_p?: number | null;
   llm_max_output_tokens?: number | null;
+  /** From server catalog — whether the selected llm_model supports image inputs. */
+  llm_model_supports_vision?: boolean;
   mcp_config?: MCPConfig | null;
   [key: string]: unknown;
 }

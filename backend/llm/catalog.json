@@ -616,6 +616,18 @@
       "max_output_tokens": 8192,
       "supports_function_calling": true
     },
+    "moonshotai/kimi-k2.5": {
+      "provider": "nvidia",
+      "aliases": [
+        "moonshotai/kimi-k2-5",
+        "kimi-k2.5",
+        "nvidia/moonshotai/kimi-k2.5"
+      ],
+      "max_input_tokens": 256000,
+      "max_output_tokens": 8192,
+      "supports_function_calling": true,
+      "supports_vision": true
+    },
     "qwen3": {
       "provider": "openai",
       "max_input_tokens": 128000,

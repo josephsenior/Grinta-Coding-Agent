@@ -244,7 +244,6 @@ class TestGetContextSummary:
 
         assert "## Recent Decisions" in summary
         assert "Use approach X" in summary
-        assert "Better performance" in summary
         assert "## Critical Context (Anchors)" not in summary
 
     def test_both_anchors_and_decisions_returns_both_sections(self):
@@ -324,11 +323,25 @@ class TestGetContextSummary:
 
         # Should have exactly 5 decisions (last 5 created)
         decision_lines = [
-            line
-            for line in summary.split("\n")
-            if line.startswith("- ") and "Rationale" in line
+            line for line in summary.split("\n") if line.startswith("- Decision ")
         ]
         assert len(decision_lines) == 5
+
+    def test_limits_anchors_to_five_highest_importance(self):
+        """Only the top 5 anchors by importance appear in the summary."""
+        tracker = ContextTracker()
+        for i in range(7):
+            tracker.add_anchor(f"Anchor {i}", "cat", importance=0.1 + i * 0.01)
+
+        summary = tracker.get_context_summary()
+        anchor_lines = [
+            line
+            for line in summary.split("\n")
+            if line.startswith("- [CAT]")
+        ]
+        assert len(anchor_lines) == 5
+        assert "Anchor 6" in summary
+        assert "Anchor 0" not in summary
 
 
 class TestStoreInMemory:

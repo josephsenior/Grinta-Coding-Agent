@@ -14,6 +14,8 @@ class TestAutonomyService(unittest.TestCase):
         self.mock_controller = MagicMock()
         self.mock_controller.circuit_breaker_service = MagicMock()
         self.mock_controller.retry_service = MagicMock()
+        # AutonomyService must not clobber the timeout set at controller construction.
+        self.mock_controller.PENDING_ACTION_TIMEOUT = 123.0
         self.service = AutonomyService(self.mock_controller)
 
     @patch("backend.controller.autonomy.AutonomyController")
@@ -32,8 +34,7 @@ class TestAutonomyService(unittest.TestCase):
         self.assertIsNone(self.mock_controller.safety_validator)
         self.assertIsNone(self.mock_controller.task_validator)
 
-        # Should set default timeout
-        self.assertEqual(self.mock_controller.PENDING_ACTION_TIMEOUT, 120.0)
+        self.assertEqual(self.mock_controller.PENDING_ACTION_TIMEOUT, 123.0)
 
         # Should reset retry metrics
         self.mock_controller.retry_service.reset_retry_metrics.assert_called_once()
@@ -165,7 +166,7 @@ class TestAutonomyService(unittest.TestCase):
         )
 
         self.assertEqual(self.mock_controller.task_validator, mock_composite_val)
-        self.assertEqual(self.mock_controller.PENDING_ACTION_TIMEOUT, 120.0)
+        self.assertEqual(self.mock_controller.PENDING_ACTION_TIMEOUT, 123.0)
 
     def test_initialize_task_validator_disabled(self):
         """Test _initialize_task_validator sets None when disabled."""
@@ -176,7 +177,7 @@ class TestAutonomyService(unittest.TestCase):
         self.service._initialize_task_validator(mock_agent)
 
         self.assertIsNone(self.mock_controller.task_validator)
-        self.assertEqual(self.mock_controller.PENDING_ACTION_TIMEOUT, 120.0)
+        self.assertEqual(self.mock_controller.PENDING_ACTION_TIMEOUT, 123.0)
 
     def test_initialize_task_validator_no_validation_config(self):
         """Test _initialize_task_validator handles missing validation config."""
@@ -225,9 +226,8 @@ class TestAutonomyService(unittest.TestCase):
         with patch("backend.controller.safety_validator.SafetyValidator"):
             self.service.initialize(mock_agent)
 
-        # Check logger.info was called for SafetyValidator
-        info_calls = [call[0][0] for call in mock_logger.info.call_args_list]
-        self.assertTrue(any("SafetyValidator enabled" in msg for msg in info_calls))
+        debug_calls = [call[0][0] for call in mock_logger.debug.call_args_list]
+        self.assertTrue(any("SafetyValidator enabled" in msg for msg in debug_calls))
 
     @patch("backend.controller.autonomy.AutonomyController")
     @patch("backend.controller.services.autonomy_service.logger")
@@ -249,9 +249,8 @@ class TestAutonomyService(unittest.TestCase):
                 with patch("backend.validation.task_validator.DiffValidator"):
                     self.service.initialize(mock_agent)
 
-        # Check logger.info was called for TaskValidator
-        info_calls = [call[0][0] for call in mock_logger.info.call_args_list]
-        self.assertTrue(any("TaskValidator enabled" in msg for msg in info_calls))
+        debug_calls = [call[0][0] for call in mock_logger.debug.call_args_list]
+        self.assertTrue(any("TaskValidator enabled" in msg for msg in debug_calls))
 
     @patch("backend.controller.autonomy.AutonomyController")
     def test_initialize_full_workflow(self, mock_autonomy_controller_class):

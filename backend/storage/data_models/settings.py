@@ -20,6 +20,13 @@ from pydantic.json import pydantic_encoder  # noqa: E402
 
 from backend.core.config.mcp_config import MCPConfig  # noqa: E402
 from backend.core.config.utils import load_forge_config  # noqa: E402
+from backend.core.constants import (  # noqa: E402
+    DEFAULT_KB_AUTO_SEARCH,
+    DEFAULT_KB_ENABLED,
+    DEFAULT_KB_RELEVANCE_THRESHOLD,
+    DEFAULT_KB_SEARCH_STRATEGY,
+    DEFAULT_KB_SEARCH_TOP_K,
+)
 from backend.storage.data_models.knowledge_base import KnowledgeBaseSettings  # noqa: E402
 from backend.storage.data_models.user_secrets import UserSecrets  # noqa: E402
 
@@ -46,122 +53,41 @@ class Settings(BaseModel):
     language: str | None = None
     agent: str | None = None
     max_iterations: int | None = None
-    security_analyzer: str | None = None
-    confirmation_mode: bool | None = None
-    llm_model: str | None = None
-    llm_api_key: SecretStr | None = None
-    llm_base_url: str | None = None
-    # Advanced LLM Configuration
-    llm_temperature: float | None = None
-    llm_top_p: float | None = None
-    llm_max_output_tokens: int | None = None
-    llm_timeout: int | None = None
-    llm_num_retries: int | None = None
-    llm_custom_llm_provider: str | None = None
-    llm_caching_prompt: bool | None = None
-    llm_disable_vision: bool | None = None
-    # Autonomy Configuration
-    autonomy_level: str | None = None
-    enable_permissions: bool | None = None
-    enable_checkpoints: bool | None = None
-    secrets_store: UserSecrets = Field(
-        default_factory=lambda: UserSecrets(), frozen=True
-    )
+
     enable_sound_notifications: bool = False
     enable_proactive_conversation_starters: bool = True
     enable_solvability_analysis: bool = True
-    enable_review_critics: bool = True
-    user_consents_to_analytics: bool | None = None
-    mcp_config: MCPConfig | None = None
-    # Knowledge Base Configuration
-    kb_enabled: bool = True
+
+    kb_enabled: bool = DEFAULT_KB_ENABLED
     kb_active_collection_ids: list[str] = Field(default_factory=list)
-    kb_search_top_k: int = 5
-    kb_relevance_threshold: float = 0.7
-    kb_auto_search: bool = True
-    kb_search_strategy: str = "hybrid"  # "hybrid", "semantic", "keyword"
-    max_budget_per_task: float | None = None
-    email: str | None = None
-    email_verified: bool | None = None
-    vcs_user_name: str | None = None
-    vcs_user_email: str | None = None
+    kb_search_top_k: int = DEFAULT_KB_SEARCH_TOP_K
+    kb_relevance_threshold: float = DEFAULT_KB_RELEVANCE_THRESHOLD
+    kb_auto_search: bool = DEFAULT_KB_AUTO_SEARCH
+    kb_search_strategy: str = DEFAULT_KB_SEARCH_STRATEGY
 
-    # Core & Runtime Configuration
-    runtime: str | None = None
-    file_store: str | None = None
-    file_store_path: str | None = None
-    workspace_base: str | None = None
-    workspace_mount_path_in_runtime: str | None = None
-    enable_browser: bool | None = None
-    cache_dir: str | None = None
-    max_budget_per_session: float | None = None
-    max_budget_per_day: float | None = None
-    debug: bool | None = None
-    disable_color: bool | None = None
-    conversation_max_age_seconds: int | None = None
-    max_concurrent_conversations: int | None = None
-    log_format: str | None = None
-    log_level: str | None = None
-    file_store_web_hook_url: str | None = None
-    file_store_web_hook_headers: dict[str, str] | None = None
-    file_store_web_hook_batch: bool | None = None
-    replay_trajectory_path: str | None = None
-    save_trajectory_path: str | None = None
-    save_screenshots_in_trajectory: bool | None = None
-    cli_multiline_input: bool | None = None
-    mcp_host: str | None = None
-    init_git_in_empty_workspace: bool | None = None
-    run_as_Forge: bool | None = None
-    file_uploads_max_file_size_mb: int | None = None
-    file_uploads_restrict_file_types: bool | None = None
-    file_uploads_allowed_extensions: list[str] | None = None
-
-    # Agent Optional Abilities
-    agent_enable_browsing: bool | None = None
-    agent_enable_llm_editor: bool | None = None
-    agent_enable_editor: bool | None = None
-    agent_enable_cmd: bool | None = None
-    agent_enable_think: bool | None = None
-    agent_enable_finish: bool | None = None
-    agent_enable_circuit_breaker: bool | None = None
-    agent_enable_graceful_shutdown: bool | None = None
-    agent_enable_history_truncation: bool | None = None
-    agent_enable_condensation_request: bool | None = None
-    # Parallel sub-agents: shared blackboard for coordination (off by default)
-    delegate_task_blackboard_enabled: bool = False
-
-    # Tool-level enable/disable flags (used by OrchestratorPlanner.build_toolset)
-    enable_task_tracker: bool | None = None
-    enable_check_tool_status: bool | None = None
-    enable_swarming: bool | None = None
-    enable_rollback: bool | None = None
-    enable_workspace_status: bool | None = None
-    enable_error_patterns: bool | None = None
-    enable_project_map: bool | None = None
-    enable_session_diff: bool | None = None
-    enable_working_memory: bool | None = None
-    enable_verify_state: bool | None = None
-    enable_meta_cognition: bool | None = None
-    enable_lsp_query: bool | None = None
-    enable_signal_progress: bool | None = None
-    enable_blackboard: bool | None = None
-    enable_verify_ui_change: bool | None = None
-
-    # Graph RAG Configurations
-    graph_rag_enabled: bool | None = None
-    graph_rag_persistence_path: str | None = None
-    graph_rag_graph_depth: int | None = None
-    graph_rag_max_seed_results: int | None = None
-
-    # Playbook Configuration
-    disabled_playbooks: list[str] | None = None
-    """Names of built-in or user playbooks to suppress for this session."""
+    llm_model: str | None = None
+    llm_api_key: SecretStr | None = None
+    llm_base_url: str | None = None
+    secrets_store: UserSecrets = Field(
+        default_factory=lambda: UserSecrets(), frozen=True
+    )
+    mcp_config: MCPConfig | None = None
 
     model_config = ConfigDict(validate_assignment=True)
 
+    @field_validator("agent")
+    @classmethod
+    def normalize_legacy_agent_names(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        if normalized.lower() in {"codeactagent", "codeact", "codact", "orchestrator"}:
+            return "Orchestrator"
+        return normalized
+
     @property
     def knowledge_base(self) -> KnowledgeBaseSettings:
-        """Returns the knowledge base settings as a KnowledgeBaseSettings object."""
         return KnowledgeBaseSettings(
             enabled=self.kb_enabled,
             active_collection_ids=self.kb_active_collection_ids,
@@ -214,25 +140,6 @@ class Settings(BaseModel):
             )
         data["secret_store"] = secret_store
         return data
-
-    @field_validator("agent", mode="before")
-    @classmethod
-    def normalize_legacy_agent_names(cls, v: str | None) -> str | None:
-        """Map deprecated/legacy agent names to current registry names."""
-        if not isinstance(v, str):
-            return v
-
-        normalized = v.strip()
-        if not normalized:
-            return None
-
-        legacy_map = {
-            "codeactagent": "Orchestrator",
-            "codeact": "Orchestrator",
-            "codact": "Orchestrator",
-            "orchestrator": "Orchestrator",
-        }
-        return legacy_map.get(normalized.lower(), normalized)
 
     @field_serializer("secrets_store")
     def secrets_store_serializer(self, secrets: UserSecrets, info: SerializationInfo):

@@ -32,7 +32,7 @@ _CORE_TOOLS = frozenset(
         "search_code",
         "explore_tree_structure",
         "read_symbol_definition",
-        "project_map",
+        "analyze_project_structure",
         # Reasoning
         "think",
         "finish",
@@ -41,7 +41,7 @@ _CORE_TOOLS = frozenset(
         # Memory — structured and unstructured memory mapped into one tool
         "memory_manager",
         # Verification
-        "verify_state",
+        "verify_file_lines",
         "verify_ui_change",
         # Meta-cognition — always available for expressing uncertainty and collaborating
         "communicate_with_user",
@@ -175,13 +175,13 @@ def _compute_allowed_tools(
         # Contextual tools — unlocked by specific conditions
         (turn >= 3 or is_complex_task, ["delegate_task", "shared_task_board"]),
 
-        (error_count >= 2, ["error_patterns", "revert_to_safe_state"]),
+        (error_count >= 2, ["query_error_solutions", "revert_to_checkpoint"]),
         (turn >= 5, ["checkpoint"]),
         (edit_count >= 3, ["session_diff"]),
         (turn <= 1 or post_condensation, ["workspace_status"]),
         (token_pct > 0.5, ["summarize_context"]),
         (bool(_MULTI_FILE_KEYWORDS.search(user_text)), ["apply_patch"]),
-        (error_count >= 1, ["check_tool_status", "query_toolbox"]),
+        (error_count >= 1, ["check_tool_status", "search_available_tools"]),
         (
             bool(_RESEARCH_KEYWORDS.search(user_text)),
             ["web_search"],

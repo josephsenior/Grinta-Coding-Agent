@@ -20,8 +20,8 @@ cd Forge
 poetry install
 python start_server.py
 
-# TUI (separate terminal)
-python -m tui
+# Web UI: start the server, then open http://localhost:3000
+uv run forge serve
 ```
 
 ## How to Contribute
@@ -53,10 +53,9 @@ python -m tui
 - Use `forge_logger` for logging (not `print()`)
 - Follow existing service decomposition patterns
 
-**TUI (Python / Textual):**
-- Follow Textual widget composition patterns
-- Keep screens focused on a single concern
-- Use `ForgeClient` for all network access (no direct httpx/socketio)
+**Python API client (`forge_client`):**
+- Keep `ForgeClient` as the single place for httpx + Socket.IO to the backend
+- Prefer extending `ForgeClient` over ad hoc httpx/socketio in scripts or tests
 
 ### Commit Convention
 
@@ -79,7 +78,7 @@ types: feat, fix, refactor, docs, test, chore, perf
 | `backend/memory/` | Context condensers, RAG, vector store |
 | `backend/core/` | Config (Pydantic), exceptions, schemas, logging |
 | `backend/security/` | Security analyzer, input validation |
-| `tui/` | Textual TUI (screens, widgets, client) |
+| `forge_client/` | Python HTTP + Socket.IO client for tests and scripts |
 
 ### Controller Service Map
 

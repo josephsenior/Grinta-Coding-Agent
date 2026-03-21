@@ -1,10 +1,12 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { inferMonacoLanguage } from "@/lib/monaco-language";
 
-export type ContextTab = "editor" | "terminal" | "diff" | "preview";
+export type WorkspaceView = "browse" | "editor" | "diff";
 
 export interface ContextPanelState {
-  activeTab: ContextTab;
+  /** browse = file tree + changes; editor / diff = full-height viewer */
+  workspaceView: WorkspaceView;
   // Editor state
   editorFilePath: string | null;
   editorContent: string | null;
@@ -13,13 +15,12 @@ export interface ContextPanelState {
   // Diff state
   diffFilePath: string | null;
   diffContent: string | null;
-  // Terminal state
+  // Legacy terminal buffer (optional; no dedicated tab)
   terminalLines: string[];
-  // Preview state
   previewUrl: string | null;
 
-  // Actions
-  setActiveTab: (tab: ContextTab) => void;
+  setWorkspaceView: (view: WorkspaceView) => void;
+  goToBrowse: () => void;
   openFile: (path: string, content: string) => void;
   openDiff: (path: string, diff: string) => void;
   appendTerminalOutput: (text: string) => void;
@@ -29,50 +30,9 @@ export interface ContextPanelState {
   resetPanel: () => void;
 }
 
-/** Infer Monaco language from file path extension. */
-function inferLanguage(path: string): string {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  const map: Record<string, string> = {
-    ts: "typescript",
-    tsx: "typescript",
-    js: "javascript",
-    jsx: "javascript",
-    py: "python",
-    rs: "rust",
-    go: "go",
-    java: "java",
-    rb: "ruby",
-    sh: "shell",
-    bash: "shell",
-    zsh: "shell",
-    json: "json",
-    yaml: "yaml",
-    yml: "yaml",
-    toml: "toml",
-    md: "markdown",
-    html: "html",
-    css: "css",
-    scss: "scss",
-    sql: "sql",
-    xml: "xml",
-    dockerfile: "dockerfile",
-    c: "c",
-    cpp: "cpp",
-    h: "c",
-    hpp: "cpp",
-    cs: "csharp",
-    swift: "swift",
-    kt: "kotlin",
-    php: "php",
-    lua: "lua",
-    r: "r",
-  };
-  return map[ext] || "plaintext";
-}
-
 export const useContextPanelStore = create<ContextPanelState>()(
   immer((set) => ({
-    activeTab: "editor",
+    workspaceView: "browse",
     editorFilePath: null,
     editorContent: null,
     editorLanguage: "plaintext",
@@ -82,31 +42,35 @@ export const useContextPanelStore = create<ContextPanelState>()(
     terminalLines: [],
     previewUrl: null,
 
-    setActiveTab: (tab) =>
+    setWorkspaceView: (view) =>
       set((state) => {
-        state.activeTab = tab;
+        state.workspaceView = view;
+      }),
+
+    goToBrowse: () =>
+      set((state) => {
+        state.workspaceView = "browse";
       }),
 
     openFile: (path, content) =>
       set((state) => {
         state.editorFilePath = path;
         state.editorContent = content;
-        state.editorLanguage = inferLanguage(path);
+        state.editorLanguage = inferMonacoLanguage(path);
         state.editorReadOnly = true;
-        state.activeTab = "editor";
+        state.workspaceView = "editor";
       }),
 
     openDiff: (path, diff) =>
       set((state) => {
         state.diffFilePath = path;
         state.diffContent = diff;
-        state.activeTab = "diff";
+        state.workspaceView = "diff";
       }),
 
     appendTerminalOutput: (text) =>
       set((state) => {
         state.terminalLines.push(text);
-        // Cap at 5000 lines
         if (state.terminalLines.length > 5000) {
           state.terminalLines = state.terminalLines.slice(-4000);
         }
@@ -120,7 +84,6 @@ export const useContextPanelStore = create<ContextPanelState>()(
     setPreviewUrl: (url) =>
       set((state) => {
         state.previewUrl = url;
-        if (url) state.activeTab = "preview";
       }),
 
     setEditorReadOnly: (readOnly) =>
@@ -128,10 +91,9 @@ export const useContextPanelStore = create<ContextPanelState>()(
         state.editorReadOnly = readOnly;
       }),
 
-    /** Reset all panel state — call on conversation change to prevent data leaking. */
     resetPanel: () =>
       set((state) => {
-        state.activeTab = "editor";
+        state.workspaceView = "browse";
         state.editorFilePath = null;
         state.editorContent = null;
         state.editorLanguage = "plaintext";

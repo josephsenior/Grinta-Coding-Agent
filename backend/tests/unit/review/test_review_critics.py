@@ -45,7 +45,7 @@ class TestCriticResult:
 class TestBaseCritic:
     def test_abc_cannot_instantiate(self):
         with pytest.raises(TypeError):
-            BaseCritic()  # type: ignore
+            BaseCritic()  # type: ignore  # pylint: disable=abstract-class-instantiated
 
     def test_concrete_subclass(self):
         class MyCritic(BaseCritic):

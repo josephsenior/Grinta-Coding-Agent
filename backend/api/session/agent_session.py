@@ -16,6 +16,7 @@ from backend.controller.agent_controller import ControllerConfig
 from backend.controller.replay import ReplayManager
 from backend.controller.state.state import State
 from backend.core.config import AgentConfig, ForgeConfig, LLMConfig
+from backend.core.enums import ErrorCategory
 from backend.core.errors import (
     RuntimeConnectError,
     SessionAlreadyActiveError,
@@ -31,10 +32,10 @@ from backend.core.provider_types import (
     ProviderTokenType,
     CustomSecret,
 )
-from backend.mcp_integration import add_mcp_tools_to_agent
+from backend.mcp_client import add_mcp_tools_to_agent
 from backend.memory.agent_memory import Memory
 from backend.runtime import RuntimeAcquireResult, runtime_orchestrator
-from backend.api.shared import get_event_service_adapter
+from backend.api.app_accessors import get_event_service_adapter
 from backend.api.types import LLMAuthenticationError
 from backend.api.utils.error_formatter import format_error_for_user
 from backend.storage.data_models.user_secrets import UserSecrets
@@ -45,6 +46,14 @@ from .constants import (
     WAIT_TIME_BEFORE_CLOSE,
     WAIT_TIME_BEFORE_CLOSE_INTERVAL,
 )
+
+_STARTUP_NOTIFY_UI_ONLY_CATEGORIES = frozenset({
+    ErrorCategory.AUTHENTICATION.value,
+    ErrorCategory.RATE_LIMIT.value,
+    ErrorCategory.AI_MODEL.value,
+    ErrorCategory.CONFIGURATION.value,
+    ErrorCategory.NETWORK.value,
+})
 
 if TYPE_CHECKING:
     from logging import LoggerAdapter
@@ -326,7 +335,7 @@ class AgentSession:
             model_name = llm_config.model or "the selected model"
             # Extract provider name from model if possible
             if "/" in model_name:
-                model_name.split("/")[0].title()
+                model_name = model_name.split("/")[0].title()
             elif (
                 "claude" in model_name.lower()
                 or "gpt" in model_name.lower()
@@ -578,14 +587,16 @@ class AgentSession:
 
     async def _handle_startup_failure_observations(self, ctx: StartupContext) -> None:
         """Handle error observations when session startup fails."""
-        # Format error for user-friendly display
-        error_content = self._format_startup_error(ctx)
+        error_content, notify_ui_only = self._startup_error_observation_payload(ctx)
 
         # Add error observation to the event stream so the UI can show it
         if self.event_stream:
             try:
                 self.event_stream.add_event(
-                    ErrorObservation(content=error_content),
+                    ErrorObservation(
+                        content=error_content,
+                        notify_ui_only=notify_ui_only,
+                    ),
                     EventSource.ENVIRONMENT,
                 )
                 from backend.events.observation import AgentStateChangedObservation
@@ -612,10 +623,10 @@ class AgentSession:
             except Exception as e:
                 self.logger.error("Failed to add startup failure observation to event stream: %s", e)
 
-    def _format_startup_error(self, ctx: StartupContext) -> str:
-        """Format the startup error for user display."""
+    def _startup_error_observation_payload(self, ctx: StartupContext) -> tuple[str, bool]:
+        """Return observation text and whether it is LLM/config noise (toast-only for UI)."""
         if not ctx.error_exception:
-            return ctx.error_msg or "Agent session failed to initialize"
+            return ctx.error_msg or "Agent session failed to initialize", False
 
         try:
             context: dict[str, Any] = {"session_id": self.sid}
@@ -630,10 +641,12 @@ class AgentSession:
                 ctx.error_exception,
                 context=context,
             )
-            return json.dumps(formatted_error)
+            category = formatted_error.get("category")
+            notify_ui_only = category in _STARTUP_NOTIFY_UI_ONLY_CATEGORIES
+            return json.dumps(formatted_error), notify_ui_only
         except Exception as format_err:
             self.logger.warning("Failed to format error: %s", format_err)
-            return ctx.error_msg or "Agent session failed to initialize"
+            return ctx.error_msg or "Agent session failed to initialize", False
 
     async def close(self) -> None:
         """Closes the Agent session, releasing all resources via try/finally."""
@@ -853,6 +866,7 @@ class AgentSession:
                 if self.runtime
                 else None,
                 delegate_task_blackboard_enabled=delegate_task_blackboard_enabled,
+                pending_action_timeout=self.config.pending_action_timeout,
             )
         )
         return (controller, initial_state is not None)
@@ -875,8 +889,8 @@ class AgentSession:
             user_id=user_id,
         )
         # Apply Knowledge Base settings if available
-        if user_settings and user_settings.knowledge_base:
-            kb_settings = user_settings.knowledge_base
+        kb_settings = getattr(user_settings, "knowledge_base", None) if user_settings else None
+        if kb_settings:
             # If we need to pass more settings to Memory, we can do it here
             # For now, KnowledgeBaseManager in Memory uses default settings
             # or we can add a method to Memory to update KB settings

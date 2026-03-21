@@ -91,7 +91,13 @@ class StepGuardService:
 
         # Check if we should auto-finish instead of sending another message
         # the agent ignores.
-        stuck_count = cb_service.circuit_breaker.stuck_detection_count if cb_service else 0
+        stuck_count = 0
+        if cb_service:
+            try:
+                raw_count = cb_service.circuit_breaker.stuck_detection_count
+                stuck_count = int(raw_count)
+            except (TypeError, ValueError, AttributeError):
+                stuck_count = 0
         if stuck_count >= 3 and await self._try_auto_finish(controller):
             return False  # Stop stepping — we finished the task
 
@@ -127,6 +133,29 @@ class StepGuardService:
         # Normalize all paths
         return {p.replace("\\", "/").strip("/").strip() for p in paths if p.strip()}
 
+    @staticmethod
+    def _task_requires_non_file_actions(text: str) -> bool:
+        """Best-effort check for tasks that require non-file steps.
+
+        Avoids prematurely telling the agent to call finish() when user asks for
+        actions like checkpoint, rollback, memory updates, or content mutation.
+        """
+        lowered = (text or "").lower()
+        markers = (
+            "checkpoint",
+            "rollback",
+            "restore",
+            "working memory",
+            "add a note",
+            "remember",
+            "update",
+            "modify",
+            "change",
+            "replace",
+            "edit",
+        )
+        return any(m in lowered for m in markers)
+
     def _inject_replan_directive(self, controller) -> None:
         """Inject a directive that forces the LLM to take real action.
 
@@ -136,69 +165,98 @@ class StepGuardService:
         """
         from backend.events.action import MessageAction
 
-        # Collect files already created (using normalized full paths)
         state = getattr(controller, "state", None)
         history = getattr(state, "history", []) if state else []
-        created_files = set()
+
+        created_files = self._collect_created_files(history)
+        task_files, task_text = self._extract_task_files_and_text(history, MessageAction)
+        requires_non_file_actions = self._task_requires_non_file_actions(task_text)
+        missing = {
+            tf for tf in task_files
+            if not any(cf == tf or cf.endswith("/" + tf) for cf in created_files)
+        }
+
+        msg, planning = self._build_stuck_recovery_message(
+            created_files, missing, requires_non_file_actions
+        )
+
+        error_obs = ErrorObservation(content=msg, error_id="STUCK_LOOP_RECOVERY")
+        controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
+
+        if state and hasattr(state, "set_planning_directive"):
+            state.set_planning_directive(planning, source="StepGuardService")
+
+    def _collect_created_files(self, history: list) -> set[str]:
+        """Collect normalized paths of files created via FileWrite/FileEdit."""
+        created = set()
         for e in history:
             if isinstance(e, (FileWriteAction, FileEditAction)):
                 p = getattr(e, "path", "") or ""
                 if p:
-                    created_files.add(self._normalize_path(p))
+                    created.add(self._normalize_path(p))
+        return created
 
-        # Extract file paths mentioned in the original user task
+    def _extract_task_files_and_text(
+        self, history: list, message_action_cls
+    ) -> tuple[set[str], str]:
+        """Extract task file paths and full task text from first user message."""
         task_files: set[str] = set()
+        task_text = ""
         for e in history:
-            if isinstance(e, MessageAction) and getattr(e, "source", None) == EventSource.USER:
+            if isinstance(e, message_action_cls) and getattr(e, "source", None) == EventSource.USER:
                 text = getattr(e, "content", "") or ""
                 if text:
+                    task_text = text
                     task_files = self._extract_task_files(text)
                 break
+        return task_files, task_text
 
-        # Match task files to created files using suffix matching
-        # (task says "src/app/page.tsx", agent creates "/workspace/src/app/page.tsx")
-        missing = set()
-        for tf in task_files:
-            if not any(cf == tf or cf.endswith("/" + tf) for cf in created_files):
-                missing.add(tf)
-
-        if created_files and not missing:
-            msg = (
-                "STUCK LOOP DETECTED — You are repeating read-only commands without progress.\n"
-                f"You have already created these files: {', '.join(sorted(created_files))}.\n"
+    def _build_stuck_recovery_message(
+        self,
+        created_files: set[str],
+        missing: set[str],
+        requires_non_file_actions: bool,
+    ) -> tuple[str, str]:
+        """Build stuck recovery message and planning directive."""
+        created_str = ", ".join(sorted(created_files))
+        if created_files and not missing and not requires_non_file_actions:
+            return (
+                f"STUCK LOOP DETECTED — You are repeating read-only commands without progress.\n"
+                f"You have already created these files: {created_str}.\n"
                 "All required files are written. Do NOT re-read or re-create them.\n"
                 "YOUR VERY NEXT ACTION MUST BE: call finish() to complete the task.\n"
-                "Do NOT run any more commands. Just call finish() NOW."
+                "Do NOT run any more commands. Just call finish() NOW.",
+                "STUCK RECOVERY: All files done. Call finish() now.",
             )
-            planning = "STUCK RECOVERY: All files done. Call finish() now."
-        elif created_files and missing:
-            msg = (
-                "STUCK LOOP DETECTED — You are repeating read-only commands without progress.\n"
-                f"Files ALREADY created (do NOT re-create): {', '.join(sorted(created_files))}.\n"
-                f"Files STILL MISSING (create these NOW): {', '.join(sorted(missing))}.\n"
-                "YOUR VERY NEXT ACTION MUST BE: create one of the missing files using str_replace_editor.\n"
-                "Do NOT run ls, cat, Get-Content, or any read command. Create the file immediately."
+        if created_files and not missing and requires_non_file_actions:
+            return (
+                f"STUCK LOOP DETECTED — You are repeating actions without progress.\n"
+                f"File creation appears complete: {created_str}.\n"
+                "But non-file steps remain (for example: update content, checkpoint/rollback, memory note).\n"
+                "Do NOT call checkpoint save repeatedly.\n"
+                "YOUR VERY NEXT ACTION MUST BE: execute the next unfinished non-file step.\n"
+                "Only call finish() after all requested steps are complete.",
+                "STUCK RECOVERY: File exists; complete remaining non-file steps, then finish.",
             )
-            planning = f"STUCK RECOVERY: Create missing files: {', '.join(sorted(missing))}. No ls/cat."
-        else:
-            msg = (
-                "STUCK LOOP DETECTED — You are repeating read-only commands without progress.\n"
-                "MANDATORY RECOVERY:\n"
-                "1. Do NOT run ls, dir, cat, Get-Content, or view.\n"
-                "2. Create the required files using str_replace_editor create.\n"
-                "3. When all files are created, call finish().\n"
-                "YOUR VERY NEXT ACTION MUST BE a file create or edit — nothing else."
+        if created_files and missing:
+            missing_str = ", ".join(sorted(missing))
+            return (
+                f"STUCK LOOP DETECTED — You are repeating read-only commands without progress.\n"
+                f"Files ALREADY created (do NOT re-create): {created_str}.\n"
+                f"Files STILL MISSING (create these NOW): {missing_str}.\n"
+                "YOUR VERY NEXT ACTION MUST BE: create one of the missing files using str_replace_editor command='create_file'.\n"
+                "Do NOT run any read command. Create the file immediately.",
+                f"STUCK RECOVERY: Create missing files: {missing_str}. No ls/cat.",
             )
-            planning = "STUCK RECOVERY: Create files now. No ls/cat/view."
-
-        # Use ErrorObservation so it renders as role='user' and survives
-        # _dedupe_system_messages (which drops all but the first system msg).
-        error_obs = ErrorObservation(content=msg, error_id="STUCK_LOOP_RECOVERY")
-        controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
-
-        state = getattr(controller, "state", None)
-        if state and hasattr(state, "set_planning_directive"):
-            state.set_planning_directive(planning, source="StepGuardService")
+        return (
+            "STUCK LOOP DETECTED — You are repeating read-only commands without progress.\n"
+            "MANDATORY RECOVERY:\n"
+            "1. Do NOT run any read command, including str_replace_editor command='view_file'.\n"
+            "2. Create the required files using str_replace_editor command='create_file'.\n"
+            "3. When all files are created, call finish().\n"
+            "YOUR VERY NEXT ACTION MUST BE a file create or edit — nothing else.",
+            "STUCK RECOVERY: Create files now. No read commands.",
+        )
 
     async def _check_recreation_auto_finish(self, controller) -> bool:
         """Auto-finish if the agent is in a sustained file recreation loop.

@@ -15,7 +15,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
             CmdRunAction(command="pip install flask"),
             CmdOutputObservation(content="Successfully installed", command="pip install flask", exit_code=0),
 
-            FileEditAction(path="test.py", command="str_replace", old_str="old", new_str="new"),
+            FileEditAction(path="test.py", command="replace_text", old_str="old", new_str="new"),
             ErrorObservation(content="Match not found"),
 
             CmdRunAction(command="pytest"),

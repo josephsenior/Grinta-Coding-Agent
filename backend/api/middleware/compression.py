@@ -76,120 +76,91 @@ class CompressionMiddleware:
         return response
 
     def _add_cache_headers(self, request: Request, response: Response) -> None:
-        """Add appropriate cache headers based on path.
-
-        Args:
-            request: FastAPI request
-            response: Response to add headers to
-
-        """
+        """Add appropriate cache headers based on path."""
         path = request.url.path
 
-        # Check if it's a static asset
-        for static_path in self.STATIC_PATHS:
-            if path.startswith(static_path) or path.endswith(
-                static_path.replace("/", "")
-            ):
-                response.headers["Cache-Control"] = (
-                    f"public, max-age={CACHE_LONG}, immutable"
-                )
-                response.headers["Vary"] = "Accept-Encoding"
-                return
+        if _set_static_cache_headers(path, response, self.STATIC_PATHS):
+            return
+        if request.method == "GET" and _set_api_cache_headers(path, response, self.CACHEABLE_API_PATHS):
+            return
 
-        # Check if it's a cacheable API endpoint (GET requests only)
-        if request.method == "GET":
-            for api_path, cache_time in self.CACHEABLE_API_PATHS.items():
-                if path.startswith(api_path):
-                    response.headers["Cache-Control"] = (
-                        f"public, max-age={cache_time}, must-revalidate"
-                    )
-                    response.headers["Vary"] = "Accept-Encoding"
-                    # Add ETag for validation
-                    if hasattr(response, "body"):
-                        etag = str(hash(response.body))
-                        response.headers["ETag"] = f'"{etag}"'
-                    return
-
-        # Default: No cache for dynamic content
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
 
     def _should_compress(self, request: Request, response: Response) -> bool:
-        """Determine if response should be compressed.
-
-        Args:
-            request: FastAPI request
-            response: Response to potentially compress
-
-        Returns:
-            True if compression should be applied
-
-        """
-        # Check if client accepts gzip
-        accept_encoding = request.headers.get("accept-encoding", "")
-        if "gzip" not in accept_encoding.lower():
+        """Determine if response should be compressed."""
+        if not _client_accepts_gzip(request):
             return False
-
-        # Check if response is already compressed
         if "content-encoding" in response.headers:
             return False
-
-        # Check content type (only compress text-based responses)
-        content_type = response.headers.get("content-type", "")
-        compressible_types = [
-            "application/json",
-            "text/",
-            "application/javascript",
-            "application/xml",
-        ]
-        if not any(ct in content_type for ct in compressible_types):
+        if not _is_compressible_content_type(response.headers.get("content-type", "")):
             return False
-
-        # Check response size
-        content_length = response.headers.get("content-length")
-        if content_length and int(content_length) < self.min_compress_size:
+        if _response_too_small(response, self.min_compress_size):
             return False
-
-        # Check if body exists
-        if not hasattr(response, "body") or not response.body:
-            return False
-
-        # Check body size
-        return not len(response.body) < self.min_compress_size
+        return True
 
     async def _compress_response(self, response: Response) -> None:
-        """Compress response body with gzip.
-
-        Args:
-            response: Response to compress
-
-        """
+        """Compress response body with gzip."""
         try:
-            # Get original body
             original_body = response.body
-
-            # Compress
             compressed_body = gzip.compress(original_body, compresslevel=6)
-
-            # Only use compression if it actually reduces size
             if len(compressed_body) < len(original_body):
                 response.body = compressed_body
                 response.headers["Content-Encoding"] = "gzip"
                 response.headers["Content-Length"] = str(len(compressed_body))
-
-                original_size = len(original_body)
-                compressed_size = len(compressed_body)
-                ratio = (1 - compressed_size / original_size) * 100
-
+                ratio = (1 - len(compressed_body) / len(original_body)) * 100
                 logger.debug(
                     "Compressed response: %sB -> %sB (%.1f%% reduction)",
-                    original_size,
-                    compressed_size,
+                    len(original_body),
+                    len(compressed_body),
                     ratio,
                 )
         except Exception as e:
             logger.warning("Failed to compress response: %s", e)
+
+
+def _set_static_cache_headers(path: str, response: "Response", static_paths: set) -> bool:
+    """Set long cache headers for static paths. Returns True if matched."""
+    for static_path in static_paths:
+        if path.startswith(static_path) or path.endswith(static_path.replace("/", "")):
+            response.headers["Cache-Control"] = f"public, max-age={CACHE_LONG}, immutable"
+            response.headers["Vary"] = "Accept-Encoding"
+            return True
+    return False
+
+
+def _set_api_cache_headers(path: str, response: "Response", cacheable_paths: dict) -> bool:
+    """Set cache headers for cacheable API paths. Returns True if matched."""
+    for api_path, cache_time in cacheable_paths.items():
+        if path.startswith(api_path):
+            response.headers["Cache-Control"] = f"public, max-age={cache_time}, must-revalidate"
+            response.headers["Vary"] = "Accept-Encoding"
+            if hasattr(response, "body"):
+                response.headers["ETag"] = f'"{hash(response.body)}"'
+            return True
+    return False
+
+
+def _client_accepts_gzip(request: "Request") -> bool:
+    """True if client Accept-Encoding includes gzip."""
+    return "gzip" in request.headers.get("accept-encoding", "").lower()
+
+
+def _is_compressible_content_type(content_type: str) -> bool:
+    """True if content type is compressible (text-based)."""
+    compressible = ("application/json", "text/", "application/javascript", "application/xml")
+    return any(ct in content_type for ct in compressible)
+
+
+def _response_too_small(response: "Response", min_size: int) -> bool:
+    """True if response body is smaller than min_size."""
+    content_length = response.headers.get("content-length")
+    if content_length and int(content_length) < min_size:
+        return True
+    if not hasattr(response, "body") or not response.body:
+        return True
+    return len(response.body) < min_size
 
 
 class ResponseSizeOptimizer:

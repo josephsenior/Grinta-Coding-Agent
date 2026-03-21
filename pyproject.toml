@@ -52,7 +52,6 @@ dependencies = [
   "tree-sitter-language-pack>=0.7.3,<0.8",
   "uvicorn>=0.30,<1",
   "whatthepatch>=1.0.6,<2",
-  "textual (>=3.0,<4)",
   "chromadb>=1.4,<2",
   "sentence-transformers>=5.2,<6",
   "transformers<4.47.0",
@@ -89,11 +88,11 @@ optional-dependencies.telemetry = [
 urls = { Repository = "https://github.com/Forge/Forge" }
 scripts.forge = "backend.cli.entry:main"
 scripts.Forge = "backend.cli.entry:main"
-scripts.forge-tui = "tui.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [
   "backend",
+  "forge_client",
 ]
 
 [tool.hatch.build.targets.wheel.force-include]
@@ -172,6 +171,7 @@ lint.pydocstyle.convention = "google"
 [tool.coverage.run]
 source = [
   "backend",
+  "forge_client",
 ]
 omit = [
   "*/tests/*",

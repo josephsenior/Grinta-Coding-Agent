@@ -181,7 +181,7 @@ Forge detects if the agent is looping by analyzing action patterns, semantic int
 
 ## 📖 Documentation
 
-- [User Guide](docs/USER_GUIDE.md) — LLM setup, autonomy modes, playbooks, and TUI usage.
+- [User Guide](docs/USER_GUIDE.md) — LLM setup, autonomy modes, playbooks, and web UI usage.
 - [Architecture](docs/ARCHITECTURE.md) — Deeper dive into the controller, events, and engine layers.
 - [Developer Guide](docs/DEVELOPER.md) — For contributors: project layout, internals, and patterns.
 - [API Reference](openapi.json) — Full OpenAPI 3.1 spec for the backend.

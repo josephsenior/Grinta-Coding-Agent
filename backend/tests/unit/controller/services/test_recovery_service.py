@@ -135,6 +135,19 @@ class TestRecoveryService(unittest.IsolatedAsyncioTestCase):
         assert result is not None
         self.assertIn("Authentication Error", result)
 
+    def test_format_llm_error_insufficient_quota(self):
+        """Test _format_llm_error for billing/quota exhaustion surfaced as auth."""
+        from backend.llm.exceptions import AuthenticationError
+
+        exc = AuthenticationError(
+            "429 insufficient_quota: please check your plan and billing details"
+        )
+        result = self.service._format_llm_error(exc)
+
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertIn("Billing", result)
+
     def test_format_llm_error_rate_limit(self):
         """Test _format_llm_error for rate limit error."""
         from backend.llm.exceptions import RateLimitError

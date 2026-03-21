@@ -27,9 +27,15 @@ def main() -> None:
             --timeout 300
     """
     warnings.filterwarnings("ignore", category=SyntaxWarning, module="pydub\\.utils")
-    port = int(os.environ.get("port") or os.environ.get("PORT") or "3000")
+    try:
+        port = int(os.environ.get("port") or os.environ.get("PORT") or "3000")
+    except ValueError:
+        port = 3000
     host = os.environ.get("HOST") or "0.0.0.0"
-    workers = int(os.environ.get("WORKERS") or "1")
+    try:
+        workers = int(os.environ.get("WORKERS") or "1")
+    except ValueError:
+        workers = 1
 
     # Suppress Uvicorn's default startup message and show custom one
     import sys

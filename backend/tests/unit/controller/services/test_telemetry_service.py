@@ -56,36 +56,6 @@ class TestTelemetryService(unittest.TestCase):
         # Check pipeline was initialized
         self.mock_context.initialize_tool_pipeline.assert_called_once()
 
-    @patch("backend.controller.tool_pipeline.PlanningMiddleware")
-    @patch("backend.controller.tool_pipeline.SafetyValidatorMiddleware")
-    @patch("backend.controller.tool_pipeline.CircuitBreakerMiddleware")
-    @patch("backend.controller.tool_pipeline.CostQuotaMiddleware")
-    @patch("backend.controller.rollback_middleware.RollbackMiddleware")
-    @patch("backend.controller.pre_exec_diff.PreExecDiffMiddleware")
-    @patch("backend.controller.tool_pipeline.LoggingMiddleware")
-    @patch("backend.controller.tool_pipeline.TelemetryMiddleware")
-    @patch("backend.controller.tool_result_validator.ToolResultValidator")
-    def test_initialize_tool_pipeline_with_planning(
-        self,
-        mock_validator,
-        mock_telemetry,
-        mock_logging,
-        mock_diff,
-        mock_rollback,
-        mock_cost,
-        mock_circuit,
-        mock_safety,
-        mock_planning,
-    ):
-        """Test initialize_tool_pipeline includes planning middleware when enabled."""
-        self.mock_context.agent_config.enable_planning_middleware = True
-        self.mock_context.agent_config.enable_reflection_middleware = False
-
-        self.service.initialize_tool_pipeline()
-
-        # Check planning middleware was created
-        mock_planning.assert_called_once_with(self.mock_controller)
-
     @patch("backend.controller.tool_pipeline.ReflectionMiddleware")
     @patch("backend.controller.tool_pipeline.SafetyValidatorMiddleware")
     @patch("backend.controller.tool_pipeline.CircuitBreakerMiddleware")

@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "./MarkdownContent";
-import { CardSectionLabel } from "./CardSectionLabel";
 import type { ActionEvent } from "@/types/events";
 
 interface MessageBubbleProps {
@@ -14,20 +13,18 @@ export function MessageBubble({ event }: MessageBubbleProps) {
   return (
     <div
       className={cn(
-        "max-w-[80%] rounded-lg p-3 text-sm",
-        isUser
-          ? "ml-auto bg-primary text-primary-foreground"
-          : "bg-muted",
+        "w-full text-[13px] leading-[1.65]",
+        isUser ? "flex justify-end" : "max-w-[min(100%,42rem)]",
       )}
     >
-      <CardSectionLabel
-        label={isUser ? "You" : "Assistant"}
-        className={cn(isUser ? "text-primary-foreground/70" : "text-muted-foreground")}
-      />
       {isUser ? (
-        <p className="whitespace-pre-wrap">{content}</p>
+        <div className="max-w-[min(100%,85%)] rounded-lg border border-border/50 bg-muted/60 px-3 py-2 text-foreground shadow-none dark:bg-muted/40">
+          <p className="whitespace-pre-wrap">{content}</p>
+        </div>
       ) : (
-        <MarkdownContent content={content} />
+        <div className="text-foreground [&_.prose]:text-[13px] [&_.prose]:leading-[1.65]">
+          <MarkdownContent content={content} className="prose-neutral" />
+        </div>
       )}
     </div>
   );

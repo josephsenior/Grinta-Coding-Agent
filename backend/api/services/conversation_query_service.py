@@ -16,10 +16,10 @@ from backend.api.schemas.conversation_info import ConversationInfo
 from backend.api.schemas.conversation_info_result_set import (
     ConversationInfoResultSet,
 )
-from backend.api.services.shared_dependencies import (
+from backend.api.services.dependencies import (
     require_conversation_manager as _require_conversation_manager,
 )
-from backend.api.shared import ConversationStoreImpl, config
+from backend.api.app_accessors import ConversationStoreImpl, config
 from backend.api.store_factory import get_conversation_store_instance
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.data_models.conversation_metadata import (

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 
 from backend.core.message import Message, TextContent
+from backend.events.observation import ErrorObservation
 from backend.memory.conversation_memory import ConversationMemory
 from backend.memory.memory_types import DecisionType
 from backend.memory.message_formatting import (
@@ -57,6 +58,32 @@ def _text_msg(role: str, text: str) -> Message:
 # ---------------------------------------------------------------------------
 # Static helpers
 # ---------------------------------------------------------------------------
+
+
+class TestErrorObservationNotifyUiOnly:
+    def test_notify_ui_only_skips_llm_message(self):
+        mem = _make_memory()
+        obs = ErrorObservation(
+            content="Authentication Error\n\ndetails",
+            notify_ui_only=True,
+        )
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message={},
+            max_message_chars=None,
+        )
+        assert out == []
+
+    def test_default_error_still_converted_for_llm(self):
+        mem = _make_memory()
+        obs = ErrorObservation(content="MCP server unreachable")
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message={},
+            max_message_chars=None,
+        )
+        assert len(out) == 1
+        assert out[0].role == "user"
 
 
 class TestStaticHelpers:

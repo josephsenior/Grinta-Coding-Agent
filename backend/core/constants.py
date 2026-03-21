@@ -27,7 +27,7 @@ def _parse_bool_env(var: str, default: str = "false") -> bool:
 # ── Core Identity & Limits ──────────────────────────────────────────
 FORGE_DEFAULT_AGENT = "Orchestrator"
 FORGE_MAX_ITERATIONS = (
-    500  # Increased from 100 for complex tasks with dynamic iteration management
+    10000  # effectively unlimited flexibility
 )
 
 # ── Workspace & Paths ───────────────────────────────────────────────
@@ -38,6 +38,8 @@ DEFAULT_CONFIG_FILE = "settings.json"
 # ── URLs ────────────────────────────────────────────────────────────
 GUIDE_URL = "https://docs.forge.dev/guide"
 TROUBLESHOOTING_URL = "https://docs.forge.dev/usage/troubleshooting"
+# Host:port for the Forge MCP HTTP endpoint (same process as default dev API :3000)
+DEFAULT_MCP_HOST = "localhost:3000"
 
 # ── Security ────────────────────────────────────────────────────────
 SECRET_PLACEHOLDER = "**********"
@@ -48,6 +50,8 @@ SETTINGS_CACHE_TTL = 60  # seconds
 # ── Timeouts & Thresholds ───────────────────────────────────────────
 GENERAL_TIMEOUT = 15
 COMPLETION_TIMEOUT = 30.0
+# Max seconds waiting for an observation matching a tool call before timing out.
+DEFAULT_PENDING_ACTION_TIMEOUT = 180.0
 
 # ── Threshold Constants ─────────────────────────────────────────────
 MAX_LINES_TO_EDIT = 300
@@ -82,7 +86,7 @@ DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_ENABLE_BROWSER = True
 
 # ── Runtime Defaults ────────────────────────────────────────────────
-DEFAULT_RUNTIME_TIMEOUT = 120
+DEFAULT_RUNTIME_TIMEOUT = 900
 DEFAULT_RUNTIME_CLOSE_DELAY = 60
 DEFAULT_RUNTIME_AUTO_LINT_ENABLED = True
 DEFAULT_RUNTIME_KEEP_ALIVE = False
@@ -129,9 +133,6 @@ DEFAULT_AGENT_CMD_ENABLED = True
 DEFAULT_AGENT_THINK_ENABLED = True
 DEFAULT_AGENT_FINISH_ENABLED = True
 DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = False
-DEFAULT_AGENT_EDITOR_ENABLED = True
-DEFAULT_AGENT_LLM_EDITOR_ENABLED = False
-DEFAULT_AGENT_ULTIMATE_EDITOR_ENABLED = False
 DEFAULT_AGENT_HISTORY_TRUNCATION_ENABLED = True
 DEFAULT_AGENT_PLAN_MODE_ENABLED = True
 DEFAULT_AGENT_MCP_ENABLED = True
@@ -151,6 +152,8 @@ DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED = True
 DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = False
 DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME = "system_prompt.j2"
 DEFAULT_AGENT_CLI_MODE = False
+DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT = True
+DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY = False
 DEFAULT_FORGE_MCP_CONFIG_CLS = "backend.core.config.mcp_config.ForgeMCPConfig"
 DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS = 5
 DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS = 10
@@ -176,24 +179,6 @@ DEFAULT_GRAPH_RAG_MAX_SEED_RESULTS = 10
 DEFAULT_REPLAY_TRAJECTORY_PATH = None
 DEFAULT_SAVE_TRAJECTORY_PATH = None
 DEFAULT_SAVE_SCREENSHOTS_IN_TRAJECTORY = False
-
-# ── Tool Reduction Defaults ─────────────────────────────────────────
-DEFAULT_ENABLE_TASK_TRACKER = True
-DEFAULT_ENABLE_CHECK_TOOL_STATUS = False
-DEFAULT_ENABLE_SWARMING = False
-DEFAULT_ENABLE_ROLLBACK = False
-DEFAULT_ENABLE_WORKSPACE_STATUS = False
-DEFAULT_ENABLE_ERROR_PATTERNS = False
-DEFAULT_ENABLE_CHECKPOINTS = False
-DEFAULT_ENABLE_PROJECT_MAP = False
-DEFAULT_ENABLE_SESSION_DIFF = False
-DEFAULT_ENABLE_WORKING_MEMORY = False
-DEFAULT_ENABLE_VERIFY_STATE = False
-DEFAULT_ENABLE_META_COGNITION = False
-DEFAULT_ENABLE_LSP_QUERY = False
-DEFAULT_ENABLE_SIGNAL_PROGRESS = False
-DEFAULT_ENABLE_BLACKBOARD = False
-DEFAULT_ENABLE_VERIFY_UI_CHANGE = False
 
 # ── API & Server ────────────────────────────────────────────────────
 API_VERSION_V1 = "v1"

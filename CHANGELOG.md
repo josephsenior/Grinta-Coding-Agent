@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Removed the Textual TUI; the React web UI is the sole interactive interface. Extracted
+  `ForgeClient` into the top-level `forge_client` package for tests and scripts.
 - **BREAKING**: All API endpoints migrated from `/api/*` to `/api/v1/*` for versioning
   - Update client code to use `/api/v1/` base URL (e.g., `/api/conversations` → `/api/v1/conversations`)
 - Removed all cloud runtime dependencies (e2b, modal, runloop-api-client, daytona) for local-first architecture
@@ -34,7 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Broke up `conversation_memory.py` (1709→4 focused modules)
 - Broke up `config/utils.py` (43KB→4 focused modules)
 - Trimmed base dependencies: moved `asyncpg`, `libtmux` to optional groups
-- Replaced React frontend with Textual TUI (~14 Python files vs ~638 TypeScript files)
 - Consolidated editor tools — `str_replace_editor` is the primary, others deprecated
 - Improved CLI entry point with `forge init` command
 

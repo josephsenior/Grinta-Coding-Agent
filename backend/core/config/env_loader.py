@@ -42,7 +42,10 @@ def _is_dict_or_list_type(field_type: Any) -> bool:
 
 
 def _process_list_items(cast_value: list, field_type: Any) -> list:
-    inner_type = get_args(field_type)[0]
+    args = get_args(field_type)
+    if not args:
+        return cast_value
+    inner_type = args[0]
     if isinstance(inner_type, type) and issubclass(inner_type, BaseModel):
         return [
             inner_type(**item) if isinstance(item, dict) else item

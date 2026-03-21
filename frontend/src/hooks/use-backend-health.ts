@@ -21,7 +21,8 @@ export function useBackendHealth() {
   const { data, isError, isLoading } = useQuery({
     queryKey: ["backend-health"],
     queryFn: fetchHealth,
-    refetchInterval: 10_000,
+    refetchInterval: (query) =>
+      query.state.status === "error" || query.state.fetchFailureCount > 0 ? 4_000 : 10_000,
     retry: 0,
     staleTime: 8_000,
   });

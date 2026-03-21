@@ -62,8 +62,10 @@ from backend.runtime.file_operations import (
     truncate_large_text,
     write_file_content,
 )
+from backend.runtime.browser_init import init_browser
 from backend.runtime.file_viewer_server import start_file_viewer_server
 from backend.runtime.mcp.proxy import MCPProxyManager
+from backend.runtime.plugin_loader import init_plugins
 from backend.runtime.plugins import ALL_PLUGINS, Plugin
 from backend.runtime.server_routes import (
     register_exception_handlers,
@@ -163,18 +165,7 @@ class ActionExecutor:
 
     async def _init_browser_async(self) -> None:
         """Initialize the browser asynchronously."""
-        if not self.enable_browser:
-            return
-
-        try:
-            logger.info("Initializing browser environment...")
-            from backend.runtime.browser.browser_env import BrowserEnv
-
-            self.browser = BrowserEnv()
-            logger.info("Browser environment initialized successfully")
-        except Exception as e:
-            logger.error("Failed to initialize browser: %s", e)
-            self.browser = None
+        self.browser = await init_browser(self.enable_browser)
 
     async def _ensure_browser_ready(self) -> None:
         """Ensure the browser is ready for use."""
@@ -235,8 +226,7 @@ class ActionExecutor:
 
             # Step 3: Initialize plugins
             logger.info("Step 3/5: Initializing plugins...")
-            for plugin in self.plugins_to_load:
-                await self._init_plugin(plugin)
+            self.plugins = await init_plugins(self.plugins_to_load, self.username)
 
             # Step 4: Initialize bash commands/aliases
             logger.info("Step 4/5: Setting up bash commands...")
@@ -261,11 +251,6 @@ class ActionExecutor:
     def initialized(self) -> bool:
         """Check if action execution server has completed initialization."""
         return self._initialized
-
-    async def _init_plugin(self, plugin: Plugin):
-        self.plugins[plugin.name] = plugin
-        await plugin.initialize(self.username)
-        logger.info("Plugin %s initialized", plugin.name)
 
     def _init_bash_commands(self):
         # We need to set up some aliases and functions in bash for better UX
@@ -663,7 +648,7 @@ class ActionExecutor:
         """Handle file reading using the FILE_EDITOR implementation."""
         result_str, _ = execute_file_editor(
             self.file_editor,
-            command="view",
+            command="view_file",
             path=action.path,
             view_range=action.view_range,
         )
@@ -736,7 +721,7 @@ class ActionExecutor:
         """Return directory view observation if path is dir and viewable; else None."""
         try:
             if os.path.isdir(filepath) and (
-                action.command == "view" or not action.command
+                action.command == "view_file" or not action.command
             ):
                 return handle_directory_view(filepath, path_for_obs)
         except Exception:
@@ -766,7 +751,7 @@ class ActionExecutor:
         result_str = truncate_large_text(result_str, max_chars, label="edit")
         # P1-B: Append a short unified diff to the observation so the LLM can
         # confirm what changed without a follow-up view call.
-        if old_content is not None and new_content is not None and command != "view":
+        if old_content is not None and new_content is not None and command != "view_file":
             try:
                 diff = get_diff(old_content, new_content, action.path)
                 if diff:
@@ -775,7 +760,7 @@ class ActionExecutor:
                 pass  # diff is a nice-to-have; never block the observation
         # Blast Radius Hook
         # If the edit is successful and there's new content, check symbol references
-        if old_content is not None and new_content is not None and command != "view":
+        if old_content is not None and new_content is not None and command != "view_file":
             try:
                 from backend.utils.blast_radius import check_blast_radius_from_code
 
@@ -815,7 +800,7 @@ class ActionExecutor:
             diff = get_diff(old_content, new_content, action.path)
 
             # Blast Radius Hook
-            if command != "view":
+            if command != "view_file":
                 try:
                     from backend.utils.blast_radius import check_blast_radius_from_code
 
@@ -834,7 +819,7 @@ class ActionExecutor:
                 impl_source=FileEditSource.LLM_BASED_EDIT,
             )
         # Blast Radius Hook
-        if old_content is not None and new_content is not None and command != "view":
+        if old_content is not None and new_content is not None and command != "view_file":
             try:
                 from backend.utils.blast_radius import check_blast_radius_from_code
 
@@ -879,7 +864,7 @@ class ActionExecutor:
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
         """Execute an MCP tool call using Forge's MCP client integration."""
         try:
-            from backend.mcp_integration.utils import (
+            from backend.mcp_client.utils import (
                 call_tool_mcp,
                 create_mcps,
             )

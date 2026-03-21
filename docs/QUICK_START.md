@@ -17,7 +17,7 @@ This script handles everything:
 - Checks for `uv` and Python versions
 - Syncs dependencies
 - Discover local models (Ollama/LM Studio)
-- Starts the Unified Interface (Backend + TUI)
+- Starts the Forge server (web UI at http://localhost:3000)
 
 ## Option 2: Manual start
 
@@ -27,19 +27,23 @@ This script handles everything:
 uv sync
 ```
 
-### 2) Start Unified Interface
+### 2) Start the server
 
 ```powershell
-uv run forge all
+uv run forge serve
 ```
 
-Or start separately:
+Same as `uv run forge all` / `uv run forge start` (aliases). Or run the backend only:
 
-- **Backend:** `uv run python start_server.py`
-- **TUI:** `uv run forge-tui`
+```powershell
+uv run python start_server.py
+```
+
+Then open **http://localhost:3000** in a browser.
 
 ## URLs
 
+- Web UI: http://localhost:3000
 - Backend API: http://localhost:3000/api
 - API docs: http://localhost:3000/docs
 

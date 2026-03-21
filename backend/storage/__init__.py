@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.storage.local import LocalFileStore
-from backend.storage.in_memory import InMemoryFileStore
+from backend.storage.in_memory_file_store import InMemoryFileStore
 
 if TYPE_CHECKING:
     from backend.storage.files import FileStore

@@ -64,26 +64,28 @@ class TestFileEditorView:
 
     def test_view_existing_file(self):
         self._write("hello.txt", "line1\nline2\nline3\n")
-        result = self.editor(command="view", path="hello.txt")
+        result = self.editor(command="view_file", path="hello.txt")
         assert result.error is None
         assert "line1" in result.output
         assert "line2" in result.output
 
     def test_view_with_line_numbers(self):
         self._write("nums.txt", "a\nb\nc\nd\ne\n")
-        result = self.editor(command="view", path="nums.txt")
+        result = self.editor(command="view_file", path="nums.txt")
         # Should have cat -n style numbering
         assert "1\t" in result.output
 
     def test_view_with_range(self):
         self._write("range.txt", "a\nb\nc\nd\ne\n")
-        result = self.editor(command="view", path="range.txt", view_range=[2, 4])
+        result = self.editor(
+            command="view_file", path="range.txt", view_range=[2, 4]
+        )
         assert result.error is None
         assert "b" in result.output
         assert "d" in result.output
 
     def test_view_nonexistent_file(self):
-        result = self.editor(command="view", path="nope.txt")
+        result = self.editor(command="view_file", path="nope.txt")
         assert result.error is not None
         assert (
             "not found" in result.error.lower() or "validation" in result.error.lower()
@@ -91,7 +93,7 @@ class TestFileEditorView:
 
     def test_view_directory_is_error(self):
         (Path(self.tmpdir) / "subdir").mkdir()
-        result = self.editor(command="view", path="subdir")
+        result = self.editor(command="view_file", path="subdir")
         assert result.error is not None
 
 
@@ -113,8 +115,10 @@ class TestFileEditorWrite:
         content = (Path(self.tmpdir) / "new.txt").read_text()
         assert content == "hello world"
 
-    def test_create_alias(self):
-        result = self.editor(command="create", path="created.txt", file_text="data")
+    def test_create_file_command(self):
+        result = self.editor(
+            command="create_file", path="created.txt", file_text="data"
+        )
         assert result.error is None
 
     def test_write_overwrites(self):

@@ -1,4 +1,4 @@
-"""Batch edit tool — atomic multi-file str_replace edits with rollback.
+"""Batch edit tool — atomic multi-file replace_text edits with rollback.
 
 Accepts a list of {path, old_str, new_str} operations and applies them all
 or none (rollback on first failure). This eliminates partial-apply states
@@ -22,7 +22,7 @@ from backend.events.action import CmdRunAction
 BATCH_EDIT_TOOL_NAME = "batch_edit"
 
 _DESCRIPTION = (
-    "Apply multiple str_replace edits atomically — all succeed or all roll back.\n\n"
+    "Apply multiple replace_text edits atomically — all succeed or all roll back.\n\n"
     "Provide a list of edit operations. Each operation must have:\n"
     "  - `path`: absolute path to the file\n"
     "  - `old_str`: exact text to find (must be unique in the file)\n"

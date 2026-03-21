@@ -25,7 +25,7 @@ from backend.api.middleware.socketio_connection_manager import get_connection_ma
 from backend.api.services.conversation_service import (
     setup_init_conversation_settings,
 )
-from backend.api.shared import (
+from backend.api.app_accessors import (
     get_conversation_manager,
     sio,
 )

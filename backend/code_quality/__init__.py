@@ -4,6 +4,6 @@ Provides advanced code quality checks with multiple backend support (ruff, pylin
 and proper error formatting. Fully self-contained implementation.
 """
 
-from backend.code_quality.impl import DefaultLinter, LintError, LintResult
+from backend.code_quality.linter import DefaultLinter, LintError, LintResult
 
 __all__ = ["DefaultLinter", "LintResult", "LintError"]

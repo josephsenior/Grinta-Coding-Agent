@@ -5,7 +5,7 @@ import socketio  # type: ignore[import-untyped]
 
 from backend.core.logger import forge_logger as logger
 from backend.api.app import app as base_app
-from backend.api.shared import sio
+from backend.api.app_accessors import sio
 
 # Import Socket.IO handlers to register them - this MUST be after sio is imported
 try:

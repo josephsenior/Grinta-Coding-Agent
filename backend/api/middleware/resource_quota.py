@@ -30,6 +30,102 @@ if TYPE_CHECKING:
 _quota_store: dict[str, dict[str, Any]] = defaultdict(dict)
 
 
+def _get_cleaned_api_calls(user_id: str, now: float) -> list[float] | None:
+    """Get user's api_calls filtered to last hour; remove empty non-anonymous entries."""
+    user_quota = _quota_store[user_id]
+    if "api_calls" not in user_quota:
+        user_quota["api_calls"] = []
+
+    api_calls = user_quota["api_calls"]
+    api_calls[:] = _filter_recent_calls(api_calls, now, window_sec=3600)
+
+    if not api_calls and user_id != "anonymous":
+        _quota_store.pop(user_id, None)
+        return None
+    return api_calls
+
+
+def _filter_recent_calls(calls: list[float], now: float, window_sec: int) -> list[float]:
+    """Filter calls to those within window_sec of now."""
+    return [t for t in calls if now - t < window_sec]
+
+
+def _purge_stale_quota_entries(now: float) -> None:
+    """Remove user entries with no calls in the last hour when store is large."""
+    if len(_quota_store) <= 100:
+        return
+    stale = [uid for uid, uq in _quota_store.items() if _is_stale_quota_entry(uq, now)]
+    for uid in stale:
+        del _quota_store[uid]
+
+
+_QUOTA_EXCLUDED_PATHS = frozenset({
+    "/health",
+    "/api/monitoring/health",
+    "/alive",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+})
+_QUOTA_EXCLUDED_PREFIXES = ("/api/auth", "/api/options")
+
+
+def _is_quota_excluded_path(path: str, normalized_path: str) -> bool:
+    """True if path should skip quota checks (health, auth, options, docs)."""
+    if normalized_path in _QUOTA_EXCLUDED_PATHS:
+        return True
+    return (
+        normalized_path.startswith(_QUOTA_EXCLUDED_PREFIXES)
+        or path.startswith(_QUOTA_EXCLUDED_PREFIXES)
+    )
+
+
+def _is_stale_quota_entry(uq: dict, now: float) -> bool:
+    """True if entry has api_calls and last call was over an hour ago."""
+    calls = uq.get("api_calls")
+    if not calls:
+        return False
+    return now - calls[-1] > 3600
+
+
+def _rate_limit_error_hourly(
+    api_calls: list[float], quota: ResourceQuota, now: float
+) -> JSONResponse | None:
+    """Return 429 error if hourly limit exceeded."""
+    if len(api_calls) < quota.max_api_calls_per_hour:
+        return None
+    retry_after = 3600 - int(now - api_calls[0]) if api_calls else 3600
+    return error(
+        message="API call rate limit exceeded (hourly)",
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        error_code="RATE_LIMIT_EXCEEDED",
+        details={
+            "limit": quota.max_api_calls_per_hour,
+            "window": "1 hour",
+            "retry_after": retry_after,
+        },
+    )
+
+
+def _rate_limit_error_per_minute(
+    recent_calls: list[float], quota: ResourceQuota, now: float
+) -> JSONResponse | None:
+    """Return 429 error if per-minute limit exceeded."""
+    if len(recent_calls) < quota.max_api_calls_per_minute:
+        return None
+    retry_after = 60 - int(now - recent_calls[0]) if recent_calls else 60
+    return error(
+        message="API call rate limit exceeded (per minute)",
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        error_code="RATE_LIMIT_EXCEEDED",
+        details={
+            "limit": quota.max_api_calls_per_minute,
+            "window": "1 minute",
+            "retry_after": retry_after,
+        },
+    )
+
+
 @dataclass
 class ResourceQuota:
     """Resource quota configuration per user plan."""
@@ -93,31 +189,9 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
         if not self.enabled:
             return await call_next(request)
 
-        # Skip quota checks for public endpoints and authentication endpoints
-        # Authentication endpoints should never be rate-limited to allow users to register/login
-        # Public options endpoints are also excluded as they're called frequently on page load
         path = request.url.path
-
-        # Normalize path (remove trailing slash and query params for comparison)
         normalized_path = path.split("?")[0].rstrip("/")
-
-        # Check exclusions (must be checked FIRST before any rate limiting)
-        # Use both normalized and original path for maximum compatibility
-        is_excluded = (
-            normalized_path
-            in {
-                "/health",
-                "/api/monitoring/health",
-                "/alive",
-                "/docs",
-                "/redoc",
-                "/openapi.json",
-            }
-            or normalized_path.startswith(("/api/auth", "/api/options"))
-            or path.startswith(("/api/auth", "/api/options"))
-        )
-
-        if is_excluded:
+        if _is_quota_excluded_path(path, normalized_path):
             logger.debug(
                 "Resource quota check skipped for excluded path: %s (normalized: %s)",
                 path,
@@ -125,30 +199,20 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
             )
             return await call_next(request)
 
-        user_id = getattr(request.state, "user_id", None)
-        if not user_id:
-            # Anonymous users get free tier limits
-            user_id = "anonymous"
-
-        # Get user's quota plan (default to free)
+        user_id = getattr(request.state, "user_id", None) or "anonymous"
         user_plan = self._get_user_plan(user_id)
         quota = QUOTA_PLANS.get(user_plan, QUOTA_PLANS["free"])
 
-        # Check API call rate limits
         rate_limit_error = self._check_rate_limits(user_id, quota)
         if rate_limit_error:
             return rate_limit_error
 
-        # Track API call
         self._track_api_call(user_id)
-
-        # Add quota headers to response
         response = await call_next(request)
         response.headers["X-Quota-Plan"] = user_plan
         response.headers["X-Quota-Remaining-Calls"] = str(
             self._get_remaining_calls(user_id, quota)
         )
-
         return response
 
     def _get_user_plan(self, user_id: str) -> str:
@@ -162,65 +226,18 @@ class ResourceQuotaMiddleware(BaseHTTPMiddleware):
     ) -> JSONResponse | None:
         """Check if user has exceeded rate limits."""
         now = time.time()
+        _purge_stale_quota_entries(now)
 
-        # Periodic sweep: remove stale user entries (no calls in last hour)
-        if len(_quota_store) > 100:
-            stale = [
-                uid
-                for uid, uq in _quota_store.items()
-                if uq.get("api_calls") and now - uq["api_calls"][-1] > 3600
-            ]
-            for uid in stale:
-                del _quota_store[uid]
-
-        user_quota = _quota_store[user_id]
-
-        # Initialize tracking if needed
-        if "api_calls" not in user_quota:
-            user_quota["api_calls"] = []
-
-        api_calls = user_quota["api_calls"]
-
-        # Clean old calls (older than 1 hour)
-        api_calls[:] = [call_time for call_time in api_calls if now - call_time < 3600]
-
-        # Remove user entry if no calls remain
-        if not api_calls and user_id != "anonymous":
-            _quota_store.pop(user_id, None)
+        api_calls = _get_cleaned_api_calls(user_id, now)
+        if api_calls is None:
             return None
 
-        # Check hourly limit
-        if len(api_calls) >= quota.max_api_calls_per_hour:
-            return error(
-                message="API call rate limit exceeded (hourly)",
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                error_code="RATE_LIMIT_EXCEEDED",
-                details={
-                    "limit": quota.max_api_calls_per_hour,
-                    "window": "1 hour",
-                    "retry_after": 3600 - int(now - api_calls[0])
-                    if api_calls
-                    else 3600,
-                },
-            )
+        hourly_err = _rate_limit_error_hourly(api_calls, quota, now)
+        if hourly_err:
+            return hourly_err
 
-        # Check per-minute limit (last 60 seconds)
-        recent_calls = [call_time for call_time in api_calls if now - call_time < 60]
-        if len(recent_calls) >= quota.max_api_calls_per_minute:
-            return error(
-                message="API call rate limit exceeded (per minute)",
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                error_code="RATE_LIMIT_EXCEEDED",
-                details={
-                    "limit": quota.max_api_calls_per_minute,
-                    "window": "1 minute",
-                    "retry_after": 60 - int(now - recent_calls[0])
-                    if recent_calls
-                    else 60,
-                },
-            )
-
-        return None
+        recent = [t for t in api_calls if now - t < 60]
+        return _rate_limit_error_per_minute(recent, quota, now)
 
     def _track_api_call(self, user_id: str) -> None:
         """Track an API call for rate limiting."""

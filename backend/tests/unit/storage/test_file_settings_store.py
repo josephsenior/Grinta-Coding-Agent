@@ -140,8 +140,13 @@ class TestFileSettingsStoreStore:
 
         with (
             patch(
-                "backend.storage.settings.file_settings_store.model_dump_json",
-                return_value='{"language": "python"}',
+                "backend.storage.settings.file_settings_store.model_dump_with_options",
+                return_value={
+                    "llm_model": None,
+                    "llm_api_key": None,
+                    "llm_base_url": None,
+                    "mcp_config": None,
+                },
             ),
             patch(
                 "backend.storage.settings.file_settings_store.call_sync_from_async",

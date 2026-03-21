@@ -22,6 +22,7 @@ from backend.core.config.utils import load_forge_config
 
 import json
 import os
+import time
 from pathlib import Path
 
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME, SEMANTIC_RECALL_TOOL_NAME
@@ -178,29 +179,11 @@ def build_recall_action(key: str) -> AgentThinkAction:
     if key in notes:
         return AgentThinkAction(thought=f"[SCRATCHPAD] [{key}] = {notes[key]!r}")
     return AgentThinkAction(thought=f"[SCRATCHPAD] (no note for [{key}])")
-"""Structured working memory tool — a cognitive workspace that survives condensation.
-
-Unlike the flat key→value scratchpad (note/recall), working memory provides
-structured sections that map to how an LLM agent actually thinks:
-- hypothesis: current theory or approach
-- findings: discovered facts and evidence
-- blockers: obstacles and unresolved issues
-- file_context: key files and their roles
-- decisions: architectural/implementation choices made
-
-All sections persist to ``.forge/working_memory.json`` and are automatically
-injected into post-condensation recovery context, ensuring the agent never
-loses its cognitive workspace even after history compression.
-"""
-
-from __future__ import annotations
-from backend.core.config.utils import load_forge_config
 
 
-import json
-import os
-import time
-from pathlib import Path
+# ---------------------------------------------------------------------------
+# Working memory tool (structured cognitive workspace)
+# ---------------------------------------------------------------------------
 
 from backend.engines.orchestrator.contracts import ChatCompletionToolParam
 from backend.engines.orchestrator.tools.common import create_tool_definition

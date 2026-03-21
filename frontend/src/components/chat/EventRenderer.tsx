@@ -1,9 +1,10 @@
 import { ActionType, ObservationType } from "@/types/agent";
 import type { ForgeEvent, ActionEvent, ObservationEvent } from "@/types/events";
+import { isNotifyUiOnlyErrorEvent } from "@/lib/error-observation";
 import { MessageBubble } from "./MessageBubble";
-import { ThinkCard, ThoughtTray } from "./ThinkCard";
 import { FileCard } from "./FileCard";
 import { CommandCard, CommandOutputCard } from "./CommandCard";
+import { CollapsibleToolOutput } from "./CollapsibleToolOutput";
 import {
   FinishCard,
   RejectCard,
@@ -14,13 +15,11 @@ import {
   ProposalCard,
   UncertaintyCard,
   DelegateCard,
-  CondensationCard,
   ErrorCard,
   McpObservationCard,
   BrowseObservationCard,
   DelegateResultCard,
   RecallFailureCard,
-  AgentStateChangedPill,
 } from "./EventCards";
 
 interface EventCardProps {
@@ -35,8 +34,6 @@ export function EventCard({ event }: EventCardProps) {
       switch (action.action) {
       case ActionType.MESSAGE:
         return <MessageBubble event={action} />;
-      case ActionType.THINK:
-        return <ThinkCard event={action} />;
       case ActionType.READ:
       case ActionType.WRITE:
       case ActionType.EDIT:
@@ -67,7 +64,11 @@ export function EventCard({ event }: EventCardProps) {
         return <DelegateCard event={action} />;
       case ActionType.RECALL:
       case ActionType.CONDENSATION:
-        return <CondensationCard event={action} />;
+      case ActionType.SUMMARIZE_CONTEXT:
+        return null;
+
+      case ActionType.THINK:
+        return null;
 
       // Silent / internal actions
       case ActionType.NULL:
@@ -88,7 +89,7 @@ export function EventCard({ event }: EventCardProps) {
         // Fallback for unhandled action types
         if (!action.message) return null;
         return (
-          <div className="rounded-lg border p-2 text-xs text-muted-foreground">
+          <div className="rounded-md border border-border/50 bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
             [{action.action}] {action.message}
           </div>
         );
@@ -98,14 +99,6 @@ export function EventCard({ event }: EventCardProps) {
     const node = renderAction();
     if (!node) return null;
     
-    if (action.args?.thought && action.action !== ActionType.THINK && action.action !== ActionType.MESSAGE) {
-      return (
-        <div className="flex flex-col gap-1 w-full m-0 p-0">
-          <ThoughtTray thought={String(action.args.thought)} />
-          {node}
-        </div>
-      );
-    }
     return node;
   }
 
@@ -117,6 +110,9 @@ export function EventCard({ event }: EventCardProps) {
       case ObservationType.TERMINAL:
         return <CommandOutputCard event={obs} />;
       case ObservationType.ERROR:
+        if (isNotifyUiOnlyErrorEvent(obs)) {
+          return null;
+        }
         return <ErrorCard event={obs} />;
       case ObservationType.MCP:
         return <McpObservationCard event={obs} />;
@@ -127,7 +123,7 @@ export function EventCard({ event }: EventCardProps) {
       case ObservationType.RECALL_FAILURE:
         return <RecallFailureCard event={obs} />;
       case ObservationType.AGENT_STATE_CHANGED:
-        return <AgentStateChangedPill event={obs} />;
+        return null;
 
       // Observations that are rendered contextually or silently
       case ObservationType.READ:
@@ -136,12 +132,14 @@ export function EventCard({ event }: EventCardProps) {
         // File observation content — show if non-empty
         if (obs.content) {
           return (
-            <div className="rounded-lg border bg-zinc-950 p-3 text-xs">
-              <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-mono text-zinc-300">
-                {obs.content.length > 2000
-                  ? obs.content.slice(0, 2000) + "\n..."
-                  : obs.content}
-              </pre>
+            <div className="rounded-md border border-border/50 bg-muted/25 p-2.5">
+              <CollapsibleToolOutput
+                content={obs.content}
+                previewLines={6}
+                collapseWhenLines={12}
+                collapseWhenChars={2500}
+                preClassName="rounded border border-border/30 bg-background/50 p-2 dark:bg-background/25"
+              />
             </div>
           );
         }
@@ -151,7 +149,7 @@ export function EventCard({ event }: EventCardProps) {
       case ObservationType.CHAT:
         if (obs.content) {
           return (
-            <div className="max-w-[80%] rounded-lg bg-muted p-3 text-sm">
+            <div className="max-w-[min(100%,42rem)] text-[13px] leading-[1.65] text-foreground">
               <p className="whitespace-pre-wrap">{obs.content}</p>
             </div>
           );
@@ -159,13 +157,7 @@ export function EventCard({ event }: EventCardProps) {
         return null;
 
       case ObservationType.CONDENSE:
-        return (
-          <div className="flex justify-center py-1">
-            <span className="rounded-full bg-muted px-3 py-0.5 text-[11px] text-muted-foreground">
-              Telemetry compacted
-            </span>
-          </div>
-        );
+        return null;
 
       case ObservationType.NULL:
       case ObservationType.STATUS:
@@ -181,7 +173,7 @@ export function EventCard({ event }: EventCardProps) {
       default:
         if (!obs.content && !obs.message) return null;
         return (
-          <div className="rounded-lg border p-2 text-xs text-muted-foreground">
+          <div className="rounded-md border border-border/50 bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
             [{obs.observation}] {obs.content || obs.message}
           </div>
         );

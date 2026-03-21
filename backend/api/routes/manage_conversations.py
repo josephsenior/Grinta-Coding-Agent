@@ -50,7 +50,7 @@ from backend.api.services.session_init_service import (
     validate_remote_api_request,
     verify_repository_access,
 )
-from backend.api.services.shared_dependencies import get_file_store
+from backend.api.services.dependencies import get_file_store
 from backend.api.types import LLMAuthenticationError, MissingSettingsError
 from backend.api.user_auth import (
     get_provider_tokens,

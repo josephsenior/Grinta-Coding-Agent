@@ -11,7 +11,7 @@ Common issues, their causes, and proven solutions.
 3. [LLM Provider Issues](#llm-provider-issues)
 4. [Agent Behavior Issues](#agent-behavior-issues)
 5. [Runtime Issues](#runtime-issues)
-6. [TUI Issues](#tui-issues)
+6. [Web UI Issues](#web-ui-issues)
 7. [Performance Issues](#performance-issues)
 8. [Windows-Specific Issues](#windows-specific-issues)
 9. [Diagnostic Commands](#diagnostic-commands)
@@ -82,8 +82,8 @@ kill -9 <pid>
 Or change the port:
 ```bash
 python start_server.py --port 3001
-forge-tui --port 3001
 ```
+Then open `http://localhost:3001` in your browser.
 
 ### Config file errors
 
@@ -185,7 +185,7 @@ for this.
 
 **Fix:**
 1. The circuit breaker will auto-pause after threshold is hit
-2. If it doesn't trigger, interrupt manually (`Ctrl+C` in TUI)
+2. If it doesn't trigger, stop the agent from the web UI or restart the server
 3. Provide more specific instructions
 4. Try a different model
 
@@ -271,34 +271,22 @@ python start_server.py --workspace /path/to/your/project
 
 ---
 
-## TUI Issues
+## Web UI Issues
 
-### TUI won't connect
+### Browser shows connection refused
 
-**Symptom:** `Connection refused` or `Cannot connect to backend`
+**Symptom:** `Connection refused` or blank page at `http://localhost:3000`
 
 **Fix:**
-1. Ensure the backend is running: `python start_server.py`
-2. Check the port matches: `forge-tui --port 3000`
+1. Ensure the backend is running: `python start_server.py` or `uv run forge serve`
+2. Use the same host/port printed in the server logs (default **3000**)
 3. Verify no firewall is blocking localhost
 
-### Display rendering issues
-
-**Symptom:** Garbled output, broken characters, layout issues
+### Page loads but Socket.IO disconnects
 
 **Fix:**
-1. Use a terminal with Unicode support (Windows Terminal, iTerm2, etc.)
-2. Ensure terminal is at least 80x24 characters
-3. Try disabling color: set `disable_color = true` in `[core]`
-
-### Key bindings not working
-
-**Symptom:** Keyboard shortcuts don't respond
-
-**Fix:**
-1. Click inside the TUI window to ensure focus
-2. Some terminals intercept certain key combinations
-3. Try different terminal emulators
+1. Check browser devtools → Network for WebSocket errors
+2. Confirm you are not mixing `http`/`https` or wrong origin with reverse proxies
 
 ---
 

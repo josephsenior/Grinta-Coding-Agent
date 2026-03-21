@@ -91,7 +91,7 @@ class ActionType(str, Enum):
     ESCALATE = "escalate"
     DELEGATE_TASK = "delegate_task"
     BLACKBOARD = "blackboard"
-    QUERY_TOOLBOX = "query_toolbox"
+    SEARCH_AVAILABLE_TOOLS = "search_available_tools"
     LSP_QUERY = "lsp_query"
     SIGNAL_PROGRESS = "signal_progress"
 

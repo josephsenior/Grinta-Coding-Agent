@@ -167,15 +167,15 @@ class FileVerificationGuard:
     # Stale-read prevention
     # ------------------------------------------------------------------ #
 
-    def record_file_read(self, file_path: str, turn: int) -> None:
+    def record_file_read(self, path: str, turn: int) -> None:
         """Record that a file was read at the given turn."""
-        self._file_read_turns[file_path] = turn
+        self._file_read_turns[path] = turn
 
-    def record_file_modification(self, file_path: str, turn: int) -> None:
+    def record_file_modification(self, path: str, turn: int) -> None:
         """Record that a file was modified at the given turn."""
-        self._file_modified_turns[file_path] = turn
+        self._file_modified_turns[path] = turn
 
-    def is_stale_read(self, file_path: str, current_turn: int) -> bool:
+    def is_stale_read(self, path: str, current_turn: int) -> bool:
         """Check whether the LLM's knowledge of a file is stale.
 
         A file is considered stale if:
@@ -184,14 +184,14 @@ class FileVerificationGuard:
         - It was last read more than `_stale_threshold` turns ago
 
         Args:
-            file_path: The file path to check
+            path: The file path to check
             current_turn: The current turn number
 
         Returns:
             True if the file content is likely stale in the LLM's context
         """
-        last_read = self._file_read_turns.get(file_path)
-        last_modified = self._file_modified_turns.get(file_path)
+        last_read = self._file_read_turns.get(path)
+        last_modified = self._file_modified_turns.get(path)
 
         # Never been read
         if last_read is None:
@@ -207,17 +207,17 @@ class FileVerificationGuard:
 
         return False
 
-    def _create_stale_read_action(self, file_path: str) -> Action | None:
+    def _create_stale_read_action(self, path: str) -> Action | None:
         """Create a command to re-read a stale file before editing."""
         from backend.events.action import FileReadAction
 
         try:
             return FileReadAction(
-                path=file_path,
+                path=path,
                 start=1,
                 end=200,
                 thought=(
-                    f"[STALE-READ PREVENTION] Re-reading {file_path} before edit — "
+                    f"[STALE-READ PREVENTION] Re-reading {path} before edit — "
                     f"file content may have changed since last read."
                 ),
             )
@@ -254,51 +254,51 @@ class FileVerificationGuard:
     def _append_verification_action(
         self, enhanced_actions: list[Action], action: Action, turn: int
     ) -> None:
-        file_path = self._safe_file_path(action)
-        if not file_path:
+        path = self._safe_file_path(action)
+        if not path:
             return
-        verification_cmd = self._create_verification_command(file_path)
+        verification_cmd = self._create_verification_command(path)
         if verification_cmd is None:
             return
-        self._register_file_operation(file_path, turn)
+        self._register_file_operation(path, turn)
         enhanced_actions.append(verification_cmd)
-        self._record_verification(file_path)
+        self._record_verification(path)
 
     @staticmethod
     def _safe_file_path(action: Action) -> str | None:
-        file_path = getattr(action, "path", None)
-        if isinstance(file_path, str) and file_path.strip():
-            return file_path
+        path = getattr(action, "path", None)
+        if isinstance(path, str) and path.strip():
+            return path
         return None
 
-    def _create_verification_command(self, file_path: str) -> Action | None:
+    def _create_verification_command(self, path: str) -> Action | None:
         from backend.events.action import FileReadAction
 
         try:
             # Cross-platform, runtime-native verification: re-read a small preview.
             # Deeper checks (existence/line count) are handled in runtime verification.
             return FileReadAction(
-                path=file_path,
+                path=path,
                 start=1,
                 end=200,
-                thought=f"[AUTO-VERIFY] Re-reading {file_path} after file operation",
+                thought=f"[AUTO-VERIFY] Re-reading {path} after file operation",
             )
         except Exception:  # pragma: no cover - defensive
             return None
 
-    def _register_file_operation(self, file_path: str, turn: int) -> None:
+    def _register_file_operation(self, path: str, turn: int) -> None:
         self.pending_file_operations.append(
             FileOperationContext(
                 operation_type="edit",
-                file_paths=[file_path],
+                file_paths=[path],
                 verified=False,
                 turn_started=turn,
             )
         )
 
-    def _record_verification(self, file_path: str) -> None:
+    def _record_verification(self, path: str) -> None:
         self.stats["verifications_injected"] += 1
-        logger.info("✓ Auto-injected verification for %s", file_path)
+        logger.info("✓ Auto-injected verification for %s", path)
 
     def validate_response(
         self, response_text: str, actions: list[Action]
@@ -365,12 +365,12 @@ class FileVerificationGuard:
 
         return list(set(claims))  # Deduplicate
 
-    def mark_operation_verified(self, file_path: str) -> None:
+    def mark_operation_verified(self, path: str) -> None:
         """Mark a file operation as verified."""
         for op in self.pending_file_operations:
-            if file_path in op.file_paths:
+            if path in op.file_paths:
                 op.verified = True
-                logger.debug("✓ Marked %s as verified", file_path)
+                logger.debug("✓ Marked %s as verified", path)
 
     def get_unverified_operations(self) -> list[FileOperationContext]:
         """Get list of unverified file operations."""

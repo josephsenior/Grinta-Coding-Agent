@@ -55,7 +55,7 @@ def create_registry_and_conversation_stats(
     user_config = config
     if user_settings:
         user_config = setup_llm_config(config, user_settings)
-    agent_cls = user_settings.agent if user_settings else None
+    agent_cls = getattr(user_settings, "agent", None) if user_settings else None
     llm_registry = LLMRegistry(user_config, agent_cls)
     file_store = get_file_store(
         file_store_type=config.file_store,

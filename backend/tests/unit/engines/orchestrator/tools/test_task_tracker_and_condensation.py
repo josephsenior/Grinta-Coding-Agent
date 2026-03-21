@@ -9,7 +9,7 @@ from backend.engines.orchestrator.tools.task_tracker import (
 )
 from backend.engines.orchestrator.tools.condensation_request import (
     _CONDENSATION_REQUEST_DESCRIPTION,
-    create_condensation_request_tool,
+    create_summarize_context_tool,
 )
 
 
@@ -120,13 +120,13 @@ class TestTaskTrackerDescriptionConstant:
 
 
 # ---------------------------------------------------------------------------
-# create_condensation_request_tool
+# create_summarize_context_tool
 # ---------------------------------------------------------------------------
 
 
 class TestCreateCondensationRequestTool:
     def setup_method(self):
-        self.tool = create_condensation_request_tool()
+        self.tool = create_summarize_context_tool()
 
     def test_returns_dict(self):
         assert isinstance(self.tool, dict)
@@ -134,8 +134,8 @@ class TestCreateCondensationRequestTool:
     def test_type_is_function(self):
         assert self.tool.get("type") == "function"
 
-    def test_name_is_request_condensation(self):
-        assert _func(self.tool)["name"] == "request_condensation"
+    def test_name_is_summarize_context(self):
+        assert _func(self.tool)["name"] == "summarize_context"
 
     def test_description_set(self):
         desc = _func(self.tool).get("description", "")

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -21,14 +20,6 @@ if TYPE_CHECKING:
 
     from .safety import OrchestratorSafetyManager
 
-
-PLAIN_CHAT_PATTERNS = [
-    r"^\s*(hi|hello|hey)\b",
-    r"\b(say|reply with)\s+(hello|hi|hey)\b",
-    r"\b(thanks|thank you)\b",
-    r"\bhow are you\b",
-    r"\bwho are you\b",
-]
 
 # Markers that appear only in system-injected user messages (workspace context,
 # playbook knowledge, knowledge-base results) — never in human-typed messages.
@@ -99,7 +90,7 @@ class OrchestratorPlanner:
         self._add_core_tools(tools, use_short_desc)
         self._add_browsing_tool(tools)
         self._add_editor_tools(tools, use_short_desc)
-        self._add_mcp_gateway_tool(tools)
+        self._add_execute_mcp_tool_tool(tools)
 
         # Invalidate cached checked-tools when toolset is rebuilt
         self._checked_tools_cache = None
@@ -138,7 +129,7 @@ class OrchestratorPlanner:
             tools.append(create_finish_tool())
         if getattr(self._config, "enable_condensation_request", False):
             tools.append(create_summarize_context_tool())
-        if getattr(self._config, "enable_note", True) or getattr(self._config, "enable_working_memory", False):
+        if getattr(self._config, "enable_working_memory", True):
             tools.append(create_memory_manager_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
@@ -150,8 +141,8 @@ class OrchestratorPlanner:
         from backend.engines.orchestrator.tools.task_tracker import (
             create_task_tracker_tool,
         )
-        from backend.engines.orchestrator.tools.query_toolbox import (
-            create_query_toolbox_tool,
+        from backend.engines.orchestrator.tools.search_available_tools import (
+            create_search_available_tools_tool,
         )
         from backend.engines.orchestrator.tools.search_code import (
             create_search_code_tool,
@@ -165,7 +156,7 @@ class OrchestratorPlanner:
             tools.append(create_apply_patch_tool())
             tools.append(create_batch_edit_tool())
         if getattr(self._config, "enable_internal_task_tracker", True):
-            tools.append(create_query_toolbox_tool())
+            tools.append(create_search_available_tools_tool())
             tools.append(create_task_tracker_tool())
         if getattr(self._config, "enable_search_code", True):
             tools.append(create_search_code_tool())
@@ -195,8 +186,8 @@ class OrchestratorPlanner:
         from backend.engines.orchestrator.tools.delegate_task import (
             create_delegate_task_tool,
         )
-        from backend.engines.orchestrator.tools.revert_to_safe_state import (
-            create_revert_to_safe_state_tool,
+        from backend.engines.orchestrator.tools.revert_to_checkpoint import (
+            create_revert_to_checkpoint_tool,
         )
         from backend.engines.orchestrator.tools.lsp_query import create_lsp_query_tool
         from backend.engines.orchestrator.tools.signal_progress import (
@@ -224,7 +215,7 @@ class OrchestratorPlanner:
         if getattr(self._config, "enable_blackboard", False):
             tools.append(create_blackboard_tool())
         if getattr(self._config, "enable_rollback", False):
-            tools.append(create_revert_to_safe_state_tool())
+            tools.append(create_revert_to_checkpoint_tool())
         self._add_lazy_import_tools(
             tools,
             [
@@ -235,13 +226,13 @@ class OrchestratorPlanner:
                     "create_workspace_status_tool",
                 ),
                 (
-                    "enable_error_patterns",
+                    "enable_query_error_solutions",
                     False,
-                    "error_patterns",
-                    "create_error_patterns_tool",
+                    "query_error_solutions",
+                    "create_query_error_solutions_tool",
                 ),
                 ("enable_checkpoints", False, "checkpoint", "create_checkpoint_tool"),
-                ("enable_project_map", False, "project_map", "create_project_map_tool"),
+                ("enable_analyze_project_structure", False, "analyze_project_structure", "create_analyze_project_structure_tool"),
                 (
                     "enable_session_diff",
                     False,
@@ -249,10 +240,10 @@ class OrchestratorPlanner:
                     "create_session_diff_tool",
                 ),
                 (
-                    "enable_verify_state",
+                    "enable_verify_file_lines",
                     False,
-                    "verify_state",
-                    "create_verify_state_tool",
+                    "verify_file_lines",
+                    "create_verify_file_lines_tool",
                 ),
             ],
         )
@@ -307,17 +298,17 @@ class OrchestratorPlanner:
                 create_structure_editor_tool(use_short_description=use_short_tool_desc)
             )
 
-    def _add_mcp_gateway_tool(self, tools: list) -> None:
+    def _add_execute_mcp_tool_tool(self, tools: list) -> None:
         """Add the MCP gateway proxy tool when MCP is enabled.
 
         The gateway replaces injecting 50+ individual MCP tool schemas.
         Available MCP tool names are listed in the system prompt instead.
         """
         if getattr(self._config, "enable_mcp", True):
-            from backend.engines.orchestrator.tools.mcp_gateway import (
-                create_mcp_gateway_tool,
+            from backend.engines.orchestrator.tools.execute_mcp_tool import (
+                create_execute_mcp_tool_tool,
             )
-            tools.append(create_mcp_gateway_tool())
+            tools.append(create_execute_mcp_tool_tool())
 
     def record_tool_used(self, tool_name: str) -> None:
         """Record that a tool was used this session (for description tiers)."""
@@ -334,17 +325,13 @@ class OrchestratorPlanner:
         state: State,
         tools: list[ChatCompletionToolParam],
     ) -> dict:
-        last_user_msg = self._get_last_user_message(messages) or ""
         tool_choice = self._determine_tool_choice(messages, state)
-        disable_tools_for_turn = self._is_plain_chat_request(last_user_msg)
 
         # NOTE: We inject control/status messages *after* tool selection so
         # tool selection heuristics see the original user/assistant content.
 
         # Progressive tool disclosure: filter tools based on context
-        if disable_tools_for_turn:
-            tools = []
-        elif getattr(self._config, "enable_progressive_tools", True):
+        if getattr(self._config, "enable_progressive_tools", True):
             tools = self._tool_selector.select_tools(tools, state, messages)
 
         # Apply three-tier tool descriptions
@@ -426,216 +413,240 @@ class OrchestratorPlanner:
         current = getattr(iter_flag, "current_value", None)
         if current is None:
             return messages
-        max_val = getattr(iter_flag, "max_value", None)
 
-        # Build context status block
+        parts = self._build_turn_context_parts(state)
+        planning_directive, memory_pressure, rep_score = self._extract_turn_signals(
+            state
+        )
+        parts = self._append_signal_parts(parts, memory_pressure, rep_score)
+
+        status = "<FORGE_CONTEXT_STATUS " + " | ".join(parts) + " />"
+        status += self._build_context_pressure_warning(parts, memory_pressure)
+        status += self._build_repetition_warning(rep_score)
+        status += self._build_first_turn_orientation(state)
+        status += self._build_active_plan_section(state)
+        if planning_directive:
+            status += f"\n<FORGE_DIRECTIVE>\n{planning_directive}\n</FORGE_DIRECTIVE>"
+
+        tool_hints = self._get_tool_hints(messages)
+        if tool_hints:
+            status += f"\n<TOOL_HINTS>{tool_hints}</TOOL_HINTS>"
+
+        return self._apply_control_message(messages, status)
+
+    def _build_turn_context_parts(self, state: State) -> list[str]:
+        """Build the core context status parts (turn, tokens, budget, history)."""
+        iter_flag = getattr(state, "iteration_flag", None)
+        max_val = getattr(iter_flag, "max_value", None) if iter_flag else None
+        current = getattr(iter_flag, "current_value", None) if iter_flag else None
         parts = [f"turn={current}" + (f"/{max_val}" if max_val else "")]
 
-        # Token usage from metrics
         metrics = getattr(state, "metrics", None)
         if metrics:
-            atu = getattr(metrics, "accumulated_token_usage", None)
-            if atu:
-                prompt_tok = getattr(atu, "prompt_tokens", 0)
-                comp_tok = getattr(atu, "completion_tokens", 0)
-                ctx_window = getattr(atu, "context_window", 0)
-                try:
-                    prompt_tok = int(prompt_tok)
-                except Exception:
-                    prompt_tok = 0
-                try:
-                    comp_tok = int(comp_tok)
-                except Exception:
-                    comp_tok = 0
-                try:
-                    ctx_window = int(ctx_window)
-                except Exception:
-                    ctx_window = 0
-                if prompt_tok or comp_tok:
-                    parts.append(f"tokens_used={prompt_tok + comp_tok}")
-                if ctx_window:
-                    parts.append(f"context_window={ctx_window}")
+            self._append_token_usage_parts(metrics, parts)
+            self._append_budget_parts(metrics, parts)
 
-            # Budget info
-            cost = getattr(metrics, "accumulated_cost", 0.0)
-            budget = getattr(metrics, "max_budget_per_task", None)
-            try:
-                cost = float(cost)
-            except Exception:
-                cost = 0.0
-            try:
-                budget_val = float(budget) if budget is not None else None
-            except Exception:
-                budget_val = None
-
-            if cost > 0:
-                budget_str = f"cost=${cost:.4f}"
-                if budget_val is not None:
-                    budget_str += f"/${budget_val:.2f}"
-                parts.append(budget_str)
-
-        # History event count
         history = getattr(state, "history", [])
         if history:
             parts.append(f"history_events={len(history)}")
+        return parts
 
-        # Turn signals (typed), with fallbacks for older sessions.
-        planning_directive = None
-        memory_pressure = None
+    def _append_token_usage_parts(self, metrics: Any, parts: list[str]) -> None:
+        """Append token usage and context window to parts."""
+        atu = getattr(metrics, "accumulated_token_usage", None)
+        if not atu:
+            return
+        prompt_tok = self._safe_int(getattr(atu, "prompt_tokens", 0))
+        comp_tok = self._safe_int(getattr(atu, "completion_tokens", 0))
+        ctx_window = self._safe_int(getattr(atu, "context_window", 0))
+        if prompt_tok or comp_tok:
+            parts.append(f"tokens_used={prompt_tok + comp_tok}")
+        if ctx_window:
+            parts.append(f"context_window={ctx_window}")
 
+    def _append_budget_parts(self, metrics: Any, parts: list[str]) -> None:
+        """Append cost/budget info to parts."""
+        cost = self._safe_float(getattr(metrics, "accumulated_cost", 0.0)) or 0.0
+        if cost <= 0:
+            return
+        budget = getattr(metrics, "max_budget_per_task", None)
+        budget_val = self._safe_float(budget) if budget is not None else None
+        budget_str = f"cost=${cost:.4f}"
+        if budget_val is not None:
+            budget_str += f"/${budget_val:.2f}"
+        parts.append(budget_str)
+
+    @staticmethod
+    def _safe_int(val: Any) -> int:
+        try:
+            return int(val)
+        except Exception:
+            return 0
+
+    @staticmethod
+    def _safe_float(val: Any) -> float | None:
+        if val is None:
+            return None
+        try:
+            return float(val)
+        except Exception:
+            return None
+
+    def _extract_turn_signals(
+        self, state: State
+    ) -> tuple[Any, Any, float]:
+        """Extract planning_directive, memory_pressure, and repetition_score."""
         ts = getattr(state, "turn_signals", None)
-        if ts is not None:
-            planning_directive = getattr(ts, "planning_directive", None)
-            memory_pressure = getattr(ts, "memory_pressure", None)
+        planning_directive = getattr(ts, "planning_directive", None) if ts else None
+        memory_pressure = getattr(ts, "memory_pressure", None) if ts else None
 
-        extra_data = getattr(state, "extra_data", {})
+        extra_data = getattr(state, "extra_data", {}) or {}
         if planning_directive is None:
             planning_directive = extra_data.get("planning_directive")
         if memory_pressure is None:
             memory_pressure = extra_data.get("memory_pressure")
 
+        rep_score = getattr(ts, "repetition_score", 0.0) if ts else 0.0
+        return planning_directive, memory_pressure, rep_score
+
+    def _append_signal_parts(
+        self, parts: list[str], memory_pressure: Any, rep_score: float
+    ) -> list[str]:
+        """Append memory_pressure and repetition_score to parts."""
         if memory_pressure:
             parts.append(f"memory_pressure={memory_pressure}")
-
-        # Repetition score — proactive stuck proximity signal
-        rep_score = 0.0
-        if ts is not None:
-            rep_score = getattr(ts, "repetition_score", 0.0)
         if rep_score and rep_score >= 0.45:
             parts.append(f"repetition_score={rep_score:.1f}")
+        return parts
 
-        # Proactive context pressure warning at ~70% token usage
-        context_pressure_warning = ""
-        try:
-            prompt_tok = (
-                int(parts[0].split("=")[0]) if "tokens_used" in " ".join(parts) else 0
+    def _build_context_pressure_warning(
+        self, parts: list[str], memory_pressure: Any
+    ) -> str:
+        """Build context pressure warning at ~70% token usage."""
+        if memory_pressure:
+            return ""
+        prompt_tok, ctx_window = 0, 0
+        for p in parts:
+            if p.startswith("tokens_used="):
+                prompt_tok = self._safe_int(p.split("=", 1)[1])
+            elif p.startswith("context_window="):
+                ctx_window = self._safe_int(p.split("=", 1)[1])
+        if not ctx_window or not prompt_tok:
+            return ""
+        usage_pct = prompt_tok / ctx_window
+        if usage_pct >= 0.85:
+            return (
+                "\n🔴 CRITICAL: Consider calling summarize_context() NOW to control "
+                "what context survives before automatic condensation forces a reset."
             )
-            ctx_window = 0
-            for p in parts:
-                if p.startswith("tokens_used="):
-                    prompt_tok = int(p.split("=")[1])
-                elif p.startswith("context_window="):
-                    ctx_window = int(p.split("=")[1])
-            if ctx_window and prompt_tok:
-                usage_pct = prompt_tok / ctx_window
-                if usage_pct >= 0.70 and not memory_pressure:
-                    remaining_pct = round((1.0 - usage_pct) * 100)
-                    context_pressure_warning = (
-                        f"\n⚠️ CONTEXT PRESSURE: {remaining_pct}% of context window remaining. "
-                        "Condensation will occur soon. To preserve context AND work efficiently:\n"
-                        "1. memory_manager(note) — persist important findings and decisions\n"
-                        "2. If plan changed, update tracking once (never repeat unchanged updates)\n"
-                        "3. memory_manager(working_memory) — save current hypothesis and blockers\n"
-                        "4. Prefer targeted reads: use view_range instead of reading full files\n"
-                        "5. Prefer search_code over cat/grep for lookups — it returns only relevant lines\n"
-                        "6. Keep responses concise — avoid restating what the code does\n"
-                        "Unsaved context from early turns WILL be lost during condensation."
-                    )
-                elif usage_pct >= 0.85 and not memory_pressure:
-                    context_pressure_warning += (
-                        "\n🔴 CRITICAL: Consider calling summarize_context() NOW to control "
-                        "what context survives before automatic condensation forces a reset."
-                    )
-        except Exception:
-            pass
+        if usage_pct >= 0.70:
+            remaining_pct = round((1.0 - usage_pct) * 100)
+            return (
+                f"\n⚠️ CONTEXT PRESSURE: ~{remaining_pct}% of context window left; "
+                "condensation is coming. Persist essentials with memory_manager (note / "
+                "working_memory), avoid redundant file re-reads, and stay concise. "
+                "Follow **Execution discipline** (EFFICIENCY + TASK_MANAGEMENT) in the "
+                "system prompt for search/read patterns."
+            )
+        return ""
 
-        status = "<FORGE_CONTEXT_STATUS " + " | ".join(parts) + " />"
-        if context_pressure_warning:
-            status += context_pressure_warning
-
-        # Repetition warning when approaching stuck threshold.
-        # Thresholds are raised from the original 0.3/0.6 to 0.45/0.7 to
-        # avoid false positives on legitimate edit-test-edit debug cycles.
+    def _build_repetition_warning(self, rep_score: float) -> str:
+        """Build repetition warning when approaching stuck threshold."""
         if rep_score >= 0.7:
-            status += (
-                "\n⚠️ REPETITION WARNING (score={:.1f}/1.0): You are approaching the stuck detection threshold. "
+            return (
+                f"\n⚠️ REPETITION WARNING (score={rep_score:.1f}/1.0): You are approaching the stuck detection threshold. "
                 "Your recent actions show a repeating pattern. You MUST change strategy:\n"
                 "1. STOP and use think() to analyze why your current approach isn't working\n"
                 "2. Try a fundamentally different approach\n"
                 "3. If editing files, re-read the file first with view command\n"
                 "4. Do not repeat unchanged tracking updates"
-            ).format(rep_score)
-        elif rep_score >= 0.45:
-            status += (
-                "\n📊 Mild repetition detected (score={:.1f}/1.0). Consider varying your approach."
-            ).format(rep_score)
+            )
+        if rep_score >= 0.45:
+            return (
+                f"\n📊 Mild repetition detected (score={rep_score:.1f}/1.0). Consider varying your approach."
+            )
+        return ""
 
-        # First-turn workspace orientation: give the LLM awareness of the
-        # project structure so it doesn't waste a turn exploring blindly.
+    def _build_first_turn_orientation(self, state: State) -> str:
+        """Build first-turn workspace orientation block."""
+        if not getattr(self._config, "enable_first_turn_orientation_prompt", True):
+            return ""
         iter_flag = getattr(state, "iteration_flag", None)
         current_turn = getattr(iter_flag, "current_value", 0) if iter_flag else 0
-        try:
-            current_turn = int(current_turn)
-        except Exception:
-            current_turn = 0
-        if current_turn <= 1 and not self._is_plain_chat_request(
-            self._get_last_user_message(messages) or ""
-        ):
-            status += (
-                "\n<FIRST_TURN_ORIENTATION>"
-                "\nThis is the first turn. Before diving in:"
-                "\n1. Use workspace_status() to see git branch, modified files, and working directory"
-                "\n2. Use project_map() to understand the repository structure"
-                "\n3. Then plan your approach with think()"
-                "\n</FIRST_TURN_ORIENTATION>"
+        current_turn = self._safe_int(current_turn)
+        if current_turn <= 1:
+            return (
+                "\n<FIRST_TURN_ORIENTATION>\n"
+                "Optional: call workspace_status() if you lack repo/git context; "
+                "then proceed (think/plan as needed).\n"
+                "</FIRST_TURN_ORIENTATION>"
             )
+        return ""
 
-        # Active Plan Injection
+    def _build_active_plan_section(self, state: State) -> str:
+        """Build active plan injection section."""
         plan = getattr(state, "plan", None)
-        if plan and hasattr(plan, "steps") and plan.steps:
-            active_plan_str = f"Title: {getattr(plan, 'title', 'Current Plan')}\n"
-            for step in plan.steps:
-                status_icon = (
-                    "✓"
-                    if step.status == "completed"
-                    else "X"
-                    if step.status == "failed"
-                    else "O"
-                    if step.status == "in_progress"
-                    else "-"
-                )
-                active_plan_str += (
-                    f"{step.id} [{status_icon}] {step.description} ({step.status})\n"
-                )
-                if step.result:
-                    active_plan_str += f"   Result: {str(step.result)[:200]}...\n"
-                for sub in step.subtasks:
-                    status_icon = "✓" if sub.status == "completed" else "-"
-                    active_plan_str += (
-                        f"    {sub.id} [{status_icon}] {sub.description}\n"
-                    )
+        if not plan or not hasattr(plan, "steps") or not plan.steps:
+            return ""
+        title = getattr(plan, "title", "Current Plan")
+        lines = [f"Title: {title}\n"]
+        for step in plan.steps:
+            lines.append(self._format_plan_step(step))
+        return f"\n<ACTIVE_PLAN>\n{''.join(lines)}</ACTIVE_PLAN>"
 
-            status += f"\n<ACTIVE_PLAN>\n{active_plan_str}</ACTIVE_PLAN>"
+    def _format_plan_step(self, step: Any) -> str:
+        """Format a single plan step for injection."""
+        icon = self._step_status_icon(step.status)
+        out = f"{step.id} [{icon}] {step.description} ({step.status})\n"
+        if step.result:
+            out += f"   Result: {str(step.result)[:200]}...\n"
+        for sub in step.subtasks:
+            sub_icon = "✓" if sub.status == "completed" else "-"
+            out += f"    {sub.id} [{sub_icon}] {sub.description}\n"
+        return out
 
-        if planning_directive:
-            status += f"\n<FORGE_DIRECTIVE>\n{planning_directive}\n</FORGE_DIRECTIVE>"
+    @staticmethod
+    def _step_status_icon(status: str) -> str:
+        """Map step status to display icon."""
+        return {"completed": "✓", "failed": "X", "in_progress": "O"}.get(status, "-")
 
-        # Context-aware tool hints based on task keywords
-        tool_hints = self._get_tool_hints(messages)
-        if tool_hints:
-            status += f"\n<TOOL_HINTS>{tool_hints}</TOOL_HINTS>"
+    def _apply_control_message(self, messages: list, status: str) -> list:
+        """Attach turn control either as a second system message or merged into primary."""
+        if getattr(self._config, "merge_control_system_into_primary", False):
+            return self._merge_control_into_primary_system(messages, status)
+        return self._insert_control_message(messages, status)
 
-        # Insert a dedicated system message just before the last user message.
+    def _merge_control_into_primary_system(self, messages: list, status: str) -> list:
+        """Append control/status to the first string system message; else fall back."""
+        msgs = list(messages)
+        for i, msg in enumerate(msgs):
+            if not isinstance(msg, dict) or msg.get("role") != "system":
+                continue
+            content = msg.get("content", "")
+            if not isinstance(content, str):
+                return self._insert_control_message(messages, status)
+            sep = "\n\n" if content.strip() else ""
+            msgs[i] = {**msg, "content": f"{content}{sep}{status}"}
+            return msgs
+        return self._insert_control_message(messages, status)
+
+    @staticmethod
+    def _insert_control_message(messages: list, status: str) -> list:
+        """Insert control message just before the last user message."""
         msgs = list(messages)
         insert_at = len(msgs)
         for i in range(len(msgs) - 1, -1, -1):
-            msg = msgs[i]
-            if isinstance(msg, dict) and msg.get("role") == "user":
+            if isinstance(msgs[i], dict) and msgs[i].get("role") == "user":
                 insert_at = i
                 break
-
-        control_message = {
-            "role": "system",
-            "content": status,
-        }
-        msgs.insert(insert_at, control_message)
+        msgs.insert(insert_at, {"role": "system", "content": status})
         return msgs
 
     # Tool-keyword mapping for context-aware hints
     _TOOL_HINT_MAP: list[tuple[list[str], str]] = [
         (
             ["debug", "error", "traceback", "exception", "fails", "broken"],
-            "Consider error_patterns(query) to check for known fixes.",
+            "Consider query_error_solutions(query) to check for known fixes.",
         ),
         (
             ["search", "find", "grep", "locate", "where"],
@@ -643,7 +654,7 @@ class OrchestratorPlanner:
         ),
         (
             ["edit", "fix", "change", "modify", "update", "refactor"],
-            "Prefer structure_editor for function/class-level edits (edit_function, rename_symbol). Use str_replace_editor only for single-line fixes or file creation. Use verify_state to confirm line contents before str_replace.",
+            "Prefer ast_code_editor for function/class-level edits (edit_symbol_body, rename_symbol). Use str_replace_editor only for single-line fixes or file creation. Use verify_file_lines to confirm line contents before replace_text.",
         ),
         (
             ["test", "testing", "pytest", "unittest"],
@@ -730,9 +741,6 @@ class OrchestratorPlanner:
         if not last_user_msg:
             return "auto"
 
-        if self._is_plain_chat_request(last_user_msg):
-            return "none"
-
         # Let the LLM decide whether to use tools — "auto" is more robust
         # than brittle regex-based question/action classification.
         return "auto"
@@ -756,19 +764,3 @@ class OrchestratorPlanner:
                     continue
                 return content
         return None
-
-    def _is_plain_chat_request(self, message: str) -> bool:
-        text = (message or "").strip().lower()
-        if not text:
-            return False
-        # Semantic check: matches a conversational pattern AND has no action verbs.
-        # This replaces the old brittle 120-char length cutoff.
-        action_patterns = [
-            r"\bcreate\b", r"\bmake\b", r"\bwrite\b", r"\bedit\b", r"\bmodify\b",
-            r"\bdelete\b", r"\bremove\b", r"\bfix\b", r"\bimplement\b", r"\badd\b",
-            r"\bupdate\b", r"\bchange\b", r"\bbuild\b", r"\brun\b", r"\binstall\b"
-        ]
-        if any(re.search(pattern, text) for pattern in PLAIN_CHAT_PATTERNS):
-            if not any(re.search(p, text) for p in action_patterns):
-                return True
-        return False

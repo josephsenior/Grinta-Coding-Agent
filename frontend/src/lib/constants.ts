@@ -4,3 +4,6 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:30
 // In production the frontend is served from :3000 so this is same-origin.
 export const WS_URL = import.meta.env.VITE_WS_URL || "http://localhost:3000";
 export const API_PREFIX = "/api/v1";
+
+/** Min ms disconnected before sustained-offline UI (disconnect toast + Chat red banner). Brief blips stay clean. */
+export const SUSTAINED_DISCONNECT_NOTICE_MS = 2000;

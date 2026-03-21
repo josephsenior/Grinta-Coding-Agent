@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from typing import Any
 
 from backend.core.features import get_feature_flags
-from backend.api.services.shared_dependencies import get_forge_config
+from backend.api.services.dependencies import get_forge_config
 
 router = APIRouter(prefix="/api/v1", tags=["features"])
 

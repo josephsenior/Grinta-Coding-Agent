@@ -76,9 +76,184 @@
 @layer base {
   * {
     @apply border-border;
+    /* Firefox — thin scrollbars, theme-colored thumb */
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
   }
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /*
+   * WebKit / Chromium / Edge — compact pill thumb, no bright OS default track.
+   * Transparent track + inset thumb reads cleaner in dark mode.
+   */
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    background-color: color-mix(in oklch, var(--color-border) 80%, var(--color-muted-foreground));
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--color-muted-foreground) 50%, var(--color-border));
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /*
+   * highlight.js (rehype-highlight) — VS Code Light+ / Dark+ inspired,
+   * driven by CSS variables so tokens track app light/dark theme.
+   */
+  :root {
+    --hljs-foreground: hsl(240 10% 9%);
+    --hljs-comment: hsl(210 6% 44%);
+    --hljs-keyword: hsl(214 99% 36%);
+    --hljs-string: hsl(14 80% 39%);
+    --hljs-number: hsl(174 100% 25%);
+    --hljs-title: hsl(32 45% 34%);
+    --hljs-built_in: hsl(196 100% 30%);
+    --hljs-attr: hsl(207 88% 34%);
+    --hljs-variable: hsl(240 10% 9%);
+    --hljs-meta: hsl(210 6% 44%);
+    --hljs-regexp: hsl(6 78% 38%);
+    --hljs-symbol: hsl(302 52% 38%);
+    --hljs-section: hsl(214 99% 36%);
+    --hljs-addition-fg: hsl(125 100% 22%);
+    --hljs-deletion-fg: hsl(0 100% 35%);
+  }
+
+  .dark {
+    --hljs-foreground: hsl(0 0% 93%);
+    --hljs-comment: hsl(96 26% 48%);
+    --hljs-keyword: hsl(207 82% 66%);
+    --hljs-string: hsl(16 68% 68%);
+    --hljs-number: hsl(102 30% 68%);
+    --hljs-title: hsl(54 40% 68%);
+    --hljs-built_in: hsl(178 52% 56%);
+    --hljs-attr: hsl(207 82% 74%);
+    --hljs-variable: hsl(0 0% 93%);
+    --hljs-meta: hsl(96 26% 48%);
+    --hljs-regexp: hsl(16 68% 68%);
+    --hljs-symbol: hsl(312 40% 72%);
+    --hljs-section: hsl(207 82% 66%);
+    --hljs-addition-fg: hsl(120 40% 58%);
+    --hljs-deletion-fg: hsl(0 70% 65%);
+  }
+
+  .hljs-comment,
+  .hljs-quote {
+    color: var(--hljs-comment);
+    font-style: italic;
+  }
+
+  .hljs-doctag,
+  .hljs-keyword,
+  .hljs-meta .hljs-keyword,
+  .hljs-template-tag,
+  .hljs-template-variable,
+  .hljs-type,
+  .hljs-variable.language_ {
+    color: var(--hljs-keyword);
+  }
+
+  .hljs-title,
+  .hljs-title.class_,
+  .hljs-title.class_.inherited__,
+  .hljs-title.function_ {
+    color: var(--hljs-title);
+  }
+
+  .hljs-attr,
+  .hljs-attribute,
+  .hljs-selector-attr,
+  .hljs-selector-class,
+  .hljs-selector-id {
+    color: var(--hljs-attr);
+  }
+
+  .hljs-literal,
+  .hljs-number,
+  .hljs-operator,
+  .hljs-variable,
+  .hljs-template-variable {
+    color: var(--hljs-number);
+  }
+
+  .hljs-meta,
+  .hljs-meta-keyword,
+  .hljs-meta-string {
+    color: var(--hljs-meta);
+  }
+
+  .hljs-regexp,
+  .hljs-string,
+  .hljs-meta .hljs-string {
+    color: var(--hljs-string);
+  }
+
+  .hljs-built_in,
+  .hljs-symbol {
+    color: var(--hljs-built_in);
+  }
+
+  .hljs-name,
+  .hljs-tag,
+  .hljs-selector-tag {
+    color: var(--hljs-keyword);
+  }
+
+  .hljs-subst,
+  .hljs-formula,
+  .hljs-params {
+    color: var(--hljs-variable);
+  }
+
+  .hljs-section {
+    color: var(--hljs-section);
+    font-weight: 600;
+  }
+
+  .hljs-emphasis {
+    font-style: italic;
+  }
+
+  .hljs-strong {
+    font-weight: 600;
+  }
+
+  .hljs-bullet,
+  .hljs-link {
+    color: var(--hljs-attr);
+  }
+
+  .hljs-addition {
+    color: var(--hljs-addition-fg);
+  }
+
+  .hljs-deletion {
+    color: var(--hljs-deletion-fg);
+  }
+
+  .hljs-code,
+  .hljs-formula {
+    color: var(--hljs-variable);
+  }
+
+  .prose pre code.hljs {
+    color: var(--hljs-foreground);
+    background: transparent;
   }
 }

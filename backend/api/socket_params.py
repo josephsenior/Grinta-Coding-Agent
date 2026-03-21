@@ -14,7 +14,8 @@ from backend.core.provider_types import ProviderType
 
 def parse_latest_event_id(query_params: dict[str, Any]) -> int:
     """Parse ``latest_event_id`` from query parameters."""
-    latest_event_id_str = query_params.get("latest_event_id", [-1])[0]
+    raw = query_params.get("latest_event_id") or [-1]
+    latest_event_id_str = raw[0] if raw else -1
     if latest_event_id_str == "undefined":
         return -1
     try:

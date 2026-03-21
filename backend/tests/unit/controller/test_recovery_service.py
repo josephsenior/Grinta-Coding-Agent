@@ -110,6 +110,19 @@ class TestFormatLlmError:
         assert result is not None
         assert "Authentication" in result
 
+    def test_insufficient_quota_formats_as_billing_quota(self):
+        from backend.llm.exceptions import AuthenticationError as AE
+
+        svc = RecoveryService(_make_context(), _make_retry_service())
+        exc = AE(
+            message="429 insufficient_quota: please check your plan and billing details",
+            llm_provider="openai",
+            model="gpt-5",
+        )
+        result = svc._format_llm_error(exc)
+        assert result is not None
+        assert "Billing" in result or "Quota" in result
+
 
 # ── _format_rate_limit_error ─────────────────────────────────────────
 
@@ -160,6 +173,19 @@ class TestDetermineRuntimeStatus:
         exc = AE(message="bad key", llm_provider="test", model="test")
         status = svc._determine_runtime_status(exc)
         assert status == RuntimeStatus.ERROR_LLM_AUTHENTICATION
+
+    def test_insufficient_quota_is_out_of_credits(self):
+        from backend.llm.exceptions import AuthenticationError as AE
+        from backend.core.enums import RuntimeStatus
+
+        svc = RecoveryService(_make_context(), _make_retry_service())
+        exc = AE(
+            message="insufficient_quota: check your plan and billing details",
+            llm_provider="openai",
+            model="gpt-5",
+        )
+        status = svc._determine_runtime_status(exc)
+        assert status == RuntimeStatus.ERROR_LLM_OUT_OF_CREDITS
 
     def test_generic_error(self):
         from backend.core.enums import RuntimeStatus

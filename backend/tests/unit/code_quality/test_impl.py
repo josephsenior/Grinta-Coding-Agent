@@ -1,6 +1,6 @@
-"""Tests for backend.code_quality.impl — code linting with multiple backends."""
+"""Tests for backend.code_quality.linter — code linting with multiple backends."""
 
-from backend.code_quality.impl import DefaultLinter, LintError, LintResult
+from backend.code_quality.linter import DefaultLinter, LintError, LintResult
 
 
 class TestLintError:

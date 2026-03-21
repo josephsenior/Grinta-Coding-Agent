@@ -197,16 +197,12 @@ class OrchestratorExecutor:
         tool_calls_dict = {}
 
         try:
-            print("!!! OrchestratorExecutor.async_execute: entering try block", flush=True)
             logger.info("OrchestratorExecutor.async_execute: calling LLM.astream")
             stream_iter = self._llm.astream(**call_params)
-            print("!!! OrchestratorExecutor.async_execute: got stream_iter", flush=True)
 
             async def _consume_stream():
                 nonlocal content_accumulate
-                print("!!! _consume_stream started", flush=True)
                 async for chunk in stream_iter:
-                    print("!!! _consume_stream got chunk", flush=True)
                     choices = chunk.get("choices", [])
                     if not choices:
                         continue
@@ -223,6 +219,8 @@ class OrchestratorExecutor:
                             )
                             ev.source = EventSource.AGENT
                             event_stream.add_event(ev, EventSource.AGENT)
+                            # Yield so Socket.IO / asyncio can flush between chunks.
+                            await asyncio.sleep(0)
 
                     if "tool_calls" in delta and delta["tool_calls"]:
                         for tc_chunk in delta["tool_calls"]:

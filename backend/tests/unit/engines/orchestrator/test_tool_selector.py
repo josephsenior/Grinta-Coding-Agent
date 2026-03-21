@@ -69,19 +69,16 @@ _ALL_TOOLS = [
     _make_tool("search_code"),
     _make_tool("think"),
     _make_tool("finish"),
-    _make_tool("note"),
-    _make_tool("recall"),
-    _make_tool("semantic_recall"),
-    _make_tool("verify_state"),
+    _make_tool("verify_file_lines"),
     _make_tool("task_tracker"),
-    _make_tool("project_map"),
+    _make_tool("memory_manager"),
+    _make_tool("analyze_project_structure"),
     # Contextual tools
-    _make_tool("error_patterns"),
-    _make_tool("working_memory"),
+    _make_tool("query_error_solutions"),
     _make_tool("checkpoint"),
     _make_tool("session_diff"),
     _make_tool("workspace_status"),
-    _make_tool("condensation_request"),
+    _make_tool("summarize_context"),
     _make_tool("apply_patch"),
     _make_tool("web_search"),
     _make_tool("web_reader"),
@@ -122,11 +119,9 @@ class TestCoreToolsAlwaysIncluded:
             "search_code",
             "think",
             "finish",
-            "note",
-            "recall",
-            "verify_state",
+            "verify_file_lines",
             "task_tracker",
-            "project_map",
+            "analyze_project_structure",
         ]:
             assert core in names, f"Core tool '{core}' missing on turn 0"
 
@@ -145,12 +140,12 @@ class TestCoreToolsAlwaysIncluded:
 
 
 class TestContextualToolsHiddenByDefault:
-    def test_error_patterns_hidden_with_no_errors(self):
+    def test_query_error_solutions_hidden_with_no_errors(self):
         ts = ToolSelector()
         state = _make_state(turn=0, errors=0)
         selected = ts.select_tools(_ALL_TOOLS, state)
         names = {_get_tool_name(t) for t in selected}
-        assert "error_patterns" not in names
+        assert "query_error_solutions" not in names
 
     def test_checkpoint_hidden_before_turn_5(self):
         ts = ToolSelector()
@@ -173,19 +168,19 @@ class TestContextualToolsHiddenByDefault:
 
 
 class TestContextualToolsUnlocked:
-    def test_error_patterns_unlocked_after_errors(self):
+    def test_query_error_solutions_unlocked_after_errors(self):
         ts = ToolSelector()
         state = _make_state(turn=5, errors=3)
         selected = ts.select_tools(_ALL_TOOLS, state)
         names = {_get_tool_name(t) for t in selected}
-        assert "error_patterns" in names
+        assert "query_error_solutions" in names
 
     def test_working_memory_unlocked_after_turn_3(self):
         ts = ToolSelector()
         state = _make_state(turn=3)
         selected = ts.select_tools(_ALL_TOOLS, state)
         names = {_get_tool_name(t) for t in selected}
-        assert "working_memory" in names
+        assert "memory_manager" in names
 
     def test_working_memory_unlocked_on_complex_task(self):
         ts = ToolSelector()
@@ -198,7 +193,7 @@ class TestContextualToolsUnlocked:
         ]
         selected = ts.select_tools(_ALL_TOOLS, state, messages)
         names = {_get_tool_name(t) for t in selected}
-        assert "working_memory" in names
+        assert "memory_manager" in names
 
     def test_checkpoint_unlocked_after_turn_5(self):
         ts = ToolSelector()
@@ -229,12 +224,12 @@ class TestContextualToolsUnlocked:
         names = {_get_tool_name(t) for t in selected}
         assert "workspace_status" in names
 
-    def test_condensation_request_on_high_token_usage(self):
+    def test_summarize_context_on_high_token_usage(self):
         ts = ToolSelector()
         state = _make_state(turn=5, token_pct=0.7)
         selected = ts.select_tools(_ALL_TOOLS, state)
         names = {_get_tool_name(t) for t in selected}
-        assert "condensation_request" in names
+        assert "summarize_context" in names
 
     def test_web_tools_on_research_task(self):
         ts = ToolSelector()

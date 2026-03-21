@@ -32,8 +32,8 @@ export function ConfirmationBanner({ events = [], pendingAction, variant = "defa
   const risk = resolvedPendingAction?.security_risk as ActionSecurityRisk | undefined;
   const containerClassName =
     variant === "inline"
-      ? "rounded-lg border border-orange-500/30 bg-orange-500/10 p-3"
-      : "border-t bg-orange-500/10 p-4";
+      ? "rounded-2xl bg-orange-500/[0.06] p-3.5 ring-1 ring-orange-500/15 dark:bg-orange-500/[0.08]"
+      : "border-t border-border/40 bg-muted/15 p-3 sm:p-4";
   const contentClassName = variant === "inline" ? "space-y-3" : "mx-auto max-w-3xl space-y-3";
 
   const handleApprove = () => {
@@ -68,12 +68,10 @@ export function ConfirmationBanner({ events = [], pendingAction, variant = "defa
     <div className={containerClassName}>
       <div className={contentClassName}>
         <div className="flex items-start gap-3">
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-orange-500" />
-          <div className="flex-1 space-y-1">
-            <p className="text-sm font-medium text-orange-700 dark:text-orange-400">
-              Process Execution Authorization Required
-            </p>
-            <p className="text-xs text-muted-foreground line-clamp-3">{description}</p>
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-orange-600/80 dark:text-orange-400/80" />
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-[13px] font-medium text-foreground/90">Approve to continue</p>
+            <p className="text-[12px] leading-relaxed text-muted-foreground line-clamp-4">{description}</p>
           </div>
           <SecurityRiskBadge risk={risk} />
         </div>
@@ -100,11 +98,11 @@ export function ConfirmationBanner({ events = [], pendingAction, variant = "defa
           </div>
         ) : (
           <div className="flex justify-end gap-2">
-            <Button size="sm" variant="outline" onClick={handleReject}>
+            <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={handleReject}>
               <X className="mr-1 h-3 w-3" /> Deny
             </Button>
             <Button size="sm" onClick={handleApprove}>
-              <Check className="mr-1 h-3 w-3" /> Authorize
+              <Check className="mr-1 h-3 w-3" /> Approve
             </Button>
           </div>
         )}

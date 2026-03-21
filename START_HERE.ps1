@@ -53,12 +53,12 @@ Write-Host "✅ Model aliases updated in settings.json" -ForegroundColor Green
 Write-Host "✅ Dependencies synced!" -ForegroundColor Green
 Write-Host ""
 
-# Step 2: Launch Unified Interface (Backend + TUI)
-Write-Host "🚀 Step 2: Launching Unified Interface..." -ForegroundColor Yellow
-Write-Host "   This runs the server in the background and TUI in the foreground." -ForegroundColor Cyan
+# Step 2: Launch Forge (web UI)
+Write-Host "🚀 Step 2: Starting Forge server..." -ForegroundColor Yellow
+Write-Host "   Open http://localhost:3000 in your browser when uvicorn is ready." -ForegroundColor Cyan
 Write-Host ""
 
-uv run forge all
+uv run forge serve
 
 Write-Host ""
 Write-Host "✅ Forge session ended." -ForegroundColor Green

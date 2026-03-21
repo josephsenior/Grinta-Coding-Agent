@@ -381,9 +381,14 @@ class LLM(RetryMixin, DebugMixin):
         call_kwargs = {
             "model": self.config.model,
             "temperature": self.config.temperature,
-            "max_tokens": self.config.max_output_tokens,
             **kwargs,
         }
+
+        # Some providers (including OpenAI-compatible gateways) treat explicit
+        # `null` values differently than omitted parameters. In particular,
+        # sending `max_tokens: null` can result in empty completions.
+        if self.config.max_output_tokens is not None:
+            call_kwargs["max_tokens"] = self.config.max_output_tokens
         if self.config.top_p is not None:
             call_kwargs["top_p"] = self.config.top_p
         if self.config.top_k is not None:
@@ -404,7 +409,11 @@ class LLM(RetryMixin, DebugMixin):
         if self.config.seed is not None:
             call_kwargs["seed"] = self.config.seed
 
-        return sanitize_call_kwargs_for_provider(self.config.model, call_kwargs)
+        call_kwargs = sanitize_call_kwargs_for_provider(self.config.model, call_kwargs)
+
+        # Drop explicit None values to avoid sending JSON nulls.
+        # Keep falsy values like 0/False.
+        return {k: v for k, v in call_kwargs.items() if v is not None}
 
     def _record_response_metrics(self, response: Any, latency: float) -> None:
         """Record latency, cost, and token usage from an LLM response.

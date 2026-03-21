@@ -21,24 +21,100 @@ _last_cleanup: float = 0.0
 _CLEANUP_INTERVAL: float = 300.0  # Purge expired keys every 5 minutes
 
 
-def _purge_expired_keys(max_age: float = 3600.0) -> None:
-    """Remove keys whose newest timestamp is older than *max_age* seconds.
+_RATE_LIMIT_EXCLUDED = frozenset({"/health", "/api/monitoring/health", "/"})
+_RATE_LIMIT_EXCLUDED_PREFIXES = ("/assets", "/api/options")
 
-    Called lazily from :meth:`RateLimiter._check_rate_limit` to avoid
-    unbounded memory growth in the in-memory store.
-    """
+
+def _is_auth_path(path: str, normalized_path: str) -> bool:
+    """True if path is an auth endpoint."""
+    return normalized_path.startswith("/api/auth") or path.startswith("/api/auth")
+
+
+def _auth_rate_limit_exceeded(auth_key: str, current_time: float) -> bool:
+    """True if auth key has exceeded per-minute limit."""
+    auth_ts = _rate_limit_store[auth_key]
+    auth_ts[:] = [ts for ts in auth_ts if current_time - ts < 60]
+    auth_limit = int(os.getenv("AUTH_RATE_LIMIT_PER_MIN", "10"))
+    return len(auth_ts) >= auth_limit
+
+
+def _auth_rate_limit_error_response(auth_key: str):
+    """Build 429 response for auth rate limit exceeded."""
+    logger.warning("Auth rate limit exceeded for %s", auth_key)
+    resp = error(
+        message="Too many authentication attempts. Try again later.",
+        status_code=429,
+        error_code="AUTH_RATE_LIMIT_EXCEEDED",
+        details={"reason": "auth_brute_force_protection"},
+        retry_after=60,
+    )
+    resp.headers["Retry-After"] = "60"
+    return resp
+
+
+def _record_auth_request(auth_key: str, current_time: float) -> None:
+    """Record auth request timestamp."""
+    _rate_limit_store[auth_key].append(current_time)
+
+
+def _is_rate_limit_excluded_path(path: str, normalized_path: str) -> bool:
+    """True if path should skip rate limiting."""
+    if normalized_path in _RATE_LIMIT_EXCLUDED:
+        return True
+    return path.startswith(_RATE_LIMIT_EXCLUDED_PREFIXES)
+
+
+def _rate_limit_error_response(rate_limit_key: str):
+    """Build 429 rate limit exceeded response."""
+    logger.warning("Rate limit exceeded for %s", rate_limit_key)
+    resp = error(
+        message="Rate limit exceeded. Please try again later.",
+        status_code=429,
+        error_code="RATE_LIMIT_EXCEEDED",
+        details={"reason": "too_many_requests"},
+        retry_after=60,
+    )
+    resp.headers["Retry-After"] = "60"
+    return resp
+
+
+def _purge_expired_keys(max_age: float = 3600.0) -> None:
+    """Remove keys whose newest timestamp is older than *max_age* seconds."""
     global _last_cleanup
     now = time.time()
     if now - _last_cleanup < _CLEANUP_INTERVAL:
         return
     _last_cleanup = now
-    stale = [
+    stale = _find_stale_rate_limit_keys(max_age, now)
+    for key in stale:
+        del _rate_limit_store[key]
+
+
+def _trim_to_window(timestamps: list[float], now: float, window: float) -> None:
+    """Trim timestamps to those within window of now (mutates in place)."""
+    timestamps[:] = [ts for ts in timestamps if now - ts < window]
+
+
+def _exceeds_hourly_limit(timestamps: list[float], limit: int) -> bool:
+    """True if timestamps count meets or exceeds hourly limit."""
+    return len(timestamps) >= limit
+
+
+def _exceeds_burst_limit(
+    timestamps: list[float], now: float, burst_window: float, burst_limit: int
+) -> bool:
+    """True if recent timestamps (within burst_window) meet or exceed burst limit."""
+    recent = [ts for ts in timestamps if now - ts < burst_window]
+    return len(recent) >= burst_limit
+
+
+def _find_stale_rate_limit_keys(max_age: float, now: float) -> list[str]:
+    """Return keys with no timestamps or newest timestamp older than max_age."""
+    return [
         key
         for key, timestamps in _rate_limit_store.items()
         if not timestamps or (now - max(timestamps)) > max_age
     ]
-    for key in stale:
-        del _rate_limit_store[key]
 
 
 class RateLimiter:
@@ -69,82 +145,43 @@ class RateLimiter:
         request: Request,
         call_next: Callable,
     ) -> Response:
-        """Process request with rate limiting.
-
-        Args:
-            request: FastAPI request
-            call_next: Next middleware/handler
-
-        Returns:
-            Response or rate limit error
-
-        """
+        """Process request with rate limiting."""
         if not self.enabled:
             return await call_next(request)
 
-        # Skip rate limiting for health checks, static files, and authentication endpoints
         path = request.url.path
-
-        # Normalize path (remove trailing slash, handle query params)
         normalized_path = path.rstrip("/")
         current_time = time.time()
 
-        # Auth endpoints get their own stricter per-IP rate limiting
-        # to prevent brute-force attacks (configurable, default 10/min)
-        if normalized_path.startswith("/api/auth") or path.startswith("/api/auth"):
-            auth_key = f"auth:{await self._get_rate_limit_key(request)}"
-            auth_ts = _rate_limit_store[auth_key]
-            auth_ts[:] = [ts for ts in auth_ts if current_time - ts < 60]
-            auth_limit = int(os.getenv("AUTH_RATE_LIMIT_PER_MIN", "10"))
-            if len(auth_ts) >= auth_limit:
-                logger.warning("Auth rate limit exceeded for %s", auth_key)
-                resp = error(
-                    message="Too many authentication attempts. Try again later.",
-                    status_code=429,
-                    error_code="AUTH_RATE_LIMIT_EXCEEDED",
-                    details={"reason": "auth_brute_force_protection"},
-                    retry_after=60,
-                )
-                resp.headers["Retry-After"] = "60"
-                return resp
-            auth_ts.append(current_time)
+        auth_result = await self._maybe_handle_auth_path(request, path, normalized_path, current_time, call_next)
+        if auth_result is not None:
+            return auth_result
+
+        if _is_rate_limit_excluded_path(path, normalized_path):
             return await call_next(request)
 
-        # Check other excluded paths (public endpoints that are called frequently)
-        if normalized_path in [
-            "/health",
-            "/api/monitoring/health",
-            "/",
-        ] or path.startswith(("/assets", "/api/options")):
-            return await call_next(request)
-
-        # Get rate limit key (user_id or IP address)
         rate_limit_key = await self._get_rate_limit_key(request)
-
-        # Check rate limits
         if not await self._check_rate_limit(rate_limit_key):
-            logger.warning("Rate limit exceeded for %s", rate_limit_key)
-            # Standardized error envelope with retry metadata
-            resp = error(
-                message="Rate limit exceeded. Please try again later.",
-                status_code=429,
-                error_code="RATE_LIMIT_EXCEEDED",
-                details={"reason": "too_many_requests"},
-                retry_after=60,
-            )
-            resp.headers["Retry-After"] = "60"
-            return resp
+            return _rate_limit_error_response(rate_limit_key)
 
-        # Process request
         response = await call_next(request)
-
-        # Add rate limit headers
         remaining = await self._get_remaining_requests(rate_limit_key)
         response.headers["X-RateLimit-Limit"] = str(self.requests_per_hour)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         response.headers["X-RateLimit-Reset"] = str(int(time.time() + self.hour_window))
-
         return response
+
+    async def _maybe_handle_auth_path(
+        self, request: Request, path: str, normalized_path: str, current_time: float, call_next: Callable
+    ):
+        """Handle auth paths with stricter rate limit. Returns response or None if not auth path."""
+        if not _is_auth_path(path, normalized_path):
+            return None
+        auth_key = f"auth:{await self._get_rate_limit_key(request)}"
+        if _auth_rate_limit_exceeded(auth_key, current_time):
+            return _auth_rate_limit_error_response(auth_key)
+        _record_auth_request(auth_key, current_time)
+        return await call_next(request)
 
     async def _get_rate_limit_key(self, request: Request) -> str:
         """Get rate limit key from request.
@@ -179,42 +216,19 @@ class RateLimiter:
             return "ip:unknown"
 
     async def _check_rate_limit(self, key: str) -> bool:
-        """Check if request is within rate limits.
-
-        Args:
-            key: Rate limit key
-
-        Returns:
-            True if within limits, False if exceeded
-
-        """
+        """Check if request is within rate limits."""
         current_time = time.time()
-
-        # Lazily purge stale keys to prevent unbounded memory growth
         _purge_expired_keys(max_age=self.hour_window)
 
-        # Get request timestamps for this key
         timestamps = _rate_limit_store[key]
+        _trim_to_window(timestamps, current_time, self.hour_window)
 
-        # Remove old timestamps (outside the hour window)
-        timestamps[:] = [
-            ts for ts in timestamps if current_time - ts < self.hour_window
-        ]
-
-        # Check hourly limit
-        if len(timestamps) >= self.requests_per_hour:
+        if _exceeds_hourly_limit(timestamps, self.requests_per_hour):
+            return False
+        if _exceeds_burst_limit(timestamps, current_time, self.burst_window, self.burst_limit):
             return False
 
-        # Check burst limit (requests in last minute)
-        recent_requests = [
-            ts for ts in timestamps if current_time - ts < self.burst_window
-        ]
-        if len(recent_requests) >= self.burst_limit:
-            return False
-
-        # Add current request timestamp
         timestamps.append(current_time)
-
         return True
 
     async def _get_remaining_requests(self, key: str) -> int:
@@ -536,24 +550,39 @@ class RedisRateLimiter(RateLimiter):
             with redis_span("rate_limit.check") as span:
                 if span is None:
                     return
-                span.set_attribute("ratelimit.key", key)
-                span.set_attribute("ratelimit.allowed", allowed)
-                if hour_count is not None:
-                    span.set_attribute("ratelimit.hour.count", int(hour_count))
-                    span.set_attribute(
-                        "ratelimit.hour.limit", int(self.requests_per_hour)
-                    )
-                if burst_count is not None:
-                    span.set_attribute("ratelimit.burst.count", int(burst_count))
-                    span.set_attribute("ratelimit.burst.limit", int(self.burst_limit))
-                if reason:
-                    span.set_attribute("ratelimit.reason", reason)
-                if exc:
-                    span.set_attribute("error", True)
-                    span.record_exception(exc)
+                _set_rate_limit_span_attrs(
+                    span, key, allowed, hour_count, burst_count,
+                    self.requests_per_hour, self.burst_limit, reason, exc
+                )
         except Exception:
-            # Never let instrumentation break request flow
             return
+
+
+def _set_rate_limit_span_attrs(
+    span,
+    key: str,
+    allowed: bool,
+    hour_count: int | None,
+    burst_count: int | None,
+    hour_limit: int,
+    burst_limit: int,
+    reason: str | None,
+    exc: Exception | None,
+) -> None:
+    """Set OTEL span attributes for rate limit decision."""
+    span.set_attribute("ratelimit.key", key)
+    span.set_attribute("ratelimit.allowed", allowed)
+    if hour_count is not None:
+        span.set_attribute("ratelimit.hour.count", int(hour_count))
+        span.set_attribute("ratelimit.hour.limit", int(hour_limit))
+    if burst_count is not None:
+        span.set_attribute("ratelimit.burst.count", int(burst_count))
+        span.set_attribute("ratelimit.burst.limit", int(burst_limit))
+    if reason:
+        span.set_attribute("ratelimit.reason", reason)
+    if exc:
+        span.set_attribute("error", True)
+        span.record_exception(exc)
 
     def _instrument_failure(self, key: str, exc: Exception) -> None:
         """Record OTEL span for Redis failures."""

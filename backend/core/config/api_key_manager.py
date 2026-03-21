@@ -108,25 +108,27 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         """
         provider = self._extract_provider(model)
 
-        # Check if provided key is correct for this provider
+        # If a key is provided and it matches the provider, trust it.
+        # If it does NOT match, prefer environment/stored provider keys first.
+        # This avoids misrouting when a user switches models/providers but their
+        # settings still contain an old provider key (e.g., OpenRouter -> Gemini).
+        fallback_key: SecretStr | None = None
         if provided_key:
             key_value = provided_key.get_secret_value()
             if self._is_correct_provider_key(provided_key, provider):
                 logger.debug("Using provided API key for %s", provider)
                 return provided_key
-            if (
-                key_value and len(key_value) > 10
-            ):  # Fallback: if it's a substantial key, use it
-                logger.info(
-                    "Using provided API key as fallback for %s (key length: %s)",
+            if key_value and len(key_value) > 10:
+                fallback_key = provided_key
+                logger.warning(
+                    "Provided API key does not match provider %s; will try env/stored keys first",
                     provider,
-                    len(key_value),
                 )
-                return provided_key
-            logger.warning(
-                "Provided API key appears to be for wrong provider. Expected %s",
-                provider,
-            )
+            else:
+                logger.warning(
+                    "Provided API key appears to be for wrong provider. Expected %s",
+                    provider,
+                )
 
         # Try to get key from environment variables
         env_key = self._get_provider_key_from_env(provider)
@@ -138,6 +140,18 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if provider in self.provider_api_keys:
             logger.debug("Using stored %s API key", provider)
             return self.provider_api_keys[provider]
+
+        # If we still haven't found a provider-specific key, fall back to any
+        # substantial key that was provided, even if it didn't match expected
+        # format. This is a last resort and may still fail at the provider.
+        if fallback_key:
+            key_value = fallback_key.get_secret_value()
+            logger.info(
+                "Using provided API key as last-resort fallback for %s (key length: %s)",
+                provider,
+                len(key_value) if key_value else 0,
+            )
+            return fallback_key
 
         # As a last-resort fallback (especially during early startup before full
         # config loading), try to read the default JSON settings file directly so

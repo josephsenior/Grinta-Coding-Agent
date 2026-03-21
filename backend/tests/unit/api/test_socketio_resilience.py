@@ -135,7 +135,7 @@ class TestForgeClientResilience:
 
     def _make_client(self):
         """Create a ForgeClient with mocked transports."""
-        from tui.client import ForgeClient
+        from forge_client import ForgeClient
 
         client = ForgeClient.__new__(ForgeClient)
         client.base_url = "http://localhost:3000"
@@ -217,7 +217,7 @@ class TestForgeClientResilience:
 
     def test_sio_configured_with_exponential_backoff(self):
         """Verify the AsyncClient is created with backoff settings."""
-        from tui.client import (
+        from forge_client.client import (
             ForgeClient,
             _RECONNECT_ATTEMPTS,
             _RECONNECT_DELAY_MAX,

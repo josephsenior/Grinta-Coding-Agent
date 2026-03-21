@@ -6,8 +6,8 @@ This document provides a high-level overview of Forge's architecture for contrib
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   TUI (Textual / Python)             │
-│  ForgeClient ─── Screens ─── Widgets                 │
+│           Web UI (React) + API clients               │
+│  Browser SPA  ·  forge_client (httpx + Socket.IO)    │
 └──────────────┬──────────────────┬────────────────────┘
                │ REST (FastAPI)   │ WebSocket (Socket.IO)
 ┌──────────────▼──────────────────▼────────────────────┐
@@ -92,18 +92,11 @@ Abstract `FileStore` interface with implementations:
 - S3
 - Google Cloud Storage
 
-## TUI Architecture
+## Clients
 
-The TUI is built with [Textual](https://textual.textualize.io/) and lives in `tui/`.
-It communicates with the backend via the same REST + Socket.IO protocol.
-
-### Key Components
-
-- `ForgeClient` — Async HTTP (httpx) + WebSocket (Socket.IO) client
-- `HomeScreen` — Conversation list and creation
-- `ChatScreen` — Streaming agent interaction with event dispatch
-- `SettingsScreen` — LLM, agent, and secret configuration
-- `DiffScreen` — Workspace diff viewer
+The React web app and automation/tests share the same REST + Socket.IO protocol.
+The Python package `forge_client` provides :class:`~forge_client.ForgeClient`
+(httpx + Socket.IO) for scripts and unit tests.
 
 ## API Surface
 

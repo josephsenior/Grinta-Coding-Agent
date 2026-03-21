@@ -22,6 +22,7 @@ For **contribution workflow**, see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Project Layout
 
 ```
+forge_client/          # Python HTTP + Socket.IO client (ForgeClient) for tests/scripts
 backend/
 ├── adapters/          # I/O and serialization adapters
 ├── controller/        # Agent loop, 21 services, safety systems
@@ -40,31 +41,26 @@ backend/
 │   ├── stream.py      # EventStream with WAL + backpressure
 │   ├── stream_stats.py # Extracted aggregated stream statistics
 │   └── durable_writer.py  # Batch-mode event persistence (16-event batches)
-├── knowledge/         # Knowledge base logic (RAG)
+├── knowledge_base/    # Knowledge base logic (RAG)
 ├── llm/               # LLM abstraction (direct SDK clients)
 ├── mcp/               # MCP tool integration
 ├── memory/            # Conversation memory + condensers
 │   ├── conversation_memory.py  # Event→LLM message conversion
 │   ├── message_formatting.py   # Type-check utils & message formatting
 │   ├── context_tracking.py     # Decision/anchor/vector memory tracking
-│   └── condenser/impl/         # 13 condenser strategies incl. auto-selector
+│   └── condenser/strategies/   # 13 condenser strategies incl. auto-selector
 ├── playbooks/         # Built-in task playbooks (.md files)
 ├── runtime/           # Sandboxed command execution
 ├── security/          # Command analysis + safety config
-├── server/            # FastAPI app, routes, middleware, sessions
+├── api/               # FastAPI app, routes, middleware, sessions
 ├── storage/           # Persistence layer (SQLite, file-based)
-├── tui/               # Textual terminal UI
-│   ├── screens/       # Home, Chat, Settings, Diff, Help screens
-│   ├── widgets/       # Reusable UI components
-│   ├── client.py      # Socket.IO client with exponential backoff & heartbeat
-│   └── __main__.py    # Entry point with --dev hot-reload flag
 └── tests/             # Test suites (unit, integration, e2e, stress)
 ```
 
 ## Request Lifecycle
 
 ```
-User Input (TUI/API)
+User Input (Web UI / forge_client)
   → ForgeClient.send_message()
     → Socket.IO / HTTP POST /api/conversations/{id}/messages
       → SessionManager.get_or_create_session()
@@ -335,7 +331,7 @@ backend/tests/
 │   ├── storage/       # Storage layer tests
 │   ├── telemetry/     # Telemetry tests
 │   ├── tools/         # Tool tests
-│   ├── tui/           # TUI client & screen tests
+│   ├── forge_client/  # Tests for forge_client.ForgeClient
 │   ├── utils/         # Utility tests
 │   └── validation/    # Validation tests
 ├── integration/       # Multi-component integration tests

@@ -26,6 +26,17 @@ from backend.utils.import_utils import get_impl
 logger = logging.getLogger(__name__)
 
 
+def _close_and_clear(obj: Any, name: str) -> None:
+    """Close object if it has a close method; always returns None. Logs errors."""
+    if obj is None:
+        return
+    try:
+        if hasattr(obj, "close"):
+            obj.close()
+    except Exception:
+        logger.debug("Error closing %s", name, exc_info=True)
+
+
 class AppState:
     """Centralized, explicit application state.
 
@@ -187,30 +198,15 @@ class AppState:
         multiple times.
         """
         with self._lock:
-            if self._conversation_manager is not None:
-                try:
-                    if hasattr(self._conversation_manager, "close"):
-                        self._conversation_manager.close()
-                except Exception:
-                    logger.debug("Error closing conversation manager", exc_info=True)
-                self._conversation_manager = None
-
-            if self._event_service_adapter is not None:
-                try:
-                    if hasattr(self._event_service_adapter, "close"):
-                        self._event_service_adapter.close()
-                except Exception:
-                    logger.debug("Error closing event service adapter", exc_info=True)
-                self._event_service_adapter = None
-
-            if self._conversation_store is not None:
-                try:
-                    if hasattr(self._conversation_store, "close"):
-                        self._conversation_store.close()
-                except Exception:
-                    logger.debug("Error closing conversation store", exc_info=True)
-                self._conversation_store = None
-
+            self._conversation_manager = _close_and_clear(
+                self._conversation_manager, "conversation manager"
+            )
+            self._event_service_adapter = _close_and_clear(
+                self._event_service_adapter, "event service adapter"
+            )
+            self._conversation_store = _close_and_clear(
+                self._conversation_store, "conversation store"
+            )
             logger.info("AppState closed")
 
 

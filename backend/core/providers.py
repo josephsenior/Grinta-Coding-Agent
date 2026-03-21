@@ -68,12 +68,14 @@ PROVIDER_PREFIX_PATTERNS = {
     "xai": ["xai/", "grok-"],
     "groq": ["groq/"],
     "openrouter": ["openrouter/"],
+    "nvidia": ["nvidia/", "moonshotai/"],
 }
 
 PROVIDER_KEYWORD_PATTERNS = {
     "google": ["gemini"],
     "xai": ["grok"],
-    "groq": ["llama-3.1", "llama-3.3", "kimi-k2", "qwen3"],
+    "groq": ["llama-3.1", "llama-3.3", "qwen3"],
+    "nvidia": ["kimi-k2.5", "moonshotai/kimi-k2-5"],
 }
 
 PROVIDER_FALLBACK_PATTERNS = {
@@ -81,7 +83,8 @@ PROVIDER_FALLBACK_PATTERNS = {
     "anthropic": ["claude"],
     "google": ["gemini"],
     "xai": ["grok"],
-    "groq": ["llama", "kimi", "qwen"],
+    "groq": ["llama", "qwen"],
+    "nvidia": ["kimi", "moonshotai"],
 }
 
 # Provider and API Key constants
@@ -210,6 +213,27 @@ PROVIDER_CONFIGURATIONS: dict[str, dict[str, Any]] = {
         },
         "forbidden_params": {"custom_llm_provider"},
         "api_key_prefixes": ["sk-or-"],
+        "api_key_min_length": 20,
+        "handles_own_routing": False,
+        "requires_custom_llm_provider": False,
+    },
+    "nvidia": {
+        "name": "nvidia",
+        "env_var": "NVIDIA_API_KEY",
+        "requires_protocol": True,
+        "supports_streaming": True,
+        "required_params": {"api_key", "model"},
+        "optional_params": {
+            "base_url",
+            "timeout",
+            "temperature",
+            "max_tokens",
+            "top_p",
+            "seed",
+            "drop_params",
+        },
+        "forbidden_params": {"custom_llm_provider"},
+        "api_key_prefixes": [],
         "api_key_min_length": 20,
         "handles_own_routing": False,
         "requires_custom_llm_provider": False,

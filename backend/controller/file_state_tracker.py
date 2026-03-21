@@ -98,9 +98,9 @@ class FileStateMiddleware(ToolInvocationMiddleware):
             if action_cls == "FileEditAction":
                 path = getattr(action, "path", "")
                 command = getattr(action, "command", "")
-                if command == "create":
+                if command == "create_file":
                     self._tracker.record(path, "created")
-                elif command == "view":
+                elif command == "view_file":
                     self._tracker.record(path, "read")
                 else:
                     self._tracker.record(path, "modified")

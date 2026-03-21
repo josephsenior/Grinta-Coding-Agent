@@ -26,7 +26,7 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     """
 
-    confirmation_mode: bool = Field(default=False)
+    confirmation_mode: bool = Field(default=True)
     security_analyzer: str | None = Field(default=None)
     enforce_security: bool = Field(
         default=True,

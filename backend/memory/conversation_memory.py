@@ -16,6 +16,7 @@ from backend.events.action import (
 from backend.events.action.message import SystemMessageAction
 from backend.events.event import Event, EventSource
 from backend.events.observation.agent import RecallObservation
+from backend.events.observation.error import ErrorObservation
 from backend.events.observation.observation import Observation
 from backend.memory.action_processors import convert_action_to_messages
 from backend.memory.context_tracking import ContextTracker
@@ -331,8 +332,6 @@ class ConversationMemory:
 
     def _track_error_as_anchor(self, event: Any) -> bool:
         """Track error observation as anchor if substantive. Returns True if handled."""
-        from backend.events.observation import ErrorObservation
-
         if not isinstance(event, ErrorObservation):
             return False
         error_text = (event.content or "").strip()
@@ -523,6 +522,9 @@ class ConversationMemory:
             return self._process_recall_observation(
                 cast(RecallObservation, obs), current_index, events or []
             )
+
+        if isinstance(obs, ErrorObservation) and getattr(obs, "notify_ui_only", False):
+            return []
 
         # Handle different observation types
         message = self._get_message_for_observation(

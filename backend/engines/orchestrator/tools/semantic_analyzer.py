@@ -1,6 +1,6 @@
 """Semantic Analyzer — uses Tree-sitter to find symbol references and definitions.
 
-Used by the project_map tool to provide more accurate results than plain regex.
+Used by the analyze_project_structure tool to provide more accurate results than plain regex.
 """
 
 import sys
@@ -37,9 +37,9 @@ def find_references(editor, symbol, root_path):
 
     # Simple semantic search: find the symbol in all files matching extensions
     for ext in (".py", ".js", ".ts", ".go", ".rs"):
-        for file_path in root.rglob(f"*{ext}"):
+        for path in root.rglob(f"*{ext}"):
             if any(
-                p in str(file_path)
+                p in str(path)
                 for p in ("node_modules", ".git", "__pycache__", ".venv", "venv")
             ):
                 continue
@@ -48,11 +48,11 @@ def find_references(editor, symbol, root_path):
                 # Use tree-sitter to find the node index for the symbol
                 # For this implementation, we'll scan for identifiers that match the symbol name
                 # and return their context if they aren't definitions.
-                parse_result = editor.parse_file(str(file_path), use_cache=True)
+                parse_result = editor.parse_file(str(path), use_cache=True)
                 if not parse_result:
                     continue
 
-                tree, file_bytes, language = parse_result
+                _tree, file_bytes, _language = parse_result
 
                 # We'll use a simple recursive visitor or query if possible
                 # For brevity in this tool, we'll do a simple scan but it's AST-backed
@@ -70,7 +70,7 @@ def find_references(editor, symbol, root_path):
                     if symbol in line:
                         references.append(
                             {
-                                "path": str(file_path),
+                                "path": str(path),
                                 "line": i + 1,
                                 "context": line.strip(),
                             }

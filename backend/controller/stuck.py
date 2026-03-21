@@ -4,6 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Sequence
 
+from backend.controller.stuck_patterns import (
+    eq_no_pid,
+    has_enough_events_for_analysis,
+    has_repeating_action_pattern,
+    has_repeating_observation_pattern,
+    is_stuck_monologue,
+    is_stuck_repeating_action_error,
+    is_stuck_repeating_action_observation,
+)
 from backend.core.logger import forge_logger as logger
 from backend.events.action.action import Action
 from backend.events.action.agent import AgentThinkAction
@@ -112,11 +121,11 @@ class StuckDetector:
         filtered_history: list[Event],
     ) -> bool:
         """Check for basic stuck patterns."""
-        if self._is_stuck_repeating_action_observation(last_actions, last_observations):
+        if is_stuck_repeating_action_observation(last_actions, last_observations):
             return True
-        if self._is_stuck_repeating_action_error(last_actions, last_observations):
+        if is_stuck_repeating_action_error(last_actions, last_observations):
             return True
-        return bool(self._is_stuck_monologue(filtered_history))
+        return bool(is_stuck_monologue(filtered_history))
 
     def _check_advanced_stuck_patterns(self, filtered_history: list[Event]) -> bool:
         """Check for advanced stuck patterns."""
@@ -182,92 +191,6 @@ class StuckDetector:
 
         return False
 
-    def _check_actions_equal(self, last_actions: list[Event]) -> bool:
-        """Check if all actions in the list are equal (ignoring PID)."""
-        return all(self._eq_no_pid(last_actions[0], action) for action in last_actions)
-
-    def _check_observations_equal(self, last_observations: list[Event]) -> bool:
-        """Check if all observations in the list are equal (ignoring PID)."""
-        return all(
-            self._eq_no_pid(last_observations[0], observation)
-            for observation in last_observations
-        )
-
-    def _is_stuck_repeating_action_observation(
-        self, last_actions: list[Event], last_observations: list[Event]
-    ) -> bool:
-        if len(last_actions) == 4 and len(last_observations) == 4:
-            actions_equal = self._check_actions_equal(last_actions)
-            observations_equal = self._check_observations_equal(last_observations)
-            if actions_equal and observations_equal:
-                logger.warning("Action, Observation loop detected")
-                return True
-        return False
-
-    def _is_stuck_repeating_action_error(
-        self, last_actions: list[Event], last_observations: list[Event]
-    ) -> bool:
-        """Check if there's a stuck repeating action-error pattern."""
-        # Check if we have enough events to analyze
-        if not self._has_enough_events_for_error_analysis(
-            last_actions, last_observations
-        ):
-            return False
-
-        # Check if actions are repeating
-        if not self._are_actions_repeating(last_actions):
-            return False
-
-        # Check for error observation patterns
-        return self._check_error_observation_patterns(last_observations)
-
-    def _has_enough_events_for_error_analysis(
-        self, last_actions: list[Event], last_observations: list[Event]
-    ) -> bool:
-        """Check if we have enough events to analyze for error patterns."""
-        return len(last_actions) >= 3 and len(last_observations) >= 3
-
-    def _are_actions_repeating(self, last_actions: list[Event]) -> bool:
-        """Check if the last 3 actions are all the same."""
-        return all(
-            self._eq_no_pid(last_actions[0], action) for action in last_actions[:3]
-        )
-
-    def _check_error_observation_patterns(self, last_observations: list[Event]) -> bool:
-        """Check for various error observation patterns."""
-        # Check for simple error observations
-        return self._check_simple_error_observations(last_observations)
-
-    def _check_simple_error_observations(self, last_observations: list[Event]) -> bool:
-        """Check for simple error observation patterns."""
-        if all(isinstance(obs, ErrorObservation) for obs in last_observations[:3]):
-            logger.warning("Action, ErrorObservation loop detected")
-            return True
-        return False
-
-    def _is_stuck_monologue(self, filtered_history: list[Event]) -> bool:
-        agent_message_actions = [
-            (i, event)
-            for i, event in enumerate(filtered_history)
-            if isinstance(event, MessageAction) and event.source == EventSource.AGENT
-        ]
-        if len(agent_message_actions) >= 3:
-            last_agent_message_actions = agent_message_actions[-3:]
-            if all(
-                last_agent_message_actions[0][1] == action[1]
-                for action in last_agent_message_actions
-            ):
-                start_index = last_agent_message_actions[0][0]
-                end_index = last_agent_message_actions[-1][0]
-                has_observation_between = any(
-                    isinstance(event, Observation)
-                    for event in filtered_history[start_index + 1 : end_index]
-                )
-                if not has_observation_between:
-                    logger.warning("Repeated MessageAction with source=AGENT detected")
-                    return True
-        return False
-
     def _is_stuck_action_observation_pattern(
         self, filtered_history: list[Event]
     ) -> bool:
@@ -278,15 +201,15 @@ class StuckDetector:
         )
 
         # Check if we have enough events to analyze
-        if not self._has_enough_events_for_analysis(
+        if not has_enough_events_for_analysis(
             last_six_actions, last_six_observations
         ):
             return False
 
         # Check for repeating patterns
-        if self._has_repeating_action_pattern(
+        if has_repeating_action_pattern(
             last_six_actions
-        ) and self._has_repeating_observation_pattern(
+        ) and has_repeating_observation_pattern(
             last_six_observations,
         ):
             logger.warning("Action, Observation pattern detected")
@@ -323,10 +246,10 @@ class StuckDetector:
     def _has_repeating_action_pattern(self, last_six_actions: list[Event]) -> bool:
         """Check if there's a repeating action pattern."""
         return (
-            self._eq_no_pid(last_six_actions[0], last_six_actions[2])
-            and self._eq_no_pid(last_six_actions[0], last_six_actions[4])
-            and self._eq_no_pid(last_six_actions[1], last_six_actions[3])
-            and self._eq_no_pid(last_six_actions[1], last_six_actions[5])
+            eq_no_pid(last_six_actions[0], last_six_actions[2])
+            and eq_no_pid(last_six_actions[0], last_six_actions[4])
+            and eq_no_pid(last_six_actions[1], last_six_actions[3])
+            and eq_no_pid(last_six_actions[1], last_six_actions[5])
         )
 
     def _has_repeating_observation_pattern(
@@ -334,10 +257,10 @@ class StuckDetector:
     ) -> bool:
         """Check if there's a repeating observation pattern."""
         return (
-            self._eq_no_pid(last_six_observations[0], last_six_observations[2])
-            and self._eq_no_pid(last_six_observations[0], last_six_observations[4])
-            and self._eq_no_pid(last_six_observations[1], last_six_observations[3])
-            and self._eq_no_pid(last_six_observations[1], last_six_observations[5])
+            eq_no_pid(last_six_observations[0], last_six_observations[2])
+            and eq_no_pid(last_six_observations[0], last_six_observations[4])
+            and eq_no_pid(last_six_observations[1], last_six_observations[3])
+            and eq_no_pid(last_six_observations[1], last_six_observations[5])
         )
 
     def _get_condensation_events(
@@ -714,7 +637,7 @@ class StuckDetector:
         if len(last_actions) < 2:
             return 0.0
         identical_count = sum(
-            1 for a in last_actions[1:] if self._eq_no_pid(last_actions[0], a)
+            1 for a in last_actions[1:] if eq_no_pid(last_actions[0], a)
         )
         return min(1.0, identical_count / 3.0)
 
@@ -840,12 +763,3 @@ class StuckDetector:
             return True
 
         return False
-
-    def _eq_no_pid(self, obj1: Event, obj2: Event) -> bool:
-        if isinstance(obj1, CmdRunAction) and isinstance(obj2, CmdRunAction):
-            return obj1.command == obj2.command
-        if isinstance(obj1, CmdOutputObservation) and isinstance(
-            obj2, CmdOutputObservation
-        ):
-            return obj1.command == obj2.command and obj1.exit_code == obj2.exit_code
-        return obj1 == obj2

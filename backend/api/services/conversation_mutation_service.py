@@ -19,11 +19,11 @@ from backend.api.services.conversation_query_service import (
     filter_conversations_by_age,
     resolve_conversation_store,
 )
-from backend.api.services.shared_dependencies import (
+from backend.api.services.dependencies import (
     get_conversation_manager_instance,
     require_conversation_manager,
 )
-from backend.api.shared import config
+from backend.api.app_accessors import config
 from backend.storage.data_models.conversation_metadata import ConversationTrigger
 from backend.storage.data_models.conversation_status import ConversationStatus
 

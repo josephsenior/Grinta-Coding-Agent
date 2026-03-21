@@ -18,7 +18,8 @@ from backend.llm.catalog_loader import lookup
 # (keywords, provider) for heuristic fallback when model not in catalog
 _PROVIDER_KEYWORDS: list[tuple[list[str], str]] = [
     (["openrouter"], "openrouter"),
-    (["groq", "kimi-k2", "moonshotai"], "groq"),
+    (["nvidia", "kimi-k2.5", "moonshotai/kimi-k2-5"], "nvidia"),
+    (["groq", "kimi-k2"], "groq"),
     (["claude", "anthropic"], "anthropic"),
     (["gemini", "google"], "google"),
     (["grok", "xai"], "xai"),
@@ -32,6 +33,7 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     "xai": "https://api.x.ai/v1",
     "deepseek": "https://api.deepseek.com/v1",
     "openrouter": "https://openrouter.ai/api/v1",
+    "nvidia": "https://integrate.api.nvidia.com/v1",
 }
 
 
@@ -280,6 +282,7 @@ class ProviderResolver:
                 "xai",
                 "deepseek",
                 "mistral",
+                "nvidia",
             ]:
                 return parts[1]
             # OpenRouter models keep the sub-path (e.g., "anthropic/claude-3.5-sonnet")

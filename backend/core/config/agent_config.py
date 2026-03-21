@@ -22,6 +22,8 @@ from backend.core.constants import (
     DEFAULT_AGENT_AUTONOMY_LEVEL,
     DEFAULT_AGENT_BROWSING_ENABLED,
     DEFAULT_AGENT_CLI_MODE,
+    DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
+    DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY,
     DEFAULT_AGENT_CMD_ENABLED,
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
@@ -144,7 +146,26 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED
     )
 
-    # Editor is always enabled via UltimateEditor now
+    # Agent Tools configuration
+    enable_terminal: bool = Field(default=True)
+    enable_search_code: bool = Field(default=True)
+    enable_apply_patch: bool = Field(default=True)
+    enable_editor: bool = Field(default=True)
+    enable_working_memory: bool = Field(default=True)
+    enable_check_tool_status: bool = Field(default=False)
+    enable_lsp_query: bool = Field(default=True)
+    enable_signal_progress: bool = Field(default=False)
+    enable_swarming: bool = Field(default=False)
+    enable_blackboard: bool = Field(default=False)
+    enable_rollback: bool = Field(default=True)
+    enable_workspace_status: bool = Field(default=True)
+    enable_query_error_solutions: bool = Field(default=False)
+    enable_checkpoints: bool = Field(default=True)
+    enable_analyze_project_structure: bool = Field(default=False)
+    enable_session_diff: bool = Field(default=False)
+    enable_verify_file_lines: bool = Field(default=False)
+    enable_meta_cognition: bool = Field(default=False)
+    enable_verify_ui_change: bool = Field(default=False)
 
     # Advanced capabilities
     enable_history_truncation: bool = Field(
@@ -247,6 +268,20 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     cli_mode: bool = Field(
         default=DEFAULT_AGENT_CLI_MODE,
         description="Whether the agent is running in CLI mode",
+    )
+    enable_first_turn_orientation_prompt: bool = Field(
+        default=DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
+        description=(
+            "Inject a short first-turn orientation block in the per-turn control message"
+        ),
+    )
+    merge_control_system_into_primary: bool = Field(
+        default=DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY,
+        description=(
+            "Append FORGE control/status text to the first system message instead of "
+            "inserting a second system message (some providers handle a single system "
+            "message better)"
+        ),
     )
     max_consecutive_errors: int = Field(
         default=DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS,

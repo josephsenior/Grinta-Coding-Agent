@@ -15,7 +15,7 @@ from backend.events.observation import NullObservation
 from backend.events.observation.agent import AgentStateChangedObservation
 from backend.events.serialization import event_to_dict
 from backend.api.middleware.socketio_connection_manager import get_connection_manager
-from backend.api.shared import get_conversation_manager, sio
+from backend.api.app_accessors import get_conversation_manager, sio
 
 
 async def replay_events(

@@ -8,6 +8,12 @@ from typing import Any
 import pytest
 
 from backend.controller.stuck import StuckDetector
+from backend.controller.stuck_patterns import (
+    eq_no_pid,
+    is_stuck_monologue,
+    is_stuck_repeating_action_error,
+    is_stuck_repeating_action_observation,
+)
 from backend.events.action.commands import CmdRunAction
 from backend.events.action.empty import NullAction
 from backend.events.action.message import MessageAction
@@ -75,24 +81,20 @@ def _condensation(content: str = "condensed") -> AgentCondensationObservation:
 
 class TestEquality:
     def test_eq_no_pid_same_cmd(self):
-        sd = StuckDetector(_state([]))
-        assert sd._eq_no_pid(_cmd("ls"), _cmd("ls")) is True
+        assert eq_no_pid(_cmd("ls"), _cmd("ls")) is True
 
     def test_eq_no_pid_different_cmd(self):
-        sd = StuckDetector(_state([]))
-        assert sd._eq_no_pid(_cmd("ls"), _cmd("cat foo")) is False
+        assert eq_no_pid(_cmd("ls"), _cmd("cat foo")) is False
 
     def test_eq_no_pid_cmd_output(self):
-        sd = StuckDetector(_state([]))
         o1 = _cmd_output("ls", "out", 0)
         o2 = _cmd_output("ls", "out", 0)
-        assert sd._eq_no_pid(o1, o2) is True
+        assert eq_no_pid(o1, o2) is True
 
     def test_eq_no_pid_cmd_output_different_exit(self):
-        sd = StuckDetector(_state([]))
         o1 = _cmd_output("ls", "out", 0)
         o2 = _cmd_output("ls", "out", 1)
-        assert sd._eq_no_pid(o1, o2) is False
+        assert eq_no_pid(o1, o2) is False
 
 
 # ---------------------------------------------------------------------------
@@ -127,19 +129,19 @@ class TestRepeatingActionObservation:
         sd = StuckDetector(_state([]))
         actions: list[Any] = [_cmd("echo 1")] * 4
         observations: list[Any] = [_cmd_output("echo 1", "1", 0)] * 4
-        assert sd._is_stuck_repeating_action_observation(actions, observations) is True
+        assert is_stuck_repeating_action_observation(actions, observations) is True
 
     def test_different_actions_not_stuck(self):
         sd = StuckDetector(_state([]))
         actions: list[Any] = [_cmd("echo 1"), _cmd("echo 2"), _cmd("echo 3"), _cmd("echo 4")]
         observations: list[Any] = [_cmd_output("echo 1", "1", 0)] * 4
-        assert sd._is_stuck_repeating_action_observation(actions, observations) is False
+        assert is_stuck_repeating_action_observation(actions, observations) is False
 
     def test_fewer_than_four_not_stuck(self):
         sd = StuckDetector(_state([]))
         actions: list[Any] = [_cmd("echo 1")] * 3
         observations: list[Any] = [_cmd_output("echo 1", "1", 0)] * 3
-        assert sd._is_stuck_repeating_action_observation(actions, observations) is False
+        assert is_stuck_repeating_action_observation(actions, observations) is False
 
 
 # ---------------------------------------------------------------------------
@@ -152,19 +154,19 @@ class TestRepeatingActionError:
         sd = StuckDetector(_state([]))
         actions: list[Any] = [_cmd("bad-cmd")] * 3
         observations: list[Any] = [_error("fail")] * 3
-        assert sd._is_stuck_repeating_action_error(actions, observations) is True
+        assert is_stuck_repeating_action_error(actions, observations) is True
 
     def test_different_actions_with_errors_not_stuck(self):
         sd = StuckDetector(_state([]))
         actions: list[Any] = [_cmd("a"), _cmd("b"), _cmd("c")]
         observations: list[Any] = [_error()] * 3
-        assert sd._is_stuck_repeating_action_error(actions, observations) is False
+        assert is_stuck_repeating_action_error(actions, observations) is False
 
     def test_fewer_than_three_not_stuck(self):
         sd = StuckDetector(_state([]))
         actions: list[Any] = [_cmd("bad")] * 2
         observations: list[Any] = [_error()] * 2
-        assert sd._is_stuck_repeating_action_error(actions, observations) is False
+        assert is_stuck_repeating_action_error(actions, observations) is False
 
 
 # ---------------------------------------------------------------------------
@@ -177,12 +179,12 @@ class TestMonologue:
         sd = StuckDetector(_state([]))
         msg = _agent_msg("I'm stuck")
         filtered: list[Any] = [msg, msg, msg]
-        assert sd._is_stuck_monologue(filtered) is True
+        assert is_stuck_monologue(filtered) is True
 
     def test_three_different_messages_not_stuck(self):
         sd = StuckDetector(_state([]))
         filtered: list[Any] = [_agent_msg("a"), _agent_msg("b"), _agent_msg("c")]
-        assert sd._is_stuck_monologue(filtered) is False
+        assert is_stuck_monologue(filtered) is False
 
     def test_messages_with_observations_between_not_stuck(self):
         sd = StuckDetector(_state([]))
@@ -190,7 +192,7 @@ class TestMonologue:
         # observation breaks the monologue
         filtered: list[Any] = [msg, _cmd_output("ls", "file"), msg, msg]
         # First and last two are identical but have observation between first and second
-        assert sd._is_stuck_monologue(filtered) is False
+        assert is_stuck_monologue(filtered) is False
 
 
 # ---------------------------------------------------------------------------

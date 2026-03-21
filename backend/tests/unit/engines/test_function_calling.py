@@ -191,7 +191,7 @@ class TestHandleStrReplaceEditorTool:
     def test_view_returns_file_read(self):
         action = _handle_str_replace_editor_tool(
             {
-                "command": "view",
+                "command": "view_file",
                 "path": "/workspace/app.py",
                 "security_risk": "low",
             }
@@ -202,7 +202,7 @@ class TestHandleStrReplaceEditorTool:
     def test_view_with_range(self):
         action = _handle_str_replace_editor_tool(
             {
-                "command": "view",
+                "command": "view_file",
                 "path": "/workspace/app.py",
                 "view_range": [10, 20],
                 "security_risk": "low",
@@ -214,7 +214,7 @@ class TestHandleStrReplaceEditorTool:
     def test_str_replace_returns_file_edit(self):
         action = _handle_str_replace_editor_tool(
             {
-                "command": "str_replace",
+                "command": "replace_text",
                 "path": "/workspace/app.py",
                 "old_str": "x = 1",
                 "new_str": "x = 2",
@@ -227,7 +227,7 @@ class TestHandleStrReplaceEditorTool:
     def test_create_returns_file_edit(self):
         action = _handle_str_replace_editor_tool(
             {
-                "command": "create",
+                "command": "create_file",
                 "path": "/workspace/new.py",
                 "file_text": "# new file",
                 "security_risk": "low",
@@ -241,13 +241,13 @@ class TestHandleStrReplaceEditorTool:
 
     def test_missing_path_raises(self):
         with pytest.raises(FunctionCallValidationError, match="path"):
-            _handle_str_replace_editor_tool({"command": "view"})
+            _handle_str_replace_editor_tool({"command": "view_file"})
 
     def test_invalid_argument_raises(self):
         with pytest.raises(FunctionCallValidationError, match="Unexpected"):
             _handle_str_replace_editor_tool(
                 {
-                    "command": "str_replace",
+                    "command": "replace_text",
                     "path": "/workspace/app.py",
                     "invalid_arg": "bad",
                     "security_risk": "low",

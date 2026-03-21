@@ -416,12 +416,12 @@ class SmartErrorHandler:
 
     @staticmethod
     def file_not_found(
-        file_path: str, similar_files: list[str] | None = None
+        path: str, similar_files: list[str] | None = None
     ) -> ErrorSuggestion:
         """Generate error message when file is not found.
 
         Args:
-            file_path: The file that was not found
+            path: The file that was not found
             similar_files: List of similar file paths
 
         Returns:
@@ -430,19 +430,19 @@ class SmartErrorHandler:
         """
         if not similar_files:
             return ErrorSuggestion(
-                message=f"File not found: {file_path}", suggestions=[], confidence=0.0
+                message=f"File not found: {path}", suggestions=[], confidence=0.0
             )
 
         # Fuzzy match file paths
         close_matches = difflib.get_close_matches(
-            file_path, similar_files, n=5, cutoff=0.5
+            path, similar_files, n=5, cutoff=0.5
         )
 
         if close_matches:
             best_match = close_matches[0]
-            similarity = difflib.SequenceMatcher(None, file_path, best_match).ratio()
+            similarity = difflib.SequenceMatcher(None, path, best_match).ratio()
 
-            message = f"File not found: {file_path}\n\nDid you mean one of these?"
+            message = f"File not found: {path}\n\nDid you mean one of these?"
             for match in close_matches[:3]:
                 message += f"\n  - {match}"
 
@@ -455,7 +455,7 @@ class SmartErrorHandler:
             )
 
         return ErrorSuggestion(
-            message=f"File not found: {file_path}\n\nNo similar files found.",
+            message=f"File not found: {path}\n\nNo similar files found.",
             suggestions=[],
             confidence=0.0,
         )
@@ -526,12 +526,12 @@ class SmartErrorHandler:
 
     @staticmethod
     def format_edit_conflict(
-        file_path: str, your_edit: str, other_edit: str
+        path: str, your_edit: str, other_edit: str
     ) -> ErrorSuggestion:
         """Format message for edit conflicts in multi-file refactoring.
 
         Args:
-            file_path: File with conflict
+            path: File with conflict
             your_edit: Description of your edit
             other_edit: Description of conflicting edit
 
@@ -540,7 +540,7 @@ class SmartErrorHandler:
 
         """
         message = (
-            f"Edit conflict in {file_path}:\n\n"
+            f"Edit conflict in {path}:\n\n"
             f"Your edit: {your_edit}\n"
             f"Conflicts with: {other_edit}\n\n"
             f"These edits cannot be applied simultaneously."

@@ -87,7 +87,7 @@ class StructureEditor:
 
         self._undo_history: dict[
             str, list[tuple[str, str]]
-        ] = {}  # file_path -> [(hash, content)]
+        ] = {}  # path -> [(hash, content)]
 
         logger.info("🚀 Ultimate Editor initialized")
         logger.info(
@@ -101,32 +101,32 @@ class StructureEditor:
     # HIGH-LEVEL OPERATIONS
     # ========================================================================
 
-    def create_file(self, file_path: str, content: str) -> EditResult:
+    def create_file(self, path: str, content: str) -> EditResult:
         """Create a new file.
 
         Args:
-            file_path: Path to the file
+            path: Path to the file
             content: File content
 
         Returns:
             EditResult
         """
-        if os.path.exists(file_path):
+        if os.path.exists(path):
             return EditResult(
                 success=False,
-                message=f"File already exists: {file_path}. Use replace_range or edit_function to modify it.",
+                message=f"File already exists: {path}. Use replace_range or edit_function to modify it.",
             )
 
         try:
             # Create parent directories if needed
-            os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
+            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
 
-            with open(file_path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
 
             return EditResult(
                 success=True,
-                message=f"Created file {file_path}",
+                message=f"Created file {path}",
                 modified_code=content,
                 lines_changed=content.count("\n") + 1,
             )
@@ -134,25 +134,25 @@ class StructureEditor:
             return EditResult(success=False, message=f"Failed to create file: {e}")
 
     def view_file(
-        self, file_path: str, line_range: list[int] | None = None
+        self, path: str, line_range: list[int] | None = None
     ) -> EditResult:
         """View file content or directory listing.
 
         Args:
-            file_path: Path to view
+            path: Path to view
             line_range: Optional [start, end] lines (1-indexed)
 
         Returns:
             EditResult with content in message
         """
-        if not os.path.exists(file_path):
-            return EditResult(success=False, message=f"Path not found: {file_path}")
+        if not os.path.exists(path):
+            return EditResult(success=False, message=f"Path not found: {path}")
 
-        if os.path.isdir(file_path):
-            return self._view_directory(file_path)
+        if os.path.isdir(path):
+            return self._view_directory(path)
 
         try:
-            with open(file_path, encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 lines = f.readlines()
 
             start_line, end_line = self._determine_view_range(line_range, len(lines))
@@ -168,7 +168,7 @@ class StructureEditor:
 
             return EditResult(
                 success=True,
-                message=f"Showing lines {start_line}-{end_line} of {file_path}:\n{content_view}",
+                message=f"Showing lines {start_line}-{end_line} of {path}:\n{content_view}",
                 original_code="".join(lines),
             )
 
@@ -176,12 +176,12 @@ class StructureEditor:
             return EditResult(success=False, message=f"Error reading file: {e}")
 
     def insert_code(
-        self, file_path: str, insert_line: int, new_code: str
+        self, path: str, insert_line: int, new_code: str
     ) -> EditResult:
         """Insert code after a specific line.
 
         Args:
-            file_path: Path to file
+            path: Path to file
             insert_line: Line number to insert after (0 for beginning of file)
             new_code: Code to insert
 
@@ -189,33 +189,33 @@ class StructureEditor:
             EditResult
         """
         return self.replace_code_range(
-            file_path,
+            path,
             start_line=insert_line + 1,
             end_line=insert_line,
             new_code=new_code,
         )
 
-    def undo_last_edit(self, file_path: str) -> EditResult:
+    def undo_last_edit(self, path: str) -> EditResult:
         """Undo the last edit to a file.
 
         Args:
-            file_path: Path to file
+            path: Path to file
 
         Returns:
             EditResult
         """
-        if file_path not in self._undo_history or not self._undo_history[file_path]:
-            return EditResult(success=False, message=f"No undo history for {file_path}")
+        if path not in self._undo_history or not self._undo_history[path]:
+            return EditResult(success=False, message=f"No undo history for {path}")
 
-        _, previous_content = self._undo_history[file_path].pop()
+        _, previous_content = self._undo_history[path].pop()
 
         try:
-            with open(file_path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(previous_content)
 
             return EditResult(
                 success=True,
-                message=f"Undid last edit to {file_path}",
+                message=f"Undid last edit to {path}",
                 modified_code=previous_content,
             )
         except Exception as e:
@@ -245,12 +245,12 @@ class StructureEditor:
         return EditResult(success=True, message="\n".join(output))
 
     def edit_function(
-        self, file_path: str, function_name: str, new_body: str
+        self, path: str, function_name: str, new_body: str
     ) -> EditResult:
         """Edit a function by name (works for ANY language).
 
         Args:
-            file_path: Path to the file
+            path: Path to the file
             function_name: Name of the function to edit
             new_body: New function body
 
@@ -258,13 +258,13 @@ class StructureEditor:
             EditResult with success status
 
         """
-        logger.info("Editing function '%s' in %s", function_name, file_path)
+        logger.info("Editing function '%s' in %s", function_name, path)
 
         # Detect language
-        language = self.universal.detect_language(file_path)
+        language = self.universal.detect_language(path)
         if not language:
             return EditResult(
-                success=False, message=f"Cannot detect language for {file_path}"
+                success=False, message=f"Cannot detect language for {path}"
             )
 
         # Skip auto-indent: the tree-sitter _replace_node_content already
@@ -273,28 +273,28 @@ class StructureEditor:
 
         # Perform edit
         result = self.universal.edit_function(
-            file_path, function_name, new_body, validate=self.config.validate_syntax
+            path, function_name, new_body, validate=self.config.validate_syntax
         )
 
         # Clean whitespace if successful and requested
-        self._handle_whitespace_cleanup(file_path, language, result.success)
+        self._handle_whitespace_cleanup(path, language, result.success)
 
         # Provide smart error message if failed
         if not result.success and "not found" in result.message.lower():
-            self._enrich_error_with_symbol_suggestions(file_path, function_name, result)
+            self._enrich_error_with_symbol_suggestions(path, function_name, result)
 
         from backend.utils.blast_radius import check_blast_radius
         # Blast Radius Hook: if successful, checking symbol references
         if result.success:
-            check_blast_radius(file_path, function_name, 10)
+            check_blast_radius(path, function_name, 10)
 
         return result
 
-    def rename_symbol(self, file_path: str, old_name: str, new_name: str) -> EditResult:
+    def rename_symbol(self, path: str, old_name: str, new_name: str) -> EditResult:
         """Rename a symbol throughout a file.
 
         Args:
-            file_path: Path to the file
+            path: Path to the file
             old_name: Current symbol name
             new_name: New symbol name
 
@@ -302,20 +302,20 @@ class StructureEditor:
             EditResult with success status
 
         """
-        logger.info("Renaming '%s' → '%s' in %s", old_name, new_name, file_path)
+        logger.info("Renaming '%s' → '%s' in %s", old_name, new_name, path)
 
-        result = self.universal.rename_symbol(file_path, old_name, new_name)
+        result = self.universal.rename_symbol(path, old_name, new_name)
 
         # Clean whitespace if successful
         if result.success and self.config.clean_whitespace:
-            language = self.universal.detect_language(file_path)
+            language = self.universal.detect_language(path)
             try:
-                with open(file_path, encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     content = f.read()
 
                 cleaned = self.whitespace.clean_whitespace(content, language=language)
 
-                with open(file_path, "w", encoding="utf-8") as f:
+                with open(path, "w", encoding="utf-8") as f:
                     f.write(cleaned)
             except Exception as e:
                 logger.warning("Whitespace cleanup failed: %s", e)
@@ -323,12 +323,12 @@ class StructureEditor:
         return result
 
     def find_symbol(
-        self, file_path: str, symbol_name: str, symbol_type: str | None = None
+        self, path: str, symbol_name: str, symbol_type: str | None = None
     ) -> SymbolLocation | None:
         """Find a symbol in a file.
 
         Args:
-            file_path: Path to the file
+            path: Path to the file
             symbol_name: Name of the symbol (supports "Class.method")
             symbol_type: Optional type filter ("function", "class", "method")
 
@@ -336,18 +336,18 @@ class StructureEditor:
             SymbolLocation if found, None otherwise
 
         """
-        result = self.universal.find_symbol(file_path, symbol_name, symbol_type)
+        result = self.universal.find_symbol(path, symbol_name, symbol_type)
 
         if not result:
             # Provide smart error
             try:
-                available_symbols = self._get_available_symbols(file_path, symbol_type)
+                available_symbols = self._get_available_symbols(path, symbol_type)
                 suggestion = self.errors.symbol_not_found(
                     symbol_name, available_symbols
                 )
                 logger.warning(suggestion.message)
             except Exception:
-                logger.warning("Symbol '%s' not found in %s", symbol_name, file_path)
+                logger.warning("Symbol '%s' not found in %s", symbol_name, path)
 
         return result
 
@@ -380,7 +380,7 @@ class StructureEditor:
         return True, ""
 
     def _apply_auto_indent(
-        self, new_code: str, lines: list[str], start_line: int, file_path: str
+        self, new_code: str, lines: list[str], start_line: int, path: str
     ) -> str:
         """Apply auto-indentation to new code.
 
@@ -388,7 +388,7 @@ class StructureEditor:
             new_code: New code to indent
             lines: Original file lines
             start_line: Line to replace
-            file_path: File path
+            path: File path
 
         Returns:
             Indented code
@@ -397,7 +397,7 @@ class StructureEditor:
         if not self.config.auto_indent:
             return new_code
 
-        language = self.universal.detect_language(file_path)
+        language = self.universal.detect_language(path)
         original_content = "".join(lines)
         indent_config = self.whitespace.detect_indent(original_content, language)
 
@@ -414,14 +414,14 @@ class StructureEditor:
         return new_code
 
     def _validate_syntax_after_edit(
-        self, new_content: str, original_lines: list[str], file_path: str
+        self, new_content: str, original_lines: list[str], path: str
     ) -> tuple[bool, str]:
         """Validate syntax of edited content.
 
         Args:
             new_content: New content to validate
             original_lines: Original lines
-            file_path: File path
+            path: File path
 
         Returns:
             Tuple of (is_valid, error_message)
@@ -430,49 +430,49 @@ class StructureEditor:
         if not self.config.validate_syntax:
             return True, ""
 
-        language = self.universal.detect_language(file_path)
+        language = self.universal.detect_language(path)
         if language:
             validation = self.universal._validate_syntax(
-                new_content, file_path, language
+                new_content, path, language
             )
             if not validation[0]:
                 return False, f"Syntax error after edit: {validation[1]}"
 
         return True, ""
 
-    def _write_and_clean_file(self, file_path: str, content: str) -> None:
+    def _write_and_clean_file(self, path: str, content: str) -> None:
         """Write content to file and optionally clean whitespace."""
         # Save to undo history before writing
         if self.config.backup_enabled:
             try:
-                if os.path.exists(file_path):
-                    with open(file_path, encoding="utf-8") as f:
+                if os.path.exists(path):
+                    with open(path, encoding="utf-8") as f:
                         old_content = f.read()
-                    if file_path not in self._undo_history:
-                        self._undo_history[file_path] = []
-                    self._undo_history[file_path].append(("hash", old_content))
+                    if path not in self._undo_history:
+                        self._undo_history[path] = []
+                    self._undo_history[path].append(("hash", old_content))
                     # Keep history limited
-                    if len(self._undo_history[file_path]) > 10:
-                        self._undo_history[file_path].pop(0)
+                    if len(self._undo_history[path]) > 10:
+                        self._undo_history[path].pop(0)
             except Exception as e:
                 logger.warning("Failed to save undo history: %s", e)
 
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(content)
 
         if self.config.clean_whitespace:
-            language = self.universal.detect_language(file_path)
+            language = self.universal.detect_language(path)
             cleaned = self.whitespace.clean_whitespace(content, language=language)
-            with open(file_path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(cleaned)
 
     def replace_code_range(
-        self, file_path: str, start_line: int, end_line: int, new_code: str
+        self, path: str, start_line: int, end_line: int, new_code: str
     ) -> EditResult:
         """Replace a range of lines with new code.
 
         Args:
-            file_path: Path to the file
+            path: Path to the file
             start_line: Start line (1-indexed)
             end_line: End line (1-indexed, inclusive)
             new_code: New code to insert
@@ -482,7 +482,7 @@ class StructureEditor:
 
         """
         try:
-            with open(file_path, encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 lines = f.readlines()
 
             is_valid, error_msg = self._validate_line_range(
@@ -491,13 +491,13 @@ class StructureEditor:
             if not is_valid:
                 return EditResult(success=False, message=error_msg)
 
-            new_code = self._apply_auto_indent(new_code, lines, start_line, file_path)
+            new_code = self._apply_auto_indent(new_code, lines, start_line, path)
 
             new_lines = lines[: start_line - 1] + [new_code + "\n"] + lines[end_line:]
             new_content = "".join(new_lines)
 
             is_valid, error_msg = self._validate_syntax_after_edit(
-                new_content, lines, file_path
+                new_content, lines, path
             )
             if not is_valid:
                 return EditResult(
@@ -507,7 +507,7 @@ class StructureEditor:
                     original_code="".join(lines),
                 )
 
-            self._write_and_clean_file(file_path, new_content)
+            self._write_and_clean_file(path, new_content)
 
             result = EditResult(
                 success=True,
@@ -519,7 +519,7 @@ class StructureEditor:
 
             from backend.utils.blast_radius import check_blast_radius_from_code
             # Blast Radius Hook: best-effort check using the first few symbols found in the new code
-            check_blast_radius_from_code(file_path, new_code, 10)
+            check_blast_radius_from_code(path, new_code, 10)
 
             return result
 
@@ -594,11 +594,11 @@ class StructureEditor:
     # ========================================================================
 
     def _get_available_symbols(
-        self, file_path: str, symbol_type: str | None = None
+        self, path: str, symbol_type: str | None = None
     ) -> list[str]:
         """Get list of available symbols in a file."""
         try:
-            parse_result = self.universal.parse_file(file_path)
+            parse_result = self.universal.parse_file(path)
             if not parse_result:
                 return []
 
@@ -655,14 +655,14 @@ class StructureEditor:
 
     def normalize_file_indent(
         self,
-        file_path: str,
+        path: str,
         target_style: str | None = None,
         target_size: int | None = None,
     ) -> EditResult:
         """Normalize indentation in a file.
 
         Args:
-            file_path: Path to the file
+            path: Path to the file
             target_style: Target style ("spaces" or "tabs", auto-detected if None)
             target_size: Target indent size (auto-detected if None)
 
@@ -671,10 +671,10 @@ class StructureEditor:
 
         """
         try:
-            with open(file_path, encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 original = f.read()
 
-            language = self.universal.detect_language(file_path)
+            language = self.universal.detect_language(path)
 
             # Create target config
             if target_style or target_size:
@@ -699,12 +699,12 @@ class StructureEditor:
             )
 
             # Write back
-            with open(file_path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(normalized)
 
             return EditResult(
                 success=True,
-                message=f"Normalized indentation in {file_path}",
+                message=f"Normalized indentation in {path}",
                 modified_code=normalized,
                 original_code=original,
             )
@@ -746,12 +746,12 @@ class StructureEditor:
             output.append(f"{i + 1:6d}\t{lines[i].rstrip()}")
         return "\n".join(output)
 
-    def _handle_auto_indent(self, file_path: str, language: str, code: str) -> str:
+    def _handle_auto_indent(self, path: str, language: str, code: str) -> str:
         """Apply auto-indentation if enabled."""
         if not self.config.auto_indent:
             return code
         try:
-            with open(file_path, encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             indent_config = self.whitespace.detect_indent(content, language)
             return self.whitespace.auto_indent_block(
@@ -762,25 +762,25 @@ class StructureEditor:
             return code
 
     def _handle_whitespace_cleanup(
-        self, file_path: str, language: str, success: bool
+        self, path: str, language: str, success: bool
     ) -> None:
         """Clean whitespace if edit was successful and requested."""
         if success and self.config.clean_whitespace:
             try:
-                with open(file_path, encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     content = f.read()
                 cleaned = self.whitespace.clean_whitespace(content, language=language)
-                with open(file_path, "w", encoding="utf-8") as f:
+                with open(path, "w", encoding="utf-8") as f:
                     f.write(cleaned)
             except Exception as e:
                 logger.warning("Whitespace cleanup failed: %s", e)
 
     def _enrich_error_with_symbol_suggestions(
-        self, file_path: str, symbol_name: str, result: EditResult
+        self, path: str, symbol_name: str, result: EditResult
     ) -> None:
         """Add symbol suggestions to error message if applicable."""
         try:
-            available_symbols = self._get_available_symbols(file_path, "function")
+            available_symbols = self._get_available_symbols(path, "function")
             suggestion = self.errors.symbol_not_found(symbol_name, available_symbols)
             result.message += f"\n\n{suggestion.message}"
         except Exception:

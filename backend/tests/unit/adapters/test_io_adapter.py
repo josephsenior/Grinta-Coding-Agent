@@ -1,10 +1,10 @@
-"""Tests for backend.adapters.io — CLI task reading helpers."""
+"""Tests for backend.adapters.cli_input — CLI task reading helpers."""
 
 from __future__ import annotations
 
 import argparse
 
-from backend.adapters.io import read_task, read_task_from_file
+from backend.adapters.cli_input import read_task, read_task_from_file
 
 
 class TestReadTaskFromFile:

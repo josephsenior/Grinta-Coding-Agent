@@ -27,6 +27,7 @@ class TestFileEdit:
         )
 
         assert edit.file_path == "/tmp/test.py"
+        assert edit.path == "/tmp/test.py"
         assert edit.operation == "modify"
         assert edit.original_content == "old"
         assert edit.new_content == "new"
@@ -47,6 +48,12 @@ class TestFileEdit:
     def test_refactor_edit_alias(self):
         """Test that RefactorEdit is an alias for FileEdit."""
         assert RefactorEdit is FileEdit
+
+    def test_path_alias_setter_updates_file_path(self):
+        """Canonical path alias should update legacy file_path field."""
+        edit = FileEdit(file_path="/tmp/a.py", operation="modify")
+        edit.path = "/tmp/b.py"
+        assert edit.file_path == "/tmp/b.py"
 
 
 class TestRefactorTransaction:

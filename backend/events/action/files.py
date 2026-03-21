@@ -67,7 +67,7 @@ class FileWriteAction(Action):
 
 @dataclass
 class FileEditAction(Action):
-    """Edits a file using various commands including view, create, str_replace, insert, and undo_edit.
+    """Edits a file using canonical file-editor commands.
 
     This class supports two main modes of operation:
     1. LLM-based editing (impl_source = FileEditSource.LLM_BASED_EDIT)
@@ -76,11 +76,11 @@ class FileEditAction(Action):
     Attributes:
         path (str): The path to the file being edited. Works for both LLM-based and FILE_EDITOR editing.
         FILE_EDITOR only arguments:
-            command (str): The editing command to be performed (view, create, str_replace, insert, undo_edit, write).
-            file_text (str): The content of the file to be created (used with 'create' command in FILE_EDITOR mode).
-            old_str (str): The string to be replaced (used with 'str_replace' command in FILE_EDITOR mode).
-            new_str (str): The string to replace old_str (used with 'str_replace' and 'insert' commands in FILE_EDITOR mode).
-            insert_line (int): The line number after which to insert new_str (used with 'insert' command in FILE_EDITOR mode).
+            command (str): The editing command to be performed (view_file, create_file, replace_text, insert_text, undo_last_edit, write).
+            file_text (str): The content of the file to be created (used with 'create_file' command in FILE_EDITOR mode).
+            old_str (str): The string to be replaced (used with 'replace_text' command in FILE_EDITOR mode).
+            new_str (str): The replacement text (used with 'replace_text' and 'insert_text' commands in FILE_EDITOR mode).
+            insert_line (int): The line number after which to insert new_str (used with 'insert_text' command in FILE_EDITOR mode).
         LLM-based editing arguments:
             content (str): The content to be written or edited in the file (used in LLM-based editing and 'write' command).
             start (int): The starting line for editing (1-indexed, inclusive). Default is 1.
@@ -127,15 +127,15 @@ class FileEditAction(Action):
             ret += f"Content:\n```\n{self.content}\n```\n"
         else:
             ret += f"Command: {self.command}\n"
-            if self.command == "create":
+            if self.command == "create_file":
                 ret += f"Created File with Text:\n```\n{self.file_text}\n```\n"
-            elif self.command == "str_replace":
+            elif self.command == "replace_text":
                 ret += f"Old String: ```\n{self.old_str}\n```\n"
                 ret += f"New String: ```\n{self.new_str}\n```\n"
-            elif self.command == "insert":
+            elif self.command == "insert_text":
                 ret += f"Insert Line: {self.insert_line}\n"
                 ret += f"New String: ```\n{self.new_str}\n```\n"
-            elif self.command == "undo_edit":
+            elif self.command == "undo_last_edit":
                 ret += "Undo Edit\n"
         return ret
 

@@ -55,7 +55,7 @@ from backend.core.setup import (
 from backend.events import EventSource, EventStreamSubscriber
 from backend.events.action import MessageAction, NullAction
 from backend.events.observation import AgentStateChangedObservation
-from backend.mcp_integration import add_mcp_tools_to_agent
+from backend.mcp_client import add_mcp_tools_to_agent
 from backend.runtime import (
     RuntimeAcquireResult,
     RuntimeOrchestrator,

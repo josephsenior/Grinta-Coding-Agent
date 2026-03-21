@@ -12,11 +12,11 @@ from backend.core.errors import (
 )
 from backend.engines.orchestrator.function_calling import (
     _handle_cmd_run_tool,
-    _handle_condensation_request_tool,
+    _handle_summarize_context_tool,
     _handle_finish_tool,
     _handle_llm_based_file_edit_tool,
     _handle_mcp_tool,
-    _handle_edit_function_command,
+    _handle_edit_symbol_body_command,
     _handle_str_replace_editor_tool,
     _handle_task_tracker_tool,
     _handle_think_tool,
@@ -177,14 +177,26 @@ class TestHandleLlmBasedFileEditTool:
 # ---------------------------------------------------------------------------
 
 class TestHandleStrReplaceEditorTool:
-    def test_view_command_returns_file_read_action(self):
-        action = _handle_str_replace_editor_tool({"command": "view", "path": "f.py"})
+    def test_canonical_view_file_command_returns_file_read_action(self):
+        action = _handle_str_replace_editor_tool(
+            {"command": "view_file", "path": "f.py"}
+        )
         assert isinstance(action, FileReadAction)
         assert action.path == "f.py"
 
+    def test_legacy_view_alias_is_rejected(self):
+        with pytest.raises(FunctionCallValidationError, match="Unknown command"):
+            _handle_str_replace_editor_tool({"command": "view", "path": "f.py"})
+
+    def test_file_path_alias_is_rejected(self):
+        with pytest.raises(FunctionCallValidationError, match="path"):
+            _handle_str_replace_editor_tool(
+                {"command": "view_file", "file_path": "f.py"}
+            )
+
     def test_view_with_range(self):
         action = _handle_str_replace_editor_tool(
-            {"command": "view", "path": "f.py", "view_range": [1, 10]}
+            {"command": "view_file", "path": "f.py", "view_range": [1, 10]}
         )
         assert isinstance(action, FileReadAction)
 
@@ -194,18 +206,22 @@ class TestHandleStrReplaceEditorTool:
 
     def test_missing_path_raises(self):
         with pytest.raises(FunctionCallValidationError, match="path"):
-            _handle_str_replace_editor_tool({"command": "create"})
+            _handle_str_replace_editor_tool({"command": "create_file"})
 
-    def test_create_command_returns_file_edit_action(self):
+    def test_create_file_command_returns_file_edit_action(self):
         action = _handle_str_replace_editor_tool(
-            {"command": "create", "path": "new.py", "file_text": "content"}
+            {"command": "create_file", "path": "new.py", "file_text": "content"}
         )
         assert isinstance(action, FileEditAction)
 
     def test_unexpected_arg_raises(self):
         with pytest.raises(FunctionCallValidationError):
             _handle_str_replace_editor_tool(
-                {"command": "create", "path": "x.py", "totally_unknown_arg": "val"}
+                {
+                    "command": "create_file",
+                    "path": "x.py",
+                    "totally_unknown_arg": "val",
+                }
             )
 
 
@@ -225,12 +241,12 @@ class TestHandleThinkTool:
 
 
 # ---------------------------------------------------------------------------
-# _handle_condensation_request_tool
+# _handle_summarize_context_tool
 # ---------------------------------------------------------------------------
 
 class TestHandleCondensationRequestTool:
     def test_creates_condensation_request_action(self):
-        action = _handle_condensation_request_tool({})
+        action = _handle_summarize_context_tool({})
         assert isinstance(action, CondensationRequestAction)
 
 
@@ -375,34 +391,74 @@ class TestProcessSingleToolCall:
 
 
 # ---------------------------------------------------------------------------
-# _validate_structure_editor_args (via _handle_structure_editor_tool)
+# _validate_structure_editor_args (via _handle_ast_code_editor_tool)
 # ---------------------------------------------------------------------------
 
 class TestValidateStructureEditorArgs:
-    """Tests for missing command / file_path validation."""
+    """Tests for missing command / path validation."""
 
     def test_missing_command_raises(self):
-        from backend.engines.orchestrator.function_calling import _handle_structure_editor_tool
+        from backend.engines.orchestrator.function_calling import _handle_ast_code_editor_tool
         with pytest.raises(FunctionCallValidationError, match="command"):
-            _handle_structure_editor_tool({"file_path": "x.py"})
+            _handle_ast_code_editor_tool({"file_path": "x.py"})
 
-    def test_missing_file_path_raises(self):
-        from backend.engines.orchestrator.function_calling import _handle_structure_editor_tool
-        with pytest.raises(FunctionCallValidationError, match="file_path"):
-            _handle_structure_editor_tool({"command": "edit_function"})
+    def test_missing_path_raises(self):
+        from backend.engines.orchestrator.function_calling import _handle_ast_code_editor_tool
+        with pytest.raises(FunctionCallValidationError, match="path"):
+            _handle_ast_code_editor_tool({"command": "edit_symbol_body"})
+
+    def test_canonical_path_with_view_file_command(self):
+        from backend.engines.orchestrator.function_calling import _handle_ast_code_editor_tool
+
+        result = _handle_ast_code_editor_tool(
+            {
+                "command": "view_file",
+                "path": "x.py",
+            }
+        )
+        assert isinstance(result, FileReadAction)
+        assert result.path == "x.py"
+
+    def test_canonical_replace_text_passthrough_returns_file_edit_action(self):
+        from backend.engines.orchestrator.function_calling import _handle_ast_code_editor_tool
+
+        result = _handle_ast_code_editor_tool(
+            {
+                "command": "replace_text",
+                "path": "x.py",
+                "old_str": "old",
+                "new_str": "new",
+            }
+        )
+        assert isinstance(result, FileEditAction)
+        assert result.path == "x.py"
+        assert result.command == "replace_text"
 
     def test_unknown_command_returns_message_action(self):
         """Unknown command returns a MessageAction with an error."""
-        from backend.engines.orchestrator.function_calling import _handle_structure_editor_tool
-        result = _handle_structure_editor_tool(
-            {"command": "totally_unknown_cmd", "file_path": "x.py"}
+        from backend.engines.orchestrator.function_calling import _handle_ast_code_editor_tool
+        result = _handle_ast_code_editor_tool(
+            {"command": "totally_unknown_cmd", "path": "x.py"}
         )
         assert isinstance(result, MessageAction)
         assert "error" in result.content.lower() or "unknown" in result.content.lower()
 
+    def test_str_replace_alias_is_rejected(self):
+        from backend.engines.orchestrator.function_calling import _handle_ast_code_editor_tool
+        result = _handle_ast_code_editor_tool(
+            {
+                "command": "str_replace",
+                "path": "x.py",
+                "old_str": "old",
+                "new_str": "new",
+            }
+        )
+        assert isinstance(result, MessageAction)
+        assert "unknown" in result.content.lower()
+
 
 # ---------------------------------------------------------------------------
-# _handle_edit_function_command (imported directly)
+# _handle_edit_symbol_body_command (imported directly)
 # ---------------------------------------------------------------------------
 
 class TestHandleEditFunctionCommand:
@@ -416,14 +472,14 @@ class TestHandleEditFunctionCommand:
 
     def test_success_returns_file_read_action(self):
         editor = self._make_editor(success=True)
-        result = _handle_edit_function_command(
+        result = _handle_edit_symbol_body_command(
             editor, "foo.py", {"function_name": "my_fn", "new_body": "return 1"}
         )
         assert isinstance(result, FileReadAction)
 
     def test_failure_returns_message_action(self):
         editor = self._make_editor(success=False, message="parse error")
-        result = _handle_edit_function_command(
+        result = _handle_edit_symbol_body_command(
             editor, "foo.py", {"function_name": "my_fn", "new_body": "return 1"}
         )
         assert isinstance(result, MessageAction)
@@ -431,13 +487,13 @@ class TestHandleEditFunctionCommand:
 
     def test_missing_function_name_raises(self):
         with pytest.raises(FunctionCallValidationError, match="function_name"):
-            _handle_edit_function_command(
+            _handle_edit_symbol_body_command(
                 MagicMock(), "foo.py", {"new_body": "return 1"}
             )
 
     def test_missing_new_body_raises(self):
         with pytest.raises(FunctionCallValidationError, match="new_body"):
-            _handle_edit_function_command(
+            _handle_edit_symbol_body_command(
                 MagicMock(), "foo.py", {"function_name": "fn"}
             )
 
@@ -661,7 +717,7 @@ class TestHealthCheck:
     def test_ultimate_editor_check_present(self):
         from backend.engines.orchestrator.tools.health_check import run_production_health_check
         result = run_production_health_check(raise_on_failure=False)
-        assert "structure_editor" in result
+        assert "ast_code_editor" in result
 
     def test_atomic_refactor_check_present(self):
         from backend.engines.orchestrator.tools.health_check import run_production_health_check

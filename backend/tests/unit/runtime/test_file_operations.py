@@ -249,7 +249,7 @@ class TestExecuteFileEditor:
         result_mock.new_content = "new"
         editor = MagicMock(return_value=result_mock)
 
-        output, (old, new) = execute_file_editor(editor, "str_replace", "/test.py")
+        output, (old, new) = execute_file_editor(editor, "replace_text", "/test.py")
         assert output == "File edited successfully"
         assert old == "old"
         assert new == "new"
@@ -260,14 +260,14 @@ class TestExecuteFileEditor:
         result_mock.output = ""
         editor = MagicMock(return_value=result_mock)
 
-        output, (old, new) = execute_file_editor(editor, "str_replace", "/test.py")
+        output, (old, new) = execute_file_editor(editor, "replace_text", "/test.py")
         assert "ERROR" in output
         assert old is None and new is None
 
     def test_invalid_insert_line(self):
         editor = MagicMock()
         output, (old, new) = execute_file_editor(
-            editor, "insert", "/test.py", insert_line="abc"
+            editor, "insert_text", "/test.py", insert_line="abc"
         )
         assert "Invalid insert_line" in output
         editor.assert_not_called()

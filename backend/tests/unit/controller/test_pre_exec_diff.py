@@ -5,7 +5,7 @@ Tests cover:
 - execute() method dispatch for different action types
 - _diff_for_edit with various FileEditAction commands
 - _diff_for_write for FileWriteAction
-- _simulate_edit for str_replace, create, insert commands
+- _simulate_edit for replace_text, create_file, insert_text commands
 - _resolve_path helper
 - _read_file helper with size limits
 """
@@ -60,7 +60,7 @@ class TestExecuteMethod:
             path="test.txt",
             old_str="old",
             new_str="new",
-            command="str_replace",
+            command="replace_text",
         )
 
         controller = MagicMock()
@@ -105,7 +105,7 @@ class TestDiffForEdit:
             path="/nonexistent/file.txt",
             old_str="old",
             new_str="new",
-            command="str_replace",
+            command="replace_text",
         )
 
         controller = MagicMock()
@@ -123,14 +123,14 @@ class TestDiffForEdit:
         assert "pre_exec_diff" not in ctx.metadata
 
     @pytest.mark.asyncio
-    async def test_diff_for_edit_with_str_replace(self):
-        """Should generate diff for str_replace command."""
+    async def test_diff_for_edit_with_replace_text(self):
+        """Should generate diff for replace_text command."""
         middleware = PreExecDiffMiddleware()
         action = FileEditAction(
             path="test.txt",
             old_str="old content",
             new_str="new content",
-            command="str_replace",
+            command="replace_text",
         )
 
         controller = MagicMock()
@@ -169,7 +169,7 @@ class TestDiffForEdit:
             path="test.txt",
             old_str="old",
             new_str="new",
-            command="str_replace",
+            command="replace_text",
         )
 
         controller = MagicMock()
@@ -303,11 +303,11 @@ class TestDiffForWrite:
 class TestSimulateEdit:
     """Test _simulate_edit method."""
 
-    def test_simulate_edit_str_replace(self):
-        """Should simulate str_replace command."""
+    def test_simulate_edit_replace_text(self):
+        """Should simulate replace_text command."""
         middleware = PreExecDiffMiddleware()
         action = MagicMock()
-        action.command = "str_replace"
+        action.command = "replace_text"
         action.old_str = "hello"
         action.new_str = "goodbye"
 
@@ -316,11 +316,11 @@ class TestSimulateEdit:
 
         assert new_content == "goodbye world"
 
-    def test_simulate_edit_str_replace_once_only(self):
-        """str_replace should replace only first occurrence."""
+    def test_simulate_edit_replace_text_once_only(self):
+        """replace_text should replace only first occurrence."""
         middleware = PreExecDiffMiddleware()
         action = MagicMock()
-        action.command = "str_replace"
+        action.command = "replace_text"
         action.old_str = "cat"
         action.new_str = "dog"
 
@@ -329,11 +329,11 @@ class TestSimulateEdit:
 
         assert new_content == "dog cat cat"
 
-    def test_simulate_edit_create(self):
-        """Should simulate create command."""
+    def test_simulate_edit_create_file(self):
+        """Should simulate create_file command."""
         middleware = PreExecDiffMiddleware()
         action = MagicMock()
-        action.command = "create"
+        action.command = "create_file"
         action.file_text = "new file content"
 
         old_content = "old content"
@@ -341,11 +341,11 @@ class TestSimulateEdit:
 
         assert new_content == "new file content"
 
-    def test_simulate_edit_insert(self):
-        """Should simulate insert command."""
+    def test_simulate_edit_insert_text(self):
+        """Should simulate insert_text command."""
         middleware = PreExecDiffMiddleware()
         action = MagicMock()
-        action.command = "insert"
+        action.command = "insert_text"
         action.insert_line = 1
         action.new_str = "inserted line"
 
@@ -355,11 +355,11 @@ class TestSimulateEdit:
         assert new_content is not None
         assert "inserted line" in new_content
 
-    def test_simulate_edit_insert_at_end(self):
-        """Should handle insert beyond last line."""
+    def test_simulate_edit_insert_text_at_end(self):
+        """Should handle insert_text beyond last line."""
         middleware = PreExecDiffMiddleware()
         action = MagicMock()
-        action.command = "insert"
+        action.command = "insert_text"
         action.insert_line = 100  # Beyond end
         action.new_str = "appended line"
 
@@ -369,11 +369,11 @@ class TestSimulateEdit:
         assert new_content is not None
         assert "appended line" in new_content
 
-    def test_simulate_edit_view_returns_none(self):
-        """Should return None for view command (no edit)."""
+    def test_simulate_edit_view_file_returns_none(self):
+        """Should return None for view_file command (no edit)."""
         middleware = PreExecDiffMiddleware()
         action = MagicMock()
-        action.command = "view"
+        action.command = "view_file"
 
         old_content = "content"
         new_content = middleware._simulate_edit(old_content, action)

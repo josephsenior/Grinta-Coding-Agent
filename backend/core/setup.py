@@ -373,6 +373,7 @@ def create_controller(
             confirmation_mode=config.security.confirmation_mode,
             replay_events=replay_events,
             security_analyzer=runtime.security_analyzer,
+            pending_action_timeout=config.pending_action_timeout,
         )
     )
     return (controller, initial_state)

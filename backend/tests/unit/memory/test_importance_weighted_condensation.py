@@ -9,7 +9,7 @@ from backend.events.action.files import FileEditAction, FileWriteAction
 from backend.events.action.message import MessageAction, SystemMessageAction
 from backend.events.event import EventSource
 from backend.events.observation import Observation
-from backend.memory.condenser.impl.conversation_window_condenser import (
+from backend.memory.condenser.strategies.conversation_window_condenser import (
     ConversationWindowCondenser,
 )
 from backend.memory.view import View

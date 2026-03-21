@@ -41,7 +41,7 @@ _RECOVERY_MAP: list[tuple[str, str, str]] = [
     (
         "file_editor",
         "not found",
-        "Use find_file or project_map to locate the correct file path.",
+        "Use find_file or analyze_project_structure to locate the correct file path.",
     ),
     (
         "web_search",

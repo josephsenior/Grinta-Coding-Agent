@@ -268,7 +268,8 @@ class GraphRAG:
         """Format retrieval results into a prompt-friendly string."""
         lines = ["### Semantic Matches"]
         for res in retrieval_result["semantic_results"]:
-            lines.append(f"- {res.get('content', '')[:200]}...")
+            content = res.get("content") or ""
+            lines.append(f"- {content[:200]}...")
 
         lines.append("\n### Structural Context (Graph)")
         if retrieval_result["graph_context"]:

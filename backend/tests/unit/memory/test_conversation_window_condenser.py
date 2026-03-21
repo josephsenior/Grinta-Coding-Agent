@@ -1,4 +1,4 @@
-"""Tests for backend.memory.condenser.impl.conversation_window_condenser."""
+"""Tests for backend.memory.condenser.strategies.conversation_window_condenser."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from backend.events.action.message import MessageAction, SystemMessageAction
 from backend.events.event import EventSource
 from backend.events.observation.empty import NullObservation
 from backend.memory.condenser.condenser import Condensation
-from backend.memory.condenser.impl.conversation_window_condenser import (
+from backend.memory.condenser.strategies.conversation_window_condenser import (
     ConversationWindowCondenser,
 )
 

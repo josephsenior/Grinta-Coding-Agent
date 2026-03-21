@@ -39,7 +39,7 @@ async def main():
     log("Creating conversation...")
     for i in range(20):
         try:
-            res = requests.post("http://127.0.0.1:3000/api/v1/conversations", json={}, timeout=30)
+            res = requests.post("http://127.0.0.1:3202/api/v1/conversations", json={}, timeout=30)
             res.raise_for_status()
             break
         except Exception as e:
@@ -54,7 +54,7 @@ async def main():
     log(f"Conversation created with ID: {sid}")
 
     log("Connecting to ws...")
-    await sio.connect(f"http://127.0.0.1:3000?conversation_id={sid}&latest_event_id=-1")
+    await sio.connect(f"http://127.0.0.1:3202?conversation_id={sid}&latest_event_id=-1")
 
     log("Waiting 2 seconds...")
     await asyncio.sleep(2)

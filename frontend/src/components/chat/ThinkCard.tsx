@@ -3,28 +3,25 @@ import { ChevronRight, Brain } from "lucide-react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { ActionEvent } from "@/types/events";
-import { CardSectionLabel } from "./CardSectionLabel";
+import { ideCaption } from "./chat-ide-styles";
+
+const panelTrigger =
+  "flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[12px] text-muted-foreground transition-colors hover:bg-muted/45";
 
 export function ThoughtTray({ thought }: { thought: string }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="mb-2">
-      <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border bg-muted/50 p-2 text-xs text-muted-foreground hover:bg-muted transition-colors">
+    <Collapsible open={open} onOpenChange={setOpen} className="mb-1.5">
+      <CollapsibleTrigger className={panelTrigger}>
         <ChevronRight
-          className={cn(
-            "h-3.5 w-3.5 shrink-0 transition-transform",
-            open && "rotate-90",
-          )}
+          className={cn("h-3 w-3 shrink-0 opacity-60 transition-transform duration-200", open && "rotate-90")}
         />
-        <CardSectionLabel
-          label="Thought Process"
-          icon={<Brain className="h-3.5 w-3.5 shrink-0" />}
-          className="mb-0 text-xs normal-case tracking-normal"
-        />
+        <Brain className="h-3 w-3 shrink-0 opacity-45" />
+        <span className={ideCaption}>Thought</span>
       </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mt-1 rounded-b-lg border border-t-0 bg-muted/30 p-3 text-sm text-muted-foreground">
+      <CollapsibleContent className="data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
+        <div className="ml-5 mt-1 border-l-2 border-border/40 pl-3 text-[12px] leading-relaxed text-muted-foreground">
           <p className="whitespace-pre-wrap">{thought}</p>
         </div>
       </CollapsibleContent>
@@ -42,21 +39,15 @@ export function ThinkCard({ event }: ThinkCardProps) {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground hover:bg-muted transition-colors">
+      <CollapsibleTrigger className={panelTrigger}>
         <ChevronRight
-          className={cn(
-            "h-3.5 w-3.5 shrink-0 transition-transform",
-            open && "rotate-90",
-          )}
+          className={cn("h-3 w-3 shrink-0 opacity-60 transition-transform duration-200", open && "rotate-90")}
         />
-        <CardSectionLabel
-          label="Logico-Semantic Analysis"
-          icon={<Brain className="h-3.5 w-3.5 shrink-0" />}
-          className="mb-0 text-sm normal-case tracking-normal"
-        />
+        <Brain className="h-3 w-3 shrink-0 opacity-45" />
+        <span className={ideCaption}>Thought</span>
       </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mt-1 rounded-b-lg border border-t-0 bg-muted/30 p-3 text-sm text-muted-foreground">
+      <CollapsibleContent className="data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0">
+        <div className="ml-5 mt-1 border-l-2 border-border/40 pl-3 text-[12px] leading-relaxed text-muted-foreground">
           <p className="whitespace-pre-wrap">{content}</p>
         </div>
       </CollapsibleContent>

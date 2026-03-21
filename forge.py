@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Forge — single-command launcher (embedded mode).
 
-Starts the backend server and TUI in one process — no second terminal needed.
+Starts the backend server in a background thread, opens the web UI, and keeps
+the process alive until Ctrl+C.
 
     python forge.py               # default port 3000
     python forge.py --port 3001   # custom port
     python forge.py --verbose     # debug logging
 
-For the two-terminal workflow (separate server + TUI), run:
-    python start_server.py        # terminal 1
-    python -m tui         # terminal 2
+For server only (open the UI yourself), run:
+    python start_server.py
+    # or: uv run forge serve
 """
 
 import sys

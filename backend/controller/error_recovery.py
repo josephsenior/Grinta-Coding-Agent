@@ -113,7 +113,7 @@ class ErrorRecoveryStrategy:
         r"crashed unexpectedly",
     ]
 
-    NETWORK_ERROR_PATTERNS = [
+    NETWORK_QUERY_ERROR_SOLUTIONS = [
         r"connection.*refused",
         r"connection.*timeout",
         r"network.*unreachable",
@@ -125,7 +125,7 @@ class ErrorRecoveryStrategy:
         r"failed to fetch",
     ]
 
-    FILESYSTEM_ERROR_PATTERNS = [
+    FILESYSTEM_QUERY_ERROR_SOLUTIONS = [
         r"no space left on device",
         r"disk.*full",
         r"permission denied",
@@ -134,7 +134,7 @@ class ErrorRecoveryStrategy:
         r"directory.*not.*found",
     ]
 
-    TOOL_CALL_ERROR_PATTERNS = [
+    TOOL_CALL_QUERY_ERROR_SOLUTIONS = [
         r"invalid.*json",
         r"malformed.*json",
         r"unexpected.*parameter",
@@ -142,7 +142,7 @@ class ErrorRecoveryStrategy:
         r"invalid.*argument",
     ]
 
-    TIMEOUT_ERROR_PATTERNS = [
+    TIMEOUT_QUERY_ERROR_SOLUTIONS = [
         r"timeout",
         r"timed out",
         r"deadline exceeded",
@@ -228,19 +228,19 @@ class ErrorRecoveryStrategy:
         ):
             return ErrorType.RUNTIME_CRASH
         if ErrorRecoveryStrategy._matches_patterns(
-            error_str, ErrorRecoveryStrategy.NETWORK_ERROR_PATTERNS
+            error_str, ErrorRecoveryStrategy.NETWORK_QUERY_ERROR_SOLUTIONS
         ):
             return ErrorType.NETWORK_ERROR
         if ErrorRecoveryStrategy._matches_patterns(
-            error_str, ErrorRecoveryStrategy.FILESYSTEM_ERROR_PATTERNS
+            error_str, ErrorRecoveryStrategy.FILESYSTEM_QUERY_ERROR_SOLUTIONS
         ):
             return ErrorRecoveryStrategy._classify_filesystem_error(error_str)
         if ErrorRecoveryStrategy._matches_patterns(
-            error_str, ErrorRecoveryStrategy.TOOL_CALL_ERROR_PATTERNS
+            error_str, ErrorRecoveryStrategy.TOOL_CALL_QUERY_ERROR_SOLUTIONS
         ):
             return ErrorType.TOOL_CALL_ERROR
         if ErrorRecoveryStrategy._matches_patterns(
-            error_str, ErrorRecoveryStrategy.TIMEOUT_ERROR_PATTERNS
+            error_str, ErrorRecoveryStrategy.TIMEOUT_QUERY_ERROR_SOLUTIONS
         ):
             return ErrorType.TIMEOUT_ERROR
 

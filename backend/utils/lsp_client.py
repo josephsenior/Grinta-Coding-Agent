@@ -433,70 +433,116 @@ class LspClient:
 
 # ── AST-based fallbacks (no pylsp needed) ─────────────────────────────────
 
-
 def _ast_list_symbols(abs_path: str, source: str, symbol_filter: str) -> LspResult:
-    """Parse source with ast and return top-level definitions."""
-    import ast
-
-    try:
-        tree = ast.parse(source)
-    except SyntaxError as e:
-        return LspResult(available=True, error=f"SyntaxError: {e}")
-
+    """Parse source with TreeSitter and return top-level definitions."""
+    from backend.utils.treesitter_editor import TreeSitterEditor
+    editor = TreeSitterEditor()
+    lang = editor.detect_language(abs_path)
+    if not lang:
+        return LspResult(available=False, error="Unsupported language for fallback")
+    
+    parser = editor.get_parser(lang)
+    if not parser:
+        return LspResult(available=False, error="No parser for language")
+        
+    tree = parser.parse(source.encode("utf-8"))
+    
     symbols: list[LspSymbol] = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if not symbol_filter or symbol_filter.lower() in node.name.lower():
-                symbols.append(
-                    LspSymbol(name=node.name, kind="Function", line=node.lineno)
-                )
-        elif isinstance(node, ast.ClassDef):
-            if not symbol_filter or symbol_filter.lower() in node.name.lower():
-                symbols.append(
-                    LspSymbol(name=node.name, kind="Class", line=node.lineno)
-                )
+    
+    def traverse(node):
+        if any(k in node.type for k in ["function", "class", "method", "declaration", "declarator"]):
+            name_node = editor._get_name_node(node)
+            if name_node:
+                name = name_node.text.decode("utf-8")
+                kind = "Class" if any(k in node.type for k in ["class", "interface"]) else "Function"
+                if not symbol_filter or symbol_filter.lower() in name.lower():
+                    symbols.append(LspSymbol(name=name, kind=kind, line=name_node.start_point[0] + 1))
+        for child in node.children:
+            traverse(child)
 
-    symbols.sort(key=lambda s: s.line)
-    return LspResult(available=True, symbols=symbols)
+    traverse(tree.root_node)
+    
+    # Filter duplicates (e.g. from nested name nodes)
+    unique_symbols = []
+    seen = set()
+    for s in symbols:
+        if s.name not in seen:
+            seen.add(s.name)
+            unique_symbols.append(s)
+            
+    unique_symbols.sort(key=lambda s: s.line)
+    return LspResult(available=True, symbols=unique_symbols)
 
 
 def _ast_hover(abs_path: str, source: str, line: int) -> LspResult:
-    """Extract docstring of the function/class at the given 1-based line."""
-    import ast
+    """Extract symbol name at the given 1-based line using TreeSitter."""
+    from backend.utils.treesitter_editor import TreeSitterEditor
+    editor = TreeSitterEditor()
+    lang = editor.detect_language(abs_path)
+    if not lang: 
+        return LspResult(available=True, hover_text="(unsupported language)")
+        
+    parser = editor.get_parser(lang)
+    if not parser: 
+        return LspResult(available=True, hover_text="(no parser)")
+        
+    tree = parser.parse(source.encode("utf-8"))
+    best = ""
+    
+    def traverse(node):
+        nonlocal best
+        # node.start_point is 0-indexed
+        if node.start_point[0] + 1 <= line <= node.end_point[0] + 1:
+            if any(k in node.type for k in ["function", "class", "method"]):
+                name_node = editor._get_name_node(node)
+                if name_node:
+                    kind = "Class" if "class" in node.type else ("Method" if "method" in node.type else "Function")
+                    best = f"{kind} `{name_node.text.decode('utf-8')}`"
+            for child in node.children:
+                traverse(child)
 
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return LspResult(available=True, hover_text="(syntax error, cannot parse)")
-
-    best: str = ""
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            if node.lineno <= line <= getattr(node, "end_lineno", node.lineno):
-                doc = ast.get_docstring(node) or ""
-                if doc:
-                    best = f"{type(node).__name__} `{node.name}`:\n{doc}"
+    traverse(tree.root_node)
     return LspResult(available=True, hover_text=best or "No documentation found.")
 
 
 def _ast_grep_symbol(abs_path: str, source: str, line: int) -> LspResult:
-    """Find definition of whatever name appears at the given line (AST grep)."""
+    """Find definition of whatever name appears at the given line (TreeSitter definition grep)."""
     lines = source.splitlines()
     if not lines or line < 1 or line > len(lines):
         return LspResult(available=True)
+        
     target_line = lines[line - 1]
-    # Extract the first identifier-like token from the line
     import re
-
-    tokens = re.findall(r"[A-Za-z_]\w*", target_line)
+    tokens = set(re.findall(r"[A-Za-z_]\w*", target_line))
     if not tokens:
         return LspResult(available=True)
-    # Search for definition in source
-    target = tokens[0]
+        
+    from backend.utils.treesitter_editor import TreeSitterEditor
+    editor = TreeSitterEditor()
+    lang = editor.detect_language(abs_path)
+    if not lang: return LspResult(available=True)
+    
+    parser = editor.get_parser(lang)
+    if not parser: return LspResult(available=True)
+    
+    tree = parser.parse(source.encode("utf-8"))
     locations: list[LspLocation] = []
-    for i, src_line in enumerate(lines, 1):
-        if re.search(rf"\bdef {target}\b|\bclass {target}\b", src_line):
-            locations.append(LspLocation(file=abs_path, line=i, column=1))
+    
+    def traverse(node):
+        if any(k in node.type for k in ["function", "class", "method", "declaration", "declarator"]):
+            name_node = editor._get_name_node(node)
+            if name_node:
+                name = name_node.text.decode("utf-8")
+                if name in tokens:
+                    locations.append(LspLocation(
+                        file=abs_path, 
+                        line=name_node.start_point[0] + 1, 
+                        column=name_node.start_point[1] + 1
+                    ))
+        for child in node.children:
+            traverse(child)
+
+    traverse(tree.root_node)
     return LspResult(available=True, locations=locations)
 
 
