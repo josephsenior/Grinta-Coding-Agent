@@ -284,7 +284,10 @@ class ActionExecutor:
         if hasattr(obs, "path") and isinstance(obs.path, str):
             obs.path = self._denormalize_obs_text(obs.path)
         if hasattr(obs, "message") and isinstance(obs.message, str):
-            obs.message = self._denormalize_obs_text(obs.message)
+            try:
+                obs.message = self._denormalize_obs_text(obs.message)
+            except AttributeError:
+                pass  # message is read-only (e.g. MCPObservation); content already denormalized
         return obs
 
     def _normalize_workspace_path(self, path: str) -> str:

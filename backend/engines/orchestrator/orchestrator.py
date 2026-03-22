@@ -142,10 +142,27 @@ class Orchestrator(Agent):
         if not os.path.exists(os.path.join(prompt_dir, system_prompt)):
             system_prompt = "system_prompt.j2"
 
+        resolved_model = ""
+        try:
+            resolved_model = (self.llm.config.model or "").strip()
+        except Exception:
+            pass
+        if not resolved_model and self.llm_registry:
+            try:
+                llm_cfg = self.llm_registry.config.get_llm_config_from_agent_config(
+                    self.config
+                )
+                if llm_cfg and getattr(llm_cfg, "model", None):
+                    resolved_model = str(llm_cfg.model).strip()
+            except Exception:
+                pass
+
         return OrchestratorPromptManager(
             prompt_dir=prompt_dir,
             system_prompt_filename=system_prompt,
             config=self.config,
+            resolved_llm_model_id=resolved_model or None,
+            forge_config=self.llm_registry.config if self.llm_registry else None,
         )
 
     def _run_production_health_check(self) -> None:
@@ -472,6 +489,23 @@ class Orchestrator(Agent):
             mcp_tools=self.mcp_tools
         )
 
+    def _mcp_server_prompt_hints(self) -> list[dict[str, str]]:
+        """Build ``[{"server": name, "hint": text}, ...]`` from Forge MCP ``usage_hint`` fields."""
+        try:
+            forge_cfg = getattr(self.llm_registry, "config", None)
+            mcp = getattr(forge_cfg, "mcp", None) if forge_cfg is not None else None
+            servers = getattr(mcp, "servers", None) or []
+            rows: list[dict[str, str]] = []
+            for s in servers:
+                hint = (getattr(s, "usage_hint", None) or "").strip()
+                if not hint:
+                    continue
+                name = (getattr(s, "name", None) or "").strip() or "unknown"
+                rows.append({"server": name, "hint": hint})
+            return rows
+        except Exception:
+            return []
+
     def set_mcp_tools(self, mcp_tools: list[dict]) -> None:
         """Set MCP tools and sync names to prompt manager for dynamic discovery."""
         super().set_mcp_tools(mcp_tools)
@@ -499,6 +533,8 @@ class Orchestrator(Agent):
                     descriptions[name] = first_line
             if hasattr(pm, "mcp_tool_descriptions"):
                 pm.mcp_tool_descriptions = descriptions
+            if hasattr(pm, "mcp_server_hints"):
+                pm.mcp_server_hints = self._mcp_server_prompt_hints()
         # Surface any MCP connection failures before the first user response so the
         # agent immediately knows which tools are unavailable, avoiding wasted turns
         # diagnosing connectivity issues at call-time.

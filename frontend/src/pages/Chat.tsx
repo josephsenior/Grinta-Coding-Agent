@@ -1,4 +1,11 @@
-import { useCallback, useState, useMemo, useEffect, useRef } from "react";
+import {
+  useCallback,
+  useState,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -55,7 +62,10 @@ import {
   takeDraftChatBootstrap,
 } from "@/lib/draft-chat-bootstrap";
 import { cn } from "@/lib/utils";
-import { SUSTAINED_DISCONNECT_NOTICE_MS } from "@/lib/constants";
+import {
+  AGENT_RUNNING_STALE_UI_MS,
+  SUSTAINED_DISCONNECT_NOTICE_MS,
+} from "@/lib/constants";
 import { deriveLiveActivity, lifecycleDisplay } from "@/lib/agent-activity";
 
 /** Workspace uploads: text/code only (server stores as UTF-8). Images use image_urls (data URLs), not this path. */
@@ -353,6 +363,17 @@ export default function Chat() {
   const navigate = useNavigate();
   const isDraft = id === "new";
 
+  /** Blocks duplicate POST /conversations while a draft chat is being created (navigation may lag after await). */
+  const draftCreateInFlightRef = useRef(false);
+  const [isDraftCreatePending, setIsDraftCreatePending] = useState(false);
+
+  useLayoutEffect(() => {
+    if (id && id !== "new") {
+      draftCreateInFlightRef.current = false;
+      setIsDraftCreatePending(false);
+    }
+  }, [id]);
+
   const {
     data: conversation,
     isError: conversationQueryError,
@@ -432,15 +453,18 @@ export default function Chat() {
     return () => clearTimeout(timer);
   }, [agentState]);
 
-  // If agentState is RUNNING for more than 90s with no new events or streaming,
-  // allow user to send a message or stop the agent (un-stick the UI).
+  // If agentState is RUNNING for a while with no new events or streaming, offer retry/stop (UI-only; see AGENT_RUNNING_STALE_UI_MS).
   const [runningTimedOut, setRunningTimedOut] = useState(false);
   useEffect(() => {
+    if (AGENT_RUNNING_STALE_UI_MS <= 0) {
+      setRunningTimedOut(false);
+      return;
+    }
     if (agentState !== AgentState.RUNNING) {
       setRunningTimedOut(false);
       return;
     }
-    const timer = setTimeout(() => setRunningTimedOut(true), 90_000);
+    const timer = setTimeout(() => setRunningTimedOut(true), AGENT_RUNNING_STALE_UI_MS);
     return () => clearTimeout(timer);
   }, [agentState, events.length, streamingContent]);
 
@@ -532,46 +556,76 @@ export default function Chat() {
     setIsUploading(true);
     try {
       if (isDraft) {
-        let imageUrls: string[] = [];
-        if (imageFiles.length > 0) {
-          imageUrls = await Promise.all(imageFiles.map(readFileAsDataUrl));
+        if (draftCreateInFlightRef.current) {
+          return;
         }
+        draftCreateInFlightRef.current = true;
+        setIsDraftCreatePending(true);
+        try {
+          let imageUrls: string[] = [];
+          if (imageFiles.length > 0) {
+            imageUrls = await Promise.all(imageFiles.map(readFileAsDataUrl));
+          }
 
-        if (workspaceFiles.length > 0) {
-          const res = await createConversation({});
-          const cid = res.conversation_id;
-          const body =
-            text ||
-            (imageUrls.length > 0 ? "Please see the attached image(s)." : "(Attached files)");
-          setDraftChatBootstrap({
-            conversationId: cid,
-            text: body,
-            workspaceFiles,
-            imageUrls,
+          if (workspaceFiles.length > 0) {
+            const res = await createConversation({});
+            const cid = res.conversation_id;
+            if (!cid) {
+              draftCreateInFlightRef.current = false;
+              setIsDraftCreatePending(false);
+              toast.error("Could not start chat", {
+                description: "The server did not return a conversation id. Try again.",
+              });
+              return;
+            }
+            const body =
+              text ||
+              (imageUrls.length > 0 ? "Please see the attached image(s)." : "(Attached files)");
+            setDraftChatBootstrap({
+              conversationId: cid,
+              text: body,
+              workspaceFiles,
+              imageUrls,
+            });
+            navigate(`/chat/${cid}`, { replace: true });
+            setInputValue("");
+            setPendingFiles([]);
+            return;
+          }
+
+          const initialMsg =
+            text || (imageUrls.length > 0 ? "Please see the attached image(s)." : undefined);
+          if (!initialMsg) {
+            draftCreateInFlightRef.current = false;
+            setIsDraftCreatePending(false);
+            toast.error("Message required", {
+              description: "Type something or attach an image to start.",
+            });
+            return;
+          }
+
+          const res = await createConversation({
+            initial_user_msg: initialMsg,
+            image_urls: imageUrls.length > 0 ? imageUrls : undefined,
           });
-          navigate(`/chat/${cid}`, { replace: true });
+          const newId = res.conversation_id;
+          if (!newId) {
+            draftCreateInFlightRef.current = false;
+            setIsDraftCreatePending(false);
+            toast.error("Could not start chat", {
+              description: "The server did not return a conversation id. Try again.",
+            });
+            return;
+          }
+          navigate(`/chat/${newId}`, { replace: true });
           setInputValue("");
           setPendingFiles([]);
           return;
+        } catch (draftErr) {
+          draftCreateInFlightRef.current = false;
+          setIsDraftCreatePending(false);
+          throw draftErr;
         }
-
-        const initialMsg =
-          text || (imageUrls.length > 0 ? "Please see the attached image(s)." : undefined);
-        if (!initialMsg) {
-          toast.error("Message required", {
-            description: "Type something or attach an image to start.",
-          });
-          return;
-        }
-
-        const res = await createConversation({
-          initial_user_msg: initialMsg,
-          image_urls: imageUrls.length > 0 ? imageUrls : undefined,
-        });
-        navigate(`/chat/${res.conversation_id}`, { replace: true });
-        setInputValue("");
-        setPendingFiles([]);
-        return;
       }
 
       let fileUrls: string[] = [];
@@ -666,7 +720,7 @@ export default function Chat() {
   const needsSetup = !apiKeySet || !modelSet;
 
   const canSend =
-    (isDraft && !needsSetup && !isUploading) ||
+    (isDraft && !needsSetup && !isUploading && !isDraftCreatePending) ||
     (isConnected &&
       (effectiveAgentStateForUi === AgentState.AWAITING_USER_INPUT ||
         effectiveAgentStateForUi === AgentState.PAUSED ||
@@ -680,7 +734,7 @@ export default function Chat() {
   const isEmpty = events.length === 0 && !streamingContent;
   /** Paperclip: draft chat has no socket yet; workspace files use bootstrap after first create. */
   const canOpenFilePicker =
-    (isDraft && !needsSetup && !isUploading) ||
+    (isDraft && !needsSetup && !isUploading && !isDraftCreatePending) ||
     (isConnected && !!id && id !== "new" && !needsSetup && !isUploading);
 
   const liveActivity = useMemo(() => {

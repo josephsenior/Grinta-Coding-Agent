@@ -71,6 +71,32 @@ class TestPromptManager:
         assert "8 turns left" in last_content.text
 
 class TestOrchestratorPromptManager:
+    def test_active_llm_model_id_uses_resolved_when_set(self, prompt_dir):
+        opm = OrchestratorPromptManager(
+            prompt_dir, resolved_llm_model_id="openai/gpt-4o"
+        )
+        assert opm._active_llm_model_id() == "openai/gpt-4o"
+
+    def test_active_llm_model_id_fallback_from_forge_config(self, prompt_dir):
+        mock_llm_cfg = MagicMock()
+        mock_llm_cfg.model = "anthropic/claude-3-5-sonnet"
+        mock_forge_config = MagicMock()
+        mock_forge_config.get_llm_config_from_agent_config.return_value = (
+            mock_llm_cfg
+        )
+        mock_agent_config = MagicMock()
+
+        opm = OrchestratorPromptManager(
+            prompt_dir,
+            config=mock_agent_config,
+            resolved_llm_model_id="",
+            forge_config=mock_forge_config,
+        )
+        assert opm._active_llm_model_id() == "anthropic/claude-3-5-sonnet"
+        mock_forge_config.get_llm_config_from_agent_config.assert_called_once_with(
+            mock_agent_config
+        )
+
     def test_get_system_message_injects_identity(self, prompt_dir):
         with patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x):
             opm = OrchestratorPromptManager(prompt_dir)

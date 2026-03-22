@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Settings as SettingsIcon,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -193,6 +194,7 @@ const EMPTY_SERVER: MCPServerConfig = {
   env: {},
   url: "",
   api_key: "",
+  usage_hint: "",
 };
 
 function MCPServerDialog({
@@ -219,6 +221,18 @@ function MCPServerDialog({
       .join(", "),
   );
 
+  useEffect(() => {
+    if (!open) return;
+    const base = initial ?? { ...EMPTY_SERVER };
+    setForm(base);
+    setArgsRaw((base.args ?? []).join(" "));
+    setEnvRaw(
+      Object.entries(base.env ?? {})
+        .map(([k, v]) => `${k}=${v}`)
+        .join(", "),
+    );
+  }, [open, initial]);
+
   const set = (key: keyof MCPServerConfig, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -233,7 +247,8 @@ function MCPServerDialog({
       if (idx > 0)
         env[trimmed.slice(0, idx).trim()] = trimmed.slice(idx + 1).trim();
     }
-    onSave({ ...form, args, env });
+    const usage_hint = (form.usage_hint ?? "").trim() || null;
+    onSave({ ...form, args, env, usage_hint });
   };
 
   const isStdio = form.type === "stdio";
@@ -352,6 +367,24 @@ function MCPServerDialog({
               </div>
             </>
           )}
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              Agent usage hint{" "}
+              <span className="font-normal text-muted-foreground">
+                (optional, system prompt)
+              </span>
+            </label>
+            <Textarea
+              placeholder="e.g. Use for up-to-date library docs and API signatures — not guesses from memory."
+              value={form.usage_hint ?? ""}
+              onChange={(e) => set("usage_hint", e.target.value)}
+              className="min-h-18 resize-y font-mono text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              One short sentence per server: when the agent should prefer this MCP server over others.
+            </p>
+          </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
@@ -484,6 +517,11 @@ function MCPSection({
                         .join(" ")
                     : (server.url ?? "")}
                 </p>
+                {server.usage_hint ? (
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    {server.usage_hint}
+                  </p>
+                ) : null}
               </div>
               <div className="flex items-center gap-1">
                 <Button

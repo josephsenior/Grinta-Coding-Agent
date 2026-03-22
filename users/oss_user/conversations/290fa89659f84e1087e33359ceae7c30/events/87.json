@@ -1,0 +1,1 @@
+{"id": 87, "sequence": 87, "timestamp": "2026-03-22T21:49:22.438672", "source": "user", "message": "Agent state changed to stopped", "action": "change_agent_state", "args": {"confirmation_state": "confirmed", "agent_state": "stopped", "thought": ""}}

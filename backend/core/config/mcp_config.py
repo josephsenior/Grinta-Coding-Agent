@@ -71,6 +71,7 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         url: Server URL (sse and shttp only)
         api_key: Optional API key (sse and shttp only)
         transport: Transport protocol for shttp (sse or shttp, defaults to sse)
+        usage_hint: Optional one-line guidance for the agent system prompt (when to use this server).
 
     """
 
@@ -82,6 +83,13 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     url: str | None = None
     api_key: str | None = None
     transport: Literal["sse", "shttp"] = "sse"
+    usage_hint: str | None = Field(
+        default=None,
+        description=(
+            "Short sentence injected into the agent system prompt under the MCP server name "
+            "(e.g. when to prefer Context7 vs browser vs fetch)."
+        ),
+    )
 
     @field_validator("name", mode="before")
     @classmethod
@@ -161,6 +169,18 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             env[key] = value
         return env
 
+    @field_validator("usage_hint", mode="before")
+    @classmethod
+    def strip_usage_hint(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        if len(s) > 800:
+            return s[:800].rstrip()
+        return s
+
     @field_validator("url", mode="before")
     @classmethod
     def validate_url(cls, v: str | None) -> str | None:
@@ -208,6 +228,7 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             and self.url == other.url
             and self.api_key == other.api_key
             and self.transport == other.transport
+            and self.usage_hint == other.usage_hint
         )
 
 

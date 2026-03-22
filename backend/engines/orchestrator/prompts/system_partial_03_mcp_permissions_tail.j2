@@ -14,7 +14,25 @@
 {% if mcp_total > mcp_cap %}
 - … and **{{ mcp_total - mcp_cap }}** more (names in tool list / `call_mcp_tool` only).
 {% endif %}
-**UI / browser / quality:** If a matching MCP tool exists (e.g. browser, fetch, UI verify, rigour), prefer `call_mcp_tool` over guessing shell workarounds.
+
+{% if mcp_server_hints %}
+<MCP_SERVER_HINTS>
+**Configured MCP servers (when to use each — from your Forge MCP settings):**
+{% for row in mcp_server_hints %}
+- **`{{ row.server }}`:** {{ row.hint }}
+{% endfor %}
+</MCP_SERVER_HINTS>
+{% endif %}
+
+<MCP_WHEN_TO_USE>
+**Discipline (MCP):**
+{% if mcp_server_hints %}
+Follow **Configured MCP servers** above for *when* to prefer each server; match the user’s task to those hints, then pick the concrete tool name from the list and each tool’s description.
+{% else %}
+Infer *when* to call MCP from each tool’s **name** and **description** in the list above (and avoid training-memory guesses for vendor-specific or version-specific facts—use a tool when one fits).
+{% endif %}
+Prefer **`call_mcp_tool`** over shell one-offs when an MCP tool covers the need. If asked what you can do or which models/tools you have, answer from **this** tool list, **MCP server hints** (if any), and your configured model id—**not** generic “no web / no docs” tropes.
+</MCP_WHEN_TO_USE>
 {% else %}
 No external MCP tools connected.
 {% endif %}

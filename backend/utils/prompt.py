@@ -264,23 +264,38 @@ class OrchestratorPromptManager(PromptManager):
         system_prompt_filename: str = "system_prompt.j2",
         *,
         config: object | None = None,
+        resolved_llm_model_id: str | None = None,
+        forge_config: object | None = None,
     ) -> None:
         super().__init__(prompt_dir, system_prompt_filename)
         self._config = config
+        # Runtime-resolved model id (ForgeConfig + user settings live on LLMRegistry; AgentConfig often only references "llm").
+        self._resolved_llm_model_id = (resolved_llm_model_id or "").strip()
+        self._forge_config = forge_config
         # Populated dynamically by the orchestrator after MCP tools connect
         self.mcp_tool_names: list[str] = []
         self.mcp_tool_descriptions: dict[str, str] = {}
+        # Per-server usage_hint lines from Forge MCP config (see MCPServerConfig.usage_hint)
+        self.mcp_server_hints: list[dict[str, str]] = []
 
     def _active_llm_model_id(self) -> str:
-        """Default LLM model string from config (for accurate self-identification in prompts)."""
-        cfg = self._config
-        if cfg is None:
-            return ""
-        try:
-            llm = cfg.get_llm_config()
-            return (llm.model or "").strip() if llm else ""
-        except Exception:
-            return ""
+        """Model id for self-identification in the system prompt."""
+        if self._resolved_llm_model_id:
+            return self._resolved_llm_model_id
+        if self._forge_config is not None and self._config is not None:
+            try:
+                llm_cfg = getattr(
+                    self._forge_config,
+                    "get_llm_config_from_agent_config",
+                    None,
+                )
+                if callable(llm_cfg):
+                    resolved = llm_cfg(self._config)
+                    if resolved and hasattr(resolved, "model") and resolved.model:
+                        return str(resolved.model).strip()
+            except Exception:
+                pass
+        return ""
 
     def get_system_message(self, **context: object) -> str:
         """Render with orchestrator defaults (config, cli_mode, identity prefix)."""
@@ -295,6 +310,7 @@ class OrchestratorPromptManager(PromptManager):
         context.setdefault("is_windows", _on_windows and not shutil.which("bash"))
         context.setdefault("mcp_tool_names", self.mcp_tool_names)
         context.setdefault("mcp_tool_descriptions", self.mcp_tool_descriptions)
+        context.setdefault("mcp_server_hints", self.mcp_server_hints)
         context.setdefault("active_llm_model", self._active_llm_model_id())
         content = super().get_system_message(**context)
         # Avoid duplicating identity: system_prompt.j2 already opens with "You are Forge, ..."

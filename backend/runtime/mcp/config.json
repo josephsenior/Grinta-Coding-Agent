@@ -3,38 +3,46 @@
     "default": {},
     "browser-use": {
       "command": "npx",
-      "args": ["-y", "browser-use-mcp"]
+      "args": ["-y", "browser-use-mcp"],
+      "usage_hint": "Full browser automation for live sites, forms, screenshots, and JS-heavy pages—prefer over raw HTTP when the DOM or user interactions matter."
     },
     "context7": {
       "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp"]
+      "args": ["-y", "@upstash/context7-mcp"],
+      "usage_hint": "Up-to-date library and framework docs (APIs, examples, version notes)—use when accuracy beats training-data recall."
     },
     "shadcn": {
       "command": "npx",
-      "args": ["-y", "@jpisnice/shadcn-ui-mcp-server", "--framework", "react"]
+      "args": ["-y", "@jpisnice/shadcn-ui-mcp-server", "--framework", "react"],
+      "usage_hint": "shadcn/ui React components: variants, props, CLI install, and registry lookups."
     },
     "github": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
+      "usage_hint": "GitHub API for repos, issues, PRs, and metadata—requires GITHUB_PERSONAL_ACCESS_TOKEN in this server’s env.",
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
       }
     },
     "fetch": {
       "command": "uvx",
-      "args": ["mcp-server-fetch"]
+      "args": ["mcp-server-fetch"],
+      "usage_hint": "Fetch a URL’s raw body (HTML/JSON/text) when you need content without driving a browser."
     },
     "duckduckgo": {
       "command": "npx",
-      "args": ["-y", "duckduckgo-mcp-server"]
+      "args": ["-y", "duckduckgo-mcp-server"],
+      "usage_hint": "Web search snippets and links for discovery before deeper fetch or browser work."
     },
     "magic": {
       "command": "npx",
-      "args": ["-y", "@21st-dev/magic@latest"]
+      "args": ["-y", "@21st-dev/magic@latest"],
+      "usage_hint": "Rapid UI/component scaffolding (21st.dev Magic)—use when the user wants quick generated UI."
     },
     "rigour": {
       "command": "npx",
-      "args": ["-y", "@rigour-labs/mcp"]
+      "args": ["-y", "@rigour-labs/mcp"],
+      "usage_hint": "Rigour Labs MCP—structured quality/rigor workflows; follow each exposed tool’s description."
     }
   },
   "tools": []

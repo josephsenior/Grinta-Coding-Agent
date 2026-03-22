@@ -7,6 +7,8 @@ export interface MCPServerConfig {
   url?: string | null;
   api_key?: string | null;
   transport?: "sse" | "shttp";
+  /** One-line hint injected into the agent system prompt (when to use this server). */
+  usage_hint?: string | null;
 }
 
 export interface MCPConfig {

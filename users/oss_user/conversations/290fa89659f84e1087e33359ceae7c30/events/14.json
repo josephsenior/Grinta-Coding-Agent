@@ -1,0 +1,1 @@
+{"id": 14, "sequence": 14, "timestamp": "2026-03-22T19:33:19.120887", "source": "user", "message": "Retrieving content for: yes , what llm are you ?", "action": "recall", "args": {"confirmation_state": "confirmed", "recall_type": "knowledge", "query": "yes , what llm are you ?", "thought": ""}}

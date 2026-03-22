@@ -1,10 +1,9 @@
 {
-  "timestamp": "2026-03-21 15:28:43",
-  "events_condensed": 25,
+  "timestamp": "2026-03-22 22:51:45",
+  "events_condensed": 42,
   "files_touched": {},
   "recent_errors": [
-    "Agent session failed to initialize",
-    "Authentication Error\n\nThere's an issue with your API key configuration.\n\n**What you can do:**\n• Check that your API key is correct in settings\n• Verify the API key has the necessary permissions\n• Ensure the API key hasn't expired or been revoked\n• Try regenerating your API key\n\n**Technical details:** 400 Bad Request. {'message': '{\\n  \"error\": {\\n    \"code\": 400,\\n    \"message\": \"API Key not found. Please pass a valid API key.\",\\n    \"status\": \"INVALID_ARGUMENT\",\\n    \"details\": [\\n      {\\n    "
+    "Unexpected error during action execution: AttributeError: property 'message' of 'MCPObservation' object has no setter"
   ],
   "decisions": [],
   "recent_commands": [],

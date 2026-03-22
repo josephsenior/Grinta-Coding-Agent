@@ -166,6 +166,20 @@ class TestMCPServerConfigStdio:
         with pytest.raises(Exception, match="key cannot be empty"):
             MCPServerConfig(name="s1", type="stdio", command="npx", env="=value")
 
+    def test_usage_hint_stripped_and_truncated(self):
+        cfg = MCPServerConfig(
+            name="s1",
+            type="stdio",
+            command="npx",
+            usage_hint="  Use for docs.  ",
+        )
+        assert cfg.usage_hint == "Use for docs."
+        long_hint = "x" * 900
+        cfg2 = MCPServerConfig(
+            name="s2", type="stdio", command="npx", usage_hint=long_hint
+        )
+        assert len(cfg2.usage_hint or "") == 800
+
     def test_equality_same(self):
         a = MCPServerConfig(name="s", type="stdio", command="npx", args=["a"], env={"K": "V"})
         b = MCPServerConfig(name="s", type="stdio", command="npx", args=["a"], env={"K": "V"})
