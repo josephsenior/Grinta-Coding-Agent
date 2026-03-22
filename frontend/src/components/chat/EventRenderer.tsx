@@ -138,7 +138,7 @@ export function EventCard({ event }: EventCardProps) {
                 previewLines={6}
                 collapseWhenLines={12}
                 collapseWhenChars={2500}
-                preClassName="rounded border border-border/30 bg-background/50 p-2 dark:bg-background/25"
+                preClassName="rounded border border-border/30 bg-muted/45 p-2 dark:bg-card/40"
               />
             </div>
           );

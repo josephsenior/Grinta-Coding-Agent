@@ -15,7 +15,7 @@ export function WorkspacePanel({ conversationId }: WorkspacePanelProps) {
   const workspaceView = useContextPanelStore((s) => s.workspaceView);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="flex h-full min-h-0 flex-col bg-transparent">
       {workspaceView === "browse" && (
         <Tabs defaultValue="workspace" className="flex h-full min-h-0 flex-col">
           <TabsList className="grid h-9 w-full shrink-0 grid-cols-3 rounded-none border-b bg-transparent px-0">

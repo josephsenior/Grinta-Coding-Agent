@@ -35,7 +35,6 @@ from backend.controller.services import (
     MetricsService,
     ObservationService,
     PendingActionService,
-    RecoveryService,
     RetryService,
     SafetyService,
     StateTransitionService,
@@ -104,7 +103,6 @@ class ControllerServices:
         self.telemetry = TelemetryService(self.context)
         self.metrics = MetricsService(self.context)
         self.retry = RetryService(self.context)
-        self.recovery = RecoveryService(self.context, self.retry)
         self.circuit_breaker = CircuitBreakerService(self.context)
         self.stuck = StuckDetectionService(controller)
         self.task_validation = TaskValidationService(self.context)

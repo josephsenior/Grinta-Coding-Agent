@@ -128,7 +128,10 @@ class OrchestratorPlanner:
         if not self._llm:
             return False
         try:
-            return prefers_short_tool_descriptions(self._llm.config.model)
+            model = (self._llm.config.model or "").strip()
+            if not model:
+                return False
+            return prefers_short_tool_descriptions(model)
         except Exception:
             return False
 
@@ -390,7 +393,7 @@ class OrchestratorPlanner:
 
         params["extra_body"] = {
             "metadata": state.to_llm_metadata(
-                model_name=self._llm.config.model,
+                model_name=(self._llm.config.model or "").strip() or "unknown",
                 agent_name=getattr(state, "agent_name", "Orchestrator"),
             )
         }
@@ -776,7 +779,10 @@ class OrchestratorPlanner:
 
     def _llm_supports_tool_choice(self) -> bool:
         try:
-            return supports_tool_choice(self._llm.config.model)
+            model = (self._llm.config.model or "").strip()
+            if not model:
+                return False
+            return supports_tool_choice(model)
         except Exception:
             return False
 

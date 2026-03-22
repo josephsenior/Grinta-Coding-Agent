@@ -157,7 +157,7 @@ export function useSocket(conversationId: string | undefined) {
   );
 
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || conversationId === "new") return;
     if (connectedRef.current) return;
     connectedRef.current = true;
 

@@ -192,7 +192,7 @@ export function FilesTree({
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!conversationId) return;
+    if (!conversationId || conversationId === "new") return;
     setLoading(true);
     setLoadError(false);
     try {
@@ -218,6 +218,16 @@ export function FilesTree({
   }, [load]);
 
   useRefetchWhenBackendRecovers(() => load({ silent: true }), true, loadError);
+
+  if (conversationId === "new") {
+    return (
+      <div className="flex h-full min-h-0 flex-col items-center justify-center px-4 py-8 text-center">
+        <p className="text-xs text-muted-foreground">
+          Send a message to start this chat. The file tree uses the active conversation id.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">

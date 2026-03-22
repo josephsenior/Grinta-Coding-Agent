@@ -147,7 +147,6 @@ class TestControllerServices:
         assert services.telemetry is not None
         assert services.metrics is not None
         assert services.retry is not None
-        assert services.recovery is not None
         assert services.circuit_breaker is not None
         assert services.stuck is not None
         assert services.task_validation is not None
@@ -156,7 +155,7 @@ class TestControllerServices:
         assert services.exception_handler is not None
 
     def test_service_count_matches_documentation(self):
-        """Test creates exactly 25 services as documented."""
+        """Test creates exactly 24 services as documented."""
         mock_controller = MagicMock()
         mock_controller.PENDING_ACTION_TIMEOUT = 30
 
@@ -169,7 +168,7 @@ class TestControllerServices:
             if not attr.startswith("_") and not callable(getattr(services, attr))
         ]
 
-        assert len(service_attrs) == 25
+        assert len(service_attrs) == 24
 
     def test_services_receive_controller_reference(self):
         """Test some services receive direct controller reference."""
@@ -243,12 +242,3 @@ class TestControllerServices:
         assert services.pending_action is not None
         assert services.confirmation is not None
 
-    def test_recovery_receives_retry(self):
-        """Test RecoveryService receives retry service."""
-        mock_controller = MagicMock()
-        mock_controller.PENDING_ACTION_TIMEOUT = 30
-
-        services = ControllerServices(mock_controller)
-
-        assert services.recovery is not None
-        assert services.retry is not None

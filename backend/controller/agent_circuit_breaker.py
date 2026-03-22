@@ -27,7 +27,7 @@ class CircuitBreakerConfig:
 
     enabled: bool = True
     max_consecutive_errors: int = (
-        3  # Reduced from 5 — 3 consecutive errors is already a bad loop
+        5  # Allow more consecutive errors to support exploratory or compilation retry loops
     )
     max_high_risk_actions: int = (
         5  # Reduced from 10 — 5 high-risk actions warrants intervention

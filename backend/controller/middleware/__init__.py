@@ -10,7 +10,6 @@ from backend.controller.middleware.conflict_detection import ConflictDetectionMi
 from backend.controller.middleware.context_window import ContextWindowMiddleware
 from backend.controller.middleware.cost_quota import CostQuotaMiddleware
 from backend.controller.middleware.edit_verify import EditVerifyMiddleware
-from backend.controller.middleware.error_pattern import ErrorPatternMiddleware
 from backend.controller.middleware.logging_mw import LoggingMiddleware
 from backend.controller.middleware.reflection import ReflectionMiddleware
 from backend.controller.middleware.safety_validator import SafetyValidatorMiddleware

@@ -72,7 +72,7 @@ export function McpCard({ event }: ActionCardProps) {
       <Wrench className="h-3.5 w-3.5 shrink-0 opacity-50" />
       <span>
         MCP{" "}
-        <code className="rounded border border-border/40 bg-background/60 px-1 font-mono text-[11px]">{tool}</code>
+        <code className="rounded border border-border/40 bg-muted/50 px-1 font-mono text-[11px] dark:bg-card/45">{tool}</code>
         {serverName && (
           <span className="text-muted-foreground/60"> via {serverName}</span>
         )}
@@ -93,7 +93,7 @@ export function BrowseCard({ event }: ActionCardProps) {
         {url && (
           <>
             {" "}
-            <code className="inline-block max-w-xs truncate rounded border border-border/40 bg-background/60 px-1 align-bottom font-mono text-[11px]">
+            <code className="inline-block max-w-xs truncate rounded border border-border/40 bg-muted/50 px-1 align-bottom font-mono text-[11px] dark:bg-card/45">
               {url}
             </code>
           </>
@@ -311,7 +311,7 @@ export function McpObservationCard({ event }: ObservationCardProps) {
           collapseWhenLines={10}
           collapseWhenChars={2000}
           className="mt-1"
-          preClassName="rounded border border-border/40 bg-background/50 p-2 dark:bg-background/30"
+          preClassName="rounded border border-border/40 bg-muted/45 p-2 dark:bg-card/40"
         />
       )}
     </div>
@@ -337,7 +337,7 @@ export function BrowseObservationCard({ event }: ObservationCardProps) {
           collapseWhenLines={10}
           collapseWhenChars={1800}
           className="mt-1"
-          preClassName="rounded border border-border/40 bg-background/50 p-2 dark:bg-background/30"
+          preClassName="rounded border border-border/40 bg-muted/45 p-2 dark:bg-card/40"
         />
       )}
     </div>
@@ -360,7 +360,7 @@ export function DelegateResultCard({ event }: ObservationCardProps) {
         collapseWhenLines={10}
         collapseWhenChars={2000}
         emptyText="(empty)"
-        preClassName="rounded border border-border/40 bg-background/50 p-2 text-foreground/90 dark:bg-background/30"
+        preClassName="rounded border border-border/40 bg-muted/45 p-2 text-foreground/90 dark:bg-card/40"
       />
     </div>
   );
@@ -382,7 +382,7 @@ export function RecallFailureCard({ event }: ObservationCardProps) {
         collapseWhenLines={10}
         collapseWhenChars={1800}
         emptyText="(no details)"
-        preClassName="rounded border border-amber-500/20 bg-background/50 p-2 text-foreground/90 dark:bg-background/30"
+        preClassName="rounded border border-amber-500/20 bg-muted/40 p-2 text-foreground/90 dark:bg-card/35"
       />
     </div>
   );

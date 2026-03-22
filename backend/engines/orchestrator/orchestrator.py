@@ -79,18 +79,9 @@ class Orchestrator(Agent):
         self.event_stream: EventStream | None = None
 
         # Safety / hallucination systems
-        from backend.engines.orchestrator.file_verification_guard import (
-            FileVerificationGuard,
-        )
-        from backend.engines.orchestrator.hallucination_detector import (
-            HallucinationDetector,
-        )
-
-        self.hallucination_detector = HallucinationDetector()
-        self.anti_hallucination = FileVerificationGuard()
         self.safety_manager: SafetyManagerProtocol = OrchestratorSafetyManager(
-            anti_hallucination=self.anti_hallucination,
-            hallucination_detector=self.hallucination_detector,
+            
+            
         )
 
         # Prompt manager + memory subsystems

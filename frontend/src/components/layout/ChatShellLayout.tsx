@@ -26,6 +26,7 @@ function readStoredWidth(key: string, fallback: number): number {
 export function ChatShellLayout() {
   const match = useMatch("/chat/:id");
   const conversationId = match?.params.id ?? null;
+  const onChatRoute = !!conversationId;
 
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const contextPanelOpen = useAppStore((s) => s.contextPanelOpen);
@@ -63,14 +64,14 @@ export function ChatShellLayout() {
     [resizeRight, workspaceWidth],
   );
 
-  const showWorkspace = contextPanelOpen && !!conversationId;
+  const showWorkspace = contextPanelOpen && onChatRoute && !!conversationId;
 
   return (
     <div className="flex h-full min-h-0 flex-1 overflow-hidden">
       {sidebarOpen && (
         <>
           <div
-            className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r bg-background"
+            className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
             style={{ width: sidebarWidth }}
           >
             <ConversationSidebar />
@@ -84,7 +85,7 @@ export function ChatShellLayout() {
         </>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-muted/20 dark:bg-muted/25">
         <Outlet />
       </div>
 
@@ -97,7 +98,7 @@ export function ChatShellLayout() {
             onMouseDown={onResizeRight}
           />
           <div
-            className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-l bg-background"
+            className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-l border-sidebar-border bg-sidebar text-sidebar-foreground"
             style={{ width: workspaceWidth }}
           >
             <WorkspacePanel conversationId={conversationId} />

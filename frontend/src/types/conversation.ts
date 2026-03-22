@@ -33,4 +33,13 @@ export interface CreateConversationRequest {
   initial_user_msg?: string;
   repository?: string;
   selected_branch?: string;
+  image_urls?: string[];
+}
+
+/** Response from POST /conversations (create / init session). */
+export interface CreateConversationResult {
+  status: string;
+  conversation_id: string;
+  message?: string | null;
+  conversation_status?: string | null;
 }

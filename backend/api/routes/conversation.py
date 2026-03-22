@@ -14,7 +14,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.core.config.llm_config import LLMConfig
 from backend.core.errors import SessionInvariantError
 from backend.core.logger import forge_logger as logger
@@ -29,7 +28,6 @@ from backend.api.dependencies import get_dependencies
 from backend.api.services.completion_service import (
     CompletionRequest,
     CompletionResult,
-    format_error_message,
 )
 from backend.api.services.completion_service import (
     get_code_completion as _run_completion,
@@ -481,8 +479,10 @@ async def update_playbook(
                 detail="This playbook is not stored in the conversation workspace (cannot edit here).",
             )
 
-        runtime = cast("Runtime", conversation.runtime)
+        runtime = conversation.runtime
         root = runtime.config.workspace_mount_path_in_runtime
+        if not root:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workspace root not available")
         old_fp = os.path.normpath(os.path.join(root, rel))
         if not old_fp.startswith(os.path.normpath(root)):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
@@ -534,10 +534,10 @@ async def update_playbook(
 
         if kind == "repo":
             memory.repo_playbooks.pop(name, None)
-            memory.repo_playbooks[reloaded.name] = reloaded
+            memory.repo_playbooks[reloaded.name] = cast("Any", reloaded)
         else:
             memory.knowledge_playbooks.pop(name, None)
-            memory.knowledge_playbooks[reloaded.name] = reloaded
+            memory.knowledge_playbooks[reloaded.name] = cast("Any", reloaded)
 
         return JSONResponse(status_code=status.HTTP_200_OK, content={"ok": True})
     except HTTPException:
@@ -576,6 +576,8 @@ async def delete_playbook(
             )
 
         root = conversation.runtime.config.workspace_mount_path_in_runtime
+        if not root:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workspace root not available")
         full_path = os.path.normpath(os.path.join(root, rel))
         if not full_path.startswith(os.path.normpath(root)):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
@@ -785,18 +787,27 @@ def _build_completion_success_content(result: CompletionResult) -> dict[str, Any
 
 def _build_completion_error_response(exc: Exception) -> JSONResponse:
     """Build JSONResponse for completion exception."""
-    error_type = ErrorRecoveryStrategy.classify_error(exc)
-    logger.error("Completion error (%s): %s", error_type.value, exc, exc_info=True)
-    status_map = {
-        ErrorType.NETWORK_ERROR: status.HTTP_503_SERVICE_UNAVAILABLE,
-        ErrorType.TIMEOUT_ERROR: status.HTTP_504_GATEWAY_TIMEOUT,
-        ErrorType.PERMISSION_ERROR: status.HTTP_403_FORBIDDEN,
-    }
+    import asyncio
+
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    error_type = "INTERNAL_ERROR"
+
+    if isinstance(exc, (ConnectionError, TimeoutError)):
+        status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        error_type = "NETWORK_ERROR"
+    elif isinstance(exc, asyncio.TimeoutError):
+        status_code = status.HTTP_504_GATEWAY_TIMEOUT
+        error_type = "TIMEOUT_ERROR"
+    elif isinstance(exc, PermissionError):
+        status_code = status.HTTP_403_FORBIDDEN
+        error_type = "PERMISSION_ERROR"
+
+    logger.error("Completion error (%s): %s", error_type, exc, exc_info=True)
     return JSONResponse(
-        status_code=status_map.get(error_type, status.HTTP_500_INTERNAL_SERVER_ERROR),
+        status_code=status_code,
         content={
-            "error": format_error_message(exc, error_type),
-            "errorType": error_type.value,
+            "error": str(exc) or "Unknown completion error",
+            "errorType": error_type,
             "completion": "",
             "stopReason": "error",
         },
@@ -812,18 +823,14 @@ async def get_code_completion(
 ) -> JSONResponse:
     """Get code completion suggestions for the current position in a file.
 
-    Delegates all resilience logic (circuit breaker, retry, budget, security,
-    anti-hallucination) to ``CompletionService``.
+    Delegates all resilience logic (circuit breaker, retry, budget, security)
+    to ``CompletionService``.
     """
-    from backend.engines.orchestrator.file_verification_guard import (
-        FileVerificationGuard,
-    )
 
     llm_config, config_error = await _load_completion_llm_config(request, user_id)
     if config_error is not None:
         return config_error
 
-    anti_hallucination = FileVerificationGuard()
     manager = require_conversation_manager()
     req = CompletionRequest(
         file_path=request_body.filePath,
@@ -842,7 +849,6 @@ async def get_code_completion(
             user_id=user_id,
             llm_config=llm_config,
             manager=manager,
-            anti_hallucination=anti_hallucination,
         )
         content = _build_completion_success_content(result)
         return JSONResponse(status_code=result.status_code, content=content)

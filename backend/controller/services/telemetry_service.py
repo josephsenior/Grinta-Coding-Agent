@@ -29,7 +29,6 @@ class TelemetryService:
             ContextWindowMiddleware,
             CostQuotaMiddleware,
             EditVerifyMiddleware,
-            ErrorPatternMiddleware,
             LoggingMiddleware,
             ReflectionMiddleware,
             SafetyValidatorMiddleware,
@@ -65,9 +64,7 @@ class TelemetryService:
         middlewares.append(AutoCheckMiddleware())
         # Warn when re-editing a file without verifying in between
         middlewares.append(ConflictDetectionMiddleware())
-        # Auto-query query_error_solutions DB when errors arrive
-        middlewares.append(ErrorPatternMiddleware())
-        # File state tracking (records files read/modified/created)
+# File state tracking (records files read/modified/created)
         file_state_mw = FileStateMiddleware()
         middlewares.append(file_state_mw)
         # Store tracker on controller for context injection by planner

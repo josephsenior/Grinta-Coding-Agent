@@ -336,7 +336,8 @@ class TestBuildLlmParams:
 
         assert p._checked_tools_cache is checked
         assert isinstance(p._checked_tools_model, str)
-        assert p._checked_tools_model.startswith(p._llm.config.model + ":")
+        model = (p._llm.config.model or "").strip()
+        assert p._checked_tools_model.startswith(f"{model}:")
         assert params["tools"] is checked
         mock_ct.assert_called_once()
 

@@ -16,7 +16,6 @@ from backend.controller.agent_circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
 )
-from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.core.cache.async_smart_cache import AsyncSmartCache
 from backend.core.constants import COMPLETION_TIMEOUT
 from backend.core.logger import forge_logger as logger
@@ -249,23 +248,23 @@ def sanitize_completion(raw: str) -> str:
     return text
 
 
-def format_error_message(exc: Exception, error_type: ErrorType) -> str:
+def format_error_message(exc: Exception, error_type: str) -> str:
     """Format user-friendly error message based on classified error type."""
     error_str = str(exc)
     messages = {
-        ErrorType.NETWORK_ERROR: (
+        "NETWORK_ERROR": (
             "Unable to connect to the AI service. Check connectivity or try again."
         ),
-        ErrorType.TIMEOUT_ERROR: (
+        "TIMEOUT_ERROR": (
             "Code completion request timed out. Try a simpler request or wait a moment."
         ),
-        ErrorType.PERMISSION_ERROR: (
+        "PERMISSION_ERROR": (
             "Insufficient permissions. Check your API key and account access."
         ),
-        ErrorType.MODULE_NOT_FOUND: (f"Missing module: {error_str[:200]}"),
+        "MODULE_NOT_FOUND": (f"Missing module: {error_str[:200]}"),
     }
     base = messages.get(error_type, f"Error: {error_str[:200]}")
-    return f"{base}\n\nError type: {error_type.value}"
+    return f"{base}\n\nError type: {error_type}"
 
 
 def _build_prompt(req: CompletionRequest) -> list[dict[str, str]]:
@@ -300,13 +299,12 @@ def _process_successful_completion(
     completion_text: str,
     req: CompletionRequest,
     conversation_sid: str,
-    anti_hallucination: Any,
 ) -> CompletionResult:
     """Sanitize, analyze security, validate, and finalize a successful completion."""
     completion = sanitize_completion(completion_text)
     risk, warning = analyze_security(completion)
     validation_error = _validate_completion_result(
-        completion, conversation_sid, anti_hallucination, risk, warning
+        completion, conversation_sid, risk, warning
     )
     if validation_error is not None:
         return validation_error
@@ -398,17 +396,12 @@ async def _run_completion_with_retries(
                 return None, _build_timeout_completion_result(retry)
         except Exception as e:
             last_error = e
-            error_type = ErrorRecoveryStrategy.classify_error(e)
-            is_retryable = error_type in (
-                ErrorType.NETWORK_ERROR,
-                ErrorType.TIMEOUT_ERROR,
-                ErrorType.RUNTIME_CRASH,
-            )
+            is_retryable = type(e).__name__ in ("TimeoutError", "ConnectionError")
             if is_retryable and attempt < retry["max_retries"]:
                 wait = retry["retry_backoff"] * (2**attempt)
                 logger.warning(
                     "Completion error (%s, attempt %d/%d), retry in %.1fs",
-                    error_type.value,
+                    type(e).__name__,
                     attempt + 1,
                     retry["max_retries"] + 1,
                     wait,
@@ -487,25 +480,14 @@ def _finalize_completion_result(
 def _validate_completion_result(
     completion: str,
     conversation_sid: str,
-    anti_hallucination: Any,
     risk: ActionSecurityRisk,
     warning: str | None,
 ) -> CompletionResult | None:
-    """Validate completion (security + hallucination). Returns error result or None."""
+    """Validate completion (security). Returns error result or None."""
     if risk == ActionSecurityRisk.HIGH:
         record_error(conversation_sid, Exception(f"High security risk: {warning}"))
         return CompletionResult(
             completion="", stop_reason="security_risk_high", warning=f"Blocked: {warning}"
-        )
-    is_valid, err_msg = anti_hallucination.validate_response(
-        response_text=completion, actions=[]
-    )
-    if not is_valid:
-        record_error(conversation_sid, Exception(f"Hallucination: {err_msg}"))
-        return CompletionResult(
-            completion="",
-            stop_reason="hallucination_detected",
-            warning="Validation failed. Please try again.",
         )
     return None
 
@@ -517,7 +499,6 @@ async def get_code_completion(
     user_id: str | None,
     llm_config: LLMConfig,
     manager: Any,
-    anti_hallucination: Any,
 ) -> CompletionResult:
     """Execute a code completion request with full resilience stack.
 
@@ -533,8 +514,7 @@ async def get_code_completion(
         LLM configuration for the request.
     manager:
         ConversationManager instance.
-    anti_hallucination:
-        FileVerificationGuard instance.
+        orchestration safety shim.
 
     Returns:
     -------
@@ -557,5 +537,5 @@ async def get_code_completion(
     if completion_text is None:
         raise RuntimeError("Code completion failed: unknown error")
     return _process_successful_completion(
-        completion_text, req, conversation_sid, anti_hallucination
+        completion_text, req, conversation_sid
     )

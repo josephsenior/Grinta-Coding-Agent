@@ -56,7 +56,7 @@ def check_blast_radius_from_code(
             if any(k in node.type for k in ["function", "class", "method", "declaration", "declarator"]):
                 name_node = editor._get_name_node(node)
                 if name_node:
-                    return name_node.text.decode("utf-8")
+                    return ((name_node.text.decode("utf-8") if name_node.text else "") if name_node.text else "")
             for child in node.children:
                 res = _find_first_symbol(child)
                 if res:

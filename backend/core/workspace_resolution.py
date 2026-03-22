@@ -16,7 +16,18 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Stable text + id for tool/runtime errors when no project folder is open (UI may toast once).
+WORKSPACE_NOT_OPEN_MESSAGE = (
+    "No project folder is open. Choose a folder via Open workspace first."
+)
+WORKSPACE_NOT_OPEN_ERROR_ID = "WORKSPACE$NOT_OPEN"
+
 _PERSIST_REL = Path(".forge") / "app" / "active_workspace.json"
+
+
+def is_workspace_not_open_error(exc: BaseException) -> bool:
+    """True if *exc* is the standard missing-workspace :class:`ValueError`."""
+    return isinstance(exc, ValueError) and str(exc) == WORKSPACE_NOT_OPEN_MESSAGE
 
 
 def _persist_file() -> Path:
@@ -113,6 +124,5 @@ def require_effective_workspace_root() -> Path:
     """Like :func:`get_effective_workspace_root` but raises if no folder is open."""
     p = get_effective_workspace_root()
     if p is None:
-        msg = "No project folder is open. Choose a folder via Open workspace first."
-        raise ValueError(msg)
+        raise ValueError(WORKSPACE_NOT_OPEN_MESSAGE)
     return p

@@ -486,10 +486,11 @@ def _merge_forge_mcp_for_api(settings: Settings) -> Settings:
     # Shallow copy only: deep=True can raise "cannot pickle 'mappingproxy' object"
     # when copying frozen UserSecrets / nested immutables, which forces GET /settings
     # into the exception path and the UI shows llm_api_key_set=False despite settings.json.
-    if not settings.mcp_config:
+    mcp_config = getattr(settings, "mcp_config", None)
+    if mcp_config is None:
         merged_mcp = forge_mcp
     else:
-        merged_mcp = forge_mcp.merge(settings.mcp_config)
+        merged_mcp = forge_mcp.merge(mcp_config)
     return settings.model_copy(update={"mcp_config": merged_mcp})
 
 
@@ -643,9 +644,10 @@ async def store_settings(
             # Some deployments/versions use a leaner Settings model that
             # doesn't include analytics consent fields.
             if "user_consents_to_analytics" in Settings.model_fields:
-                if settings.user_consents_to_analytics is None:
-                    settings.user_consents_to_analytics = (
-                        existing_settings.user_consents_to_analytics
+                current_consent = getattr(settings, "user_consents_to_analytics", None)
+                if current_consent is None:
+                    settings.user_consents_to_analytics = getattr(
+                        existing_settings, "user_consents_to_analytics", None
                     )
 
         _apply_runtime_and_git_overrides(settings)

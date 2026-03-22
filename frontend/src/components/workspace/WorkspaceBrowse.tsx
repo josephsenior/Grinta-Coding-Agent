@@ -4,6 +4,7 @@ import { GitChanges } from "@/components/side-panel/GitChanges";
 import { WorkspaceFilePreview } from "./WorkspaceFilePreview";
 import { WorkspaceResizableChangesLayout } from "./WorkspaceResizableChangesLayout";
 import { WorkspaceFolderBar } from "./WorkspaceFolderBar";
+import { OpenWorkspaceButton } from "./OpenWorkspaceButton";
 import { Button } from "@/components/ui/button";
 import { Maximize2 } from "lucide-react";
 import { useContextPanelStore } from "@/stores/context-panel-store";
@@ -40,13 +41,8 @@ export function WorkspaceBrowse({ conversationId }: WorkspaceBrowseProps) {
 
   if (!workspacePath) {
     return (
-      <div className="flex h-full min-h-0 flex-col overflow-hidden border-b border-border/40">
-        <WorkspaceFolderBar />
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Open a workspace to browse project files and git changes for this chat.
-          </p>
-        </div>
+      <div className="flex h-full min-h-0 items-center justify-center overflow-hidden px-4 py-8">
+        <OpenWorkspaceButton variant="secondary" size="default" className="gap-2" />
       </div>
     );
   }

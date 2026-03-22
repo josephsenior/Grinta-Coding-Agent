@@ -18,10 +18,11 @@ export function useConversations(pageId?: string) {
 }
 
 export function useConversation(id: string | undefined) {
+  const ready = !!id && id !== "new";
   return useQuery({
     queryKey: ["conversation", id],
     queryFn: () => getConversation(id!),
-    enabled: !!id,
+    enabled: ready,
   });
 }
 

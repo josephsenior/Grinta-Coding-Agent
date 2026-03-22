@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 from backend.events.action.agent import CondensationAction
@@ -87,14 +88,14 @@ class TestFileEventsPreserved(unittest.TestCase):
         sys_msg = MagicMock(spec=SystemMessageAction)
         sys_msg.id = 0
         sys_msg.source = EventSource.USER
-        sys_msg.__class__ = SystemMessageAction  # type: ignore[assignment]
+        sys_msg.__class__ = cast(Any, SystemMessageAction)
         events.append(sys_msg)
 
         user_msg = MagicMock(spec=MessageAction)
         user_msg.id = 1
         user_msg.source = EventSource.USER
         user_msg.content = "Create a Next.js app"
-        user_msg.__class__ = MessageAction
+        user_msg.__class__ = cast(Any, MessageAction)
         events.append(user_msg)
 
         for i in range(2, n_total):
@@ -103,7 +104,7 @@ class TestFileEventsPreserved(unittest.TestCase):
                 fa.id = i
                 fa.source = EventSource.AGENT
                 fa.path = file_actions[i]
-                fa.__class__ = FileWriteAction  # type: ignore[assignment]
+                fa.__class__ = cast(Any, FileWriteAction)
                 fa.content = f"content-{i}"
                 fa.cause = None
                 events.append(fa)
@@ -112,7 +113,7 @@ class TestFileEventsPreserved(unittest.TestCase):
                 ev.id = i
                 ev.source = EventSource.AGENT
                 ev.content = f"action-{i}"
-                ev.__class__ = MessageAction
+                ev.__class__ = cast(Any, MessageAction)
                 ev.cause = None
                 events.append(ev)
 

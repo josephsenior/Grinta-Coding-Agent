@@ -108,7 +108,7 @@ class RuntimeOrchestrator:
         """Clear warm pool so the next acquire creates a runtime in the new workspace."""
         pool = getattr(self._pool, "drain_all", None)
         if callable(pool):
-            self._pool.drain_all()
+            pool()
 
     def release(self, result: RuntimeAcquireResult, key: str | None = None) -> None:
         key = key or result.runtime.config.runtime  # type: ignore[attr-defined]

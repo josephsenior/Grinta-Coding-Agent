@@ -12,12 +12,12 @@ import { useBackendHealth } from "@/hooks/use-backend-health";
 import { useNewConversation } from "@/hooks/use-new-conversation";
 import { useAppStore } from "@/stores/app-store";
 
-/** Compact primary actions: dark mode = white fill + dark text; light mode = dark fill + light text. */
+/** Compact primary actions: light = high-contrast pill; dark = soft card surface (no pure white). */
 function topNavPill(active?: boolean) {
   return cn(
-    "h-7 shrink-0 gap-1 rounded-md border border-transparent px-2 text-xs font-medium shadow-sm transition-colors",
-    "bg-neutral-950 text-white hover:bg-neutral-800 hover:text-white",
-    "dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 dark:hover:text-neutral-950",
+    "h-7 shrink-0 gap-1 rounded-md border px-2 text-xs font-medium shadow-sm transition-colors",
+    "border-transparent bg-neutral-950 text-white hover:bg-neutral-800 hover:text-white",
+    "dark:border-border/55 dark:bg-card dark:text-foreground dark:shadow-none dark:hover:bg-muted dark:hover:text-foreground",
     "[&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-current",
     active && "ring-1 ring-primary/50 ring-offset-1 ring-offset-background dark:ring-offset-background",
   );

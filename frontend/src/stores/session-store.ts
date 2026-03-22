@@ -8,6 +8,7 @@ import {
   isNotifyUiOnlyErrorEvent,
   toastNotifyUiOnlyError,
 } from "@/lib/error-observation";
+import { maybeToastWorkspaceNotOpen } from "@/lib/workspace-not-open-toast";
 
 function recomputeAgentStateFromEvents(events: ForgeEvent[]): AgentState {
   let state = AgentState.LOADING;
@@ -138,6 +139,7 @@ export const useSessionStore = create<SessionState>()(
           }
         }
 
+        maybeToastWorkspaceNotOpen(ev, state.conversationId);
         state.events.push(ev);
         if (eid > state.latestEventId) {
           state.latestEventId = eid;
@@ -192,6 +194,7 @@ export const useSessionStore = create<SessionState>()(
             }
           }
 
+          maybeToastWorkspaceNotOpen(ev, state.conversationId);
           state.events.push(ev);
           existingIds.add(eid);
           if (eid > state.latestEventId) {

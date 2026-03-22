@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from typing import Any
+
 from backend.engines.orchestrator.tools.common import create_tool_definition
 
 MEMORY_MANAGER_TOOL_NAME = "memory_manager"
 
-def create_memory_manager_tool() -> dict[str, Any]:
+def create_memory_manager_tool():
     return create_tool_definition(
         name=MEMORY_MANAGER_TOOL_NAME,
         description=(

@@ -1,0 +1,1 @@
+{"id": 14, "timestamp": "2026-03-22T15:31:15.227646", "source": "environment", "message": "Agent session failed to initialize", "observation": "error", "content": "Agent session failed to initialize", "extras": {"truncation_strategy": null, "error_id": "", "notify_ui_only": false}}

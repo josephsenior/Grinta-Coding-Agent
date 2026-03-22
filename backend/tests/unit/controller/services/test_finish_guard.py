@@ -41,12 +41,12 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
         """Finish should be blocked when task files are missing."""
         action = PlaybookFinishAction(outputs={"result": "done"})
 
-        # Mock _get_missing_task_files to return missing files
-        self.service._get_missing_task_files = MagicMock(  # type: ignore[method-assign]
-            return_value={"src/app/page.tsx", "src/app/layout.tsx"}
-        )
-
-        await self.service._handle_finish_action(action)
+        with patch.object(
+            self.service,
+            "_get_missing_task_files",
+            return_value={"src/app/page.tsx", "src/app/layout.tsx"},
+        ):
+            await self.service._handle_finish_action(action)
 
         # Should NOT set state to finished
         self.mock_controller.set_agent_state_to.assert_not_called()
@@ -65,15 +65,15 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
         )
         action.force_finish = True
 
-        # Even with missing files, should not check
-        self.service._get_missing_task_files = MagicMock(
-            return_value={"src/app/page.tsx"}
-        )
-
-        await self.service._handle_finish_action(action)
+        with patch.object(
+            self.service,
+            "_get_missing_task_files",
+            return_value={"src/app/page.tsx"},
+        ) as mock_get_missing_task_files:
+            await self.service._handle_finish_action(action)
 
         # _get_missing_task_files should NOT be called
-        self.service._get_missing_task_files.assert_not_called()
+        mock_get_missing_task_files.assert_not_called()
         # Should proceed to finish
         self.mock_controller.set_agent_state_to.assert_called_once_with(
             AgentState.FINISHED
@@ -83,9 +83,8 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
         """Finish allowed when all task files are created."""
         action = PlaybookFinishAction(outputs={"result": "done"})
 
-        self.service._get_missing_task_files = MagicMock(return_value=set())  # type: ignore[method-assign]
-
-        await self.service._handle_finish_action(action)
+        with patch.object(self.service, "_get_missing_task_files", return_value=set()):
+            await self.service._handle_finish_action(action)
 
         # Should set state to finished
         self.mock_controller.set_agent_state_to.assert_called_once_with(
@@ -96,22 +95,24 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
     async def test_blocked_finish_does_not_log_audit(self):
         """Blocked finish should not log a success audit."""
         action = PlaybookFinishAction(outputs={"result": "done"})
-        self.service._get_missing_task_files = MagicMock(  # type: ignore[method-assign]
-            return_value={"src/missing.tsx"}
-        )
-
-        await self.service._handle_finish_action(action)
+        with patch.object(
+            self.service,
+            "_get_missing_task_files",
+            return_value={"src/missing.tsx"},
+        ):
+            await self.service._handle_finish_action(action)
 
         self.mock_controller.log_task_audit.assert_not_called()
 
     async def test_error_observation_source_is_environment(self):
         """INCOMPLETE_TASK error should come from ENVIRONMENT source."""
         action = PlaybookFinishAction(outputs={"result": "done"})
-        self.service._get_missing_task_files = MagicMock(  # type: ignore[method-assign]
-            return_value={"src/page.tsx"}
-        )
-
-        await self.service._handle_finish_action(action)
+        with patch.object(
+            self.service,
+            "_get_missing_task_files",
+            return_value={"src/page.tsx"},
+        ):
+            await self.service._handle_finish_action(action)
 
         args, _ = self.mock_controller.event_stream.add_event.call_args
         source = args[1]

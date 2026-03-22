@@ -287,9 +287,16 @@ class LLM(RetryMixin, DebugMixin):
     ) -> None:
         super().__init__()
         self.config: LLMConfig = copy.deepcopy(config)
+        if not self.config.model or not str(self.config.model).strip():
+            raise AuthenticationError(
+                "No LLM model is configured. Set llm_model in settings.json or LLM_MODEL in the environment.",
+                model=None,
+            )
         self.service_id = service_id
         self.metrics: Metrics = (
-            metrics if metrics is not None else Metrics(model_name=config.model)
+            metrics
+            if metrics is not None
+            else Metrics(model_name=self.config.model)
         )
         self.retry_listener = retry_listener
         self._function_calling_active: bool = False
@@ -325,7 +332,10 @@ class LLM(RetryMixin, DebugMixin):
         Uses native model_features.
         """
         try:
-            features = get_features(self.config.model)
+            model = (self.config.model or "").strip()
+            if not model:
+                return
+            features = get_features(model)
             if self.config.max_input_tokens is None:
                 self.config.max_input_tokens = features.max_input_tokens
             if self.config.max_output_tokens is None:
@@ -386,8 +396,10 @@ class LLM(RetryMixin, DebugMixin):
             sanitize_call_kwargs_for_provider,
         )
 
+        model = (self.config.model or "").strip() or "unknown"
+
         call_kwargs = apply_model_param_overrides(
-            self.config.model,
+            model,
             call_kwargs,
             reasoning_effort=self.config.reasoning_effort,
             is_stream=is_stream,
@@ -396,7 +408,7 @@ class LLM(RetryMixin, DebugMixin):
         if self.config.seed is not None:
             call_kwargs["seed"] = self.config.seed
 
-        call_kwargs = sanitize_call_kwargs_for_provider(self.config.model, call_kwargs)
+        call_kwargs = sanitize_call_kwargs_for_provider(model, call_kwargs)
 
         # Drop explicit None values to avoid sending JSON nulls.
         # Keep falsy values like 0/False.
@@ -507,7 +519,7 @@ class LLM(RetryMixin, DebugMixin):
                 return response
             except Exception as e:
                 # Map provider SDK exceptions to our unified hierarchy
-                mapped = _map_provider_exception(e, self.config.model)
+                mapped = _map_provider_exception(e, (self.config.model or "").strip())
                 if mapped is not e:
                     raise mapped from e
                 raise
@@ -610,7 +622,7 @@ class LLM(RetryMixin, DebugMixin):
                 is_last = attempt >= max_attempts
                 if not self._should_retry_astream(is_retryable, is_last, yielded_any):
                     logger.error("LLM astream error: %s", e)
-                    mapped = _map_provider_exception(e, self.config.model)
+                    mapped = _map_provider_exception(e, (self.config.model or "").strip())
                     if mapped is not e:
                         raise mapped from e
                     raise
@@ -669,9 +681,10 @@ class LLM(RetryMixin, DebugMixin):
     def get_token_count(self, messages: list[dict] | list[Message]) -> int:
         """Estimate token count."""
         try:
+            model = (self.config.model or "").strip()
             return get_token_count(
                 messages,
-                model=self.config.model,
+                model=model,
                 custom_tokenizer=self.config.custom_tokenizer,
             )
         except Exception as e:

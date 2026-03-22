@@ -160,20 +160,18 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
                 raise ValueError(f"Invalid JSON in {json_file}") from e
             return
 
-        # LLM — build from data without creating an empty LLMConfig() first,
-        # so we never trigger "No API key found" during load when the key is in JSON.
+        # LLM — merge JSON over existing cfg (env/TOML). If llm_model appears in JSON,
+        # it overrides LLM_MODEL from the environment even when both are set.
         llm_keys = ("llm_model", "llm_api_key", "llm_base_url")
-        if any(k in data for k in llm_keys) or "llm_model" in data:
-            from backend.core.constants import DEFAULT_LLM_MODEL
-
+        if any(k in data for k in llm_keys):
             base = cfg.llms.get("llm")
-            llm_dict = (
-                base.model_dump(exclude_none=True)
-                if base
-                else {"model": DEFAULT_LLM_MODEL}
-            )
-            if "llm_model" in data and data["llm_model"]:
-                llm_dict["model"] = data["llm_model"]
+            llm_dict = base.model_dump(exclude_none=True) if base else {}
+            if "llm_model" in data:
+                raw_m = data["llm_model"]
+                if raw_m is not None and str(raw_m).strip():
+                    llm_dict["model"] = str(raw_m).strip()
+                else:
+                    llm_dict["model"] = None
             if "llm_api_key" in data and data["llm_api_key"]:
                 llm_dict["api_key"] = data["llm_api_key"]
             if "llm_base_url" in data and data["llm_base_url"]:
@@ -435,32 +433,29 @@ def load_forge_config(
 
     config = ForgeConfig()
 
-    # 1. Load from environment first (lower precedence than file)
-    load_from_env(config, dict(os.environ))
-
-    # 2. Load from JSON (higher precedence, overrides env vars)
-    # CRITICAL: Use suppress_env_export_context to prevent LLMConfig from
-    # logging "No API key found" before we've had a chance to sync.
     from backend.core.config.api_key_manager import api_key_manager
-    with api_key_manager.suppress_env_export_context():
-        load_from_json(config, config_file)
-        # Ensure the default LLM config is updated with the loaded values
-        # and its model_post_init (which triggers key resolution) is re-run
-        # but with suppression still active.
-        llm_cfg = config.get_llm_config()
-        # Re-trigger post_init logic by re-validating
-        # Use model_dump(exclude_none=True) to avoid issues with None values
-        config.set_llm_config(llm_cfg.__class__.model_validate(llm_cfg.model_dump(exclude_none=True)))
 
-    # 3. Finalize and sync
+    # Suppress API key manager side effects until JSON (and env) have been applied.
+    # Otherwise get_llm_config() during load_from_env creates LLMConfig with the
+    # default model (gemini → google) and validates settings.json's key against
+    # Google prefixes even when llm_model in that file is another provider.
+    with api_key_manager.suppress_env_export_context():
+        load_from_env(config, dict(os.environ))
+        load_from_json(config, config_file)
+        llm_cfg = config.get_llm_config()
+        config.set_llm_config(
+            llm_cfg.__class__.model_validate(llm_cfg.model_dump(exclude_none=True))
+        )
+
     finalize_config(config)
-    
+
     # CRITICAL: Sync the loaded config (which might have come from settings.json)
     # back to the APIKeyManager so that DirectLLMClient can find it.
-    from backend.core.config.api_key_manager import api_key_manager
     # Temporarily suppress env export to avoid double-setting during sync
     with api_key_manager.suppress_env_export_context():
         for llm_name, llm_cfg in config.llms.items():
+            if not llm_cfg.model or not str(llm_cfg.model).strip():
+                continue
             if llm_cfg.api_key:
                 api_key_manager.set_api_key(llm_cfg.model, llm_cfg.api_key)
                 api_key_manager.set_environment_variables(llm_cfg.model, llm_cfg.api_key)

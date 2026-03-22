@@ -40,7 +40,6 @@ export default function App() {
               <Route element={<Layout />}>
                 <Route element={<ChatShellLayout />}>
                   <Route path="/" element={<Navigate to="/chat/new" replace />} />
-                  <Route path="/chat/new" element={<Chat />} />
                   <Route path="/chat/:id" element={<Chat />} />
                 </Route>
                 <Route path="/settings" element={<OpenWindowRedirect kind="settings" />} />

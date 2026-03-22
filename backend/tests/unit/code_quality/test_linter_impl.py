@@ -1,16 +1,25 @@
 """Tests for backend.code_quality.linter — LintError, LintResult, DefaultLinter."""
 
+# pylint: disable=no-member,protected-access,wrong-import-order,use-implicit-booleaness-not-comparison
+
 from __future__ import annotations
 
 import json
-
-import pytest
 import time
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 from backend.code_quality.linter import DefaultLinter, LintError, LintResult
+
+DefaultLinterAny: Any = DefaultLinter
+
+
+def default_linter_any(*args: Any, **kwargs: Any) -> Any:
+    return DefaultLinter(*args, **kwargs)
 
 
 # ── LintError ─────────────────────────────────────────────────────────
@@ -49,8 +58,8 @@ class TestLintResult:
 
     def test_empty_results(self):
         result = LintResult(errors=[], warnings=[])
-        assert result.errors == []
-        assert result.warnings == []
+        assert not result.errors
+        assert not result.warnings
 
     def test_duplicates_in_both_lists_separated(self):
         e1 = LintError(line=1, column=None, message="x", severity="error")
@@ -66,7 +75,7 @@ class TestLintResult:
 class TestDefaultLinterInit:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=False)
     def test_no_backend_available(self, mock_check):
-        linter = DefaultLinter(backend="auto")
+        linter = default_linter_any(backend="auto")
         assert linter._detected_backend is None
 
     @patch.object(
@@ -75,17 +84,17 @@ class TestDefaultLinterInit:
         side_effect=lambda b: b == "tree-sitter",
     )
     def test_auto_detects_tree_sitter(self, mock_check):
-        linter = DefaultLinter(backend="auto")
+        linter = default_linter_any(backend="auto")
         assert linter._detected_backend == "tree-sitter"
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_explicit_backend(self, mock_check):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         assert linter._detected_backend == "tree-sitter"
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=False)
     def test_explicit_backend_unavailable(self, mock_check):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         assert linter._detected_backend is None
 
 
@@ -95,14 +104,14 @@ class TestDefaultLinterInit:
 class TestDefaultLinterCache:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=False)
     def test_no_backend_returns_empty(self, _):
-        linter = DefaultLinter()
+        linter = default_linter_any()
         result = linter.lint(content="x = 1")
-        assert result.errors == []
-        assert result.warnings == []
+        assert not result.errors
+        assert not result.warnings
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_cache_hit(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         expected = LintResult(errors=[], warnings=[])
         key = "lint:content:abc:def"
         linter._cache[key] = (expected, time.time())
@@ -115,7 +124,7 @@ class TestDefaultLinterCache:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_cache_hit_uses_cached_result(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         expected = LintResult(errors=[LintError(1, None, "x")], warnings=[])
         key = "lint:content:hit:cfg"
 
@@ -130,14 +139,14 @@ class TestDefaultLinterCache:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_cache_miss_increments_counter(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         with patch.object(linter, "_lint_content", return_value=LintResult([], [])):
             linter.lint(content="x = 1")
         assert linter._cache_misses == 1
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_cache_eviction(self, _):
-        linter = DefaultLinter(backend="tree-sitter", max_cache_size=2)
+        linter = default_linter_any(backend="tree-sitter", max_cache_size=2)
         linter._cache["k1"] = (LintResult([], []), time.time())
         linter._cache["k2"] = (LintResult([], []), time.time())
         # Add a third entry
@@ -147,7 +156,7 @@ class TestDefaultLinterCache:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_expired_cache_entry(self, _):
-        linter = DefaultLinter(backend="tree-sitter", cache_ttl=1)
+        linter = default_linter_any(backend="tree-sitter", cache_ttl=1)
         linter._cache["key"] = (LintResult([], []), time.time() - 10)
         result = linter._get_from_cache("key")
         assert result is None
@@ -155,7 +164,7 @@ class TestDefaultLinterCache:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_clear_cache(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         linter._cache["k1"] = (LintResult([], []), time.time())
         linter._cache_hits = 5
         linter._cache_misses = 3
@@ -165,7 +174,7 @@ class TestDefaultLinterCache:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_get_cache_stats(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         linter._cache_hits = 10
         linter._cache_misses = 5
         stats = linter.get_cache_stats()
@@ -180,14 +189,14 @@ class TestDefaultLinterCache:
 class TestGetCacheKey:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_content_based_key(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         key = linter._get_cache_key(None, "hello world")
         assert key is not None
         assert "lint:content:" in key
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_no_input_returns_none(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         key = linter._get_cache_key(None, None)
         assert key is None
 
@@ -195,7 +204,7 @@ class TestGetCacheKey:
     def test_file_path_key(self, _, tmp_path):
         f = tmp_path / "test.py"
         f.write_text("x = 1")
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         key = linter._get_cache_key(str(f), None)
         assert key is not None
         assert "lint:" in key
@@ -204,7 +213,7 @@ class TestGetCacheKey:
     def test_file_path_stat_oserror(self, _, tmp_path, monkeypatch):
         f = tmp_path / "test.py"
         f.write_text("x = 1")
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
 
         monkeypatch.setattr(Path, "exists", lambda self: True)
 
@@ -223,13 +232,13 @@ class TestGetCacheKey:
 class TestHashConfig:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_deterministic(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         assert linter._hash_config() == linter._hash_config()
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_different_config_path(self, _):
-        linter1 = DefaultLinter(backend="tree-sitter", config_path=None)
-        linter2 = DefaultLinter(backend="tree-sitter", config_path="/tmp/ruff.toml")
+        linter1 = default_linter_any(backend="tree-sitter", config_path=None)
+        linter2 = default_linter_any(backend="tree-sitter", config_path="/tmp/ruff.toml")
         assert linter1._hash_config() != linter2._hash_config()
 
 
@@ -239,7 +248,7 @@ class TestHashConfig:
 class TestLintFileDiff:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_delegates_to_lint(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         expected = LintResult(
             errors=[LintError(line=1, column=None, message="err")],
             warnings=[
@@ -259,7 +268,7 @@ class TestLintFileDiff:
 class TestLintWithRuff:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_parses_ruff_json_output(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         ruff_output = [
             {
                 "location": {"row": 5, "column": 1},
@@ -287,7 +296,7 @@ class TestLintWithRuff:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_ruff_timeout(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         import subprocess
 
         with patch(
@@ -299,7 +308,7 @@ class TestLintWithRuff:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_ruff_not_found(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         with patch(
             "backend.code_quality.linter.subprocess.run", side_effect=FileNotFoundError
         ):
@@ -308,7 +317,7 @@ class TestLintWithRuff:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_ruff_bad_returncode(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         mock_result = MagicMock()
         mock_result.returncode = 2
         mock_result.stderr = "crash"
@@ -320,7 +329,7 @@ class TestLintWithRuff:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_ruff_invalid_json(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stdout = "not json"
@@ -332,7 +341,7 @@ class TestLintWithRuff:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_ruff_uses_config_path(self, _):
-        linter = DefaultLinter(backend="tree-sitter", config_path="/tmp/ruff.toml")
+        linter = default_linter_any(backend="tree-sitter", config_path="/tmp/ruff.toml")
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "[]"
@@ -352,7 +361,7 @@ class TestLintWithRuff:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_ruff_generic_exception(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         with patch(
             "backend.code_quality.linter.subprocess.run", side_effect=RuntimeError("boom")
         ):
@@ -364,7 +373,7 @@ class TestLintWithRuff:
 class TestLintWithPylint:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_parses_pylint_json_output(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         linter._detected_backend = "pylint"
         pylint_output = [
             {
@@ -396,7 +405,7 @@ class TestLintWithPylint:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_pylint_timeout(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         linter._detected_backend = "pylint"
         import subprocess
 
@@ -409,7 +418,7 @@ class TestLintWithPylint:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_pylint_invalid_json(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         linter._detected_backend = "pylint"
         mock_result = MagicMock()
         mock_result.returncode = 2
@@ -423,7 +432,7 @@ class TestLintWithPylint:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_pylint_not_found(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         linter._detected_backend = "pylint"
         with patch(
             "backend.code_quality.linter.subprocess.run", side_effect=FileNotFoundError
@@ -433,7 +442,7 @@ class TestLintWithPylint:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_pylint_generic_exception(self, _):
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         linter._detected_backend = "pylint"
         with patch(
             "backend.code_quality.linter.subprocess.run", side_effect=RuntimeError("boom")
@@ -443,7 +452,7 @@ class TestLintWithPylint:
 
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_pylint_uses_config_path(self, _):
-        linter = DefaultLinter(backend="tree-sitter", config_path="/tmp/pylint.rc")
+        linter = default_linter_any(backend="tree-sitter", config_path="/tmp/pylint.rc")
         linter._detected_backend = "pylint"
         mock_result = MagicMock()
         mock_result.returncode = 2
@@ -467,7 +476,7 @@ class TestLintContent:
     @patch.object(DefaultLinter, "_check_backend_available", return_value=True)
     def test_lint_content_returns_result(self, _, tmp_path):
         """_lint_content returns LintResult (currently empty; uses LSP path)."""
-        linter = DefaultLinter(backend="tree-sitter")
+        linter = default_linter_any(backend="tree-sitter")
         result = linter._lint_content("x = 1", file_path=str(tmp_path / "file.py"))
         assert isinstance(result, LintResult)
         assert result.errors == []

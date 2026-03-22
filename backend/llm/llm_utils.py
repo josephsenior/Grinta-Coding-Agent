@@ -19,7 +19,7 @@ def check_tools(tools: list[dict], llm_config: LLMConfig) -> list[dict]:
         Modified tools compatible with the LLM
 
     """
-    if "gemini" not in llm_config.model.lower():
+    if not llm_config.model or "gemini" not in llm_config.model.lower():
         return tools
 
     logger.info(

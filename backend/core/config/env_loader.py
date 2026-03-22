@@ -179,7 +179,7 @@ def export_llm_api_keys(cfg: ForgeConfig) -> None:
         from backend.core.config.api_key_manager import api_key_manager
 
         for llm in cfg.llms.values():
-            if llm.api_key:
+            if llm.api_key and llm.model and str(llm.model).strip():
                 api_key_manager.set_api_key(llm.model, llm.api_key)
                 api_key_manager.set_environment_variables(llm.model, llm.api_key)
     except Exception:

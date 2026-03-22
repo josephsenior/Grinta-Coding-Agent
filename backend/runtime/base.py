@@ -550,6 +550,30 @@ class Runtime(
             )
         except PermissionError as e:
             observation = ErrorObservation(content=str(e))
+        except ValueError as e:
+            from backend.core.workspace_resolution import (
+                WORKSPACE_NOT_OPEN_ERROR_ID,
+                is_workspace_not_open_error,
+            )
+
+            if is_workspace_not_open_error(e):
+                observation = ErrorObservation(
+                    content=str(e),
+                    error_id=WORKSPACE_NOT_OPEN_ERROR_ID,
+                )
+            else:
+                self._handle_runtime_error(event, e, is_network_error=False)
+                observation = ErrorObservation(
+                    content=f"Unexpected error during action execution: {type(e).__name__}: {e}"
+                )
+                logger.warning(
+                    "[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s",
+                    self.sid,
+                    action_type,
+                    action_id,
+                    type(e).__name__,
+                    e,
+                )
         except (httpx.NetworkError, AgentRuntimeDisconnectedError) as e:
             self._handle_runtime_error(event, e, is_network_error=True)
             # Always emit an observation so the controller isn't stuck

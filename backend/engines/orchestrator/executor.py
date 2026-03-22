@@ -386,10 +386,10 @@ class OrchestratorExecutor:
     # Response processing
     # ------------------------------------------------------------------ #
     def _response_to_actions(self, response: ModelResponse) -> list[Action]:
-        actions = orchestrator_function_calling.response_to_actions(
+        actions = list(orchestrator_function_calling.response_to_actions(
             response,
             mcp_tool_names=list(self._mcp_tool_name_provider()),
-        )
+        ))
 
         response_text = self._extract_response_text(response)
         proceed, validated_actions = self._safety.apply(response_text, actions)

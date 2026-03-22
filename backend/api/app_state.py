@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 from typing import Any
 
@@ -238,15 +239,12 @@ class AppState:
         multiple times.
         """
         with self._lock:
-            self._conversation_manager = _close_and_clear(
-                self._conversation_manager, "conversation manager"
-            )
-            self._event_service_adapter = _close_and_clear(
-                self._event_service_adapter, "event service adapter"
-            )
-            self._conversation_store = _close_and_clear(
-                self._conversation_store, "conversation store"
-            )
+            _close_and_clear(self._conversation_manager, "conversation manager")
+            self._conversation_manager = None
+            _close_and_clear(self._event_service_adapter, "event service adapter")
+            self._event_service_adapter = None
+            _close_and_clear(self._conversation_store, "conversation store")
+            self._conversation_store = None
             logger.info("AppState closed")
 
 
@@ -257,9 +255,9 @@ _state_lock = threading.Lock()
 
 def get_app_state() -> AppState:
     """Return (or create) the global ``AppState`` singleton."""
-    global _app_state
-    if _app_state is None:
+    module = sys.modules[__name__]
+    if module.__dict__.get("_app_state") is None:
         with _state_lock:
-            if _app_state is None:
-                _app_state = AppState()
-    return _app_state
+            if module.__dict__.get("_app_state") is None:
+                module.__dict__["_app_state"] = AppState()
+    return module.__dict__["_app_state"]

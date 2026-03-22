@@ -28,9 +28,9 @@ class StepGuardService:
         controller = self._context.get_controller()
         # Stuck detection first — it emits targeted recovery messages.
         # Circuit breaker second — it only decides whether to stop the agent.
-        if await self._handle_stuck_detection(controller) is False:
-            return False
         if await self._check_circuit_breaker(controller) is False:
+            return False
+        if await self._handle_stuck_detection(controller) is False:
             return False
         return True
 

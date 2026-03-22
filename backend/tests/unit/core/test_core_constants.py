@@ -102,7 +102,7 @@ class TestCoreConstants:
         assert DEFAULT_RUNTIME_TIMEOUT > 0
 
     def test_llm_defaults(self):
-        assert isinstance(DEFAULT_LLM_MODEL, str)
+        assert DEFAULT_LLM_MODEL is None
         assert DEFAULT_LLM_TEMPERATURE == 0.0
 
     def test_agent_defaults(self):

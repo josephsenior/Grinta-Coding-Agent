@@ -3,6 +3,7 @@ import type {
   ConversationListResponse,
   ConversationInfo,
   CreateConversationRequest,
+  CreateConversationResult,
 } from "@/types/conversation";
 
 export async function getConversations(
@@ -24,8 +25,8 @@ export async function getConversation(id: string): Promise<ConversationInfo> {
 
 export async function createConversation(
   req: CreateConversationRequest,
-): Promise<ConversationInfo> {
-  const { data } = await apiClient.post<ConversationInfo>("/conversations", req);
+): Promise<CreateConversationResult> {
+  const { data } = await apiClient.post<CreateConversationResult>("/conversations", req);
   return data;
 }
 

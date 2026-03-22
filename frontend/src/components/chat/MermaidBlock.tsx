@@ -77,7 +77,7 @@ export function MermaidBlock({ chart }: MermaidBlockProps) {
       {error && (
         <div className="mb-2 space-y-2">
           <p className="text-[11px] text-destructive">Could not render diagram</p>
-          <pre className="overflow-x-auto rounded border border-border/40 bg-background/50 p-2 font-mono text-[11px] text-muted-foreground">
+          <pre className="overflow-x-auto rounded border border-border/40 bg-muted/45 p-2 font-mono text-[11px] text-muted-foreground dark:bg-card/40">
             {chart.trim()}
           </pre>
         </div>

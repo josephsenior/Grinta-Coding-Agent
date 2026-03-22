@@ -305,8 +305,9 @@ class Session:
             )
             agent_cls = fallback_agent
             agent_config = self.config.get_agent_config(agent_cls)
-            if settings.disabled_playbooks is not None:
-                agent_config.disabled_playbooks = list(settings.disabled_playbooks)
+            disabled_playbooks = getattr(settings, "disabled_playbooks", None)
+            if disabled_playbooks is not None:
+                agent_config.disabled_playbooks = list(disabled_playbooks)
             agent_name = agent_cls if agent_cls is not None else "agent"
             llm_config = self.config.get_llm_config_from_agent(agent_name)
             self._apply_condenser(settings, agent_config, llm_config)

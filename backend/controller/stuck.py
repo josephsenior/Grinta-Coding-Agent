@@ -436,6 +436,8 @@ class StuckDetector:
         """
         if isinstance(action, CmdRunAction):
             return self._categorize_cmd_action(action.command.lower())
+        if hasattr(action, "path"):
+            return f"file_op_{getattr(action, 'path')}"
         return "other_action"
 
     def _categorize_cmd_action(self, command: str) -> str:
@@ -567,9 +569,9 @@ class StuckDetector:
             prompt_tokens[-1] - prompt_tokens[-5] if len(prompt_tokens) >= 5 else 0
         )
 
-        # If we added more than 10k tokens in 5 steps, that's suspicious of a runaway loop
-        # (Average 2k per step is high but possible, but sustained high growth is bad)
-        if recent_growth > 10000:
+        # If we added more than 50k tokens in 5 steps, that's suspicious of a runaway loop
+        # (Average 10k per step is high sustained output indicative of un-truncated runaway commands)
+        if recent_growth > 50000:
             logger.warning(
                 "Cost acceleration detected: %s tokens added in last 5 steps",
                 recent_growth,
@@ -740,7 +742,7 @@ class StuckDetector:
                 write_count += 1
 
         readonly_count = len(readonly_commands)
-        if readonly_count < 5 or write_count > 0:
+        if readonly_count < 8 or write_count > 0:
             return False
 
         # Check diversity: if commands are diverse (exploring different paths),
@@ -748,9 +750,9 @@ class StuckDetector:
         unique_commands = len(set(readonly_commands))
         diversity = unique_commands / readonly_count if readonly_count else 1.0
 
-        # Low diversity (< 50% unique) = stuck loop
+        # Low diversity (< 25% unique) = stuck loop (allows polling 4-5 times safely)
         # High diversity = legitimate exploration
-        if diversity < 0.5:
+        if diversity < 0.25:
             logger.warning(
                 "Read-only inspection loop detected: %d read-only actions "
                 "(%d unique, %.0f%% diversity), %d writes in last %d events",

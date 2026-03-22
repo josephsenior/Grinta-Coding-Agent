@@ -139,7 +139,7 @@ export function ConversationSidebar() {
         toast.success("Conversation deleted");
         setDeleteTarget(null);
         if (activeId === removedId) {
-          navigate("/");
+          navigate("/chat/new");
         }
       },
       onError: () => {
@@ -153,7 +153,7 @@ export function ConversationSidebar() {
       onSuccess: () => {
         toast.success("All conversations deleted");
         setIsDeletingAll(false);
-        navigate("/");
+        navigate("/chat/new");
       },
       onError: () => {
         toast.error("Failed to delete all conversations");
@@ -162,7 +162,7 @@ export function ConversationSidebar() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col border-r bg-muted/15">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-1 border-b px-2 py-2">
         <span className="flex-1 truncate px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Chats

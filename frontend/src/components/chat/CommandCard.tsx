@@ -57,7 +57,7 @@ export function CommandOutputCard({ event }: CommandOutputCardProps) {
         collapseWhenLines={10}
         collapseWhenChars={2000}
         className="mt-1"
-        preClassName="rounded border border-border/30 bg-background/40 p-2 dark:bg-background/25"
+        preClassName="rounded border border-border/30 bg-muted/40 p-2 dark:bg-card/35"
       />
     </div>
   );

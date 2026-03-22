@@ -94,7 +94,9 @@ DEFAULT_RUNTIME_AUTO_LINT_ENABLED = True
 DEFAULT_RUNTIME_KEEP_ALIVE = False
 
 # ── LLM Defaults ────────────────────────────────────────────────────
-DEFAULT_LLM_MODEL = "gemini-2.5-flash"
+# No default model until settings.json (llm_model) or env (LLM_MODEL) supplies one.
+# Flat settings.json llm_model overrides env when both are set (see load_from_json).
+DEFAULT_LLM_MODEL: str | None = None
 DEFAULT_LLM_NUM_RETRIES = 5
 DEFAULT_LLM_RETRY_MULTIPLIER = 8
 DEFAULT_LLM_RETRY_MIN_WAIT = 8

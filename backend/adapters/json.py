@@ -94,7 +94,9 @@ def _repair_and_load(extracted: str, kwargs: dict) -> Any:
     """Attempt to repair malformed JSON and load."""
     try:
         repaired = repair_json(extracted)
-        return json.loads(repaired, **kwargs)
+        if isinstance(repaired, tuple):
+            repaired = repaired[0] if repaired else extracted
+        return json.loads(str(repaired), **kwargs)
     except (json.JSONDecodeError, ValueError, TypeError) as e:
         raise LLMResponseError(
             "Invalid JSON in response. Please make sure the response is a valid JSON object."

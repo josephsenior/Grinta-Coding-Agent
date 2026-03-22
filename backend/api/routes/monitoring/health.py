@@ -174,8 +174,7 @@ async def controller_health(sid: str):
 
     health_info = {"status": "healthy"}
     func = _collect_controller_health
-    if func:
-        health_info.update(func(session.controller))
+    health_info.update(func(session.controller))
     severity = str(health_info.get("severity", "green"))
     health_info["status"] = monitoring_helpers.status_from_severity(severity)
 

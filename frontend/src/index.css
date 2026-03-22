@@ -39,37 +39,39 @@
 }
 
 .dark {
-  --color-background: hsl(240 10% 3.9%);
-  --color-foreground: hsl(0 0% 98%);
-  --color-card: hsl(240 10% 3.9%);
-  --color-card-foreground: hsl(0 0% 98%);
-  --color-popover: hsl(240 10% 3.9%);
-  --color-popover-foreground: hsl(0 0% 98%);
-  --color-primary: hsl(0 0% 98%);
-  --color-primary-foreground: hsl(240 5.9% 10%);
-  --color-secondary: hsl(240 3.7% 15.9%);
-  --color-secondary-foreground: hsl(0 0% 98%);
-  --color-muted: hsl(240 3.7% 15.9%);
-  --color-muted-foreground: hsl(240 5% 64.9%);
-  --color-accent: hsl(240 3.7% 15.9%);
-  --color-accent-foreground: hsl(0 0% 98%);
-  --color-destructive: hsl(0 62.8% 30.6%);
-  --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(240 3.7% 15.9%);
-  --color-input: hsl(240 3.7% 15.9%);
-  --color-ring: hsl(240 4.9% 83.9%);
+  /* Softer than OLED-black; foreground slightly below pure white for long sessions. */
+  --color-background: hsl(240 8% 7%);
+  --color-foreground: hsl(240 5% 93%);
+  --color-card: hsl(240 7% 11%);
+  --color-card-foreground: hsl(240 5% 93%);
+  --color-popover: hsl(240 7% 11%);
+  --color-popover-foreground: hsl(240 5% 93%);
+  --color-primary: hsl(240 4% 92%);
+  --color-primary-foreground: hsl(240 8% 8%);
+  --color-secondary: hsl(240 5% 14%);
+  --color-secondary-foreground: hsl(240 5% 93%);
+  --color-muted: hsl(240 6% 12%);
+  --color-muted-foreground: hsl(240 4% 62%);
+  --color-accent: hsl(240 5% 14%);
+  --color-accent-foreground: hsl(240 5% 93%);
+  --color-destructive: hsl(0 55% 42%);
+  --color-destructive-foreground: hsl(0 0% 96%);
+  --color-border: hsl(240 5% 18%);
+  --color-input: hsl(240 5% 16%);
+  --color-ring: hsl(240 5% 68%);
   --color-chart-1: hsl(220 70% 50%);
   --color-chart-2: hsl(160 60% 45%);
   --color-chart-3: hsl(30 80% 55%);
   --color-chart-4: hsl(280 65% 60%);
   --color-chart-5: hsl(340 75% 55%);
-  --color-sidebar-background: hsl(240 5.9% 10%);
-  --color-sidebar-foreground: hsl(240 4.8% 95.9%);
+  /* Side rails: distinct step from main canvas and from card. */
+  --color-sidebar-background: hsl(240 6% 9.5%);
+  --color-sidebar-foreground: hsl(240 5% 92%);
   --color-sidebar-primary: hsl(224.3 76.3% 48%);
   --color-sidebar-primary-foreground: hsl(0 0% 100%);
-  --color-sidebar-accent: hsl(240 3.7% 15.9%);
-  --color-sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --color-sidebar-border: hsl(240 3.7% 15.9%);
+  --color-sidebar-accent: hsl(240 5% 14%);
+  --color-sidebar-accent-foreground: hsl(240 5% 92%);
+  --color-sidebar-border: hsl(240 5% 17%);
   --color-sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
 

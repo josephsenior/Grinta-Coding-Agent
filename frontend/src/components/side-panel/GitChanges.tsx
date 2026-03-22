@@ -46,7 +46,7 @@ export function GitChanges({ conversationId }: GitChangesProps) {
   const setContextPanelOpen = useAppStore((s) => s.setContextPanelOpen);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!conversationId) return;
+    if (!conversationId || conversationId === "new") return;
     setLoading(true);
     setLoadError(false);
     try {
@@ -70,6 +70,16 @@ export function GitChanges({ conversationId }: GitChangesProps) {
   }, [load]);
 
   useRefetchWhenBackendRecovers(() => load({ silent: true }), true, loadError);
+
+  if (conversationId === "new") {
+    return (
+      <div className="flex h-full flex-col items-center justify-center px-4 py-6 text-center">
+        <p className="text-xs text-muted-foreground">
+          Git changes appear after you send your first message.
+        </p>
+      </div>
+    );
+  }
 
   const handleClick = async (change: GitChange) => {
     if (change.status.toUpperCase() === "D") {
