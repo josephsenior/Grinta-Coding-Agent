@@ -1,4 +1,8 @@
 ---
+name: codereview_roasted
+type: knowledge
+version: 2.0.0
+agent: Orchestrator
 triggers:
   - /codereview-roasted
 ---

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -32,6 +33,33 @@ _INJECTED_MSG_MARKERS = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _maybe_log_prompt_metrics(messages: list) -> None:
+    """Log system-message character counts when FORGE_DEBUG_PROMPT_METRICS is set."""
+    flag = os.environ.get("FORGE_DEBUG_PROMPT_METRICS", "").strip().lower()
+    if flag not in ("1", "true", "yes", "on"):
+        return
+    sizes: list[int] = []
+    for m in messages:
+        if not isinstance(m, dict) or m.get("role") != "system":
+            continue
+        c = m.get("content", "")
+        if isinstance(c, str):
+            sizes.append(len(c))
+        elif isinstance(c, list):
+            sizes.append(sum(len(str(part)) for part in c))
+        else:
+            sizes.append(len(str(c)))
+    if not sizes:
+        logger.info("FORGE_DEBUG_PROMPT_METRICS: no system messages")
+        return
+    logger.info(
+        "FORGE_DEBUG_PROMPT_METRICS: system_messages=%s chars_each=%s chars_total=%s",
+        len(sizes),
+        sizes,
+        sum(sizes),
+    )
 
 
 def _get_last_user_text_from_messages(messages: list) -> str:
@@ -349,6 +377,7 @@ class OrchestratorPlanner:
             self._checked_tools_model = cache_key
 
         messages = self._inject_turn_status(messages, state)
+        _maybe_log_prompt_metrics(messages)
 
         params: dict[str, Any] = {
             "messages": messages,

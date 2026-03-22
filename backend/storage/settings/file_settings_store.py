@@ -118,17 +118,23 @@ class FileSettingsStore(SettingsStore):
     ) -> FileSettingsStore:
         """Get FileSettingsStore singleton instance.
 
+        Persisted path is always ``settings.json`` under :func:`get_app_settings_root`
+        (not ``config.local_data_root`` / project folder), so the open-folder workspace does not get a
+        second settings file.
+
         Args:
-            config: Forge configuration
+            config: Forge configuration (used for store *type* and webhooks only)
             user_id: Optional user ID
 
         Returns:
             FileSettingsStore instance
 
         """
+        from backend.core.app_paths import get_app_settings_root
+
         file_store = get_file_store(
             file_store_type=config.file_store,
-            file_store_path=config.file_store_path,
+            local_data_root=get_app_settings_root(),
             file_store_web_hook_url=config.file_store_web_hook_url,
             file_store_web_hook_headers=config.file_store_web_hook_headers,
             file_store_web_hook_batch=config.file_store_web_hook_batch,

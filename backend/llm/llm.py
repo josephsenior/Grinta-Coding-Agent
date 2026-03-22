@@ -184,18 +184,6 @@ LLM_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
 )
 
 
-def _apply_model_alias_resolution(config: Any) -> None:
-    """Resolve model aliases and update config.model if changed."""
-    from backend.llm.model_aliases import get_alias_manager
-
-    alias_manager = get_alias_manager()
-    original = config.model
-    resolved = alias_manager.resolve_alias(original)
-    if resolved != original:
-        logger.info("Model alias resolved: %s -> %s", original, resolved)
-        config.model = resolved
-
-
 def _get_provider_resolver() -> Any:
     """Return the provider resolver instance."""
     from backend.llm.provider_resolver import get_resolver
@@ -306,7 +294,6 @@ class LLM(RetryMixin, DebugMixin):
         self.retry_listener = retry_listener
         self._function_calling_active: bool = False
 
-        _apply_model_alias_resolution(self.config)
         resolver = _get_provider_resolver()
         _apply_base_url_discovery(self.config, resolver)
 

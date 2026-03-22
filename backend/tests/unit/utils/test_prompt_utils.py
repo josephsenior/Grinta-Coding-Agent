@@ -297,22 +297,23 @@ class TestOrchestratorPromptManager:
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
         opm.set_prompt_tier("debug")
 
-        # Test missing lessons file
-        with patch("os.path.exists", return_value=False):
+        with patch(
+            "backend.core.workspace_resolution.get_effective_workspace_root",
+            return_value=tmp_path,
+        ):
+            # Test missing lessons file
             result = opm.get_system_message()
             assert "REPOSITORY_LESSONS_LEARNED" not in result
 
-        # Test existing lessons file
-        lessons_dir = tmp_path / ".Forge"
-        lessons_dir.mkdir(exist_ok=True)
-        lessons_file = lessons_dir / "lessons.md"
-        lessons_file.write_text("Always test your code.", encoding="utf-8")
+            # Test existing lessons file
+            lessons_dir = tmp_path / ".Forge"
+            lessons_dir.mkdir(exist_ok=True)
+            lessons_file = lessons_dir / "lessons.md"
+            lessons_file.write_text("Always test your code.", encoding="utf-8")
 
-        with patch("os.path.exists", side_effect=lambda p: str(lessons_file) in p or ".Forge" in p):
-            with patch("os.path.join", return_value=str(lessons_file)):
-                result = opm.get_system_message()
-                assert "REPOSITORY_LESSONS_LEARNED" in result
-                assert "Always test your code." in result
+            result = opm.get_system_message()
+            assert "REPOSITORY_LESSONS_LEARNED" in result
+            assert "Always test your code." in result
 
     @patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x)
     def test_inject_scratchpad(self, mock_refine, tmp_path):
@@ -324,7 +325,10 @@ class TestOrchestratorPromptManager:
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
 
-        with patch("backend.engines.orchestrator.tools.note._load_notes", return_value={"key": "val"}):
+        with patch(
+            "backend.engines.orchestrator.tools.memory_manager_temp1.scratchpad_entries_for_prompt",
+            return_value=[("key", "val")],
+        ):
             result = opm.get_system_message()
             assert "WORKING_SCRATCHPAD" in result
             assert "[key]: val" in result

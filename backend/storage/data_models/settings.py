@@ -77,14 +77,11 @@ class Settings(BaseModel):
 
     @field_validator("agent")
     @classmethod
-    def normalize_legacy_agent_names(cls, value: str | None) -> str | None:
+    def strip_agent_field(cls, value: str | None) -> str | None:
         if value is None:
             return None
-
-        normalized = value.strip()
-        if normalized.lower() in {"codeactagent", "codeact", "codact", "orchestrator"}:
-            return "Orchestrator"
-        return normalized
+        s = value.strip()
+        return s if s else None
 
     @property
     def knowledge_base(self) -> KnowledgeBaseSettings:

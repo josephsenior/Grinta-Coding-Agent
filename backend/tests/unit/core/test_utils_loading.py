@@ -224,12 +224,10 @@ class TestMainEntryPoints:
 class TestLoadFromJson:
     def test_load_from_json_success(self, tmp_path):
         json_file = tmp_path / "settings.json"
-        json_file.write_text('{"file_store": "memory", "agent": "test_agent"}')
+        json_file.write_text('{"mcp_host": "custom-host:9999"}')
         cfg = ForgeConfig()
         load_from_json(cfg, str(json_file))
-        assert cfg.file_store == "memory"
-        # ForgeConfig uses agents dict for the base agent too, but default_agent covers this
-        assert cfg.default_agent == "test_agent"
+        assert cfg.mcp_host == "custom-host:9999"
 
     def test_load_from_json_file_not_found(self):
         cfg = ForgeConfig()

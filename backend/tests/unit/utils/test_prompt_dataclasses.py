@@ -246,8 +246,10 @@ class TestOrchestratorPromptManager:
 
     def test_inject_scratchpad_success(self, pm):
         """Test scratchpad injection when notes exist."""
-        with patch("backend.engines.orchestrator.tools.note._load_notes") as mock_load:
-            mock_load.return_value = {"todo": "buy milk"}
+        with patch(
+            "backend.engines.orchestrator.tools.memory_manager_temp1.scratchpad_entries_for_prompt",
+            return_value=[("todo", "buy milk")],
+        ):
             content = "Original content"
             result = pm._inject_scratchpad(content)
             assert "Original content" in result
@@ -256,8 +258,10 @@ class TestOrchestratorPromptManager:
 
     def test_inject_scratchpad_no_notes(self, pm):
         """Test scratchpad injection when no notes exist."""
-        with patch("backend.engines.orchestrator.tools.note._load_notes") as mock_load:
-            mock_load.return_value = {}
+        with patch(
+            "backend.engines.orchestrator.tools.memory_manager_temp1.scratchpad_entries_for_prompt",
+            return_value=[],
+        ):
             content = "Original content"
             result = pm._inject_scratchpad(content)
             assert result == content
@@ -265,7 +269,7 @@ class TestOrchestratorPromptManager:
     def test_inject_scratchpad_exception(self, pm):
         """Test scratchpad injection handles exceptions."""
         with patch(
-            "backend.engines.orchestrator.tools.note._load_notes",
+            "backend.engines.orchestrator.tools.memory_manager_temp1.scratchpad_entries_for_prompt",
             side_effect=Exception("Crash"),
         ):
             content = "Original content"

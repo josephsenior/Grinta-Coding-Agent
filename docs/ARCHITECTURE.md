@@ -73,9 +73,8 @@ Context window management via the **Condenser** system:
 Pydantic v2 Settings cascading dynamically from:
 
 1. Environment variables (`.env`, `.env.local`)
-2. Local Project Settings (`<workspace_root>/settings.json`)
-3. Global User Settings (`~/.forge/settings.json`)
-4. Internal Defaults
+2. **`settings.json`** in the Forge **app root** (directory from `FORGE_APP_ROOT`, or the process working directory when the server starts — not the per-folder workspace root)
+3. Internal defaults
 
 Provides safe merging.
 

@@ -31,7 +31,7 @@ from backend.core.constants import (
     DEFAULT_MAX_CONCURRENT_CONVERSATIONS,
     DEFAULT_MAX_FILE_UPLOAD_SIZE_MB,
     DEFAULT_RUNTIME,
-    DEFAULT_WORKSPACE_BASE,
+    DEFAULT_LOCAL_DATA_ROOT,
     FORGE_DEFAULT_AGENT,
     FORGE_MAX_ITERATIONS,
 )
@@ -88,7 +88,8 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         runtime_config: Runtime configuration settings.
         runtime: Runtime environment identifier.
         file_store: Type of file store to use.
-        file_store_path: Path to the file store.
+        local_data_root: Disk root for LocalFileStore (sessions, etc.).
+        project_root: Open-project directory (agent cwd); optional until user picks a folder.
         enable_browser: Whether to enable the browser environment
         max_iterations: Maximum number of iterations allowed.
         mcp: MCP configuration settings.
@@ -103,7 +104,13 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     runtime: str = Field(default=DEFAULT_RUNTIME)
     file_store: str = Field(default=DEFAULT_FILE_STORE)
-    file_store_path: str = Field(default=DEFAULT_WORKSPACE_BASE)
+    local_data_root: str = Field(
+        default=DEFAULT_LOCAL_DATA_ROOT,
+        description=(
+            "Filesystem root for LocalFileStore (e.g. sessions/). "
+            "When a project is open, AppState sets this to match project_root."
+        ),
+    )
     enable_browser: bool = Field(default=DEFAULT_ENABLE_BROWSER)
     cache_dir: str = Field(default=DEFAULT_CACHE_DIR)
     max_iterations: int = Field(default=FORGE_MAX_ITERATIONS)
@@ -173,8 +180,9 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=None, description="Extended configuration for additional features"
     )
     # Optional attributes accessed via extended config or direct access
-    workspace_base: str | None = Field(
-        default=None, description="Base workspace directory"
+    project_root: str | None = Field(
+        default=None,
+        description="User-opened project folder (agent + UI workspace).",
     )
     workspace_mount_path_in_runtime: str | None = Field(
         default=None, description="Workspace mount path in runtime"

@@ -32,7 +32,9 @@ FORGE_MAX_ITERATIONS = (
 
 # ── Workspace & Paths ───────────────────────────────────────────────
 JWT_SECRET_FILE = ".jwt_secret"
-DEFAULT_WORKSPACE_BASE = "~/.Forge"
+# Default disk root for LocalFileStore when settings do not set ``local_data_root``.
+DEFAULT_LOCAL_DATA_ROOT = ""
+
 DEFAULT_CONFIG_FILE = "settings.json"
 
 # ── URLs ────────────────────────────────────────────────────────────
@@ -122,7 +124,7 @@ CURRENT_AGENT_CONFIG_SCHEMA_VERSION = "2025-11-14"
 DEFAULT_AGENT_MEMORY_ENABLED = True
 DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED = True
 DEFAULT_AGENT_BROWSING_ENABLED = True
-DEFAULT_AGENT_VECTOR_MEMORY_ENABLED = False
+DEFAULT_AGENT_VECTOR_MEMORY_ENABLED = True
 DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED = False
 DEFAULT_AGENT_PROMPT_CACHING_ENABLED = True
 DEFAULT_AGENT_AUTO_LINT_ENABLED = True

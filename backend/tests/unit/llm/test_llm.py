@@ -389,11 +389,8 @@ class TestLLMInit:
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_init_basic(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
+    def test_init_basic(self, mock_resolver, mock_features, mock_client):
         """Test basic LLM initialization."""
         # Setup mocks
         mock_config = Mock()
@@ -405,7 +402,6 @@ class TestLLMInit:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        mock_alias_mgr.return_value.resolve_alias.return_value = "gpt-4"
         mock_resolver.return_value.is_local_model.return_value = False
         mock_resolver.return_value.resolve_base_url.return_value = None
 
@@ -424,12 +420,9 @@ class TestLLMInit:
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_init_with_alias_resolution(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
-        """Test initialization with model alias resolution."""
+    def test_init_model_id_passed_through(self, mock_resolver, mock_features, mock_client):
+        """Model id is used as configured; there is no alias resolution layer."""
         mock_config = Mock()
         mock_config.model = "gpt4"
         mock_config.base_url = "https://api.openai.com"
@@ -439,8 +432,6 @@ class TestLLMInit:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        # Alias resolves to full name
-        mock_alias_mgr.return_value.resolve_alias.return_value = "gpt-4"
         mock_resolver.return_value.is_local_model.return_value = False
         mock_resolver.return_value.resolve_base_url.return_value = None
 
@@ -453,16 +444,12 @@ class TestLLMInit:
         with patch.object(LLM, "_extract_api_key", return_value="test-key"):
             llm = LLM(mock_config, "test-service")
 
-        # Config should be updated with resolved model
-        assert llm.config.model == "gpt-4"
+        assert llm.config.model == "gpt4"
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_init_auto_discovers_base_url(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
+    def test_init_auto_discovers_base_url(self, mock_resolver, mock_features, mock_client):
         """Test auto-discovery of base_url for local models."""
         mock_config = Mock()
         mock_config.model = "ollama/llama2"
@@ -473,7 +460,6 @@ class TestLLMInit:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        mock_alias_mgr.return_value.resolve_alias.return_value = "ollama/llama2"
 
         # Resolver discovers local endpoint
         mock_resolver_inst = mock_resolver.return_value
@@ -495,11 +481,8 @@ class TestLLMInit:
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_init_local_model_no_api_key_required(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
+    def test_init_local_model_no_api_key_required(self, mock_resolver, mock_features, mock_client):
         """Test local models don't require API key."""
         mock_config = Mock()
         mock_config.model = "ollama/llama2"
@@ -510,7 +493,6 @@ class TestLLMInit:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        mock_alias_mgr.return_value.resolve_alias.return_value = "ollama/llama2"
         mock_resolver.return_value.is_local_model.return_value = True
         mock_resolver.return_value.resolve_base_url.return_value = None
 
@@ -527,11 +509,8 @@ class TestLLMInit:
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_init_cloud_model_requires_api_key(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
+    def test_init_cloud_model_requires_api_key(self, mock_resolver, mock_features, mock_client):
         """Test cloud models require API key."""
         mock_config = Mock()
         mock_config.model = "gpt-4"
@@ -542,7 +521,6 @@ class TestLLMInit:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        mock_alias_mgr.return_value.resolve_alias.return_value = "gpt-4"
         mock_resolver.return_value.is_local_model.return_value = False
         mock_resolver.return_value.resolve_base_url.return_value = None
 
@@ -554,11 +532,8 @@ class TestLLMInit:
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_init_with_metrics(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
+    def test_init_with_metrics(self, mock_resolver, mock_features, mock_client):
         """Test initialization with custom metrics."""
         mock_config = Mock()
         mock_config.model = "gpt-4"
@@ -569,7 +544,6 @@ class TestLLMInit:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        mock_alias_mgr.return_value.resolve_alias.return_value = "gpt-4"
         mock_resolver.return_value.is_local_model.return_value = False
         mock_resolver.return_value.resolve_base_url.return_value = None
 
@@ -588,11 +562,8 @@ class TestLLMInit:
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_init_function_calling_configuration(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
+    def test_init_function_calling_configuration(self, mock_resolver, mock_features, mock_client):
         """Test function calling is properly configured."""
         mock_config = Mock()
         mock_config.model = "gpt-4"
@@ -603,7 +574,6 @@ class TestLLMInit:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        mock_alias_mgr.return_value.resolve_alias.return_value = "gpt-4"
         mock_resolver.return_value.is_local_model.return_value = False
         mock_resolver.return_value.resolve_base_url.return_value = None
 
@@ -620,11 +590,8 @@ class TestLLMInit:
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_init_handles_feature_lookup_failure(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
+    def test_init_handles_feature_lookup_failure(self, mock_resolver, mock_features, mock_client):
         """Test graceful handling of feature lookup failures."""
         mock_config = Mock()
         mock_config.model = "unknown-model"
@@ -635,7 +602,6 @@ class TestLLMInit:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        mock_alias_mgr.return_value.resolve_alias.return_value = "unknown-model"
         mock_resolver.return_value.is_local_model.return_value = True
         mock_resolver.return_value.resolve_base_url.return_value = None
         mock_features.side_effect = KeyError("Model not found")
@@ -647,11 +613,8 @@ class TestLLMInit:
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_init_config_is_deep_copied(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
+    def test_init_config_is_deep_copied(self, mock_resolver, mock_features, mock_client):
         """Test that config is deep copied on init."""
         mock_config = Mock()
         mock_config.model = "gpt-4"
@@ -662,7 +625,6 @@ class TestLLMInit:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        mock_alias_mgr.return_value.resolve_alias.return_value = "gpt-4"
         mock_resolver.return_value.is_local_model.return_value = False
         mock_resolver.return_value.resolve_base_url.return_value = None
 
@@ -685,11 +647,8 @@ class TestLLMProperties:
 
     @patch("backend.llm.llm.get_direct_client")
     @patch("backend.llm.llm.get_features")
-    @patch("backend.llm.model_aliases.get_alias_manager")
     @patch("backend.llm.provider_resolver.get_resolver")
-    def test_features_property(
-        self, mock_resolver, mock_alias_mgr, mock_features, mock_client
-    ):
+    def test_features_property(self, mock_resolver, mock_features, mock_client):
         """Test features property returns cached features."""
         mock_config = Mock()
         mock_config.model = "gpt-4"
@@ -700,7 +659,6 @@ class TestLLMProperties:
         mock_config.max_output_tokens = None
         mock_config.custom_tokenizer = None
 
-        mock_alias_mgr.return_value.resolve_alias.return_value = "gpt-4"
         mock_resolver.return_value.is_local_model.return_value = False
         mock_resolver.return_value.resolve_base_url.return_value = None
 

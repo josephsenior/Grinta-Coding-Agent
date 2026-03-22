@@ -8,7 +8,12 @@ interface HealthReady {
   status: string;
   uptime_seconds: number;
   checks: {
-    config: { status: string; workspace_base?: string; detail?: string };
+    config: {
+      status: string;
+      project_root?: string;
+      local_data_root?: string;
+      detail?: string;
+    };
     storage: { status: string; path?: string; detail?: string };
   };
 }
@@ -36,7 +41,11 @@ function CheckRow({
   label: string;
   check: { status: string; [key: string]: string | undefined };
 }) {
-  const detail = check.workspace_base ?? check.path ?? check.detail;
+  const detail =
+    check.project_root ??
+    check.local_data_root ??
+    check.path ??
+    check.detail;
   return (
     <div className="flex items-start gap-3 rounded-lg border px-4 py-3">
       <StatusIcon status={check.status} />

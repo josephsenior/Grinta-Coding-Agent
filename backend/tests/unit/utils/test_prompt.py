@@ -78,48 +78,65 @@ class TestOrchestratorPromptManager:
             msg = opm.get_system_message(name="Test")
             assert msg.startswith("You are Forge agent.\nSystem: Test")
 
-    def test_inject_lessons_learned_missing_file(self, prompt_dir):
+    def test_inject_lessons_learned_missing_file(self, prompt_dir, tmp_path):
         # Line 255: return content if file doesn't exist
         opm = OrchestratorPromptManager(prompt_dir)
         content = "original"
-        with patch("os.path.exists", return_value=False):
+        with patch(
+            "backend.core.workspace_resolution.get_effective_workspace_root",
+            return_value=tmp_path,
+        ):
             result = opm._inject_lessons_learned(content)
             assert result == content
 
-    def test_inject_lessons_learned_success(self, prompt_dir):
+    def test_inject_lessons_learned_success(self, prompt_dir, tmp_path):
         # Line 260-288 coverage
         opm = OrchestratorPromptManager(prompt_dir)
         content = "base-prompt"
-        with patch("os.path.exists", return_value=True), \
-             patch("builtins.open", MagicMock()) as mock_file:
-            # Setup the context manager behavior for open()
-            mock_file.return_value.__enter__.return_value.read.return_value = "lesson 1"
+        lessons = tmp_path / ".Forge" / "lessons.md"
+        lessons.parent.mkdir(parents=True)
+        lessons.write_text("lesson 1", encoding="utf-8")
+        with patch(
+            "backend.core.workspace_resolution.get_effective_workspace_root",
+            return_value=tmp_path,
+        ):
             result = opm._inject_lessons_learned(content)
             assert "lesson 1" in result
             assert "<REPOSITORY_LESSONS_LEARNED>" in result
 
-    def test_inject_lessons_learned_truncation(self, prompt_dir):
+    def test_inject_lessons_learned_truncation(self, prompt_dir, tmp_path):
         opm = OrchestratorPromptManager(prompt_dir)
         long_lessons = "X" * 4000
-        with patch("os.path.exists", return_value=True), \
-             patch("builtins.open", MagicMock()) as mock_file:
-            mock_file.return_value.__enter__.return_value.read.return_value = long_lessons
+        lessons = tmp_path / ".Forge" / "lessons.md"
+        lessons.parent.mkdir(parents=True)
+        lessons.write_text(long_lessons, encoding="utf-8")
+        with patch(
+            "backend.core.workspace_resolution.get_effective_workspace_root",
+            return_value=tmp_path,
+        ):
             result = opm._inject_lessons_learned("content")
             assert "truncated" in result
             assert len(result) < 4000 + 150
 
-    def test_inject_lessons_learned_empty_file(self, prompt_dir):
+    def test_inject_lessons_learned_empty_file(self, prompt_dir, tmp_path):
         opm = OrchestratorPromptManager(prompt_dir)
-        with patch("os.path.exists", return_value=True), \
-             patch("builtins.open", MagicMock()) as mock_file:
-            mock_file.return_value.__enter__.return_value.read.return_value = "  "
+        lessons = tmp_path / ".Forge" / "lessons.md"
+        lessons.parent.mkdir(parents=True)
+        lessons.write_text("  ", encoding="utf-8")
+        with patch(
+            "backend.core.workspace_resolution.get_effective_workspace_root",
+            return_value=tmp_path,
+        ):
             result = opm._inject_lessons_learned("content")
             assert result == "content"
 
     def test_inject_lessons_learned_exception(self, prompt_dir):
         # Line 287-288: except Exception: return content
         opm = OrchestratorPromptManager(prompt_dir)
-        with patch("os.path.exists", side_effect=RuntimeError("disk fail")):
+        with patch(
+            "backend.core.workspace_resolution.get_effective_workspace_root",
+            side_effect=RuntimeError("disk fail"),
+        ):
             result = opm._inject_lessons_learned("content")
             assert result == "content"
 
@@ -137,13 +154,19 @@ class TestOrchestratorPromptManager:
     def test_inject_scratchpad_exception(self, prompt_dir):
         # Line 303-304: except Exception: return content
         opm = OrchestratorPromptManager(prompt_dir)
-        with patch("backend.engines.orchestrator.tools.note._load_notes", side_effect=Exception("failed")):
+        with patch(
+            "backend.engines.orchestrator.tools.memory_manager_temp1.scratchpad_entries_for_prompt",
+            side_effect=Exception("failed"),
+        ):
             result = opm._inject_scratchpad("content")
             assert result == "content"
 
     def test_inject_scratchpad_success(self, prompt_dir):
         opm = OrchestratorPromptManager(prompt_dir)
-        with patch("backend.engines.orchestrator.tools.note._load_notes", return_value={"key": "note value"}):
+        with patch(
+            "backend.engines.orchestrator.tools.memory_manager_temp1.scratchpad_entries_for_prompt",
+            return_value=[("key", "note value")],
+        ):
             result = opm._inject_scratchpad("content")
             assert "[key]: note value" in result
             assert "<WORKING_SCRATCHPAD>" in result

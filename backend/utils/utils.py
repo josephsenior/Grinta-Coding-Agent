@@ -59,7 +59,7 @@ def create_registry_and_conversation_stats(
     llm_registry = LLMRegistry(user_config, agent_cls)
     file_store = get_file_store(
         file_store_type=config.file_store,
-        file_store_path=config.file_store_path,
+        local_data_root=config.local_data_root,
         file_store_web_hook_url=config.file_store_web_hook_url,
         file_store_web_hook_headers=config.file_store_web_hook_headers,
         file_store_web_hook_batch=config.file_store_web_hook_batch,

@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from typing import Any, List
 
-from backend.core.config.utils import load_forge_config
-
 from backend.engines.orchestrator.tools.common import (
     create_tool_definition,
     get_command_param,
@@ -26,7 +24,9 @@ class TaskTracker:
     def __init__(self, workspace_root: str | Path | None = None):
         """Initialize the task tracker with a workspace root."""
         if workspace_root is None:
-            workspace_root = load_forge_config(set_logging_levels=False).workspace_base or "."
+            from backend.core.workspace_resolution import require_effective_workspace_root
+
+            workspace_root = require_effective_workspace_root()
         self.path = Path(workspace_root) / ".forge" / "active_plan.json"
 
     def load_from_file(self) -> List[dict[str, Any]]:

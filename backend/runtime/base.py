@@ -185,7 +185,7 @@ class Runtime(
     runtime_status: RuntimeStatus | None
     _runtime_initialized: bool = False
     security_analyzer: SecurityAnalyzer | None = None
-    workspace_base: str | None = None
+    project_root: str | None = None
     capabilities: RuntimeCapabilities | None = None
     """Frozen capability snapshot, populated during ``connect()``."""
 
@@ -202,7 +202,7 @@ class Runtime(
         headless_mode: bool = False,
         user_id: str | None = None,
         vcs_provider_tokens: ProviderTokenType | None = None,
-        workspace_base: str | None = None,
+        project_root: str | None = None,
     ) -> None:
         """Initialize runtime state, subscriptions, plugins, and provider credentials."""
         self.git_handler = GitHandler(
@@ -211,7 +211,7 @@ class Runtime(
         )
         self.sid = sid
         self.event_stream = event_stream
-        self.workspace_base = workspace_base
+        self.project_root = project_root
         if event_stream:
             # Unsubscribe first if already exists (handles reconnection cases)
             try:
@@ -276,16 +276,16 @@ class Runtime(
 
         Subclasses (e.g. LocalRuntimeInProcess) override this to expose their
         internal workspace tracking attribute.  The base implementation falls
-        back to ``workspace_base`` when set, and ``Path.cwd()`` otherwise so
+        back to ``project_root`` when set, and ``Path.cwd()`` otherwise so
         that every call-site can rely on a single, always-valid property.
         """
-        if self.workspace_base:
-            return Path(self.workspace_base)
+        if self.project_root:
+            return Path(self.project_root)
         return Path.cwd()
 
     @workspace_root.setter
     def workspace_root(self, value: Path) -> None:
-        self.workspace_base = str(value)
+        self.project_root = str(value)
 
     @property
     def runtime_initialized(self) -> bool:

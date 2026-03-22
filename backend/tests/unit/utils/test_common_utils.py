@@ -40,7 +40,7 @@ def base_config() -> ForgeConfig:
 
     # Mock other config fields
     config.file_store = "local"
-    config.file_store_path = "/tmp/files"
+    config.local_data_root = "/tmp/files"
     config.file_store_web_hook_url = None
     config.file_store_web_hook_headers = None
     config.file_store_web_hook_batch = 10
@@ -322,7 +322,7 @@ class TestCreateRegistryAndStats:
         # Verify get_file_store was called with config values
         mock_get_file_store.assert_called_once_with(
             file_store_type="local",
-            file_store_path="/tmp/files",
+            local_data_root="/tmp/files",
             file_store_web_hook_url=None,
             file_store_web_hook_headers=None,
             file_store_web_hook_batch=10,

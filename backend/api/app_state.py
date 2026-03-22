@@ -51,11 +51,51 @@ class AppState:
         # Eagerly loaded (cheap, no I/O)
         self.server_config: ServerConfig = server_config or load_server_config()
 
+        from pathlib import Path
+
+        from backend.core.app_paths import get_app_settings_root
         from backend.core.config.utils import load_forge_config
+        from backend.core.workspace_resolution import (
+            apply_workspace_to_config,
+            is_reserved_user_forge_data_dir,
+            load_persisted_workspace_path,
+            resolve_existing_directory,
+        )
+
         self.config: ForgeConfig = load_forge_config()
 
-        workspace_base = os.path.expanduser(self.config.file_store_path)
-        self.file_store: FileStore = LocalFileStore(workspace_base)
+        persisted = load_persisted_workspace_path()
+        if persisted:
+            try:
+                root = resolve_existing_directory(persisted)
+                apply_workspace_to_config(self.config, root)
+            except ValueError as e:
+                logger.warning(
+                    "Ignoring persisted workspace path %s: %s", persisted, e
+                )
+
+        wb = (self.config.project_root or "").strip()
+        if not wb:
+            fsp = (self.config.local_data_root or "").strip()
+            if fsp:
+                try:
+                    cand = Path(fsp).expanduser().resolve()
+                    if is_reserved_user_forge_data_dir(cand):
+                        self.config.local_data_root = ""
+                    else:
+                        apply_workspace_to_config(self.config, cand)
+                        wb = (self.config.project_root or "").strip()
+                except OSError:
+                    self.config.local_data_root = ""
+
+        app_root = str(Path(get_app_settings_root()).resolve())
+        if wb:
+            disk_root = str(Path(wb).expanduser().resolve())
+        else:
+            disk_root = app_root
+        self.config.local_data_root = disk_root
+
+        self.file_store: FileStore = LocalFileStore(disk_root)
 
         # Store implementation classes (resolved once from config)
         from backend.storage.secrets.secrets_store import SecretsStore

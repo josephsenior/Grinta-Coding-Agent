@@ -166,7 +166,7 @@ class TestFileSettingsStoreGetInstance:
     async def test_creates_instance(self):
         mock_config = MagicMock()
         mock_config.file_store = "local"
-        mock_config.file_store_path = "/tmp/test"
+        mock_config.local_data_root = "/tmp/test"
         mock_config.file_store_web_hook_url = None
         mock_config.file_store_web_hook_headers = None
         mock_config.file_store_web_hook_batch = False

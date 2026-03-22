@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import type { ForgeEvent, ObservationEvent } from "@/types/events";
 import { ObservationType } from "@/types/agent";
+import { isRecoverableTransientErrorObservation } from "@/lib/transient-session-errors";
 
 /** Turn literal `\n` sequences (common in embedded JSON/repr strings) into real newlines. */
 export function normalizeDisplayNewlines(s: string): string {
@@ -12,10 +13,16 @@ function isObservationEvent(ev: ForgeEvent): ev is ObservationEvent {
   return "observation" in ev;
 }
 
-/** LLM key / provider / quota errors: toast only, hidden from transcript, omitted from LLM context (server-side). */
+/**
+ * Errors shown as toast only — not persisted in the chat transcript.
+ * - Backend sets `extras.notify_ui_only` for provider/key/quota style errors.
+ * - Frontend also treats recoverable startup/connectivity errors the same way
+ *   (see transient-session-errors.ts) so large red inline cards don't stick.
+ */
 export function isNotifyUiOnlyErrorEvent(ev: ForgeEvent): boolean {
   if (!isObservationEvent(ev) || ev.observation !== ObservationType.ERROR) return false;
-  return ev.extras?.notify_ui_only === true;
+  if (ev.extras?.notify_ui_only === true) return true;
+  return isRecoverableTransientErrorObservation(ev);
 }
 
 function toastPayloadFromErrorObservation(ev: ObservationEvent): { title: string; description: string } {

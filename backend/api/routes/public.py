@@ -98,7 +98,7 @@ async def get_config() -> dict[str, Any]:
             with structure depending on server_config implementation:
             - app_mode: Application mode ("SAAS", "STANDALONE", etc.)
             - api_base_url: Base URL for API endpoints
-            - workspace_base: Base path for workspace directory
+            - project_root: Open project directory (agent workspace)
             - feature_flags: Enabled features
             - Other server-specific settings
 
@@ -107,7 +107,7 @@ async def get_config() -> dict[str, Any]:
         {
             "app_mode": "SAAS",
             "api_base_url": "https://api.example.com",
-            "workspace_base": "/data/workspace",
+            "project_root": "/data/workspace",
             ...
         }
 

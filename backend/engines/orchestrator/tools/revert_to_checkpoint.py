@@ -5,17 +5,11 @@ especially when hitting errors after CmdRunAction or FileEditAction.
 """
 
 from __future__ import annotations
-from backend.core.config.utils import load_forge_config
-
-
-import os
 
 from backend.events.action.agent import AgentThinkAction
 from backend.core.rollback.rollback_manager import RollbackManager
 
 REVERT_TO_CHECKPOINT_TOOL_NAME = "revert_to_checkpoint"
-
-_WORKSPACE_ROOT = load_forge_config(set_logging_levels=False).workspace_base or "."
 
 
 def create_revert_to_checkpoint_tool() -> dict:
@@ -48,10 +42,12 @@ def create_revert_to_checkpoint_tool() -> dict:
 
 def build_revert_to_checkpoint_action(arguments: dict) -> AgentThinkAction:
     """Execute the rollback and return a think action describing the result."""
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
     checkpoint_id = arguments.get("checkpoint_id")
 
     manager = RollbackManager(
-        workspace_path=_WORKSPACE_ROOT,
+        workspace_path=str(require_effective_workspace_root()),
         max_checkpoints=30,
         auto_cleanup=True,
     )

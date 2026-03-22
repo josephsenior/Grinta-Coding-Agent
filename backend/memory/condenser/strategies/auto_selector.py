@@ -116,7 +116,6 @@ def select_condenser_config(
     events: Sequence[Event],
     *,
     llm_config: object | None = None,
-    llm_config_name: object | None = None,
     fallback: CondenserConfig | None = None,
     supports_function_calling: bool = False,
 ) -> CondenserConfig:
@@ -129,10 +128,7 @@ def select_condenser_config(
     llm_config:
         LLM configuration reference to pass to LLM-based condensers.
         May be an LLMConfig instance (preferred) or a named LLM config section
-        (e.g. "llm", "coding-model"). When ``None`` LLM-based strategies are skipped.
-    llm_config_name:
-        Backwards-compatible alias for ``llm_config`` (historically this parameter
-        only supported named config sections). Prefer ``llm_config``.
+        (e.g. ``"llm"``). When ``None`` LLM-based strategies are skipped.
     fallback:
         Config returned when events are too few to decide meaningfully.
 
@@ -141,8 +137,6 @@ def select_condenser_config(
     CondenserConfig
         The selected condenser configuration.
     """
-    if llm_config is None:
-        llm_config = llm_config_name
     sig = compute_signals(events)
 
     logger.debug(

@@ -153,6 +153,16 @@ class WarmRuntimePool(RuntimePool):
         with self._lock:
             return dict(self._evictions)
 
+    def drain_all(self) -> None:
+        """Disconnect and drop every pooled runtime (e.g. after workspace folder change)."""
+        with self._lock:
+            for key, queue in list(self._pool.items()):
+                while queue:
+                    _, pooled = queue.popleft()
+                    call_async_disconnect(pooled.runtime)
+                    self._evictions[key] += 1
+            self._pool.clear()
+
     def configure_policies(
         self,
         default_policy: WarmPoolPolicy,

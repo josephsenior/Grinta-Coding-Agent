@@ -235,7 +235,7 @@ def _configure_jwt_secret(cfg: ForgeConfig) -> None:
     if not cfg.jwt_secret:
         cfg.jwt_secret = SecretStr(
             get_or_create_jwt_secret(
-                get_file_store(cfg.file_store, cfg.file_store_path)
+                get_file_store(cfg.file_store, cfg.local_data_root)
             )
         )
 
@@ -489,8 +489,9 @@ def setup_config_from_args(args: argparse.Namespace) -> ForgeConfig:
 
     Configuration precedence (from highest to lowest):
     1. CLI parameters (e.g., -l for LLM config)
-    2. settings.json in current directory (or --config-file location if specified)
-    3. ~/.Forge/settings.json
+    2. ``settings.json`` from ``--config-file`` (default: relative to process CWD)
+    3. Canonical ``<get_app_settings_root()>/settings.json`` if that path differs and
+       contains LLM keys (see :func:`backend.core.app_paths.get_app_settings_root`)
     """
     config = load_forge_config(config_file=args.config_file)
     apply_llm_config_override(config, args)

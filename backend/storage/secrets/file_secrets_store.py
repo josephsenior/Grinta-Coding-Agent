@@ -83,6 +83,8 @@ class FileSecretsStore(SecretsStore):
     ) -> FileSecretsStore:
         """Get FileSecretsStore singleton instance.
 
+        Same root as ``settings.json`` — see :func:`backend.core.app_paths.get_app_settings_root`.
+
         Args:
             config: Forge configuration
             user_id: Optional user ID
@@ -91,9 +93,11 @@ class FileSecretsStore(SecretsStore):
             FileSecretsStore instance
 
         """
+        from backend.core.app_paths import get_app_settings_root
+
         file_store = get_file_store(
             file_store_type=config.file_store,
-            file_store_path=config.file_store_path,
+            local_data_root=get_app_settings_root(),
             file_store_web_hook_url=config.file_store_web_hook_url,
             file_store_web_hook_headers=config.file_store_web_hook_headers,
             file_store_web_hook_batch=config.file_store_web_hook_batch,

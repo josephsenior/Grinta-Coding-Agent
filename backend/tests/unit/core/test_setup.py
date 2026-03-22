@@ -104,7 +104,7 @@ def test_create_runtime(
 ):
     mock_config = MagicMock(spec=ForgeConfig)
     mock_config.file_store = "memory"
-    mock_config.file_store_path = "/tmp"
+    mock_config.local_data_root = "/tmp"
     mock_config.runtime = "docker"
     mock_config.default_agent = "agent"
 
@@ -144,6 +144,7 @@ def test_create_controller(mock_controller_cls, mock_restore):
     mock_config = MagicMock(spec=ForgeConfig)
     mock_config.max_iterations = 10
     mock_config.max_budget_per_task = 100
+    mock_config.pending_action_timeout = 60.0
     mock_config.get_agent_to_llm_config_map.return_value = {}
     mock_config.security = MagicMock()
     mock_config.security.confirmation_mode = False

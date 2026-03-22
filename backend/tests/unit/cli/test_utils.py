@@ -1,5 +1,6 @@
 """Tests for backend.cli.utils — shared utility functions and local config helpers."""
 
+import json
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
@@ -188,21 +189,19 @@ class TestOrganizeModelsAndProviders:
 class TestLocalConfigFunctions:
     """Tests for local configuration file functions."""
 
-    def test_get_local_config_trusted_dirs_no_file(self):
+    def test_get_local_config_trusted_dirs_no_file(self, tmp_path):
         """Test get_local_config_trusted_dirs with no config file."""
-        with patch("backend.cli.utils._LOCAL_CONFIG_FILE_PATH") as mock_path:
-            mock_path.exists.return_value = False
+        fake = tmp_path / "settings.json"
+        with patch("backend.cli.utils._canonical_settings_path", return_value=fake):
             dirs = get_local_config_trusted_dirs()
             assert dirs == []
 
-    def test_get_local_config_trusted_dirs_with_dirs(self):
+    def test_get_local_config_trusted_dirs_with_dirs(self, tmp_path):
         """Test get_local_config_trusted_dirs with existing dirs."""
         config_data = {"runtime": {"trusted_dirs": ["/path/to/dir1", "/path/to/dir2"]}}
-        with (
-            patch("backend.cli.utils._LOCAL_CONFIG_FILE_PATH") as mock_path,
-            patch("backend.cli.utils.json.load", return_value=config_data),
-        ):
-            mock_path.exists.return_value = True
+        fake = tmp_path / "settings.json"
+        fake.write_text(json.dumps(config_data), encoding="utf-8")
+        with patch("backend.cli.utils._canonical_settings_path", return_value=fake):
             dirs = get_local_config_trusted_dirs()
             assert len(dirs) == 2
             assert "/path/to/dir1" in dirs
@@ -210,12 +209,9 @@ class TestLocalConfigFunctions:
     def test_add_local_config_trusted_dir_new_dir(self):
         """Test add_local_config_trusted_dir adds new directory."""
         with (
-            patch("backend.cli.utils._LOCAL_CONFIG_FILE_PATH") as mock_path,
             patch("backend.cli.utils._load_local_config") as mock_load,
             patch("backend.cli.utils._save_local_config") as mock_save,
         ):
-            mock_path.exists.return_value = False
-            mock_path.parent.mkdir = MagicMock()
             mock_load.return_value = {"runtime": {"trusted_dirs": []}}
 
             add_local_config_trusted_dir("/new/path")

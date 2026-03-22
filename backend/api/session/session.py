@@ -271,12 +271,6 @@ class Session:
 
         # Get agent class
         agent_cls = getattr(settings, "agent", None) or self.config.default_agent
-        legacy_agent_aliases = {
-            "CodeActAgent": "Orchestrator",
-            "CodeAct": "Orchestrator",
-            "codact": "Orchestrator",
-        }
-        agent_cls = legacy_agent_aliases.get(agent_cls, agent_cls)
 
         # Apply all settings in one shot
         self._apply_settings(settings)

@@ -73,16 +73,15 @@ Forge uses a multi-layered configuration system based on JSON and Environment Va
 
 Configuration loads with this exact precedence (highest wins):
 
-1. **Environment Variables**: Native shell vars, `.env.local`, and `.env` (Best for API Keys)
-2. **Local Project Override**: `<workspace_root>/settings.json` (Used for repo-specific engine toggles)
-3. **Global User Settings**: `~/.forge/settings.json` (This is the file driven by the Web UI)
-4. **Pydantic Defaults**: Internal safe fallbacks.
+1. **Environment Variables**: Native shell vars, `.env.local`, and `.env` (best for API keys)
+2. **`settings.json` at the Forge app root**: The single source of truth for persisted settings (same file the Web UI reads and writes). Resolved via `FORGE_APP_ROOT` if set, otherwise the directory the backend process was started from — **not** the “Open folder” workspace path.
+3. **Pydantic defaults**: Internal safe fallbacks.
 
-If you ever find that changing settings in the UI does not affect your agent, ensure you don't have a conflicting `settings.json` in your local project root silently overriding the global UI configuration!
+If the UI and CLI disagree, confirm the backend’s working directory (or set `FORGE_APP_ROOT` to your Forge checkout) so everyone targets the same `settings.json`.
 
 ### Getting Started
 
-For standard use, rely entirely on the Web UI to populate `~/.forge/settings.json`. However, strictly protect your API keys by placing them in an `.env` file at the root of your project:
+For standard use, rely on the Web UI to edit the repo’s `settings.json` (under the app root above). Protect API keys in `.env` at the Forge project root (or via your shell environment):
 
 ```bash
 LLM_API_KEY=sk-your-key

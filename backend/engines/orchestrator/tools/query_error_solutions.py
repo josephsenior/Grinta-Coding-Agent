@@ -16,8 +16,6 @@ Each pattern has:
 """
 
 from __future__ import annotations
-from backend.core.config.utils import load_forge_config
-
 
 import json
 import os
@@ -28,13 +26,14 @@ from backend.events.action.agent import AgentThinkAction
 
 QUERY_ERROR_SOLUTIONS_TOOL_NAME = "query_error_solutions"
 
-_WORKSPACE_ROOT = load_forge_config(set_logging_levels=False).workspace_base or "."
 _PATTERNS_FILE = ".forge/query_error_solutions.json"
 _GLOBAL_PATTERNS_FILE = Path.home() / ".forge" / "global_query_error_solutions.json"
 
 
 def _patterns_path() -> Path:
-    return Path(_WORKSPACE_ROOT) / _PATTERNS_FILE
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    return require_effective_workspace_root() / _PATTERNS_FILE
 
 
 def _load_patterns() -> list[dict]:

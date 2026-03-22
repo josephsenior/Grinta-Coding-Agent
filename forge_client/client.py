@@ -13,16 +13,27 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections import deque
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, cast
 
 import httpx
 import socketio  # type: ignore[import-untyped]
 
 logger = logging.getLogger("forge.client")
+
+
+def _forge_settings_json_path() -> Path:
+    """Match backend :func:`backend.core.app_paths.get_app_settings_root` / ``settings.json``."""
+    override = (os.environ.get("FORGE_APP_ROOT") or "").strip()
+    if override:
+        return Path(os.path.abspath(os.path.expanduser(override))) / "settings.json"
+    return Path.cwd() / "settings.json"
+
 
 # ---------------------------------------------------------------------------
 # Resilience configuration
@@ -299,9 +310,8 @@ class ForgeClient:
             # Fall back to reading config file directly when server is unavailable
             try:
                 import json
-                from pathlib import Path
 
-                cfg_path = Path.cwd() / "settings.json"
+                cfg_path = _forge_settings_json_path()
                 if cfg_path.exists():
                     with cfg_path.open(encoding="utf-8") as fh:
                         cfg = json.load(fh)

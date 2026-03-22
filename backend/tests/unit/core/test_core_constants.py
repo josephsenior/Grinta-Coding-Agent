@@ -23,7 +23,7 @@ from backend.core.constants import (
     DEFAULT_MAX_FILE_UPLOAD_SIZE_MB,
     DEFAULT_RUNTIME,
     DEFAULT_RUNTIME_TIMEOUT,
-    DEFAULT_WORKSPACE_BASE,
+    DEFAULT_LOCAL_DATA_ROOT,
     ENV_VAR_REGISTRY,
     FILES_TO_IGNORE,
     FORGE_DEFAULT_AGENT,
@@ -86,7 +86,7 @@ class TestCoreConstants:
 
     def test_path_constants(self):
         assert DEFAULT_CONFIG_FILE == "settings.json"
-        assert isinstance(DEFAULT_WORKSPACE_BASE, str)
+        assert isinstance(DEFAULT_LOCAL_DATA_ROOT, str)
 
     def test_security(self):
         assert SECRET_PLACEHOLDER == "**********"

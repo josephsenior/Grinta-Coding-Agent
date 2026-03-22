@@ -271,6 +271,17 @@ class OrchestratorPromptManager(PromptManager):
         self.mcp_tool_names: list[str] = []
         self.mcp_tool_descriptions: dict[str, str] = {}
 
+    def _active_llm_model_id(self) -> str:
+        """Default LLM model string from config (for accurate self-identification in prompts)."""
+        cfg = self._config
+        if cfg is None:
+            return ""
+        try:
+            llm = cfg.get_llm_config()
+            return (llm.model or "").strip() if llm else ""
+        except Exception:
+            return ""
+
     def get_system_message(self, **context: object) -> str:
         """Render with orchestrator defaults (config, cli_mode, identity prefix)."""
         if self._config is not None:
@@ -284,6 +295,7 @@ class OrchestratorPromptManager(PromptManager):
         context.setdefault("is_windows", _on_windows and not shutil.which("bash"))
         context.setdefault("mcp_tool_names", self.mcp_tool_names)
         context.setdefault("mcp_tool_descriptions", self.mcp_tool_descriptions)
+        context.setdefault("active_llm_model", self._active_llm_model_id())
         content = super().get_system_message(**context)
         # Avoid duplicating identity: system_prompt.j2 already opens with "You are Forge, ..."
         if not _content_has_forge_identity(content):
@@ -297,13 +309,15 @@ class OrchestratorPromptManager(PromptManager):
     def _inject_lessons_learned(self, content: str) -> str:
         """Inject lessons learned from .Forge/lessons.md into the system prompt."""
         try:
-            # Try to locate the lessons file in the project root
-            # We assume the CWD or a known parent contains .Forge
-            lessons_path = os.path.join(".Forge", "lessons.md")
-            if not os.path.exists(lessons_path):
-                # Fallback to repository memory path
-                lessons_path = os.path.join("memories", "repo", "lessons.md")
-                if not os.path.exists(lessons_path):
+            from backend.core.workspace_resolution import get_effective_workspace_root
+
+            root = get_effective_workspace_root()
+            if root is None:
+                return content
+            lessons_path = root / ".Forge" / "lessons.md"
+            if not lessons_path.is_file():
+                lessons_path = root / "memories" / "repo" / "lessons.md"
+                if not lessons_path.is_file():
                     return content
 
             with open(lessons_path, "r", encoding="utf-8") as f:
@@ -329,14 +343,16 @@ class OrchestratorPromptManager(PromptManager):
     def _inject_scratchpad(self, content: str) -> str:
         """Append persistent scratchpad notes so they survive context condensation."""
         try:
-            from backend.engines.orchestrator.tools.note import _load_notes
+            from backend.engines.orchestrator.tools.memory_manager_temp1 import (
+                scratchpad_entries_for_prompt,
+            )
 
-            notes = _load_notes()
-            if not notes:
+            entries = scratchpad_entries_for_prompt()
+            if not entries:
                 return content
             lines: list[str] = []
             char_budget = 2000
-            for key, value in notes.items():
+            for key, value in entries:
                 line = f"  [{key}]: {value}"
                 if len("\n".join(lines + [line])) > char_budget:
                     lines.append("  ... (additional notes truncated)")

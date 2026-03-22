@@ -351,15 +351,11 @@ class EventRouterService:
 
                 user_id = getattr(parent_config, "user_id", None)
 
-                # Find the agent config for 'coder' or fallback to the parent's agent config
                 agent_configs = getattr(parent_config, "agent_configs", None) or {}
-                worker_agent_config = agent_configs.get("coder")
+                worker_agent_config = getattr(self._ctrl.agent, "config", None)
                 if worker_agent_config is None:
-                    # Fall back to the currently running agent's config.
-                    worker_agent_config = getattr(self._ctrl.agent, "config", None)
-
+                    worker_agent_config = agent_configs.get("Orchestrator")
                 if worker_agent_config is None:
-                    # Last-ditch: try to construct a minimal config targeting Orchestrator.
                     worker_agent_config = AgentConfig(name="Orchestrator")
 
                 # Ensure config is a proper AgentConfig instance.
@@ -375,9 +371,7 @@ class EventRouterService:
                 agent_to_llm_config = (
                     getattr(parent_config, "agent_to_llm_config", None) or {}
                 )
-                llm_cfg = agent_to_llm_config.get("coder") or agent_to_llm_config.get(
-                    worker_agent_config.name
-                )
+                llm_cfg = agent_to_llm_config.get(worker_agent_config.name)
                 if llm_cfg is not None:
                     worker_agent_config = worker_agent_config.model_copy(
                         deep=True, update={"llm_config": llm_cfg}

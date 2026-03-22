@@ -7,8 +7,6 @@ durable progress snapshot that survives condensation.
 """
 
 from __future__ import annotations
-from backend.core.config.utils import load_forge_config
-
 
 import json
 import os
@@ -20,12 +18,13 @@ from backend.events.action.agent import AgentThinkAction
 
 CHECKPOINT_TOOL_NAME = "checkpoint"
 
-_WORKSPACE_ROOT = load_forge_config(set_logging_levels=False).workspace_base or "."
 _CHECKPOINTS_FILE = ".forge/checkpoints.json"
 
 
 def _checkpoints_path() -> Path:
-    return Path(_WORKSPACE_ROOT) / _CHECKPOINTS_FILE
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    return require_effective_workspace_root() / _CHECKPOINTS_FILE
 
 
 def _load_checkpoints() -> list[dict]:

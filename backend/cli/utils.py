@@ -9,6 +9,7 @@ import json
 
 from pydantic import BaseModel, Field
 
+from backend.core.app_paths import get_app_settings_root
 from backend.core.providers import (
     VERIFIED_ANTHROPIC_MODELS,
     VERIFIED_MISTRAL_MODELS,
@@ -18,7 +19,11 @@ from backend.core.providers import (
 if TYPE_CHECKING:
     pass
 
-_LOCAL_CONFIG_FILE_PATH = Path.home() / ".Forge" / "settings.json"
+def _canonical_settings_path() -> Path:
+    """Same file the server uses — :func:`get_app_settings_root` / ``settings.json``."""
+    return Path(get_app_settings_root()) / "settings.json"
+
+
 _DEFAULT_CONFIG: dict[str, dict[str, list[str]]] = {"runtime": {"trusted_dirs": []}}
 
 
@@ -29,8 +34,9 @@ def get_local_config_trusted_dirs() -> list[str]:
         list[str]: List of trusted directory paths from local config.
 
     """
-    if _LOCAL_CONFIG_FILE_PATH.exists():
-        with open(_LOCAL_CONFIG_FILE_PATH, encoding="utf-8") as f:
+    path = _canonical_settings_path()
+    if path.exists():
+        with open(path, encoding="utf-8") as f:
             try:
                 config = json.load(f)
             except Exception:
@@ -42,14 +48,15 @@ def get_local_config_trusted_dirs() -> list[str]:
 
 def _load_local_config() -> dict:
     """Load local config file or return default config."""
-    if _LOCAL_CONFIG_FILE_PATH.exists():
+    path = _canonical_settings_path()
+    if path.exists():
         try:
-            with open(_LOCAL_CONFIG_FILE_PATH, encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return _DEFAULT_CONFIG
     else:
-        _LOCAL_CONFIG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         return _DEFAULT_CONFIG
 
 
@@ -69,7 +76,9 @@ def _add_trusted_dir(config: dict, folder_path: str) -> None:
 
 def _save_local_config(config: dict) -> None:
     """Save config to local config file."""
-    with open(_LOCAL_CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+    path = _canonical_settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -44,6 +45,10 @@ async def test_create_conversation_handler_success() -> None:
     payload = InitSessionRequest.model_validate({"initial_user_msg": "hello"})
 
     with (
+        patch(
+            "backend.core.workspace_resolution.get_effective_workspace_root",
+            return_value=Path("/tmp"),
+        ),
         patch(
             "backend.api.routes.manage_conversations.extract_request_data",
             return_value=(

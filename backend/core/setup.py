@@ -127,7 +127,7 @@ def create_runtime(
     event_stream: EventStream | None = None,
     env_vars: dict[str, str] | None = None,
     user_id: str | None = None,
-    workspace_base: str | None = None,
+    project_root: str | None = None,
 ) -> Runtime:
     """Create a runtime for the agent to run on.
 
@@ -142,7 +142,7 @@ def create_runtime(
         event_stream: Optional event stream for real-time monitoring.
         env_vars: Optional environment variables for the runtime.
         user_id: Optional user ID for ownership and quotas.
-        workspace_base: Optional workspace base directory.
+        project_root: Optional open-project directory (overrides config.project_root).
 
     Returns:
         The created Runtime instance (not yet connected or initialized).
@@ -150,7 +150,7 @@ def create_runtime(
     """
     if event_stream is None:
         session_id = sid or generate_sid(config)
-        file_store = get_file_store(config.file_store, config.file_store_path)
+        file_store = get_file_store(config.file_store, config.local_data_root)
         event_stream = EventStream(session_id, file_store)
     else:
         session_id = sid or event_stream.sid
@@ -164,7 +164,15 @@ def create_runtime(
         agent_cls_name=agent_cls.__name__,
     )
 
+    from pathlib import Path
+
     from backend.runtime.factory import get_runtime_cls
+
+    resolved_ws = project_root
+    if resolved_ws is None:
+        wb = (getattr(config, "project_root", None) or "").strip()
+        if wb:
+            resolved_ws = str(Path(wb).expanduser().resolve())
 
     runtime_cls = get_runtime_cls(config.runtime)
     logger.debug("Initializing runtime: %s", runtime_cls.__name__)
@@ -179,7 +187,7 @@ def create_runtime(
         vcs_provider_tokens=vcs_provider_tokens,
         env_vars=env_vars,
         user_id=user_id,
-        workspace_base=workspace_base,
+        project_root=resolved_ws,
     )
     logger.debug(
         "Runtime created with plugins: %s", [plugin.name for plugin in runtime.plugins]

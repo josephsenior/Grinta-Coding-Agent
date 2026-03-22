@@ -34,7 +34,7 @@ class AutoCondenser(Condenser):
         # NOTE: This is intentionally *not* just a model string.
         # It can be either:
         # - an LLMConfig instance (preferred; inherits the primary model + keys)
-        # - a named LLM config section (e.g. "llm", "coding-model")
+        # - a named LLM config section (e.g. "llm")
         self._llm_config = llm_config
         self._llm_registry = llm_registry
         self._cached_delegate: Condenser | None = None

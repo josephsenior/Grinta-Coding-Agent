@@ -188,7 +188,9 @@ class OrchestratorExecutor:
 
         ckpt_token = self._checkpoint.begin(call_params)
 
-        timeout_seconds = float(os.getenv("FORGE_LLM_STEP_TIMEOUT_SECONDS", "180"))
+        from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
+
+        timeout_seconds = llm_step_timeout_seconds_from_env()
 
         response = None
         loop = asyncio.get_running_loop()
@@ -240,7 +242,10 @@ class OrchestratorExecutor:
                                 tool_calls_dict[idx]["function"]["arguments"] += fn["arguments"]
 
             consume_task = loop.create_task(_consume_stream())
-            await asyncio.wait_for(consume_task, timeout=timeout_seconds)
+            if timeout_seconds is None:
+                await consume_task
+            else:
+                await asyncio.wait_for(consume_task, timeout=timeout_seconds)
 
             # finalize streams
             if event_stream and content_accumulate:
@@ -264,11 +269,18 @@ class OrchestratorExecutor:
                 tool_calls=tool_calls_list
             )
 
-        except (asyncio.TimeoutError, asyncio.CancelledError) as exc:
+        except asyncio.TimeoutError as exc:
             from backend.llm.exceptions import Timeout as LLMTimeout
+
             model_name = getattr(getattr(self._llm, "config", None), "model", None)
             logger.error("LLM timeout %s", type(exc).__name__)
-            raise LLMTimeout(f"LLM streaming call timed out after {timeout_seconds} seconds", model=model_name) from exc
+            cap = timeout_seconds if timeout_seconds is not None else 0.0
+            raise LLMTimeout(
+                f"LLM streaming call timed out after {cap} seconds",
+                model=model_name,
+            ) from exc
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:
             from backend.llm.exceptions import LLMError
             if isinstance(exc, LLMError):

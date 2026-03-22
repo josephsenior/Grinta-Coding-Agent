@@ -6,13 +6,14 @@ import sys
 from pathlib import Path
 
 from backend import __version__
+from backend.core.app_paths import get_app_settings_root
 
 
 def ensure_config_dir_exists() -> Path:
-    """Ensure the Forge configuration directory exists and return its path."""
-    config_dir = Path.home() / ".Forge"
-    config_dir.mkdir(exist_ok=True)
-    return config_dir
+    """Ensure the directory for canonical ``settings.json`` exists (app root, not ``~/.Forge``)."""
+    root = Path(get_app_settings_root())
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
 def launch_gui_server() -> None:

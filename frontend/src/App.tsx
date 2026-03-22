@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { Layout } from "@/components/layout/Layout";
 import { ChatShellLayout } from "@/components/layout/ChatShellLayout";
-import Home from "@/pages/Home";
 import Chat from "@/pages/Chat";
 import { useAppStore } from "@/stores/app-store";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -27,7 +26,7 @@ function OpenWindowRedirect({ kind }: { kind: "settings" | "knowledge" }) {
     if (kind === "settings") setSettings(true);
     else setKnowledge(true);
   }, [kind, setKnowledge, setSettings]);
-  return <Navigate to="/" replace />;
+  return <Navigate to="/chat/new" replace />;
 }
 
 export default function App() {
@@ -40,7 +39,8 @@ export default function App() {
             <Routes>
               <Route element={<Layout />}>
                 <Route element={<ChatShellLayout />}>
-                  <Route path="/" element={<Home />} />
+                  <Route path="/" element={<Navigate to="/chat/new" replace />} />
+                  <Route path="/chat/new" element={<Chat />} />
                   <Route path="/chat/:id" element={<Chat />} />
                 </Route>
                 <Route path="/settings" element={<OpenWindowRedirect kind="settings" />} />

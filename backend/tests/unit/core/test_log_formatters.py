@@ -134,7 +134,7 @@ class TestEnhancedJSONFormatter:
         )
         rec.request_id = "req-123"
         rec.conversation_id = "conv-456"
-        rec.agent_type = "coder"
+        rec.agent_type = "Orchestrator"
         rec.action_type = "run"
         rec.model_used = "gpt-4"
         rec.tokens_consumed = 100
@@ -143,7 +143,7 @@ class TestEnhancedJSONFormatter:
         output = fmt.format(rec)
         assert "req-123" in output
         assert "conv-456" in output
-        assert "coder" in output
+        assert "Orchestrator" in output
         assert "gpt-4" in output
 
 

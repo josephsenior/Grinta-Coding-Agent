@@ -1,129 +1,40 @@
 ---
 name: React
 type: knowledge
-version: 1.0.0
+version: 2.0.0
 agent: Orchestrator
 triggers:
   - /react
-  - useState(
-  - useEffect(
 ---
 
-# React Best Practices
+# React / hooks focus
 
-## Hooks Patterns
+Use when the user invokes **`/react`**.
 
-### State Management
-```tsx
-// ✅ Good: Functional updates
-setCount(prev => prev + 1);
+## State
 
-// ❌ Bad: Direct state reference
-setCount(count + 1);
+- Prefer **functional updates** `setX(p => …)` when next state depends on previous.
+- Group related fields in **one object** instead of many scalars when they change together.
+- **Derive** values with plain expressions when possible — no `useState` for computable data.
 
-// ✅ Good: Multiple related states
-const [form, setForm] = useState({ name: '', email: '' });
+## Effects
 
-// ✅ Good: Derived state (no useState needed)
-const fullName = `${firstName} ${lastName}`;
-```
+- List **all** reactive values in the dependency array ESLint expects.
+- **Clean up** subscriptions, timers, and listeners in the effect return.
+- Do not use effects to mirror state you can compute during render.
 
-### Effects
-```tsx
-// ✅ Good: Cleanup
-useEffect(() => {
-  const timer = setInterval(() => tick(), 1000);
-  return () => clearInterval(timer);
-}, []);
+## Lists & keys
 
-// ✅ Good: Dependencies
-useEffect(() => {
-  fetchData(userId);
-}, [userId]);
+Use **stable ids** (`item.id`), never array index, for dynamic lists.
 
-// ❌ Bad: Missing dependencies (use ESLint!)
-useEffect(() => {
-  fetchData(userId);
-}, []); // userId should be in deps
-```
+## Immutability
 
-### Custom Hooks
-```tsx
-// ✅ Good: Reusable logic
-function useFetch<T>(url: string) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+Update arrays/objects with spreads / `map` / `filter` — never mutate existing state in place.
 
-  useEffect(() => {
-    fetch(url)
-      .then(r => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [url]);
+## Performance (when needed)
 
-  return { data, loading };
-}
-```
+`useMemo` / `useCallback` / `React.memo` only after measurement or clear prop-stability needs — avoid by default.
 
-## Component Patterns
+## Composition
 
-### Composition over Props Drilling
-```tsx
-// ✅ Good: Context for shared state
-const ThemeContext = createContext<Theme>('light');
-
-// ✅ Good: Children prop
-function Card({ children }: { children: React.ReactNode }) {
-  return <div className="card">{children}</div>;
-}
-```
-
-### Memoization
-```tsx
-// Use React.memo for expensive renders
-const ExpensiveComponent = React.memo(({ data }) => {
-  // Heavy computation
-});
-
-// Use useMemo for expensive calculations
-const sortedList = useMemo(() =>
-  items.sort((a, b) => a.value - b.value),
-  [items]
-);
-
-// Use useCallback for stable function references
-const handleClick = useCallback(() => {
-  doSomething(id);
-}, [id]);
-```
-
-## Common Pitfalls
-
-❌ **Mutating state directly**
-```tsx
-// Bad
-items.push(newItem);
-setItems(items);
-
-// Good
-setItems([...items, newItem]);
-```
-
-❌ **Using index as key**
-```tsx
-// Bad
-{items.map((item, i) => <div key={i}>{item}</div>)}
-
-// Good
-{items.map(item => <div key={item.id}>{item}</div>)}
-```
-
-❌ **Unnecessary re-renders**
-```tsx
-// Bad: Creates new object every render
-<Child style={{ margin: 10 }} />
-
-// Good: Define outside or use useMemo
-const style = { margin: 10 };
-<Child style={style} />
-```
+Prefer **children** or context over deep prop drilling for cross-cutting UI state.

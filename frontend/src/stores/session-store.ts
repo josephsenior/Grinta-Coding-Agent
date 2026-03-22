@@ -8,7 +8,6 @@ import {
   isNotifyUiOnlyErrorEvent,
   toastNotifyUiOnlyError,
 } from "@/lib/error-observation";
-import type { ObservationEvent } from "@/types/events";
 
 function recomputeAgentStateFromEvents(events: ForgeEvent[]): AgentState {
   let state = AgentState.LOADING;
@@ -25,6 +24,8 @@ function recomputeAgentStateFromEvents(events: ForgeEvent[]): AgentState {
 export interface SessionState {
   conversationId: string | null;
   events: ForgeEvent[];
+  /** Event IDs handled as toast-only or skipped on history merge — not in `events`, but must dedupe socket replay. */
+  offTimelineEventIds: Set<number>;
   agentState: AgentState;
   latestEventId: number;
   streamingContent: string;
@@ -50,6 +51,7 @@ export const useSessionStore = create<SessionState>()(
   immer((set) => ({
     conversationId: null,
     events: [],
+    offTimelineEventIds: new Set<number>(),
     agentState: AgentState.LOADING,
     latestEventId: -1,
     streamingContent: "",
@@ -63,6 +65,7 @@ export const useSessionStore = create<SessionState>()(
         if (state.conversationId === id) return;
         state.conversationId = id;
         state.events = [];
+        state.offTimelineEventIds.clear();
         state.agentState = AgentState.LOADING;
         state.latestEventId = -1;
         state.streamingContent = "";
@@ -72,6 +75,7 @@ export const useSessionStore = create<SessionState>()(
       set((state) => {
         state.conversationId = null;
         state.events = [];
+        state.offTimelineEventIds.clear();
         state.agentState = AgentState.LOADING;
         state.latestEventId = -1;
         state.streamingContent = "";
@@ -111,13 +115,16 @@ export const useSessionStore = create<SessionState>()(
         }
 
         // Drop duplicate deliveries (e.g. REST hydrate + socket replay).
-        if (state.events.some((x) => Number(x.id) === eid)) {
+        if (
+          state.events.some((x) => Number(x.id) === eid) ||
+          state.offTimelineEventIds.has(eid)
+        ) {
           return;
         }
 
         if (isNotifyUiOnlyErrorEvent(ev)) {
           toastNotifyUiOnlyError(ev as ObservationEvent);
-          state.events.push(ev);
+          state.offTimelineEventIds.add(eid);
           if (eid > state.latestEventId) {
             state.latestEventId = eid;
           }
@@ -139,7 +146,10 @@ export const useSessionStore = create<SessionState>()(
 
     mergeHistoricalEvents: (incoming) =>
       set((state) => {
-        const existingIds = new Set(state.events.map((e) => Number(e.id)));
+        const existingIds = new Set([
+          ...state.events.map((e) => Number(e.id)),
+          ...state.offTimelineEventIds,
+        ]);
         const sorted = [...incoming].sort((a, b) => Number(a.id) - Number(b.id));
 
         for (const raw of sorted) {
@@ -169,6 +179,7 @@ export const useSessionStore = create<SessionState>()(
 
           if (isNotifyUiOnlyErrorEvent(ev)) {
             existingIds.add(eid);
+            state.offTimelineEventIds.add(eid);
             if (eid > state.latestEventId) {
               state.latestEventId = eid;
             }

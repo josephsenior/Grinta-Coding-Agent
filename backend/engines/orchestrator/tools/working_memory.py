@@ -14,8 +14,6 @@ loses its cognitive workspace even after history compression.
 """
 
 from __future__ import annotations
-from backend.core.config.utils import load_forge_config
-
 
 import json
 import os
@@ -27,9 +25,6 @@ from backend.engines.orchestrator.tools.common import create_tool_definition
 from backend.events.action.agent import AgentThinkAction
 
 WORKING_MEMORY_TOOL_NAME = "working_memory"
-
-_WORKSPACE_ROOT = load_forge_config(set_logging_levels=False).workspace_base or "."
-_MEMORY_FILE = ".forge/working_memory.json"
 
 _VALID_SECTIONS = ("hypothesis", "findings", "blockers", "file_context", "decisions", "plan")
 
@@ -81,7 +76,9 @@ def create_working_memory_tool() -> ChatCompletionToolParam:
 # --- Persistence ---
 
 def _memory_path() -> Path:
-    return Path(_WORKSPACE_ROOT) / _MEMORY_FILE
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    return require_effective_workspace_root() / ".forge" / "working_memory.json"
 
 
 def _load_memory() -> dict[str, str]:

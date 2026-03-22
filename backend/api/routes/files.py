@@ -22,7 +22,6 @@ from backend.runtime.utils.git_changes import get_git_changes
 from backend.api.dependencies import get_dependencies
 from backend.core.constants import FILES_TO_IGNORE
 from backend.api.files import POSTUploadFilesModel
-from backend.api.services.dependencies import require_conversation_manager
 from backend.api.utils import get_conversation, get_conversation_store
 from backend.api.utils.responses import error
 from backend.utils.async_utils import call_sync_from_async
@@ -476,19 +475,23 @@ def zip_current_workspace(
     "/git/changes",
     response_model=None,
     responses={
-        200: {"description": "List of git changes"},
-        404: {"description": "Not a git repository"},
+        200: {"description": "List of git changes (empty if not a repo or no changes)"},
+        503: {"description": "Runtime not ready"},
         500: {"description": "Error getting changes"},
     },
 )
 async def git_changes(
     conversation_id: str,
+    conversation: ServerConversation = Depends(get_conversation),
 ) -> Any:
     """Get list of git-tracked file changes in the workspace.
 
     Retrieves the conversation's runtime and queries it for modified files
     compared to the git repository. Returns empty list if not a git repository
     or if git is unavailable in the runtime container.
+
+    Uses the same authenticated user as other file routes (not a hard-coded
+    ``dev-user``) so OSS / multi-user sessions can load the CHANGES panel.
 
     Args:
         conversation_id: Conversation identifier to query runtime
@@ -505,44 +508,32 @@ async def git_changes(
         Response: [{"path": "src/main.py", "status": "modified"}, ...]
 
     """
-    manager = require_conversation_manager()
+    if not conversation.runtime:
+        return JSONResponse(
+            content={"error": "Runtime not ready"}, status_code=503
+        )
+
+    runtime = cast("RuntimeFileOps", conversation.runtime)
+    cwd = runtime.config.workspace_mount_path_in_runtime
+    logger.info("Getting git changes in %s", cwd)
+
+    # Check if the workspace directory exists
+    if not os.path.exists(cwd):
+        logger.warning("Workspace directory %s does not exist", cwd)
+        return JSONResponse(status_code=200, content=[])
+
     try:
-        conversation = await manager.attach_to_conversation(conversation_id, "dev-user")
-        if not conversation:
-            return JSONResponse(
-                content={"error": "Conversation not found"}, status_code=404
-            )
-
-        if not conversation.runtime:
-            return JSONResponse(
-                content={"error": "Runtime not ready"}, status_code=503
-            )
-
-        runtime = cast("RuntimeFileOps", conversation.runtime)
-        cwd = runtime.config.workspace_mount_path_in_runtime
-        logger.info("Getting git changes in %s", cwd)
-
-        # Check if the workspace directory exists
-        if not os.path.exists(cwd):
-            logger.warning("Workspace directory %s does not exist", cwd)
+        changes = await call_sync_from_async(get_git_changes, cwd)
+        if changes is None:
             return JSONResponse(status_code=200, content=[])
-
-        try:
-            changes = await call_sync_from_async(get_git_changes, cwd)
-            if changes is None:
-                return JSONResponse(
-                    status_code=404, content={"error": "Not a git repository"}
-                )
-            return changes
-        except FileNotFoundError as e:
-            if "git" in str(e):
-                logger.warning(
-                    "Git not available in container, returning empty changes list"
-                )
-                return JSONResponse(status_code=200, content=[])
-            raise
-        finally:
-            await manager.detach_from_conversation(conversation)
+        return changes
+    except FileNotFoundError as e:
+        if "git" in str(e):
+            logger.warning(
+                "Git not available in container, returning empty changes list"
+            )
+            return JSONResponse(status_code=200, content=[])
+        raise
     except AgentRuntimeUnavailableError as e:
         logger.error("Runtime unavailable: %s", e)
         return JSONResponse(

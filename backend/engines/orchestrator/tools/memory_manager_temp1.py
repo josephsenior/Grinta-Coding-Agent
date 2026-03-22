@@ -17,9 +17,6 @@ which eliminates latency, encoding concerns, and sandbox permission issues.
 """
 
 from __future__ import annotations
-from backend.core.config.utils import load_forge_config
-
-
 import json
 import os
 import time
@@ -129,41 +126,95 @@ def create_semantic_recall_tool() -> ChatCompletionToolParam:
 # Native action builders (called from function_calling.py)
 # ---------------------------------------------------------------------------
 
-# Workspace root can be overridden via env for testing; defaults to cwd.
-_WORKSPACE_ROOT = load_forge_config(set_logging_levels=False).workspace_base or "."
 _NOTES_RELPATH = os.path.join(".forge", "agent_notes.json")
+# Reserved top-level key for per-key update timestamps (prompt injection recency).
+_SCRATCHPAD_META_KEY = "__forge_scratchpad_meta__"
 
 
 def _notes_path() -> Path:
     """Return the absolute path to the scratchpad JSON file."""
-    return Path(_WORKSPACE_ROOT) / _NOTES_RELPATH
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    return require_effective_workspace_root() / _NOTES_RELPATH
 
 
-def _load_notes() -> dict[str, str]:
-    """Load the scratchpad dict, returning {} if missing or corrupt."""
+def _read_notes_blob() -> dict:
+    """Load raw JSON object from disk, or {} if missing/corrupt."""
     p = _notes_path()
     if not p.exists():
         return {}
     try:
         with open(p, encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, OSError):
         return {}
 
 
-def _save_notes(data: dict[str, str]) -> None:
-    """Persist the scratchpad dict to disk."""
+def _parse_notes_blob(raw: dict) -> tuple[dict[str, str], dict[str, float]]:
+    """Split user notes from internal metadata; coerce timestamps to float."""
+    blob = dict(raw)
+    meta = blob.pop(_SCRATCHPAD_META_KEY, None)
+    updated: dict[str, float] = {}
+    if isinstance(meta, dict):
+        u = meta.get("updated")
+        if isinstance(u, dict):
+            for k, v in u.items():
+                if isinstance(k, str) and isinstance(v, (int, float)):
+                    updated[k] = float(v)
+    notes: dict[str, str] = {}
+    for k, v in blob.items():
+        if isinstance(v, str):
+            notes[k] = v
+    return notes, updated
+
+
+def _write_notes_blob(notes: dict[str, str], updated: dict[str, float]) -> None:
+    """Persist notes plus update timestamps (for recency ordering in prompts)."""
     p = _notes_path()
     p.parent.mkdir(parents=True, exist_ok=True)
+    out: dict = {**notes, _SCRATCHPAD_META_KEY: {"updated": updated}}
     with open(p, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        json.dump(out, f, indent=2, ensure_ascii=False)
+
+
+def _load_notes() -> dict[str, str]:
+    """Load user-visible scratchpad keys only (no internal metadata)."""
+    return _parse_notes_blob(_read_notes_blob())[0]
+
+
+def scratchpad_entries_for_prompt() -> list[tuple[str, str]]:
+    """Return (key, value) pairs for system-prompt injection: deduped, newest first.
+
+    - Case-insensitive keys are collapsed; the variant with the latest ``updated``
+      timestamp wins (or arbitrary among ties).
+    - When no timestamps exist (legacy file), entries are sorted alphabetically by key.
+    """
+    notes, ts = _parse_notes_blob(_read_notes_blob())
+    merged: dict[str, tuple[str, str, float]] = {}
+    for k, v in notes.items():
+        ks = k.strip()
+        if not ks:
+            continue
+        t = float(ts.get(k, 0.0))
+        cf = ks.casefold()
+        prev = merged.get(cf)
+        if prev is None or t >= prev[2]:
+            merged[cf] = (ks, v, t)
+    rows = list(merged.values())
+    if rows and any(r[2] > 0.0 for r in rows):
+        rows.sort(key=lambda r: r[2], reverse=True)
+    else:
+        rows.sort(key=lambda r: r[0].casefold())
+    return [(r[0], r[1]) for r in rows]
 
 
 def build_note_action(key: str, value: str) -> AgentThinkAction:
     """Persist key→value to the scratchpad and return a think action with confirmation."""
-    notes = _load_notes()
+    notes, updated = _parse_notes_blob(_read_notes_blob())
     notes[key] = value
-    _save_notes(notes)
+    updated[key] = time.time()
+    _write_notes_blob(notes, updated)
     return AgentThinkAction(thought=f"[SCRATCHPAD] Noted [{key}]")
 
 
@@ -191,7 +242,6 @@ from backend.events.action.agent import AgentThinkAction
 
 WORKING_MEMORY_TOOL_NAME = "working_memory"
 
-_WORKSPACE_ROOT = load_forge_config(set_logging_levels=False).workspace_base or "."
 _MEMORY_FILE = ".forge/working_memory.json"
 
 _VALID_SECTIONS = ("hypothesis", "findings", "blockers", "file_context", "decisions", "plan")
@@ -244,7 +294,9 @@ def create_working_memory_tool() -> ChatCompletionToolParam:
 # --- Persistence ---
 
 def _memory_path() -> Path:
-    return Path(_WORKSPACE_ROOT) / _MEMORY_FILE
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    return require_effective_workspace_root() / _MEMORY_FILE
 
 
 def _load_memory() -> dict[str, str]:

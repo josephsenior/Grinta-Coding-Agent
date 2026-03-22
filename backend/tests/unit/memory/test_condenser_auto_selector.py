@@ -156,13 +156,13 @@ class TestSelectCondenserConfig:
 
     def test_long_session_with_llm_returns_smart(self):
         events = _make_events(_LONG_SESSION + 10)
-        config = select_condenser_config(events, llm_config_name="condenser_llm")
+        config = select_condenser_config(events, llm_config="condenser_llm")
         assert isinstance(config, SmartCondenserConfig)
         assert config.llm_config == "condenser_llm"
 
     def test_long_session_no_llm_returns_amortized(self):
         events = _make_events(_LONG_SESSION + 10)
-        config = select_condenser_config(events, llm_config_name=None)
+        config = select_condenser_config(events, llm_config=None)
         assert isinstance(config, AmortizedForgettingCondenserConfig)
 
     def test_medium_session_returns_observation_masking(self):
@@ -181,7 +181,7 @@ class TestSelectCondenserConfig:
         total = _LONG_SESSION + 10
         error_count = int(total * _HIGH_ERROR_RATIO) + 5
         events = _make_error_heavy_events(total, error_count)
-        config = select_condenser_config(events, llm_config_name="llm")
+        config = select_condenser_config(events, llm_config="llm")
         # Error heuristic should fire before long-session heuristic
         assert isinstance(config, RecentEventsCondenserConfig)
 

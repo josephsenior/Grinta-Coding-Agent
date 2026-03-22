@@ -137,22 +137,28 @@ class TestApplyLlmConfigOverride:
 
     def test_missing_config_raises(self, tmp_path):
         config = ForgeConfig()
-        args = Namespace(llm_config="nonexistent", config_file="nonexistent.json")
-        with patch("os.path.expanduser", return_value=str(tmp_path)):
+        args = Namespace(
+            llm_config="nonexistent", config_file=str(tmp_path / "nonexistent.json")
+        )
+        with patch(
+            "backend.core.config.cli_config.get_app_settings_root",
+            return_value=str(tmp_path),
+        ):
             with pytest.raises(ValueError, match="Cannot find"):
                 apply_llm_config_override(config, args)
 
-    def test_config_from_user_fallback(self, tmp_path):
-        """Test fallback to user config when not found in main config."""
+    def test_config_from_canonical_fallback(self, tmp_path):
+        """Fallback reads LLM keys from canonical app-root settings.json."""
         main_config = tmp_path / "main.json"
         main_config.write_text('{"agent_name": "test"}')
 
-        user_config_dir = tmp_path / ".Forge"
-        user_config_dir.mkdir()
-        user_config = user_config_dir / "settings.json"
-        user_config.write_text('{"llm_model": "gpt-4-user"}')
+        canonical = tmp_path / "settings.json"
+        canonical.write_text('{"llm_model": "gpt-4-user"}')
 
-        with patch("os.path.expanduser", return_value=str(tmp_path)):
+        with patch(
+            "backend.core.config.cli_config.get_app_settings_root",
+            return_value=str(tmp_path),
+        ):
             config = ForgeConfig()
             args = Namespace(llm_config="custom", config_file=str(main_config))
             apply_llm_config_override(config, args)

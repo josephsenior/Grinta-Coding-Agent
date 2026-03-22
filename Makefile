@@ -29,7 +29,7 @@ SHELL=/usr/bin/env bash
 BACKEND_HOST ?= "127.0.0.1"
 BACKEND_PORT ?= 3000
 BACKEND_HOST_PORT = "$(BACKEND_HOST):$(BACKEND_PORT)"
-DEFAULT_WORKSPACE_DIR = "./workspace"
+DEFAULT_LOCAL_DATA_DIR = "./workspace"
 DEFAULT_MODEL = "gpt-4o"
 CONFIG_FILE = settings.json
 PRE_COMMIT_CONFIG_PATH = "./backend/dev_config/python/.pre-commit-config.yaml"
@@ -169,10 +169,10 @@ setup-config:
 	@echo "$(GREEN)settings.json setup completed.$(RESET)"
 
 setup-config-prompts:
-	@echo '{"workspace_base":"$(DEFAULT_WORKSPACE_DIR)","llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":"","model_aliases":{}}' > $(CONFIG_FILE).tmp
-	@read -p "Enter your workspace directory (as absolute path) [default: $(DEFAULT_WORKSPACE_DIR)]: " workspace_dir; \
-	 workspace_dir=$${workspace_dir:-$(DEFAULT_WORKSPACE_DIR)}; \
-	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['workspace_base']='$$workspace_dir'; json.dump(d, open(f,'w'), indent=2)"
+	@echo '{"local_data_root":"$(DEFAULT_LOCAL_DATA_DIR)","llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":""}' > $(CONFIG_FILE).tmp
+	@read -p "Enter local data root (LocalFileStore directory, absolute path) [default: $(DEFAULT_LOCAL_DATA_DIR)]: " data_root_dir; \
+	 data_root_dir=$${data_root_dir:-$(DEFAULT_LOCAL_DATA_DIR)}; \
+	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['local_data_root']='$$data_root_dir'; json.dump(d, open(f,'w'), indent=2)"
 	@read -p "Enter your LLM model name [default: $(DEFAULT_MODEL)]: " llm_model; \
 	 llm_model=$${llm_model:-$(DEFAULT_MODEL)}; \
 	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_model']='$$llm_model'; json.dump(d, open(f,'w'), indent=2)"
@@ -182,7 +182,7 @@ setup-config-prompts:
 	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_base_url']='$$llm_base_url'; json.dump(d, open(f,'w'), indent=2)"
 
 setup-config-basic:
-	@cp settings.template.json settings.json 2>/dev/null || (echo '{"workspace_base":"./workspace","max_budget_per_task":5.0,"llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":"","model_aliases":{}}' > settings.json)
+	@cp settings.template.json settings.json 2>/dev/null || (echo '{"local_data_root":"./workspace","max_budget_per_task":5.0,"llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":""}' > settings.json)
 	@echo "$(GREEN)settings.json created.$(RESET)"
 
 # Clean up all caches
@@ -198,55 +198,10 @@ help:
 	@echo "  $(GREEN)build$(RESET)               - Build project, including environment setup and dependencies."
 	@echo "  $(GREEN)lint$(RESET)                - Run linters on the project."
 	@echo "  $(GREEN)setup-config$(RESET)        - Setup the configuration for Forge by providing LLM API key,"
-	@echo "                        LLM Model name, and workspace directory."
+	@echo "                        LLM Model name, and local data root directory."
 	@echo "  $(GREEN)start-backend$(RESET)       - Start the backend server for the Forge project."
 	@echo "  $(GREEN)run$(RESET)                 - Start the backend, then launch the TUI with: uv run forge-tui"
 	@echo "  $(GREEN)help$(RESET)                - Display this help message, providing information on available targets."
 
 # Phony targets
 .PHONY: build check-dependencies check-system check-python check-uv install-python-dependencies install-pre-commit-hooks lint start-backend run setup-config setup-config-prompts setup-config-basic clean help
-
-# Setup settings.json
-setup-config:
-	@echo "$(YELLOW)Setting up Forge configuration...$(RESET)"
-	@$(MAKE) setup-config-prompts
-	@mv $(CONFIG_FILE).tmp $(CONFIG_FILE)
-	@echo "$(GREEN)settings.json setup completed.$(RESET)"
-
-setup-config-prompts:
-	@echo '{"workspace_base":"$(DEFAULT_WORKSPACE_DIR)","llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":"","model_aliases":{}}' > $(CONFIG_FILE).tmp
-	@read -p "Enter your workspace directory (as absolute path) [default: $(DEFAULT_WORKSPACE_DIR)]: " workspace_dir; \
-	 workspace_dir=$${workspace_dir:-$(DEFAULT_WORKSPACE_DIR)}; \
-	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['workspace_base']='$$workspace_dir'; json.dump(d, open(f,'w'), indent=2)"
-	@read -p "Enter your LLM model name [default: $(DEFAULT_MODEL)]: " llm_model; \
-	 llm_model=$${llm_model:-$(DEFAULT_MODEL)}; \
-	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_model']='$$llm_model'; json.dump(d, open(f,'w'), indent=2)"
-	@read -p "Enter your LLM API key: " llm_api_key; \
-	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_api_key']='$$llm_api_key'; json.dump(d, open(f,'w'), indent=2)"
-	@read -p "Enter your LLM base URL [mostly used for local LLMs, leave blank if not needed]: " llm_base_url; \
-	 $(PYTHON) -c "import json; f='$(CONFIG_FILE).tmp'; d=json.load(open(f)); d['llm_base_url']='$$llm_base_url'; json.dump(d, open(f,'w'), indent=2)"
-
-setup-config-basic:
-	@cp settings.template.json settings.json 2>/dev/null || (echo '{"workspace_base":"./workspace","max_budget_per_task":5.0,"llm_model":"$(DEFAULT_MODEL)","llm_api_key":"","llm_base_url":"","model_aliases":{}}' > settings.json)
-	@echo "$(GREEN)settings.json created.$(RESET)"
-
-# Clean up all caches
-clean:
-	@echo "$(YELLOW)Cleaning up caches...$(RESET)"
-	@rm -rf backend/.cache
-	@echo "$(GREEN)Caches cleaned up successfully.$(RESET)"
-
-# Help
-help:
-	@echo "$(BLUE)Usage: make [target]$(RESET)"
-	@echo "Targets:"
-	@echo "  $(GREEN)build$(RESET)               - Build project, including environment setup and dependencies."
-	@echo "  $(GREEN)lint$(RESET)                - Run linters on the project."
-	@echo "  $(GREEN)setup-config$(RESET)        - Setup the configuration for Forge by providing LLM API key,"
-	@echo "                        LLM Model name, and workspace directory."
-	@echo "  $(GREEN)start-backend$(RESET)       - Start the backend server for the Forge project."
-	@echo "  $(GREEN)run$(RESET)                 - Start the backend, then launch the TUI with: python -m tui"
-	@echo "  $(GREEN)help$(RESET)                - Display this help message, providing information on available targets."
-
-# Phony targets
-.PHONY: build check-dependencies check-system check-python check-poetry install-python-dependencies install-pre-commit-hooks lint start-backend run setup-config setup-config-prompts setup-config-basic clean help

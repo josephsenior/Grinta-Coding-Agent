@@ -33,6 +33,7 @@ from backend.api.conversation_manager.conversation_manager import ConversationMa
 from backend.api.conversation_manager.metadata_tracker import (
     ConversationMetadataTracker,
 )
+from backend.storage.files import FileStore
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -48,7 +49,6 @@ if TYPE_CHECKING:
     from backend.api.session.session import Session
     from backend.storage.data_models.conversation_metadata import ConversationMetadata
     from backend.storage.data_models.settings import Settings
-    from backend.storage.files import FileStore
 
 _CLEANUP_INTERVAL = 15
 UPDATED_AT_CALLBACK_ID = "updated_at_callback_id"
@@ -397,6 +397,21 @@ class LocalConversationManager(ConversationManager):
                 self.server_config.conversation_store_class,
             )
         return await conversation_store_class.get_instance(self.config, user_id)
+
+    async def switch_workspace_root(self, new_file_store: FileStore) -> None:
+        """Point metadata + future streams at a new project folder; close active chats."""
+        self.file_store = new_file_store
+        loop = self._loop or asyncio.get_event_loop()
+        self._metadata_tracker = ConversationMetadataTracker(
+            sio=self.sio,
+            file_store=self.file_store,
+            conversation_store_factory=self._get_conversation_store,
+            session_lookup=lambda sid: self._local_agent_loops_by_sid.get(sid),
+            loop=loop,
+        )
+        async with self._sessions_lock:
+            sids = list(self._local_agent_loops_by_sid.keys())
+        await wait_all(self._close_session(sid) for sid in sids)
 
     async def get_running_agent_loops(
         self,
