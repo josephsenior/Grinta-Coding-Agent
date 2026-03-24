@@ -14,8 +14,10 @@ from backend.validation.task_validator import (
     TestPassingValidator,
     ValidationResult,
 )
+from backend.core.enums import FileReadSource
 from backend.events.action import CmdRunAction
 from backend.events.observation import CmdOutputObservation
+from backend.events.observation.files import FileReadObservation
 
 
 # ---------------------------------------------------------------------------
@@ -174,8 +176,13 @@ class TestFileExistsValidator:
 
     async def test_expected_files_found(self):
         v = FileExistsValidator(expected_files=["main.py"])
-        cmd = CmdRunAction(command="cat main.py")
-        state = self._make_state([cmd])
+        # Existence is proven from typed file events, not shell commands.
+        ev = FileReadObservation(
+            path="main.py",
+            content="ok",
+            impl_source=FileReadSource.DEFAULT,
+        )
+        state = self._make_state([ev])
         result = await v.validate_completion(Task(description="x"), state)
         assert result.passed is True
 

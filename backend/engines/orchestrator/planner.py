@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import logging
 import os
 from collections import defaultdict
@@ -33,6 +32,18 @@ _INJECTED_MSG_MARKERS = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _shorten_tool_description(desc: str, max_len: int = 80) -> str:
+    """Trim long tool descriptions without splitting on the first period (avoids Dr., URLs, versions)."""
+    text = desc.strip()
+    if len(text) <= max_len:
+        return text
+    window = text[: max_len + 1]
+    last_space = window.rfind(" ")
+    cut = last_space if last_space > max_len // 2 else max_len
+    out = text[:cut].rstrip(".,;:")
+    return f"{out}…" if out else text[:max_len]
 
 
 def _maybe_log_prompt_metrics(messages: list) -> None:
@@ -103,10 +114,8 @@ class OrchestratorPlanner:
         self._tools_used_this_session: set[str] = set()
         # Within-conversation error learning
         from backend.engines.orchestrator.error_learner import SessionErrorLearner
-        from backend.engines.orchestrator.behavioral_hints import BehavioralHintsBuilder
 
         self._error_learner = SessionErrorLearner()
-        self._hints_builder = BehavioralHintsBuilder(error_learner=self._error_learner)
 
     # ------------------------------------------------------------------ #
     # Tool assembly
@@ -361,8 +370,12 @@ class OrchestratorPlanner:
         # NOTE: We inject control/status messages *after* tool selection so
         # tool selection heuristics see the original user/assistant content.
 
-        # Progressive tool disclosure: filter tools based on context
-        if getattr(self._config, "enable_progressive_tools", True):
+        # Reliability-first tool selection (opt-in): ToolSelector now only
+        # deduplicates the tool list and intentionally avoids contextual unlock
+        # heuristics that change behavior across similar requests.
+        # Must be actual bool True — MagicMock configs must not accidentally enable this.
+        _ept = getattr(self._config, "enable_progressive_tools", False)
+        if _ept is True:
             tools = self._tool_selector.select_tools(tools, state, messages)
 
         # Apply three-tier tool descriptions
@@ -371,8 +384,10 @@ class OrchestratorPlanner:
         # Cache check_tools output — only recompute when tools or model changes
         # Invalidate cache when tool selection changes the list
         current_model = self._llm.config.model if self._llm else ""
+        # Stringify names so cache keys work with MagicMock-based tests and odd payloads.
         tool_fingerprint = ",".join(
-            t.get("function", {}).get("name", "") for t in tools
+            str((t.get("function") or {}).get("name", "") if isinstance(t, dict) else "")
+            for t in tools
         )
         cache_key = f"{current_model}:{tool_fingerprint}"
         if self._checked_tools_cache is None or self._checked_tools_model != cache_key:
@@ -420,11 +435,10 @@ class OrchestratorPlanner:
                 # Tier 1: minimal description for already-used tools
                 desc = fn.get("description", "")
                 if len(desc) > 80:
-                    # Keep only the first sentence
-                    first_sentence = desc.split(".")[0] + "."
+                    trimmed_desc = _shorten_tool_description(desc, max_len=80)
                     trimmed = {
                         **tool,
-                        "function": {**fn, "description": first_sentence},
+                        "function": {**fn, "description": trimmed_desc},
                     }
                     result.append(trimmed)
                     continue
@@ -459,10 +473,6 @@ class OrchestratorPlanner:
         status += self._build_active_plan_section(state)
         if planning_directive:
             status += f"\n<FORGE_DIRECTIVE>\n{planning_directive}\n</FORGE_DIRECTIVE>"
-
-        tool_hints = self._get_tool_hints(messages)
-        if tool_hints:
-            status += f"\n<TOOL_HINTS>{tool_hints}</TOOL_HINTS>"
 
         return self._apply_control_message(messages, status)
 
@@ -674,78 +684,24 @@ class OrchestratorPlanner:
         msgs.insert(insert_at, {"role": "system", "content": status})
         return msgs
 
-    # Tool-keyword mapping for context-aware hints
-    _TOOL_HINT_MAP: list[tuple[list[str], str]] = [
-        (
-            ["debug", "error", "traceback", "exception", "fails", "broken"],
-            "Consider query_error_solutions(query) to check for known fixes.",
-        ),
-        (
-            ["search", "find", "grep", "locate", "where"],
-            "Use search_code for codebase search, or web_search for external info.",
-        ),
-        (
-            ["edit", "fix", "change", "modify", "update", "refactor"],
-            "Prefer ast_code_editor for function/class-level edits (edit_symbol_body, rename_symbol). Use str_replace_editor only for single-line fixes or file creation. Use verify_file_lines to confirm line contents before replace_text.",
-        ),
-        (
-            ["test", "testing", "pytest", "unittest"],
-            "Use bash/execute_bash to run tests (e.g., `pytest -q`).",
-        ),
-        (
-            ["git", "commit", "branch", "merge", "diff"],
-            "Use workspace_status for a quick git overview before git operations.",
-        ),
-        (
-            ["remember", "note", "save", "persist"],
-            "Use memory_manager(action='working_memory') for structured cognitive state, memory_manager(action='note') for quick key-value pairs.",
-        ),
-    ]
-
     def _get_tool_hints(self, messages: list) -> str:
-        """Generate context-specific tool suggestions based on keywords AND agent behavior."""
-        text = _get_last_user_text_from_messages(messages)
-        if not text:
-            return ""
+        """Tool hints are disabled in reliability-first mode.
 
-        text_lower = text.lower()
-        hints = [
-            hint
-            for keywords, hint in self._TOOL_HINT_MAP
-            if any(kw in text_lower for kw in keywords)
-        ]
-        behavioral = self._get_behavioral_hints(messages)
-        if behavioral:
-            hints.extend(behavioral)
-
-        return " ".join(hints) if hints else ""
-
-    def _get_behavioral_hints(self, messages: list) -> list[str]:
-        """Analyze recent agent messages to detect behavioral patterns and generate hints."""
-        # Scan tool results for error learning (full message list)
+        The planner may still collect telemetry from recent tool results for
+        debugging or future offline analysis, but it must not inject
+        heuristic guidance into the critical action-selection prompt.
+        """
         self._scan_tool_results_for_learning(messages)
-
-        recent = self._collect_recent_assistant_messages(messages, max_messages=15)
-        if len(recent) < 3:
-            return []
-
-        return self._hints_builder.extract_and_build(recent)
-
-    def _collect_recent_assistant_messages(
-        self, messages: list, max_messages: int = 15
-    ) -> list:
-        """Collect last N assistant messages in chronological order."""
-        recent: list = []
-        for msg in reversed(messages):
-            if isinstance(msg, dict) and msg.get("role") == "assistant":
-                recent.append(msg)
-                if len(recent) >= max_messages:
-                    break
-        recent.reverse()
-        return recent
+        return ""
 
     def _scan_tool_results_for_learning(self, messages: list) -> None:
-        """Scan tool response messages to record failures/successes for error learning."""
+        """Scan tool response messages to record failures/successes for error learning.
+
+        Reliability-first behavior only trusts structured outcome markers:
+        ``forge_tool_ok`` on serialized tool dicts, or a JSON object body with
+        an explicit ``ok`` field. Free-form content parsing is intentionally not
+        used to steer future model behavior.
+        """
         if not hasattr(self, "_error_learner"):
             return
         seen: set[str] = getattr(self, "_seen_tool_call_ids", set())
@@ -758,11 +714,20 @@ class OrchestratorPlanner:
                 continue
             seen.add(tc_id)
             tool_name = msg.get("name", "")
-            content = str(msg.get("content", ""))
-            content_lower = content.lower()
-            is_error = "[error" in content_lower or "error occurred" in content_lower
+            structured = msg.get("forge_tool_ok")
+            if structured is True:
+                is_error = False
+            elif structured is False:
+                is_error = True
+            else:
+                logger.debug(
+                    "Planner skipped untyped tool-result learning for %s (tool_call_id=%s)",
+                    tool_name,
+                    tc_id,
+                )
+                continue
             if is_error:
-                self._error_learner.record_failure(tool_name, content, i)
+                self._error_learner.record_failure(tool_name, str(msg.get("content", "")), i)
             else:
                 self._error_learner.record_success(tool_name, i)
 

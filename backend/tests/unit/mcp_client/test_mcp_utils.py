@@ -11,12 +11,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.events.action.mcp import MCPAction
+from backend.mcp_client.mcp_bootstrap_status import reset_mcp_bootstrap_status
 from backend.mcp_client.utils import (
     _find_matching_mcp,
     _is_windows_stdio_mcp_disabled,
     _log_successful_connection,
     _serialize_result_to_json,
     convert_mcps_to_tools,
+    fetch_mcp_tools_from_config,
 )
 
 
@@ -125,6 +127,15 @@ class TestFindMatchingMcp:
         with pytest.raises(ValueError, match="No matching MCP"):
             _find_matching_mcp([client], "nonexistent")
 
+    def test_found_by_protocol_name_when_tool_is_aliased(self):
+        tool = MagicMock()
+        tool.name = "mcp_docs_get_component"
+        client = MagicMock()
+        client.tools = [tool]
+        client.exposed_to_protocol = {"mcp_docs_get_component": "get_component"}
+
+        assert _find_matching_mcp([client], "get_component") is client
+
 
 # ---------------------------------------------------------------------------
 # _log_successful_connection
@@ -162,6 +173,9 @@ class TestAsyncHelpers:
             obs = await _execute_wrapper_tool(action, [])
             data = json.loads(obs.content)
             assert data["result"] == "ok"
+            assert data["ok"] is True
+            assert data["isError"] is False
+            assert obs.tool_result["ok"] is True
 
     @pytest.mark.asyncio
     async def test_execute_wrapper_tool_error(self):
@@ -179,6 +193,40 @@ class TestAsyncHelpers:
             obs = await _execute_wrapper_tool(action, [])
             data = json.loads(obs.content)
             assert data["isError"] is True
+            assert data["ok"] is False
+            assert obs.tool_result["ok"] is False
+
+    @pytest.mark.asyncio
+    async def test_wrapper_and_direct_failures_share_envelope_shape(self):
+        from backend.mcp_client.utils import _execute_direct_tool, _execute_wrapper_tool
+
+        wrapper_action = self._as_action(SimpleNamespace(name="bad_wrapper", arguments={}))
+        direct_action = self._as_action(SimpleNamespace(name="tool1", arguments={"x": 1}))
+
+        async def failing_wrapper(mcps, args, call_fn):
+            raise RuntimeError("wrapper broke")
+
+        direct_client = AsyncMock()
+        direct_client.call_tool = AsyncMock(side_effect=RuntimeError("server down"))
+
+        with patch.dict(
+            "backend.mcp_client.utils.WRAPPER_TOOL_REGISTRY",
+            {"bad_wrapper": failing_wrapper},
+        ):
+            wrapper_obs = await _execute_wrapper_tool(wrapper_action, [])
+        direct_obs = await _execute_direct_tool(direct_action, direct_client)
+
+        wrapper_data = json.loads(wrapper_obs.content)
+        direct_data = json.loads(direct_obs.content)
+
+        expected_keys = {"ok", "isError", "error_code", "retryable", "tool", "content"}
+        assert expected_keys.issubset(wrapper_data)
+        assert expected_keys.issubset(direct_data)
+        assert wrapper_data["ok"] is False and direct_data["ok"] is False
+        assert wrapper_obs.tool_result["ok"] is False
+        assert direct_obs.tool_result["ok"] is False
+        assert wrapper_obs.tool_result["observation"] == wrapper_obs.observation
+        assert direct_obs.tool_result["observation"] == direct_obs.observation
 
     @pytest.mark.asyncio
     async def test_execute_direct_tool_cache_hit(self):
@@ -191,6 +239,7 @@ class TestAsyncHelpers:
             obs = await _execute_direct_tool(action, client)
             data = json.loads(obs.content)
             assert data["cached"] is True
+            assert data["ok"] is True
 
     @pytest.mark.asyncio
     async def test_execute_direct_tool_success(self):
@@ -212,6 +261,8 @@ class TestAsyncHelpers:
             obs = await _execute_direct_tool(action, client)
             data = json.loads(obs.content)
             assert data["result"] == "data"
+            assert data["ok"] is True
+            assert obs.tool_result["ok"] is True
 
     @pytest.mark.asyncio
     async def test_call_tool_mcp_windows_disabled(self):
@@ -230,9 +281,10 @@ class TestAsyncHelpers:
         action = self._as_action(SimpleNamespace(name="tool1", arguments={}))
         with patch("backend.mcp_client.utils._is_windows_stdio_mcp_disabled", return_value=False):
             obs = await call_tool_mcp([], action)
-            assert "no mcp clients" in obs.content.lower() or "no mcp clients" in str(
-                obs
-            ).lower() or "no mcp" in obs.content.lower()
+            data = json.loads(obs.content)
+            assert data["ok"] is False
+            assert data["error_code"] == "MCP_NO_CLIENTS"
+            assert obs.tool_result["ok"] is False
 
     @pytest.mark.asyncio
     async def test_call_tool_mcp_wrapper_dispatch(self):
@@ -256,6 +308,32 @@ class TestAsyncHelpers:
             obs = await call_tool_mcp([mock_client], action)
             data = json.loads(obs.content)
             assert data["wrapped"] is True
+            assert data["ok"] is True
+
+    @pytest.mark.asyncio
+    async def test_call_mcp_raw_resolves_wrapper_underlying_alias(self):
+        from backend.mcp_client.utils import _call_mcp_raw
+
+        action = self._as_action(SimpleNamespace(name="get_component", arguments={"name": "button"}))
+        tool = MagicMock()
+        tool.name = "mcp_docs_get_component"
+        client = MagicMock()
+        client.tools = [tool]
+        client.exposed_to_protocol = {"mcp_docs_get_component": "get_component"}
+        client.call_tool = AsyncMock(return_value=MagicMock())
+
+        with (
+            patch("backend.mcp_client.utils.get_cached", return_value=None),
+            patch(
+                "backend.mcp_client.utils.model_dump_with_options",
+                return_value={"result": "ok"},
+            ),
+            patch("backend.mcp_client.utils.set_cache"),
+        ):
+            result = await _call_mcp_raw([client], action)
+
+        assert result["result"] == "ok"
+        client.call_tool.assert_awaited_once_with("mcp_docs_get_component", {"name": "button"})
 
     @pytest.mark.asyncio
     async def test_create_mcps_windows_disabled(self):
@@ -274,11 +352,53 @@ class TestAsyncHelpers:
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_fetch_mcp_tools_windows_disabled(self):
-        from backend.mcp_client.utils import fetch_mcp_tools_from_config
+    async def test_fetch_mcp_tools_disabled_records_state(self):
+        from backend.mcp_client.mcp_bootstrap_status import get_mcp_bootstrap_status
 
+        from types import SimpleNamespace
+
+        reset_mcp_bootstrap_status()
         config = MagicMock()
-        with patch("backend.mcp_client.utils._is_windows_stdio_mcp_disabled", return_value=True):
+        config.enabled = False
+        config.servers = [SimpleNamespace(name="s", type="stdio")]
+        out = await fetch_mcp_tools_from_config(config)
+        assert out == []
+        assert get_mcp_bootstrap_status()["state"] == "mcp_disabled"
+        reset_mcp_bootstrap_status()
+
+    @pytest.mark.asyncio
+    async def test_fetch_mcp_tools_fetch_failed_returns_wrappers_not_empty(self):
+        from backend.mcp_client.mcp_bootstrap_status import get_mcp_bootstrap_status
+
+        from types import SimpleNamespace
+
+        reset_mcp_bootstrap_status()
+        config = MagicMock()
+        config.enabled = True
+        config.mcp_exposed_name_reserved = frozenset()
+        config.servers = [SimpleNamespace(name="r", type="sse", url="https://example.invalid/mcp")]
+        with patch(
+            "backend.mcp_client.utils.create_mcps",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("network down"),
+        ):
+            result = await fetch_mcp_tools_from_config(config)
+        assert any(
+            t.get("function", {}).get("name") == "mcp_capabilities_status" for t in result
+        )
+        assert get_mcp_bootstrap_status()["state"] == "fetch_failed"
+        reset_mcp_bootstrap_status()
+
+    @pytest.mark.asyncio
+    async def test_fetch_mcp_tools_windows_disabled(self):
+        from types import SimpleNamespace
+
+        # No successful connections → explicit degraded tool surface (not empty list).
+        config = MagicMock()
+        config.enabled = True
+        config.mcp_exposed_name_reserved = frozenset()
+        config.servers = [SimpleNamespace(name="r", type="sse", url="https://example.invalid/mcp")]
+        with patch("backend.mcp_client.utils.create_mcps", new_callable=AsyncMock, return_value=[]):
             result = await fetch_mcp_tools_from_config(config)
             assert isinstance(result, list)
             assert any(
@@ -310,3 +430,28 @@ class TestAsyncHelpers:
 
         with pytest.raises(ValueError, match="not found"):
             await _call_mcp_raw([client], action)
+
+    @pytest.mark.asyncio
+    async def test_execute_mcp_capabilities_status_with_configured_servers(self):
+        """mcp_capabilities_status reports configured vs connected when wired from runtime."""
+        from backend.mcp_client.utils import _execute_wrapper_tool
+
+        action = MCPAction(name="mcp_capabilities_status", arguments={})
+        servers = [
+            SimpleNamespace(name="server_a", type="shttp"),
+            SimpleNamespace(name="server_b", type="stdio"),
+        ]
+        obs = await _execute_wrapper_tool(action, [], configured_servers=servers)
+        outer = json.loads(obs.content)
+        inner = json.loads(outer["content"][0]["text"])
+        assert inner["configured_servers_count"] == 2
+        assert inner["configured_servers"][0]["name"] == "server_a"
+        assert inner["configured_servers"][1]["name"] == "server_b"
+        assert inner["connected_clients_count"] == 0
+        assert inner["mcp_available"] is False
+        assert inner["connected_tools"] == []
+        assert "mcp_capabilities_status" in inner["wrapper_tools_registered"]
+        assert "notes" in inner
+        assert any("not connected" in n for n in inner["notes"])
+        assert "forge_bootstrap" in inner
+        assert inner["forge_bootstrap"].get("state") is not None

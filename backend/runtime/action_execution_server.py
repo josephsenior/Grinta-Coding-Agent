@@ -157,6 +157,8 @@ class ActionExecutor:
         # MCP clients are created lazily on first use.
         self._mcp_config = mcp_config
         self._mcp_clients: list[Any] | None = None
+        # Same server list passed to create_mcps (after Windows stdio filter), for diagnostics.
+        self._mcp_servers_resolved: list[Any] | None = None
 
     @property
     def initial_cwd(self) -> str:
@@ -668,8 +670,8 @@ class ActionExecutor:
         # Translate /workspace/ virtual paths to the actual workspace directory.
         action.path = self._normalize_workspace_path(action.path)
 
-        # Check for binary files
-        if is_binary(action.path):
+        # Check for binary files (skip probe if path is missing — avoids noisy errors)
+        if os.path.isfile(action.path) and is_binary(action.path):
             return ErrorObservation("ERROR_BINARY_FILE")
 
         # Handle FILE_EDITOR implementation
@@ -885,9 +887,20 @@ class ActionExecutor:
                 # config loading so that explicitly-allowed stdio servers are
                 # kept while unknown ones are still blocked.
                 servers = _filter_windows_stdio_servers(list(servers))
+                self._mcp_servers_resolved = list(servers)
                 self._mcp_clients = await create_mcps(servers)
+                from backend.mcp_client.mcp_tool_aliases import (
+                    prepare_mcp_tool_exposed_names,
+                )
 
-            observation = await call_tool_mcp(self._mcp_clients, action)  # type: ignore[arg-type]
+                _reserved = getattr(cfg, "mcp_exposed_name_reserved", None) or frozenset()
+                prepare_mcp_tool_exposed_names(self._mcp_clients, set(_reserved))
+
+            observation = await call_tool_mcp(
+                self._mcp_clients,
+                action,
+                configured_servers=self._mcp_servers_resolved,
+            )  # type: ignore[arg-type]
 
             # Apply truncation to large MCP outputs
             if hasattr(observation, "content") and isinstance(observation.content, str):
@@ -935,6 +948,30 @@ class ActionExecutor:
 
     def close(self) -> None:
         """Clean up resources owned by the in-process executor."""
+        if self._mcp_clients:
+            _clients = list(self._mcp_clients)
+            self._mcp_clients = None
+
+            async def _disconnect_mcp() -> None:
+                for c in _clients:
+                    try:
+                        await c.disconnect()
+                    except asyncio.CancelledError:
+                        raise
+                    except BaseExceptionGroup as eg:
+                        logger.debug("MCP executor disconnect (exception group): %s", eg)
+                    except Exception as e:
+                        logger.debug("MCP executor disconnect: %s", e, exc_info=True)
+                    await asyncio.sleep(0)
+
+            try:
+                from backend.core.constants import GENERAL_TIMEOUT
+                from backend.utils.async_utils import call_async_from_sync
+
+                call_async_from_sync(_disconnect_mcp, GENERAL_TIMEOUT)
+            except Exception as exc:
+                logger.debug("MCP disconnect during ActionExecutor.close: %s", exc)
+
         try:
             self.session_manager.close_all()
         except Exception:

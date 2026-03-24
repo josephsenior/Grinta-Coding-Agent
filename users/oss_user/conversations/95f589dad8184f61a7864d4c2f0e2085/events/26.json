@@ -1,0 +1,1 @@
+{"id": 26, "timestamp": "2026-03-23T11:51:44.195524", "source": "environment", "message": "Recall failed after retries", "cause": 24, "observation": "recall_failure", "content": "Recall failure", "extras": {"truncation_strategy": null, "recall_type": "knowledge", "error_message": "Recall failed after retries"}}

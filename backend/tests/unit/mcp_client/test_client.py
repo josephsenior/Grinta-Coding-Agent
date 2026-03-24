@@ -3,6 +3,7 @@
 Tests MCPClient session management, connection, reconnection, and tool calls.
 """
 
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -328,6 +329,29 @@ class TestMCPClientToolCalls(unittest.IsolatedAsyncioTestCase):
             name="search_files", arguments={"query": "test.py"}
         )
 
+    async def test_call_tool_uses_protocol_name_for_exposed_alias(self) -> None:
+        """Exposed alias names must resolve back to the original protocol name."""
+        mock_client = AsyncMock(spec=Client)
+        mock_result = CallToolResult(content=[{"type": "text", "text": "File found"}])
+        mock_client.call_tool_mcp = AsyncMock(return_value=mock_result)
+
+        mcp_client = MCPClient(client=mock_client, _session_active=True)
+        mcp_client.tool_map = {
+            "mcp_docs_search": MCPClientTool(
+                name="mcp_docs_search",
+                description="Aliased search tool",
+                inputSchema={},
+            )
+        }
+        mcp_client.exposed_to_protocol = {"mcp_docs_search": "search"}
+
+        result = await mcp_client.call_tool("mcp_docs_search", {"query": "typed contracts"})
+
+        self.assertEqual(result, mock_result)
+        mock_client.call_tool_mcp.assert_called_once_with(
+            name="search", arguments={"query": "typed contracts"}
+        )
+
     async def test_call_tool_not_found(self) -> None:
         """Test calling unknown tool raises ValueError."""
         mcp_client = MCPClient(client=AsyncMock(spec=Client), _session_active=True)
@@ -375,6 +399,96 @@ class TestMCPClientToolCalls(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, success_result)
         self.assertEqual(mock_client.call_tool_mcp.call_count, 2)
+
+    async def test_call_tool_reconnects_on_timeout(self) -> None:
+        """Timeouts should trigger one reconnect and retry."""
+        mock_client = AsyncMock(spec=Client)
+        success_result = CallToolResult(content=[{"type": "text", "text": "OK"}])
+        mock_client.call_tool_mcp = AsyncMock(
+            side_effect=[asyncio.TimeoutError(), success_result]
+        )
+
+        mcp_client = MCPClient(client=mock_client, _session_active=True)
+        mcp_client.tool_map = {
+            "test_tool": MCPClientTool(
+                name="test_tool",
+                description="Test",
+                inputSchema={},
+            )
+        }
+
+        with patch.object(mcp_client, "_reconnect", new_callable=AsyncMock) as mock_reconnect:
+            result = await mcp_client.call_tool("test_tool", {})
+
+        self.assertEqual(result, success_result)
+        mock_reconnect.assert_awaited_once_with()
+        self.assertEqual(mock_client.call_tool_mcp.call_count, 2)
+
+    async def test_call_tool_timeout_on_both_attempts_propagates(self) -> None:
+        """The second timeout after reconnect should be surfaced to the caller."""
+        mock_client = AsyncMock(spec=Client)
+        mock_client.call_tool_mcp = AsyncMock(
+            side_effect=[asyncio.TimeoutError(), asyncio.TimeoutError()]
+        )
+
+        mcp_client = MCPClient(client=mock_client, _session_active=True)
+        mcp_client.tool_map = {
+            "test_tool": MCPClientTool(
+                name="test_tool",
+                description="Test",
+                inputSchema={},
+            )
+        }
+
+        with patch.object(mcp_client, "_reconnect", new_callable=AsyncMock):
+            with self.assertRaises(asyncio.TimeoutError):
+                await mcp_client.call_tool("test_tool", {})
+
+    async def test_call_tool_reconnect_preserves_alias_protocol_mapping(self) -> None:
+        """Retry after reconnect must still use protocol names for aliased tools."""
+        mock_client = AsyncMock(spec=Client)
+        success_result = CallToolResult(content=[{"type": "text", "text": "OK"}])
+        mock_client.call_tool_mcp = AsyncMock(
+            side_effect=[ConnectionError("Lost connection"), success_result]
+        )
+
+        mcp_client = MCPClient(client=mock_client, _session_active=True)
+        mcp_client.tool_map = {
+            "mcp_docs_search": MCPClientTool(
+                name="mcp_docs_search",
+                description="Aliased search tool",
+                inputSchema={},
+            )
+        }
+        mcp_client.exposed_to_protocol = {"mcp_docs_search": "search"}
+
+        with patch.object(mcp_client, "_reconnect", new_callable=AsyncMock) as mock_reconnect:
+            result = await mcp_client.call_tool("mcp_docs_search", {"query": "test"})
+
+        self.assertEqual(result, success_result)
+        mock_reconnect.assert_awaited_once_with()
+        mock_client.call_tool_mcp.assert_any_call(
+            name="search", arguments={"query": "test"}
+        )
+
+    async def test_call_tool_does_not_retry_on_generic_exception(self) -> None:
+        """Non-transport errors must propagate (avoid duplicate mutating tool calls)."""
+        mock_client = AsyncMock(spec=Client)
+        mock_client.call_tool_mcp = AsyncMock(side_effect=ValueError("bad args"))
+
+        mcp_client = MCPClient(client=mock_client, _session_active=True)
+        mcp_client.tool_map = {
+            "test_tool": MCPClientTool(
+                name="test_tool",
+                description="Test",
+                inputSchema={},
+            )
+        }
+
+        with self.assertRaises(ValueError):
+            await mcp_client.call_tool("test_tool", {})
+
+        self.assertEqual(mock_client.call_tool_mcp.call_count, 1)
 
 
 class TestMCPClientReconnection(unittest.IsolatedAsyncioTestCase):

@@ -40,7 +40,6 @@ from backend.core.config import (
     parse_arguments,
     setup_config_from_args,
 )
-from backend.core.config.mcp_config import ForgeMCPConfig
 from backend.core.logger import forge_logger as logger
 from backend.core.loop import run_agent_until_done
 from backend.core.schemas import AgentState
@@ -159,15 +158,6 @@ async def _setup_memory_and_mcp(
         )
 
     if agent.config.enable_mcp:
-        # Add default Forge SHTTP server endpoint
-        default_server, _ = ForgeMCPConfig.create_default_mcp_server_config(
-            config_.mcp_host,
-            config_,
-            None,
-        )
-        if default_server:
-            runtime.config.mcp.servers.append(default_server)
-
         await add_mcp_tools_to_agent(agent, runtime, memory)
 
     return memory

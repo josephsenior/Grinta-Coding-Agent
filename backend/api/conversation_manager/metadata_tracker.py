@@ -12,6 +12,7 @@ from collections.abc import Callable
 from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
+from backend.core.constants import CONVERSATION_METADATA_UPDATE_SYNC_TIMEOUT
 from backend.core.logger import forge_logger as logger
 from backend.core.schemas import EventSource, ObservationType
 from backend.events.action import MessageAction
@@ -82,7 +83,7 @@ class ConversationMetadataTracker:
         def callback(event: Any, *args: Any, **kwargs: Any) -> None:
             call_async_from_sync(
                 self._update_conversation_for_event,
-                GENERAL_TIMEOUT,
+                CONVERSATION_METADATA_UPDATE_SYNC_TIMEOUT,
                 user_id,
                 conversation_id,
                 settings,

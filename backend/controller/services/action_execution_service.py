@@ -63,10 +63,17 @@ class ActionExecutionService:
         for attempt in range(max_repair_attempts + 1):
             try:
                 confirmation = self._context.confirmation_service
-                if confirmation:
-                    # Delegate to confirmation/replay service, but still inside
-                    # the try/except so LLMMalformedActionError from agent.step()
-                    # is retried the same as the direct path.
+                controller = self._context.get_controller()
+                replay_mgr = getattr(controller, "_replay_manager", None)
+                # ConfirmationService.get_next_action() uses synchronous agent.step()
+                # for live runs, which disables real token streaming (astep/async_execute).
+                # Only delegate there during trajectory replay; otherwise prefer astep.
+                use_confirmation_replay = (
+                    confirmation is not None
+                    and replay_mgr is not None
+                    and replay_mgr.should_replay() is True
+                )
+                if use_confirmation_replay:
                     action = confirmation.get_next_action()
                 else:
                     # Prefer the async step path (real LLM streaming) when
@@ -189,8 +196,13 @@ class ActionExecutionService:
             from backend.core.plugin import get_plugin_registry
 
             action = await get_plugin_registry().dispatch_action_pre(action)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "ActionExecutionService action_pre hook failed for %s: %s",
+                type(action).__name__,
+                exc,
+                exc_info=True,
+            )
 
         ctx: ToolInvocationContext | None = None
         pipeline = self._context.tool_pipeline

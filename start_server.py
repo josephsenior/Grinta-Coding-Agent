@@ -93,4 +93,6 @@ if __name__ == '__main__':
         log_level='info',
         reload=reload_enabled,
         reload_excludes=['./workspace'],
+        # Avoid websockets.legacy.server two-arg ws_handler (DeprecationWarning on websockets 15+).
+        ws='websockets-sansio',
     )

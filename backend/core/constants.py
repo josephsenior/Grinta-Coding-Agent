@@ -52,8 +52,15 @@ SETTINGS_CACHE_TTL = 60  # seconds
 # ── Timeouts & Thresholds ───────────────────────────────────────────
 GENERAL_TIMEOUT = 15
 COMPLETION_TIMEOUT = 30.0
+# Sync bridge for metadata updates: title path sleeps 5s then calls an LLM; 15s is too tight.
+CONVERSATION_METADATA_UPDATE_SYNC_TIMEOUT = 180.0
+# Recall runs KB / vector search synchronously; cap wall time so pending RecallAction always resolves.
+RECALL_PIPELINE_TIMEOUT_SECONDS = 90.0
 # Max seconds waiting for an observation matching a tool call before timing out.
-DEFAULT_PENDING_ACTION_TIMEOUT = 180.0
+# 0 or negative = disabled (no timeout error, no watchdog).
+DEFAULT_PENDING_ACTION_TIMEOUT = 0.0
+# MCP (stdio/SSE) can exceed the default (npx cold start, slow servers). Pending actions use max(base, this).
+MCP_PENDING_ACTION_TIMEOUT_FLOOR = 0.0
 
 # ── Threshold Constants ─────────────────────────────────────────────
 MAX_LINES_TO_EDIT = 300
@@ -91,7 +98,7 @@ DEFAULT_ENABLE_BROWSER = True
 DEFAULT_RUNTIME_TIMEOUT = 900
 DEFAULT_RUNTIME_CLOSE_DELAY = 60
 DEFAULT_RUNTIME_AUTO_LINT_ENABLED = True
-DEFAULT_RUNTIME_KEEP_ALIVE = False
+DEFAULT_RUNTIME_KEEP_ALIVE = True
 
 # ── LLM Defaults ────────────────────────────────────────────────────
 # No default model until settings.json (llm_model) or env (LLM_MODEL) supplies one.
@@ -102,8 +109,8 @@ DEFAULT_LLM_RETRY_MULTIPLIER = 8
 DEFAULT_LLM_RETRY_MIN_WAIT = 8
 DEFAULT_LLM_RETRY_MAX_WAIT = 64
 DEFAULT_LLM_MAX_MESSAGE_CHARS = 15000
-DEFAULT_LLM_TEMPERATURE = 0.0
-DEFAULT_LLM_TOP_P = 1.0
+DEFAULT_LLM_TEMPERATURE = 0.5
+DEFAULT_LLM_TOP_P = 0.95
 DEFAULT_LLM_CORRECT_NUM = 5
 
 # ── File Upload ─────────────────────────────────────────────────────
@@ -158,6 +165,8 @@ DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME = "system_prompt.j2"
 DEFAULT_AGENT_CLI_MODE = False
 DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT = True
 DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY = False
+# Heuristic keyword/turn-based tool filtering (ToolSelector); default off for reliability.
+DEFAULT_AGENT_ENABLE_PROGRESSIVE_TOOLS = False
 DEFAULT_FORGE_MCP_CONFIG_CLS = "backend.core.config.mcp_config.ForgeMCPConfig"
 DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS = 5
 DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS = 10
@@ -413,7 +422,7 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     "OTEL_LOG_CORRELATION": ("<OTEL_ENABLED>", "Attach OTEL trace/span IDs to logs"),
     "OTEL_ENABLED": ("false", "Master switch for OpenTelemetry integration"),
     "LOG_TO_FILE": ("<true when DEBUG>", "Write logs to a file in addition to stdout"),
-    "LOG_ALL_EVENTS": ("false", "Log every event processed by the event stream"),
+    "LOG_ALL_EVENTS": ("True", "Log every event processed by the event stream"),
     "DEBUG_RUNTIME": ("false", "Extra runtime container debug output"),
     # API versioning
     "FORGE_PERMISSIVE_API": (

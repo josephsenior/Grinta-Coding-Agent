@@ -64,12 +64,12 @@ class TestExtractObservationOutcome(unittest.TestCase):
         result = self.detector._extract_observation_outcome(obs)
         self.assertEqual(result, "no_change")
 
-    def test_already_exists_returns_no_change(self):
-        """'already exists' in content → 'no_change'."""
+    def test_already_exists_prose_is_not_semantic_signal(self):
+        """Free-form 'already exists' text is not used for stuck scoring (too many false positives)."""
         obs = MagicMock(spec=Observation)
         obs.content = "Error: file already exists at /workspace/src/page.tsx"
         result = self.detector._extract_observation_outcome(obs)
-        self.assertEqual(result, "no_change")
+        self.assertEqual(result, "unknown")
 
     def test_empty_content_returns_unknown(self):
         """Empty/normal observation → 'unknown'."""

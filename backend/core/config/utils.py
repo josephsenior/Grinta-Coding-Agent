@@ -214,6 +214,13 @@ def get_or_create_jwt_secret(file_store: FileStore) -> str:
 
 def finalize_config(cfg: ForgeConfig) -> None:
     """More tweaks to the config after it's been loaded."""
+    from backend.core.config.mcp_config import (
+        ensure_default_forge_mcp_http_server,
+        extend_mcp_servers_with_bundled_defaults,
+    )
+
+    extend_mcp_servers_with_bundled_defaults(cfg.mcp.servers)
+    ensure_default_forge_mcp_http_server(cfg)
     _configure_llm_logging(cfg)
     _ensure_cache_directory(cfg)
     _configure_jwt_secret(cfg)

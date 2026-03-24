@@ -18,6 +18,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from .cache import get_cached
+from .mcp_bootstrap_status import get_mcp_bootstrap_status
 
 REQUIRED_UNDERLYING = {
     "list_components": ["search_components"],
@@ -122,25 +123,97 @@ async def search_components(mcps, args: dict[str, Any], call_tool_func) -> dict:
     }
 
 
-async def mcp_capabilities_status(mcps, args: dict[str, Any], call_tool_func) -> dict:
+def _windows_stdio_mcp_note() -> str | None:
+    """Explain stdio MCP policy without importing utils at module load (breaks cycles)."""
+    from backend.mcp_client.utils import _is_windows_stdio_mcp_disabled
+
+    if _is_windows_stdio_mcp_disabled():
+        return (
+            "On Windows, stdio MCP servers are skipped unless the environment variable "
+            "FORGE_ENABLE_WINDOWS_MCP is set (HTTP/SSE/SHTTP servers are still attempted)."
+        )
+    return None
+
+
+def _connected_client_summary(client: Any) -> dict[str, Any]:
+    cfg = getattr(client, "_server_config", None)
+    name = (
+        getattr(cfg, "name", None)
+        or getattr(cfg, "url", None)
+        or getattr(cfg, "command", None)
+        or "unknown"
+    )
+    tools = list(getattr(client, "tools", []) or [])
+    return {
+        "server_name": name,
+        "server_type": getattr(cfg, "type", None),
+        "remote_tool_count": len(tools),
+        "remote_tools": sorted(t.name for t in tools),
+    }
+
+
+async def mcp_capabilities_status(
+    mcps,
+    args: dict[str, Any],
+    call_tool_func,
+    *,
+    configured_servers: list[Any] | None = None,
+) -> dict:
+    """Report configured vs connected MCP state, remote tools, and Forge wrapper tools."""
+    mcps_list = list(mcps or [])
+    configured = configured_servers or []
+    configured_summaries = [
+        {"name": getattr(s, "name", ""), "type": getattr(s, "type", "")}
+        for s in configured
+    ]
+    remote_names = sorted(
+        {
+            tool.name
+            for client in mcps_list
+            for tool in getattr(client, "tools", [])
+        }
+    )
+    notes: list[str] = []
+    n_cfg = len(configured_summaries)
+    n_conn = len(mcps_list)
+    if n_cfg > n_conn:
+        notes.append(
+            f"{n_cfg - n_conn} configured server(s) were not connected for this session "
+            "(connection timeout, bad URL, transport error, or skipped stdio on Windows)."
+        )
+    if mcps_list and not remote_names:
+        notes.append(
+            "Connected server(s) returned zero tools from list_tools(). "
+            "Forge may still register wrapper tools (see wrapper_tools_registered); "
+            "the LLM tool list merges remote tools plus applicable wrappers."
+        )
+
+    win = _windows_stdio_mcp_note()
+    if win:
+        notes.append(win)
+
+    payload: dict[str, Any] = {
+        "mcp_available": bool(mcps_list),
+        # Backward-compatible keys (counts / flat tool list)
+        "connected_servers": n_conn,
+        "connected_tools": remote_names,
+        # Clearer diagnostics
+        "configured_servers_count": n_cfg,
+        "configured_servers": configured_summaries,
+        "connected_clients_count": n_conn,
+        "connected_clients": [_connected_client_summary(c) for c in mcps_list],
+        "wrapper_tools_registered": sorted(WRAPPER_TOOL_REGISTRY.keys()),
+        # Last Forge MCP bootstrap outcome (disabled vs unavailable vs degraded vs healthy)
+        "forge_bootstrap": get_mcp_bootstrap_status(),
+    }
+    if notes:
+        payload["notes"] = notes
+
     return {
         "content": [
             {
                 "type": "text",
-                "text": json.dumps(
-                    {
-                        "connected_servers": len(mcps or []),
-                        "connected_tools": sorted(
-                            {
-                                tool.name
-                                for client in (mcps or [])
-                                for tool in getattr(client, "tools", [])
-                            }
-                        ),
-                        "mcp_available": bool(mcps),
-                    },
-                    ensure_ascii=False,
-                ),
+                "text": json.dumps(payload, ensure_ascii=False),
             }
         ]
     }
@@ -161,7 +234,11 @@ def wrapper_tool_params(available_server_tools: list[str]) -> list[dict]:
             "type": "function",
             "function": {
                 "name": "mcp_capabilities_status",
-                "description": "Report MCP connectivity and currently available MCP tool names for degraded-mode diagnostics.",
+                "description": (
+                    "Report MCP diagnostics: configured servers vs connected clients, "
+                    "remote tools from list_tools(), and Forge wrapper tools. "
+                    "Use when connected_tools is empty but you still see MCP tools in the agent."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {},

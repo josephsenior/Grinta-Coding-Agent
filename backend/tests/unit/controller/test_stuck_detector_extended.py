@@ -104,10 +104,10 @@ class TestAdvancedPatterns:
         history: list[Any] = []
         for i in range(10):
             m = _cmd(f"cmd {i}")
-            # Rapidly growing prompt tokens
+            # Rapidly growing prompt tokens (must exceed stuck threshold: >50k in 5 steps)
             m.llm_metrics = Metrics()
             m.llm_metrics.token_usages = [  # type: ignore[union-attr]
-                TokenUsage(prompt_tokens=i * 3000, completion_tokens=10)
+                TokenUsage(prompt_tokens=i * 13_000, completion_tokens=10)
             ]
             history.append(m)
             history.append(_cmd_output())

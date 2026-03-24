@@ -515,12 +515,22 @@ class Runtime(
         except Exception:
             exit_code = None
 
+        existing_tool_result = (
+            observation.tool_result if isinstance(observation.tool_result, dict) else {}
+        )
         observation.tool_result = {
-            "ok": not isinstance(observation, ErrorObservation),
-            "retryable": isinstance(observation, ErrorObservation),
-            "exit_code": exit_code,
-            "action": getattr(event, "action", None),
-            "observation": getattr(observation, "observation", None),
+            **existing_tool_result,
+            "ok": existing_tool_result.get(
+                "ok", not isinstance(observation, ErrorObservation)
+            ),
+            "retryable": existing_tool_result.get(
+                "retryable", isinstance(observation, ErrorObservation)
+            ),
+            "exit_code": existing_tool_result.get("exit_code", exit_code),
+            "action": existing_tool_result.get("action", getattr(event, "action", None)),
+            "observation": existing_tool_result.get(
+                "observation", getattr(observation, "observation", None)
+            ),
         }
 
         if isinstance(observation, NullObservation):

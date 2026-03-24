@@ -455,6 +455,15 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
 
         self.ctrl.services.retry.shutdown.assert_awaited_once()
 
+    async def test_close_shuts_down_pending_action_service(self):
+        self.ctrl.services.state.set_agent_state = AsyncMock()
+        self.ctrl.services.retry.shutdown = AsyncMock()
+        self.ctrl.services.pending_action.shutdown = MagicMock()
+
+        await self.ctrl.close()
+
+        self.ctrl.services.pending_action.shutdown.assert_called_once_with()
+
     async def test_stop_sets_stopped_state(self):
         self.ctrl.services.state.set_agent_state = AsyncMock()
         self.ctrl.services.pending_action.set = MagicMock()

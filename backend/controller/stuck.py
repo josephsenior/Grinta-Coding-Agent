@@ -14,6 +14,7 @@ from backend.controller.stuck_patterns import (
     is_stuck_repeating_action_observation,
 )
 from backend.core.logger import forge_logger as logger
+from backend.validation.command_classification import classify_shell_intent
 from backend.events.action.action import Action
 from backend.events.action.agent import AgentThinkAction
 from backend.events.action.commands import CmdRunAction
@@ -388,6 +389,10 @@ class StuckDetector:
 
         return action_intents, observation_outcomes
 
+    def _categorize_cmd_action(self, command: str) -> str:
+        """Classify a shell command for loop / diversity scoring (token-oriented)."""
+        return classify_shell_intent(command)
+
     def _calculate_intent_diversity(self, action_intents: list[str]) -> float:
         """Calculate diversity of action intents.
 
@@ -420,7 +425,7 @@ class StuckDetector:
         failures = sum(
             1
             for outcome in observation_outcomes
-            if outcome in ["error", "no_change", "not_found"]
+            if outcome in ("error", "no_change")
         )
         return failures / len(observation_outcomes)
 
@@ -435,37 +440,10 @@ class StuckDetector:
 
         """
         if isinstance(action, CmdRunAction):
-            return self._categorize_cmd_action(action.command.lower())
+            return self._categorize_cmd_action(action.command)
         if hasattr(action, "path"):
             return f"file_op_{getattr(action, 'path')}"
         return "other_action"
-
-    def _categorize_cmd_action(self, command: str) -> str:
-        """Categorize command action by type.
-
-        Args:
-            command: Lowercased command string
-
-        Returns:
-            Category string
-
-        """
-        # Command categories with their patterns
-        categories = [
-            (["pytest", "npm test", "cargo test", "go test"], "run_test"),
-            (["cat", "ls", "pwd", "find", "get-content", "get-childitem", "dir", "type", "tree"], "inspect_filesystem"),
-            (["git clone", "git pull", "git fetch"], "fetch_code"),
-            (["pip install", "npm install", "cargo build"], "install_dependency"),
-            (["mkdir", "touch", "echo >"], "create_file"),
-            (["rm", "rmdir"], "delete_file"),
-            (["python", "node", "cargo run"], "execute_code"),
-        ]
-
-        for patterns, category in categories:
-            if any(cmd in command for cmd in patterns):
-                return category
-
-        return "other_command"
 
     def _extract_observation_outcome(self, observation: Observation) -> str | None:
         """Extract the outcome/result of an observation.
@@ -481,9 +459,8 @@ class StuckDetector:
             return "error"
         if isinstance(observation, CmdOutputObservation):
             return self._categorize_cmd_output(observation)
-        # Detect file-create-already-exists (SKIPPED) as no_change
         content = getattr(observation, "content", "") or ""
-        if content.startswith("SKIPPED:") or "already exists" in content:
+        if content.startswith("SKIPPED:"):
             return "no_change"
         # Detect silent-success re-creation: old_content == new_content means
         # the file already existed and nothing was actually written.
@@ -495,27 +472,21 @@ class StuckDetector:
         return "unknown"
 
     def _categorize_cmd_output(self, observation: CmdOutputObservation) -> str:
-        """Categorize command output observation.
-
-        Args:
-            observation: Command output observation
-
-        Returns:
-            Outcome category string
-
-        """
-        if observation.exit_code != 0:
+        """Categorize command output from exit code and structured tool metadata only."""
+        code = observation.exit_code
+        if code is not None and code != 0:
             return "error"
-
-        content_lower = observation.content.lower()
-
-        if "no such file" in content_lower or "not found" in content_lower:
-            return "not_found"
-        if "permission denied" in content_lower:
-            return "permission_error"
-        if len(observation.content.strip()) == 0:
+        tr_raw = getattr(observation, "tool_result", None)
+        tr = tr_raw if isinstance(tr_raw, dict) else None
+        if tr is not None and tr.get("ok") is False:
+            return "error"
+        if code == 0:
+            if len((observation.content or "").strip()) == 0:
+                return "no_output"
+            return "success"
+        if len((observation.content or "").strip()) == 0:
             return "no_output"
-        return "success"
+        return "unknown"
 
     def _is_stuck_token_repetition(self, filtered_history: list[Event]) -> bool:
         """Detect exact token-level repetition in agent messages.

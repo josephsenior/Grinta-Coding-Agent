@@ -11,7 +11,6 @@ from backend.controller.agent import Agent
 
 if TYPE_CHECKING:
     pass
-from backend.core.config.mcp_config import ForgeMCPConfig
 from backend.core.errors import AgentNotRegisteredError, PlaybookValidationError
 from backend.core.logger import ForgeLoggerAdapter
 from backend.core.schemas import AgentState
@@ -140,18 +139,9 @@ class Session:
             cfg.mcp = cfg.mcp.merge(mcp_config)
             self.logger.debug("Merged custom MCP Config: %s", mcp_config)
 
-        forge_mcp_server, forge_mcp_stdio_servers = (
-            ForgeMCPConfig.create_default_mcp_server_config(
-                cfg.mcp_host,
-                cfg,
-                self.user_id,
-            )
-        )
-        if forge_mcp_server:
-            cfg.mcp.servers.append(forge_mcp_server)
+        from backend.core.config.mcp_config import dedupe_forge_mcp_http_servers
 
-        if forge_mcp_stdio_servers:
-            cfg.mcp.servers.extend(forge_mcp_stdio_servers)
+        dedupe_forge_mcp_http_servers(cfg.mcp)
 
         self.logger.debug(
             "MCP configuration after setup - self.config.mcp: %s", cfg.mcp

@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import backend
+from backend.core.constants import RECALL_PIPELINE_TIMEOUT_SECONDS
 from backend.core.logger import forge_logger as logger
 from backend.events.action.agent import RecallAction
 from backend.core.enums import RecallType
@@ -88,17 +90,41 @@ class Memory:
         try:
             if not isinstance(event, RecallAction):
                 return
-            observation = await self._process_recall_with_retry(event)
-            if observation is None:
-                observation = cast(
-                    RecallObservation, self._build_failure_observation(event)
+            # KB / vector search is synchronous and can block for minutes. Running it on the
+            # default event loop stalls the whole session (pending RecallAction never clears).
+            try:
+                observation = await asyncio.wait_for(
+                    asyncio.to_thread(self._complete_recall_pipeline_sync, event),
+                    timeout=RECALL_PIPELINE_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Recall pipeline timed out after %.0fs (event id=%s, type=%s)",
+                    RECALL_PIPELINE_TIMEOUT_SECONDS,
+                    getattr(event, "id", None),
+                    event.recall_type,
+                )
+                observation = RecallFailureObservation(
+                    recall_type=event.recall_type,
+                    error_message="Recall timed out",
+                    content=(
+                        f"Recall timed out after {RECALL_PIPELINE_TIMEOUT_SECONDS:.0f}s "
+                        "(knowledge-base / vector search may be overloaded)."
+                    ),
                 )
             observation.cause = event.id
             self.event_stream.add_event(observation, EventSource.ENVIRONMENT)
         except Exception as exc:
             await self._handle_recall_exception(event, exc)
 
-    async def _process_recall_with_retry(
+    def _complete_recall_pipeline_sync(self, event: RecallAction) -> RecallObservation | RecallFailureObservation:
+        """Run retry loop in a worker thread (see _on_event). Always returns an observation."""
+        observation = self._process_recall_with_retry_sync(event)
+        if observation is None:
+            return self._build_failure_observation(event)
+        return observation
+
+    def _process_recall_with_retry_sync(
         self, event: RecallAction, max_attempts: int = 3
     ) -> RecallObservation | None:
         attempt = 0
@@ -117,7 +143,7 @@ class Memory:
                         exc,
                     )
                     break
-                await self._backoff_retry(attempt, exc)
+                self._backoff_retry_sync(attempt, exc)
         return None
 
     def _process_recall_once(
@@ -143,7 +169,7 @@ class Memory:
             return self._on_playbook_recall(event)
         return None
 
-    async def _backoff_retry(self, attempt: int, exc: Exception) -> None:
+    def _backoff_retry_sync(self, attempt: int, exc: Exception) -> None:
         backoff = min(0.8, 0.2 * (2 ** (attempt - 1)))
         jitter = 0.05 * attempt
         sleep_time = backoff + jitter
@@ -153,7 +179,7 @@ class Memory:
             exc,
             sleep_time,
         )
-        await asyncio.sleep(sleep_time)
+        time.sleep(sleep_time)
 
     def _build_failure_observation(
         self, event: RecallAction

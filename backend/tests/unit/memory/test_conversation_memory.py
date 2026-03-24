@@ -7,7 +7,10 @@ from unittest.mock import MagicMock
 
 
 from backend.core.message import Message, TextContent
+from backend.events.observation.commands import CmdOutputObservation
+from backend.events.observation.mcp import MCPObservation
 from backend.events.observation import ErrorObservation
+from backend.events.tool import ToolCallMetadata
 from backend.memory.conversation_memory import ConversationMemory
 from backend.memory.memory_types import DecisionType
 from backend.memory.message_formatting import (
@@ -84,6 +87,74 @@ class TestErrorObservationNotifyUiOnly:
         )
         assert len(out) == 1
         assert out[0].role == "user"
+
+
+class TestToolResultPropagation:
+    def test_tool_result_ok_is_propagated_to_forge_tool_ok(self):
+        mem = _make_memory()
+        obs = MCPObservation(content='{"ok": true}', name="remote_tool", arguments={"x": 1})
+        obs.tool_result = {"ok": True, "retryable": False}
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name="remote_tool",
+            tool_call_id="call_1",
+            model_response={"id": "resp_1"},
+            total_calls_in_response=1,
+        )
+        tool_messages: dict[str, Message] = {}
+
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message=tool_messages,
+            max_message_chars=None,
+        )
+
+        assert out == []
+        assert tool_messages["call_1"].forge_tool_ok is True
+
+    def test_tool_result_failure_is_propagated_to_forge_tool_ok(self):
+        mem = _make_memory()
+        obs = MCPObservation(content='{"ok": false}', name="remote_tool", arguments={})
+        obs.tool_result = {"ok": False, "retryable": True, "error_code": "TIMEOUT"}
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name="remote_tool",
+            tool_call_id="call_2",
+            model_response={"id": "resp_2"},
+            total_calls_in_response=1,
+        )
+        tool_messages: dict[str, Message] = {}
+
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message=tool_messages,
+            max_message_chars=None,
+        )
+
+        assert out == []
+        assert tool_messages["call_2"].forge_tool_ok is False
+
+    def test_cmd_output_exit_code_zero_propagates_success(self):
+        mem = _make_memory()
+        obs = CmdOutputObservation(
+            content="tests passed",
+            command="pytest",
+            metadata={"exit_code": 0},
+        )
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name="cmd_run",
+            tool_call_id="call_3",
+            model_response={"id": "resp_3"},
+            total_calls_in_response=1,
+        )
+        tool_messages: dict[str, Message] = {}
+
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message=tool_messages,
+            max_message_chars=None,
+        )
+
+        assert out == []
+        assert tool_messages["call_3"].forge_tool_ok is True
 
 
 class TestStaticHelpers:

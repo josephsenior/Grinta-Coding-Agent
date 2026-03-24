@@ -19,6 +19,14 @@ class TestPendingActionService(unittest.TestCase):
         self.mock_context = MagicMock()
         self.mock_context.get_controller.return_value = self.mock_controller
 
+        # Without a running event loop, _schedule_watchdog falls back to
+        # run_until_complete(sleep(timeout+2)) and blocks each test for minutes.
+        self._watchdog_patcher = patch.object(
+            PendingActionService, "_schedule_watchdog", autospec=True
+        )
+        self._watchdog_patcher.start()
+        self.addCleanup(self._watchdog_patcher.stop)
+
         self.service = PendingActionService(self.mock_context, timeout=120.0)
 
     def test_initialization(self):
@@ -56,6 +64,18 @@ class TestPendingActionService(unittest.TestCase):
         self.assertIsNone(self.service._pending)
         # Should have logged clearing
         self.assertEqual(self.mock_controller.log.call_count, 2)  # Set + clear
+
+    def test_set_none_clears_get_and_info_views(self):
+        """Clearing a pending action must remove all observable pending state."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+
+        self.service.set(mock_action)
+        self.service.set(None)
+
+        self.assertIsNone(self.service.get())
+        self.assertIsNone(self.service.info())
 
     def test_set_none_when_no_pending(self):
         """Test set(None) when no pending action does nothing."""
@@ -136,6 +156,23 @@ class TestPendingActionService(unittest.TestCase):
         action, timestamp = result
         self.assertEqual(action, mock_action)
         self.assertIsInstance(timestamp, float)
+
+    @patch("time.time")
+    def test_info_returns_none_when_pending_has_timed_out(self, mock_time):
+        """info() should not expose stale pending state after timeout."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+
+        mock_time.return_value = 100.0
+        self.service.set(mock_action)
+
+        mock_time.return_value = 225.1
+        result = self.service.info()
+
+        self.assertIsNone(result)
+        self.assertIsNone(self.service._pending)
+        self.mock_controller.event_stream.add_event.assert_called_once()
 
     def test_info_returns_none_when_no_pending(self):
         """Test info() returns None when no pending action."""
@@ -247,6 +284,111 @@ class TestPendingActionService(unittest.TestCase):
 
         self.assertEqual(service._timeout, 60.0)
 
+    def test_shutdown_clears_pending_and_cancels_watchdog(self):
+        """shutdown() should clear pending state and cancel watchdog."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+        self.service.set(mock_action)
+
+        fake_handle = MagicMock()
+        self.service._watchdog_handle = fake_handle
+
+        self.service.shutdown()
+
+        self.assertIsNone(self.service._pending)
+        self.assertIsNone(self.service._watchdog_handle)
+        fake_handle.cancel.assert_called_once_with()
+
+    @patch("time.time")
+    def test_zero_timeout_never_times_out(self, mock_time):
+        """pending_action_timeout <= 0 disables timeout and watchdog."""
+        service = PendingActionService(self.mock_context, timeout=0.0)
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+
+        mock_time.return_value = 100.0
+        service.set(mock_action)
+        mock_time.return_value = 100.0 + 86400.0 * 365
+        action = service.get()
+
+        self.assertEqual(action, mock_action)
+        self.mock_controller.event_stream.add_event.assert_not_called()
+
+    @patch("time.time")
+    def test_mcp_action_with_zero_base_uses_no_floor(self, mock_time):
+        """When base timeout is disabled, MCP floor must not apply."""
+        service = PendingActionService(self.mock_context, timeout=0.0)
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "MCPAction"
+        mock_action.id = "mcp-1"
+
+        mock_time.return_value = 0.0
+        service.set(mock_action)
+        mock_time.return_value = 1e9
+        action = service.get()
+
+        self.assertEqual(action, mock_action)
+        self.mock_controller.event_stream.add_event.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPendingActionWatchdog(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.mock_controller = MagicMock()
+        self.mock_controller.log = MagicMock()
+        self.mock_controller.event_stream = MagicMock()
+
+        self.mock_context = MagicMock()
+        self.mock_context.get_controller.return_value = self.mock_controller
+        self.mock_context.trigger_step = MagicMock()
+
+        self.service = PendingActionService(self.mock_context, timeout=5.0)
+
+    @patch("time.time")
+    async def test_watchdog_fire_calls_trigger_step_after_timeout(self, mock_time):
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "TestAction"
+        mock_action.id = "action-123"
+
+        mock_time.return_value = 100.0
+        self.service._pending = (mock_action, 100.0)
+
+        mock_time.return_value = 106.0
+        self.service._watchdog_fire()
+
+        self.mock_context.trigger_step.assert_called_once_with()
+
+    @patch("backend.controller.services.pending_action_service.asyncio.get_running_loop")
+    @patch("backend.utils.async_utils.run_or_schedule")
+    async def test_schedule_watchdog_uses_async_fallback_without_running_loop(
+        self, mock_run_or_schedule, mock_get_running_loop
+    ):
+        mock_get_running_loop.side_effect = RuntimeError("no running loop")
+
+        self.service._schedule_watchdog()
+
+        mock_run_or_schedule.assert_called_once()
+
+    @patch("time.time")
+    async def test_mcp_action_uses_timeout_floor_when_base_below_floor(self, mock_time):
+        from backend.core.constants import MCP_PENDING_ACTION_TIMEOUT_FLOOR
+
+        service = PendingActionService(self.mock_context, timeout=1.0)
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = "MCPAction"
+        mock_action.id = "42"
+
+        mock_time.return_value = 100.0
+        service.set(mock_action)
+        mock_time.return_value = 100.0 + MCP_PENDING_ACTION_TIMEOUT_FLOOR - 1
+        self.assertEqual(service.get(), mock_action)
+
+        mock_time.return_value = 100.0 + MCP_PENDING_ACTION_TIMEOUT_FLOOR + 1
+        self.assertIsNone(service.get())
+        self.mock_controller.event_stream.add_event.assert_called_once()
+        service.shutdown()

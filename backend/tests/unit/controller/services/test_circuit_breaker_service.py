@@ -102,7 +102,7 @@ class TestCircuitBreakerService(unittest.TestCase):
         config_call = mock_config_class.call_args[1]
         self.assertEqual(config_call["max_consecutive_errors"], 5)
         self.assertEqual(config_call["max_high_risk_actions"], 10)
-        self.assertEqual(config_call["max_stuck_detections"], 3)
+        self.assertEqual(config_call["max_stuck_detections"], 15)
 
     @patch("backend.controller.services.circuit_breaker_service.CircuitBreaker")
     @patch("backend.controller.services.circuit_breaker_service.CircuitBreakerConfig")

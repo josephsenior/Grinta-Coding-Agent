@@ -331,6 +331,9 @@ class AgentController:
             self._step_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._step_task
+        pending_service = getattr(self, "pending_action_service", None)
+        if pending_service is not None:
+            pending_service.shutdown()
         if set_stop_state:
             await self.set_agent_state_to(AgentState.STOPPED)
         self.state_tracker.close(self.event_stream)

@@ -116,6 +116,7 @@ def _apply_state_turn_signals(state: State, doc: dict) -> None:
         state.turn_signals = TurnSignals(
             planning_directive=ts.get("planning_directive"),
             memory_pressure=ts.get("memory_pressure"),
+            repetition_score=float(ts.get("repetition_score", 0.0) or 0.0),
         )
 
 
@@ -149,15 +150,78 @@ def _apply_state_metrics(state: State, doc: dict) -> None:
             setattr(state, attr, m)
 
 
-def _build_plan_step(d: dict) -> PlanStep:
-    """Recursively rebuild a PlanStep from dict."""
+VALID_PLAN_STEP_STATUSES = frozenset(
+    {"pending", "in_progress", "completed", "failed", "skipped"}
+)
+
+
+def _normalize_plan_step_status(raw_status: Any) -> str:
+    status = str(raw_status or "pending").strip().lower()
+    return status if status in VALID_PLAN_STEP_STATUSES else "pending"
+
+
+def normalize_plan_step_payload(step: dict[str, Any], idx: int | None = None) -> dict[str, Any]:
+    """Normalize plan/task-tracker step payloads to the canonical schema."""
+    if not isinstance(step, dict):
+        msg = f"Plan step must be a dictionary, got {type(step)}"
+        raise TypeError(msg)
+
+    fallback_id = f"step-{idx}" if idx is not None else "step"
+    subtasks = step.get("subtasks", [])
+    if subtasks is None:
+        subtasks = []
+    if not isinstance(subtasks, list):
+        msg = "Plan step 'subtasks' must be a list"
+        raise TypeError(msg)
+
+    tags = step.get("tags", [])
+    if tags is None:
+        tags = []
+    if not isinstance(tags, list):
+        msg = "Plan step 'tags' must be a list"
+        raise TypeError(msg)
+
+    return {
+        "id": str(step.get("id") or fallback_id),
+        "description": str(step.get("description") or step.get("title") or "Untitled step"),
+        "status": _normalize_plan_step_status(step.get("status")),
+        "result": step.get("result", step.get("notes")),
+        "tags": [str(tag) for tag in tags],
+        "subtasks": [
+            normalize_plan_step_payload(substep, i + 1)
+            for i, substep in enumerate(subtasks)
+        ],
+    }
+
+
+def build_plan_step_from_payload(step: dict[str, Any], idx: int | None = None) -> PlanStep:
+    """Build a ``PlanStep`` from normalized-or-legacy payload data."""
+    normalized = normalize_plan_step_payload(step, idx)
     return PlanStep(
-        id=d["id"],
-        description=d["description"],
-        status=d.get("status", "pending"),
-        result=d.get("result"),
-        subtasks=[_build_plan_step(s) for s in d.get("subtasks", [])],
-        tags=d.get("tags", []),
+        id=normalized["id"],
+        description=normalized["description"],
+        status=normalized["status"],
+        result=normalized["result"],
+        subtasks=[
+            build_plan_step_from_payload(substep, i + 1)
+            for i, substep in enumerate(normalized["subtasks"])
+        ],
+        tags=normalized["tags"],
+    )
+
+
+def build_active_plan_from_payload(
+    raw_steps: list[dict[str, Any]],
+    *,
+    title: str = "Current Plan",
+) -> ActivePlan:
+    """Build an ``ActivePlan`` from external payload data."""
+    return ActivePlan(
+        steps=[
+            build_plan_step_from_payload(step, i + 1)
+            for i, step in enumerate(raw_steps)
+        ],
+        title=title,
     )
 
 
@@ -167,8 +231,13 @@ def _apply_state_plan(state: State, doc: dict) -> None:
     if not isinstance(plan_dict, dict):
         return
     try:
-        steps = [_build_plan_step(s) for s in plan_dict.get("steps", [])]
-        state.plan = ActivePlan(steps=steps, title=plan_dict.get("title", "Current Plan"))
+        raw_steps = plan_dict.get("steps", [])
+        if not isinstance(raw_steps, list):
+            raise TypeError("Plan 'steps' must be a list")
+        state.plan = build_active_plan_from_payload(
+            raw_steps,
+            title=plan_dict.get("title", "Current Plan"),
+        )
     except Exception as e:
         logger.warning("Failed to restore plan from state: %s", e)
 

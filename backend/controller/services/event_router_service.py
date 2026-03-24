@@ -65,8 +65,12 @@ class EventRouterService:
             from backend.core.plugin import get_plugin_registry
 
             await get_plugin_registry().dispatch_event(event)
-        except Exception:
-            pass
+        except Exception as exc:
+            self._ctrl.log(
+                "warning",
+                f"Plugin event_emitted hook failed for {type(event).__name__}: {exc}",
+                extra={"msg_type": "PLUGIN_EVENT_HOOK"},
+            )
 
         # StreamingChunkAction events are transient display hints — they
         # must NOT be added to the history that the LLM sees on the next
@@ -114,118 +118,27 @@ class EventRouterService:
 
     async def _handle_task_tracking_action(self, action: TaskTrackingAction) -> None:
         """Handle task tracking action to update active plan."""
-        from backend.controller.state.state import ActivePlan, PlanStep
+        from backend.controller.state.state import build_active_plan_from_payload
 
         try:
-            # Recursive helper to build steps
-            def _build_step(d: dict) -> PlanStep:
-                return PlanStep(
-                    id=d.get("id", ""),
-                    description=d.get("description", d.get("title", "")),
-                    status=d.get("status", "pending"),
-                    result=d.get("result", d.get("notes")),
-                    tags=d.get("tags", []),
-                    subtasks=[_build_step(s) for s in d.get("subtasks", [])],
-                )
-
             current_plan = self._ctrl.state.plan
             current_title = current_plan.title if current_plan else "Current Plan"
-
-            steps = [_build_step(t) for t in action.task_list]
-            self._ctrl.state.plan = ActivePlan(
-                steps=steps,
+            self._ctrl.state.plan = build_active_plan_from_payload(
+                action.task_list,
                 title=current_title,
             )
-            self._ctrl.log("info", f"Plan updated with {len(steps)} steps.")
+            self._ctrl.log("info", f"Plan updated with {len(action.task_list)} steps.")
         except Exception as e:
             self._ctrl.log("error", f"Failed to update plan: {e}")
 
     async def _handle_finish_action(self, action: PlaybookFinishAction) -> None:
         """Handle agent finish action with completion validation."""
-        # Reject premature finish if task files are not all created
-        if not getattr(action, "force_finish", False):
-            missing = self._get_missing_task_files()
-            if missing:
-                from backend.events.observation.error import ErrorObservation
-
-                msg = (
-                    f"FINISH BLOCKED: {len(missing)} files from your task "
-                    f"have not been created yet:\n"
-                    + "\n".join(f"  - {f}" for f in sorted(missing))
-                    + "\n\nCreate the remaining files before finishing."
-                )
-                error_obs = ErrorObservation(content=msg)
-                error_obs.error_id = "INCOMPLETE_TASK"
-                self._ctrl.event_stream.add_event(
-                    error_obs, EventSource.ENVIRONMENT
-                )
-                return
         if not await self._ctrl.task_validation_service.handle_finish(action):
             return
         self._ctrl.state.set_outputs(action.outputs, source="EventRouterService.finish")
         await self._ctrl.set_agent_state_to(AgentState.FINISHED)
         await self._ctrl.log_task_audit(status="success")
         await self._run_critics()
-
-    def _get_missing_task_files(self) -> set[str]:
-        """Return task files that haven't been created yet."""
-        state = self._ctrl.state
-        history = list(state.history) if state else []
-
-        created = self._collect_created_file_paths(history)
-        task_files = self._extract_task_files_from_history(history)
-
-        if not task_files:
-            return set()
-
-        return {
-            tf for tf in task_files
-            if not any(cf == tf or cf.endswith("/" + tf) for cf in created)
-        }
-
-    def _collect_created_file_paths(self, history: list) -> set[str]:
-        """Collect normalized file paths from FileWrite/FileEdit actions."""
-        from backend.events.action.files import FileEditAction, FileWriteAction
-
-        created: set[str] = set()
-        for e in history:
-            if isinstance(e, (FileWriteAction, FileEditAction)):
-                p = getattr(e, "path", "") or ""
-                if p:
-                    p = p.replace("\\", "/").strip("/")
-                    if p.startswith("workspace/"):
-                        p = p[len("workspace/"):]
-                    created.add(p)
-        return created
-
-    def _extract_task_files_from_history(self, history: list) -> set[str]:
-        """Extract expected file paths from the first user message."""
-        import re
-
-        for e in history:
-            if isinstance(e, MessageAction) and getattr(e, "source", None) == EventSource.USER:
-                text = getattr(e, "content", "") or ""
-                if text:
-                    return self._parse_task_files_from_text(text)
-                break
-        return set()
-
-    @staticmethod
-    def _parse_task_files_from_text(text: str) -> set[str]:
-        """Parse file paths from task text, filtering false positives."""
-        import re
-
-        _FRAMEWORK_PREFIXES = ("next.js", "node.js", "vue.js", "react.js")
-        _FILE_PATTERN = r'(?<![.\w])[\w./\[\]]+\.(?:py|html|css|js|jsx|ts|tsx|json|txt|md|yaml|yml|toml|cfg|ini|sh|sql|prisma|env|mjs|cjs|svelte|vue|example)\b'
-        _DOTFILE_PATTERN = r'(?:^|\s)(\.[\w]+\.[\w]+)'
-
-        paths = set(re.findall(_FILE_PATTERN, text))
-        paths.update(re.findall(_DOTFILE_PATTERN, text, re.MULTILINE))
-        normalized = {p.replace("\\", "/").strip("/").strip() for p in paths if p.strip()}
-        return {
-            f for f in normalized
-            if "/" in f or not any(f.lower().startswith(fw) for fw in _FRAMEWORK_PREFIXES)
-        }
 
     async def _run_critics(self) -> None:
         """Run all critics against the completed task's event history and log scores.

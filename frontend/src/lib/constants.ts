@@ -10,13 +10,13 @@ export const SUSTAINED_DISCONNECT_NOTICE_MS = 2000;
 
 /**
  * While the agent is RUNNING, show "No response for a while…" after this many ms without new events/streaming.
- * Set `VITE_AGENT_RUNNING_STALE_UI_MS=0` in `.env` to disable (this is UI-only; LLM request timeout is separate).
+ * Default 0 = disabled. Set VITE_AGENT_RUNNING_STALE_UI_MS in .env to enable (e.g. 90000 for 90s).
  */
 function parseAgentRunningStaleUiMs(): number {
   const raw = import.meta.env.VITE_AGENT_RUNNING_STALE_UI_MS;
-  if (raw === "" || raw === undefined) return 90_000;
+  if (raw === "" || raw === undefined) return 0;
   const n = Number(raw);
-  if (!Number.isFinite(n)) return 90_000;
+  if (!Number.isFinite(n)) return 0;
   return n;
 }
 

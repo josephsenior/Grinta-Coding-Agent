@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 
 from backend.controller.state.state import AgentState
 from backend.core.logger import forge_logger as logger
-from backend.events.event import EventSource
 from backend.events.observation import Observation
 from backend.events.serialization.event import truncate_content
 
@@ -14,7 +13,6 @@ if TYPE_CHECKING:
     from backend.controller.services.controller_context import ControllerContext
     from backend.controller.services.pending_action_service import PendingActionService
     from backend.controller.tool_pipeline import ToolInvocationContext
-    from backend.engines.orchestrator.action_verifier import ActionVerifier
 
 
 async def transition_agent_state_logic(
@@ -49,7 +47,6 @@ class ObservationService:
     ) -> None:
         self._context = context
         self._pending_service = pending_action_service
-        self._action_verifier: ActionVerifier | None = None
 
     async def handle_observation(self, observation: Observation) -> None:
         controller = self._context.get_controller()
@@ -63,16 +60,14 @@ class ObservationService:
     async def _handle_pending_action_observation(
         self, observation: Observation
     ) -> None:
+        controller = self._context.get_controller()
         pending_action = self._pending_service.get()
-        if not (pending_action and pending_action.id == observation.cause):
-            # Log mismatch for debugging stuck-agent issues
+        if not self._matches_pending_action(pending_action, observation):
             if observation.cause is not None:
-                pending_id = getattr(pending_action, "id", None) if pending_action else None
-                logger.debug(
-                    "Observation cause=%s did not match pending action id=%s (type=%s)",
-                    observation.cause,
-                    pending_id,
-                    type(observation).__name__,
+                self._report_pending_action_mismatch(
+                    controller,
+                    pending_action=pending_action,
+                    observation=observation,
                 )
             return
 
@@ -83,10 +78,14 @@ class ObservationService:
             observation = await get_plugin_registry().dispatch_action_post(
                 pending_action, observation
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "ObservationService action_post hook failed for %s: %s",
+                type(pending_action).__name__,
+                exc,
+                exc_info=True,
+            )
 
-        controller = self._context.get_controller()
         if controller.state.agent_state == AgentState.AWAITING_USER_CONFIRMATION:
             return
 
@@ -95,7 +94,6 @@ class ObservationService:
             ctx = self._context.pop_action_context(observation.cause)
 
         self._pending_service.set(None)
-        await self._run_post_action_verification(pending_action, observation)
 
         # Inform the hallucination detector that this file operation actually happened.
         # This feeds the state-based verification layer so it can distinguish real
@@ -110,83 +108,41 @@ class ObservationService:
         else:
             await transition_agent_state_logic(controller, ctx, observation)
 
-        # Trigger the next agent step now that the pending action is resolved.
-        # Without this, the server path has no mechanism to drive the agent loop
-        # forward after a tool/recall observation clears the pending action.
-        self._context.trigger_step()
+        self._trigger_post_resolution_step()
 
-    async def _run_post_action_verification(
-        self,
-        action,
+    @staticmethod
+    def _matches_pending_action(pending_action, observation: Observation) -> bool:
+        """Compare pending action id and observation cause robustly."""
+        if pending_action is None:
+            return False
+        pending_id = getattr(pending_action, "id", None)
+        cause = getattr(observation, "cause", None)
+        if pending_id == cause:
+            return True
+        try:
+            return pending_id is not None and cause is not None and int(pending_id) == int(cause)
+        except (TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _report_pending_action_mismatch(
+        controller: Any,
+        *,
+        pending_action,
         observation: Observation,
     ) -> None:
-        """Verify critical actions actually changed runtime state as expected."""
-        from backend.events.observation import ErrorObservation
-
-        if isinstance(observation, ErrorObservation):
-            return
-
-        verifier = self._get_action_verifier()
-        if verifier is None:
-            return
-
-        if not verifier.should_verify(action):
-            return
-
-        controller = self._context.get_controller()
-        try:
-            ok, message, verification_observation = await verifier.verify_action(action)
-        except Exception as exc:
-            controller.log(
-                "warning",
-                f"Post-action verification crashed for {type(action).__name__}: {exc}",
-                extra={"msg_type": "ACTION_VERIFICATION"},
-            )
-            return
-
-        if verification_observation is not None:
-            verification_observation.cause = None
-            controller.event_stream.add_event(
-                verification_observation,
-                EventSource.ENVIRONMENT,
-            )
-
-        if ok:
-            return
-
-        controller.event_stream.add_event(
-            ErrorObservation(
-                content=(
-                    "ACTION VERIFICATION FAILED:\n"
-                    f"{message}\n"
-                    "The agent should re-read the target file and re-apply the change."
-                ),
-                error_id="ACTION_VERIFICATION_FAILED",
-            ),
-            EventSource.ENVIRONMENT,
+        pending_id = getattr(pending_action, "id", None) if pending_action else None
+        message = (
+            "Observation cause "
+            f"{observation.cause!r} did not match pending action id {pending_id!r} "
+            f"for {type(observation).__name__}"
         )
-    def _get_action_verifier(self):
-        """Lazily construct ActionVerifier if runtime supports it."""
-        if self._action_verifier is not None:
-            return self._action_verifier
+        logger.warning(message)
+        controller.log("warning", message, extra={"msg_type": "OBSERVATION_MISMATCH"})
 
-        controller = self._context.get_controller()
-        runtime = getattr(controller, "runtime", None)
-        if runtime is None:
-            return None
-
-        try:
-            from backend.engines.orchestrator.action_verifier import ActionVerifier
-
-            self._action_verifier = ActionVerifier(runtime)
-        except Exception as exc:
-            controller.log(
-                "debug",
-                f"ActionVerifier unavailable: {exc}",
-                extra={"msg_type": "ACTION_VERIFICATION"},
-            )
-            self._action_verifier = None
-        return self._action_verifier
+    def _trigger_post_resolution_step(self) -> None:
+        """Advance exactly once after a pending action is resolved in server mode."""
+        self._context.trigger_step()
 
     def _prepare_observation_for_logging(self, observation: Observation) -> Observation:
         controller = self._context.get_controller()

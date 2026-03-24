@@ -17,7 +17,14 @@ if TYPE_CHECKING:
 
 from backend.core.logger import forge_logger as logger
 from backend.events.action import CmdRunAction
+from backend.events.action.files import FileEditAction, FileWriteAction
 from backend.events.observation import CmdOutputObservation
+from backend.events.observation.files import FileEditObservation, FileReadObservation, FileWriteObservation
+from backend.validation.command_classification import (
+    find_cmd_output_for_run,
+    is_git_diff_command,
+    is_test_run_command,
+)
 
 
 @dataclass
@@ -116,31 +123,17 @@ class TestPassingValidator(TaskValidator):
         test_executions = []
         recent_history = state.history[-50:]  # Look at last 50 events
 
-        test_commands = [
-            "pytest",
-            "npm test",
-            "jest",
-            "mocha",
-            "cargo test",
-            "go test",
-            "python -m unittest",
-        ]
-
         for i, event in enumerate(recent_history):
-            if isinstance(event, CmdRunAction):
-                if any(test_cmd in event.command.lower() for test_cmd in test_commands):
-                    # Look for corresponding observation
-                    for j in range(i + 1, min(i + 5, len(recent_history))):
-                        next_event = recent_history[j]
-                        if isinstance(next_event, CmdOutputObservation):
-                            test_executions.append(
-                                {
-                                    "command": event.command,
-                                    "exit_code": next_event.exit_code,
-                                    "output": next_event.content,
-                                },
-                            )
-                            break
+            if isinstance(event, CmdRunAction) and is_test_run_command(event.command):
+                paired = find_cmd_output_for_run(event, recent_history, i)
+                if paired is not None:
+                    test_executions.append(
+                        {
+                            "command": event.command,
+                            "exit_code": paired.exit_code,
+                            "output": paired.content,
+                        },
+                    )
 
         return test_executions
 
@@ -205,13 +198,10 @@ class DiffValidator(TaskValidator):
         recent_history = state.history[-100:]
 
         for i, event in enumerate(recent_history):
-            if isinstance(event, CmdRunAction):
-                if "git diff" in event.command.lower():
-                    # Look for corresponding observation
-                    for j in range(i + 1, min(i + 5, len(recent_history))):
-                        next_event = recent_history[j]
-                        if isinstance(next_event, CmdOutputObservation):
-                            return next_event.content
+            if isinstance(event, CmdRunAction) and is_git_diff_command(event.command):
+                paired = find_cmd_output_for_run(event, recent_history, i)
+                if paired is not None:
+                    return paired.content
 
         return None
 
@@ -277,7 +267,13 @@ class DiffValidator(TaskValidator):
 
 
 class FileExistsValidator(TaskValidator):
-    """Validates that expected output files exist."""
+    """Validates that expected output files exist.
+
+    When ``expected_files`` is empty, ``_extract_expected_files`` uses a small
+    set of regexes over the task description. That path is a best-effort hint
+    for autonomy-style validation only; prefer passing explicit paths when the
+    task definition allows.
+    """
 
     def __init__(self, expected_files: list[str] | None = None) -> None:
         """Initialize validator.
@@ -336,6 +332,10 @@ class FileExistsValidator(TaskValidator):
     def _extract_expected_files(self, task_description: str) -> list[str]:
         """Try to extract expected file names from task description.
 
+        Patterns are intentionally narrow (quoted paths, or explicit
+        create/file/output/save phrasing) to reduce false positives from
+        incidental ``word.ext`` mentions in prose.
+
         Args:
             task_description: Task description text
 
@@ -343,11 +343,11 @@ class FileExistsValidator(TaskValidator):
             List of potential file paths
 
         """
-        # Look for common file patterns in task description
         file_patterns = [
-            r'create\s+(?:a\s+)?(?:file\s+)?["\']?([a-zA-Z0-9_./\-]+\.[a-zA-Z0-9]+)["\']?',
-            r'output\s+(?:to\s+)?["\']?([a-zA-Z0-9_./\-]+\.[a-zA-Z0-9]+)["\']?',
-            r'save\s+(?:to\s+)?["\']?([a-zA-Z0-9_./\-]+\.[a-zA-Z0-9]+)["\']?',
+            r'create\s+(?:a\s+)?file\s+([a-zA-Z0-9_./\\-]+\.[a-zA-Z][a-zA-Z0-9]{0,15})\b',
+            r'["\']([a-zA-Z0-9_./\\-]+\.[a-zA-Z][a-zA-Z0-9]{0,15})["\']',
+            r'output\s+to\s+([a-zA-Z0-9_./\\-]+\.[a-zA-Z][a-zA-Z0-9]{0,15})\b',
+            r'save\s+(?:to\s+)?([a-zA-Z0-9_./\\-]+\.[a-zA-Z][a-zA-Z0-9]{0,15})\b',
         ]
 
         expected_files = []
@@ -358,7 +358,7 @@ class FileExistsValidator(TaskValidator):
         return list(set(expected_files))  # Remove duplicates
 
     def _check_file_exists(self, state: State, file_path: str) -> bool:
-        """Check if file exists by looking at history.
+        """Check if file exists using typed file events from history.
 
         Args:
             state: Current agent state
@@ -368,18 +368,29 @@ class FileExistsValidator(TaskValidator):
             True if file appears to exist
 
         """
+        def _normalize_path(path: str) -> str:
+            normalized = path.replace("\\", "/").strip("/")
+            if normalized.startswith("workspace/"):
+                normalized = normalized[len("workspace/"):]
+            return normalized
+
         recent_history = state.history[-100:]
-
-        # Look for file operations on this path
+        expected = _normalize_path(file_path)
         for event in recent_history:
-            if isinstance(event, CmdRunAction):
-                if file_path in event.command and (
-                    "cat " in event.command or "ls " in event.command
-                ):
-                    # Look for successful output
-                    return True
-
-        # Could also check FileEditAction or FileWriteAction events
+            event_path = getattr(event, "path", None)
+            if not isinstance(event_path, str) or _normalize_path(event_path) != expected:
+                continue
+            if isinstance(
+                event,
+                (
+                    FileEditAction,
+                    FileWriteAction,
+                    FileEditObservation,
+                    FileWriteObservation,
+                    FileReadObservation,
+                ),
+            ):
+                return True
         return False
 
 

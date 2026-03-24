@@ -266,7 +266,7 @@ class AgentSession:
 
             # Phase: CONTROLLER
             ctx.phase = StartupPhase.CONTROLLER
-            initial_message = await self._setup_controller_and_handle_replay(
+            initial_message, ctx.restored_state = await self._setup_controller_and_handle_replay(
                 replay_json,
                 initial_message,
                 agent,
@@ -501,8 +501,9 @@ class AgentSession:
         agent_to_llm_config,
         agent_configs,
         user_settings: Settings | None = None,
-    ):
+    ) -> tuple[MessageAction | None, bool]:
         """Setup controller and handle replay if specified."""
+        restored_state = False
         if replay_json:
             initial_message = self._run_replay(
                 initial_message,
@@ -515,7 +516,7 @@ class AgentSession:
                 agent_configs,
             )
         else:
-            self.controller, _restored_state = self._create_controller(
+            self.controller, restored_state = self._create_controller(
                 agent,
                 config.security.confirmation_mode,
                 max_iterations,
@@ -524,7 +525,7 @@ class AgentSession:
                 agent_configs=agent_configs,
                 user_settings=user_settings,
             )
-        return initial_message
+        return initial_message, restored_state
 
     def _start_agent_execution(self, initial_message) -> None:
         """Start agent execution with appropriate initial state."""
@@ -543,18 +544,28 @@ class AgentSession:
                     ChangeAgentStateAction(AgentState.RUNNING), EventSource.ENVIRONMENT
                 )
             else:
+                target_state = self._startup_target_state()
                 self.logger.info(
-                    "No initial message; queueing ChangeAgentStateAction(AWAITING_USER_INPUT)",
+                    "No initial message; queueing ChangeAgentStateAction(%s)",
+                    target_state,
                     extra={"signal": "agent_start"},
                 )
                 self.logger.debug(
-                    "Enqueuing ChangeAgentStateAction(AWAITING_USER_INPUT)",
+                    "Enqueuing ChangeAgentStateAction(%s)",
+                    target_state,
                     extra={"signal": "agent_start"},
                 )
                 self.event_stream.add_event(  # type: ignore[attr-defined]
-                    ChangeAgentStateAction(AgentState.AWAITING_USER_INPUT),
+                    ChangeAgentStateAction(target_state),
                     EventSource.ENVIRONMENT,
                 )
+
+    def _startup_target_state(self) -> AgentState:
+        """Choose the initial controller state when no new user message is supplied."""
+        controller = getattr(self, "controller", None)
+        state = getattr(controller, "state", None) if controller is not None else None
+        resume_state = getattr(state, "resume_state", None)
+        return resume_state if isinstance(resume_state, AgentState) else AgentState.AWAITING_USER_INPUT
 
     async def _finalize_session_startup(self, ctx: StartupContext) -> None:
         """Finalize session startup and log results."""

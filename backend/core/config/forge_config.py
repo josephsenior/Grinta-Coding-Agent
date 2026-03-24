@@ -118,7 +118,8 @@ class ForgeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_PENDING_ACTION_TIMEOUT,
         description=(
             "Seconds to wait for an observation matching a pending tool call "
-            "before emitting a pending-action timeout error."
+            "before emitting a pending-action timeout error. "
+            "0 or negative disables the timeout (no watchdog)."
         ),
     )
     max_budget_per_task: float | None = Field(

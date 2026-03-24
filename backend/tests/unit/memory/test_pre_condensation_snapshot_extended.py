@@ -7,6 +7,7 @@ from backend.events.action.commands import CmdRunAction
 from backend.events.action.files import FileEditAction
 from backend.events.observation.commands import CmdOutputObservation
 from backend.events.observation.error import ErrorObservation
+from backend.events.observation.files import FileEditObservation
 
 class TestPreCondensationSnapshot(unittest.TestCase):
     def test_extract_snapshot_attempted_approaches(self):
@@ -61,3 +62,28 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         assert "test.py" in formatted
         assert "FAILED approaches" in formatted
         assert "pytest" in formatted
+
+    def test_file_edit_observation_benign_error_word_is_success(self):
+        """Diff/code mentioning 'error' must not mark the approach as FAILED."""
+        events = [
+            FileEditAction(path="app.py", command="replace_text", old_str="a", new_str="b"),
+            FileEditObservation(
+                content="+def handle_error():\n    pass\n",
+                path="app.py",
+            ),
+        ]
+        snapshot = extract_snapshot(events)
+        approaches = snapshot["attempted_approaches"]
+        assert len(approaches) == 1
+        assert approaches[0]["outcome"] == "SUCCESS"
+
+    def test_file_edit_observation_skipped_prefix_is_failure(self):
+        events = [
+            FileEditAction(path="x.py", command="create_file", old_str="", new_str=""),
+            FileEditObservation(
+                content="SKIPPED: file already exists",
+                path="x.py",
+            ),
+        ]
+        snapshot = extract_snapshot(events)
+        assert snapshot["attempted_approaches"][0]["outcome"].startswith("FAILED")

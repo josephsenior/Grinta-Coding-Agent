@@ -16,7 +16,6 @@ from pydantic import (  # noqa: E402
     field_validator,
     model_validator,
 )
-from pydantic.json import pydantic_encoder  # noqa: E402
 
 from backend.core.config.mcp_config import MCPConfig  # noqa: E402
 from backend.core.config.utils import load_forge_config  # noqa: E402
@@ -105,7 +104,7 @@ class Settings(BaseModel):
         context = info.context
         if context and context.get("expose_secrets", False):
             return api_key.get_secret_value()
-        return pydantic_encoder(api_key)
+        return "**********"
 
     @model_validator(mode="before")
     @classmethod

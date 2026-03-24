@@ -11,5 +11,6 @@ if __name__ == "__main__":
         log_level="info",
         loop="asyncio",
         http="h11",  # avoid optional httptools dep for quick local run
+        ws="websockets-sansio",
         access_log=False,
     )

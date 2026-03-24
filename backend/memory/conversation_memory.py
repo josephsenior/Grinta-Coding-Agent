@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -16,8 +17,10 @@ from backend.events.action import (
 from backend.events.action.message import SystemMessageAction
 from backend.events.event import Event, EventSource
 from backend.events.observation.agent import RecallObservation
+from backend.events.observation.commands import CmdOutputObservation
 from backend.events.observation.error import ErrorObservation
 from backend.events.observation.observation import Observation
+from backend.events.observation.reject import UserRejectObservation
 from backend.memory.action_processors import convert_action_to_messages
 from backend.memory.context_tracking import ContextTracker
 from backend.memory.graph_store import GraphMemoryStore
@@ -44,6 +47,27 @@ from backend.memory.tool_call_tracker import (
 )
 from backend.memory.vector_store import EnhancedVectorStore
 from backend.utils.prompt import PromptManager
+
+
+def _forge_tool_ok_for_observation(obs: Observation) -> bool | None:
+    """Structured tool outcome for serialized role=tool messages.
+
+    Prefer canonical ``tool_result`` metadata when present. ``None`` means the
+    observation does not carry a stable machine-readable success/failure signal.
+    """
+    tool_result = getattr(obs, "tool_result", None)
+    if isinstance(tool_result, dict) and "ok" in tool_result:
+        raw_ok = tool_result.get("ok")
+        if isinstance(raw_ok, bool):
+            return raw_ok
+    if isinstance(obs, (ErrorObservation, UserRejectObservation)):
+        return False
+    if isinstance(obs, CmdOutputObservation):
+        ec = getattr(obs, "exit_code", None)
+        if ec is None:
+            return None
+        return ec == 0
+    return True
 
 
 @dataclass
@@ -417,8 +441,26 @@ class ConversationMemory:
                     cli_mode=self.agent_config.cli_mode,
                     config=self.agent_config,
                 )
-            except Exception:
-                system_prompt = "You are Forge agent."
+            except Exception as e:
+                logger.error(
+                    "Failed to load system prompt from PromptManager: %s",
+                    e,
+                    exc_info=True,
+                )
+                if os.getenv("FORGE_ALLOW_EMERGENCY_SYSTEM_PROMPT", "").strip().lower() in (
+                    "1",
+                    "true",
+                    "yes",
+                ):
+                    logger.warning(
+                        "FORGE_ALLOW_EMERGENCY_SYSTEM_PROMPT set — using minimal emergency system text"
+                    )
+                    system_prompt = "You are Forge agent."
+                else:
+                    raise RuntimeError(
+                        "System prompt could not be loaded. Fix PromptManager configuration or set "
+                        "FORGE_ALLOW_EMERGENCY_SYSTEM_PROMPT=1 for an explicit degraded mode."
+                    ) from e
             messages.insert(0, message_with_text("system", system_prompt))
         elif first_idx != 0:
             messages.insert(0, messages.pop(first_idx))
@@ -541,6 +583,7 @@ class ConversationMemory:
                 content=message.content,
                 tool_call_id=tool_call_metadata.tool_call_id,
                 name=tool_call_metadata.function_name,
+                forge_tool_ok=_forge_tool_ok_for_observation(obs),
             )
             return []
 

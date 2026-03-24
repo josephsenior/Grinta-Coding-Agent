@@ -37,6 +37,16 @@ from backend.events.action.mcp import MCPAction
 from backend.events.action import TaskTrackingAction
 
 
+@pytest.fixture(autouse=True)
+def _workspace_dir_for_task_tracker(tmp_path, monkeypatch):
+    """Task tracker persistence now requires an explicit workspace root."""
+    monkeypatch.setattr(
+        "backend.core.workspace_resolution.require_effective_workspace_root",
+        lambda: tmp_path,
+    )
+    return tmp_path
+
+
 # ---------------------------------------------------------------------------
 # combine_thought
 # ---------------------------------------------------------------------------
@@ -317,6 +327,26 @@ class TestHandleTaskTrackerTool:
         task = action.task_list[0]
         assert task["id"] == "step-1"
         assert task["status"] == "pending"
+
+    def test_normalizes_legacy_task_fields_and_invalid_status(self):
+        args = {
+            "command": "plan",
+            "task_list": [
+                {
+                    "title": "Legacy title",
+                    "status": "todo",
+                    "notes": "Legacy note",
+                    "subtasks": [{"title": "Child step", "status": "completed"}],
+                }
+            ],
+        }
+        action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
+        task = action.task_list[0]
+        assert task["description"] == "Legacy title"
+        assert task["status"] == "pending"
+        assert task["result"] == "Legacy note"
+        assert task["subtasks"][0]["description"] == "Child step"
+        assert task["subtasks"][0]["status"] == "completed"
 
     def test_non_plan_command_with_empty_task_list(self):
         args = {"command": "update", "task_list": []}

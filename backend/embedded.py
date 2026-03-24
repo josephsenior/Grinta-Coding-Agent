@@ -41,6 +41,7 @@ def _run_server(host: str, port: int) -> None:
         port=port,
         log_level="error",   # suppress uvicorn's startup noise in embedded mode
         reload=False,        # reload incompatible with threads
+        ws="websockets-sansio",
     )
 
 

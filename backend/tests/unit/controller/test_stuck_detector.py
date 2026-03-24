@@ -296,10 +296,17 @@ class TestObservationOutcome:
         sd = StuckDetector(_state([]))
         assert sd._extract_observation_outcome(_cmd_output("ls", "err", 1)) == "error"
 
-    def test_cmd_output_not_found(self):
+    def test_cmd_output_zero_exit_ignores_prose(self):
+        """Exit 0 means success for stuck scoring; do not infer failure from stdout text."""
         sd = StuckDetector(_state([]))
         obs = _cmd_output("ls", "No such file or directory", 0)
-        assert sd._extract_observation_outcome(obs) == "not_found"
+        assert sd._extract_observation_outcome(obs) == "success"
+
+    def test_cmd_output_tool_result_not_ok(self):
+        sd = StuckDetector(_state([]))
+        obs = _cmd_output("ls", "ok", 0)
+        obs.tool_result = {"ok": False}
+        assert sd._extract_observation_outcome(obs) == "error"
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +337,7 @@ class TestSemanticLoopHelpers:
 
     def test_calculate_failure_rate_mixed(self):
         sd = StuckDetector(_state([]))
-        rate = sd._calculate_failure_rate(["error", "success", "not_found", "success"])
+        rate = sd._calculate_failure_rate(["error", "success", "no_change", "success"])
         assert rate == pytest.approx(0.5)
 
 

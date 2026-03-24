@@ -1,1 +1,0 @@
-{"id": 20, "sequence": 20, "timestamp": "2026-03-22T19:34:47.607030", "source": "user", "message": "Retrieving content for: as a coding agent how do you rate yourself on a sc", "action": "recall", "args": {"confirmation_state": "confirmed", "recall_type": "knowledge", "query": "as a coding agent how do you rate yourself on a scale of 1 to 10", "thought": ""}}

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastmcp import Client
 from fastmcp.client.transports import (
@@ -12,7 +12,7 @@ from fastmcp.client.transports import (
     StreamableHttpTransport,
 )
 from mcp import McpError
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from backend.core.config.mcp_config import (
     MCPRemoteServerConfig,
@@ -43,7 +43,10 @@ class MCPClient(BaseModel):
     description: str = "MCP client tools for server interaction"
     tools: list[MCPClientTool] = Field(default_factory=list)
     tool_map: dict[str, MCPClientTool] = Field(default_factory=dict)
+    exposed_to_protocol: dict[str, str] = Field(default_factory=dict)
     _session_active: bool = False
+    _mcp_alias_peers: list[Any] | None = PrivateAttr(default=None)
+    _mcp_alias_reserved: frozenset[str] | None = PrivateAttr(default=None)
     _connect_kwargs: dict | None = None
     _server_config: (
         MCPStdioServerConfig | MCPRemoteServerConfig | None
@@ -52,6 +55,22 @@ class MCPClient(BaseModel):
     # ------------------------------------------------------------------
     # Internal session management
     # ------------------------------------------------------------------
+
+    def register_alias_context(
+        self, peers: list[Any], reserved: frozenset[str]
+    ) -> None:
+        """Remember peer list and reserved names so reconnect can re-apply aliases."""
+        self._mcp_alias_peers = peers
+        self._mcp_alias_reserved = reserved
+
+    def _reapply_mcp_tool_aliases(self) -> None:
+        peers = self._mcp_alias_peers
+        reserved = self._mcp_alias_reserved
+        if peers is None or reserved is None:
+            return
+        from backend.mcp_client.mcp_tool_aliases import prepare_mcp_tool_exposed_names
+
+        prepare_mcp_tool_exposed_names(peers, set(reserved))
 
     async def _open_session(self) -> None:
         """Open the persistent session on the current ``self.client``."""
@@ -63,13 +82,28 @@ class MCPClient(BaseModel):
 
     async def _close_session(self) -> None:
         """Close the persistent session if active."""
-        if self.client is not None and self._session_active:
+        if self.client is None or not self._session_active:
+            return
+        cli = self.client
+        try:
             try:
-                await self.client.__aexit__(None, None, None)
+                await cli.__aexit__(None, None, None)
             except asyncio.CancelledError:
                 raise
+            except BaseExceptionGroup as eg:
+                # stdio MCP often ends with ExceptionGroup(BrokenResourceError); not an app bug.
+                logger.debug("MCP session __aexit__ teardown: %s", eg)
             except Exception as exc:
                 logger.warning("MCP session close failed: %s", exc, exc_info=True)
+            try:
+                await cli.close()
+            except asyncio.CancelledError:
+                raise
+            except BaseExceptionGroup as eg:
+                logger.debug("MCP client.close() teardown: %s", eg)
+            except Exception as exc:
+                logger.debug("MCP client.close(): %s", exc, exc_info=True)
+        finally:
             self._session_active = False
 
     async def _populate_tools(self) -> None:
@@ -108,6 +142,7 @@ class MCPClient(BaseModel):
             try:
                 await self._open_session()
                 await self._populate_tools()
+                self._reapply_mcp_tool_aliases()
                 logger.info("MCP reconnected on attempt %d", attempt)
                 return
             except Exception as exc:
@@ -201,8 +236,14 @@ class MCPClient(BaseModel):
         """Connect to MCP server using stdio transport."""
         try:
             assert server.command is not None
+            # keep_alive=False: default True skips transport.disconnect() on session exit,
+            # leaving _stdio_transport_connect_task to die with BrokenResourceError and
+            # asyncio "Task exception was never retrieved" (fastmcp client/transports.py).
             transport = StdioTransport(
-                command=server.command, args=server.args or [], env=server.env
+                command=server.command,
+                args=server.args or [],
+                env=server.env,
+                keep_alive=False,
             )
             self.client = Client(transport, timeout=timeout)
             self._server_config = server
@@ -243,29 +284,35 @@ class MCPClient(BaseModel):
             msg = "Client session is not available."
             raise RuntimeError(msg)
 
-        try:
+        wire_name = self.exposed_to_protocol.get(tool_name, tool_name)
+
+        async def _call_once():
+            assert self.client is not None
             return await asyncio.wait_for(
-                self.client.call_tool_mcp(name=tool_name, arguments=args),
+                self.client.call_tool_mcp(name=wire_name, arguments=args),
                 timeout=self.CALL_TIMEOUT,
             )
+
+        try:
+            return await _call_once()
         except asyncio.TimeoutError:
             logger.warning(
-                "MCP call_tool(%s) timed out after %.1fs — attempting reconnect",
+                "MCP call_tool(%s) timed out after %.1fs — reconnect + single retry",
                 tool_name,
                 self.CALL_TIMEOUT,
             )
-            await self._reconnect()
-        except Exception as exc:
+        except (ConnectionError, OSError) as exc:
+            # Transport-level drops only; do not retry arbitrary exceptions (risk of
+            # duplicate side effects on mutating tools if the server already applied the call).
             logger.warning(
-                "MCP call_tool(%s) failed: %s — attempting reconnect", tool_name, exc
+                "MCP call_tool(%s) transport error (%s): %s — reconnect + single retry",
+                tool_name,
+                type(exc).__name__,
+                exc,
             )
-            await self._reconnect()
 
-        # Retry once after reconnect (with timeout)
-        return await asyncio.wait_for(
-            self.client.call_tool_mcp(name=tool_name, arguments=args),
-            timeout=self.CALL_TIMEOUT,
-        )
+        await self._reconnect()
+        return await _call_once()
 
     # ------------------------------------------------------------------
     # Public API — disconnect
@@ -278,4 +325,7 @@ class MCPClient(BaseModel):
         self._session_active = False
         self.tools = []
         self.tool_map = {}
+        self.exposed_to_protocol = {}
+        self._mcp_alias_peers = None
+        self._mcp_alias_reserved = None
         logger.info("MCP client disconnected.")

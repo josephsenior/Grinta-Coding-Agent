@@ -25,6 +25,9 @@ def main() -> None:
             --worker-class uvicorn.workers.UvicornWorker \
             --bind 0.0.0.0:3000 \
             --timeout 300
+
+        For Socket.IO / WebSockets on websockets>=15, subclass UvicornWorker and set
+        CONFIG_KWARGS to include ws="websockets-sansio" (same as python -m backend.api).
     """
     warnings.filterwarnings("ignore", category=SyntaxWarning, module="pydub\\.utils")
     try:
@@ -92,6 +95,7 @@ def main() -> None:
         workers=workers,  # Single worker for development, use gunicorn for production
         loop="asyncio",
         http="httptools",  # Faster HTTP parser
+        ws="websockets-sansio",
         access_log=False,  # Disable access logs in production
     )
 

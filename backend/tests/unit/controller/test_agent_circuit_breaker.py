@@ -29,9 +29,9 @@ class TestCircuitBreakerConfig:
         config = CircuitBreakerConfig()
 
         assert config.enabled is True
-        assert config.max_consecutive_errors == 3
-        assert config.max_high_risk_actions == 5
-        assert config.max_stuck_detections == 8
+        assert config.max_consecutive_errors == 5
+        assert config.max_high_risk_actions == 10
+        assert config.max_stuck_detections == 15
         assert config.max_error_rate == 0.5
         assert config.error_rate_window == 10
 

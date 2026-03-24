@@ -64,6 +64,8 @@ class Agent(ABC):
         self._complete = False
         self._prompt_manager: PromptManager | None = None
         self.mcp_tools: dict[str, Any] = {}
+        #: Machine-readable MCP discovery state from last ``add_mcp_tools_to_agent`` (see ``get_mcp_bootstrap_status``).
+        self.mcp_capability_status: dict[str, Any] | None = None
         self.tools: list = []
 
     @property

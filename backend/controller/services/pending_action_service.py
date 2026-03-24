@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import math
 import time
 from typing import TYPE_CHECKING
 
+from backend.core.constants import MCP_PENDING_ACTION_TIMEOUT_FLOOR
 from backend.core.logger import forge_logger as logger
 from backend.events import EventSource
 from backend.events.action import Action
@@ -24,6 +26,16 @@ class PendingActionService:
         self._timeout = timeout
         self._pending: tuple[Action, float] | None = None
         self._watchdog_handle: asyncio.TimerHandle | None = None
+        self._watchdog_delay_s: float = timeout + 2
+
+    @staticmethod
+    def _effective_timeout_seconds(base: float, action: Action) -> float:
+        """MCP tool calls often need longer than the default (cold npx, network)."""
+        if base <= 0:
+            return math.inf
+        if type(action).__name__ == "MCPAction":
+            return max(float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR)
+        return float(base)
 
     def set(self, action: Action | None) -> None:
         controller = self._context.get_controller()
@@ -44,10 +56,13 @@ class PendingActionService:
             extra={"msg_type": "PENDING_ACTION_SET"},
         )
         self._pending = (action, time.time())
+        effective = self._effective_timeout_seconds(self._timeout, action)
+        self._watchdog_delay_s = effective + 2 if math.isfinite(effective) else 0.0
         # Schedule a watchdog that triggers step() after the timeout, ensuring
         # the timeout check in get() is actually reached even if no other event
-        # drives the agent loop forward.
-        self._schedule_watchdog()
+        # drives the agent loop forward. Skipped when timeout is disabled (<=0).
+        if math.isfinite(effective):
+            self._schedule_watchdog()
 
     def get(self) -> Action | None:
         if self._pending is None:
@@ -56,13 +71,15 @@ class PendingActionService:
         controller = self._context.get_controller()
         action, timestamp = self._pending
         elapsed = time.time() - timestamp
+        limit = self._effective_timeout_seconds(self._timeout, action)
 
-        if elapsed > self._timeout:
+        if math.isfinite(limit) and elapsed > limit:
+            self._cancel_watchdog()
             self._handle_timeout(controller, action, elapsed)
             self._pending = None
             return None
 
-        if elapsed > 60.0 and int(elapsed) % 30 == 0:
+        if math.isfinite(limit) and elapsed > 60.0 and int(elapsed) % 30 == 0:
             controller.log(
                 "info",
                 f"Pending action active for {elapsed:.1f}s: {type(action).__name__} "
@@ -72,7 +89,14 @@ class PendingActionService:
         return action
 
     def info(self) -> tuple[Action, float] | None:
+        if self.get() is None:
+            return None
         return self._pending
+
+    def shutdown(self) -> None:
+        """Cancel watchdog and clear pending state during controller shutdown."""
+        self._cancel_watchdog()
+        self._pending = None
 
     def _log_clear(self, controller, prev_action: Action, timestamp: float) -> None:
         action_id = getattr(prev_action, "id", "unknown")
@@ -125,13 +149,13 @@ class PendingActionService:
             run_or_schedule(self._watchdog_async())
             return
         self._watchdog_handle = loop.call_later(
-            self._timeout + 2,  # +2s buffer so get() sees the timeout
+            self._watchdog_delay_s,
             self._watchdog_fire,
         )
 
     async def _watchdog_async(self) -> None:
         """Async fallback watchdog when no running loop is available at schedule time."""
-        await asyncio.sleep(self._timeout + 2)
+        await asyncio.sleep(self._watchdog_delay_s)
         self._watchdog_fire()
 
     def _watchdog_fire(self) -> None:
@@ -141,7 +165,8 @@ class PendingActionService:
             return
         action, timestamp = self._pending
         elapsed = time.time() - timestamp
-        if elapsed >= self._timeout:
+        limit = self._effective_timeout_seconds(self._timeout, action)
+        if math.isfinite(limit) and elapsed >= limit:
             logger.warning(
                 "Pending action watchdog fired after %.1fs for %s (id=%s); triggering step",
                 elapsed,

@@ -155,6 +155,18 @@ class TestStateJsonRoundTrip:
         restored = State._from_json_str(s._to_json_str())
         assert restored.resume_state == AgentState.RUNNING
 
+    def test_turn_signals_repetition_score_roundtrip(self):
+        s = State()
+        s.turn_signals.planning_directive = "verify state"
+        s.turn_signals.memory_pressure = "high"
+        s.turn_signals.repetition_score = 0.75
+
+        restored = State._from_json_str(s._to_json_str())
+
+        assert restored.turn_signals.planning_directive == "verify state"
+        assert restored.turn_signals.memory_pressure == "high"
+        assert restored.turn_signals.repetition_score == pytest.approx(0.75)
+
 
 # ---------------------------------------------------------------------------
 # State — __getstate__ / __setstate__

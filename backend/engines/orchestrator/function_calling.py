@@ -756,21 +756,16 @@ def _handle_summarize_context_tool(arguments: dict) -> CondensationRequestAction
 
 def _normalize_task_tracker_step(s: dict, idx: int) -> dict:
     """Normalize a single task step dict. Raises FunctionCallValidationError on invalid input."""
+    from backend.controller.state.state import normalize_plan_step_payload
+
     if not isinstance(s, dict):
         raise FunctionCallValidationError(
             f"Task item must be a dictionary, got {type(s)}"
         )
-    return {
-        "id": s.get("id", f"step-{idx}"),
-        "description": s.get("description", s.get("title", "Untitled step")),
-        "status": s.get("status", "pending"),
-        "result": s.get("result", s.get("notes", None)),
-        "tags": s.get("tags", []),
-        "subtasks": [
-            _normalize_task_tracker_step(sub, i)
-            for i, sub in enumerate(s.get("subtasks", []))
-        ],
-    }
+    try:
+        return normalize_plan_step_payload(s, idx)
+    except TypeError as e:
+        raise FunctionCallValidationError(str(e)) from e
 
 
 def _normalize_task_tracker_list(raw_list: list) -> list[dict]:

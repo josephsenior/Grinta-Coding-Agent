@@ -12,7 +12,6 @@ Architecture notes (preserve these strengths):
 
 from __future__ import annotations
 
-import contextlib
 import os
 from collections import deque
 from typing import TYPE_CHECKING, Any
@@ -290,16 +289,23 @@ class Orchestrator(Agent):
         return condensed.pending_action
 
     def _set_prompt_tier_from_recent_history(self, state: State) -> None:
-        """Escalate to debug tier when recent errors or file ops exist."""
+        """Escalate to debug tier on recent errors or elevated-risk file operations."""
         try:
-            from backend.events.observation import ErrorObservation
+            from backend.core.enums import ActionSecurityRisk
             from backend.events.action import FileEditAction, FileWriteAction
+            from backend.events.observation import ErrorObservation
+
             recent = state.history[-12:] if len(state.history) > 12 else state.history
-            tier = "debug" if (
-                any(isinstance(e, ErrorObservation) for e in recent)
-                or any(isinstance(e, (FileEditAction, FileWriteAction)) for e in recent)
-            ) else "base"
-            self.prompt_manager.set_prompt_tier(tier)
+            if any(isinstance(e, ErrorObservation) for e in recent):
+                self.prompt_manager.set_prompt_tier("debug")
+                return
+            for e in recent:
+                if isinstance(e, (FileEditAction, FileWriteAction)):
+                    risk = getattr(e, "security_risk", ActionSecurityRisk.UNKNOWN)
+                    if risk in (ActionSecurityRisk.MEDIUM, ActionSecurityRisk.HIGH):
+                        self.prompt_manager.set_prompt_tier("debug")
+                        return
+            self.prompt_manager.set_prompt_tier("base")
         except Exception:
             pass
 
@@ -331,9 +337,10 @@ class Orchestrator(Agent):
             if hasattr(state, "ack_memory_pressure"):
                 state.ack_memory_pressure(source="Orchestrator")
         finally:
-            with contextlib.suppress(Exception):
-                state.extra_data.pop("planning_directive", None)
-                state.extra_data.pop("memory_pressure", None)
+            extra_data = getattr(state, "extra_data", None)
+            if isinstance(extra_data, dict):
+                extra_data.pop("planning_directive", None)
+                extra_data.pop("memory_pressure", None)
 
         self._last_llm_latency = result.execution_time
 
@@ -371,9 +378,10 @@ class Orchestrator(Agent):
             if hasattr(state, "ack_memory_pressure"):
                 state.ack_memory_pressure(source="Orchestrator")
         finally:
-            with contextlib.suppress(Exception):
-                state.extra_data.pop("planning_directive", None)
-                state.extra_data.pop("memory_pressure", None)
+            extra_data = getattr(state, "extra_data", None)
+            if isinstance(extra_data, dict):
+                extra_data.pop("planning_directive", None)
+                extra_data.pop("memory_pressure", None)
 
         self._last_llm_latency = result.execution_time
 
@@ -526,8 +534,9 @@ class Orchestrator(Agent):
             pm.mcp_tool_names = list(self.mcp_tools.keys())
             descriptions: dict[str, str] = {}
             for tool_dict in mcp_tools:
-                name = tool_dict.get("name", "")
-                desc = tool_dict.get("description", "")
+                fn = tool_dict.get("function") or {}
+                name = fn.get("name") or tool_dict.get("name", "")
+                desc = fn.get("description") or tool_dict.get("description", "")
                 if name and desc:
                     first_line = desc.split("\n")[0][:120]
                     descriptions[name] = first_line

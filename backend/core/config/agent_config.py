@@ -24,6 +24,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_CLI_MODE,
     DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
     DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY,
+    DEFAULT_AGENT_ENABLE_PROGRESSIVE_TOOLS,
     DEFAULT_AGENT_CMD_ENABLED,
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
@@ -281,6 +282,14 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "Append FORGE control/status text to the first system message instead of "
             "inserting a second system message (some providers handle a single system "
             "message better)"
+        ),
+    )
+    enable_progressive_tools: bool = Field(
+        default=DEFAULT_AGENT_ENABLE_PROGRESSIVE_TOOLS,
+        description=(
+            "If true, OrchestratorPlanner filters tools each turn via ToolSelector "
+            "(turn counts, keyword regex, errors). Default off: expose full built "
+            "toolset for predictable behavior."
         ),
     )
     max_consecutive_errors: int = Field(
