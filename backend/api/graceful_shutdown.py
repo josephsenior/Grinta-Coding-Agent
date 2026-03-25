@@ -1,48 +1,45 @@
-"""Graceful shutdown handler for Forge server.
+"""Graceful shutdown for the Forge API process.
 
-Ensures proper cleanup of resources on shutdown:
-- Stop accepting new requests
-- Wait for in-flight requests to complete
-- Close Socket.IO connections gracefully
-- Clean up runtime resources
-- Close database connections
-- Flush logs
+Registered handlers run from FastAPI lifespan teardown (after Uvicorn receives
+SIGINT/SIGTERM and begins shutdown). Signal handling is owned by the ASGI server.
 """
 
 from __future__ import annotations
 
 import asyncio
-import sys
 from collections.abc import Callable
 
 from backend.core.logger import forge_logger as logger
 
 _shutdown_handlers: list[Callable] = []
 _shutdown_in_progress = False
-_shutdown_timeout = 30  # seconds
+
+
+def is_shutting_down() -> bool:
+    """True while graceful shutdown is running or after it has started."""
+    return _shutdown_in_progress
 
 
 def register_shutdown_handler(handler: Callable) -> None:
-    """Register a handler to be called during graceful shutdown.
-
-    Args:
-        handler: Async or sync function to call during shutdown
-    """
+    """Register a handler to be called during graceful shutdown."""
     _shutdown_handlers.append(handler)
 
 
 async def graceful_shutdown() -> None:
-    """Perform graceful shutdown of all registered resources."""
+    """Run all registered shutdown handlers (idempotent)."""
     global _shutdown_in_progress
 
     if _shutdown_in_progress:
         logger.warning("Shutdown already in progress, skipping")
         return
 
+    from backend.utils.shutdown_listener import request_process_shutdown
+
+    request_process_shutdown()
+
     _shutdown_in_progress = True
     logger.info("Starting graceful shutdown...")
 
-    # Execute all shutdown handlers
     for handler in _shutdown_handlers:
         try:
             if asyncio.iscoroutinefunction(handler):
@@ -56,39 +53,3 @@ async def graceful_shutdown() -> None:
             )
 
     logger.info("Graceful shutdown completed")
-
-
-def setup_signal_handlers() -> None:
-    """Setup signal handlers for graceful shutdown."""
-    import signal as signal_module
-
-    def signal_handler(signum, frame):
-        """Handle shutdown signals."""
-        logger.info("Received signal %s, initiating graceful shutdown...", signum)
-        # Run graceful shutdown in event loop
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop and loop.is_running():
-            # Create task and let event loop handle it - don't exit immediately
-            asyncio.create_task(graceful_shutdown())
-        else:
-            # Run shutdown directly if loop is not running
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(graceful_shutdown())
-        sys.exit(0)
-
-    # Register handlers for common shutdown signals
-    signal_module.signal(signal_module.SIGTERM, signal_handler)
-    signal_module.signal(signal_module.SIGINT, signal_handler)
-
-
-# Auto-register signal handlers on import
-try:
-    setup_signal_handlers()
-except ValueError:
-    # signal() only works in main thread — skip in test/worker threads
-    pass

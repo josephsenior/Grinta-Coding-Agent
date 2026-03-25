@@ -274,6 +274,9 @@ async def main() -> int:
             evt_type = event.get("type")
             status_update = event.get("status_update")
             state = _agent_state(event)
+            if event.get("action") == "streaming_chunk":
+                print("GOT STREAMING CHUNK")
+            if event.get('action') == 'streaming_chunk': print('CHUNK', repr(event)[:50])
             if state:
                 last_agent_state = state
 

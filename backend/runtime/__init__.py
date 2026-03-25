@@ -15,14 +15,14 @@ from backend.runtime.orchestrator import (
     RuntimeOrchestrator,
     runtime_orchestrator,
 )
-from backend.runtime.pool import (
+from backend.runtime.runtime_pool import (
     PooledRuntime,
     RuntimePool,
     SingleUseRuntimePool,
     WarmPoolPolicy,
     WarmRuntimePool,
 )
-from backend.runtime.factory import get_runtime_cls
+from backend.runtime.runtime_factory import get_runtime_cls
 from backend.runtime.watchdog import runtime_watchdog
 from backend.utils.import_utils import get_impl
 
@@ -61,3 +61,4 @@ def __getattr__(name: str) -> Any:  # Lazy access to runtime classes
             "LocalRuntimeInProcess",
         )
     raise AttributeError(name)
+

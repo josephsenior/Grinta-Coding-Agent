@@ -3,6 +3,7 @@ import {
   Brain,
   FilePlus,
   FileText,
+  BookOpen,
   ListOrdered,
   Loader2,
   MessageSquare,
@@ -14,8 +15,8 @@ import {
   ArrowRightLeft,
   HelpCircle,
 } from "lucide-react";
-import { ActionType } from "@/types/agent";
-import type { ForgeEvent, ActionEvent } from "@/types/events";
+import { ActionType, ObservationType } from "@/types/agent";
+import type { ForgeEvent, ActionEvent, ObservationEvent } from "@/types/events";
 
 export interface LiveActivity {
   Icon: LucideIcon;
@@ -23,6 +24,12 @@ export interface LiveActivity {
   detail?: string;
   linesAdded?: number;
   linesRemoved?: number;
+}
+
+export interface StateConfidenceInfo {
+  stage: string;
+  hint: string;
+  score: number;
 }
 
 const SILENT_ACTIONS = new Set<ActionType>([
@@ -120,6 +127,30 @@ function actionActivity(action: ActionEvent): LiveActivity | null {
   }
 }
 
+function observationActivity(obs: ObservationEvent): LiveActivity | null {
+  switch (obs.observation) {
+    case ObservationType.AGENT_STATE_CHANGED: {
+      const state = String(obs.extras?.agent_state ?? "");
+      if (state === "running") return { Icon: Loader2, verb: "Working…" };
+      if (state === "awaiting_user_confirmation") {
+        return { Icon: HelpCircle, verb: "Needs approval", detail: "Waiting for your decision" };
+      }
+      if (state === "awaiting_user_input") {
+        return { Icon: MessageSquare, verb: "Ready for input" };
+      }
+      return null;
+    }
+    case ObservationType.RECALL:
+      return { Icon: BookOpen, verb: "Gathering context" };
+    case ObservationType.MCP:
+      return { Icon: Wrench, verb: "Tool result received" };
+    case ObservationType.DELEGATE_TASK_RESULT:
+      return { Icon: ArrowRightLeft, verb: "Sub-task completed" };
+    default:
+      return null;
+  }
+}
+
 /**
  * Latest meaningful agent/tool activity for the top bar while the agent is active.
  */
@@ -135,16 +166,130 @@ export function deriveLiveActivity(
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i];
     if (e === undefined) continue;
-    if (!("action" in e)) continue;
-    const a = e as ActionEvent;
-    if (SILENT_ACTIONS.has(a.action as ActionType)) continue;
-    if (a.source === "user" && a.action === ActionType.MESSAGE) continue;
 
-    const hit = actionActivity(a);
-    if (hit) return hit;
+    if ("action" in e) {
+      const a = e as ActionEvent;
+      if (SILENT_ACTIONS.has(a.action as ActionType)) continue;
+      if (a.source === "user" && a.action === ActionType.MESSAGE) continue;
+
+      const hit = actionActivity(a);
+      if (hit) return hit;
+      continue;
+    }
+
+    if ("observation" in e) {
+      const hit = observationActivity(e as ObservationEvent);
+      if (hit) return hit;
+    }
   }
 
   return { Icon: Loader2, verb: "Working…" };
+}
+
+export function deriveStateConfidenceInfo(
+  events: ForgeEvent[],
+  options: { state: string; streaming: boolean },
+): StateConfidenceInfo {
+  if (options.streaming) {
+    return {
+      stage: "Composing response",
+      hint: "Generating your final answer",
+      score: 0.92,
+    };
+  }
+
+  if (options.state === "awaiting_user_confirmation") {
+    return {
+      stage: "Needs approval",
+      hint: "Waiting for your decision",
+      score: 0.82,
+    };
+  }
+
+  if (options.state === "awaiting_user_input") {
+    return {
+      stage: "Ready for input",
+      hint: "Awaiting your next message",
+      score: 1,
+    };
+  }
+
+  if (options.state === "error") {
+    return {
+      stage: "Recovering",
+      hint: "Needs retry or new instruction",
+      score: 0.2,
+    };
+  }
+
+  if (options.state !== "running") {
+    return {
+      stage: "Idle",
+      hint: "No active work in progress",
+      score: 1,
+    };
+  }
+
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (!e || !("action" in e)) continue;
+    const a = e as ActionEvent;
+
+    if (a.action === ActionType.RECALL || a.action === ActionType.READ) {
+      return {
+        stage: "Gathering context",
+        hint: "Reading relevant project history",
+        score: 0.55,
+      };
+    }
+
+    if (
+      a.action === ActionType.MCP ||
+      a.action === ActionType.BROWSE ||
+      a.action === ActionType.BROWSE_INTERACTIVE ||
+      a.action === ActionType.DELEGATE_TASK
+    ) {
+      return {
+        stage: "Using tools",
+        hint: "Collecting external/runtime data",
+        score: 0.72,
+      };
+    }
+
+    if (
+      a.action === ActionType.RUN ||
+      a.action === ActionType.TERMINAL_RUN ||
+      a.action === ActionType.TERMINAL_INPUT
+    ) {
+      return {
+        stage: "Executing commands",
+        hint: "Running checks and collecting outputs",
+        score: 0.76,
+      };
+    }
+
+    if (a.action === ActionType.EDIT || a.action === ActionType.WRITE) {
+      return {
+        stage: "Applying changes",
+        hint: "Updating files for this step",
+        score: 0.84,
+      };
+    }
+
+    if (a.action === ActionType.THINK) {
+      return {
+        stage: "Reasoning",
+        hint: "Planning the next precise action",
+        score: 0.48,
+      };
+    }
+  }
+
+  return {
+    stage: "Thinking",
+    hint: "Preparing the next action",
+    score: 0.45,
+  };
 }
 
 /** User-facing lifecycle label + styling (top bar primary state). */

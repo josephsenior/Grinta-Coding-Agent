@@ -7,7 +7,7 @@ from backend.runtime.orchestrator import (
     RuntimeOrchestrator,
     RuntimeAcquireResult,
 )
-from backend.runtime.pool import PooledRuntime, WarmPoolPolicy
+from backend.runtime.runtime_pool import PooledRuntime, WarmPoolPolicy
 
 
 class TestRuntimeAcquireResult(unittest.TestCase):
@@ -96,7 +96,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         mock_watchdog.watch_runtime.assert_called_once()
 
     @patch("backend.runtime.orchestrator.runtime_watchdog")
-    @patch("backend.core.setup.create_runtime")
+    @patch("backend.core.bootstrap.setup.create_runtime")
     def test_acquire_creates_new_runtime(self, mock_create, mock_watchdog):
         """Test acquire creates new runtime when pool is empty."""
         self.mock_pool.acquire.return_value = None
@@ -132,7 +132,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
         )
 
     @patch("backend.runtime.orchestrator.runtime_watchdog")
-    @patch("backend.core.setup.create_runtime")
+    @patch("backend.core.bootstrap.setup.create_runtime")
     def test_acquire_with_repo_initializer(self, mock_create, mock_watchdog):
         """Test acquire runs repo initializer when provided."""
         self.mock_pool.acquire.return_value = None
@@ -390,3 +390,4 @@ class TestRuntimeOrchestrator(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

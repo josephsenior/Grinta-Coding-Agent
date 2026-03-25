@@ -1,4 +1,4 @@
-"""Tests for backend.mcp_client.utils — MCP tool conversion & helper functions."""
+"""Tests for backend.mcp_client.mcp_utils — MCP tool conversion & helper functions."""
 
 from __future__ import annotations
 from typing import Any, cast
@@ -12,7 +12,7 @@ import pytest
 
 from backend.events.action.mcp import MCPAction
 from backend.mcp_client.mcp_bootstrap_status import reset_mcp_bootstrap_status
-from backend.mcp_client.utils import (
+from backend.mcp_client.mcp_utils import (
     _find_matching_mcp,
     _is_windows_stdio_mcp_disabled,
     _log_successful_connection,
@@ -93,7 +93,7 @@ class TestConvertMcpsToTools:
         client = MagicMock()
         client.tools = [tool_mock]
 
-        with patch("backend.mcp_client.utils.wrapper_tool_params", return_value=[]):
+        with patch("backend.mcp_client.mcp_utils.wrapper_tool_params", return_value=[]):
             result = convert_mcps_to_tools([client])
         assert len(result) == 1
         assert result[0]["function"]["name"] == "search_files"
@@ -159,7 +159,7 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_execute_wrapper_tool_success(self):
-        from backend.mcp_client.utils import _execute_wrapper_tool
+        from backend.mcp_client.mcp_utils import _execute_wrapper_tool
 
         action = self._as_action(SimpleNamespace(name="test_wrapper", arguments={"q": "hello"}))
 
@@ -167,7 +167,7 @@ class TestAsyncHelpers:
             return {"result": "ok"}
 
         with patch.dict(
-            "backend.mcp_client.utils.WRAPPER_TOOL_REGISTRY",
+            "backend.mcp_client.mcp_utils.WRAPPER_TOOL_REGISTRY",
             {"test_wrapper": fake_wrapper},
         ):
             obs = await _execute_wrapper_tool(action, [])
@@ -179,7 +179,7 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_execute_wrapper_tool_error(self):
-        from backend.mcp_client.utils import _execute_wrapper_tool
+        from backend.mcp_client.mcp_utils import _execute_wrapper_tool
 
         action = self._as_action(SimpleNamespace(name="bad_wrapper", arguments={}))
 
@@ -187,7 +187,7 @@ class TestAsyncHelpers:
             raise RuntimeError("wrapper broke")
 
         with patch.dict(
-            "backend.mcp_client.utils.WRAPPER_TOOL_REGISTRY",
+            "backend.mcp_client.mcp_utils.WRAPPER_TOOL_REGISTRY",
             {"bad_wrapper": failing_wrapper},
         ):
             obs = await _execute_wrapper_tool(action, [])
@@ -198,7 +198,7 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_wrapper_and_direct_failures_share_envelope_shape(self):
-        from backend.mcp_client.utils import _execute_direct_tool, _execute_wrapper_tool
+        from backend.mcp_client.mcp_utils import _execute_direct_tool, _execute_wrapper_tool
 
         wrapper_action = self._as_action(SimpleNamespace(name="bad_wrapper", arguments={}))
         direct_action = self._as_action(SimpleNamespace(name="tool1", arguments={"x": 1}))
@@ -210,7 +210,7 @@ class TestAsyncHelpers:
         direct_client.call_tool = AsyncMock(side_effect=RuntimeError("server down"))
 
         with patch.dict(
-            "backend.mcp_client.utils.WRAPPER_TOOL_REGISTRY",
+            "backend.mcp_client.mcp_utils.WRAPPER_TOOL_REGISTRY",
             {"bad_wrapper": failing_wrapper},
         ):
             wrapper_obs = await _execute_wrapper_tool(wrapper_action, [])
@@ -230,12 +230,12 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_execute_direct_tool_cache_hit(self):
-        from backend.mcp_client.utils import _execute_direct_tool
+        from backend.mcp_client.mcp_utils import _execute_direct_tool
 
         action = self._as_action(SimpleNamespace(name="tool1", arguments={"x": 1}))
         client = MagicMock()
 
-        with patch("backend.mcp_client.utils.get_cached", return_value={"cached": True}):
+        with patch("backend.mcp_client.mcp_utils.get_cached", return_value={"cached": True}):
             obs = await _execute_direct_tool(action, client)
             data = json.loads(obs.content)
             assert data["cached"] is True
@@ -243,19 +243,19 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_execute_direct_tool_success(self):
-        from backend.mcp_client.utils import _execute_direct_tool
+        from backend.mcp_client.mcp_utils import _execute_direct_tool
 
         action = self._as_action(SimpleNamespace(name="tool1", arguments={"x": 1}))
         client = AsyncMock()
         response = MagicMock()
 
         with (
-            patch("backend.mcp_client.utils.get_cached", return_value=None),
+            patch("backend.mcp_client.mcp_utils.get_cached", return_value=None),
             patch(
-                "backend.mcp_client.utils.model_dump_with_options",
+                "backend.mcp_client.mcp_utils.model_dump_with_options",
                 return_value={"result": "data"},
             ),
-            patch("backend.mcp_client.utils.set_cache"),
+            patch("backend.mcp_client.mcp_utils.set_cache"),
         ):
             client.call_tool = AsyncMock(return_value=response)
             obs = await _execute_direct_tool(action, client)
@@ -266,20 +266,20 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_call_tool_mcp_windows_disabled(self):
-        from backend.mcp_client.utils import call_tool_mcp
+        from backend.mcp_client.mcp_utils import call_tool_mcp
 
         action = self._as_action(SimpleNamespace(name="tool1", arguments={}))
-        with patch("backend.mcp_client.utils._is_windows_stdio_mcp_disabled", return_value=True):
+        with patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=True):
             obs = await call_tool_mcp([], action)
             # Windows-disabled or empty clients — either message is fine
             assert obs.content
 
     @pytest.mark.asyncio
     async def test_call_tool_mcp_no_clients(self):
-        from backend.mcp_client.utils import call_tool_mcp
+        from backend.mcp_client.mcp_utils import call_tool_mcp
 
         action = self._as_action(SimpleNamespace(name="tool1", arguments={}))
-        with patch("backend.mcp_client.utils._is_windows_stdio_mcp_disabled", return_value=False):
+        with patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=False):
             obs = await call_tool_mcp([], action)
             data = json.loads(obs.content)
             assert data["ok"] is False
@@ -288,7 +288,7 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_call_tool_mcp_wrapper_dispatch(self):
-        from backend.mcp_client.utils import call_tool_mcp
+        from backend.mcp_client.mcp_utils import call_tool_mcp
 
         action = self._as_action(SimpleNamespace(name="wrap_tool", arguments={"q": "test"}))
 
@@ -299,9 +299,9 @@ class TestAsyncHelpers:
         mock_client.tools = []
 
         with (
-            patch("backend.mcp_client.utils._is_windows_stdio_mcp_disabled", return_value=False),
+            patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=False),
             patch.dict(
-                "backend.mcp_client.utils.WRAPPER_TOOL_REGISTRY",
+                "backend.mcp_client.mcp_utils.WRAPPER_TOOL_REGISTRY",
                 {"wrap_tool": fake_wrapper},
             ),
         ):
@@ -312,7 +312,7 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_call_mcp_raw_resolves_wrapper_underlying_alias(self):
-        from backend.mcp_client.utils import _call_mcp_raw
+        from backend.mcp_client.mcp_utils import _call_mcp_raw
 
         action = self._as_action(SimpleNamespace(name="get_component", arguments={"name": "button"}))
         tool = MagicMock()
@@ -323,12 +323,12 @@ class TestAsyncHelpers:
         client.call_tool = AsyncMock(return_value=MagicMock())
 
         with (
-            patch("backend.mcp_client.utils.get_cached", return_value=None),
+            patch("backend.mcp_client.mcp_utils.get_cached", return_value=None),
             patch(
-                "backend.mcp_client.utils.model_dump_with_options",
+                "backend.mcp_client.mcp_utils.model_dump_with_options",
                 return_value={"result": "ok"},
             ),
-            patch("backend.mcp_client.utils.set_cache"),
+            patch("backend.mcp_client.mcp_utils.set_cache"),
         ):
             result = await _call_mcp_raw([client], action)
 
@@ -337,17 +337,17 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_create_mcps_windows_disabled(self):
-        from backend.mcp_client.utils import create_mcps
+        from backend.mcp_client.mcp_utils import create_mcps
 
-        with patch("backend.mcp_client.utils._is_windows_stdio_mcp_disabled", return_value=True):
+        with patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=True):
             result = await create_mcps([])
             assert result == []
 
     @pytest.mark.asyncio
     async def test_create_mcps_empty(self):
-        from backend.mcp_client.utils import create_mcps
+        from backend.mcp_client.mcp_utils import create_mcps
 
-        with patch("backend.mcp_client.utils._is_windows_stdio_mcp_disabled", return_value=False):
+        with patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=False):
             result = await create_mcps([])
             assert result == []
 
@@ -378,7 +378,7 @@ class TestAsyncHelpers:
         config.mcp_exposed_name_reserved = frozenset()
         config.servers = [SimpleNamespace(name="r", type="sse", url="https://example.invalid/mcp")]
         with patch(
-            "backend.mcp_client.utils.create_mcps",
+            "backend.mcp_client.mcp_utils.create_mcps",
             new_callable=AsyncMock,
             side_effect=RuntimeError("network down"),
         ):
@@ -398,7 +398,7 @@ class TestAsyncHelpers:
         config.enabled = True
         config.mcp_exposed_name_reserved = frozenset()
         config.servers = [SimpleNamespace(name="r", type="sse", url="https://example.invalid/mcp")]
-        with patch("backend.mcp_client.utils.create_mcps", new_callable=AsyncMock, return_value=[]):
+        with patch("backend.mcp_client.mcp_utils.create_mcps", new_callable=AsyncMock, return_value=[]):
             result = await fetch_mcp_tools_from_config(config)
             assert isinstance(result, list)
             assert any(
@@ -408,7 +408,7 @@ class TestAsyncHelpers:
 
     @pytest.mark.asyncio
     async def test_call_mcp_raw_cache_hit(self):
-        from backend.mcp_client.utils import _call_mcp_raw
+        from backend.mcp_client.mcp_utils import _call_mcp_raw
 
         action = self._as_action(SimpleNamespace(name="raw_tool", arguments={"a": 1}))
         tool = MagicMock()
@@ -416,13 +416,13 @@ class TestAsyncHelpers:
         client = MagicMock()
         client.tools = [tool]
 
-        with patch("backend.mcp_client.utils.get_cached", return_value={"cached": True}):
+        with patch("backend.mcp_client.mcp_utils.get_cached", return_value={"cached": True}):
             result = await _call_mcp_raw([client], action)
             assert result["cached"] is True
 
     @pytest.mark.asyncio
     async def test_call_mcp_raw_no_match(self):
-        from backend.mcp_client.utils import _call_mcp_raw
+        from backend.mcp_client.mcp_utils import _call_mcp_raw
 
         action = self._as_action(SimpleNamespace(name="missing_tool", arguments={}))
         client = MagicMock()
@@ -434,7 +434,7 @@ class TestAsyncHelpers:
     @pytest.mark.asyncio
     async def test_execute_mcp_capabilities_status_with_configured_servers(self):
         """mcp_capabilities_status reports configured vs connected when wired from runtime."""
-        from backend.mcp_client.utils import _execute_wrapper_tool
+        from backend.mcp_client.mcp_utils import _execute_wrapper_tool
 
         action = MCPAction(name="mcp_capabilities_status", arguments={})
         servers = [

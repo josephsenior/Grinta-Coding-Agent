@@ -177,12 +177,40 @@ class TestOnWorkspaceContextRecall:
         assert isinstance(obs, RecallObservation)
         assert obs.recall_type == RecallType.WORKSPACE_CONTEXT
 
-    def test_returns_none_when_nothing(self, memory):
+    def test_returns_empty_observation_when_nothing(self, memory):
         action = MagicMock(spec=RecallAction)
         action.recall_type = RecallType.WORKSPACE_CONTEXT
         action.query = ""
         result = memory._on_workspace_context_recall(action)
-        assert result is None
+        assert isinstance(result, RecallObservation)
+        assert result.recall_type == RecallType.WORKSPACE_CONTEXT
+        assert result.repo_instructions == ""
+        assert result.playbook_knowledge == []
+
+
+# ── _on_playbook_recall ──────────────────────────────────────────────
+
+
+class TestOnPlaybookRecall:
+    def test_empty_query_returns_empty_success(self, memory):
+        action = MagicMock(spec=RecallAction)
+        action.recall_type = RecallType.KNOWLEDGE
+        action.query = ""
+        memory._kb_manager.search = MagicMock(return_value=[])
+        obs = memory._on_playbook_recall(action)
+        assert isinstance(obs, RecallObservation)
+        assert obs.recall_type == RecallType.KNOWLEDGE
+        assert obs.playbook_knowledge == []
+        assert obs.knowledge_base_results == []
+
+    def test_no_match_returns_empty_success(self, memory):
+        action = MagicMock(spec=RecallAction)
+        action.recall_type = RecallType.KNOWLEDGE
+        action.query = "plain user question with no playbook trigger"
+        memory._kb_manager.search = MagicMock(return_value=[])
+        obs = memory._on_playbook_recall(action)
+        assert isinstance(obs, RecallObservation)
+        assert obs.playbook_knowledge == []
 
 
 # ── get_playbook_mcp_tools ───────────────────────────────────────────

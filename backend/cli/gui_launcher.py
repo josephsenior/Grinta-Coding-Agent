@@ -57,7 +57,7 @@ def launch_gui_server() -> None:
             sys.executable,
             "-m",
             "uvicorn",
-            "backend.api.listen:app",
+            "backend.api.socketio_asgi_app:app",
             "--host",
             "0.0.0.0",
             "--port",
@@ -78,3 +78,4 @@ def launch_gui_server() -> None:
         print("")
         print(f"❌ An unexpected error occurred: {e}")
         sys.exit(1)
+

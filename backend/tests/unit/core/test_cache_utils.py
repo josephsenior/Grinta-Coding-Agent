@@ -1,11 +1,11 @@
-"""Tests for backend.core.cache.utils — Redis cache utility functions."""
+"""Tests for backend.core.cache.cache_utils — Redis cache utility functions."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 
 
-from backend.core.cache.utils import (
+from backend.core.cache.cache_utils import (
     extract_redis_stats,
     get_redis_connection_params,
     merge_settings_with_cache,

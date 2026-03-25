@@ -219,7 +219,7 @@ class OrchestratorPlanner:
             tools.append(create_terminal_manager_tool())
 
     def _add_optional_feature_tools(self, tools: list) -> None:
-        """Add check_tool_status, web_search, delegate, rollback, workspace_status, etc."""
+        """Add check_tool_status, delegate, rollback, workspace_status, etc."""
         from backend.engines.orchestrator.tools.check_tool_status import (
             create_check_tool_status_tool,
         )
@@ -236,14 +236,10 @@ class OrchestratorPlanner:
 
         if getattr(self._config, "enable_check_tool_status", False):
             tools.append(create_check_tool_status_tool())
-        if getattr(self._config, "enable_web_search", False):
-            from backend.engines.orchestrator.tools.web_search import (
-                create_web_search_tool,
-            )
 
-            tools.append(create_web_search_tool())
-
-        # New core tools — gated by flags (default off to reduce tool bloat)
+        # Optional feature tools remain flag-gated; note that enable_lsp_query
+        # currently defaults to True in AgentConfig while the others below are
+        # mostly default-off.
         if getattr(self._config, "enable_lsp_query", False):
             tools.append(create_lsp_query_tool())
         if getattr(self._config, "enable_signal_progress", False):

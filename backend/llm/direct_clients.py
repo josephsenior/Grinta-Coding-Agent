@@ -361,15 +361,6 @@ class OpenAIClient(DirectLLMClient):
     ) -> LLMResponse:
         kwargs.pop("model", None)
         try:
-            import json
-            if "metadata" in kwargs: print("!!! KWARGS HAS METADATA !!!", flush=True)
-            for key in ("metadata", "user", "extra_body", "reasoning_effort"):
-                if key in kwargs:
-                    _val = kwargs.pop(key)
-                    print(f"!!! POPPED {key} from kwargs to avoid Moonshot errors !!!", _val, flush=True)
-            for m in messages:
-                if "metadata" in m:
-                    print("!!! MESSAGE HAS METADATA !!!", m["metadata"], flush=True)
             response = await self.async_client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,  # type: ignore[arg-type]
@@ -405,15 +396,10 @@ class OpenAIClient(DirectLLMClient):
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
+        # OpenAI-compatible APIs require stream=True for token streaming.
         kwargs["stream"] = True
         kwargs.pop("model", None)
         try:
-            for key in ("metadata", "user", "extra_body", "reasoning_effort"):
-                if key in kwargs:
-                    _val = kwargs.pop(key)
-                    print(f"!!! POPPED {key} from kwargs in astream !!!", _val, flush=True)
-            for m in messages:
-                if "metadata" in m: m.pop("metadata")
             stream = await self.async_client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,  # type: ignore[arg-type]

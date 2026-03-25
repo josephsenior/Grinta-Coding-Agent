@@ -414,6 +414,7 @@ class Session:
 
         # Log dispatch start
         self._log_dispatch_start(data)
+        self._ensure_core_event_subscriptions()
 
         # Parse event from data
         event = event_from_dict(data.copy())
@@ -425,6 +426,65 @@ class Session:
 
         # Add event to stream
         self.agent_session.event_stream.add_event(event, EventSource.USER)  # type: ignore[attr-defined]
+
+    def _ensure_core_event_subscriptions(self) -> None:
+        """Restore critical event-stream subscribers if they were lost.
+
+        A stale session can continue accepting user events even if one of the
+        in-process subscribers was dropped. In that state the raw event is still
+        persisted, but the UI echo, recall pipeline, and controller step never
+        fire. Re-subscribing here keeps reconnects and long-lived sessions
+        recoverable without requiring a full page refresh.
+        """
+        event_stream = getattr(self.agent_session, "event_stream", None)
+        if event_stream is None:
+            return
+
+        subscribers = getattr(event_stream, "_subscribers", None)
+        if not isinstance(subscribers, dict):
+            return
+
+        def _is_subscribed(subscriber_id: EventStreamSubscriber, callback_id: str) -> bool:
+            callbacks = subscribers.get(subscriber_id, {})
+            return isinstance(callbacks, dict) and callback_id in callbacks
+
+        def _restore(
+            subscriber_id: EventStreamSubscriber,
+            callback,
+            callback_id: str | None,
+            label: str,
+        ) -> None:
+            if callback is None or not callback_id:
+                return
+            if _is_subscribed(subscriber_id, callback_id):
+                return
+            with contextlib.suppress(ValueError):
+                event_stream.subscribe(subscriber_id, callback, callback_id)
+                self.logger.warning(
+                    "Restored missing %s subscription for session %s",
+                    label,
+                    self.sid,
+                    extra={"signal": f"session_restore_{label}_subscription"},
+                )
+
+        _restore(EventStreamSubscriber.SERVER, self.on_event, self.sid, "server")
+
+        controller = getattr(self.agent_session, "controller", None)
+        controller_id = getattr(controller, "id", None) or self.sid
+        _restore(
+            EventStreamSubscriber.AGENT_CONTROLLER,
+            getattr(controller, "on_event", None),
+            controller_id,
+            "controller",
+        )
+
+        memory = getattr(self.agent_session, "memory", None)
+        _restore(
+            EventStreamSubscriber.MEMORY,
+            getattr(memory, "on_event", None),
+            self.sid,
+            "memory",
+        )
 
     def _log_dispatch_start(self, data: dict) -> None:
         """Log the start of dispatch operation."""
@@ -475,6 +535,46 @@ class Session:
 
         return False
 
+    @staticmethod
+    def _is_low_priority_publish_event(data: dict[str, object]) -> bool:
+        """Return True for websocket events that are safe to drop first under pressure."""
+        action = data.get("action")
+        # Keep streaming_chunk events high-priority so token-by-token rendering
+        # stays live even when the publish queue is under pressure.
+        if action in {"think"}:
+            return True
+
+        if data.get("status_update") is True and data.get("type") == "info":
+            return True
+
+        return False
+
+    def _evict_oldest_low_priority_publish_event(self) -> bool:
+        """Drop the oldest low-priority queued websocket event, preserving order."""
+        buffered: list[dict[str, object]] = []
+        dropped = False
+
+        while True:
+            try:
+                queued = self._publish_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
+            if (
+                not dropped
+                and isinstance(queued, dict)
+                and self._is_low_priority_publish_event(queued)
+            ):
+                dropped = True
+                continue
+
+            buffered.append(queued)
+
+        for queued in buffered:
+            self._publish_queue.put_nowait(queued)
+
+        return dropped
+
     async def send(self, data: dict[str, object]) -> None:
         """Queue data for publishing to WebSocket clients.
 
@@ -488,11 +588,40 @@ class Session:
         try:
             self._publish_queue.put_nowait(data)
         except asyncio.QueueFull:
-            # Drop the oldest queued item to make room
-            try:
-                self._publish_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
+            evicted_low_priority = self._evict_oldest_low_priority_publish_event()
+
+            if not evicted_low_priority and self._is_low_priority_publish_event(data):
+                self.logger.warning(
+                    "Publish queue full; dropping incoming low-priority websocket event",
+                    extra={
+                        "signal": "session_publish_queue_drop_low_priority",
+                        "action": data.get("action"),
+                        "observation": data.get("observation"),
+                        "status_update": data.get("status_update"),
+                    },
+                )
+                return
+
+            if not evicted_low_priority:
+                try:
+                    dropped = self._publish_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    dropped = None
+                self.logger.warning(
+                    "Publish queue full; dropping oldest websocket event to preserve latest event",
+                    extra={
+                        "signal": "session_publish_queue_drop_oldest",
+                        "dropped_action": dropped.get("action")
+                        if isinstance(dropped, dict)
+                        else None,
+                        "dropped_observation": dropped.get("observation")
+                        if isinstance(dropped, dict)
+                        else None,
+                        "incoming_action": data.get("action"),
+                        "incoming_observation": data.get("observation"),
+                    },
+                )
+
             self._publish_queue.put_nowait(data)
 
     async def _monitor_publish_queue(self) -> None:
@@ -530,8 +659,8 @@ class Session:
 
                 await self._emit_to_client(data)
 
-            # Removed artificial delay for instant streaming
-            # await asyncio.sleep(0.001)
+            # Re-added small delay to ensure asyncio loop serves the websocket socket writer correctly
+            await asyncio.sleep(0.001)
             self.last_active_ts = int(time.time())
             return True
 

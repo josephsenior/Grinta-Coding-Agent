@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from backend.core.logger import forge_logger as logger
 from backend.events.event import EventSource
 from backend.events.serialization.event import event_from_dict
-from backend.api.services.dependencies import (
+from backend.api.services.service_dependencies import (
     require_conversation_manager,
     require_event_service_adapter,
 )
@@ -82,3 +82,4 @@ async def dispatch_raw_message_event(
                 "note": "persisted_to_event_store",
             }
         )
+

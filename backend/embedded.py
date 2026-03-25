@@ -36,7 +36,7 @@ def _run_server(host: str, port: int) -> None:
     import uvicorn  # imported here so the main thread can start fast
 
     uvicorn.run(
-        "backend.api.listen:app",
+        "backend.api.socketio_asgi_app:app",
         host=host,
         port=port,
         log_level="error",   # suppress uvicorn's startup noise in embedded mode
@@ -166,3 +166,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

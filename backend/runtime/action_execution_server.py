@@ -36,6 +36,7 @@ from backend.events.observation import (
     FileEditObservation,
     FileReadObservation,
     FileWriteObservation,
+    LspQueryObservation,
     Observation,
 )
 from backend.events.action.code_nav import LspQueryAction
@@ -869,12 +870,12 @@ class ActionExecutor:
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
         """Execute an MCP tool call using Forge's MCP client integration."""
         try:
-            from backend.mcp_client.utils import (
+            from backend.mcp_client.mcp_utils import (
                 call_tool_mcp,
                 create_mcps,
             )
             from backend.core.config.mcp_config import _filter_windows_stdio_servers
-            from backend.core.config.utils import load_forge_config
+            from backend.core.config.config_loader import load_forge_config
 
             if self._mcp_clients is None:
                 # Prefer injected config (e.g. in-process runtime), fallback to load.
@@ -925,6 +926,7 @@ class ActionExecutor:
         """Execute an LSP query using the lsp_client."""
         from backend.utils.lsp_client import LspClient
 
+        start = time.perf_counter()
         try:
             client = LspClient()
             result = client.query(
@@ -934,12 +936,42 @@ class ActionExecutor:
                 column=action.column,
                 symbol=getattr(action, "symbol", ""),
             )
-            return Observation(content=result.format_text(action.command))
+
+            latency_ms = int((time.perf_counter() - start) * 1000)
+            obs = LspQueryObservation(
+                content=result.format_text(action.command),
+                available=bool(result.available),
+            )
+            obs.tool_result = {
+                "tool": "lsp_query",
+                "command": action.command,
+                "file": action.file,
+                "latency_ms": latency_ms,
+                "available": bool(result.available),
+                "has_error": bool(result.error),
+            }
+            logger.info(
+                "LSP query completed: command=%s available=%s latency_ms=%d",
+                action.command,
+                bool(result.available),
+                latency_ms,
+            )
+            return obs
         except Exception as e:
+            latency_ms = int((time.perf_counter() - start) * 1000)
             logger.error("LSP query failed: %s", e, exc_info=True)
-            return ErrorObservation(
+            err = ErrorObservation(
                 f"LSP query failed: {e}. Check if python-lsp-server is installed."
             )
+            err.tool_result = {
+                "tool": "lsp_query",
+                "command": action.command,
+                "file": action.file,
+                "latency_ms": latency_ms,
+                "available": False,
+                "has_error": True,
+            }
+            return err
 
     async def signal_progress(self, action: SignalProgressAction) -> Observation:
         """Handle a progress signal from the agent."""
@@ -1165,7 +1197,7 @@ if __name__ == "__main__":
                     api_key=None,
                     logger_level=logger.getEffectiveLevel(),
                 )
-                from backend.core.config.utils import load_forge_config
+                from backend.core.config.config_loader import load_forge_config
 
                 forge_config = load_forge_config()
                 mcp_proxy_manager.initialize(forge_config.mcp.servers)

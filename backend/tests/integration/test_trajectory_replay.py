@@ -7,7 +7,7 @@ from backend.events.stream import EventStream
 from backend.api.routes.trajectory import get_trajectory
 from backend.api.session.conversation import ServerConversation
 from backend.core.config import ForgeConfig
-from backend.storage.local import LocalFileStore
+from backend.storage.local_file_store import LocalFileStore
 
 
 async def test_trajectory_replay_since_id_and_ordering() -> None:
@@ -50,3 +50,4 @@ async def test_trajectory_replay_since_id_and_ordering() -> None:
             assert ids_limited == [2, 3]
         finally:
             event_stream.close()
+

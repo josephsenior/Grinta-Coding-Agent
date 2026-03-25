@@ -12,6 +12,8 @@ from backend.controller.services.step_prerequisite_service import (
     StepPrerequisiteService,
 )
 from backend.core.schemas import AgentState
+from backend.events import RecallType
+from backend.events.action.agent import RecallAction
 
 
 class _FakeContext:
@@ -58,6 +60,12 @@ class TestStepPrerequisiteService:
         ctx = _FakeContext(AgentState.RUNNING, pending_action=pending)
         svc = StepPrerequisiteService(cast(ControllerContext, ctx))
         assert svc.can_step() is False
+
+    def test_can_step_when_pending_recall_action(self):
+        pending = RecallAction(query="q", recall_type=RecallType.KNOWLEDGE)
+        ctx = _FakeContext(AgentState.RUNNING, pending_action=pending)
+        svc = StepPrerequisiteService(cast(ControllerContext, ctx))
+        assert svc.can_step() is True
 
     def test_can_step_no_pending_running(self):
         ctx = _FakeContext(AgentState.RUNNING, pending_action=None)

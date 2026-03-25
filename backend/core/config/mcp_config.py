@@ -252,7 +252,7 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     """
 
-    enabled: bool = False
+    enabled: bool = True
     servers: list[MCPServerConfig] = Field(default_factory=list)
     #: Internal orchestrator tool names reserved when exposing MCP tools (runtime + API must match).
     mcp_exposed_name_reserved: frozenset[str] = Field(default_factory=frozenset)

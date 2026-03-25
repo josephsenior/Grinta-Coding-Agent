@@ -1,4 +1,4 @@
-/** Agent lifecycle states — mirrors backend AgentState enum. */
+/** Agent lifecycle states — mirrors the curated backend contract in `backend/core/agent_contract.py`. */
 export enum AgentState {
   LOADING = "loading",
   RUNNING = "running",
@@ -41,6 +41,7 @@ export enum ActionType {
   SEND_PR = "send_pr",
   RECALL = "recall",
   CONDENSATION = "condensation",
+  SUMMARIZE_CONTEXT = "summarize_context",
   CONDENSATION_REQUEST = "condensation_request",
   TASK_TRACKING = "task_tracking",
   STREAMING_CHUNK = "streaming_chunk",

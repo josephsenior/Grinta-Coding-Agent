@@ -10,7 +10,7 @@ directly from ``AppState``, ensuring a single source of truth.
 .. deprecated::
     Route files should inject ``config``, ``file_store``, and ``server_config``
     via FastAPI ``Depends()`` providers defined in
-    ``backend.api.services.dependencies`` (``get_forge_config``,
+    ``backend.api.services.service_dependencies`` (``get_forge_config``,
     ``get_file_store``, ``get_server_config``).  Direct imports from this
     module remain supported for non-route code (CLI, tests, utilities) that
     cannot use the DI system.
@@ -79,3 +79,4 @@ async def get_conversation_store_async(user_id: str | None = None):
 def get_conversation_store():
     """Synchronous conversation store accessor."""
     return _state.get_conversation_store()
+

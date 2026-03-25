@@ -22,7 +22,7 @@ from backend.core.config.llm_config import LLMConfig
 from backend.core.config.mcp_config import MCPConfig
 from backend.core.config.runtime_config import RuntimeConfig
 from backend.core.config.security_config import SecurityConfig
-from backend.core.config.utils import (
+from backend.core.config.config_loader import (
     finalize_config,
     get_agent_config_arg,
     get_llm_config_arg,

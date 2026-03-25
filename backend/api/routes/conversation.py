@@ -24,7 +24,7 @@ from backend.events.event_store import EventStore
 from backend.events.serialization.event import event_to_dict
 from backend.playbook_engine.playbook import BasePlaybook
 from backend.playbook_engine.types import InputMetadata
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.api.services.completion_service import (
     CompletionRequest,
     CompletionResult,
@@ -33,7 +33,7 @@ from backend.api.services.completion_service import (
     get_code_completion as _run_completion,
 )
 from backend.api.services.raw_event_service import dispatch_raw_message_event
-from backend.api.services.dependencies import (
+from backend.api.services.service_dependencies import (
     require_conversation_manager,
 )
 from backend.api.app_state import get_app_state
@@ -856,3 +856,4 @@ async def get_code_completion(
         raise
     except Exception as e:
         return _build_completion_error_response(e)
+

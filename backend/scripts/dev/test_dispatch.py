@@ -5,7 +5,7 @@ from backend.core.config import ForgeConfig
 from backend.llm.llm_registry import LLMRegistry
 from backend.api.services.conversation_stats import ConversationStats
 from backend.api.session.session import Session
-from backend.storage.local import LocalFileStore
+from backend.storage.local_file_store import LocalFileStore
 
 
 class DummySIO:
@@ -29,3 +29,4 @@ async def run_test():
 
 if __name__ == "__main__":
     asyncio.run(run_test())
+

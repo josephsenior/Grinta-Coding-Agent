@@ -27,10 +27,8 @@ from backend.core.errors import (
     ToolExecutionError,
 )
 from backend.core.logger import forge_logger as logger
-from backend.core.message import Message
 from backend.llm.exceptions import LLMError
 from backend.events.action import AgentThinkAction, MessageAction, PlaybookFinishAction
-from backend.events.action.files import FileReadAction
 from backend.events.event import EventSource
 from backend.llm.llm_registry import LLMRegistry
 from backend.runtime.plugins import (
@@ -118,7 +116,7 @@ class Orchestrator(Agent):
             llm=self.llm,
             safety_manager=self.safety_manager,
             planner=self.planner,
-            mcp_tool_name_provider=lambda: self.mcp_tools.keys(),  # pylint: disable=unnecessary-lambda
+            mcp_tools_provider=lambda: self.mcp_tools,  # pylint: disable=unnecessary-lambda
         )
 
         # Production health checks

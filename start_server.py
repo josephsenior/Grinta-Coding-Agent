@@ -65,6 +65,10 @@ _load_dotenv_local()
 
 # Set environment variables
 os.environ.setdefault('PORT', '3000')
+# Prevent prolonged "Working..." when provider calls stall.
+# These can still be overridden via .env.local or process environment.
+os.environ.setdefault('FORGE_LLM_STEP_TIMEOUT_SECONDS', '45')
+os.environ.setdefault('FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '8')
 
 # Now import and run uvicorn
 import uvicorn  # noqa: E402
@@ -79,15 +83,16 @@ if __name__ == '__main__':
         )
         os.environ['PORT'] = str(port)
 
-    reload_enabled = (
-        os.environ.get('FORGE_ENV', 'development') != 'production'
-        and os.environ.get('FORGE_WATCH', '1') != '0'
-    )
+    # Reload uses a supervisor process; on Windows Ctrl+C often never reaches the worker.
+    # Uvicorn owns SIGINT; keep reload off Windows entirely.
+    _dev = os.environ.get('FORGE_ENV', 'development') != 'production'
+    _watch = os.environ.get('FORGE_WATCH', '1').strip().lower() not in ('0', 'false', 'no', 'off')
+    reload_enabled = _dev and _watch and sys.platform != 'win32'
     print(f'Starting Forge server on http://{host}:{port}')
     print('Press Ctrl+C to stop the server.\n')
 
     uvicorn.run(
-        'backend.api.listen:app',
+        'backend.api.socketio_asgi_app:app',
         host=host,
         port=port,
         log_level='info',
@@ -96,3 +101,4 @@ if __name__ == '__main__':
         # Avoid websockets.legacy.server two-arg ws_handler (DeprecationWarning on websockets 15+).
         ws='websockets-sansio',
     )
+

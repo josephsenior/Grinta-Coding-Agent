@@ -33,6 +33,7 @@ class TestContextTrackerInit:
 class TestGraphRAGWiring:
     def test_store_in_memory_indexes_graph(self, tmp_path):
         mock_store = MagicMock()
+        mock_store.delete_by_ids = MagicMock()
         graph_store = GraphMemoryStore(persistence_path=str(tmp_path / "graph.json"))
         tracker = ContextTracker(vector_store=mock_store, graph_store=graph_store)
 
@@ -43,7 +44,17 @@ class TestGraphRAGWiring:
             metadata={"file_path": "example.py"},
         )
 
+        mock_store.delete_by_ids.assert_called_once_with(["e1"])
         assert graph_store.graph.has_node("example.py")
+
+    def test_store_in_memory_replaces_existing_step_id_when_supported(self):
+        mock_store = MagicMock()
+        tracker = ContextTracker(vector_store=mock_store)
+
+        tracker.store_in_memory("e1", "user", "hello")
+
+        mock_store.delete_by_ids.assert_called_once_with(["e1"])
+        mock_store.add.assert_called_once()
 
     def test_recall_from_memory_prepends_graph_rag_context(self, tmp_path):
         mock_store = MagicMock()

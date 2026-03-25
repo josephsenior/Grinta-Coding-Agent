@@ -22,7 +22,7 @@ from backend.core.config.security_config import SecurityConfig
 from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
-    from backend.core.config.utils import ConfigLoadSummary
+    from backend.core.config.config_loader import ConfigLoadSummary
 
 
 def process_core_section(

@@ -357,30 +357,38 @@ class OrchestratorPromptManager(PromptManager):
             return content
 
     def _inject_scratchpad(self, content: str) -> str:
-        """Append persistent scratchpad notes so they survive context condensation."""
+        """Append persistent scratchpad and working memory so they survive condensation."""
         try:
-            from backend.engines.orchestrator.tools.memory_manager_temp1 import (
+            from backend.engines.orchestrator.tools.note import (
                 scratchpad_entries_for_prompt,
+            )
+            from backend.engines.orchestrator.tools.working_memory import (
+                get_working_memory_prompt_block,
             )
 
             entries = scratchpad_entries_for_prompt()
-            if not entries:
+            memory_blocks: list[str] = []
+            if entries:
+                lines: list[str] = []
+                char_budget = 2000
+                for key, value in entries:
+                    line = f"  [{key}]: {value}"
+                    if len("\n".join(lines + [line])) > char_budget:
+                        lines.append("  ... (additional notes truncated)")
+                        break
+                    lines.append(line)
+                scratchpad_block = "\n".join(lines)
+                memory_blocks.append(
+                    "<WORKING_SCRATCHPAD>\n"
+                    "Your persistent notes (survive context condensation):\n"
+                    f"{scratchpad_block}\n"
+                    "</WORKING_SCRATCHPAD>"
+                )
+            working_memory_block = get_working_memory_prompt_block()
+            if working_memory_block:
+                memory_blocks.append(working_memory_block)
+            if not memory_blocks:
                 return content
-            lines: list[str] = []
-            char_budget = 2000
-            for key, value in entries:
-                line = f"  [{key}]: {value}"
-                if len("\n".join(lines + [line])) > char_budget:
-                    lines.append("  ... (additional notes truncated)")
-                    break
-                lines.append(line)
-            scratchpad_block = "\n".join(lines)
-            return (
-                f"{content}\n\n"
-                f"<WORKING_SCRATCHPAD>\n"
-                f"Your persistent notes (survive context condensation):\n"
-                f"{scratchpad_block}\n"
-                f"</WORKING_SCRATCHPAD>"
-            )
+            return f"{content}\n\n" + "\n\n".join(memory_blocks)
         except Exception:
             return content

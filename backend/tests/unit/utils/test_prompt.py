@@ -181,7 +181,7 @@ class TestOrchestratorPromptManager:
         # Line 303-304: except Exception: return content
         opm = OrchestratorPromptManager(prompt_dir)
         with patch(
-            "backend.engines.orchestrator.tools.memory_manager_temp1.scratchpad_entries_for_prompt",
+            "backend.engines.orchestrator.tools.note.scratchpad_entries_for_prompt",
             side_effect=Exception("failed"),
         ):
             result = opm._inject_scratchpad("content")
@@ -190,12 +190,28 @@ class TestOrchestratorPromptManager:
     def test_inject_scratchpad_success(self, prompt_dir):
         opm = OrchestratorPromptManager(prompt_dir)
         with patch(
-            "backend.engines.orchestrator.tools.memory_manager_temp1.scratchpad_entries_for_prompt",
+            "backend.engines.orchestrator.tools.note.scratchpad_entries_for_prompt",
             return_value=[("key", "note value")],
+        ), patch(
+            "backend.engines.orchestrator.tools.working_memory.get_working_memory_prompt_block",
+            return_value="",
         ):
             result = opm._inject_scratchpad("content")
             assert "[key]: note value" in result
             assert "<WORKING_SCRATCHPAD>" in result
+
+    def test_inject_scratchpad_includes_working_memory_block(self, prompt_dir):
+        opm = OrchestratorPromptManager(prompt_dir)
+        with patch(
+            "backend.engines.orchestrator.tools.note.scratchpad_entries_for_prompt",
+            return_value=[],
+        ), patch(
+            "backend.engines.orchestrator.tools.working_memory.get_working_memory_prompt_block",
+            return_value="<WORKING_MEMORY>\n[PLAN] test\n</WORKING_MEMORY>",
+        ):
+            result = opm._inject_scratchpad("content")
+            assert "<WORKING_MEMORY>" in result
+            assert "[PLAN] test" in result
 
 def test_sentinels():
     assert isinstance(UNINITIALIZED_PROMPT_MANAGER, _UninitializedPromptManager)

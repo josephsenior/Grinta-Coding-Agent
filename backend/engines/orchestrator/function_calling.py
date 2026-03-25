@@ -39,10 +39,6 @@ from backend.engines.orchestrator.tools.search_code import (
     build_search_code_action,
     SEARCH_CODE_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.web_search import (
-    build_web_search_action,
-    WEB_SEARCH_TOOL_NAME,
-)
 from backend.engines.orchestrator.tools.check_tool_status import (
     build_check_tool_status_action,
 )
@@ -247,7 +243,7 @@ def _handle_memory_manager_tool(arguments: dict) -> AgentThinkAction:
         results = recall_fn(query, k)
         if not results:
             return AgentThinkAction(
-                thought=f"[SEMANTIC_RECALL_RESULT] No results found for query: {query!r}"
+                thought=f"[SEMANTIC_RECALL_RESULT] No indexed memory results found for query: {query!r}"
             )
         parts = [f"[SEMANTIC_RECALL_RESULT] {len(results)} results for query: {query!r}\n"]
         for i, item in enumerate(results, 1):
@@ -292,17 +288,6 @@ def _handle_search_code_tool(arguments: dict) -> CmdRunAction:
         case_sensitive=arguments.get("case_sensitive", "false"),
         max_results=arguments.get("max_results", 50),
     )
-
-
-def _handle_web_search_tool(arguments: dict) -> CmdRunAction:
-    """Handle WEB_SEARCH_TOOL: search the web for information."""
-    query = arguments.get("query", "")
-    if not query:
-        raise FunctionCallValidationError(
-            'Missing required argument "query" in tool call web_search'
-        )
-    num_results = int(arguments.get("num_results", 5))
-    return build_web_search_action(query=query, num_results=num_results)
 
 
 def _handle_workspace_status_tool(arguments: dict) -> CmdRunAction:
@@ -1216,7 +1201,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
         create_apply_patch_tool()["function"]["name"]: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
-        WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,
         "check_tool_status": lambda args: _handle_check_tool_status_tool(
             args, {}
         ),  # Simplified for static map

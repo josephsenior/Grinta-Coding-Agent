@@ -1,6 +1,6 @@
 """Prompt generation service for conversation context recall.
 
-Extracted from ``manage_conversations.py`` to keep route handlers thin.
+Extracted from ``conversation_collection.py`` to keep route handlers thin.
 Contains template rendering, LLM prompt generation, and contextual event
 retrieval for the ``remember-prompt`` endpoint.
 """

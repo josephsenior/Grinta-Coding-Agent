@@ -125,7 +125,7 @@ async def search_components(mcps, args: dict[str, Any], call_tool_func) -> dict:
 
 def _windows_stdio_mcp_note() -> str | None:
     """Explain stdio MCP policy without importing utils at module load (breaks cycles)."""
-    from backend.mcp_client.utils import _is_windows_stdio_mcp_disabled
+    from backend.mcp_client.mcp_utils import _is_windows_stdio_mcp_disabled
 
     if _is_windows_stdio_mcp_disabled():
         return (

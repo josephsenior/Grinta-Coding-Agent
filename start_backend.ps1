@@ -157,4 +157,10 @@ $env:PYTHONPATH = "$PSScriptRoot"
 $env:PORT = "$resolvedPort"
 $env:FORGE_ENABLE_WINDOWS_MCP = "1"
 $env:PYTHONUTF8 = "1"
-uv run python start_server.py
+# Prefer the project venv so Ctrl+C goes to Python (not a uv wrapper); fallback to uv run.
+$venvPy = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+if (Test-Path -LiteralPath $venvPy) {
+    & $venvPy start_server.py
+} else {
+    uv run python start_server.py
+}

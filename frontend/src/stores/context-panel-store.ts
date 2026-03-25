@@ -24,6 +24,7 @@ export interface ContextPanelState {
   openFile: (path: string, content: string) => void;
   openDiff: (path: string, diff: string) => void;
   appendTerminalOutput: (text: string) => void;
+  appendTerminalOutputBatch: (lines: string[]) => void;
   clearTerminal: () => void;
   setPreviewUrl: (url: string | null) => void;
   setEditorReadOnly: (readOnly: boolean) => void;
@@ -71,6 +72,15 @@ export const useContextPanelStore = create<ContextPanelState>()(
     appendTerminalOutput: (text) =>
       set((state) => {
         state.terminalLines.push(text);
+        if (state.terminalLines.length > 5000) {
+          state.terminalLines = state.terminalLines.slice(-4000);
+        }
+      }),
+
+    appendTerminalOutputBatch: (lines) =>
+      set((state) => {
+        if (!Array.isArray(lines) || lines.length === 0) return;
+        state.terminalLines.push(...lines);
         if (state.terminalLines.length > 5000) {
           state.terminalLines = state.terminalLines.slice(-4000);
         }

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.storage.local import LocalFileStore
+from backend.storage.local_file_store import LocalFileStore
 from backend.storage.in_memory_file_store import InMemoryFileStore
 
 if TYPE_CHECKING:
@@ -58,3 +58,4 @@ def get_file_store(
         else:
             store = WebHookFileStore(store, file_store_web_hook_url, client)
     return store
+

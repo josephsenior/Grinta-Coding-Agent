@@ -32,7 +32,7 @@ BACKEND_HOST_PORT = "$(BACKEND_HOST):$(BACKEND_PORT)"
 DEFAULT_LOCAL_DATA_DIR = "./workspace"
 DEFAULT_MODEL = "gpt-4o"
 CONFIG_FILE = settings.json
-PRE_COMMIT_CONFIG_PATH = "./backend/dev_config/python/.pre-commit-config.yaml"
+PRE_COMMIT_CONFIG_PATH = "./.pre-commit-config.yaml"
 PYTHON_VERSION = 3.12
 
 # ANSI color codes
@@ -148,14 +148,14 @@ update-openapi:
 # Start backend
 start-backend:
 	@echo "$(YELLOW)Starting backend...$(RESET)"
-	@uv run uvicorn backend.api.listen:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload --reload-exclude "./workspace"
+	@uv run uvicorn backend.api.socketio_asgi_app:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload --reload-exclude "./workspace"
 
 # Run the app
 run:
 	@echo "$(YELLOW)Running the app...$(RESET)"
 	@mkdir -p logs
 	@echo "$(YELLOW)Starting backend server...$(RESET)"
-	@uv run uvicorn backend.api.listen:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) &
+	@uv run uvicorn backend.api.socketio_asgi_app:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) &
 	@echo "$(YELLOW)Waiting for the backend to start...$(RESET)"
 	@until nc -z localhost $(BACKEND_PORT); do sleep 0.1; done
 	@echo "$(GREEN)Backend started successfully on $(BACKEND_HOST_PORT).$(RESET)"
@@ -205,3 +205,4 @@ help:
 
 # Phony targets
 .PHONY: build check-dependencies check-system check-python check-uv install-python-dependencies install-pre-commit-hooks lint start-backend run setup-config setup-config-prompts setup-config-basic clean help
+

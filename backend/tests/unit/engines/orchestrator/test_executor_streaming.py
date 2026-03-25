@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 from typing import Any, cast
 
 from backend.engines.orchestrator.safety import OrchestratorSafetyManager
@@ -47,7 +47,7 @@ def test_executor_emits_streaming_chunk_actions(monkeypatch):
         llm=llm,
         safety_manager=cast(OrchestratorSafetyManager, _Safety()),
         planner=planner,
-        mcp_tool_name_provider=lambda: [],
+        mcp_tools_provider=lambda: {},
     )
 
     executor.execute({"messages": [], "stream": True}, event_stream)
@@ -63,7 +63,7 @@ def test_executor_content_to_str_supports_output_text_parts():
         llm=MagicMock(),
         safety_manager=cast(OrchestratorSafetyManager, _Safety()),
         planner=MagicMock(),
-        mcp_tool_name_provider=lambda: [],
+        mcp_tools_provider=lambda: {},
     )
 
     content = [
@@ -80,7 +80,7 @@ def test_executor_extract_last_user_text_supports_object_messages():
         llm=MagicMock(),
         safety_manager=cast(OrchestratorSafetyManager, _Safety()),
         planner=MagicMock(),
-        mcp_tool_name_provider=lambda: [],
+        mcp_tools_provider=lambda: {},
     )
 
     messages = cast(
@@ -100,7 +100,6 @@ def test_executor_extract_last_user_text_supports_object_messages():
 def test_async_execute_emits_real_streaming_chunks(monkeypatch):
     """async_execute should stream real chunks via astream and emit StreamingChunkAction."""
     from backend.engines.orchestrator.executor import OrchestratorExecutor
-    from backend.events.action.message import StreamingChunkAction
 
     import backend.engines.orchestrator.function_calling as fc
     sys.modules.setdefault("forge.engines.orchestrator.function_calling", fc)
@@ -136,7 +135,7 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
         llm=llm,
         safety_manager=cast(OrchestratorSafetyManager, _Safety()),
         planner=MagicMock(),
-        mcp_tool_name_provider=lambda: [],
+        mcp_tools_provider=lambda: {},
     )
 
     result = asyncio.run(executor.async_execute({"messages": []}, event_stream))
@@ -207,7 +206,7 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
         llm=llm,
         safety_manager=cast(OrchestratorSafetyManager, _Safety()),
         planner=MagicMock(),
-        mcp_tool_name_provider=lambda: [],
+        mcp_tools_provider=lambda: {},
     )
 
     result = asyncio.run(executor.async_execute({"messages": []}, MagicMock()))

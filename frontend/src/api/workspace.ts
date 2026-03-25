@@ -11,9 +11,12 @@ export async function getWorkspace(): Promise<WorkspaceInfo> {
 }
 
 export async function setWorkspacePath(path: string): Promise<WorkspaceInfo & { ok: boolean }> {
-  const { data } = await apiClient.post<WorkspaceInfo & { ok: boolean }>("/workspace", {
-    path,
-  });
+  // Closing MCP-backed sessions during switch can exceed the default 30s client timeout.
+  const { data } = await apiClient.post<WorkspaceInfo & { ok: boolean }>(
+    "/workspace",
+    { path },
+    { timeout: 180_000 },
+  );
   return data;
 }
 

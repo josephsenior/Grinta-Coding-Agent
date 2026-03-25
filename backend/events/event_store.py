@@ -16,8 +16,6 @@ from backend.storage.locations import (
     get_conversation_event_filename,
     get_conversation_events_dir,
 )
-from backend.utils.shutdown_listener import should_continue
-
 if TYPE_CHECKING:
     from backend.events.event import Event, EventSource
     from backend.events.event_filter import EventFilter
@@ -171,9 +169,6 @@ class EventStore(EventStoreABC):
         num_results = 0
 
         for index in range(start_id, end_id, step):
-            if not should_continue():
-                return
-
             if not cache_page.covers(index):
                 cache_page = self._load_cache_page_for_index(index)
 

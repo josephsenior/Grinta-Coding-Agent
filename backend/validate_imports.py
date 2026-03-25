@@ -44,7 +44,7 @@ def main():
     # Core imports
     print("Checking core modules...")
     try_import("backend.api.app", "Main FastAPI app")
-    try_import("backend.api.listen", "Server entry point")
+    try_import("backend.api.socketio_asgi_app", "Server entry point")
 
     # Route imports (from app.py)
     print("\nChecking route modules...")
@@ -56,7 +56,7 @@ def main():
         ("backend.api.routes.git", "Git routes"),
         ("backend.api.routes.global_export", "Export routes"),
         ("backend.api.routes.knowledge_base", "Knowledge base routes"),
-        ("backend.api.routes.manage_conversations", "Manage conversations routes"),
+        ("backend.api.routes.conversation_collection", "Manage conversations routes"),
         ("backend.api.routes.memory", "Memory routes"),
         ("backend.api.routes.monitoring", "Monitoring routes"),
         ("backend.api.routes.public", "Public API routes"),
@@ -93,3 +93,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+

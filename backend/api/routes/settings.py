@@ -16,7 +16,7 @@ from backend.core.logger import forge_logger as logger
 # Import these at runtime so FastAPI can resolve them in Annotated types
 from backend.core.provider_types import ProviderTokenType, ProviderType
 from backend.core.pydantic_compat import model_dump_with_options
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.api.settings import GETSettingsModel
 from backend.api.app_state import get_app_state
 from backend.api.user_auth import (
@@ -474,7 +474,7 @@ def _merge_forge_mcp_for_api(settings: Settings) -> Settings:
     the UI shows zero servers while the runtime uses forge MCP.
     """
     try:
-        from backend.core.config.utils import load_forge_config
+        from backend.core.config.config_loader import load_forge_config
 
         forge_mcp = load_forge_config().mcp
     except Exception as exc:
@@ -836,3 +836,4 @@ def _build_default_settings_response() -> GETSettingsModel:
             "llm_api_key": None,
         },
     )
+

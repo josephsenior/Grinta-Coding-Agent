@@ -9,7 +9,7 @@ from backend.events import EventSource
 from backend.events.observation.empty import NullObservation
 from backend.events.serialization.event import event_to_dict
 from backend.events.stream import EventStream
-from backend.storage.local import LocalFileStore
+from backend.storage.local_file_store import LocalFileStore
 from backend.storage.locations import get_conversation_events_dir
 
 
@@ -78,3 +78,4 @@ def test_event_stream_persists_and_loads_events_across_restart() -> None:
             assert restarted.cur_id >= 2
         finally:
             restarted.close()
+

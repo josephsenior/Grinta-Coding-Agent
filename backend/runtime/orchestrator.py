@@ -9,7 +9,7 @@ from backend.core.constants import (
     IDLE_RECLAIM_SPIKE_THRESHOLD,
 )
 from backend.core.logger import forge_logger as logger
-from backend.runtime.pool import (
+from backend.runtime.runtime_pool import (
     PooledRuntime,
     RuntimePool,
     WarmPoolPolicy,
@@ -67,7 +67,7 @@ class RuntimeOrchestrator:
         env_vars: dict[str, str] | None = None,
         user_id: str | None = None,
     ) -> RuntimeAcquireResult:
-        from backend.core.setup import create_runtime  # lazy import to avoid cycles
+        from backend.core.bootstrap.setup import create_runtime  # lazy import to avoid cycles
 
         key = config.runtime
         pooled = self._pool.acquire(key)
@@ -236,3 +236,4 @@ class RuntimeOrchestrator:
 
 
 runtime_orchestrator = RuntimeOrchestrator()
+

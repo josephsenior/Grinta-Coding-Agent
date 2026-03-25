@@ -1,6 +1,6 @@
 """Session initialization business logic.
 
-Extracted from ``manage_conversations.py`` to keep route handlers thin.
+Extracted from ``conversation_collection.py`` to keep route handlers thin.
 Contains request parsing, validation, trigger determination, and the
 main conversation-creation orchestration that the ``POST /conversations``
 route delegates to.

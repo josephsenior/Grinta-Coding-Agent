@@ -1,4 +1,4 @@
-"""Tests for scratchpad persistence and prompt ordering (memory_manager_temp1)."""
+"""Tests for scratchpad persistence and prompt ordering."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.engines.orchestrator.tools import memory_manager_temp1 as m
+from backend.engines.orchestrator.tools import note as m
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def test_casefold_dedupe_keeps_newer_timestamp(scratchpad_root):
 
 def test_build_note_writes_meta_and_roundtrip(scratchpad_root):
     with patch(
-        "backend.engines.orchestrator.tools.memory_manager_temp1.time.time",
+        "backend.engines.orchestrator.tools.note.time.time",
         side_effect=[10.0, 20.0],
     ):
         m.build_note_action("k1", "v1")

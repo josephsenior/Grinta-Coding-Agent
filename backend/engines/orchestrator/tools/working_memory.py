@@ -200,3 +200,25 @@ def get_full_working_memory() -> str:
         return ""
     parts.append("</WORKING_MEMORY>")
     return "\n".join(parts)
+
+
+def get_working_memory_prompt_block(char_budget: int = 2000) -> str:
+    """Return a bounded working-memory block for prompt or recovery injection."""
+    memory = _load_memory()
+    if not memory:
+        return ""
+
+    lines = ["<WORKING_MEMORY>", "Your structured working memory:"]
+    for sec in _VALID_SECTIONS:
+        val = memory.get(sec, "")
+        if not val:
+            continue
+        line = f"[{sec.upper()}] {val}"
+        if len("\n".join(lines + [line, "</WORKING_MEMORY>"])) > char_budget:
+            lines.append("... (additional working memory truncated)")
+            break
+        lines.append(line)
+    if len(lines) == 2:
+        return ""
+    lines.append("</WORKING_MEMORY>")
+    return "\n".join(lines)

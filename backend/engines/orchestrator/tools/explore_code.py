@@ -12,6 +12,7 @@ from backend.engines.orchestrator.tools.common import create_tool_definition
 _EXPLORE_TREE_STRUCTURE_DESCRIPTION = """
 Unified repository exploring tool that traverses a pre-built code graph to retrieve dependency structure around specified entities.
 The search can be controlled to traverse upstream (exploring dependencies that entities rely on) or downstream (exploring how entities impact others), with optional limits on traversal depth and filters for entity and dependency types.
+Use this for architecture and dependency traversal after you know the relevant entity. For literal text search use `search_code`; for precise symbol references in a known file use `lsp_query`.
 
 Code Graph Definition:
 * Entity Types: 'directory', 'file', 'class', 'function'.
@@ -77,6 +78,7 @@ def create_explore_tree_structure_tool():
 _READ_SYMBOL_DEFINITION_DESCRIPTION = """
 Searches the codebase to retrieve the complete implementations of specified entities based on the provided entity names.
 The tool can handle specific entity queries such as function names, class names, or file paths.
+Use this when you need the full body of a known symbol or file. For broad text search use `search_code`; for precise definition/reference lookup at a known cursor position use `lsp_query`.
 
 Usage Example:
 # Search for a specific function implementation

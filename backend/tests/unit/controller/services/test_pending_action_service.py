@@ -376,19 +376,20 @@ class TestPendingActionWatchdog(unittest.IsolatedAsyncioTestCase):
 
     @patch("time.time")
     async def test_mcp_action_uses_timeout_floor_when_base_below_floor(self, mock_time):
-        from backend.core.constants import MCP_PENDING_ACTION_TIMEOUT_FLOOR
-
         service = PendingActionService(self.mock_context, timeout=1.0)
-        mock_action = MagicMock()
-        mock_action.__class__.__name__ = "MCPAction"
+        mock_action = type("MCPAction", (), {})()
         mock_action.id = "42"
 
-        mock_time.return_value = 100.0
-        service.set(mock_action)
-        mock_time.return_value = 100.0 + MCP_PENDING_ACTION_TIMEOUT_FLOOR - 1
-        self.assertEqual(service.get(), mock_action)
+        with patch(
+            "backend.controller.services.pending_action_service.MCP_PENDING_ACTION_TIMEOUT_FLOOR",
+            30.0,
+        ):
+            mock_time.return_value = 100.0
+            service.set(mock_action)
+            mock_time.return_value = 129.0
+            self.assertEqual(service.get(), mock_action)
 
-        mock_time.return_value = 100.0 + MCP_PENDING_ACTION_TIMEOUT_FLOOR + 1
-        self.assertIsNone(service.get())
-        self.mock_controller.event_stream.add_event.assert_called_once()
+            mock_time.return_value = 131.0
+            self.assertIsNone(service.get())
+            self.mock_controller.event_stream.add_event.assert_called_once()
         service.shutdown()

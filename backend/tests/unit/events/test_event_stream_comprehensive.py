@@ -185,6 +185,40 @@ class TestAddEvent:
         lock.wait(timeout=3)
         assert received
 
+    def test_add_event_dispatches_even_when_shutdown_flag_is_stale(self, stream):
+        import backend.utils.shutdown_listener as shutdown_mod
+
+        received: list[Event] = []
+        lock = threading.Event()
+
+        def cb(event):
+            received.append(event)
+            lock.set()
+
+        stream.subscribe(EventStreamSubscriber.TEST, cb, "recv-stale-shutdown")
+        shutdown_mod._should_exit = True
+
+        stream.add_event(NullObservation("dispatch-after-stale-shutdown"), EventSource.AGENT)
+
+        lock.wait(timeout=3)
+        assert received
+
+    def test_user_event_dispatches_inline_when_queue_not_ready(self, stream, monkeypatch):
+        received: list[Event] = []
+        lock = threading.Event()
+
+        def cb(event):
+            received.append(event)
+            lock.set()
+
+        stream.subscribe(EventStreamSubscriber.TEST, cb, "recv-inline-user")
+        monkeypatch.setattr(stream._queue_ready, "wait", lambda timeout=None: False)
+
+        stream.add_event(MessageAction(content="inline user event"), EventSource.USER)
+
+        lock.wait(timeout=1)
+        assert received
+
 
 # ---------------------------------------------------------------------------
 # Activity listeners

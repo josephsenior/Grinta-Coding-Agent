@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.api.app_state import get_app_state
+from backend.core.logger import forge_logger as logger
 from backend.core.workspace_resolution import (
     apply_workspace_to_config,
     get_effective_workspace_root,
@@ -15,7 +16,7 @@ from backend.core.workspace_resolution import (
     save_persisted_workspace_path,
 )
 from backend.runtime import runtime_orchestrator
-from backend.storage.local import LocalFileStore
+from backend.storage.local_file_store import LocalFileStore
 
 router = APIRouter(prefix="/api/v1/workspace", tags=["v1", "workspace"])
 
@@ -42,7 +43,23 @@ async def _apply_and_persist(root: Path) -> str:
     runtime_orchestrator.drain_pooled_runtimes()
     cm = state.conversation_manager
     if cm is not None and hasattr(cm, "switch_workspace_root"):
-        await cm.switch_workspace_root(new_store)
+        try:
+            await cm.switch_workspace_root(new_store)
+        except TimeoutError as e:
+            logger.exception("Workspace switch timed out while closing sessions")
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    "Closing open chats took too long (MCP/runtime teardown). "
+                    "Try again, or stop the agent and disconnect first."
+                ),
+            ) from e
+        except Exception as e:
+            logger.exception("Workspace switch failed while closing sessions")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Could not switch workspace: {e}",
+            ) from e
     return s
 
 
@@ -91,3 +108,4 @@ async def create_workspace(body: CreateWorkspaceBody) -> dict:
         ) from e
     s = await _apply_and_persist(dest)
     return {"path": s, "ok": True}
+

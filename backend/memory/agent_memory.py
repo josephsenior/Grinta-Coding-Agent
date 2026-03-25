@@ -121,7 +121,9 @@ class Memory:
         """Run retry loop in a worker thread (see _on_event). Always returns an observation."""
         observation = self._process_recall_with_retry_sync(event)
         if observation is None:
-            return self._build_failure_observation(event)
+            # No playbook/KB hits (or unsupported recall shape) is success with nothing to add —
+            # not a user-visible "Recall failed" (see _on_playbook_recall / _on_workspace_context_recall).
+            return self._empty_recall_success(event)
         return observation
 
     def _process_recall_with_retry_sync(
@@ -181,13 +183,32 @@ class Memory:
         )
         time.sleep(sleep_time)
 
-    def _build_failure_observation(
-        self, event: RecallAction
-    ) -> RecallFailureObservation:
-        return RecallFailureObservation(
-            recall_type=event.recall_type,
-            error_message="Recall failed after retries",
-            content="Recall failure",
+    def _empty_recall_success(self, event: RecallAction) -> RecallObservation:
+        """Recall completed with nothing to inject into the prompt (not a failure)."""
+        if event.recall_type == RecallType.WORKSPACE_CONTEXT:
+            repo_info = self._get_repo_info_fields()
+            runtime_info = self._get_runtime_info_fields()
+            conversation_instructions = self._get_conversation_instructions()
+            return RecallObservation(
+                recall_type=RecallType.WORKSPACE_CONTEXT,
+                repo_name=repo_info["repo_name"],
+                repo_directory=repo_info["repo_directory"],
+                repo_branch=repo_info["repo_branch"],
+                repo_instructions="",
+                runtime_hosts=runtime_info["runtime_hosts"],
+                additional_agent_instructions=runtime_info["additional_agent_instructions"],
+                playbook_knowledge=[],
+                content="",
+                date=runtime_info["date"],
+                custom_secrets_descriptions=runtime_info["custom_secrets_descriptions"],
+                conversation_instructions=conversation_instructions,
+                working_dir=runtime_info["working_dir"],
+            )
+        return RecallObservation(
+            recall_type=RecallType.KNOWLEDGE,
+            playbook_knowledge=[],
+            knowledge_base_results=[],
+            content="",
         )
 
     async def _handle_recall_exception(self, event: Event, exc: Exception) -> None:
@@ -322,18 +343,31 @@ class Memory:
         # Find playbook knowledge based on query
         playbook_knowledge = self._find_playbook_knowledge(event.query)
 
-        # Check if we should create a recall observation
-        if not self._should_create_recall_observation(
-            repo_instructions, playbook_knowledge
-        ):
-            return None
-
-        # Get all required fields
+        # Get all required fields (always emit an observation so the pipeline never treats
+        # "no repo/runtime yet" as RecallFailure; prompt_assembly drops empty content.)
         repo_info = self._get_repo_info_fields()
         runtime_info = self._get_runtime_info_fields()
         conversation_instructions = self._get_conversation_instructions()
 
-        # Create and return the recall observation
+        if not self._should_create_recall_observation(
+            repo_instructions, playbook_knowledge
+        ):
+            return RecallObservation(
+                recall_type=RecallType.WORKSPACE_CONTEXT,
+                repo_name=repo_info["repo_name"],
+                repo_directory=repo_info["repo_directory"],
+                repo_branch=repo_info["repo_branch"],
+                repo_instructions="",
+                runtime_hosts=runtime_info["runtime_hosts"],
+                additional_agent_instructions=runtime_info["additional_agent_instructions"],
+                playbook_knowledge=[],
+                content="",
+                date=runtime_info["date"],
+                custom_secrets_descriptions=runtime_info["custom_secrets_descriptions"],
+                conversation_instructions=conversation_instructions,
+                working_dir=runtime_info["working_dir"],
+            )
+
         return RecallObservation(
             recall_type=RecallType.WORKSPACE_CONTEXT,
             repo_name=repo_info["repo_name"],
@@ -388,7 +422,12 @@ class Memory:
                 knowledge_base_results=kb_results,
                 content="Retrieved knowledge from playbooks and knowledge base",
             )
-        return None
+        return RecallObservation(
+            recall_type=RecallType.KNOWLEDGE,
+            playbook_knowledge=[],
+            knowledge_base_results=[],
+            content="",
+        )
 
     def set_knowledge_base_settings(self, settings: KnowledgeBaseSettings) -> None:
         """Update knowledge base settings for this memory instance."""

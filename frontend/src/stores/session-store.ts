@@ -105,10 +105,25 @@ export const useSessionStore = create<SessionState>()(
 
         // Handle streaming chunks — append to buffer instead of events list
         if ("action" in ev && (ev as ActionEvent).action === ActionType.STREAMING_CHUNK) {
-          const chunk = (ev as ActionEvent).args?.chunk;
-          if (typeof chunk === "string") {
+          const chunkArgs = (ev as ActionEvent).args;
+          const chunk = chunkArgs?.chunk;
+          const accumulated = chunkArgs?.accumulated;
+          const is_final = chunkArgs?.is_final;
+
+          // Prefer server-provided accumulated text so UI stays correct even when
+          // transport drops intermediate chunks under pressure.
+          if (typeof accumulated === "string") {
+            state.streamingContent = accumulated;
+          } else if (typeof chunk === "string") {
             state.streamingContent += chunk;
           }
+
+          // Do not clear on final chunk. Keep the rendered stream visible until
+          // the next concrete agent action/message arrives and replaces it.
+          if (is_final && typeof accumulated === "string") {
+            state.streamingContent = accumulated;
+          }
+
           if (eid > state.latestEventId) {
             state.latestEventId = eid;
           }
@@ -132,11 +147,9 @@ export const useSessionStore = create<SessionState>()(
           return;
         }
 
-        // When a message action arrives after streaming, finalize the streaming content
-        if ("action" in ev && (ev as ActionEvent).action === ActionType.MESSAGE) {
-          if (state.streamingContent) {
-            state.streamingContent = "";
-          }
+        // When an action arrives after streaming, finalize the streaming content
+        if ("action" in ev && state.streamingContent && ev.source === "agent") {
+          state.streamingContent = "";
         }
 
         maybeToastWorkspaceNotOpen(ev, state.conversationId);
@@ -188,10 +201,8 @@ export const useSessionStore = create<SessionState>()(
             continue;
           }
 
-          if ("action" in ev && (ev as ActionEvent).action === ActionType.MESSAGE) {
-            if (state.streamingContent) {
-              state.streamingContent = "";
-            }
+          if ("action" in ev && state.streamingContent && ev.source === "agent") {
+            state.streamingContent = "";
           }
 
           maybeToastWorkspaceNotOpen(ev, state.conversationId);

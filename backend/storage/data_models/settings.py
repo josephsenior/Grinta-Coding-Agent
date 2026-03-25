@@ -18,7 +18,7 @@ from pydantic import (  # noqa: E402
 )
 
 from backend.core.config.mcp_config import MCPConfig  # noqa: E402
-from backend.core.config.utils import load_forge_config  # noqa: E402
+from backend.core.config.config_loader import load_forge_config  # noqa: E402
 from backend.core.constants import (  # noqa: E402
     DEFAULT_KB_AUTO_SEARCH,
     DEFAULT_KB_ENABLED,

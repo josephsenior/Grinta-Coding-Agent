@@ -1,8 +1,33 @@
+import axios from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getWorkspace, setWorkspacePath } from "@/api/workspace";
 import { useSessionStore } from "@/stores/session-store";
+
+function formatWorkspaceSetError(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const d = err.response?.data as { detail?: unknown } | undefined;
+    const detail = d?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+    if (Array.isArray(detail)) {
+      const parts = detail.map((x) =>
+        typeof x === "object" && x !== null && "msg" in x
+          ? String((x as { msg: string }).msg)
+          : JSON.stringify(x),
+      );
+      if (parts.length) {
+        return parts.join("; ");
+      }
+    }
+    if (err.code === "ECONNABORTED") {
+      return "Request timed out while switching workspace — try again or close active chats first.";
+    }
+  }
+  return "Could not set workspace";
+}
 
 export function useWorkspace() {
   return useQuery({
@@ -26,14 +51,7 @@ export function useSetWorkspace() {
       toast.success("Project folder updated. Chats for this folder load in the sidebar.");
     },
     onError: (err: unknown) => {
-      const msg =
-        err && typeof err === "object" && "response" in err
-          ? String(
-              (err as { response?: { data?: { detail?: string } } }).response?.data
-                ?.detail ?? "Could not set workspace",
-            )
-          : "Could not set workspace";
-      toast.error(msg);
+      toast.error(formatWorkspaceSetError(err));
     },
   });
 }

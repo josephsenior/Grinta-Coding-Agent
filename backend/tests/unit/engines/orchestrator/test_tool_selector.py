@@ -39,7 +39,6 @@ _ALL_TOOLS = [
     _make_tool("workspace_status"),
     _make_tool("summarize_context"),
     _make_tool("apply_patch"),
-    _make_tool("web_search"),
     _make_tool("web_reader"),
 ]
 

@@ -153,20 +153,20 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_apply_patch: bool = Field(default=True)
     enable_editor: bool = Field(default=True)
     enable_working_memory: bool = Field(default=True)
-    enable_check_tool_status: bool = Field(default=False)
+    enable_check_tool_status: bool = Field(default=True)
     enable_lsp_query: bool = Field(default=True)
-    enable_signal_progress: bool = Field(default=False)
-    enable_swarming: bool = Field(default=False)
-    enable_blackboard: bool = Field(default=False)
+    enable_signal_progress: bool = Field(default=True)
+    enable_swarming: bool = Field(default=True)
+    enable_blackboard: bool = Field(default=True)
     enable_rollback: bool = Field(default=True)
     enable_workspace_status: bool = Field(default=True)
-    enable_query_error_solutions: bool = Field(default=False)
+    enable_query_error_solutions: bool = Field(default=True)
     enable_checkpoints: bool = Field(default=True)
-    enable_analyze_project_structure: bool = Field(default=False)
-    enable_session_diff: bool = Field(default=False)
-    enable_verify_file_lines: bool = Field(default=False)
-    enable_meta_cognition: bool = Field(default=False)
-    enable_verify_ui_change: bool = Field(default=False)
+    enable_analyze_project_structure: bool = Field(default=True)
+    enable_session_diff: bool = Field(default=True)
+    enable_verify_file_lines: bool = Field(default=True)
+    enable_meta_cognition: bool = Field(default=True)
+    enable_verify_ui_change: bool = Field(default=True)
 
     # Advanced capabilities
     enable_history_truncation: bool = Field(
@@ -178,8 +178,8 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     enable_mcp: bool = Field(default=DEFAULT_AGENT_MCP_ENABLED)
     enable_web_search: bool = Field(
-        default=True,
-        description="Enable the web_search tool (DuckDuckGo, no API key required)",
+        default=False,
+        description="Deprecated no-op flag retained for backward compatibility.",
     )
     enable_auto_planning: bool = Field(
         default=DEFAULT_AGENT_AUTO_PLANNING_ENABLED,

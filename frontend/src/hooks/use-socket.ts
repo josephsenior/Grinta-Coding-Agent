@@ -13,6 +13,7 @@ import {
 import { queryClient } from "@/lib/query-client";
 import { toast } from "sonner";
 import { SUSTAINED_DISCONNECT_NOTICE_MS } from "@/lib/constants";
+import { extractTerminalLinesFromEvent } from "@/lib/terminal-events";
 
 /**
  * Manages the Socket.IO lifecycle for a conversation.
@@ -54,6 +55,49 @@ export function useSocket(conversationId: string | undefined) {
         latestEventId: fromEventId,
       });
 
+      const refreshReplayCursor = () => {
+        socket.io.opts.query = {
+          conversation_id: conversationIdRef.current ?? convId,
+          latest_event_id: latestEventIdRef.current,
+        };
+      };
+
+      let hasConnectedOnce = false;
+
+      const recoverAfterReconnect = async () => {
+        const convId = conversationIdRef.current;
+        const afterId = useSessionStore.getState().latestEventId;
+        if (convId) {
+          try {
+            const batch = await fetchConversationEventsAfter(convId, afterId);
+            if (batch.length > 0) {
+              const replayLines = batch.flatMap(extractTerminalLinesFromEvent);
+              if (replayLines.length > 0) {
+                useContextPanelStore.getState().appendTerminalOutputBatch(replayLines);
+              }
+              mergeHistoricalEvents(batch);
+              latestEventIdRef.current = useSessionStore.getState().latestEventId;
+            }
+          } catch (err) {
+            console.warn("[forge] Reconnect REST catch-up failed", err);
+          }
+          useSessionStore.getState().pruneRecoverableTransientErrors();
+          void queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
+        }
+
+        if (disconnectToastTimerRef.current) {
+          clearTimeout(disconnectToastTimerRef.current);
+          disconnectToastTimerRef.current = null;
+        }
+        const showRecoveryToast = userNotifiedDisconnectRef.current;
+        userNotifiedDisconnectRef.current = false;
+        if (showRecoveryToast) {
+          toast.success("Back online", {
+            description: "Live updates and sending messages work again.",
+          });
+        }
+      };
+
       const offForge = registerForgeEventListener(socket, (event) => {
         if (event.id < 0) return;
 
@@ -68,17 +112,30 @@ export function useSocket(conversationId: string | undefined) {
 
         latestEventIdRef.current = event.id;
         addEvent(event);
+
+        const terminalLines = extractTerminalLinesFromEvent(event);
+        if (terminalLines.length > 0) {
+          useContextPanelStore.getState().appendTerminalOutputBatch(terminalLines);
+        }
       });
 
       socket.on("connect", () => {
         setConnected(true);
         setReconnecting(false);
+
+        if (!hasConnectedOnce) {
+          hasConnectedOnce = true;
+          return;
+        }
+
+        void recoverAfterReconnect();
       });
 
       socket.on("disconnect", (reason) => {
         setConnected(false);
         // Intentional client teardown (e.g. leaving the chat) — no toast.
         if (reason === "io client disconnect") return;
+        setReconnecting(true);
 
         if (disconnectToastTimerRef.current) {
           clearTimeout(disconnectToastTimerRef.current);
@@ -97,45 +154,16 @@ export function useSocket(conversationId: string | undefined) {
             toast.error("Connection lost", { description: retryHint });
           }
         }, SUSTAINED_DISCONNECT_NOTICE_MS);
+
+        if (reason === "io server disconnect") {
+          refreshReplayCursor();
+          socket.connect();
+        }
       });
 
       socket.io.on("reconnect_attempt", () => {
         setReconnecting(true);
-      });
-
-      socket.io.on("reconnect", () => {
-        setReconnecting(false);
-        setConnected(true);
-
-        if (disconnectToastTimerRef.current) {
-          clearTimeout(disconnectToastTimerRef.current);
-          disconnectToastTimerRef.current = null;
-        }
-        const showRecoveryToast = userNotifiedDisconnectRef.current;
-        userNotifiedDisconnectRef.current = false;
-
-        void (async () => {
-          const convId = conversationIdRef.current;
-          const afterId = useSessionStore.getState().latestEventId;
-          if (convId) {
-            try {
-              const batch = await fetchConversationEventsAfter(convId, afterId);
-              if (batch.length > 0) {
-                mergeHistoricalEvents(batch);
-                latestEventIdRef.current = useSessionStore.getState().latestEventId;
-              }
-            } catch (err) {
-              console.warn("[forge] Reconnect REST catch-up failed", err);
-            }
-            useSessionStore.getState().pruneRecoverableTransientErrors();
-            void queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
-          }
-          if (showRecoveryToast) {
-            toast.success("Back online", {
-              description: "Live updates and sending messages work again.",
-            });
-          }
-        })();
+        refreshReplayCursor();
       });
 
       socket.io.on("reconnect_failed", () => {
@@ -176,6 +204,10 @@ export function useSocket(conversationId: string | undefined) {
         try {
           const batch = await fetchAllConversationEvents(conversationId);
           if (!cancelled && batch.length > 0) {
+            const historicalLines = batch.flatMap(extractTerminalLinesFromEvent);
+            if (historicalLines.length > 0) {
+              useContextPanelStore.getState().appendTerminalOutputBatch(historicalLines);
+            }
             mergeHistoricalEvents(batch);
           }
         } catch (err) {

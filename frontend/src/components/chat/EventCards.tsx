@@ -81,6 +81,26 @@ export function McpCard({ event }: ActionCardProps) {
   );
 }
 
+/** LSP code-navigation query. */
+export function LspQueryCard({ event }: ActionCardProps) {
+  const command = String(event.args?.command ?? "query");
+  const file = String(event.args?.file ?? "");
+  const line = Number(event.args?.line ?? 1);
+  const column = Number(event.args?.column ?? 1);
+
+  return (
+    <div className={cn(ideToolShell, "flex items-center gap-2 text-[12px] text-muted-foreground")}> 
+      <BookOpen className="h-3.5 w-3.5 shrink-0 opacity-50" />
+      <span>
+        LSP <code className="rounded border border-border/40 bg-muted/50 px-1 font-mono text-[11px] dark:bg-card/45">{command}</code>
+        {file && (
+          <span className="text-muted-foreground/70"> at {file}:{Number.isFinite(line) ? line : 1}:{Number.isFinite(column) ? column : 1}</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 /** Browse / Browse Interactive — URL card. */
 export function BrowseCard({ event }: ActionCardProps) {
   const url = String(event.args?.url ?? "");
@@ -310,6 +330,29 @@ export function McpObservationCard({ event }: ObservationCardProps) {
           previewLines={5}
           collapseWhenLines={10}
           collapseWhenChars={2000}
+          className="mt-1"
+          preClassName="rounded border border-border/40 bg-muted/45 p-2 dark:bg-card/40"
+        />
+      )}
+    </div>
+  );
+}
+
+/** LSP query result observation. */
+export function LspObservationCard({ event }: ObservationCardProps) {
+  const unavailable = String(event.message || "").toLowerCase().includes("unavailable");
+  return (
+    <div className={cn(ideToolShell, "text-[11px] text-muted-foreground")}> 
+      <div className="mb-1 flex items-center gap-1.5">
+        <BookOpen className="h-3 w-3 shrink-0 opacity-50" />
+        <span className={ideCaption}>{unavailable ? "LSP unavailable" : "LSP result"}</span>
+      </div>
+      {event.content && (
+        <CollapsibleToolOutput
+          content={event.content}
+          previewLines={6}
+          collapseWhenLines={12}
+          collapseWhenChars={2200}
           className="mt-1"
           preClassName="rounded border border-border/40 bg-muted/45 p-2 dark:bg-card/40"
         />

@@ -21,7 +21,7 @@ from backend.api.monitoring import MonitoringListener
 from backend.api.store_factory import get_conversation_store_instance
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.files import FileStore
-from backend.storage.local import LocalFileStore
+from backend.storage.local_file_store import LocalFileStore
 from backend.utils.import_utils import get_impl
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class AppState:
         from pathlib import Path
 
         from backend.core.app_paths import get_app_settings_root
-        from backend.core.config.utils import load_forge_config
+        from backend.core.config.config_loader import load_forge_config
         from backend.core.workspace_resolution import (
             apply_workspace_to_config,
             is_reserved_user_forge_data_dir,
@@ -170,7 +170,7 @@ class AppState:
                 impl = self.get_conversation_manager_impl()
 
                 # Ensure config is fresh before initializing manager
-                from backend.core.config.utils import load_forge_config
+                from backend.core.config.config_loader import load_forge_config
                 self.config = load_forge_config()
 
                 self._conversation_manager = impl.get_instance(  # type: ignore[attr-defined]
@@ -261,3 +261,4 @@ def get_app_state() -> AppState:
             if module.__dict__.get("_app_state") is None:
                 module.__dict__["_app_state"] = AppState()
     return module.__dict__["_app_state"]
+

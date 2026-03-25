@@ -117,16 +117,10 @@ class TestGracefulShutdown:
         await graceful_shutdown()  # should not raise
 
 
-class TestSetupSignalHandlers:
-    def test_registers_signal_handlers(self):
-        """setup_signal_handlers registers SIGTERM and SIGINT."""
-        import signal as signal_module
+class TestGracefulShutdownRequestsProcessShutdown:
+    async def test_calls_request_process_shutdown(self):
+        from backend.api.graceful_shutdown import graceful_shutdown
 
-        with patch.object(signal_module, "signal") as mock_signal:
-            from backend.api.graceful_shutdown import setup_signal_handlers
-
-            setup_signal_handlers()
-            calls = mock_signal.call_args_list
-            registered_signals = {c[0][0] for c in calls}
-            assert signal_module.SIGTERM in registered_signals
-            assert signal_module.SIGINT in registered_signals
+        with patch("backend.utils.shutdown_listener.request_process_shutdown") as rps:
+            await graceful_shutdown()
+            rps.assert_called_once()

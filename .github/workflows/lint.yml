@@ -53,15 +53,15 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
       - name: Set up python
         uses: useblacksmith/setup-python@v6
         with:
           python-version: 3.12
-      - name: Install Poetry
-        uses: snok/install-poetry@v1.4.1
-        with:
-          virtualenvs-in-project: true
       - name: Install dependencies
-        run: poetry install --with dev --no-interaction
+        run: uv sync --group dev
       - name: Run mypy
-        run: poetry run mypy --config-file mypy.ini
+        run: uv run mypy --config-file mypy.ini

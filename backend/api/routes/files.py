@@ -19,7 +19,7 @@ from backend.events.action import FileReadAction
 from backend.events.action.files import FileWriteAction
 from backend.events.observation import ErrorObservation, FileReadObservation
 from backend.runtime.utils.git_changes import get_git_changes
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.core.constants import FILES_TO_IGNORE
 from backend.api.files import POSTUploadFilesModel
 from backend.api.utils import get_conversation, get_conversation_store
@@ -692,3 +692,4 @@ async def upload_files(
         status_code=status.HTTP_200_OK,
         content={"uploaded_files": uploaded_files, "skipped_files": skipped_files},
     )
+

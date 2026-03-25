@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { useContextPanelStore } from "@/stores/context-panel-store";
 import { useAppStore } from "@/stores/app-store";
+import { Button } from "@/components/ui/button";
 import "@xterm/xterm/css/xterm.css";
 
 const DARK_THEME = {
@@ -26,6 +27,7 @@ export function TerminalTab() {
   const writtenCountRef = useRef(0);
 
   const terminalLines = useContextPanelStore((s) => s.terminalLines);
+  const clearTerminal = useContextPanelStore((s) => s.clearTerminal);
   const appTheme = useAppStore((s) => s.theme);
 
   // Initialize terminal
@@ -87,6 +89,30 @@ export function TerminalTab() {
   }, [terminalLines]);
 
   return (
-    <div ref={containerRef} className="h-full w-full" />
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/50 px-2">
+        <div className="text-[11px] text-muted-foreground">Live terminal output</div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] tabular-nums text-muted-foreground/80">{terminalLines.length} lines</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[10px]"
+            onClick={clearTerminal}
+            disabled={terminalLines.length === 0}
+          >
+            Clear
+          </Button>
+        </div>
+      </div>
+      <div className="relative min-h-0 flex-1">
+        {terminalLines.length === 0 && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center text-center text-[11px] text-muted-foreground/80">
+            Terminal output will appear here when the agent runs commands.
+          </div>
+        )}
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
+    </div>
   );
 }

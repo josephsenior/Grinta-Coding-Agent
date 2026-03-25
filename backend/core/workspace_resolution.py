@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +81,24 @@ def save_persisted_workspace_path(path: str) -> None:
     p.write_text(json.dumps({"path": resolved}, indent=2), encoding="utf-8")
 
 
+def normalize_user_workspace_path(path_str: str) -> str:
+    """Strip whitespace, optional quotes, and ``file://`` URLs from UI-pasted paths."""
+    s = path_str.strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in "\"'":
+        s = s[1:-1].strip()
+    if s.lower().startswith("file:"):
+        parsed = urlparse(s)
+        path = unquote(parsed.path or "")
+        if sys.platform == "win32" and len(path) >= 3 and path[0] == "/" and path[2] == ":":
+            path = path[1:]
+        s = path
+    return s
+
+
 def resolve_existing_directory(path_str: str) -> Path:
     """Expand user home, resolve, and require a real directory."""
-    p = Path(path_str).expanduser().resolve()
+    normalized = normalize_user_workspace_path(path_str)
+    p = Path(normalized).expanduser().resolve()
     if not p.is_dir():
         msg = f"Not a directory or does not exist: {p}"
         raise ValueError(msg)
@@ -112,7 +129,7 @@ def get_effective_workspace_root() -> Path | None:
     except Exception:
         pass
 
-    from backend.core.config.utils import load_forge_config
+    from backend.core.config.config_loader import load_forge_config
 
     wb = (load_forge_config(set_logging_levels=False).project_root or "").strip()
     if wb:

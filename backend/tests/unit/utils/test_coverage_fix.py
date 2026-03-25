@@ -95,24 +95,23 @@ class TestSearchUtilsFinal:
 class TestShutdownFinal:
     """Extra gaps for shutdown_listener."""
 
-    def test_register_signal_handlers_already_set(self):
-        """Covers line 75 (early return when already set)."""
+    def test_request_process_shutdown_noop_when_already_exiting(self):
         import backend.utils.shutdown_listener as mod
-        # If it's not None, it returns
-        with unittest.mock.patch("backend.utils.shutdown_listener._should_exit", False):
-             mod._register_signal_handlers()
 
-    def test_handler_fallback_none(self):
-        """Covers lines where fallback_handler is None."""
-        import backend.utils.shutdown_listener as mod
-        import signal
+        from backend.utils.shutdown_listener import (
+            add_shutdown_listener,
+            remove_shutdown_listener,
+            request_process_shutdown,
+        )
 
-        with unittest.mock.patch("signal.signal") as mock_sig, \
-             unittest.mock.patch("signal.getsignal", return_value=None):
-            mod._register_signal_handler(signal.SIGINT)
-            handler = mock_sig.call_args[0][1]
-            with unittest.mock.patch("backend.utils.shutdown_listener._should_exit", True):
-                handler(signal.SIGINT, None)
+        mod._should_exit = True
+        listener = unittest.mock.MagicMock()
+        lid = add_shutdown_listener(listener)
+        try:
+            request_process_shutdown()
+        finally:
+            remove_shutdown_listener(lid)
+        listener.assert_not_called()
 
 
 class TestTenacityStopFinal:

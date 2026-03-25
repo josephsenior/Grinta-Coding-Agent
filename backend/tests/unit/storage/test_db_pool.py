@@ -1,4 +1,4 @@
-"""Tests for backend.storage.db_pool — async database pool utilities."""
+"""Tests for backend.storage.database_pool — async database pool utilities."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import backend.storage.db_pool as db_pool_module
+import backend.storage.database_pool as db_pool_module
 
 
 @pytest.fixture(autouse=True)
@@ -124,3 +124,4 @@ class TestCloseDbPool:
             await db_pool_module.close_db_pool()
         # Pool should still be set to None even after error
         assert db_pool_module._pool is None
+

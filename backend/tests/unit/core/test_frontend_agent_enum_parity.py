@@ -5,16 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from backend.core.enums import (
-    ActionConfirmationStatus,
-    ActionSecurityRisk,
-    ActionType,
-    AgentState,
-    ErrorCategory,
-    ErrorSeverity,
-    ObservationType,
-    RuntimeStatus,
-)
+from backend.core.agent_contract import build_agent_contract
 
 
 def _parse_ts_enum_members(source: str, enum_name: str) -> dict[str, str]:
@@ -40,51 +31,69 @@ def _frontend_agent_types_source() -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _backend_contract_enums() -> dict[str, dict[str, str]]:
+    return build_agent_contract()["enums"]
+
+
 class TestFrontendAgentEnumParity:
     def test_agent_state_enum_matches_backend(self):
         source = _frontend_agent_types_source()
-        assert _parse_ts_enum_members(source, "AgentState") == {
-            item.name: item.value for item in AgentState
-        }
+        assert _parse_ts_enum_members(source, "AgentState") == _backend_contract_enums()[
+            "AgentState"
+        ]
 
     def test_action_type_enum_matches_backend(self):
         source = _frontend_agent_types_source()
-        assert _parse_ts_enum_members(source, "ActionType") == {
-            item.name: item.value for item in ActionType
-        }
+        assert _parse_ts_enum_members(source, "ActionType") == _backend_contract_enums()[
+            "ActionType"
+        ]
 
     def test_observation_type_enum_matches_backend(self):
         source = _frontend_agent_types_source()
-        assert _parse_ts_enum_members(source, "ObservationType") == {
-            item.name: item.value for item in ObservationType
-        }
+        assert _parse_ts_enum_members(source, "ObservationType") == _backend_contract_enums()[
+            "ObservationType"
+        ]
 
     def test_action_security_risk_enum_matches_backend(self):
         source = _frontend_agent_types_source()
-        assert _parse_ts_enum_members(source, "ActionSecurityRisk") == {
-            item.name: str(item.value) for item in ActionSecurityRisk
-        }
+        assert _parse_ts_enum_members(source, "ActionSecurityRisk") == _backend_contract_enums()[
+            "ActionSecurityRisk"
+        ]
 
     def test_error_severity_enum_matches_backend(self):
         source = _frontend_agent_types_source()
-        assert _parse_ts_enum_members(source, "ErrorSeverity") == {
-            item.name: item.value for item in ErrorSeverity
-        }
+        assert _parse_ts_enum_members(source, "ErrorSeverity") == _backend_contract_enums()[
+            "ErrorSeverity"
+        ]
 
     def test_error_category_enum_matches_backend(self):
         source = _frontend_agent_types_source()
-        assert _parse_ts_enum_members(source, "ErrorCategory") == {
-            item.name: item.value for item in ErrorCategory
-        }
+        assert _parse_ts_enum_members(source, "ErrorCategory") == _backend_contract_enums()[
+            "ErrorCategory"
+        ]
 
     def test_runtime_status_enum_matches_backend(self):
         source = _frontend_agent_types_source()
-        assert _parse_ts_enum_members(source, "RuntimeStatus") == {
-            item.name: item.value for item in RuntimeStatus
-        }
+        assert _parse_ts_enum_members(source, "RuntimeStatus") == _backend_contract_enums()[
+            "RuntimeStatus"
+        ]
 
     def test_action_confirmation_status_enum_matches_backend(self):
         source = _frontend_agent_types_source()
-        assert _parse_ts_enum_members(source, "ActionConfirmationStatus") == {
-            item.name: item.value for item in ActionConfirmationStatus
-        }
+        assert _parse_ts_enum_members(source, "ActionConfirmationStatus") == _backend_contract_enums()[
+            "ActionConfirmationStatus"
+        ]
+
+    def test_backend_contract_surface_is_json_serializable_and_explicit(self):
+        contract = build_agent_contract()
+        assert sorted(contract) == ["enums"]
+        assert sorted(contract["enums"]) == [
+            "ActionConfirmationStatus",
+            "ActionSecurityRisk",
+            "ActionType",
+            "AgentState",
+            "ErrorCategory",
+            "ErrorSeverity",
+            "ObservationType",
+            "RuntimeStatus",
+        ]

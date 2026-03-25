@@ -24,7 +24,7 @@ def register_routes(app: FastAPI) -> None:
     from backend.api.routes.global_export import router as global_export_router
     from backend.api.routes.health import add_health_endpoints
     from backend.api.routes.knowledge_base import router as knowledge_base_router
-    from backend.api.routes.manage_conversations import (
+    from backend.api.routes.conversation_collection import (
         sub_router as manage_conversation_api_router,
     )
     from backend.api.routes.memory import router as memory_router
@@ -113,3 +113,4 @@ def _register_sampling_debug(app: FastAPI) -> None:
             return JSONResponse(payload)
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=500)
+

@@ -91,3 +91,24 @@ class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
             observation, None
         )
         self.context.trigger_step.assert_called_once_with()
+
+    async def test_restored_state_late_observation_does_not_duplicate_advancement(self):
+        """A restored controller with no pending action must ignore stale late observations."""
+        self.controller.state.resume_state = AgentState.PAUSED
+        self.controller.state.agent_state = AgentState.PAUSED
+
+        late_observation = CmdOutputObservation(
+            content="late result",
+            command="echo hello",
+            metadata={"exit_code": 0},
+        )
+        late_observation.cause = 101
+
+        with patch("backend.core.plugin.get_plugin_registry"):
+            await self.observation_service._handle_pending_action_observation(
+                late_observation
+            )
+
+        self.assertIsNone(self.pending_service.get())
+        self.context.trigger_step.assert_not_called()
+        self.controller.confirmation_service.handle_observation_for_pending_action.assert_not_awaited()

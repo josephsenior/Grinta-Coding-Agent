@@ -27,7 +27,6 @@ from .str_replace_editor import create_str_replace_editor_tool
 from .structure_editor_tool import create_structure_editor_tool
 from .task_tracker import create_task_tracker_tool
 from .think import create_think_tool
-from .web_search import create_web_search_tool
 from .verify_file_lines import create_verify_file_lines_tool
 from .verify_ui import create_verify_ui_change_tool
 from .workspace_status import create_workspace_status_tool
@@ -55,7 +54,6 @@ __all__ = [
     "create_str_replace_editor_tool",
     "create_structure_editor_tool",
     "create_task_tracker_tool",
-    "create_web_search_tool",
     "create_verify_file_lines_tool",
     "create_workspace_status_tool",
     "create_delegate_task_tool",

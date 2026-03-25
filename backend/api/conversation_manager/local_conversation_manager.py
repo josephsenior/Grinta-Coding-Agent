@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from backend.core.constants import WORKSPACE_SWITCH_SESSION_CLOSE_TIMEOUT
 from backend.core.errors import AgentRuntimeUnavailableError
 from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
@@ -27,7 +28,7 @@ from backend.utils.async_utils import (
 )
 from backend.utils.import_utils import get_impl
 from backend.utils.shutdown_listener import should_continue
-from backend.utils.utils import create_registry_and_conversation_stats
+from backend.utils.core_utils import create_registry_and_conversation_stats
 
 from backend.api.conversation_manager.conversation_manager import ConversationManager
 from backend.api.conversation_manager.metadata_tracker import (
@@ -411,7 +412,10 @@ class LocalConversationManager(ConversationManager):
         )
         async with self._sessions_lock:
             sids = list(self._local_agent_loops_by_sid.keys())
-        await wait_all(self._close_session(sid) for sid in sids)
+        await wait_all(
+            (self._close_session(sid) for sid in sids),
+            timeout=WORKSPACE_SWITCH_SESSION_CLOSE_TIMEOUT,
+        )
 
     async def get_running_agent_loops(
         self,
@@ -470,9 +474,16 @@ class LocalConversationManager(ConversationManager):
                 extra={"session_id": sid},
             )
             raise RuntimeError("Conversation settings were not initialized")
-        session = self._local_agent_loops_by_sid.get(
-            sid
-        ) or await self._start_agent_loop(
+        session = self._local_agent_loops_by_sid.get(sid)
+        if session is not None and self._session_needs_restart(session):
+            logger.warning(
+                "Detected unhealthy session for %s; restarting agent loop",
+                sid,
+                extra={"session_id": sid, "user_id": user_id},
+            )
+            await self._close_session(sid)
+            session = None
+        session = session or await self._start_agent_loop(
             sid,
             settings,
             user_id,
@@ -480,6 +491,27 @@ class LocalConversationManager(ConversationManager):
             replay_json,
         )
         return self._agent_loop_info_from_session(session)
+
+    @staticmethod
+    def _session_needs_restart(session: Session) -> bool:
+        """Return True when a cached session is too unhealthy to reuse."""
+        if getattr(session, "_closed", False):
+            return True
+        if not getattr(session, "is_alive", True):
+            return True
+
+        agent_session = getattr(session, "agent_session", None)
+        if agent_session is None:
+            return True
+        if getattr(agent_session, "_startup_failed", False):
+            return True
+        if hasattr(agent_session, "is_closed") and agent_session.is_closed():
+            return True
+        if not getattr(agent_session, "_starting", False) and getattr(
+            agent_session, "controller", None
+        ) is None:
+            return True
+        return False
 
     async def _start_agent_loop(
         self,
@@ -578,7 +610,23 @@ class LocalConversationManager(ConversationManager):
 
     async def send_event_to_conversation(self, sid: str, data: dict) -> None:
         """Dispatch event payload to a specific conversation session."""
-        if session := self._local_agent_loops_by_sid.get(sid):
+        session = self._local_agent_loops_by_sid.get(sid)
+        if session is None or self._session_needs_restart(session):
+            user_id = getattr(session, "user_id", None) if session is not None else None
+            logger.warning(
+                "Detected unhealthy session during dispatch for %s; rebuilding before user event",
+                sid,
+                extra={"session_id": sid, "user_id": user_id},
+            )
+            from backend.api.services.conversation_service import (
+                setup_init_conversation_settings,
+            )
+
+            settings = await setup_init_conversation_settings(user_id, sid)
+            await self.maybe_start_agent_loop(sid, settings, user_id)
+            session = self._local_agent_loops_by_sid.get(sid)
+
+        if session is not None:
             await session.dispatch(data)
         else:
             msg = f"no_conversation:{sid}"

@@ -1,1 +1,0 @@
-{"id": 18, "sequence": 18, "timestamp": "2026-03-23T11:48:24.597196", "source": "user", "message": "Retrieving content for: how many mcp servers do you currently have ?", "action": "recall", "args": {"confirmation_state": "confirmed", "recall_type": "knowledge", "query": "how many mcp servers do you currently have ?", "thought": ""}}

@@ -20,7 +20,7 @@ def main() -> None:
 
     Production Deployment:
         For production with multiple workers, use gunicorn:
-        gunicorn backend.api.listen:app \
+        gunicorn backend.api.socketio_asgi_app:app \
             --workers 4 \
             --worker-class uvicorn.workers.UvicornWorker \
             --bind 0.0.0.0:3000 \
@@ -86,7 +86,7 @@ def main() -> None:
         },
     }
     uvicorn.run(
-        "backend.api.listen:app",
+        "backend.api.socketio_asgi_app:app",
         host=host,  # nosec B104 - Safe: web server intentionally accessible on all interfaces
         port=port,
         log_config=log_config,
@@ -102,3 +102,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

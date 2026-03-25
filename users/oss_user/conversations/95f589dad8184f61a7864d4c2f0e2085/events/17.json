@@ -1,1 +1,0 @@
-{"id": 17, "sequence": 17, "timestamp": "2026-03-23T11:48:24.552633", "source": "user", "message": "how many mcp servers do you currently have ?", "action": "message", "args": {"confirmation_state": "confirmed", "content": "how many mcp servers do you currently have ?", "file_urls": null, "image_urls": null, "wait_for_response": false, "security_risk": -1}}

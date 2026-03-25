@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -89,12 +89,12 @@ class OrchestratorExecutor:
         llm: LLM,
         safety_manager: OrchestratorSafetyManager,
         planner: OrchestratorPlanner,
-        mcp_tool_name_provider: Callable[[], Iterable[str]],
+        mcp_tools_provider: Callable[[], dict[str, Any]],
     ) -> None:
         self._llm = llm
         self._safety = safety_manager
         self._planner = planner
-        self._mcp_tool_name_provider = mcp_tool_name_provider
+        self._mcp_tools_provider = mcp_tools_provider
         # Write-ahead checkpoint for crash recovery
         ckpt_dir = os.path.join(
             os.environ.get("FORGE_DATA_DIR", os.path.expanduser("~/.forge")),
@@ -202,36 +202,83 @@ class OrchestratorExecutor:
             logger.info("OrchestratorExecutor.async_execute: calling LLM.astream")
             stream_iter = self._llm.astream(**call_params)
 
+            first_chunk_timeout: float | None = 12.0
+            first_chunk_timeout_raw = os.getenv(
+                "FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS", "12"
+            ).strip()
+            try:
+                parsed_first_chunk_timeout = float(first_chunk_timeout_raw)
+                first_chunk_timeout = (
+                    parsed_first_chunk_timeout if parsed_first_chunk_timeout > 0 else None
+                )
+            except ValueError:
+                first_chunk_timeout = 12.0
+
             async def _consume_stream():
                 nonlocal content_accumulate
-                async for chunk in stream_iter:
-                    choices = chunk.get("choices", [])
-                    if not choices:
-                        continue
-                    delta = choices[0].get("delta", {})
 
-                    if "content" in delta and delta["content"]:
-                        text_chunk = delta["content"]
-                        content_accumulate += text_chunk
+                async def _emit_text_piece(text_piece: str) -> None:
+                    nonlocal content_accumulate
+                    if not text_piece:
+                        return
+
+                    # Some providers deliver very large deltas, which makes UI updates
+                    # appear "all at once". Emit smaller chunks for smoother typing.
+                    emit_size = 24
+                    for i in range(0, len(text_piece), emit_size):
+                        piece = text_piece[i : i + emit_size]
+                        if not piece:
+                            continue
+                        content_accumulate += piece
                         if event_stream:
                             ev = StreamingChunkAction(
-                                chunk=text_chunk,
+                                chunk=piece,
                                 accumulated=content_accumulate,
                                 is_final=False,
                             )
                             ev.source = EventSource.AGENT
                             event_stream.add_event(ev, EventSource.AGENT)
                             # Yield so Socket.IO / asyncio can flush between chunks.
-                            await asyncio.sleep(0)
+                            await asyncio.sleep(0.008)
+
+                async def _process_delta(delta: dict[str, Any]) -> None:
+                    text_chunk = ""
+                    delta_content = delta.get("content")
+                    if isinstance(delta_content, str):
+                        text_chunk = delta_content
+                    elif isinstance(delta_content, list):
+                        parts: list[str] = []
+                        for part in delta_content:
+                            if isinstance(part, str):
+                                parts.append(part)
+                                continue
+                            if not isinstance(part, dict):
+                                continue
+                            maybe_text = part.get("text")
+                            if isinstance(maybe_text, str):
+                                parts.append(maybe_text)
+                        text_chunk = "".join(parts)
+
+                    # Some OpenAI-compatible providers stream reasoning under
+                    # alternate keys instead of delta.content.
+                    if not text_chunk:
+                        for alt_key in ("reasoning_content", "reasoning"):
+                            alt_val = delta.get(alt_key)
+                            if isinstance(alt_val, str) and alt_val:
+                                text_chunk = alt_val
+                                break
+
+                    if text_chunk:
+                        await _emit_text_piece(text_chunk)
 
                     if "tool_calls" in delta and delta["tool_calls"]:
                         for tc_chunk in delta["tool_calls"]:
-                            idx = tc_chunk.get("index", 0)
+                            idx = tc_chunk["index"]
                             if idx not in tool_calls_dict:
                                 tool_calls_dict[idx] = {
-                                    "id": tc_chunk.get("id", f"call_{idx}"),
+                                    "id": tc_chunk.get("id"),
                                     "type": "function",
-                                    "function": {"name": "", "arguments": ""}
+                                    "function": {"name": "", "arguments": ""},
                                 }
 
                             fn = tc_chunk.get("function", {})
@@ -239,7 +286,106 @@ class OrchestratorExecutor:
                                 tool_calls_dict[idx]["function"]["name"] += fn["name"]
                                 
                             if fn.get("arguments"):
-                                tool_calls_dict[idx]["function"]["arguments"] += fn["arguments"]
+                                chunk_args = fn["arguments"]
+                                tool_calls_dict[idx]["function"]["arguments"] += chunk_args
+                                if event_stream:
+                                    logger.debug("DEBUG: Emitting tool argument chunk of len %d", len(chunk_args))
+                                    ev = StreamingChunkAction(
+                                        chunk=chunk_args,
+                                        accumulated=tool_calls_dict[idx]["function"]["arguments"],
+                                        is_final=False,
+                                    )
+                                    ev.source = EventSource.AGENT
+                                    event_stream.add_event(ev, EventSource.AGENT)
+                                    await asyncio.sleep(0.001)
+
+                stream_aiter = stream_iter.__aiter__()
+                if first_chunk_timeout is not None:
+                    try:
+                        first_chunk = await asyncio.wait_for(
+                            stream_aiter.__anext__(),
+                            timeout=first_chunk_timeout,
+                        )
+                    except StopAsyncIteration:
+                        return
+                    except asyncio.TimeoutError:
+                        logger.warning(
+                            "LLM stream produced no first chunk after %.1fs; "
+                            "falling back to non-stream completion",
+                            first_chunk_timeout,
+                        )
+
+                        fallback_params = dict(call_params)
+                        fallback_params["stream"] = False
+                        fallback = await self._llm.acompletion(**fallback_params)
+
+                        fallback_content_raw = getattr(fallback, "content", None)
+                        fallback_content = (
+                            self._content_to_str(fallback_content_raw)
+                            if fallback_content_raw is not None
+                            else ""
+                        )
+
+                        fallback_message: Any | None = None
+                        choices = getattr(fallback, "choices", None)
+                        if isinstance(choices, list) and choices:
+                            first_choice = choices[0]
+                            if isinstance(first_choice, dict):
+                                fallback_message = first_choice.get("message")
+                            else:
+                                fallback_message = getattr(first_choice, "message", None)
+
+                        if not fallback_content and fallback_message is not None:
+                            if isinstance(fallback_message, dict):
+                                fallback_content = self._content_to_str(
+                                    fallback_message.get("content")
+                                )
+                            else:
+                                fallback_content = self._content_to_str(
+                                    getattr(fallback_message, "content", None)
+                                )
+
+                        if fallback_content:
+                            await _emit_text_piece(fallback_content)
+
+                        fallback_tool_calls = getattr(fallback, "tool_calls", None)
+                        if not isinstance(fallback_tool_calls, list):
+                            fallback_tool_calls = None
+                        if fallback_tool_calls is None and fallback_message is not None:
+                            if isinstance(fallback_message, dict):
+                                maybe_tool_calls = fallback_message.get("tool_calls")
+                            else:
+                                maybe_tool_calls = getattr(fallback_message, "tool_calls", None)
+                            if isinstance(maybe_tool_calls, list):
+                                fallback_tool_calls = maybe_tool_calls
+                        fallback_tool_calls = fallback_tool_calls or []
+
+                        if isinstance(fallback_tool_calls, list):
+                            for i, tc in enumerate(fallback_tool_calls):
+                                if not isinstance(tc, dict):
+                                    continue
+                                fn = tc.get("function") or {}
+                                name = fn.get("name") if isinstance(fn, dict) else ""
+                                arguments = fn.get("arguments") if isinstance(fn, dict) else ""
+                                tool_calls_dict[i] = {
+                                    "id": tc.get("id"),
+                                    "type": tc.get("type", "function"),
+                                    "function": {
+                                        "name": name if isinstance(name, str) else "",
+                                        "arguments": arguments if isinstance(arguments, str) else "",
+                                    },
+                                }
+                        return
+
+                    choices = first_chunk.get("choices", [])
+                    if choices:
+                        await _process_delta(choices[0].get("delta", {}))
+
+                async for chunk in stream_aiter:
+                    choices = chunk.get("choices", [])
+                    if not choices:
+                        continue
+                    await _process_delta(choices[0].get("delta", {}))
 
             consume_task = loop.create_task(_consume_stream())
             if timeout_seconds is None:
@@ -386,9 +532,11 @@ class OrchestratorExecutor:
     # Response processing
     # ------------------------------------------------------------------ #
     def _response_to_actions(self, response: ModelResponse) -> list[Action]:
+        mcp_tools = self._mcp_tools_provider()
         actions = list(orchestrator_function_calling.response_to_actions(
             response,
-            mcp_tool_names=list(self._mcp_tool_name_provider()),
+            mcp_tool_names=list(mcp_tools.keys()),
+            mcp_tools=mcp_tools,
         ))
 
         response_text = self._extract_response_text(response)

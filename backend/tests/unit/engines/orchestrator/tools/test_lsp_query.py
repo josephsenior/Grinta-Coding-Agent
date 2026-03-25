@@ -58,11 +58,12 @@ def test_lsp_query_action_list_symbols():
 def test_lsp_client_graceful_degradation(monkeypatch):
     """Verify the LSP client gracefully fails when pylsp is not available."""
 
-    # Mock subprocess.Popen to raise FileNotFoundError (command not found)
-    def mock_popen(*args, **kwargs):
+    # Mock subprocess.run to raise FileNotFoundError (command not found)
+    def mock_run(*args, **kwargs):
         raise FileNotFoundError("pylsp not found")
 
-    monkeypatch.setattr("subprocess.Popen", mock_popen)
+    monkeypatch.setattr("subprocess.run", mock_run)
+    monkeypatch.setattr("backend.utils.lsp_client._PYLSP_AVAILABLE", None)
 
     client = LspClient()
 

@@ -91,7 +91,7 @@ def _fallback_print(
 def _main() -> None:
     diff = get_git_diff(sys.argv[-1])
     try:
-        from backend.core.io import print_json_stdout
+        from backend.core.json_stdout import print_json_stdout
     except Exception:  # pragma: no cover - fallback is tested separately
         _fallback_print(diff)
     else:

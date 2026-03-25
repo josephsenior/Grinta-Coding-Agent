@@ -1,6 +1,8 @@
 """Metrics routes for monitoring."""
 
 import asyncio
+import math
+import os
 from datetime import datetime
 from typing import Any
 
@@ -14,6 +16,14 @@ from . import monitoring_helpers
 router = APIRouter()
 
 
+class LspMetricsResponse(BaseModel):
+    sessions_scanned: int = 0
+    samples: int = 0
+    failures: int = 0
+    failure_rate: float = 0.0
+    latency_ms: dict[str, float] = Field(default_factory=dict)
+
+
 class SystemMetrics(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
     active_conversations: int = 0
@@ -25,6 +35,7 @@ class SystemMetrics(BaseModel):
     parallel_execution_stats: dict[str, Any] = Field(default_factory=dict)
     tool_usage: dict[str, int] = Field(default_factory=dict)
     failure_distribution: dict[str, int] = Field(default_factory=dict)
+    lsp: LspMetricsResponse = Field(default_factory=LspMetricsResponse)
 
 
 class AgentMetrics(BaseModel):
@@ -37,6 +48,85 @@ class AgentMetrics(BaseModel):
 class MetricsResponse(BaseModel):
     system: SystemMetrics
     agents: list[AgentMetrics] = Field(default_factory=list)
+
+
+def _percentile(sorted_values: list[int], pct: float) -> float:
+    if not sorted_values:
+        return 0.0
+    if len(sorted_values) == 1:
+        return float(sorted_values[0])
+    rank = max(0, min(len(sorted_values) - 1, math.ceil(pct * len(sorted_values)) - 1))
+    return float(sorted_values[rank])
+
+
+def _iter_recent_events_for_session(session: Any, limit: int) -> list[Any]:
+    controller = getattr(session, "controller", None)
+    event_stream = getattr(controller, "event_stream", None) if controller is not None else None
+    if event_stream is None or not hasattr(event_stream, "search_events"):
+        return []
+    try:
+        return list(event_stream.search_events(reverse=True, limit=limit))
+    except Exception:
+        logger.debug("Failed to read event stream for LSP metrics", exc_info=True)
+        return []
+
+
+def _extract_lsp_sample(event: Any) -> tuple[int, bool] | None:
+    tool_result = getattr(event, "tool_result", None)
+    if not isinstance(tool_result, dict):
+        return None
+    if str(tool_result.get("tool", "")).lower() != "lsp_query":
+        return None
+    latency = tool_result.get("latency_ms", 0)
+    try:
+        latency_ms = max(0, int(float(latency)))
+    except Exception:
+        latency_ms = 0
+    has_error = bool(tool_result.get("has_error", False))
+    return latency_ms, has_error
+
+
+def _collect_lsp_metrics(manager: Any) -> LspMetricsResponse:
+    if not manager:
+        return LspMetricsResponse()
+
+    sessions = monitoring_helpers.get_conversation_sessions(manager)
+    per_session_limit = max(50, int(os.getenv("FORGE_LSP_METRICS_EVENT_LIMIT", "400")))
+
+    latencies: list[int] = []
+    failures = 0
+    sessions_scanned = 0
+
+    for session in sessions.values():
+        sessions_scanned += 1
+        for event in _iter_recent_events_for_session(session, per_session_limit):
+            sample = _extract_lsp_sample(event)
+            if sample is None:
+                continue
+            latency_ms, has_error = sample
+            latencies.append(latency_ms)
+            if has_error:
+                failures += 1
+
+    if not latencies:
+        return LspMetricsResponse(sessions_scanned=sessions_scanned)
+
+    latencies.sort()
+    total = len(latencies)
+
+    return LspMetricsResponse(
+        sessions_scanned=sessions_scanned,
+        samples=total,
+        failures=failures,
+        failure_rate=round(failures / total, 4),
+        latency_ms={
+            "min": float(latencies[0]),
+            "avg": round(float(sum(latencies)) / total, 2),
+            "p50": _percentile(latencies, 0.5),
+            "p95": _percentile(latencies, 0.95),
+            "max": float(latencies[-1]),
+        },
+    )
 
 
 @router.get("/metrics", response_model=MetricsResponse)
@@ -73,6 +163,8 @@ async def get_metrics():
         except Exception:
             logger.debug("Failed to collect cache stats", exc_info=True)
 
+        lsp_metrics = _collect_lsp_metrics(manager)
+
         return MetricsResponse(
             system=SystemMetrics(
                 timestamp=datetime.now(),
@@ -80,6 +172,7 @@ async def get_metrics():
                 uptime_seconds=max(0, uptime),
                 cache_stats=cache_stats,
                 parallel_execution_stats={"enabled": True, "active_tasks": 0},
+                lsp=lsp_metrics,
             ),
             agents=[AgentMetrics(agent_name="Orchestrator")],
         )
@@ -171,4 +264,15 @@ async def get_agent_metrics():
         return _aggregate_agent_metrics(all_metrics, active_sessions)
     except Exception as e:
         logger.error("Failed to collect agent metrics", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/lsp-metrics", response_model=LspMetricsResponse)
+async def get_lsp_metrics():
+    """Aggregate LSP query reliability and latency metrics from recent session events."""
+    try:
+        manager = monitoring_helpers.get_manager()
+        return _collect_lsp_metrics(manager)
+    except Exception as e:
+        logger.error("Failed to collect LSP metrics", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e

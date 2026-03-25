@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -99,6 +100,7 @@ class ConversationMemory:
 
         # Context tracking (decisions, anchors, vector memory)
         self._ctx = ContextTracker(vector_store=vector_store, graph_store=graph_store)
+        self._indexed_event_ids: set[str] = set()
 
     # Delegate context-tracking API to ContextTracker
     @property
@@ -306,6 +308,7 @@ class ConversationMemory:
     ) -> list[Message]:
         """Dispatch an event to the appropriate transformation helper."""
         self._auto_track_event_context(event)
+        self._index_event_for_semantic_recall(event)
 
         if is_action_event(event):
             return self._process_action(
@@ -399,6 +402,103 @@ class ConversationMemory:
             self._track_agent_think_as_decision(event)
         except Exception:
             logger.debug("Auto context tracking skipped for event", exc_info=True)
+
+    def _index_event_for_semantic_recall(self, event: Event) -> None:
+        """Index durable event content into vector memory when available."""
+        record = self._memory_record_for_event(event)
+        if record is None:
+            return
+        event_id, role, content, metadata = record
+        if event_id in self._indexed_event_ids:
+            return
+        self.store_in_memory(event_id, role, content, metadata)
+        self._indexed_event_ids.add(event_id)
+
+    def _memory_record_for_event(
+        self, event: Event
+    ) -> tuple[str, str, str, dict[str, Any]] | None:
+        """Return an indexable memory record for high-value conversation events."""
+        if isinstance(event, MessageAction) and event.source == EventSource.USER:
+            content = (event.content or "").strip()
+            if not content:
+                return None
+            return (
+                self._semantic_event_id(event, content),
+                "user",
+                content[:2000],
+                {"event_type": type(event).__name__},
+            )
+
+        if type(event).__name__ == "AgentThinkAction":
+            thought = str(getattr(event, "thought", "") or "").strip()
+            if not thought:
+                return None
+            return (
+                self._semantic_event_id(event, thought),
+                "assistant",
+                thought[:2000],
+                {"event_type": type(event).__name__},
+            )
+
+        if isinstance(event, ErrorObservation):
+            content = (event.content or "").strip()
+            if not content:
+                return None
+            return (
+                self._semantic_event_id(event, content),
+                "observation",
+                content[:2000],
+                {
+                    "event_type": type(event).__name__,
+                    "error_id": getattr(event, "error_id", None),
+                },
+            )
+
+        if isinstance(event, CmdOutputObservation):
+            content = (event.content or "").strip()
+            if not content:
+                return None
+            return (
+                self._semantic_event_id(event, content),
+                "observation",
+                f"Command: {getattr(event, 'command', '')}\n{content[:1800]}",
+                {
+                    "event_type": type(event).__name__,
+                    "exit_code": getattr(event, "exit_code", None),
+                },
+            )
+
+        if isinstance(event, Observation) and type(event).__name__ == "MCPObservation":
+            content = (getattr(event, "content", "") or "").strip()
+            if not content:
+                return None
+            metadata: dict[str, Any] = {
+                "event_type": type(event).__name__,
+                "tool_name": getattr(event, "name", None),
+            }
+            tool_result = getattr(event, "tool_result", None)
+            if isinstance(tool_result, dict):
+                metadata["tool_ok"] = tool_result.get("ok")
+                metadata["error_code"] = tool_result.get("error_code")
+            return (
+                self._semantic_event_id(event, content),
+                "tool",
+                content[:2000],
+                metadata,
+            )
+
+        return None
+
+    @staticmethod
+    def _semantic_event_id(event: Event, content: str) -> str:
+        """Stable ID for vector-memory indexing."""
+        event_id = getattr(event, "id", None)
+        if event_id is not None:
+            return f"event_{event_id}"
+        digest = hashlib.sha1(
+            f"{type(event).__name__}:{content[:400]}".encode("utf-8", "ignore")
+        ).hexdigest()[:16]
+        return f"synthetic_{type(event).__name__}_{digest}"
 
     def _add_anchor_if_new(
         self,
@@ -606,36 +706,48 @@ class ConversationMemory:
 
     def _ensure_system_message(self, events: list[Event]) -> None:
         """Checks if a system message exists and adds one if not.
+        
+        If a system message already exists, it is replaced with a new one containing
+        the latest system prompt to ensure the agent always sees the most up-to-date
+        configuration (e.g. dynamically connected MCP tools).
 
         Uses duck-typing in addition to isinstance to avoid false negatives
         when tests or alternate imports provide compatible event stubs.
         """
+        system_prompt = self.prompt_manager.get_system_message(
+            cli_mode=self.agent_config.cli_mode, config=self.agent_config
+        )
+        if not system_prompt:
+            return
+
+        system_message = SystemMessageAction(content=system_prompt)
         has_system_message = False
-        for event in events:
+        
+        for i, event in enumerate(events):
             # Primary fast-path: direct isinstance or duck-typed equivalent
             if is_instance_of(event, SystemMessageAction):
                 has_system_message = True
+                events[i] = system_message
                 break
             # Class name match fallback (handles duplicate class loading / re-import edge cases)
             if (
                 type(event).__name__ == "SystemMessageAction"
             ):  # pragma: no cover - defensive
                 has_system_message = True
+                events[i] = system_message
                 break
             # Duck-typed detection: an event with action == ActionType.SYSTEM is treated as system
             if getattr(event, "action", None) == ActionType.SYSTEM:
                 has_system_message = True
+                events[i] = system_message
                 break
+                
         if not has_system_message:
             logger.debug(
                 "[ConversationMemory] No SystemMessageAction found in events. Adding one.",
             )
-            if system_prompt := self.prompt_manager.get_system_message(
-                cli_mode=self.agent_config.cli_mode, config=self.agent_config
-            ):
-                system_message = SystemMessageAction(content=system_prompt)
-                events.insert(0, system_message)
-                logger.info("[ConversationMemory] Added SystemMessageAction")
+            events.insert(0, system_message)
+            logger.info("[ConversationMemory] Added SystemMessageAction")
 
     def _ensure_initial_user_message(
         self, events: list[Event], initial_user_action: MessageAction

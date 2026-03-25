@@ -61,7 +61,7 @@ class TestGetEventRuntimeDefaults:
         get_event_runtime_defaults.cache_clear()
 
     @patch(
-        "backend.core.config.utils.load_forge_config",
+        "backend.core.config.config_loader.load_forge_config",
         side_effect=ImportError("no config"),
     )
     def test_env_var_fallback_defaults(self, mock_load):
@@ -78,7 +78,7 @@ class TestGetEventRuntimeDefaults:
                 assert result.workers == 1
 
     @patch(
-        "backend.core.config.utils.load_forge_config", side_effect=RuntimeError("fail")
+        "backend.core.config.config_loader.load_forge_config", side_effect=RuntimeError("fail")
     )
     def test_env_var_custom_values(self, mock_load):
         """When config load fails, use custom env vars."""
@@ -108,7 +108,7 @@ class TestGetEventRuntimeDefaults:
             assert result.coalesce_window_ms == 50.0
             assert result.coalesce_max_batch == 10
 
-    @patch("backend.core.config.utils.load_forge_config", side_effect=Exception("fail"))
+    @patch("backend.core.config.config_loader.load_forge_config", side_effect=Exception("fail"))
     def test_workers_minimum_one(self, mock_load):
         """Workers env value should be at least 1."""
         get_event_runtime_defaults.cache_clear()
@@ -116,7 +116,7 @@ class TestGetEventRuntimeDefaults:
             result = get_event_runtime_defaults()
             assert result.workers == 1
 
-    @patch("backend.core.config.utils.load_forge_config", side_effect=Exception("fail"))
+    @patch("backend.core.config.config_loader.load_forge_config", side_effect=Exception("fail"))
     def test_coalesce_max_batch_minimum_one(self, mock_load):
         """coalesce_max_batch should be at least 1."""
         get_event_runtime_defaults.cache_clear()
@@ -126,7 +126,7 @@ class TestGetEventRuntimeDefaults:
             result = get_event_runtime_defaults()
             assert result.coalesce_max_batch == 1
 
-    @patch("backend.core.config.utils.load_forge_config", side_effect=Exception("fail"))
+    @patch("backend.core.config.config_loader.load_forge_config", side_effect=Exception("fail"))
     def test_async_write_false_values(self, mock_load):
         """async_write env values that are not truthy should be False."""
         get_event_runtime_defaults.cache_clear()
@@ -156,7 +156,7 @@ class TestGetEventRuntimeDefaults:
         mock_cfg = SimpleNamespace(event_stream=event_cfg)
 
         with patch(
-            "backend.core.config.utils.load_forge_config", return_value=mock_cfg
+            "backend.core.config.config_loader.load_forge_config", return_value=mock_cfg
         ):
             result = get_event_runtime_defaults()
             assert result.max_queue_size == 1000
@@ -173,7 +173,7 @@ class TestGetEventRuntimeDefaults:
         mock_cfg = SimpleNamespace()  # No event_stream attr
 
         with patch(
-            "backend.core.config.utils.load_forge_config", return_value=mock_cfg
+            "backend.core.config.config_loader.load_forge_config", return_value=mock_cfg
         ):
             with patch.dict(os.environ, {}, clear=True):
                 result = get_event_runtime_defaults()

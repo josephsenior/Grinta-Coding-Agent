@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useState,
   useMemo,
@@ -48,8 +49,9 @@ import { useAppStore } from "@/stores/app-store";
 import { sendUserAction } from "@/socket/client";
 import { toast } from "sonner";
 import { AgentState, ActionType } from "@/types/agent";
-import type { ActionEvent } from "@/types/events";
+import type { ActionEvent, ForgeEvent } from "@/types/events";
 import { EventCard } from "@/components/chat/EventRenderer";
+import { MessageBubble } from "@/components/chat/MessageBubble";
 import { StreamingBubble } from "@/components/chat/StreamingBubble";
 import { DraftWelcomeIllustration } from "@/components/chat/DraftWelcomeIllustration";
 import { ConfirmationBanner } from "@/components/chat/ConfirmationBanner";
@@ -66,7 +68,11 @@ import {
   AGENT_RUNNING_STALE_UI_MS,
   SUSTAINED_DISCONNECT_NOTICE_MS,
 } from "@/lib/constants";
-import { deriveLiveActivity, lifecycleDisplay } from "@/lib/agent-activity";
+import {
+  deriveLiveActivity,
+  deriveStateConfidenceInfo,
+  lifecycleDisplay,
+} from "@/lib/agent-activity";
 
 /** Workspace uploads: text/code only (server stores as UTF-8). Images use image_urls (data URLs), not this path. */
 const CHAT_ATTACH_MAX_FILES = 8;
@@ -114,9 +120,26 @@ const CHAT_ATTACH_ACCEPT = [
 ].join(",");
 const CHAT_IMAGE_ACCEPT = "image/jpeg,image/png,image/gif,image/webp";
 const CHAT_FILE_INPUT_ACCEPT = `${CHAT_ATTACH_ACCEPT},${CHAT_IMAGE_ACCEPT}`;
+const TIMELINE_SEPARATOR_GAP_MS = 4 * 60 * 1000;
+
+interface OptimisticUserMessage {
+  clientId: string;
+  content: string;
+}
 
 function isImageFile(file: File): boolean {
   return file.type.startsWith("image/");
+}
+
+function optimisticMessageContent(
+  text: string,
+  opts: { imageCount?: number; fileCount?: number } = {},
+): string {
+  const trimmed = text.trim();
+  if (trimmed) return trimmed;
+  if ((opts.imageCount ?? 0) > 0) return "Please see the attached image(s).";
+  if ((opts.fileCount ?? 0) > 0) return "(Attached files)";
+  return "";
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -126,6 +149,38 @@ function readFileAsDataUrl(file: File): Promise<string> {
     r.onerror = () => reject(r.error ?? new Error("read failed"));
     r.readAsDataURL(file);
   });
+}
+
+function deriveTimelineSeparator(
+  previous: ForgeEvent | undefined,
+  current: ForgeEvent,
+): string | null {
+  if (!previous) return null;
+
+  const prevTs = Date.parse(previous.timestamp || "");
+  const currTs = Date.parse(current.timestamp || "");
+  if (!Number.isFinite(prevTs) || !Number.isFinite(currTs)) return null;
+
+  const diffMs = currTs - prevTs;
+  if (diffMs < TIMELINE_SEPARATOR_GAP_MS) return null;
+
+  const diffMinutes = Math.round(diffMs / 60000);
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min later`;
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  return `${diffHours} hr later`;
+}
+
+function TimelineSeparator({ label }: { label: string }) {
+  return (
+    <div className="my-1 flex items-center gap-2 text-[10px] text-muted-foreground/75">
+      <div className="h-px flex-1 bg-border/45" />
+      <span className="rounded-full bg-muted/50 px-2 py-0.5">{label}</span>
+      <div className="h-px flex-1 bg-border/45" />
+    </div>
+  );
 }
 
 // --- Inline Tasks Strip ---
@@ -424,11 +479,52 @@ export default function Chat() {
   const [inputValue, setInputValue] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [optimisticUserMessages, setOptimisticUserMessages] = useState<OptimisticUserMessage[]>(
+    [],
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const seenUserMessageEventIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     setPendingFiles([]);
   }, [id]);
+
+  useEffect(() => {
+    setOptimisticUserMessages([]);
+    seenUserMessageEventIdsRef.current.clear();
+  }, [id]);
+
+  useEffect(() => {
+    const echoedUserMessages = events.filter((event): event is ActionEvent => {
+      return (
+        "action" in event &&
+        event.action === ActionType.MESSAGE &&
+        event.source === "user" &&
+        !seenUserMessageEventIdsRef.current.has(Number(event.id))
+      );
+    });
+
+    if (echoedUserMessages.length === 0) return;
+
+    for (const event of echoedUserMessages) {
+      seenUserMessageEventIdsRef.current.add(Number(event.id));
+    }
+
+    setOptimisticUserMessages((prev) => {
+      const next = [...prev];
+      for (const event of echoedUserMessages) {
+        if (next.length === 0) break;
+        const content = String(event.message || event.args?.content || "").trim();
+        const matchIndex = content ? next.findIndex((item) => item.content === content) : -1;
+        if (matchIndex >= 0) {
+          next.splice(matchIndex, 1);
+        } else {
+          next.shift();
+        }
+      }
+      return next;
+    });
+  }, [events]);
 
   // Fetch settings to know if the API key / model are configured
   const { data: settings, isLoading: settingsLoading } = useQuery({
@@ -485,7 +581,7 @@ export default function Chat() {
 
   // Auto-scroll
   const { scrollContainerRef, bottomRef, showScrollFab, scrollToBottom, handleScroll } =
-    useAutoScroll([events.length, streamingContent]);
+    useAutoScroll([events.length, optimisticUserMessages.length, streamingContent]);
 
   // Playbook autocomplete
   const playbookMatch = useMemo(() => {
@@ -673,6 +769,19 @@ export default function Chat() {
         });
         return;
       }
+      const optimisticContent = optimisticMessageContent(text, {
+        imageCount: imageUrls.length,
+        fileCount: fileUrls.length,
+      });
+      if (optimisticContent) {
+        setOptimisticUserMessages((prev) => [
+          ...prev,
+          {
+            clientId: `${Date.now()}-${prev.length}`,
+            content: optimisticContent,
+          },
+        ]);
+      }
       setInputValue("");
       setPendingFiles([]);
     } catch (e) {
@@ -731,7 +840,8 @@ export default function Chat() {
         runningTimedOut));
   const isRunning =
     !isDraft && effectiveAgentStateForUi === AgentState.RUNNING && !runningTimedOut;
-  const isEmpty = events.length === 0 && !streamingContent;
+  const isEmpty =
+    events.length === 0 && optimisticUserMessages.length === 0 && !streamingContent;
   /** Paperclip: draft chat has no socket yet; workspace files use bootstrap after first create. */
   const canOpenFilePicker =
     (isDraft && !needsSetup && !isUploading && !isDraftCreatePending) ||
@@ -746,6 +856,15 @@ export default function Chat() {
   }, [events, streamingContent, isRunning]);
 
   const showActivityStrip = !!liveActivity && (isRunning || !!streamingContent);
+  const stateConfidence = useMemo(
+    () =>
+      deriveStateConfidenceInfo(events, {
+        state: effectiveAgentStateForUi,
+        streaming: !!streamingContent,
+      }),
+    [events, effectiveAgentStateForUi, streamingContent],
+  );
+  const confidencePercent = Math.max(0, Math.min(100, Math.round(stateConfidence.score * 100)));
 
   useEffect(() => {
     if (isDraft || !id || id === "new" || !isConnected) return;
@@ -778,6 +897,20 @@ export default function Chat() {
           toast.error("Could not send attachments", {
             description: "Connection dropped. Refresh and try again.",
           });
+        } else {
+          const optimisticContent = optimisticMessageContent(boot.text, {
+            imageCount: boot.imageUrls.length,
+            fileCount: fileUrls.length,
+          });
+          if (optimisticContent) {
+            setOptimisticUserMessages((prev) => [
+              ...prev,
+              {
+                clientId: `${Date.now()}-${prev.length}`,
+                content: optimisticContent,
+              },
+            ]);
+          }
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Send failed";
@@ -854,7 +987,7 @@ export default function Chat() {
             {/* Agent State Pill */}
             <div
               className={cn(
-                "flex items-center gap-1.5 rounded-full px-2.5 py-1 ring-1 ring-border/35",
+                "flex items-center gap-2 rounded-full px-2.5 py-1 ring-1 ring-border/35",
                 effectiveAgentStateForUi === AgentState.ERROR
                   ? "bg-destructive/6 ring-destructive/20"
                   : runningTimedOut
@@ -875,8 +1008,16 @@ export default function Chat() {
                   )}
                 />
               )}
-              <span className={cn("text-[11px] font-medium", stateInfo.textClass)}>
-                {stateInfo.label}
+              <div className="flex min-w-0 flex-col">
+                <span className={cn("text-[11px] font-medium", stateInfo.textClass)}>
+                  {stateInfo.label}
+                </span>
+                <span className="truncate text-[10px] text-muted-foreground/90">
+                  {stateConfidence.stage} · {stateConfidence.hint}
+                </span>
+              </div>
+              <span className="shrink-0 rounded-full bg-muted/55 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                {confidencePercent}%
               </span>
             </div>
 
@@ -960,7 +1101,7 @@ export default function Chat() {
             onScroll={handleScroll}
             className="flex-1 overflow-y-auto"
           >
-            <div className="mx-auto flex max-w-[720px] flex-col gap-4 p-4 pb-8">
+            <div className="mx-auto flex max-w-180 flex-col gap-4 p-4 pb-8">
               {conversationQueryError && id && (
                 <ConversationErrorBanner onRetry={() => void refetchConversation()} />
               )}
@@ -994,10 +1135,31 @@ export default function Chat() {
                 </div>
               )}
 
-              {events.map((event, i) => (
-                <EventCard
-                  key={event.id != null ? `e-${event.id}` : `i-${i}`}
-                  event={event}
+              {events.map((event, i) => {
+                const previous = i > 0 ? events[i - 1] : undefined;
+                const separatorLabel = deriveTimelineSeparator(previous, event);
+
+                return (
+                  <Fragment key={event.id != null ? `e-${event.id}` : `i-${i}`}>
+                    {separatorLabel && <TimelineSeparator label={separatorLabel} />}
+                    <EventCard event={event} />
+                  </Fragment>
+                );
+              })}
+
+              {optimisticUserMessages.map((message) => (
+                <MessageBubble
+                  key={`optimistic-${message.clientId}`}
+                  event={
+                    {
+                      id: -1,
+                      timestamp: new Date().toISOString(),
+                      source: "user",
+                      message: message.content,
+                      action: ActionType.MESSAGE,
+                      args: { content: message.content },
+                    } as ActionEvent
+                  }
                 />
               ))}
 
@@ -1045,13 +1207,13 @@ export default function Chat() {
                 e.target.value = "";
               }}
             />
-            <div className="relative mx-auto flex max-w-[720px] flex-col gap-2">
+            <div className="relative mx-auto flex max-w-180 flex-col gap-2">
               {pendingFiles.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 px-0.5">
                   {pendingFiles.map((f, i) => (
                     <span
                       key={`${f.name}-${f.size}-${i}`}
-                      className="inline-flex max-w-[220px] items-center gap-1 rounded-md bg-muted/55 px-2 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/35"
+                      className="inline-flex max-w-55 items-center gap-1 rounded-md bg-muted/55 px-2 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/35"
                     >
                       <span className="truncate" title={f.name}>
                         {f.name}

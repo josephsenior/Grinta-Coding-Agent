@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { splitAssistantThoughtAndResponse } from "@/lib/assistant-text";
 import { MarkdownContent } from "./MarkdownContent";
 import type { ActionEvent } from "@/types/events";
 
@@ -8,7 +9,12 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ event }: MessageBubbleProps) {
   const isUser = event.source === "user";
-  const content = event.message || String(event.args?.content ?? "");
+  const rawContent = event.message || String(event.args?.content ?? "");
+  const segments = isUser
+    ? { thought: "", response: rawContent, hasSplit: false }
+    : splitAssistantThoughtAndResponse(rawContent);
+  const thought = segments.thought;
+  const content = segments.response || (segments.hasSplit ? "" : rawContent);
 
   return (
     <div
@@ -22,8 +28,13 @@ export function MessageBubble({ event }: MessageBubbleProps) {
           <p className="whitespace-pre-wrap">{content}</p>
         </div>
       ) : (
-        <div className="text-foreground [&_.prose]:text-[13px] [&_.prose]:leading-[1.65]">
-          <MarkdownContent content={content} className="prose-neutral" />
+        <div className="space-y-2 text-foreground [&_.prose]:text-[13px] [&_.prose]:leading-[1.65]">
+          {thought && (
+            <div className="border-l-2 border-border/45 pl-3 text-[12px] italic leading-[1.55] text-muted-foreground/85">
+              <p className="whitespace-pre-wrap">{thought}</p>
+            </div>
+          )}
+          {content && <MarkdownContent content={content} className="prose-neutral" />}
         </div>
       )}
     </div>

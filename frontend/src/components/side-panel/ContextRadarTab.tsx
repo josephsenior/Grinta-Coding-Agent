@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BrainCircuit, Book, Edit, FileSearch } from "lucide-react";
+import { BrainCircuit, Book, Edit } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import type { ActionEvent } from "@/types/events";
 
 interface ContextItem {
   path: string;
-  type: "read" | "edit" | "write" | "search";
+  type: "read" | "edit" | "write";
   timestamp: string;
 }
 
@@ -25,9 +25,6 @@ export function ContextRadarTab() {
       const actionEvent = e as ActionEvent;
 
       let path = (actionEvent.args?.path as string) || (actionEvent.args?.file_path as string);
-      if (!path && actionEvent.action === ActionType.RECALL) {
-        path = actionEvent.args?.query as string; // Re-use path to store the search query for recalls
-      }
 
       if (!path) return;
 
@@ -41,9 +38,6 @@ export function ContextRadarTab() {
           break;
         case ActionType.WRITE:
           type = "write";
-          break;
-        case ActionType.RECALL:
-          type = "search";
           break;
       }
 
@@ -81,7 +75,7 @@ export function ContextRadarTab() {
         )}
       </div>
       <div className="flex flex-wrap items-center gap-1 border-b px-2 py-1.5">
-        {(["all", "read", "edit", "write", "search"] as const).map((value) => (
+        {(["all", "read", "edit", "write"] as const).map((value) => (
           <Button
             key={value}
             type="button"
@@ -109,10 +103,9 @@ export function ContextRadarTab() {
                 <div className="flex items-start gap-2">
                   {file.type === "read" && <Book className="h-3.5 w-3.5 shrink-0 text-blue-500" />}
                   {file.type === "edit" || file.type === "write" ? <Edit className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : null}
-                  {file.type === "search" && <FileSearch className="h-3.5 w-3.5 shrink-0 text-purple-500" />}
                   
                   <span className="flex-1 text-xs break-all font-mono leading-tight">
-                    {file.type === "search" ? `query: ${file.path}` : file.path}
+                    {file.path}
                   </span>
                   
                   <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px] uppercase tracking-wider">

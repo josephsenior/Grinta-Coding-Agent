@@ -24,23 +24,24 @@ jobs:
         python-version: ['3.12']
     steps:
       - uses: actions/checkout@v4
-      - name: Install poetry via pipx
-        run: pipx install poetry
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
       - name: Set up Python
         uses: useblacksmith/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
-      - name: Poetry validation
-        run: poetry check --lock
-      - name: Install Python dependencies using Poetry
-        run: poetry install --with dev,test,runtime
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: uv sync --group dev --group test --group runtime
       - name: Verify optional imports
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)
-        run: poetry run python -m compileall backend
+        run: uv run python -m compileall backend
       - name: Run minimal pytest slice
-        run: PYTHONPATH=".:$PYTHONPATH" poetry run pytest -q \
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -q \
           backend/tests/test_metrics_labels.py \
           backend/tests/test_request_metrics.py \
           backend/tests/integration/test_trajectory_replay.py
@@ -53,25 +54,24 @@ jobs:
         python-version: ['3.12']
     steps:
       - uses: actions/checkout@v4
-      - name: Install pipx
-        run: pip install pipx
-      - name: Install poetry via pipx
-        run: pipx install poetry
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
-      - name: Poetry validation
-        run: poetry check --lock
-      - name: Install Python dependencies using Poetry
-        run: poetry install --with dev,test,runtime
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: uv sync --group dev --group test --group runtime
       - name: Verify optional imports
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)
-        run: poetry run python -m compileall backend
+        run: uv run python -m compileall backend
       - name: Run minimal pytest slice
-        run: poetry run pytest -q backend/tests/test_metrics_labels.py backend/tests/test_request_metrics.py backend/tests/integration/test_trajectory_replay.py
+        run: uv run pytest -q backend/tests/test_metrics_labels.py backend/tests/test_request_metrics.py backend/tests/integration/test_trajectory_replay.py
         env:
           PYTHONPATH: ".;$env:PYTHONPATH"
 
@@ -84,20 +84,21 @@ jobs:
         python-version: ['3.12']
     steps:
       - uses: actions/checkout@v4
-      - name: Install poetry via pipx
-        run: pipx install poetry
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
       - name: Set up Python
         uses: useblacksmith/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
       - name: Install Python dependencies
-        run: poetry install --with dev,test,runtime
-      - name: Poetry validation
-        run: poetry check --lock
+        run: uv sync --group dev --group test --group runtime
+      - name: Lockfile validation
+        run: uv lock --check
       - name: Verify optional imports
         run: python backend/scripts/verify/verify_optional_imports.py
       - name: Compile backend (syntax gate)
-        run: poetry run python -m compileall backend
+        run: uv run python -m compileall backend
       - name: Run heavy / integration tests
-        run: PYTHONPATH=".:$PYTHONPATH" poetry run pytest -m "heavy or integration or benchmark" -vv
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -m "heavy or integration or benchmark" -vv

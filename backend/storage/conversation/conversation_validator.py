@@ -6,7 +6,7 @@ import os
 from datetime import UTC, datetime
 from typing import Literal
 
-from backend.core.config.utils import load_forge_config
+from backend.core.config.config_loader import load_forge_config
 from backend.core.logger import forge_logger as logger
 from backend.api.config.server_config import ServerConfig
 from backend.api.user_auth import get_current_user_id

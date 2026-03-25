@@ -9,6 +9,7 @@ import {
   FinishCard,
   RejectCard,
   McpCard,
+  LspQueryCard,
   BrowseCard,
   ClarificationCard,
   EscalateCard,
@@ -17,10 +18,12 @@ import {
   DelegateCard,
   ErrorCard,
   McpObservationCard,
+  LspObservationCard,
   BrowseObservationCard,
   DelegateResultCard,
   RecallFailureCard,
 } from "./EventCards";
+import { ThinkCard } from "./ThinkCard";
 
 interface EventCardProps {
   event: ForgeEvent;
@@ -49,6 +52,8 @@ export function EventCard({ event }: EventCardProps) {
         return <RejectCard event={action} />;
       case ActionType.MCP:
         return <McpCard event={action} />;
+      case ActionType.LSP_QUERY:
+        return <LspQueryCard event={action} />;
       case ActionType.BROWSE:
       case ActionType.BROWSE_INTERACTIVE:
         return <BrowseCard event={action} />;
@@ -68,7 +73,7 @@ export function EventCard({ event }: EventCardProps) {
         return null;
 
       case ActionType.THINK:
-        return null;
+        return <ThinkCard event={action} />;
 
       // Silent / internal actions
       case ActionType.NULL:
@@ -116,6 +121,8 @@ export function EventCard({ event }: EventCardProps) {
         return <ErrorCard event={obs} />;
       case ObservationType.MCP:
         return <McpObservationCard event={obs} />;
+      case ObservationType.LSP_QUERY_RESULT:
+        return <LspObservationCard event={obs} />;
       case ObservationType.BROWSE:
         return <BrowseObservationCard event={obs} />;
       case ObservationType.DELEGATE_TASK_RESULT:

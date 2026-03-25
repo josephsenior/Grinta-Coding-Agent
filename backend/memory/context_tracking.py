@@ -141,6 +141,12 @@ class ContextTracker:
         if not self.vector_store:
             return
         try:
+            delete_by_ids = getattr(self.vector_store, "delete_by_ids", None)
+            if callable(delete_by_ids):
+                try:
+                    delete_by_ids([event_id])
+                except Exception:
+                    logger.debug("Vector memory delete_by_ids skipped", exc_info=True)
             self.vector_store.add(
                 step_id=event_id,
                 role=role,

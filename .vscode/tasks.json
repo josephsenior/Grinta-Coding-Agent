@@ -46,7 +46,7 @@
 		{
 			"label": "Run Uvicorn Task",
 			"type": "shell",
-			"command": "poetry run uvicorn backend.api.listen:app --port 3030",
+			"command": "poetry run uvicorn backend.api.socketio_asgi_app:app --port 3030",
 			"isBackground": true
 		},
 		{

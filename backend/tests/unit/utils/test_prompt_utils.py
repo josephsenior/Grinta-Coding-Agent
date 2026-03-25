@@ -326,8 +326,11 @@ class TestOrchestratorPromptManager:
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
 
         with patch(
-            "backend.engines.orchestrator.tools.memory_manager_temp1.scratchpad_entries_for_prompt",
+            "backend.engines.orchestrator.tools.note.scratchpad_entries_for_prompt",
             return_value=[("key", "val")],
+        ), patch(
+            "backend.engines.orchestrator.tools.working_memory.get_working_memory_prompt_block",
+            return_value="",
         ):
             result = opm.get_system_message()
             assert "WORKING_SCRATCHPAD" in result

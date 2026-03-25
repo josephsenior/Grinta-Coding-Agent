@@ -26,6 +26,7 @@ class LspQueryObservation(Observation):
 
     content: str = ""
     available: bool = True
+    observation: ClassVar[str] = ObservationType.LSP_QUERY_RESULT
     observation_type: ClassVar[str] = ObservationType.LSP_QUERY_RESULT
 
     @property

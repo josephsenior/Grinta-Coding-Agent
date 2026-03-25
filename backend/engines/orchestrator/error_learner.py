@@ -43,11 +43,6 @@ _RECOVERY_MAP: list[tuple[str, str, str]] = [
         "not found",
         "Use find_file or analyze_project_structure to locate the correct file path.",
     ),
-    (
-        "web_search",
-        "timeout",
-        "Network may be unreliable. Try again or use local codebase search instead.",
-    ),
 ]
 
 

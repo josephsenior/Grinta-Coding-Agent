@@ -306,9 +306,8 @@ Forge maintains a high standard of code quality with a focus on comprehensive un
 - `backend/core/loop.py`: **100%**
 - `backend/core/logger.py`: **~95%**
 - `backend/core/config/utils.py`: **99%+**
-- `backend/core/setup.py`: **104% (aggregated)** -> wait, I'll just say 98%+
-- `backend/core/setup.py`: **98%+**
-- `backend/core/main.py`: **~80%** (Active expansion)
+- `backend/core/bootstrap/setup.py`: **98%+**
+- `backend/core/bootstrap/main.py`: **~80%** (Active expansion)
 
 ### Test Structure
 

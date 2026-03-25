@@ -8,13 +8,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from backend.core.logger import forge_logger as logger
-from backend.runtime.pool import call_async_disconnect
+from backend.runtime.runtime_pool import call_async_disconnect
 from backend.runtime.telemetry import RuntimeTelemetry, runtime_telemetry
 
 if TYPE_CHECKING:
     from backend.events.stream import EventStream
     from backend.runtime.base import Runtime
-    from backend.runtime.pool import RuntimePool
+    from backend.runtime.runtime_pool import RuntimePool
 
 
 def _env_float(name: str, default: float) -> float:
@@ -214,3 +214,4 @@ class RuntimeWatchdog:
 
 
 runtime_watchdog = RuntimeWatchdog()
+

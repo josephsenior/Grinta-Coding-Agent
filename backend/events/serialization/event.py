@@ -13,7 +13,7 @@ from backend.core.pydantic_compat import model_dump_with_options
 from backend.events.event import Event, EventSource
 from backend.events.serialization.action import action_from_dict
 from backend.events.serialization.observation import observation_from_dict
-from backend.events.serialization.utils import remove_fields
+from backend.events.serialization.serialization_utils import remove_fields
 from backend.events.tool import ToolCallMetadata
 from backend.llm.metrics import Cost, Metrics, ResponseLatency, TokenUsage
 

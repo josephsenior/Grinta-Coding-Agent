@@ -217,11 +217,14 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
     # Register the main event loop so background threads (EventStream
     # dispatch, etc.) can schedule coroutines on it via run_or_schedule.
     from backend.utils.async_utils import set_main_event_loop
+    from backend.utils.shutdown_listener import reset_shutdown_state
+
+    reset_shutdown_state()
     set_main_event_loop()
 
     # ── Config validation (fail fast on misconfiguration) ───────────────
     # Reload config to ensure it picks up any changes made to settings.json
-    from backend.core.config.utils import load_forge_config
+    from backend.core.config.config_loader import load_forge_config
     fastapi_app.state.config = load_forge_config()
 
     _validate_config()
@@ -263,7 +266,7 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
             from backend.storage.conversation.database_conversation_store import (
                 DatabaseConversationStore,
             )
-            from backend.storage.db_pool import get_db_pool
+            from backend.storage.database_pool import get_db_pool
             from backend.storage.knowledge_base.database_knowledge_base_store import (
                 DatabaseKnowledgeBaseStore,
             )
@@ -604,3 +607,4 @@ if observability_enabled:
 
 register_exception_handlers(app)
 register_routes(app)
+

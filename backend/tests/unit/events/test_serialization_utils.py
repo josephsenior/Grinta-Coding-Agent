@@ -1,4 +1,4 @@
-"""Tests for backend.events.serialization.utils."""
+"""Tests for backend.events.serialization.serialization_utils."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import pytest
 
-from backend.events.serialization.utils import remove_fields
+from backend.events.serialization.serialization_utils import remove_fields
 
 
 class TestRemoveFields:

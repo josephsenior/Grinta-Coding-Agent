@@ -11,7 +11,8 @@ SEARCH_AVAILABLE_TOOLS_TOOL_NAME = "search_available_tools"
 _DESCRIPTION = (
     "Search the full registry of available tools (built-in and MCP) by capability or tag. "
     "Use this tool when you need a specific capability but don't see an appropriate tool in your current toolset. "
-    "For example, you could search for 'network', 'db', or a specific command name."
+    "For example, you could search for 'network', 'db', or a specific command name. "
+    "This is not for searching repository text or symbols; use search_code for that."
 )
 
 def create_search_available_tools_tool() -> ChatCompletionToolParam:
