@@ -1,8 +1,8 @@
-"""Tests for backend.storage.in_memory — InMemoryFileStore."""
+"""Tests for backend.storage.in_memory_file_store — InMemoryFileStore."""
 
 import pytest
 
-from backend.storage.in_memory import InMemoryFileStore
+from backend.storage.in_memory_file_store import InMemoryFileStore
 
 
 class TestInMemoryFileStoreInit:

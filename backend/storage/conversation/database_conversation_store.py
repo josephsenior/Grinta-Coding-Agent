@@ -196,7 +196,7 @@ class DatabaseConversationStore(ConversationStore):
         cls, config: ForgeConfig, user_id: str | None
     ) -> DatabaseConversationStore:
         """Get a store for the user represented by the token given."""
-        from backend.storage.db_pool import get_db_pool
+        from backend.storage.database_pool import get_db_pool
 
         pool = await get_db_pool()
         return cls(pool=pool)
@@ -257,3 +257,4 @@ class DatabaseConversationStore(ConversationStore):
                 tokens_used,
                 cost,
             )
+

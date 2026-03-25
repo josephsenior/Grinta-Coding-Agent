@@ -132,14 +132,34 @@ def _load_scratchpad_snapshot() -> str:
         return ""
 
 
+def _load_working_memory_snapshot() -> str:
+    """Load structured working memory for post-condensation recovery."""
+    try:
+        from backend.engines.orchestrator.tools.working_memory import (
+            get_working_memory_prompt_block,
+        )
+
+        block = get_working_memory_prompt_block()
+        if not block:
+            return ""
+        return "\n" + "─" * 60 + "\n" + f"{block}\n"
+    except Exception:
+        return ""
+
+
 def _handle_condensation_observation(
     obs: AgentCondensationObservation, max_message_chars: int | None
 ) -> Message:
     """Handle AgentCondensationObservation with an explicit visibility banner."""
     summary = obs.content or "(no summary provided)"
     scratchpad = _load_scratchpad_snapshot()
+    working_memory = _load_working_memory_snapshot()
     text = truncate_content(
-        _CONDENSATION_BANNER + summary + scratchpad + _POST_CONDENSATION_RECOVERY,
+        _CONDENSATION_BANNER
+        + summary
+        + scratchpad
+        + working_memory
+        + _POST_CONDENSATION_RECOVERY,
         max_message_chars,
     )
     return Message(role="user", content=[TextContent(text=text)])

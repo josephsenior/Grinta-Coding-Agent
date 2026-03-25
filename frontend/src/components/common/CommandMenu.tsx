@@ -1,18 +1,19 @@
 import { useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "cmdk";
-import { Hammer, Settings, BookOpen, Activity, MessageSquare, Plus } from "lucide-react";
+import { Settings, BookOpen, Activity, MessageSquare, Plus } from "lucide-react";
 import { useConversations } from "@/hooks/use-conversations";
 import { useNewConversation } from "@/hooks/use-new-conversation";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/stores/app-store";
+import { CMDK_CONTENT, CMDK_OVERLAY, CMDK_ROOT } from "@/components/common/cmdk-palette-classes";
 
-interface CommandMenuProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
+export function CommandMenu() {
   const navigate = useNavigate();
+  const open = useAppStore((s) => s.commandMenuOpen);
+  const setOpen = useAppStore((s) => s.setCommandMenuOpen);
+  const setSettingsWindowOpen = useAppStore((s) => s.setSettingsWindowOpen);
+  const setKnowledgeWindowOpen = useAppStore((s) => s.setKnowledgeWindowOpen);
   const { data } = useConversations();
   const { create: handleCreate } = useNewConversation();
 
@@ -21,10 +22,10 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
     (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
-        onOpenChange(!open);
+        setOpen(!open);
       }
     },
-    [open, onOpenChange],
+    [open, setOpen],
   );
 
   useEffect(() => {
@@ -33,18 +34,21 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
   }, [handleKeyDown]);
 
   const runCommand = (command: () => void) => {
-    onOpenChange(false);
+    setOpen(false);
     command();
   };
 
   return (
     <CommandDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={setOpen}
       label="Global Command Menu"
+      overlayClassName={CMDK_OVERLAY}
+      contentClassName={CMDK_CONTENT}
+      className={CMDK_ROOT}
     >
-      <CommandInput placeholder="Search conversations, pages..." />
-      <CommandList>
+      <CommandInput placeholder="Search conversations, pages…" />
+      <CommandList className="max-h-[min(55vh,400px)] min-h-0 overflow-x-hidden overflow-y-auto">
         <CommandEmpty>No results found.</CommandEmpty>
 
         <CommandGroup heading="Actions">
@@ -55,22 +59,37 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
           </CommandItem>
         </CommandGroup>
 
-        <CommandGroup heading="Pages">
-          <CommandItem onSelect={() => runCommand(() => navigate("/"))}>
-            <Hammer className={cn("mr-2 h-4 w-4")} />
-            Home
-          </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => navigate("/knowledge"))}>
+        <CommandGroup heading="Windows">
+          <CommandItem
+            onSelect={() =>
+              runCommand(() => {
+                setKnowledgeWindowOpen(true);
+              })
+            }
+          >
             <BookOpen className={cn("mr-2 h-4 w-4")} />
-            Knowledge Base
+            Knowledge base
           </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => navigate("/settings"))}>
+          <CommandItem
+            onSelect={() =>
+              runCommand(() => {
+                setSettingsWindowOpen(true);
+              })
+            }
+          >
             <Settings className={cn("mr-2 h-4 w-4")} />
             Settings
           </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => navigate("/settings"))}>
+          <CommandItem
+            onSelect={() =>
+              runCommand(() => {
+                setSettingsWindowOpen(true);
+              })
+            }
+          >
             <Activity className={cn("mr-2 h-4 w-4")} />
             Monitoring
+            <span className="ml-auto text-xs text-muted-foreground">in Settings</span>
           </CommandItem>
         </CommandGroup>
 

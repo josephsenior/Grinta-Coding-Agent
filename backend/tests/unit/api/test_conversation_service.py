@@ -368,13 +368,13 @@ async def test_setup_init_conversation_settings_success(
 
     # Settings
     settings_store = AsyncMock()
-    settings = Settings(agent="default")
+    settings = Settings(llm_model="gpt-4")
     settings_store.load.return_value = settings
     mock_get_settings.return_value = settings_store
 
     result = await setup_init_conversation_settings("u1", "c1")
 
-    assert result.agent == "default"
+    assert result.llm_model == "gpt-4"
     assert result.selected_repository == "repo"
     store.get_metadata.assert_called_once_with("c1")
 
@@ -744,7 +744,7 @@ async def test_setup_init_conversation_settings_with_providers(
 
     # Settings
     settings_store = AsyncMock()
-    settings = Settings(agent="default")
+    settings = Settings(llm_model="gpt-4")
     settings_store.load.return_value = settings
     mock_get_settings.return_value = settings_store
 
@@ -752,7 +752,7 @@ async def test_setup_init_conversation_settings_with_providers(
         "u1", "c1", providers_set=[_SSO, "github"]
     )
 
-    assert result.agent == "default"
+    assert result.llm_model == "gpt-4"
     assert result.selected_repository == "repo"
 
 

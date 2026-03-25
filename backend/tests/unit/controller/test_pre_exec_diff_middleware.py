@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 
@@ -69,32 +68,32 @@ class TestSimulateEdit:
     def setup_method(self):
         self.mw = PreExecDiffMiddleware()
 
-    def test_str_replace(self):
+    def test_replace_text(self):
         action = MagicMock()
-        action.command = "str_replace"
+        action.command = "replace_text"
         action.old_str = "old"
         action.new_str = "new"
         result = self.mw._simulate_edit("line with old text", action)
         assert result == "line with new text"
 
-    def test_str_replace_first_occurrence_only(self):
+    def test_replace_text_first_occurrence_only(self):
         action = MagicMock()
-        action.command = "str_replace"
+        action.command = "replace_text"
         action.old_str = "a"
         action.new_str = "b"
         result = self.mw._simulate_edit("a a a", action)
         assert result == "b a a"
 
-    def test_create_command(self):
+    def test_create_file_command(self):
         action = MagicMock()
-        action.command = "create"
+        action.command = "create_file"
         action.file_text = "brand new content"
         result = self.mw._simulate_edit("old", action)
         assert result == "brand new content"
 
-    def test_insert_command(self):
+    def test_insert_text_command(self):
         action = MagicMock()
-        action.command = "insert"
+        action.command = "insert_text"
         action.insert_line = 1
         action.new_str = "inserted line"
         result = self.mw._simulate_edit("line0\nline1\n", action)
@@ -103,7 +102,7 @@ class TestSimulateEdit:
 
     def test_unknown_command_returns_none(self):
         action = MagicMock()
-        action.command = "view"
+        action.command = "view_file"
         result = self.mw._simulate_edit("content", action)
         assert result is None
 
@@ -123,7 +122,7 @@ class TestExecuteEdit:
         action = MagicMock()
         action.__class__.__name__ = "FileEditAction"
         action.path = str(test_file)
-        action.command = "str_replace"
+        action.command = "replace_text"
         action.old_str = "line2"
         action.new_str = "modified_line2"
 
@@ -148,7 +147,7 @@ class TestExecuteEdit:
         test_file.write_text("content", encoding="utf-8")
 
         action = MagicMock()
-        action.command = "view"  # returns None from _simulate_edit
+        action.command = "view_file"  # returns None from _simulate_edit
         action.path = str(test_file)
 
         ctx = _make_ctx(action=action)
@@ -171,7 +170,7 @@ class TestMetadataPropagation:
 
         action = MagicMock()
         action.path = str(test_file)
-        action.command = "str_replace"
+        action.command = "replace_text"
         action.old_str = "old"
         action.new_str = "new"
 

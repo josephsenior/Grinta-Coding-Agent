@@ -21,7 +21,7 @@ from backend.core.config.config_sections import (
     process_security_section,
 )
 from backend.core.config.forge_config import ForgeConfig
-from backend.core.config.utils import ConfigLoadSummary
+from backend.core.config.config_loader import ConfigLoadSummary
 
 
 class TestCheckUnknownSections:

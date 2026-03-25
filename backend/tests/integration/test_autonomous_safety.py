@@ -17,7 +17,6 @@ from backend.controller.agent_circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
 )
-from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.controller.safety_validator import ExecutionContext, SafetyValidator
 from backend.events.action import ActionSecurityRisk, CmdRunAction
 from backend.security.command_analyzer import CommandAnalyzer
@@ -153,52 +152,6 @@ class TestSafetyValidator:
 
         assert result.allowed is True
         assert result.risk_level == ActionSecurityRisk.LOW
-
-
-class TestErrorRecovery:
-    """Test error recovery strategies."""
-
-    def test_classify_module_not_found(self):
-        """Test ImportError classification."""
-        error = ModuleNotFoundError("No module named 'requests'")
-        error_type = ErrorRecoveryStrategy.classify_error(error)
-
-        assert error_type == ErrorType.MODULE_NOT_FOUND
-
-    def test_classify_network_error(self):
-        """Test network error classification."""
-        error = Exception("Connection timeout while git clone")
-        error_type = ErrorRecoveryStrategy.classify_error(error)
-
-        assert error_type == ErrorType.NETWORK_ERROR
-
-    def test_classify_runtime_crash(self):
-        """Test runtime crash classification."""
-        error = Exception("Container crashed unexpectedly")
-        error_type = ErrorRecoveryStrategy.classify_error(error)
-
-        assert error_type == ErrorType.RUNTIME_CRASH
-
-    def test_recovery_actions_for_import_error(self):
-        """Test recovery actions for ImportError."""
-        error = ModuleNotFoundError("No module named 'requests'")
-        actions = ErrorRecoveryStrategy.get_recovery_actions(
-            ErrorType.MODULE_NOT_FOUND, error
-        )
-
-        assert actions
-        assert any("pip install" in str(action) for action in actions)
-
-    def test_recovery_actions_for_network_error(self):
-        """Test recovery actions for network errors."""
-        error = Exception("git clone failed: connection timeout")
-        actions = ErrorRecoveryStrategy.get_recovery_actions(
-            ErrorType.NETWORK_ERROR, error
-        )
-
-        assert actions
-        # Should configure git for better resilience
-        assert any("git config" in str(action) for action in actions)
 
 
 class TestCircuitBreaker:
@@ -356,22 +309,6 @@ class TestPendingActionTimeout:
         """Test that pending actions auto-clear after timeout."""
         # This requires full controller setup
         # Placeholder for future implementation
-
-
-def test_error_type_classification():
-    """Test that errors are correctly classified."""
-    # Test various error types
-    test_cases = [
-        (ModuleNotFoundError("No module named 'foo'"), ErrorType.MODULE_NOT_FOUND),
-        (Exception("Container crashed"), ErrorType.RUNTIME_CRASH),
-        (Exception("Connection timeout"), ErrorType.NETWORK_ERROR),
-        (PermissionError("Permission denied"), ErrorType.PERMISSION_ERROR),
-        (TimeoutError("Operation timed out"), ErrorType.TIMEOUT_ERROR),
-    ]
-
-    for error, expected_type in test_cases:
-        actual_type = ErrorRecoveryStrategy.classify_error(error)
-        assert actual_type == expected_type, f"Failed for {error}"
 
 
 def test_safety_config_defaults():

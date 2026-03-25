@@ -1,7 +1,6 @@
 """Structured task tracking tool definition for Orchestrator runs."""
 
 import json
-import os
 from pathlib import Path
 from typing import Any, List
 
@@ -25,23 +24,25 @@ class TaskTracker:
     def __init__(self, workspace_root: str | Path | None = None):
         """Initialize the task tracker with a workspace root."""
         if workspace_root is None:
-            workspace_root = os.environ.get("FORGE_WORKSPACE_DIR", ".")
-        self.file_path = Path(workspace_root) / ".forge" / "active_plan.json"
+            from backend.core.workspace_resolution import require_effective_workspace_root
+
+            workspace_root = require_effective_workspace_root()
+        self.path = Path(workspace_root) / ".forge" / "active_plan.json"
 
     def load_from_file(self) -> List[dict[str, Any]]:
         """Load the task list from disk."""
-        if not self.file_path.exists():
+        if not self.path.exists():
             return []
         try:
-            with open(self.file_path, encoding="utf-8") as f:
+            with open(self.path, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
             return []
 
     def save_to_file(self, task_list: List[dict[str, Any]]) -> None:
         """Save the task list to disk."""
-        self.file_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.file_path, "w", encoding="utf-8") as f:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path, "w", encoding="utf-8") as f:
             json.dump(task_list, f, indent=2, ensure_ascii=False)
 
 

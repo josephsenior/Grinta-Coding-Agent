@@ -48,8 +48,11 @@ class FileConversationStore(ConversationStore):
         self.file_store = file_store
         self.user_id = user_id
 
-        # Maintain a convenience path for local file stores so directories exist.
-        base_path = Path(self.config.workspace_base or ".") / ".Forge" / "conversations"
+        from backend.core.app_paths import get_app_settings_root
+
+        wb = (self.config.project_root or "").strip()
+        conv_root = Path(wb).expanduser().resolve() if wb else Path(get_app_settings_root())
+        base_path = conv_root / ".Forge" / "conversations"
         if user_id:
             base_path = base_path / user_id
         base_path.mkdir(parents=True, exist_ok=True)
@@ -245,7 +248,7 @@ class FileConversationStore(ConversationStore):
         """
         file_store = get_file_store(
             file_store_type=config.file_store,
-            file_store_path=config.file_store_path,
+            local_data_root=config.local_data_root,
             file_store_web_hook_url=config.file_store_web_hook_url,
             file_store_web_hook_headers=config.file_store_web_hook_headers,
             file_store_web_hook_batch=config.file_store_web_hook_batch,

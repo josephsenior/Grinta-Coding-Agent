@@ -30,7 +30,7 @@ class TestExtractObservationOutcome(unittest.TestCase):
     def test_file_edit_same_content_returns_no_change(self):
         """Re-creation: old_content == new_content → 'no_change'."""
         obs = MagicMock(spec=FileEditObservation)
-        obs.__class__ = FileEditObservation
+        obs.__class__ = FileEditObservation  # type: ignore[assignment]
         obs.content = "File created successfully"
         obs.old_content = "export default function Page() {}"
         obs.new_content = "export default function Page() {}"
@@ -40,7 +40,7 @@ class TestExtractObservationOutcome(unittest.TestCase):
     def test_file_edit_different_content_returns_unknown(self):
         """Genuine edit: old != new → 'unknown' (not no_change)."""
         obs = MagicMock(spec=FileEditObservation)
-        obs.__class__ = FileEditObservation
+        obs.__class__ = FileEditObservation  # type: ignore[assignment]
         obs.content = "File created successfully"
         obs.old_content = "old version"
         obs.new_content = "new version"
@@ -50,7 +50,7 @@ class TestExtractObservationOutcome(unittest.TestCase):
     def test_file_edit_none_old_content(self):
         """New file creation: old_content is None → 'unknown'."""
         obs = MagicMock(spec=FileEditObservation)
-        obs.__class__ = FileEditObservation
+        obs.__class__ = FileEditObservation  # type: ignore[assignment]
         obs.content = "File created successfully"
         obs.old_content = None
         obs.new_content = "new file content"
@@ -64,12 +64,12 @@ class TestExtractObservationOutcome(unittest.TestCase):
         result = self.detector._extract_observation_outcome(obs)
         self.assertEqual(result, "no_change")
 
-    def test_already_exists_returns_no_change(self):
-        """'already exists' in content → 'no_change'."""
+    def test_already_exists_prose_is_not_semantic_signal(self):
+        """Free-form 'already exists' text is not used for stuck scoring (too many false positives)."""
         obs = MagicMock(spec=Observation)
         obs.content = "Error: file already exists at /workspace/src/page.tsx"
         result = self.detector._extract_observation_outcome(obs)
-        self.assertEqual(result, "no_change")
+        self.assertEqual(result, "unknown")
 
     def test_empty_content_returns_unknown(self):
         """Empty/normal observation → 'unknown'."""

@@ -366,7 +366,7 @@ class TestNewPolicyMiddlewares:
 
         ctx = ToolInvocationContext(
             controller=ctrl,
-            action=FileEditAction(path="src/main.py", command="str_replace"),
+            action=FileEditAction(path="src/main.py", command="replace_text"),
             state=_mock_state(),
         )
 

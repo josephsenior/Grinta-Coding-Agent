@@ -1,8 +1,8 @@
 """Embedded (single-process) mode for solo local-first use.
 
 Starts the Forge FastAPI/Socket.IO backend in a *background thread* using
-uvicorn, waits until it is ready, then launches the Textual TUI in the main
-thread.  This means users only need **one terminal** instead of two.
+uvicorn, waits until it is ready, then opens the web UI in a browser and
+keeps the process alive until Ctrl+C.
 
 Usage::
 
@@ -19,6 +19,7 @@ import os
 import sys
 import threading
 import time
+import webbrowser
 
 logger = logging.getLogger("forge.embedded")
 
@@ -35,11 +36,12 @@ def _run_server(host: str, port: int) -> None:
     import uvicorn  # imported here so the main thread can start fast
 
     uvicorn.run(
-        "backend.api.listen:app",
+        "backend.api.socketio_asgi_app:app",
         host=host,
         port=port,
         log_level="error",   # suppress uvicorn's startup noise in embedded mode
         reload=False,        # reload incompatible with threads
+        ws="websockets-sansio",
     )
 
 
@@ -50,7 +52,8 @@ def _wait_for_server(host: str, port: int, timeout: float = _STARTUP_TIMEOUT) ->
     """
     import httpx
 
-    url = f"http://{host}:{port}/api/v1/alive"
+    probe_host = "127.0.0.1" if host in ("0.0.0.0", "::", "::0") else host
+    url = f"http://{probe_host}:{port}/api/v1/alive"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -63,16 +66,18 @@ def _wait_for_server(host: str, port: int, timeout: float = _STARTUP_TIMEOUT) ->
     return False
 
 
+def _browser_url(host: str, port: int) -> str:
+    """URL for opening the React UI (avoid bare 0.0.0.0 in the browser)."""
+    open_host = "127.0.0.1" if host in ("0.0.0.0", "::", "::0") else host
+    return f"http://{open_host}:{port}/"
+
+
 # ---------------------------------------------------------------------------
 # Embedded entry point
 # ---------------------------------------------------------------------------
 
 def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = False) -> None:
-    """Start server in background thread, then run TUI in the foreground.
-
-    This is the single-process path for local solo users — no second terminal
-    or separate server process required.
-    """
+    """Start server in background thread, open the web UI, wait for Ctrl+C."""
     level = logging.DEBUG if verbose else logging.WARNING
     logging.basicConfig(
         level=level,
@@ -83,7 +88,7 @@ def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = Fals
     print(f"🔧 Forge embedded mode — starting server on http://{host}:{port} …")
 
     # Start the server in a daemon thread so it dies automatically when the
-    # TUI (main thread) exits.
+    # main thread exits.
     server_thread = threading.Thread(
         target=_run_server,
         args=(host, port),
@@ -106,19 +111,20 @@ def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = Fals
 
     print(" ready ✓")
 
-    # Launch the TUI
-    from tui.app import ForgeApp
-    from tui.client import ForgeClient
-
-    base_url = f"http://{host}:{port}"
-    client = ForgeClient(base_url=base_url)
-    app = ForgeApp(client)
-
+    ui_url = _browser_url(host, port)
+    print(f"   Opening web UI: {ui_url}")
     try:
-        app.run()
+        webbrowser.open(ui_url)
+    except Exception:
+        logger.warning("Could not open browser; open %s manually", ui_url, exc_info=True)
+
+    print("   Press Ctrl+C to stop.")
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        print("\n   Stopping…")
     finally:
-        # Server thread is a daemon — it will exit on its own.
-        # Give uvicorn a moment to finish any in-flight requests.
         time.sleep(0.5)
 
 
@@ -131,7 +137,7 @@ def _parse_args() -> argparse.Namespace:
         prog="forge",
         description=(
             "Forge — single-process embedded mode.  "
-            "Starts the backend server and TUI together in one terminal."
+            "Starts the backend server and opens the web UI."
         ),
     )
     parser.add_argument(
@@ -160,3 +166,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

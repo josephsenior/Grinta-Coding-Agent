@@ -42,6 +42,15 @@ class LifecycleService:
         controller.status_callback = status_callback
         controller.security_analyzer = security_analyzer
 
+        # Ensure agents that support event streaming (e.g., Orchestrator)
+        # receive the shared EventStream instance used by the controller.
+        try:
+            if hasattr(agent, "event_stream"):
+                setattr(agent, "event_stream", event_stream)
+        except Exception:
+            # Wiring failure should not block controller bootstrap.
+            pass
+
         event_stream.subscribe(
             EventStreamSubscriber.AGENT_CONTROLLER, controller.on_event, controller.id
         )

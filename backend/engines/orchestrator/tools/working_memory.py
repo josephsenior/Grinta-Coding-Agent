@@ -26,9 +26,6 @@ from backend.events.action.agent import AgentThinkAction
 
 WORKING_MEMORY_TOOL_NAME = "working_memory"
 
-_WORKSPACE_ROOT = os.environ.get("FORGE_WORKSPACE_DIR", ".")
-_MEMORY_FILE = ".forge/working_memory.json"
-
 _VALID_SECTIONS = ("hypothesis", "findings", "blockers", "file_context", "decisions", "plan")
 
 _DESCRIPTION = (
@@ -79,7 +76,9 @@ def create_working_memory_tool() -> ChatCompletionToolParam:
 # --- Persistence ---
 
 def _memory_path() -> Path:
-    return Path(_WORKSPACE_ROOT) / _MEMORY_FILE
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    return require_effective_workspace_root() / ".forge" / "working_memory.json"
 
 
 def _load_memory() -> dict[str, str]:
@@ -201,3 +200,25 @@ def get_full_working_memory() -> str:
         return ""
     parts.append("</WORKING_MEMORY>")
     return "\n".join(parts)
+
+
+def get_working_memory_prompt_block(char_budget: int = 2000) -> str:
+    """Return a bounded working-memory block for prompt or recovery injection."""
+    memory = _load_memory()
+    if not memory:
+        return ""
+
+    lines = ["<WORKING_MEMORY>", "Your structured working memory:"]
+    for sec in _VALID_SECTIONS:
+        val = memory.get(sec, "")
+        if not val:
+            continue
+        line = f"[{sec.upper()}] {val}"
+        if len("\n".join(lines + [line, "</WORKING_MEMORY>"])) > char_budget:
+            lines.append("... (additional working memory truncated)")
+            break
+        lines.append(line)
+    if len(lines) == 2:
+        return ""
+    lines.append("</WORKING_MEMORY>")
+    return "\n".join(lines)

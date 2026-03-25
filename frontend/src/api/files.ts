@@ -1,12 +1,21 @@
 import apiClient from "./client";
 
+/** Best-effort path for the agent: upload API may return absolute paths; workspace tools expect a simple relative name for root uploads. */
+export function agentPathFromUploadResponse(uploadedPath: string): string {
+  const normalized = uploadedPath.replace(/\\/g, "/");
+  const parts = normalized.split("/").filter(Boolean);
+  return parts.length > 0 ? (parts[parts.length - 1] as string) : uploadedPath;
+}
+
 /** List files at a path in the conversation workspace. */
 export async function listFiles(
   conversationId: string,
   path?: string,
+  options?: { recursive?: boolean },
 ): Promise<string[]> {
-  const params: Record<string, string> = {};
+  const params: Record<string, string | boolean> = {};
   if (path) params.path = path;
+  if (options?.recursive) params.recursive = true;
   const { data } = await apiClient.get<string[]>(
     `/conversations/${conversationId}/files/list-files`,
     { params },

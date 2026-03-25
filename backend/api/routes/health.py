@@ -18,9 +18,9 @@ def get_system_info() -> dict:
 def _check_storage() -> dict:
     """Validate that the file-store directory is writable."""
     try:
-        from backend.storage.locations import get_file_store_path
+        from backend.storage.locations import get_local_data_root
 
-        store_path = get_file_store_path()
+        store_path = get_local_data_root()
         writable = os.path.isdir(store_path) and os.access(store_path, os.W_OK)
         return {"status": "ok" if writable else "degraded", "path": str(store_path)}
     except Exception as exc:
@@ -35,7 +35,8 @@ def _check_config() -> dict:
         cfg = load_forge_config()
         return {
             "status": "ok",
-            "workspace_base": str(getattr(cfg, "workspace_base", "?")),
+            "project_root": str(getattr(cfg, "project_root", None) or ""),
+            "local_data_root": str(getattr(cfg, "local_data_root", "") or ""),
         }
     except Exception as exc:
         return {"status": "error", "detail": str(exc)}

@@ -133,10 +133,10 @@ def get_cli_parser() -> argparse.ArgumentParser:
     )
     subparsers.add_parser("serve", help="Launch the Forge GUI server (web interface)")
     subparsers.add_parser(
-        "all", help="Launch both backend server and TUI in one terminal"
+        "all", help="Alias for 'serve' (launch the web GUI server)"
     )
     subparsers.add_parser(
-        "start", help="Launch both backend server and TUI (alias for 'all')"
+        "start", help="Alias for 'serve' (launch the web GUI server)"
     )
 
     subparsers.add_parser(

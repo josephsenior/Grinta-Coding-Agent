@@ -1,4 +1,4 @@
-"""Tests for backend.core.setup — framework initialization helpers."""
+"""Tests for backend.core.bootstrap.setup — framework initialization helpers."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 
 from backend.runtime.plugins.requirement import PluginRequirement
 from backend.core.config.forge_config import ForgeConfig
-from backend.core.setup import (
+from backend.core.bootstrap.setup import (
     filter_plugins_by_config,
     generate_sid,
     create_runtime,
@@ -59,15 +59,15 @@ def test_filter_plugins_by_config():
 
 @patch("backend.controller.agent.Agent.get_cls")
 def test_ensure_agent_class_available_success(mock_get_cls):
-    from backend.core.setup import _ensure_agent_class_available
+    from backend.core.bootstrap.setup import _ensure_agent_class_available
 
     _ensure_agent_class_available("any")
     mock_get_cls.assert_called_with("any")
 
 
-@patch("backend.core.setup.get_file_store")
-@patch("backend.core.setup.EventStream")
-@patch("backend.runtime.factory.get_runtime_cls")
+@patch("backend.core.bootstrap.setup.get_file_store")
+@patch("backend.core.bootstrap.setup.EventStream")
+@patch("backend.runtime.runtime_factory.get_runtime_cls")
 def test_create_runtime_sid_from_stream(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
 ):
@@ -96,15 +96,15 @@ def test_create_runtime_sid_from_stream(
     assert mock_runtime_cls.call_args[1]["sid"] == "stream_sid"
 
 
-@patch("backend.core.setup.get_file_store")
-@patch("backend.core.setup.EventStream")
-@patch("backend.runtime.factory.get_runtime_cls")
+@patch("backend.core.bootstrap.setup.get_file_store")
+@patch("backend.core.bootstrap.setup.EventStream")
+@patch("backend.runtime.runtime_factory.get_runtime_cls")
 def test_create_runtime(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
 ):
     mock_config = MagicMock(spec=ForgeConfig)
     mock_config.file_store = "memory"
-    mock_config.file_store_path = "/tmp"
+    mock_config.local_data_root = "/tmp"
     mock_config.runtime = "docker"
     mock_config.default_agent = "agent"
 
@@ -132,8 +132,8 @@ def test_create_runtime(
     mock_runtime_cls.assert_called()
 
 
-@patch("backend.core.setup.State.restore_from_session")
-@patch("backend.core.setup.AgentController")
+@patch("backend.core.bootstrap.setup.State.restore_from_session")
+@patch("backend.core.bootstrap.setup.AgentController")
 def test_create_controller(mock_controller_cls, mock_restore):
     mock_agent = MagicMock()
     mock_runtime = MagicMock()
@@ -144,6 +144,7 @@ def test_create_controller(mock_controller_cls, mock_restore):
     mock_config = MagicMock(spec=ForgeConfig)
     mock_config.max_iterations = 10
     mock_config.max_budget_per_task = 100
+    mock_config.pending_action_timeout = 60.0
     mock_config.get_agent_to_llm_config_map.return_value = {}
     mock_config.security = MagicMock()
     mock_config.security.confirmation_mode = False
@@ -175,7 +176,7 @@ def test_create_memory_extended():
     assert memory.sid == "sid"
 
 
-@patch("backend.core.setup.importlib.import_module")
+@patch("backend.core.bootstrap.setup.importlib.import_module")
 @patch("backend.controller.agent.Agent.get_cls")
 def test_create_agent_retry(mock_get_cls, mock_import):
     mock_config = MagicMock(spec=ForgeConfig)
@@ -203,7 +204,7 @@ def test_create_agent_retry(mock_get_cls, mock_import):
 
 @patch("backend.controller.agent.Agent.get_cls")
 def test_ensure_agent_class_available_fatal(mock_get_cls):
-    from backend.core.setup import _ensure_agent_class_available
+    from backend.core.bootstrap.setup import _ensure_agent_class_available
     from backend.core.errors import AgentNotRegisteredError
 
     mock_get_cls.side_effect = AgentNotRegisteredError("any")
@@ -222,23 +223,23 @@ def test_create_controller_no_stream():
         create_controller(mock_agent, mock_runtime, MagicMock(), MagicMock())
 
 
-@patch("backend.core.setup.UserSecrets")
+@patch("backend.core.bootstrap.setup.UserSecrets")
 def test_create_secret_store_logic(mock_user_secrets):
-    from backend.core.setup import _create_secret_store
+    from backend.core.bootstrap.setup import _create_secret_store
 
     assert _create_secret_store({}) is None
     _create_secret_store({"a": 1})
     mock_user_secrets.assert_called_once()
 
 
-@patch("backend.core.setup._create_secret_store")
+@patch("backend.core.bootstrap.setup._create_secret_store")
 def test_get_provider_tokens_none(mock_create):
     mock_create.return_value = None
     assert get_provider_tokens() is None
 
 
-@patch("backend.core.setup.get_provider_tokens")
-@patch("backend.core.setup.call_async_from_sync")
+@patch("backend.core.bootstrap.setup.get_provider_tokens")
+@patch("backend.core.bootstrap.setup.call_async_from_sync")
 def test_initialize_repository_for_runtime_no_tokens(mock_call_async, mock_get_tokens):
     mock_runtime = MagicMock()
     mock_call_async.return_value = "/path"
@@ -246,3 +247,4 @@ def test_initialize_repository_for_runtime_no_tokens(mock_call_async, mock_get_t
 
     res = initialize_repository_for_runtime(mock_runtime)
     assert res == "/path"
+

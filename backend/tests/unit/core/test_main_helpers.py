@@ -1,4 +1,4 @@
-"""Tests for backend.core.main — entry point helpers."""
+"""Tests for backend.core.bootstrap.main — entry point helpers."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
 
 from backend.core.config.forge_config import ForgeConfig
-from backend.core.main import (
+from backend.core.bootstrap.main import (
     _validate_run_controller_inputs,
     _setup_replay_events,
     _validate_initial_action,
@@ -56,7 +56,7 @@ def test_setup_replay_events_none():
     assert act is action
 
 
-@patch("backend.core.main.load_replay_log")
+@patch("backend.core.bootstrap.main.load_replay_log")
 def test_setup_replay_events_enabled(mock_load):
     config = MagicMock(spec=ForgeConfig)
     config.replay_trajectory_path = "path.json"
@@ -118,8 +118,8 @@ def test_prepare_final_state():
     assert res.iteration_flag.current_value == 0
 
 
-@patch("backend.core.main.create_registry_and_conversation_stats")
-@patch("backend.core.main.create_agent")
+@patch("backend.core.bootstrap.main.create_registry_and_conversation_stats")
+@patch("backend.core.bootstrap.main.create_agent")
 def test_initialize_session_components(mock_create_agent, mock_registry):
     config = ForgeConfig()
     mock_registry.return_value = (MagicMock(), MagicMock(), config)
@@ -136,13 +136,10 @@ def test_auto_continue_response():
     assert "NEVER ASK" in resp
 
 
-@patch("backend.core.main.create_memory")
-@patch("backend.core.main.add_mcp_tools_to_agent")
-@patch("backend.core.main.ForgeMCPConfig.create_default_mcp_server_config")
+@patch("backend.core.bootstrap.main.create_memory")
+@patch("backend.core.bootstrap.main.add_mcp_tools_to_agent")
 @pytest.mark.asyncio
-async def test_setup_memory_and_mcp_with_mcp(
-    mock_mcp_cfg, mock_add_mcp, mock_create_mem
-):
+async def test_setup_memory_and_mcp_with_mcp(mock_add_mcp, mock_create_mem):
     config = ForgeConfig()
     config.mcp_host = "localhost"
     mock_runtime = MagicMock()
@@ -151,16 +148,12 @@ async def test_setup_memory_and_mcp_with_mcp(
     mock_agent = MagicMock()
     mock_agent.config.enable_mcp = True
 
-    server_mock = MagicMock()
-    mock_mcp_cfg.return_value = (server_mock, [])
-
     await _setup_memory_and_mcp(
         config, mock_runtime, "sid", None, None, None, mock_agent
     )
 
     mock_create_mem.assert_called()
     mock_add_mcp.assert_called()
-    assert server_mock in mock_runtime.config.mcp.servers
 
 
 def test_create_early_status_callback():
@@ -168,7 +161,7 @@ def test_create_early_status_callback():
     callback = _create_early_status_callback(mock_controller)
 
     # Test error
-    with patch("backend.core.main.logger.error") as mock_err:
+    with patch("backend.core.bootstrap.main.logger.error") as mock_err:
         callback("error", RuntimeStatus.ERROR_MEMORY, "bad thing")
         assert mock_err.called
         mock_controller.state.set_last_error.assert_called_with(
@@ -176,7 +169,7 @@ def test_create_early_status_callback():
         )
 
 
-@patch("backend.core.main.read_input")
+@patch("backend.core.bootstrap.main.read_input")
 def test_create_event_handler(mock_read_input):
     config = ForgeConfig()
     mock_event_stream = MagicMock()
@@ -193,9 +186,9 @@ def test_create_event_handler(mock_read_input):
     assert "hello" in mock_event_stream.add_event.call_args[0][0].content
 
 
-@patch("backend.core.main.os.makedirs")
-@patch("backend.core.main.open", create=True)
-@patch("backend.core.main.json.dump")
+@patch("backend.core.bootstrap.main.os.makedirs")
+@patch("backend.core.bootstrap.main.open", create=True)
+@patch("backend.core.bootstrap.main.json.dump")
 def test_save_trajectory(mock_json, mock_open, mock_mkdir):
     config = ForgeConfig()
     config.save_trajectory_path = "/tmp/trajectories"
@@ -208,10 +201,10 @@ def test_save_trajectory(mock_json, mock_open, mock_mkdir):
     mock_json.assert_called()
 
 
-@patch("backend.core.main.ReplayManager.get_replay_events")
-@patch("backend.core.main.Path.exists", return_value=True)
-@patch("backend.core.main.Path.is_file", return_value=True)
-@patch("backend.core.main.open", create=True)
+@patch("backend.core.bootstrap.main.ReplayManager.get_replay_events")
+@patch("backend.core.bootstrap.main.Path.exists", return_value=True)
+@patch("backend.core.bootstrap.main.Path.is_file", return_value=True)
+@patch("backend.core.bootstrap.main.open", create=True)
 def test_load_replay_log(mock_open, mock_is_file, mock_exists, mock_get_events):
     mock_get_events.return_value = [
         MessageAction(content="task"),
@@ -229,10 +222,10 @@ def test_load_replay_log(mock_open, mock_is_file, mock_exists, mock_get_events):
     assert cast(Any, events[0]).content == "next"
 
 
-@patch("backend.core.main._initialize_session_components")
-@patch("backend.core.main._setup_runtime_for_controller")
-@patch("backend.core.main._execute_controller_lifecycle")
-@patch("backend.core.main._save_trajectory")
+@patch("backend.core.bootstrap.main._initialize_session_components")
+@patch("backend.core.bootstrap.main._setup_runtime_for_controller")
+@patch("backend.core.bootstrap.main._execute_controller_lifecycle")
+@patch("backend.core.bootstrap.main._save_trajectory")
 @pytest.mark.asyncio
 async def test_run_controller_full(mock_save, mock_exec, mock_setup, mock_init):
     config = ForgeConfig()
@@ -248,7 +241,7 @@ async def test_run_controller_full(mock_save, mock_exec, mock_setup, mock_init):
     mock_exec.assert_called()
 
 
-@patch("backend.core.main.run_agent_until_done", new_callable=AsyncMock)
+@patch("backend.core.bootstrap.main.run_agent_until_done", new_callable=AsyncMock)
 @pytest.mark.asyncio
 async def test_run_agent_loop_basic(mock_until_done):
     mock_runtime = AsyncMock()
@@ -259,7 +252,7 @@ async def test_run_agent_loop_basic(mock_until_done):
     mock_until_done.assert_called_once()
 
 
-@patch("backend.core.main._setup_runtime_and_repo")
+@patch("backend.core.bootstrap.main._setup_runtime_and_repo")
 def test_setup_runtime_for_controller(mock_setup_repo):
     config = ForgeConfig()
     mock_runtime = MagicMock()
@@ -284,13 +277,13 @@ def test_setup_runtime_for_controller(mock_setup_repo):
     assert repo2 is None
 
 
-@patch("backend.core.main._setup_memory_and_mcp")
-@patch("backend.core.main._setup_replay_events")
-@patch("backend.core.main.create_controller")
-@patch("backend.core.main._attach_status_callback")
-@patch("backend.core.main._setup_initial_events")
-@patch("backend.core.main._run_agent_loop")
-@patch("backend.core.main._persist_controller_state", new_callable=AsyncMock)
+@patch("backend.core.bootstrap.main._setup_memory_and_mcp")
+@patch("backend.core.bootstrap.main._setup_replay_events")
+@patch("backend.core.bootstrap.main.create_controller")
+@patch("backend.core.bootstrap.main._attach_status_callback")
+@patch("backend.core.bootstrap.main._setup_initial_events")
+@patch("backend.core.bootstrap.main._run_agent_loop")
+@patch("backend.core.bootstrap.main._persist_controller_state", new_callable=AsyncMock)
 @pytest.mark.asyncio
 async def test_execute_controller_lifecycle(
     mock_persist,

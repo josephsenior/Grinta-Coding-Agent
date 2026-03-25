@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 from typing import Any
 
@@ -20,10 +21,21 @@ from backend.api.monitoring import MonitoringListener
 from backend.api.store_factory import get_conversation_store_instance
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.files import FileStore
-from backend.storage.local import LocalFileStore
+from backend.storage.local_file_store import LocalFileStore
 from backend.utils.import_utils import get_impl
 
 logger = logging.getLogger(__name__)
+
+
+def _close_and_clear(obj: Any, name: str) -> None:
+    """Close object if it has a close method; always returns None. Logs errors."""
+    if obj is None:
+        return
+    try:
+        if hasattr(obj, "close"):
+            obj.close()
+    except Exception:
+        logger.debug("Error closing %s", name, exc_info=True)
 
 
 class AppState:
@@ -40,11 +52,51 @@ class AppState:
         # Eagerly loaded (cheap, no I/O)
         self.server_config: ServerConfig = server_config or load_server_config()
 
-        from backend.core.config.utils import load_forge_config
+        from pathlib import Path
+
+        from backend.core.app_paths import get_app_settings_root
+        from backend.core.config.config_loader import load_forge_config
+        from backend.core.workspace_resolution import (
+            apply_workspace_to_config,
+            is_reserved_user_forge_data_dir,
+            load_persisted_workspace_path,
+            resolve_existing_directory,
+        )
+
         self.config: ForgeConfig = load_forge_config()
 
-        workspace_base = os.path.expanduser(self.config.file_store_path)
-        self.file_store: FileStore = LocalFileStore(workspace_base)
+        persisted = load_persisted_workspace_path()
+        if persisted:
+            try:
+                root = resolve_existing_directory(persisted)
+                apply_workspace_to_config(self.config, root)
+            except ValueError as e:
+                logger.warning(
+                    "Ignoring persisted workspace path %s: %s", persisted, e
+                )
+
+        wb = (self.config.project_root or "").strip()
+        if not wb:
+            fsp = (self.config.local_data_root or "").strip()
+            if fsp:
+                try:
+                    cand = Path(fsp).expanduser().resolve()
+                    if is_reserved_user_forge_data_dir(cand):
+                        self.config.local_data_root = ""
+                    else:
+                        apply_workspace_to_config(self.config, cand)
+                        wb = (self.config.project_root or "").strip()
+                except OSError:
+                    self.config.local_data_root = ""
+
+        app_root = str(Path(get_app_settings_root()).resolve())
+        if wb:
+            disk_root = str(Path(wb).expanduser().resolve())
+        else:
+            disk_root = app_root
+        self.config.local_data_root = disk_root
+
+        self.file_store: FileStore = LocalFileStore(disk_root)
 
         # Store implementation classes (resolved once from config)
         from backend.storage.secrets.secrets_store import SecretsStore
@@ -118,7 +170,7 @@ class AppState:
                 impl = self.get_conversation_manager_impl()
 
                 # Ensure config is fresh before initializing manager
-                from backend.core.config.utils import load_forge_config
+                from backend.core.config.config_loader import load_forge_config
                 self.config = load_forge_config()
 
                 self._conversation_manager = impl.get_instance(  # type: ignore[attr-defined]
@@ -187,30 +239,12 @@ class AppState:
         multiple times.
         """
         with self._lock:
-            if self._conversation_manager is not None:
-                try:
-                    if hasattr(self._conversation_manager, "close"):
-                        self._conversation_manager.close()
-                except Exception:
-                    logger.debug("Error closing conversation manager", exc_info=True)
-                self._conversation_manager = None
-
-            if self._event_service_adapter is not None:
-                try:
-                    if hasattr(self._event_service_adapter, "close"):
-                        self._event_service_adapter.close()
-                except Exception:
-                    logger.debug("Error closing event service adapter", exc_info=True)
-                self._event_service_adapter = None
-
-            if self._conversation_store is not None:
-                try:
-                    if hasattr(self._conversation_store, "close"):
-                        self._conversation_store.close()
-                except Exception:
-                    logger.debug("Error closing conversation store", exc_info=True)
-                self._conversation_store = None
-
+            _close_and_clear(self._conversation_manager, "conversation manager")
+            self._conversation_manager = None
+            _close_and_clear(self._event_service_adapter, "event service adapter")
+            self._event_service_adapter = None
+            _close_and_clear(self._conversation_store, "conversation store")
+            self._conversation_store = None
             logger.info("AppState closed")
 
 
@@ -221,9 +255,10 @@ _state_lock = threading.Lock()
 
 def get_app_state() -> AppState:
     """Return (or create) the global ``AppState`` singleton."""
-    global _app_state
-    if _app_state is None:
+    module = sys.modules[__name__]
+    if module.__dict__.get("_app_state") is None:
         with _state_lock:
-            if _app_state is None:
-                _app_state = AppState()
-    return _app_state
+            if module.__dict__.get("_app_state") is None:
+                module.__dict__["_app_state"] = AppState()
+    return module.__dict__["_app_state"]
+

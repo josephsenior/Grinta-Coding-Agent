@@ -17,15 +17,15 @@ class TestLLMConfigDefaults:
     def test_default_construction(self):
         with suppress_llm_env_export():
             cfg = LLMConfig()
-        assert cfg.model  # non-empty default
+        assert cfg.model is None
         assert cfg.num_retries >= 0
         assert 0.0 <= cfg.temperature <= 2.0
         assert 0.0 <= cfg.top_p <= 1.0
 
-    def test_model_is_required_nonempty(self):
+    def test_empty_model_string_normalizes_to_none(self):
         with suppress_llm_env_export():
-            with pytest.raises(ValidationError):
-                LLMConfig(model="")
+            cfg = LLMConfig(model="")
+        assert cfg.model is None
 
     def test_extra_fields_rejected(self):
         with suppress_llm_env_export():

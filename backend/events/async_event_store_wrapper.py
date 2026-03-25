@@ -1,6 +1,5 @@
 """Async utilities for iterating over event stores."""
 
-import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -28,12 +27,11 @@ class AsyncEventStoreWrapper:
         self.kwargs = kwargs
 
     async def __aiter__(self) -> AsyncIterator[Event]:
-        """Iterate over events asynchronously."""
-        loop = asyncio.get_running_loop()
+        """Iterate over events asynchronously.
+
+        Events are yielded directly. ``search_events`` already runs in this coroutine;
+        using the default executor per event was redundant and breaks during shutdown
+        when the interpreter shuts down the thread pool while replay is still active.
+        """
         for event in self.event_store.search_events(*self.args, **self.kwargs):
-
-            def get_event(e: Event = event) -> Event:
-                """Closure to capture event for async executor."""
-                return e
-
-            yield await loop.run_in_executor(None, get_event)
+            yield event

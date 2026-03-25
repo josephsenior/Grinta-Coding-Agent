@@ -1,10 +1,10 @@
-"""Tests for backend.events.utils — action/observation pairing utilities."""
+"""Tests for backend.events.event_utils — action/observation pairing utilities."""
 
 from typing import Any
 from unittest.mock import MagicMock
 
 
-from backend.events.utils import (
+from backend.events.event_utils import (
     _build_action_and_observation_maps,
     _add_action_observation_pairs,
     _add_orphaned_observations,

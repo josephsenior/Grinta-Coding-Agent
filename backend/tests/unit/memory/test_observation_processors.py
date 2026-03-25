@@ -18,6 +18,7 @@ from backend.events.observation import (
     MCPObservation,
     UserRejectObservation,
 )
+from backend.events.observation.agent import AgentCondensationObservation
 
 # ── _get_observation_content ─────────────────────────────────────────
 
@@ -105,3 +106,21 @@ class TestConvertObservation:
         )
         msg = convert_observation_to_message(obs, max_message_chars=None)
         assert msg.role == "user"
+
+    def test_condensation_observation_restores_scratchpad_and_working_memory(self, monkeypatch):
+        monkeypatch.setattr(
+            "backend.memory.observation_processors._load_scratchpad_snapshot",
+            lambda: "\nSCRATCHPAD\n",
+        )
+        monkeypatch.setattr(
+            "backend.memory.observation_processors._load_working_memory_snapshot",
+            lambda: "\nWORKING_MEMORY\n",
+        )
+        obs = AgentCondensationObservation(content="summary")
+
+        msg = convert_observation_to_message(obs, max_message_chars=None)
+
+        text = msg.content[0].text
+        assert "summary" in text
+        assert "SCRATCHPAD" in text
+        assert "WORKING_MEMORY" in text

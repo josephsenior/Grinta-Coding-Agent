@@ -79,7 +79,7 @@ class ActionExecutionClient(Runtime):
         headless_mode: bool = False,
         user_id: str | None = None,
         vcs_provider_tokens: Any | None = None,
-        workspace_base: str | None = None,
+        project_root: str | None = None,
         *args,
         **kwargs,
     ) -> None:
@@ -95,7 +95,7 @@ class ActionExecutionClient(Runtime):
             headless_mode=headless_mode,
             user_id=user_id,
             vcs_provider_tokens=vcs_provider_tokens,
-            workspace_base=workspace_base,
+            project_root=project_root,
         )
         self._vscode_token: str | None = None
 

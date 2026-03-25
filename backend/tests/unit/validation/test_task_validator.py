@@ -1,7 +1,10 @@
 """Tests for backend.validation.task_validator — task completion validation framework."""
 
 import pytest
+from unittest.mock import MagicMock
 
+from backend.events.action.files import FileWriteAction
+from backend.events.observation.files import FileReadObservation
 from backend.validation.task_validator import (
     CompositeValidator,
     DiffValidator,
@@ -249,6 +252,26 @@ class TestFileExistsValidator:
         for pattern in patterns:
             files = validator._extract_expected_files(pattern)
             assert len(files) >= 0  # Should extract or fail gracefully
+
+    def test_check_file_exists_uses_typed_history_events(self):
+        validator = FileExistsValidator(expected_files=["output.txt"])
+        state = MagicMock()
+        state.history = [FileWriteAction(path="output.txt", content="done")]
+        assert validator._check_file_exists(state, "output.txt") is True
+
+    def test_check_file_exists_does_not_infer_from_shell_text(self):
+        validator = FileExistsValidator(expected_files=["output.txt"])
+        state = MagicMock()
+        fake_cmd = MagicMock()
+        fake_cmd.command = "cat output.txt"
+        state.history = [fake_cmd]
+        assert validator._check_file_exists(state, "output.txt") is False
+
+    def test_check_file_exists_accepts_file_read_observation(self):
+        validator = FileExistsValidator(expected_files=["config.json"])
+        state = MagicMock()
+        state.history = [FileReadObservation(path="config.json", content="{}")]
+        assert validator._check_file_exists(state, "config.json") is True
 
 
 class TestLLMTaskEvaluator:

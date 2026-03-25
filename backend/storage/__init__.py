@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.storage.local import LocalFileStore
-from backend.storage.in_memory import InMemoryFileStore
+from backend.storage.local_file_store import LocalFileStore
+from backend.storage.in_memory_file_store import InMemoryFileStore
 
 if TYPE_CHECKING:
     from backend.storage.files import FileStore
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 def get_file_store(
     file_store_type: str,
-    file_store_path: str | None = None,
+    local_data_root: str | None = None,
     file_store_web_hook_url: str | None = None,
     file_store_web_hook_headers: dict | None = None,
     file_store_web_hook_batch: bool = False,
@@ -22,7 +22,7 @@ def get_file_store(
 
     Args:
         file_store_type: Type of file store ("local" or defaults to in-memory).
-        file_store_path: Path for local file store.
+        local_data_root: Root directory for local disk-backed storage.
         file_store_web_hook_url: Optional webhook URL for file store events.
         file_store_web_hook_headers: Optional headers for webhook requests.
         file_store_web_hook_batch: Whether to batch webhook requests.
@@ -31,15 +31,17 @@ def get_file_store(
         FileStore: Configured file store instance.
 
     Raises:
-        ValueError: If file_store_path is required but not provided for local storage.
+        ValueError: If local path is required but not usable for local storage.
 
     """
     store: FileStore
     if file_store_type == "local":
-        if file_store_path is None:
-            msg = "file_store_path is required for local file store"
-            raise ValueError(msg)
-        store = LocalFileStore(file_store_path)
+        path = (local_data_root or "").strip()
+        if not path:
+            from backend.core.app_paths import get_app_settings_root
+
+            path = get_app_settings_root()
+        store = LocalFileStore(path)
     else:
         store = InMemoryFileStore()
     if file_store_web_hook_url:
@@ -56,3 +58,4 @@ def get_file_store(
         else:
             store = WebHookFileStore(store, file_store_web_hook_url, client)
     return store
+

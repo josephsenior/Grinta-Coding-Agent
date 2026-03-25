@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Path, Query, status
 from fastapi.responses import JSONResponse
 
 from backend.core.logger import forge_logger as logger
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.api.services.trajectory_service import export_trajectory
 from backend.api.session.conversation import ServerConversation
 from backend.api.session.session_contract import normalize_replay_cursor
@@ -56,3 +56,4 @@ async def get_trajectory(
         status_code=status.HTTP_200_OK,
         content={"trajectory": trajectory},
     )
+

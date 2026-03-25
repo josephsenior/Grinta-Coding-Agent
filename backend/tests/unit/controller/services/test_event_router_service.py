@@ -12,6 +12,7 @@ from backend.events.action import (
     MessageAction,
     PlaybookFinishAction,
     AgentRejectAction,
+    TaskTrackingAction,
 )
 from backend.events.observation import Observation
 
@@ -255,6 +256,31 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.set_agent_state_to.assert_called_once_with(
             AgentState.RUNNING
         )
+
+    async def test_handle_task_tracking_action_uses_canonical_plan_normalization(self):
+        """Live plan updates should use the same normalization as persisted state reloads."""
+        action = TaskTrackingAction(
+            command="update",
+            task_list=[
+                {
+                    "title": "Top level",
+                    "status": "unknown",
+                    "notes": "legacy note",
+                    "subtasks": [{"title": "Nested child", "status": "completed"}],
+                }
+            ],
+        )
+
+        await self.service._handle_task_tracking_action(action)
+
+        plan = self.mock_controller.state.plan
+        self.assertEqual(plan.steps[0].id, "step-1")
+        self.assertEqual(plan.steps[0].description, "Top level")
+        self.assertEqual(plan.steps[0].status, "pending")
+        self.assertEqual(plan.steps[0].result, "legacy note")
+        self.assertEqual(plan.steps[0].subtasks[0].id, "step-1")
+        self.assertEqual(plan.steps[0].subtasks[0].description, "Nested child")
+        self.assertEqual(plan.steps[0].subtasks[0].status, "completed")
 
     async def test_handle_finish_action_success(self):
         """Test _handle_finish_action marks task as finished."""

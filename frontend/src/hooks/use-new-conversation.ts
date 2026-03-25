@@ -1,27 +1,15 @@
 import { useNavigate } from "react-router-dom";
-import { useCreateConversation } from "./use-conversations";
-import { toast } from "sonner";
 
+/** Opens a fresh chat UI; the server conversation is created on first send (see Chat page). */
 export function useNewConversation() {
   const navigate = useNavigate();
-  const createMutation = useCreateConversation();
 
   const create = () => {
-    createMutation.mutate(
-      {},
-      {
-        onSuccess: (conv) => {
-          navigate(`/chat/${conv.conversation_id}`);
-        },
-        onError: () => {
-          toast.error("Failed to create conversation");
-        },
-      },
-    );
+    navigate("/chat/new");
   };
 
   return {
     create,
-    isPending: createMutation.isPending,
+    isPending: false,
   };
 }

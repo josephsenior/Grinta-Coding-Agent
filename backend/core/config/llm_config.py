@@ -83,10 +83,12 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     """
 
-    model: str = Field(
+    model: str | None = Field(
         default=DEFAULT_LLM_MODEL,
-        min_length=1,
-        description="The LLM model identifier to use",
+        description=(
+            "LLM model id (e.g. openai/gpt-4o). None until set via settings.json "
+            "llm_model or LLM_MODEL env; settings.json wins when both are set."
+        ),
     )
     api_key: SecretStr | None = Field(
         default=None, description="The API key to use for authentication"
@@ -196,9 +198,10 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         """Set default values for reasoning_effort and base_url."""
         # Set reasoning_effort default if not provided
         if self.reasoning_effort is None:
+            model_l = (self.model or "").lower()
             # Gemini models keep None for optimization
             if not (
-                "gemini" in self.model.lower()
+                "gemini" in model_l
                 or (
                     self.custom_llm_provider
                     and "gemini" in self.custom_llm_provider.lower()
@@ -222,13 +225,21 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("model", "log_completions_folder")
+    @field_validator("model", mode="before")
     @classmethod
-    def validate_required_strings(cls, v: str) -> str:
-        """Validate required string fields are non-empty."""
+    def normalize_optional_model(cls, v: object) -> str | None:
+        """Allow unset model; normalize empty strings to None."""
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s or None
+
+    @field_validator("log_completions_folder")
+    @classmethod
+    def validate_log_completions_folder(cls, v: str) -> str:
         from backend.core.type_safety.type_safety import validate_non_empty_string
 
-        return validate_non_empty_string(v, name="field")
+        return validate_non_empty_string(v, name="log_completions_folder")
 
     @field_validator("base_url")
     @classmethod
@@ -330,29 +341,34 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             has_explicit_key = bool(key_val and key_val.strip())
             object.__setattr__(self, "_has_explicit_api_key", has_explicit_key)
 
-            if not has_explicit_key:
-                # Get the correct API key for this model/provider
-                correct_api_key = api_key_manager.get_api_key_for_model(
-                    self.model, self.api_key
-                )
+            if self.model:
+                if not has_explicit_key:
+                    # Get the correct API key for this model/provider
+                    correct_api_key = api_key_manager.get_api_key_for_model(
+                        self.model, self.api_key
+                    )
 
-                if correct_api_key:
-                    self.api_key = correct_api_key
-                    logger.debug("Set correct API key for model: %s", self.model)
-                else:
-                    # Try to set from environment as fallback
-                    provider = api_key_manager._extract_provider(self.model)
-                    env_key = api_key_manager._get_provider_key_from_env(provider)
-                    if env_key:
-                        self.api_key = SecretStr(env_key)
-                        logger.debug("Loaded API key from environment for %s", provider)
+                    if correct_api_key:
+                        self.api_key = correct_api_key
+                        logger.debug("Set correct API key for model: %s", self.model)
                     else:
-                        logger.warning("No API key available for model: %s", self.model)
+                        # Try to set from environment as fallback
+                        provider = api_key_manager._extract_provider(self.model)
+                        env_key = api_key_manager._get_provider_key_from_env(provider)
+                        if env_key:
+                            self.api_key = SecretStr(env_key)
+                            logger.debug(
+                                "Loaded API key from environment for %s", provider
+                            )
+                        else:
+                            logger.warning(
+                                "No API key available for model: %s", self.model
+                            )
 
-            # ALWAYS sync with api_key_manager if we have a key (explicit or loaded)
-            if self.api_key:
-                api_key_manager.set_api_key(self.model, self.api_key)
-                api_key_manager.set_environment_variables(self.model, self.api_key)
+                # ALWAYS sync with api_key_manager if we have a key (explicit or loaded)
+                if self.api_key:
+                    api_key_manager.set_api_key(self.model, self.api_key)
+                    api_key_manager.set_environment_variables(self.model, self.api_key)
 
         # CRITICAL: Clean base_url to prevent protocol errors
         self._clean_base_url()
@@ -362,6 +378,8 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     def _clean_base_url(self) -> None:
         """Clean base_url and other parameters using provider-aware validation."""
+        if not self.model:
+            return
         provider = api_key_manager._extract_provider(self.model)
         provider_config = provider_config_manager.get_provider_config(provider)
 
@@ -390,5 +408,9 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     def _configure_model_defaults(self) -> None:
         """Configure model-specific default settings."""
         # Set reasoning_effort to 'high' by default for non-Gemini models
-        if self.reasoning_effort is None and "gemini-2.5-pro" not in self.model:
+        if (
+            self.model
+            and self.reasoning_effort is None
+            and "gemini-2.5-pro" not in self.model
+        ):
             self.reasoning_effort = "high"

@@ -28,6 +28,13 @@ class StepPrerequisiteService:
 
         pending = self._context.pending_action
         if pending:
+            if type(pending).__name__ == "RecallAction":
+                controller.log(
+                    "debug",
+                    "Allowing step while RecallAction runs in background",
+                    extra={"msg_type": "STEP_ALLOWED_PENDING_RECALL"},
+                )
+                return True
             action_id = getattr(pending, "id", "unknown")
             action_type = type(pending).__name__
             controller.log(

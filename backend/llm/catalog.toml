@@ -482,6 +482,14 @@ max_input_tokens = 128_000
 max_output_tokens = 8_192
 supports_function_calling = true
 
+[models."moonshotai/kimi-k2.5"]
+provider = "nvidia"       # NVIDIA NIM OpenAI-compatible endpoint (API uses dot in id)
+aliases = ["moonshotai/kimi-k2-5", "kimi-k2.5", "nvidia/moonshotai/kimi-k2.5"]
+max_input_tokens = 256_000
+max_output_tokens = 8_192
+supports_function_calling = true
+supports_vision = true
+
 [models."qwen3"]
 provider = "openai"       # Usually served via OpenAI-compatible endpoints
 max_input_tokens = 128_000

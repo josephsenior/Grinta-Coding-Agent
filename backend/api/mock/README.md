@@ -7,7 +7,7 @@ This is a simple mock server to facilitate development of API clients.
 Follow the instructions in the README to install dependencies. Then run:
 
 ```
-python listen.py
+python -m backend.api
 ```
 
-Then connect a client (TUI or HTTP) to the mock server. It will simply reply to every received message.
+Then connect a client (browser, `forge_client`, or HTTP) to the mock server. It will simply reply to every received message.

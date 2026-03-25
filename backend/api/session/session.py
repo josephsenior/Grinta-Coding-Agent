@@ -11,7 +11,6 @@ from backend.controller.agent import Agent
 
 if TYPE_CHECKING:
     pass
-from backend.core.config.mcp_config import ForgeMCPConfig
 from backend.core.errors import AgentNotRegisteredError, PlaybookValidationError
 from backend.core.logger import ForgeLoggerAdapter
 from backend.core.schemas import AgentState
@@ -131,20 +130,6 @@ class Session:
         """
         cfg = self.config
 
-        # Security
-        if settings.confirmation_mode is not None:
-            cfg.security.confirmation_mode = settings.confirmation_mode
-        if settings.security_analyzer is not None:
-            cfg.security.security_analyzer = settings.security_analyzer
-
-        # Git
-        vcs_user_name = getattr(settings, "vcs_user_name", None)
-        if vcs_user_name is not None:
-            cfg.vcs_user_name = vcs_user_name
-        vcs_user_email = getattr(settings, "vcs_user_email", None)
-        if vcs_user_email is not None:
-            cfg.vcs_user_email = vcs_user_email
-
         # MCP
         self.logger.debug(
             "MCP configuration before setup - self.config.mcp_config: %s", cfg.mcp
@@ -154,18 +139,9 @@ class Session:
             cfg.mcp = cfg.mcp.merge(mcp_config)
             self.logger.debug("Merged custom MCP Config: %s", mcp_config)
 
-        forge_mcp_server, forge_mcp_stdio_servers = (
-            ForgeMCPConfig.create_default_mcp_server_config(
-                cfg.mcp_host,
-                cfg,
-                self.user_id,
-            )
-        )
-        if forge_mcp_server:
-            cfg.mcp.servers.append(forge_mcp_server)
+        from backend.core.config.mcp_config import dedupe_forge_mcp_http_servers
 
-        if forge_mcp_stdio_servers:
-            cfg.mcp.servers.extend(forge_mcp_stdio_servers)
+        dedupe_forge_mcp_http_servers(cfg.mcp)
 
         self.logger.debug(
             "MCP configuration after setup - self.config.mcp: %s", cfg.mcp
@@ -259,9 +235,15 @@ class Session:
             return
         except Exception as e:
             self.logger.exception("Error creating agent_session: %s", e)
-            await self.send_error(
-                f"Failed to create agent session: {e.__class__.__name__}"
-            )
+            detail = str(e).strip()
+            if detail:
+                await self.send_error(
+                    f"Failed to create agent session: {e.__class__.__name__}: {detail}"
+                )
+            else:
+                await self.send_error(
+                    f"Failed to create agent session: {e.__class__.__name__}"
+                )
             return
 
     async def initialize_agent(
@@ -278,27 +260,23 @@ class Session:
         )
 
         # Get agent class
-        agent_cls = settings.agent or self.config.default_agent
-        legacy_agent_aliases = {
-            "CodeActAgent": "Orchestrator",
-            "CodeAct": "Orchestrator",
-            "codact": "Orchestrator",
-        }
-        agent_cls = legacy_agent_aliases.get(agent_cls, agent_cls)
+        agent_cls = getattr(settings, "agent", None) or self.config.default_agent
 
         # Apply all settings in one shot
         self._apply_settings(settings)
 
         # Derive agent config and budget limits
-        max_iterations = settings.max_iterations or self.config.max_iterations
+        max_iterations = getattr(settings, "max_iterations", None) or self.config.max_iterations
+        settings_budget = getattr(settings, "max_budget_per_task", None)
         max_budget_per_task = (
-            settings.max_budget_per_task
-            if settings.max_budget_per_task is not None
+            settings_budget
+            if settings_budget is not None
             else self.config.max_budget_per_task
         )
         agent_config = self.config.get_agent_config(agent_cls)
-        if settings.disabled_playbooks is not None:
-            agent_config.disabled_playbooks = list(settings.disabled_playbooks)
+        settings_playbooks = getattr(settings, "disabled_playbooks", None)
+        if settings_playbooks is not None:
+            agent_config.disabled_playbooks = list(settings_playbooks)
         agent_name = agent_cls if agent_cls is not None else "agent"
         llm_config = self.config.get_llm_config_from_agent(agent_name)
 
@@ -316,10 +294,10 @@ class Session:
                 fallback_agent,
             )
             agent_cls = fallback_agent
-            settings.agent = fallback_agent
             agent_config = self.config.get_agent_config(agent_cls)
-            if settings.disabled_playbooks is not None:
-                agent_config.disabled_playbooks = list(settings.disabled_playbooks)
+            disabled_playbooks = getattr(settings, "disabled_playbooks", None)
+            if disabled_playbooks is not None:
+                agent_config.disabled_playbooks = list(disabled_playbooks)
             agent_name = agent_cls if agent_cls is not None else "agent"
             llm_config = self.config.get_llm_config_from_agent(agent_name)
             self._apply_condenser(settings, agent_config, llm_config)
@@ -436,6 +414,7 @@ class Session:
 
         # Log dispatch start
         self._log_dispatch_start(data)
+        self._ensure_core_event_subscriptions()
 
         # Parse event from data
         event = event_from_dict(data.copy())
@@ -447,6 +426,65 @@ class Session:
 
         # Add event to stream
         self.agent_session.event_stream.add_event(event, EventSource.USER)  # type: ignore[attr-defined]
+
+    def _ensure_core_event_subscriptions(self) -> None:
+        """Restore critical event-stream subscribers if they were lost.
+
+        A stale session can continue accepting user events even if one of the
+        in-process subscribers was dropped. In that state the raw event is still
+        persisted, but the UI echo, recall pipeline, and controller step never
+        fire. Re-subscribing here keeps reconnects and long-lived sessions
+        recoverable without requiring a full page refresh.
+        """
+        event_stream = getattr(self.agent_session, "event_stream", None)
+        if event_stream is None:
+            return
+
+        subscribers = getattr(event_stream, "_subscribers", None)
+        if not isinstance(subscribers, dict):
+            return
+
+        def _is_subscribed(subscriber_id: EventStreamSubscriber, callback_id: str) -> bool:
+            callbacks = subscribers.get(subscriber_id, {})
+            return isinstance(callbacks, dict) and callback_id in callbacks
+
+        def _restore(
+            subscriber_id: EventStreamSubscriber,
+            callback,
+            callback_id: str | None,
+            label: str,
+        ) -> None:
+            if callback is None or not callback_id:
+                return
+            if _is_subscribed(subscriber_id, callback_id):
+                return
+            with contextlib.suppress(ValueError):
+                event_stream.subscribe(subscriber_id, callback, callback_id)
+                self.logger.warning(
+                    "Restored missing %s subscription for session %s",
+                    label,
+                    self.sid,
+                    extra={"signal": f"session_restore_{label}_subscription"},
+                )
+
+        _restore(EventStreamSubscriber.SERVER, self.on_event, self.sid, "server")
+
+        controller = getattr(self.agent_session, "controller", None)
+        controller_id = getattr(controller, "id", None) or self.sid
+        _restore(
+            EventStreamSubscriber.AGENT_CONTROLLER,
+            getattr(controller, "on_event", None),
+            controller_id,
+            "controller",
+        )
+
+        memory = getattr(self.agent_session, "memory", None)
+        _restore(
+            EventStreamSubscriber.MEMORY,
+            getattr(memory, "on_event", None),
+            self.sid,
+            "memory",
+        )
 
     def _log_dispatch_start(self, data: dict) -> None:
         """Log the start of dispatch operation."""
@@ -479,21 +517,63 @@ class Session:
         if not controller:
             return False
 
-        # Check if vision is disabled
         if controller.agent.llm.config.disable_vision:
             await self.send_error(
-                "Support for images is disabled for this model, try without an image."
+                "Images are turned off for this model. Enable vision in Settings or remove the image."
             )
             return True
 
-        # Check if model supports vision
-        if not controller.agent.llm.vision_is_active():
+        from backend.llm.catalog_loader import lookup
+
+        model_name = getattr(controller.agent.llm.config, "model", None) or ""
+        entry = lookup(str(model_name)) if model_name else None
+        if not entry or not entry.supports_vision:
             await self.send_error(
-                "Model does not support image upload, change to a different model or try without an image.",
+                "This model doesn't accept images. Choose a vision-capable model in Settings or remove the image."
             )
             return True
 
         return False
+
+    @staticmethod
+    def _is_low_priority_publish_event(data: dict[str, object]) -> bool:
+        """Return True for websocket events that are safe to drop first under pressure."""
+        action = data.get("action")
+        # Keep streaming_chunk events high-priority so token-by-token rendering
+        # stays live even when the publish queue is under pressure.
+        if action in {"think"}:
+            return True
+
+        if data.get("status_update") is True and data.get("type") == "info":
+            return True
+
+        return False
+
+    def _evict_oldest_low_priority_publish_event(self) -> bool:
+        """Drop the oldest low-priority queued websocket event, preserving order."""
+        buffered: list[dict[str, object]] = []
+        dropped = False
+
+        while True:
+            try:
+                queued = self._publish_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
+            if (
+                not dropped
+                and isinstance(queued, dict)
+                and self._is_low_priority_publish_event(queued)
+            ):
+                dropped = True
+                continue
+
+            buffered.append(queued)
+
+        for queued in buffered:
+            self._publish_queue.put_nowait(queued)
+
+        return dropped
 
     async def send(self, data: dict[str, object]) -> None:
         """Queue data for publishing to WebSocket clients.
@@ -508,18 +588,52 @@ class Session:
         try:
             self._publish_queue.put_nowait(data)
         except asyncio.QueueFull:
-            # Drop the oldest queued item to make room
-            try:
-                self._publish_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
+            evicted_low_priority = self._evict_oldest_low_priority_publish_event()
+
+            if not evicted_low_priority and self._is_low_priority_publish_event(data):
+                self.logger.warning(
+                    "Publish queue full; dropping incoming low-priority websocket event",
+                    extra={
+                        "signal": "session_publish_queue_drop_low_priority",
+                        "action": data.get("action"),
+                        "observation": data.get("observation"),
+                        "status_update": data.get("status_update"),
+                    },
+                )
+                return
+
+            if not evicted_low_priority:
+                try:
+                    dropped = self._publish_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    dropped = None
+                self.logger.warning(
+                    "Publish queue full; dropping oldest websocket event to preserve latest event",
+                    extra={
+                        "signal": "session_publish_queue_drop_oldest",
+                        "dropped_action": dropped.get("action")
+                        if isinstance(dropped, dict)
+                        else None,
+                        "dropped_observation": dropped.get("observation")
+                        if isinstance(dropped, dict)
+                        else None,
+                        "incoming_action": data.get("action"),
+                        "incoming_observation": data.get("observation"),
+                    },
+                )
+
             self._publish_queue.put_nowait(data)
 
     async def _monitor_publish_queue(self) -> None:
         try:
             while True:
-                data: dict = await self._publish_queue.get()
-                await self._send(data)
+                try:
+                    data: dict = await self._publish_queue.get()
+                    await self._send(data)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self.logger.error("Error in publish queue handler: %s", getattr(e, 'message', str(e)))
         except asyncio.CancelledError:
             return
 
@@ -545,8 +659,8 @@ class Session:
 
                 await self._emit_to_client(data)
 
-            # Removed artificial delay for instant streaming
-            # await asyncio.sleep(0.001)
+            # Re-added small delay to ensure asyncio loop serves the websocket socket writer correctly
+            await asyncio.sleep(0.001)
             self.last_active_ts = int(time.time())
             return True
 

@@ -9,7 +9,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from backend.core.constants import SETTINGS_CACHE_TTL
-from backend.core.pydantic_compat import model_dump_json
+from pydantic import SecretStr
+
+from backend.core.pydantic_compat import model_dump_with_options
 from backend.storage import get_file_store
 from backend.storage.data_models.settings import Settings
 from backend.storage.settings.settings_store import SettingsStore
@@ -79,7 +81,30 @@ class FileSettingsStore(SettingsStore):
 
     async def store(self, settings: Settings) -> None:
         """Store settings and invalidate cache."""
-        json_str = model_dump_json(settings, context={"expose_secrets": True})
+        # Persist LLM connectivity plus MCP overrides. Forge still supplies defaults;
+        # merged MCP from GET is optional to save, but when the user edits MCP in the
+        # UI we must not drop it on the next LLM-only save (merge happens before store).
+        minimal = model_dump_with_options(
+            settings,
+            context={"expose_secrets": True},
+            include={"llm_model", "llm_api_key", "llm_base_url", "mcp_config"},
+            exclude_none=False,
+        )
+
+        llm_api_key = minimal.get("llm_api_key")
+        if isinstance(llm_api_key, SecretStr):
+            llm_api_key = llm_api_key.get_secret_value()
+
+        normalized: dict = {
+            "llm_model": minimal.get("llm_model"),
+            "llm_api_key": llm_api_key,
+            "llm_base_url": minimal.get("llm_base_url"),
+        }
+        mcp = minimal.get("mcp_config")
+        if mcp is not None:
+            normalized["mcp_config"] = mcp
+
+        json_str = json.dumps(normalized, ensure_ascii=False, indent=2)
         await call_sync_from_async(self.file_store.write, self.path, json_str)
 
         # 🚀 FIX: Invalidate cache on write
@@ -93,17 +118,23 @@ class FileSettingsStore(SettingsStore):
     ) -> FileSettingsStore:
         """Get FileSettingsStore singleton instance.
 
+        Persisted path is always ``settings.json`` under :func:`get_app_settings_root`
+        (not ``config.local_data_root`` / project folder), so the open-folder workspace does not get a
+        second settings file.
+
         Args:
-            config: Forge configuration
+            config: Forge configuration (used for store *type* and webhooks only)
             user_id: Optional user ID
 
         Returns:
             FileSettingsStore instance
 
         """
+        from backend.core.app_paths import get_app_settings_root
+
         file_store = get_file_store(
             file_store_type=config.file_store,
-            file_store_path=config.file_store_path,
+            local_data_root=get_app_settings_root(),
             file_store_web_hook_url=config.file_store_web_hook_url,
             file_store_web_hook_headers=config.file_store_web_hook_headers,
             file_store_web_hook_batch=config.file_store_web_hook_batch,

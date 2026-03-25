@@ -76,7 +76,7 @@ class FileEditor:
         """Execute a file editor command.
 
         Args:
-            command: Command to execute ("view", "edit", "apply_edit", "write")
+            command: Command to execute ("view_file", "replace_text", "insert_text", "create_file", "undo_last_edit", "view_and_replace", "edit", "write")
             path: File path (relative to workspace_root or absolute)
             file_text: Optional file content for write/edit operations (use MISSING if not provided)
             view_range: Optional [start_line, end_line] for view command (1-indexed)
@@ -102,9 +102,14 @@ class FileEditor:
             safe_path = self._resolve_path_safe(path)
             file_path = safe_path.path
 
-            if command == "view":
+            if command == "view_file":
                 return self._handle_view(file_path, view_range, path)
-            if command in ("edit", "apply_edit"):
+            if command in (
+                "edit",
+                "replace_text",
+                "insert_text",
+                "view_and_replace",
+            ):
                 return self._handle_edit(
                     file_path,
                     file_text,
@@ -115,14 +120,22 @@ class FileEditor:
                     end_line,
                     dry_run=dry_run,
                 )
-            if command in ("write", "create"):
-                # Handle sentinels for write/create command
-                # "create" is an alias for "write" - both create or overwrite files
+            if command == "undo_last_edit":
+                # Runtime file editor has no durable undo stack yet.
+                return ToolResult(
+                    output="",
+                    error=(
+                        "undo_last_edit is not currently supported in runtime mode. "
+                        "Use checkpoint/rollback for reversal."
+                    ),
+                )
+            if command in ("write", "create_file"):
+                # Handle sentinels for write/create_file command
                 content = self._extract_content(file_text, new_str)
                 return self._handle_write(
                     file_path,
                     content,
-                    is_create=(command == "create"),
+                    is_create=(command == "create_file"),
                     dry_run=dry_run,
                 )
 
@@ -570,7 +583,7 @@ class FileEditor:
             )
 
         if start_line < 1:
-             return ToolResult(
+            return ToolResult(
                 output="",
                 error=f"Start line must be >= 1 (got {start_line})",
                 new_content=content
@@ -583,7 +596,7 @@ class FileEditor:
 
         # Validation
         if start_idx >= len(lines):
-             return ToolResult(
+            return ToolResult(
                 output="",
                 error=f"Start line {start_line} is beyond file length ({len(lines)} lines)",
                 new_content=content

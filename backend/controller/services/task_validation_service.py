@@ -2,15 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
-
-
-@dataclass
-class _TestCoverageResult:
-    has_file_edits: bool
-    has_test_run: bool
-    has_passing_test_run: bool
 
 from backend.core.logger import forge_logger as logger  # noqa: E402
 from backend.core.schemas import AgentState  # noqa: E402
@@ -85,107 +77,6 @@ class TaskValidationService:
             logger.info("Saved lessons learned to %s", memories_path)
         except Exception as e:
             logger.warning("Failed to save lessons learned: %s", e)
-
-    # ── internals ───────────────────────────────────────────────────
-
-    async def _check_test_coverage(self, action: PlaybookFinishAction) -> bool:
-        """Block finish when code edits exist without a successful test run.
-
-        Returns True if ok to proceed, False if blocked.
-        """
-        if self._has_explicit_test_skip(action):
-            return True
-
-        controller = self._context.get_controller()
-        history = getattr(controller.state, "history", [])
-        if not isinstance(history, (list, tuple)) or not history:
-            return True
-
-        tail = list(history)[-80:]
-
-        # Auto-allow finish if the agent has already been blocked once.
-        # The first block gives the LLM a chance to run tests; if it can't
-        # or doesn't, the second attempt goes through to prevent loops.
-        from backend.events.observation import ErrorObservation
-        block_count = sum(
-            1 for e in tail
-            if isinstance(e, ErrorObservation)
-            and getattr(e, "error_id", "") in ("TESTS_NOT_RUN", "TESTS_NOT_PASSING")
-        )
-        if block_count >= 1:
-            logger.info("Auto-allowing finish after %d prior test-coverage blocks", block_count)
-            return True
-
-        coverage = self._analyze_test_coverage(tail)
-
-        if coverage.has_file_edits and not coverage.has_test_run:
-            logger.info("Finish blocked: file edits detected without recent test run")
-            return await self._emit_finish_block(
-                "⚠️ FINISH BLOCKED: You made file edits but haven't run tests in this session.\n"
-                "Run relevant tests to verify your changes, then call finish again.\n"
-                "If no tests exist or tests are not applicable, just call finish again immediately.",
-                error_id="TESTS_NOT_RUN",
-            )
-
-        if coverage.has_file_edits and coverage.has_test_run and not coverage.has_passing_test_run:
-            logger.info("Finish blocked: tests were run but no passing result detected")
-            return await self._emit_finish_block(
-                "⚠️ FINISH BLOCKED: Tests were run but no successful test result was detected.\n"
-                "Fix failing tests (or run relevant tests successfully) before finishing.",
-                error_id="TESTS_NOT_PASSING",
-            )
-
-        return True
-
-    def _analyze_test_coverage(self, tail: list) -> _TestCoverageResult:
-        """Analyze recent history for file edits and test execution."""
-        from backend.events.action import CmdRunAction, FileEditAction, FileWriteAction
-
-        has_file_edits = False
-        has_test_run = False
-        has_passing_test_run = False
-
-        for idx, event in enumerate(tail):
-            if isinstance(event, (FileEditAction, FileWriteAction)):
-                if getattr(event, "command", None) != "view":
-                    has_file_edits = True
-
-            if isinstance(event, CmdRunAction):
-                if self._is_test_command(event):
-                    has_test_run = True
-                    has_passing_test_run |= self._has_passing_output_after(tail, idx)
-                if self._is_run_tests_tool(event):
-                    has_test_run = True
-
-        return _TestCoverageResult(has_file_edits, has_test_run, has_passing_test_run)
-
-    def _is_test_command(self, event: Any) -> bool:
-        """Return True if the command appears to run tests (pytest, run_tests, unittest)."""
-        cmd = (getattr(event, "command", "") or "").lower()
-        return any(tok in cmd for tok in ("pytest", "run_tests", "unittest"))
-
-    def _has_passing_output_after(self, tail: list, idx: int) -> bool:
-        """Return True if the next CmdOutputObservation (within 5 events) has exit_code 0."""
-        from backend.events.observation import CmdOutputObservation
-
-        for next_event in tail[idx + 1 : idx + 6]:
-            if isinstance(next_event, CmdOutputObservation):
-                return getattr(next_event, "exit_code", None) == 0
-        return False
-
-    def _is_run_tests_tool(self, event: Any) -> bool:
-        """Return True if event's tool_call_metadata indicates run_tests was invoked."""
-        meta = getattr(event, "tool_call_metadata", None)
-        return bool(meta and getattr(meta, "function_name", "") == "run_tests")
-
-    def _has_explicit_test_skip(self, action: PlaybookFinishAction) -> bool:
-        outputs = getattr(action, "outputs", {})
-        if not isinstance(outputs, dict):
-            return False
-        if not outputs.get("tests_not_applicable"):
-            return False
-        reason = str(outputs.get("tests_not_applicable_reason", "")).strip()
-        return len(reason) >= 12
 
     async def _emit_finish_block(self, message: str, error_id: str) -> bool:
         from backend.events.observation import ErrorObservation

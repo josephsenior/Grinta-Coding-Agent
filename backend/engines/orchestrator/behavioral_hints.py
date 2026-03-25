@@ -36,14 +36,16 @@ class BehavioralHintsBuilder:
                 name = fn.get("name", "")
                 args_raw = fn.get("arguments", "{}")
 
-                if name in ("str_replace_editor", "edit_file", "structure_editor"):
+                if name in ("str_replace_editor", "edit_file", "ast_code_editor"):
                     path = self._extract_edit_path(args_raw)
                     if path:
                         edited_files[path] = edited_files.get(path, 0) + 1
                     if name == "str_replace_editor":
                         str_replace_count += 1
-                elif name == "run_tests":
-                    has_test_run = True
+                elif name in ("execute_bash", "bash"):
+                    args_str = str(args_raw).lower()
+                    if "pytest" in args_str or "unittest" in args_str:
+                        has_test_run = True
 
             content = str(msg.get("content", ""))
             if "error" in content.lower() or "failed" in content.lower():
@@ -57,7 +59,7 @@ class BehavioralHintsBuilder:
             import json as _json
 
             args = _json.loads(args_raw) if isinstance(args_raw, str) else args_raw
-            path = args.get("path", args.get("file_path", ""))
+            path = args.get("path", "")
             return path if path and args.get("command") != "view" else None
         except Exception:
             return None
@@ -77,27 +79,27 @@ class BehavioralHintsBuilder:
             if count >= 3:
                 hints.append(
                     f"You've edited '{path}' {count} times recently — "
-                    "use verify_state to confirm line contents before your next edit."
+                    "use verify_file_lines to confirm line contents before your next edit."
                 )
                 break
 
         if str_replace_count >= 2:
             hints.append(
                 "You've used str_replace_editor multiple times. Consider switching to "
-                "structure_editor (edit_function, rename_symbol) for function/class-level edits — "
+                "ast_code_editor (edit_function, rename_symbol) for function/class-level edits — "
                 "it targets by symbol name and avoids context-matching issues."
             )
 
         total_edits = sum(edited_files.values())
         if total_edits >= 4 and not has_test_run:
             hints.append(
-                "Multiple file edits without running tests — consider run_tests to verify changes."
+                "Multiple file edits without running tests — consider running the relevant test suite to verify changes."
             )
 
         if error_count >= 3:
             hints.append(
                 "Multiple errors detected — consider working_memory(update, hypothesis) "
-                "to reassess, or error_patterns(query) for known fixes."
+                "to reassess, or query_error_solutions(query) for known fixes."
             )
 
         # Cross-file impact warning: when any file was edited, suggest checking callers

@@ -74,7 +74,7 @@ class SafetyValidator:
         self.telemetry_logger = None
         if config.enable_audit_logging:
             try:
-                from backend.telemetry.telemetry_logger import AuditLogger  # type: ignore[import-not-found]
+                from backend.telemetry.telemetry_logger import AuditLogger  # type: ignore[import-untyped]
 
                 self.telemetry_logger = AuditLogger(config.audit_log_path)
             except ImportError:

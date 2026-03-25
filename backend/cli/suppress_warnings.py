@@ -19,9 +19,6 @@ def suppress_cli_warnings() -> None:
         category=UserWarning,
     )
     warnings.filterwarnings(
-        "ignore", message=".*Call to deprecated method.*", category=DeprecationWarning
-    )
-    warnings.filterwarnings(
         "ignore", message=".*Expected .* fields but got .*", category=UserWarning
     )
     warnings.filterwarnings("ignore", category=SyntaxWarning, module="pydub\\.utils")

@@ -19,10 +19,9 @@ from backend.events.action import FileReadAction
 from backend.events.action.files import FileWriteAction
 from backend.events.observation import ErrorObservation, FileReadObservation
 from backend.runtime.utils.git_changes import get_git_changes
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.core.constants import FILES_TO_IGNORE
 from backend.api.files import POSTUploadFilesModel
-from backend.api.services.shared_dependencies import require_conversation_manager
 from backend.api.utils import get_conversation, get_conversation_store
 from backend.api.utils.responses import error
 from backend.utils.async_utils import call_sync_from_async
@@ -200,11 +199,13 @@ def _validate_list_files_path(
 
 
 async def _fetch_file_list_from_runtime(
-    runtime: Any, path: str | None
+    runtime: Any, path: str | None, *, recursive: bool = False
 ) -> tuple[list[str] | None, Any | None]:
     """Call runtime.list_files and handle errors. Returns (file_list, error_response)."""
     try:
-        file_list = await call_sync_from_async(runtime.list_files, path)
+        file_list = await call_sync_from_async(
+            runtime.list_files, path, recursive
+        )
         return file_list, None
     except (httpx.ConnectError, ConnectionRefusedError) as e:
         logger.error("Runtime unavailable when listing files: %s", e, exc_info=True)
@@ -275,6 +276,10 @@ def _apply_path_prefix_and_filter(
 )
 async def list_files(
     path: str | None = Query(None, description="Optional path to list files from"),
+    recursive: bool = Query(
+        False,
+        description="If true, list all files under path (or workspace root) recursively",
+    ),
     conversation: ServerConversation = Depends(get_conversation),
 ) -> Any:
     """List files in the specified path."""
@@ -297,7 +302,9 @@ async def list_files(
             "Runtime health check failed before listing files: %s", health_check_error
         )
 
-    file_list, fetch_error = await _fetch_file_list_from_runtime(runtime, path)
+    file_list, fetch_error = await _fetch_file_list_from_runtime(
+        runtime, path, recursive=recursive
+    )
     if fetch_error is not None:
         return fetch_error
 
@@ -433,6 +440,13 @@ def zip_current_workspace(
         JSONResponse: An error response if zipping fails.
 
     """
+    if not conversation.runtime:
+        logger.warning("zip_current_workspace request received before runtime ready")
+        return error(
+            message="Runtime not ready",
+            status_code=503,
+            error_code="RUNTIME_NOT_READY",
+        )
     try:
         logger.debug("Zipping workspace")
         runtime = cast("RuntimeFileOps", conversation.runtime)
@@ -461,19 +475,23 @@ def zip_current_workspace(
     "/git/changes",
     response_model=None,
     responses={
-        200: {"description": "List of git changes"},
-        404: {"description": "Not a git repository"},
+        200: {"description": "List of git changes (empty if not a repo or no changes)"},
+        503: {"description": "Runtime not ready"},
         500: {"description": "Error getting changes"},
     },
 )
 async def git_changes(
     conversation_id: str,
+    conversation: ServerConversation = Depends(get_conversation),
 ) -> Any:
     """Get list of git-tracked file changes in the workspace.
 
     Retrieves the conversation's runtime and queries it for modified files
     compared to the git repository. Returns empty list if not a git repository
     or if git is unavailable in the runtime container.
+
+    Uses the same authenticated user as other file routes (not a hard-coded
+    ``dev-user``) so OSS / multi-user sessions can load the CHANGES panel.
 
     Args:
         conversation_id: Conversation identifier to query runtime
@@ -490,40 +508,32 @@ async def git_changes(
         Response: [{"path": "src/main.py", "status": "modified"}, ...]
 
     """
-    manager = require_conversation_manager()
+    if not conversation.runtime:
+        return JSONResponse(
+            content={"error": "Runtime not ready"}, status_code=503
+        )
+
+    runtime = cast("RuntimeFileOps", conversation.runtime)
+    cwd = runtime.config.workspace_mount_path_in_runtime
+    logger.info("Getting git changes in %s", cwd)
+
+    # Check if the workspace directory exists
+    if not os.path.exists(cwd):
+        logger.warning("Workspace directory %s does not exist", cwd)
+        return JSONResponse(status_code=200, content=[])
+
     try:
-        conversation = await manager.attach_to_conversation(conversation_id, "dev-user")
-        if not conversation:
-            return JSONResponse(
-                content={"error": "Conversation not found"}, status_code=404
-            )
-
-        runtime = cast("RuntimeFileOps", conversation.runtime)
-        cwd = runtime.config.workspace_mount_path_in_runtime
-        logger.info("Getting git changes in %s", cwd)
-
-        # Check if the workspace directory exists
-        if not os.path.exists(cwd):
-            logger.warning("Workspace directory %s does not exist", cwd)
+        changes = await call_sync_from_async(get_git_changes, cwd)
+        if changes is None:
             return JSONResponse(status_code=200, content=[])
-
-        try:
-            changes = await call_sync_from_async(get_git_changes, cwd)
-            await manager.detach_from_conversation(conversation)
-
-            if changes is None:
-                return JSONResponse(
-                    status_code=404, content={"error": "Not a git repository"}
-                )
-            return changes
-        except FileNotFoundError as e:
-            if "git" in str(e):
-                logger.warning(
-                    "Git not available in container, returning empty changes list"
-                )
-                await manager.detach_from_conversation(conversation)
-                return JSONResponse(status_code=200, content=[])
-            raise
+        return changes
+    except FileNotFoundError as e:
+        if "git" in str(e):
+            logger.warning(
+                "Git not available in container, returning empty changes list"
+            )
+            return JSONResponse(status_code=200, content=[])
+        raise
     except AgentRuntimeUnavailableError as e:
         logger.error("Runtime unavailable: %s", e)
         return JSONResponse(
@@ -682,3 +692,4 @@ async def upload_files(
         status_code=status.HTTP_200_OK,
         content={"uploaded_files": uploaded_files, "skipped_files": skipped_files},
     )
+

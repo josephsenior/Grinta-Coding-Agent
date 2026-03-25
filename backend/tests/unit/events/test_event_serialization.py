@@ -12,7 +12,7 @@ from backend.events.serialization.event import (
     event_to_trajectory,
 )
 from backend.events.action import MessageAction, NullAction
-from backend.events.observation import ErrorObservation
+from backend.events.observation import ErrorObservation, LspQueryObservation
 from backend.events.event import EventSource
 
 
@@ -91,6 +91,27 @@ class TestEventToDict:
         d = event_to_dict(obs)
         assert d["observation"] == "error"
         assert d["content"] == "err msg"
+
+    def test_lsp_observation_serializes_with_type_and_available_message(self):
+        obs = LspQueryObservation(content="Found 1 result(s):", available=True)
+        obs._source = EventSource.AGENT
+
+        d = event_to_dict(obs)
+
+        assert d["observation"] == "lsp_query_result"
+        assert d["content"] == "Found 1 result(s):"
+        assert d["message"] == "LSP query completed."
+        assert d["extras"]["available"] is True
+
+    def test_lsp_observation_serializes_unavailable_message(self):
+        obs = LspQueryObservation(content="LSP is not available", available=False)
+        obs._source = EventSource.AGENT
+
+        d = event_to_dict(obs)
+
+        assert d["observation"] == "lsp_query_result"
+        assert "LSP unavailable" in d["message"]
+        assert d["extras"]["available"] is False
 
 
 # ── event_to_trajectory ─────────────────────────────────────────────

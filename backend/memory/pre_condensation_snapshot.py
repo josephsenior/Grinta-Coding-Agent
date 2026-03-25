@@ -45,6 +45,21 @@ def _snapshot_path() -> Path:
 _MAX_ATTEMPTED_APPROACHES = 20
 
 
+def _file_edit_observation_indicates_failure(content: str) -> bool:
+    """True only for known failure shapes; avoids treating diff/code containing 'error' as failure."""
+    s = content.strip()
+    low = s.lower()
+    if low.startswith("skipped:"):
+        return True
+    if "[edit error:" in low:
+        return True
+    if s.startswith("ERROR:"):
+        return True
+    if "critical verification failure" in low:
+        return True
+    return False
+
+
 def extract_snapshot(events: list[Event]) -> dict[str, Any]:
     """Extract critical context from events that are about to be condensed.
 
@@ -265,7 +280,8 @@ def _handle_file_edit_observation(
 ) -> dict[str, Any] | None:
     """Resolve pending action with FileEditObservation result (SUCCESS or FAILED)."""
     content = str(getattr(event, "content", ""))
-    outcome = f"FAILED: {content[:150]}" if "error" in content.lower() or "failed" in content.lower() else "SUCCESS"
+    failed = _file_edit_observation_indicates_failure(content)
+    outcome = f"FAILED: {content[:150]}" if failed else "SUCCESS"
     _append_with_outcome(approaches, pending, outcome)
     return None
 

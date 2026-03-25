@@ -32,7 +32,7 @@ def _extract_tool_names(mcp_tools: dict[str, Any] | list[dict[str, Any]] | None)
 def _collect_mcp_connection_errors(limit: int = 10) -> list[dict[str, Any]]:
     """Collect recent MCP connection errors for degraded-mode visibility."""
     try:
-        from backend.mcp_integration.error_collector import mcp_error_collector
+        from backend.mcp_client.error_collector import mcp_error_collector
 
         recent_errors = mcp_error_collector.get_errors()[-limit:]
         return [

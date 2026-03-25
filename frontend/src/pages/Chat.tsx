@@ -1,12 +1,20 @@
-import { useCallback, useState, useMemo, useRef, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import {
+  Fragment,
+  useCallback,
+  useState,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Send,
   Square,
   Play,
   Loader2,
+  PanelLeft,
   PanelRightOpen,
   PanelRightClose,
   ArrowDown,
@@ -19,31 +27,161 @@ import {
   Settings,
   AlertTriangle,
   MessageSquare,
-  Sparkles,
   RotateCcw,
+  Paperclip,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useConversation } from "@/hooks/use-conversations";
 import { usePlaybooks } from "@/hooks/use-playbooks";
 import { useSocket } from "@/hooks/use-socket";
+import { useRecoverChatAfterConnectivity } from "@/hooks/use-recover-chat-after-connectivity";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import { useSessionStore } from "@/stores/session-store";
 import { useAppStore } from "@/stores/app-store";
 import { sendUserAction } from "@/socket/client";
 import { toast } from "sonner";
-import { AgentState, ActionType, ObservationType } from "@/types/agent";
+import { AgentState, ActionType } from "@/types/agent";
 import type { ActionEvent, ForgeEvent } from "@/types/events";
 import { EventCard } from "@/components/chat/EventRenderer";
-import { AgentWorkflowGroup } from "@/components/chat/AgentWorkflowGroup";
+import { MessageBubble } from "@/components/chat/MessageBubble";
 import { StreamingBubble } from "@/components/chat/StreamingBubble";
+import { DraftWelcomeIllustration } from "@/components/chat/DraftWelcomeIllustration";
 import { ConfirmationBanner } from "@/components/chat/ConfirmationBanner";
 import { PlaybookAutocomplete } from "@/components/chat/PlaybookAutocomplete";
-import { ContextPanel } from "@/components/context-panel/ContextPanel";
 import { getSettings } from "@/api/settings";
+import { createConversation } from "@/api/conversations";
+import { uploadFiles, agentPathFromUploadResponse } from "@/api/files";
+import {
+  setDraftChatBootstrap,
+  takeDraftChatBootstrap,
+} from "@/lib/draft-chat-bootstrap";
 import { cn } from "@/lib/utils";
+import {
+  AGENT_RUNNING_STALE_UI_MS,
+  SUSTAINED_DISCONNECT_NOTICE_MS,
+} from "@/lib/constants";
+import {
+  deriveLiveActivity,
+  deriveStateConfidenceInfo,
+  lifecycleDisplay,
+} from "@/lib/agent-activity";
+
+/** Workspace uploads: text/code only (server stores as UTF-8). Images use image_urls (data URLs), not this path. */
+const CHAT_ATTACH_MAX_FILES = 8;
+const CHAT_ATTACH_MAX_BYTES = 12 * 1024 * 1024;
+const CHAT_IMAGE_MAX_COUNT = 4;
+const CHAT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+const CHAT_ATTACH_ACCEPT = [
+  ".txt",
+  ".md",
+  ".markdown",
+  ".json",
+  ".csv",
+  ".xml",
+  ".yaml",
+  ".yml",
+  ".py",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".html",
+  ".htm",
+  ".css",
+  ".scss",
+  ".less",
+  ".rs",
+  ".go",
+  ".java",
+  ".kt",
+  ".cs",
+  ".php",
+  ".rb",
+  ".swift",
+  ".sql",
+  ".sh",
+  ".bash",
+  ".ps1",
+  ".zsh",
+  ".toml",
+  ".ini",
+  ".cfg",
+  ".log",
+].join(",");
+const CHAT_IMAGE_ACCEPT = "image/jpeg,image/png,image/gif,image/webp";
+const CHAT_FILE_INPUT_ACCEPT = `${CHAT_ATTACH_ACCEPT},${CHAT_IMAGE_ACCEPT}`;
+const TIMELINE_SEPARATOR_GAP_MS = 4 * 60 * 1000;
+
+interface OptimisticUserMessage {
+  clientId: string;
+  content: string;
+}
+
+function isImageFile(file: File): boolean {
+  return file.type.startsWith("image/");
+}
+
+function optimisticMessageContent(
+  text: string,
+  opts: { imageCount?: number; fileCount?: number } = {},
+): string {
+  const trimmed = text.trim();
+  if (trimmed) return trimmed;
+  if ((opts.imageCount ?? 0) > 0) return "Please see the attached image(s).";
+  if ((opts.fileCount ?? 0) > 0) return "(Attached files)";
+  return "";
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error ?? new Error("read failed"));
+    r.readAsDataURL(file);
+  });
+}
+
+function deriveTimelineSeparator(
+  previous: ForgeEvent | undefined,
+  current: ForgeEvent,
+): string | null {
+  if (!previous) return null;
+
+  const prevTs = Date.parse(previous.timestamp || "");
+  const currTs = Date.parse(current.timestamp || "");
+  if (!Number.isFinite(prevTs) || !Number.isFinite(currTs)) return null;
+
+  const diffMs = currTs - prevTs;
+  if (diffMs < TIMELINE_SEPARATOR_GAP_MS) return null;
+
+  const diffMinutes = Math.round(diffMs / 60000);
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min later`;
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  return `${diffHours} hr later`;
+}
+
+function TimelineSeparator({ label }: { label: string }) {
+  return (
+    <div className="my-1 flex items-center gap-2 text-[10px] text-muted-foreground/75">
+      <div className="h-px flex-1 bg-border/45" />
+      <span className="rounded-full bg-muted/50 px-2 py-0.5">{label}</span>
+      <div className="h-px flex-1 bg-border/45" />
+    </div>
+  );
+}
 
 // --- Inline Tasks Strip ---
 type TaskStatus = "open" | "in_progress" | "completed" | "abandoned";
@@ -119,28 +257,24 @@ function InlineTasksPanel() {
   const doneTasks = tasks.filter((t) => t.status === "completed").length;
 
   return (
-    <div className="border-b bg-muted/20 shrink-0">
+    <div className="shrink-0 border-b border-border/40 bg-muted/10">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 px-4 py-1.5 text-xs hover:bg-muted/40 transition-colors"
+        className="flex w-full items-center gap-2 px-4 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/35"
       >
-        <CheckSquare className="h-3 w-3 text-muted-foreground shrink-0" />
-        <span className="font-medium text-muted-foreground">Tasks</span>
-        <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-normal">
+        <CheckSquare className="h-3 w-3 shrink-0 opacity-60" />
+        <span className="font-normal tracking-wide text-muted-foreground/90">Tasks</span>
+        <span className="tabular-nums text-muted-foreground/75">
           {doneTasks}/{tasks.length}
-        </Badge>
-        {activeTasks > 0 && (
-          <Badge variant="default" className="h-4 px-1.5 text-[10px] font-normal">
-            {activeTasks} active
-          </Badge>
-        )}
-        <span className="ml-auto text-muted-foreground">
+          {activeTasks > 0 ? ` · ${activeTasks} in progress` : ""}
+        </span>
+        <span className="ml-auto text-muted-foreground/60">
           {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         </span>
       </button>
       {expanded && (
-        <div className="max-h-44 overflow-y-auto px-4 pb-2">
+        <div className="max-h-40 overflow-y-auto px-4 pb-2">
           {tasks.map((task) => (
             <TaskRow key={task.id} task={task} />
           ))}
@@ -150,57 +284,36 @@ function InlineTasksPanel() {
   );
 }
 
-// --- Agent state display ---
-function agentStateDisplay(state: AgentState) {
-  switch (state) {
-    case AgentState.LOADING:
-      return { label: "Starting...", color: "text-muted-foreground", pulse: true };
-    case AgentState.RUNNING:
-      return { label: "Working", color: "text-green-500", pulse: true };
-    case AgentState.AWAITING_USER_INPUT:
-      return { label: "Your turn", color: "text-blue-500", pulse: false };
-    case AgentState.PAUSED:
-      return { label: "Paused", color: "text-yellow-500", pulse: false };
-    case AgentState.STOPPED:
-      return { label: "Stopped", color: "text-muted-foreground", pulse: false };
-    case AgentState.FINISHED:
-      return { label: "Complete", color: "text-green-500", pulse: false };
-    case AgentState.ERROR:
-      return { label: "Error", color: "text-destructive", pulse: false };
-    case AgentState.AWAITING_USER_CONFIRMATION:
-      return { label: "Needs approval", color: "text-orange-500", pulse: true };
-    case AgentState.RATE_LIMITED:
-      return { label: "Rate limited", color: "text-yellow-500", pulse: false };
-    default:
-      return { label: state, color: "text-muted-foreground", pulse: false };
-  }
-}
-
 // --- Setup banner for missing configuration ---
 function SetupBanner({ apiKeySet, modelSet }: { apiKeySet: boolean; modelSet: boolean }) {
+  const setSettingsWindowOpen = useAppStore((s) => s.setSettingsWindowOpen);
   if (apiKeySet && modelSet) return null;
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+    <div className="mx-auto w-full max-w-xl">
+      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/3 p-4 dark:border-amber-500/20 dark:bg-amber-500/4">
         <div className="flex items-start gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-yellow-500/10">
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/20 bg-transparent dark:border-amber-500/15">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400/90" />
           </div>
-          <div className="flex-1 space-y-1">
-            <p className="text-sm font-medium">Configuration needed</p>
-            <p className="text-xs text-muted-foreground">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <p className="text-[13px] font-medium text-foreground">Finish setup</p>
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
               {!modelSet && !apiKeySet
-                ? "Set up your LLM model and API key to start using the agent."
+                ? "Add an API key and pick a model in Settings to run the agent."
                 : !apiKeySet
-                  ? "Add your API key so the agent can communicate with the LLM."
-                  : "Choose an LLM model for the agent to use."}
+                  ? "Add your API key in Settings so the agent can call the model."
+                  : "Choose a model in Settings."}
             </p>
-            <Button variant="outline" size="sm" className="mt-2 h-7 gap-1.5 text-xs" asChild>
-              <Link to="/settings">
-                <Settings className="h-3 w-3" />
-                Open Settings
-              </Link>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-1 h-8 gap-1.5 border-border/60 text-xs shadow-none"
+              onClick={() => setSettingsWindowOpen(true)}
+            >
+              <Settings className="h-3 w-3 opacity-70" />
+              Open Settings
             </Button>
           </div>
         </div>
@@ -209,114 +322,212 @@ function SetupBanner({ apiKeySet, modelSet }: { apiKeySet: boolean; modelSet: bo
   );
 }
 
-// --- Welcome empty state ---
-function WelcomeState() {
+// --- Live connection banner (after at least one successful connect) ---
+function ConnectionBanner({
+  isConnected,
+  isReconnecting,
+  everConnected,
+  showSustainedOffline,
+}: {
+  isConnected: boolean;
+  isReconnecting: boolean;
+  everConnected: boolean;
+  /** Red "lost" strip only after offline long enough (brief blips stay clean). */
+  showSustainedOffline: boolean;
+}) {
+  if (isConnected || !everConnected) return null;
+
+  if (!isReconnecting && !showSustainedOffline) return null;
+
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center gap-5 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-        <Sparkles className="h-7 w-7 text-primary" />
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-lg font-semibold">Systems Online</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Input mission parameters below to deploy an agent. It can synthesize code, resolve exceptions, execute workflows, or analyze the workspace structure.
-        </p>
-      </div>
-      <div className="flex flex-wrap justify-center gap-2">
-        {["Resolve test pipeline exceptions", "Architectural refactoring", "Decompile logic intent"].map((hint) => (
-          <span
-            key={hint}
-            className="rounded-full border bg-muted/50 px-3 py-1 text-xs text-muted-foreground"
-          >
-            {hint}
+    <div
+      className={cn(
+        "shrink-0 border-b px-4 py-2.5 text-center text-[12px] leading-relaxed",
+        isReconnecting
+          ? "border-amber-500/30 bg-amber-500/6 text-amber-950 dark:border-amber-500/25 dark:bg-amber-500/5 dark:text-amber-100/90"
+          : "border-destructive/35 bg-destructive/6 text-destructive dark:border-destructive/30 dark:bg-destructive/5 dark:text-red-200/85",
+      )}
+    >
+      {isReconnecting ? (
+        <p>
+          <span className="font-medium">Reconnecting…</span>{" "}
+          <span className="opacity-90">
+            Restoring the live link. You can keep reading; sending will work again shortly.
           </span>
-        ))}
+        </p>
+      ) : (
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-3">
+          <p className="max-w-xl">
+            <span className="font-medium">Connection lost.</span> Messages can&apos;t be sent until the
+            link is back. Auto-retry has stopped — refresh the page after checking the backend.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-8 shrink-0 text-xs"
+            onClick={() => window.location.reload()}
+          >
+            Refresh page
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConversationErrorBanner({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="mx-auto w-full max-w-xl px-4 pt-4">
+      <div className="rounded-2xl bg-destructive/8 p-4 ring-1 ring-destructive/15">
+        <div className="flex flex-col gap-2 text-left sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <p className="text-[13px] font-medium text-foreground">Couldn&apos;t load this conversation</p>
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              The API may be down or this chat no longer exists. Check that the Forge backend is running,
+              then try again.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" onClick={onRetry}>
+            Try again
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
 
-type GroupedEventItem = 
-  | { type: "single"; event: ForgeEvent }
-  | { type: "workflow"; id: string; events: ForgeEvent[] };
-
-function isPrimaryEvent(event: ForgeEvent): boolean {
-  if ("action" in event) {
-    return [
-      ActionType.MESSAGE,
-      ActionType.CLARIFICATION,
-      ActionType.PROPOSAL,
-      ActionType.ESCALATE,
-      ActionType.UNCERTAINTY,
-      ActionType.FINISH,
-      ActionType.REJECT
-    ].includes(event.action as ActionType);
-  }
-  if ("observation" in event) {
-    return [
-      ObservationType.MESSAGE,
-      ObservationType.CHAT,
-      ObservationType.USER_REJECTED
-    ].includes(event.observation as ObservationType);
-  }
-  return false;
+// --- Welcome empty state (minimal SVG; connecting keeps a single status line) ---
+function WelcomeState({ waitingForConnection }: { waitingForConnection?: boolean }) {
+  return (
+    <div
+      className="mx-auto flex max-w-md flex-col items-center justify-center gap-5 py-16"
+      role="status"
+      aria-label={waitingForConnection ? "Connecting to server" : "New chat"}
+    >
+      <DraftWelcomeIllustration className="w-[min(220px,72vw)] text-primary/30 dark:text-primary/22" />
+      {waitingForConnection ? (
+        <p className="text-[12px] text-muted-foreground">Connecting…</p>
+      ) : null}
+    </div>
+  );
 }
 
 export default function Chat() {
   const { id } = useParams<{ id: string }>();
-  const { data: conversation } = useConversation(id);
+  const navigate = useNavigate();
+  const isDraft = id === "new";
+
+  /** Blocks duplicate POST /conversations while a draft chat is being created (navigation may lag after await). */
+  const draftCreateInFlightRef = useRef(false);
+  const [isDraftCreatePending, setIsDraftCreatePending] = useState(false);
+
+  useLayoutEffect(() => {
+    if (id && id !== "new") {
+      draftCreateInFlightRef.current = false;
+      setIsDraftCreatePending(false);
+    }
+  }, [id]);
+
+  const {
+    data: conversation,
+    isError: conversationQueryError,
+    refetch: refetchConversation,
+  } = useConversation(id);
   const { data: playbooks = [] } = usePlaybooks(id);
 
-  useSocket(id);
+  useSocket(isDraft ? undefined : id);
+  useRecoverChatAfterConnectivity(isDraft ? undefined : id);
+
+  useEffect(() => {
+    if (!isDraft) return;
+    const { clearSession } = useSessionStore.getState();
+    clearSession();
+    useSessionStore.setState({ agentState: AgentState.AWAITING_USER_INPUT });
+  }, [isDraft, id]);
+
+  const [everConnected, setEverConnected] = useState(false);
+  useEffect(() => {
+    setEverConnected(false);
+  }, [id]);
 
   const events = useSessionStore((s) => s.events);
-
-  const groupedEvents = useMemo(() => {
-    const groups: GroupedEventItem[] = [];
-    let currentWorkflow: ForgeEvent[] = [];
-
-    for (const event of events) {
-      if (isPrimaryEvent(event)) {
-        if (currentWorkflow.length > 0) {
-          groups.push({ type: "workflow", id: `wf-${currentWorkflow[0]?.id ?? groups.length}`, events: currentWorkflow });
-          currentWorkflow = [];
-        }
-        groups.push({ type: "single", event });
-      } else {
-        // Exclude completely silent internal events from the workflow group
-        // EventRenderer handles skipping but grouping them empty is weird
-        // We'll let EventRenderer internally drop them anyway, but it's fine
-        currentWorkflow.push(event);
-      }
-    }
-    
-    if (currentWorkflow.length > 0) {
-      groups.push({ type: "workflow", id: `wf-${currentWorkflow[0]?.id ?? groups.length}`, events: currentWorkflow });
-    }
-    
-    return groups;
-  }, [events]);
 
   const agentState = useSessionStore((s) => s.agentState);
   const streamingContent = useSessionStore((s) => s.streamingContent);
   const isConnected = useSessionStore((s) => s.isConnected);
   const isReconnecting = useSessionStore((s) => s.isReconnecting);
+  useEffect(() => {
+    if (isConnected) setEverConnected(true);
+  }, [isConnected]);
+
+  const [showSustainedOffline, setShowSustainedOffline] = useState(false);
+  useEffect(() => {
+    if (isConnected || isReconnecting || !everConnected) {
+      setShowSustainedOffline(false);
+      return;
+    }
+    const t = setTimeout(() => setShowSustainedOffline(true), SUSTAINED_DISCONNECT_NOTICE_MS);
+    return () => clearTimeout(t);
+  }, [isConnected, isReconnecting, everConnected]);
+
   const contextPanelOpen = useAppStore((s) => s.contextPanelOpen);
   const setContextPanelOpen = useAppStore((s) => s.setContextPanelOpen);
+  const sidebarOpen = useAppStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
 
   const [inputValue, setInputValue] = useState("");
-  const [contextWidth, setContextWidth] = useState(380);
-  const isDragging = useRef(false);
-  const contextPanelRef = useRef<HTMLDivElement | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [optimisticUserMessages, setOptimisticUserMessages] = useState<OptimisticUserMessage[]>(
+    [],
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const seenUserMessageEventIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    if (contextPanelRef.current) {
-      contextPanelRef.current.style.width = `${contextWidth}px`;
+    setPendingFiles([]);
+  }, [id]);
+
+  useEffect(() => {
+    setOptimisticUserMessages([]);
+    seenUserMessageEventIdsRef.current.clear();
+  }, [id]);
+
+  useEffect(() => {
+    const echoedUserMessages = events.filter((event): event is ActionEvent => {
+      return (
+        "action" in event &&
+        event.action === ActionType.MESSAGE &&
+        event.source === "user" &&
+        !seenUserMessageEventIdsRef.current.has(Number(event.id))
+      );
+    });
+
+    if (echoedUserMessages.length === 0) return;
+
+    for (const event of echoedUserMessages) {
+      seenUserMessageEventIdsRef.current.add(Number(event.id));
     }
-  }, [contextWidth]);
+
+    setOptimisticUserMessages((prev) => {
+      const next = [...prev];
+      for (const event of echoedUserMessages) {
+        if (next.length === 0) break;
+        const content = String(event.message || event.args?.content || "").trim();
+        const matchIndex = content ? next.findIndex((item) => item.content === content) : -1;
+        if (matchIndex >= 0) {
+          next.splice(matchIndex, 1);
+        } else {
+          next.shift();
+        }
+      }
+      return next;
+    });
+  }, [events]);
 
   // Fetch settings to know if the API key / model are configured
-  const { data: settings } = useQuery({
+  const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ["settings"],
     queryFn: getSettings,
     staleTime: 30_000,
@@ -338,27 +549,18 @@ export default function Chat() {
     return () => clearTimeout(timer);
   }, [agentState]);
 
-  // Intermediate stall warning: if RUNNING for 30s with no new events/streaming,
-  // show a soft "taking longer than expected" message to reassure the user.
-  const [runningSlow, setRunningSlow] = useState(false);
-  useEffect(() => {
-    if (agentState !== AgentState.RUNNING) {
-      setRunningSlow(false);
-      return;
-    }
-    const timer = setTimeout(() => setRunningSlow(true), 30_000);
-    return () => clearTimeout(timer);
-  }, [agentState, events.length, streamingContent]);
-
-  // If agentState is RUNNING for more than 90s with no new events or streaming,
-  // allow user to send a message or stop the agent (un-stick the UI).
+  // If agentState is RUNNING for a while with no new events or streaming, offer retry/stop (UI-only; see AGENT_RUNNING_STALE_UI_MS).
   const [runningTimedOut, setRunningTimedOut] = useState(false);
   useEffect(() => {
+    if (AGENT_RUNNING_STALE_UI_MS <= 0) {
+      setRunningTimedOut(false);
+      return;
+    }
     if (agentState !== AgentState.RUNNING) {
       setRunningTimedOut(false);
       return;
     }
-    const timer = setTimeout(() => setRunningTimedOut(true), 90_000);
+    const timer = setTimeout(() => setRunningTimedOut(true), AGENT_RUNNING_STALE_UI_MS);
     return () => clearTimeout(timer);
   }, [agentState, events.length, streamingContent]);
 
@@ -373,31 +575,13 @@ export default function Chat() {
     return AgentState.LOADING;
   }, [agentState, conversation?.agent_state, loadingTimedOut]);
 
-  // Resizable context panel — drag the left edge
-  const handleResizeMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      const startX = e.clientX;
-      const startWidth = contextWidth;
-      const onMove = (ev: MouseEvent) => {
-        const delta = startX - ev.clientX;
-        setContextWidth(Math.max(260, Math.min(720, startWidth + delta)));
-      };
-      const onUp = () => {
-        isDragging.current = false;
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-      };
-      isDragging.current = true;
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    },
-    [contextWidth],
-  );
+  const effectiveAgentStateForUi = isDraft
+    ? AgentState.AWAITING_USER_INPUT
+    : effectiveAgentState;
 
   // Auto-scroll
   const { scrollContainerRef, bottomRef, showScrollFab, scrollToBottom, handleScroll } =
-    useAutoScroll([events.length, streamingContent]);
+    useAutoScroll([events.length, optimisticUserMessages.length, streamingContent]);
 
   // Playbook autocomplete
   const playbookMatch = useMemo(() => {
@@ -407,24 +591,220 @@ export default function Chat() {
     return inputValue.slice(1);
   }, [inputValue]);
 
-  const handleSend = useCallback(() => {
-    const text = inputValue.trim();
-    if (!text) return;
-    const sent = sendUserAction({
-      action: "message",
-      args: { content: text },
+  const addPendingFiles = useCallback((list: FileList | File[]) => {
+    const incoming = Array.from(list);
+    if (incoming.length === 0) return;
+
+    setPendingFiles((prev) => {
+      const next = [...prev];
+      for (const file of incoming) {
+        const image = isImageFile(file);
+        const maxBytes = image ? CHAT_IMAGE_MAX_BYTES : CHAT_ATTACH_MAX_BYTES;
+        if (file.size > maxBytes) {
+          toast.error(`"${file.name}" is too large`, {
+            description: `Max ${Math.round(maxBytes / (1024 * 1024))} MB per ${image ? "image" : "file"}.`,
+          });
+          continue;
+        }
+        const imagesNow = next.filter(isImageFile).length;
+        if (image && imagesNow >= CHAT_IMAGE_MAX_COUNT) {
+          toast.error(`At most ${CHAT_IMAGE_MAX_COUNT} images per message.`);
+          continue;
+        }
+        if (next.length >= CHAT_ATTACH_MAX_FILES) {
+          toast.error(`At most ${CHAT_ATTACH_MAX_FILES} attachments per message.`);
+          break;
+        }
+        next.push(file);
+      }
+      return next;
     });
-    if (!sent) {
-      toast.error("Not connected — waiting for backend...");
+  }, []);
+
+  const handleSend = useCallback(async () => {
+    const text = inputValue.trim();
+    const files = pendingFiles;
+    if (!text && files.length === 0) return;
+    if (!id) {
+      toast.error("No conversation", { description: "Open or create a chat first." });
       return;
     }
-    setInputValue("");
-  }, [inputValue]);
+
+    const imageFiles = files.filter(isImageFile);
+    const workspaceFiles = files.filter((f) => !isImageFile(f));
+
+    if (imageFiles.length > 0) {
+      if (settingsLoading) {
+        toast.info("Checking your model…", {
+          description: "Wait a moment before sending images.",
+        });
+        return;
+      }
+      if (!settings?.llm_model_supports_vision) {
+        toast.error("This model can't view images", {
+          description:
+            "Pick a vision-capable model in Settings, or remove the images and send only text or workspace files.",
+        });
+        return;
+      }
+    }
+
+    setIsUploading(true);
+    try {
+      if (isDraft) {
+        if (draftCreateInFlightRef.current) {
+          return;
+        }
+        draftCreateInFlightRef.current = true;
+        setIsDraftCreatePending(true);
+        try {
+          let imageUrls: string[] = [];
+          if (imageFiles.length > 0) {
+            imageUrls = await Promise.all(imageFiles.map(readFileAsDataUrl));
+          }
+
+          if (workspaceFiles.length > 0) {
+            const res = await createConversation({});
+            const cid = res.conversation_id;
+            if (!cid) {
+              draftCreateInFlightRef.current = false;
+              setIsDraftCreatePending(false);
+              toast.error("Could not start chat", {
+                description: "The server did not return a conversation id. Try again.",
+              });
+              return;
+            }
+            const body =
+              text ||
+              (imageUrls.length > 0 ? "Please see the attached image(s)." : "(Attached files)");
+            setDraftChatBootstrap({
+              conversationId: cid,
+              text: body,
+              workspaceFiles,
+              imageUrls,
+            });
+            navigate(`/chat/${cid}`, { replace: true });
+            setInputValue("");
+            setPendingFiles([]);
+            return;
+          }
+
+          const initialMsg =
+            text || (imageUrls.length > 0 ? "Please see the attached image(s)." : undefined);
+          if (!initialMsg) {
+            draftCreateInFlightRef.current = false;
+            setIsDraftCreatePending(false);
+            toast.error("Message required", {
+              description: "Type something or attach an image to start.",
+            });
+            return;
+          }
+
+          const res = await createConversation({
+            initial_user_msg: initialMsg,
+            image_urls: imageUrls.length > 0 ? imageUrls : undefined,
+          });
+          const newId = res.conversation_id;
+          if (!newId) {
+            draftCreateInFlightRef.current = false;
+            setIsDraftCreatePending(false);
+            toast.error("Could not start chat", {
+              description: "The server did not return a conversation id. Try again.",
+            });
+            return;
+          }
+          navigate(`/chat/${newId}`, { replace: true });
+          setInputValue("");
+          setPendingFiles([]);
+          return;
+        } catch (draftErr) {
+          draftCreateInFlightRef.current = false;
+          setIsDraftCreatePending(false);
+          throw draftErr;
+        }
+      }
+
+      let fileUrls: string[] = [];
+      let imageUrls: string[] = [];
+      if (workspaceFiles.length > 0) {
+        const { uploaded_files: uploaded, skipped_files: skipped } = await uploadFiles(
+          id,
+          workspaceFiles,
+        );
+        for (const s of skipped) {
+          toast.error(`Skipped “${s.name}”`, { description: s.reason });
+        }
+        fileUrls = uploaded.map(agentPathFromUploadResponse);
+        if (workspaceFiles.length > 0 && fileUrls.length === 0) {
+          toast.error("Upload failed", {
+            description: "No files were written to the workspace. Check the server log.",
+          });
+          return;
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        imageUrls = await Promise.all(imageFiles.map(readFileAsDataUrl));
+      }
+
+      const args: Record<string, unknown> = {
+        content: text,
+      };
+      if (fileUrls.length > 0) {
+        args.file_urls = fileUrls;
+      }
+      if (imageUrls.length > 0) {
+        args.image_urls = imageUrls;
+      }
+
+      const sent = sendUserAction({
+        action: "message",
+        args,
+      });
+      if (!sent) {
+        toast.error("Not connected", {
+          description: everConnected
+            ? "Wait for reconnect or refresh the page. Ensure the Forge backend is running."
+            : "Still connecting… If this persists, start the API and refresh.",
+        });
+        return;
+      }
+      const optimisticContent = optimisticMessageContent(text, {
+        imageCount: imageUrls.length,
+        fileCount: fileUrls.length,
+      });
+      if (optimisticContent) {
+        setOptimisticUserMessages((prev) => [
+          ...prev,
+          {
+            clientId: `${Date.now()}-${prev.length}`,
+            content: optimisticContent,
+          },
+        ]);
+      }
+      setInputValue("");
+      setPendingFiles([]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      toast.error("Could not send message", { description: msg });
+    } finally {
+      setIsUploading(false);
+    }
+  }, [
+    inputValue,
+    pendingFiles,
+    id,
+    everConnected,
+    settings?.llm_model_supports_vision,
+    settingsLoading,
+    isDraft,
+    navigate,
+  ]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
@@ -436,131 +816,283 @@ export default function Chat() {
     sendUserAction({ action: "change_agent_state", args: { agent_state: "running" } });
   };
 
-  // Override state display when the agent appears stuck
+  const baseLifecycle = lifecycleDisplay(effectiveAgentStateForUi);
   const stateInfo = runningTimedOut
-    ? { label: "May be stuck", color: "text-orange-500", pulse: false }
-    : runningSlow && effectiveAgentState === AgentState.RUNNING
-      ? { label: "Still working...", color: "text-yellow-500", pulse: true }
-      : agentStateDisplay(effectiveAgentState);
-  const canSend =
-    isConnected &&
-    (
-      effectiveAgentState === AgentState.AWAITING_USER_INPUT ||
-      effectiveAgentState === AgentState.PAUSED ||
-      effectiveAgentState === AgentState.ERROR ||
-      effectiveAgentState === AgentState.FINISHED ||
-      effectiveAgentState === AgentState.STOPPED ||
-      effectiveAgentState === AgentState.RATE_LIMITED ||
-      runningTimedOut
-    );
-  const isRunning = effectiveAgentState === AgentState.RUNNING && !runningTimedOut;
-  const isEmpty = events.length === 0 && !streamingContent;
+    ? {
+        label: "May need attention",
+        textClass: "text-orange-600 dark:text-orange-400",
+        dotClass: "bg-orange-500 dark:bg-orange-400",
+        pulse: false,
+      }
+    : baseLifecycle;
+
   const needsSetup = !apiKeySet || !modelSet;
+
+  const canSend =
+    (isDraft && !needsSetup && !isUploading && !isDraftCreatePending) ||
+    (isConnected &&
+      (effectiveAgentStateForUi === AgentState.AWAITING_USER_INPUT ||
+        effectiveAgentStateForUi === AgentState.PAUSED ||
+        effectiveAgentStateForUi === AgentState.ERROR ||
+        effectiveAgentStateForUi === AgentState.FINISHED ||
+        effectiveAgentStateForUi === AgentState.STOPPED ||
+        effectiveAgentStateForUi === AgentState.RATE_LIMITED ||
+        runningTimedOut));
+  const isRunning =
+    !isDraft && effectiveAgentStateForUi === AgentState.RUNNING && !runningTimedOut;
+  const isEmpty =
+    events.length === 0 && optimisticUserMessages.length === 0 && !streamingContent;
+  /** Paperclip: draft chat has no socket yet; workspace files use bootstrap after first create. */
+  const canOpenFilePicker =
+    (isDraft && !needsSetup && !isUploading && !isDraftCreatePending) ||
+    (isConnected && !!id && id !== "new" && !needsSetup && !isUploading);
+
+  const liveActivity = useMemo(() => {
+    const streaming = !!streamingContent;
+    return deriveLiveActivity(events, {
+      streaming,
+      isRunning: isRunning || streaming,
+    });
+  }, [events, streamingContent, isRunning]);
+
+  const showActivityStrip = !!liveActivity && (isRunning || !!streamingContent);
+  const stateConfidence = useMemo(
+    () =>
+      deriveStateConfidenceInfo(events, {
+        state: effectiveAgentStateForUi,
+        streaming: !!streamingContent,
+      }),
+    [events, effectiveAgentStateForUi, streamingContent],
+  );
+  const confidencePercent = Math.max(0, Math.min(100, Math.round(stateConfidence.score * 100)));
+
+  useEffect(() => {
+    if (isDraft || !id || id === "new" || !isConnected) return;
+    const boot = takeDraftChatBootstrap(id);
+    if (!boot) return;
+    void (async () => {
+      try {
+        let fileUrls: string[] = [];
+        if (boot.workspaceFiles.length > 0) {
+          const { uploaded_files: uploaded, skipped_files: skipped } = await uploadFiles(
+            id,
+            boot.workspaceFiles,
+          );
+          for (const s of skipped) {
+            toast.error(`Skipped “${s.name}”`, { description: s.reason });
+          }
+          fileUrls = uploaded.map(agentPathFromUploadResponse);
+          if (boot.workspaceFiles.length > 0 && fileUrls.length === 0) {
+            toast.error("Upload failed", {
+              description: "No files were written to the workspace. Check the server log.",
+            });
+            return;
+          }
+        }
+        const args: Record<string, unknown> = { content: boot.text };
+        if (fileUrls.length > 0) args.file_urls = fileUrls;
+        if (boot.imageUrls.length > 0) args.image_urls = boot.imageUrls;
+        const sent = sendUserAction({ action: "message", args });
+        if (!sent) {
+          toast.error("Could not send attachments", {
+            description: "Connection dropped. Refresh and try again.",
+          });
+        } else {
+          const optimisticContent = optimisticMessageContent(boot.text, {
+            imageCount: boot.imageUrls.length,
+            fileCount: fileUrls.length,
+          });
+          if (optimisticContent) {
+            setOptimisticUserMessages((prev) => [
+              ...prev,
+              {
+                clientId: `${Date.now()}-${prev.length}`,
+                content: optimisticContent,
+              },
+            ]);
+          }
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Send failed";
+        toast.error("Could not send message with attachments", { description: msg });
+      }
+    })();
+  }, [id, isConnected, isDraft]);
 
   return (
     <div className="flex h-full flex-col">
       {/* Chat TopBar */}
-      <div className="flex h-12 shrink-0 items-center justify-between border-b bg-background/80 backdrop-blur-sm px-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-            <Link to="/"><ArrowLeft className="h-4 w-4" /></Link>
-          </Button>
-          <div className="flex items-center gap-2 min-w-0">
-            <MessageSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="truncate font-medium text-sm max-w-75">
-              {conversation?.title || "New Conversation"}
+      <div className="flex min-h-12 shrink-0 items-center justify-between gap-3 border-b border-border/40 bg-card/85 px-4 py-1.5 backdrop-blur-sm dark:bg-card/75">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          {!sidebarOpen && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => setSidebarOpen(true)}
+                  aria-label="Show conversation list"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Show conversation list</TooltipContent>
+            </Tooltip>
+          )}
+          <div className="flex min-w-0 items-center gap-2">
+            <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="max-w-75 truncate text-sm font-medium">
+              {isDraft ? "New chat" : conversation?.title || "Conversation"}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Agent State Pill */}
-          <div className={cn(
-            "flex items-center gap-1.5 rounded-full border px-2.5 py-1",
-            effectiveAgentState === AgentState.ERROR
-              ? "border-destructive/30 bg-destructive/5"
-              : runningTimedOut
-                ? "border-orange-500/30 bg-orange-500/5"
-                : effectiveAgentState === AgentState.RUNNING
-                  ? "border-green-500/30 bg-green-500/5"
-                  : "border-border",
-          )}>
-            {effectiveAgentState === AgentState.LOADING ? (
-              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-            ) : (
-              <span
+        <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
+          {showActivityStrip && liveActivity && (
+            <div
+              className="flex max-w-[min(100vw-8rem,18rem)] items-center gap-1.5 text-[11px] text-foreground/90 sm:max-w-[20rem]"
+              title={
+                liveActivity.detail
+                  ? `${liveActivity.verb} · ${liveActivity.detail}`
+                  : liveActivity.verb
+              }
+            >
+              <liveActivity.Icon
                 className={cn(
-                  "h-1.5 w-1.5 rounded-full",
-                  stateInfo.color.replace("text-", "bg-"),
-                  stateInfo.pulse && "animate-pulse",
+                  "h-3.5 w-3.5 shrink-0 opacity-90",
+                  liveActivity.verb === "Working…" && "animate-spin",
                 )}
               />
-            )}
-            <span className={cn("text-[11px] font-medium", stateInfo.color)}>
-              {stateInfo.label}
-            </span>
-          </div>
+              <span className="shrink-0 font-medium">{liveActivity.verb}</span>
+              {liveActivity.detail && (
+                <span className="min-w-0 truncate text-muted-foreground">
+                  · {liveActivity.detail}
+                </span>
+              )}
+              {liveActivity.linesAdded != null && liveActivity.linesAdded > 0 && (
+                <span className="shrink-0 tabular-nums text-emerald-600 dark:text-emerald-400">
+                  +{liveActivity.linesAdded}
+                </span>
+              )}
+              {liveActivity.linesRemoved != null && liveActivity.linesRemoved > 0 && (
+                <span className="shrink-0 tabular-nums text-red-500 dark:text-red-400">
+                  −{liveActivity.linesRemoved}
+                </span>
+              )}
+            </div>
+          )}
 
-          {/* Connection indicator */}
-          {(!isConnected || isReconnecting) && (
-            <>
-              <Separator orientation="vertical" className="h-4" />
-              <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            {/* Agent State Pill */}
+            <div
+              className={cn(
+                "flex items-center gap-2 rounded-full px-2.5 py-1 ring-1 ring-border/35",
+                effectiveAgentStateForUi === AgentState.ERROR
+                  ? "bg-destructive/6 ring-destructive/20"
+                  : runningTimedOut
+                    ? "bg-orange-500/6 ring-orange-500/15"
+                    : effectiveAgentStateForUi === AgentState.RUNNING
+                      ? "bg-emerald-500/6 ring-emerald-500/15"
+                      : "bg-muted/25",
+              )}
+            >
+              {effectiveAgentStateForUi === AgentState.LOADING ? (
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              ) : (
                 <span
                   className={cn(
                     "h-1.5 w-1.5 rounded-full",
-                    isReconnecting
-                      ? "bg-yellow-500 animate-pulse"
-                      : "bg-red-500",
+                    stateInfo.dotClass,
+                    stateInfo.pulse && "animate-pulse",
                   )}
                 />
-                <span className={cn(
-                  "text-[10px]",
-                  isReconnecting ? "text-yellow-500" : "text-red-500",
-                )}>
-                  {isReconnecting ? "Reconnecting..." : "Disconnected"}
+              )}
+              <div className="flex min-w-0 flex-col">
+                <span className={cn("text-[11px] font-medium", stateInfo.textClass)}>
+                  {stateInfo.label}
+                </span>
+                <span className="truncate text-[10px] text-muted-foreground/90">
+                  {stateConfidence.stage} · {stateConfidence.hint}
                 </span>
               </div>
-            </>
-          )}
+              <span className="shrink-0 rounded-full bg-muted/55 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                {confidencePercent}%
+              </span>
+            </div>
 
-          {isRunning && (
-            <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={handleStop}>
-              <Square className="mr-1 h-3 w-3" /> Stop
-            </Button>
-          )}
-          {runningTimedOut && (
-            <Button variant="outline" size="sm" className="h-7 text-xs border-orange-500/30 text-orange-500 hover:bg-orange-500/10" onClick={handleResume}>
-              <RotateCcw className="mr-1 h-3 w-3" /> Retry
-            </Button>
-          )}
-          {(effectiveAgentState === AgentState.PAUSED ||
-            effectiveAgentState === AgentState.STOPPED) && (
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleResume}>
-              <Play className="mr-1 h-3 w-3" /> Resume
-            </Button>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            title="Toggle context panel"
-            onClick={() => setContextPanelOpen(!contextPanelOpen)}
-          >
-            {contextPanelOpen ? (
-              <PanelRightClose className="h-4 w-4" />
-            ) : (
-              <PanelRightOpen className="h-4 w-4" />
+            {/* Connection indicator */}
+            {!isDraft && (!isConnected || isReconnecting) && (
+              <>
+                <Separator orientation="vertical" className="h-4" />
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      isReconnecting ? "animate-pulse bg-yellow-500" : "bg-red-500",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-[10px]",
+                      isReconnecting ? "text-yellow-500" : "text-red-500",
+                    )}
+                  >
+                    {isReconnecting ? "Reconnecting…" : "Disconnected"}
+                  </span>
+                </div>
+              </>
             )}
-          </Button>
+
+            {isRunning && (
+              <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={handleStop}>
+                <Square className="mr-1 h-3 w-3" /> Stop
+              </Button>
+            )}
+            {runningTimedOut && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 border-orange-500/30 text-xs text-orange-500 hover:bg-orange-500/10"
+                onClick={handleResume}
+              >
+                <RotateCcw className="mr-1 h-3 w-3" /> Retry
+              </Button>
+            )}
+            {(effectiveAgentStateForUi === AgentState.PAUSED ||
+              effectiveAgentStateForUi === AgentState.STOPPED) && (
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleResume}>
+                <Play className="mr-1 h-3 w-3" /> Resume
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              title="Toggle workspace panel"
+              onClick={() => setContextPanelOpen(!contextPanelOpen)}
+            >
+              {contextPanelOpen ? (
+                <PanelRightClose className="h-4 w-4" />
+              ) : (
+                <PanelRightOpen className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Chat Body */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Main Chat Column */}
-        <div className="relative flex flex-1 flex-col min-w-0">
+      {/* Chat Body — center column only; shell provides sidebar + workspace */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          {!isDraft && (
+            <ConnectionBanner
+              isConnected={isConnected}
+              isReconnecting={isReconnecting}
+              everConnected={everConnected}
+              showSustainedOffline={showSustainedOffline}
+            />
+          )}
           {/* Tasks strip — shown at top when tasks exist */}
           <InlineTasksPanel />
 
@@ -569,54 +1101,76 @@ export default function Chat() {
             onScroll={handleScroll}
             className="flex-1 overflow-y-auto"
           >
-            <div className="mx-auto flex max-w-2xl flex-col gap-3 p-4">
+            <div className="mx-auto flex max-w-180 flex-col gap-4 p-4 pb-8">
+              {conversationQueryError && id && (
+                <ConversationErrorBanner onRetry={() => void refetchConversation()} />
+              )}
+
               {/* Setup banner — shown when API key or model is missing */}
               {needsSetup && isEmpty && <SetupBanner apiKeySet={apiKeySet} modelSet={modelSet} />}
 
               {/* Welcome empty state */}
-              {isEmpty && !isRunning && effectiveAgentState !== AgentState.LOADING && (
-                <WelcomeState />
-              )}
+              {isEmpty &&
+                !isRunning &&
+                effectiveAgentStateForUi !== AgentState.LOADING &&
+                !conversationQueryError && (
+                  <WelcomeState
+                    waitingForConnection={
+                      !isDraft && !isConnected && !everConnected && !!id && id !== "new"
+                    }
+                  />
+                )}
 
               {/* Loading state — only first few seconds */}
-              {isEmpty && effectiveAgentState === AgentState.LOADING && (
-                <div className="mx-auto flex flex-col items-center gap-3 py-16 text-center">
+              {isEmpty &&
+                effectiveAgentStateForUi === AgentState.LOADING &&
+                !conversationQueryError && (
+                <div className="mx-auto flex max-w-sm flex-col items-center gap-3 py-16 text-center">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Connecting to agent...</p>
+                  <p className="text-sm text-muted-foreground">Connecting to agent…</p>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground/90">
+                    If this never finishes, start the Forge backend and refresh. You can still read past
+                    messages once they load from the server.
+                  </p>
                 </div>
               )}
 
-              {groupedEvents.map((item, i) => {
-                if (item.type === "single") {
-                  return <EventCard key={item.event.id != null ? `e-${item.event.id}` : `i-${i}`} event={item.event} />;
-                } else {
-                  return (
-                    <AgentWorkflowGroup 
-                      key={`wf-${item.id || i}`} 
-                      events={item.events} 
-                      isLatest={i === groupedEvents.length - 1} 
-                    />
-                  );
-                }
+              {events.map((event, i) => {
+                const previous = i > 0 ? events[i - 1] : undefined;
+                const separatorLabel = deriveTimelineSeparator(previous, event);
+
+                return (
+                  <Fragment key={event.id != null ? `e-${event.id}` : `i-${i}`}>
+                    {separatorLabel && <TimelineSeparator label={separatorLabel} />}
+                    <EventCard event={event} />
+                  </Fragment>
+                );
               })}
+
+              {optimisticUserMessages.map((message) => (
+                <MessageBubble
+                  key={`optimistic-${message.clientId}`}
+                  event={
+                    {
+                      id: -1,
+                      timestamp: new Date().toISOString(),
+                      source: "user",
+                      message: message.content,
+                      action: ActionType.MESSAGE,
+                      args: { content: message.content },
+                    } as ActionEvent
+                  }
+                />
+              ))}
 
               {/* Streaming indicator */}
               {streamingContent && <StreamingBubble content={streamingContent} />}
 
-              {isRunning && !streamingContent && events.length > 0 && (
-                <div className="flex items-center gap-2 text-muted-foreground text-sm py-1">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span className="text-xs">
-                    {runningSlow ? "Taking longer than expected..." : "Working..."}
-                  </span>
-                </div>
-              )}
-
               {runningTimedOut && events.length > 0 && (
-                <div className="flex items-center gap-3 rounded-lg border border-orange-500/30 bg-orange-500/5 px-3 py-2 text-sm">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-orange-500" />
-                  <span className="text-xs text-muted-foreground">
-                    The agent hasn't responded in a while. You can send a message, retry, or stop it.
+                <div className="flex items-start gap-2.5 rounded-xl bg-orange-500/6 px-3 py-2.5 ring-1 ring-orange-500/12">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-600/80 dark:text-orange-400/75" />
+                  <span className="text-[12px] leading-relaxed text-muted-foreground">
+                    No response for a while — you can message, retry, or stop.
                   </span>
                 </div>
               )}
@@ -630,69 +1184,147 @@ export default function Chat() {
               type="button"
               onClick={() => scrollToBottom()}
               aria-label="Scroll to bottom"
-              className="absolute bottom-24 right-6 z-10 flex h-8 w-8 items-center justify-center rounded-full border bg-background shadow-md hover:bg-accent transition-colors"
+              className="absolute bottom-24 right-6 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-card/90 shadow-sm ring-1 ring-border/40 transition-colors hover:bg-muted/60"
             >
               <ArrowDown className="h-3.5 w-3.5" />
             </button>
           )}
 
-          {effectiveAgentState === AgentState.AWAITING_USER_CONFIRMATION && (
+          {effectiveAgentStateForUi === AgentState.AWAITING_USER_CONFIRMATION && (
             <ConfirmationBanner events={events} />
           )}
 
           {/* Input Bar */}
-          <div className="border-t bg-background/80 backdrop-blur-sm p-3">
-            <div className="relative mx-auto flex max-w-2xl items-end gap-2">
-              {playbookMatch !== null && playbooks.length > 0 && (
-                <PlaybookAutocomplete
-                  playbooks={playbooks}
-                  filter={playbookMatch}
-                  onSelect={(pb) => setInputValue(`/${pb.name} `)}
-                />
-              )}
-
-              <Textarea
-                placeholder={
-                  !isConnected
-                    ? "Establishing secure uplink..."
-                    : needsSetup
-                      ? "Awaiting API telemetry configuration..."
-                      : canSend
-                        ? "Provide directive... (/ for playbooks)"
-                        : "Agent sequence active..."
-                }
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={!canSend}
-                className="min-h-10 max-h-37.5 resize-none rounded-xl border-muted-foreground/20 bg-muted/30 text-sm"
-                rows={1}
-              />
-              <Button
-                size="icon"
-                className="h-9 w-9 rounded-xl shrink-0"
-                onClick={handleSend}
-                disabled={!canSend || !inputValue.trim()}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Resizable Context Panel */}
-        {contextPanelOpen && (
-          <div ref={contextPanelRef} className="flex shrink-0 border-l">
-            {/* Drag handle */}
-            <div
-              className="w-1 shrink-0 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors"
-              onMouseDown={handleResizeMouseDown}
+          <div className="border-t border-border/40 bg-card/85 p-3 backdrop-blur-sm dark:bg-card/75">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              accept={CHAT_FILE_INPUT_ACCEPT}
+              onChange={(e) => {
+                addPendingFiles(e.target.files ?? []);
+                e.target.value = "";
+              }}
             />
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <ContextPanel />
+            <div className="relative mx-auto flex max-w-180 flex-col gap-2">
+              {pendingFiles.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 px-0.5">
+                  {pendingFiles.map((f, i) => (
+                    <span
+                      key={`${f.name}-${f.size}-${i}`}
+                      className="inline-flex max-w-55 items-center gap-1 rounded-md bg-muted/55 px-2 py-0.5 text-[11px] text-muted-foreground ring-1 ring-border/35"
+                    >
+                      <span className="truncate" title={f.name}>
+                        {f.name}
+                      </span>
+                      <button
+                        type="button"
+                        className="shrink-0 rounded p-0.5 hover:bg-muted/50"
+                        aria-label={`Remove ${f.name}`}
+                        onClick={() =>
+                          setPendingFiles((prev) => prev.filter((_, j) => j !== i))
+                        }
+                      >
+                        <X className="h-3 w-3 opacity-70" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-end gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-9 w-9 shrink-0 rounded-lg",
+                        !canOpenFilePicker && "opacity-40",
+                      )}
+                      aria-label="Attach files"
+                      aria-disabled={!canOpenFilePicker}
+                      onClick={() => {
+                        if (!canOpenFilePicker) {
+                          if (needsSetup) {
+                            toast.info("Finish setup first", {
+                              description:
+                                "Set your API key and model in Settings, then you can attach files.",
+                            });
+                          } else if (!isDraft && !isConnected) {
+                            toast.info("Not connected", {
+                              description: everConnected
+                                ? "Reconnect or refresh, then try again."
+                                : "Still connecting to the server…",
+                            });
+                          }
+                          return;
+                        }
+                        fileInputRef.current?.click();
+                      }}
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    Attach files or images (JPEG/PNG/GIF/WebP). Text/code go to the workspace; images
+                    are sent to the model when it supports vision (max {CHAT_IMAGE_MAX_COUNT} images,{" "}
+                    {Math.round(CHAT_IMAGE_MAX_BYTES / (1024 * 1024))} MB each).
+                  </TooltipContent>
+                </Tooltip>
+
+                <div className="relative min-w-0 flex-1">
+                  {playbookMatch !== null && playbooks.length > 0 && (
+                    <PlaybookAutocomplete
+                      playbooks={playbooks}
+                      filter={playbookMatch}
+                      onSelect={(pb) => setInputValue(`/${pb.name} `)}
+                    />
+                  )}
+                  <Textarea
+                    placeholder={
+                      isDraft
+                        ? needsSetup
+                          ? "Set API key and model in Settings to start."
+                          : "Message the agent… (chat is created when you send)"
+                        : !isConnected
+                          ? everConnected
+                            ? "Disconnected — refresh or wait for reconnect…"
+                            : "Connecting…"
+                          : needsSetup
+                            ? "Set API key and model in Settings to start."
+                            : canSend
+                              ? "Message the agent… (/ for playbooks, paperclip to attach)"
+                              : "Agent is running…"
+                    }
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={!canSend || isUploading}
+                    className="min-h-10 max-h-37.5 w-full resize-none rounded-xl border-muted-foreground/20 bg-muted/30 text-sm"
+                    rows={1}
+                  />
+                </div>
+                <Button
+                  size="icon"
+                  className="h-9 w-9 shrink-0 rounded-lg"
+                  onClick={() => void handleSend()}
+                  disabled={
+                    !canSend ||
+                    isUploading ||
+                    (!inputValue.trim() && pendingFiles.length === 0)
+                  }
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
-        )}
       </div>
     </div>
   );

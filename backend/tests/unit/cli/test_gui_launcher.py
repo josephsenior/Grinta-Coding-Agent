@@ -81,7 +81,7 @@ class TestLaunchGUIServer(unittest.TestCase):
         self.assertEqual(cmd[0], sys.executable)
         self.assertEqual(cmd[1], "-m")
         self.assertEqual(cmd[2], "uvicorn")
-        self.assertEqual(cmd[3], "backend.api.listen:app")
+        self.assertEqual(cmd[3], "backend.api.socketio_asgi_app:app")
         self.assertIn("3000", cmd)
 
     @patch("backend.cli.gui_launcher.ensure_config_dir_exists")
@@ -265,3 +265,4 @@ class TestLaunchGUIServer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

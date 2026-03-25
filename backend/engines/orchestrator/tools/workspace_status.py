@@ -2,9 +2,12 @@
 
 Returns git status, recent changes, file tree summary, and running
 processes so the agent can orient without multiple bash round-trips.
+Platform-aware: uses PowerShell on Windows, bash on Unix.
 """
 
 from __future__ import annotations
+
+import sys
 
 WORKSPACE_STATUS_TOOL_NAME = "workspace_status"
 
@@ -43,6 +46,64 @@ def create_workspace_status_tool() -> dict:
     }
 
 
+def _build_bash_command(
+    include_git: bool, include_tree: bool, tree_depth: int
+) -> str:
+    """Build bash command for Unix (Linux, macOS)."""
+    parts: list[str] = []
+    if include_git:
+        parts.append(
+            'echo "=== GIT STATUS ===" && '
+            "(git status --short 2>/dev/null || echo '(not a git repo)') && "
+            'echo "" && echo "=== RECENT COMMITS ===" && '
+            "(git log --oneline -5 2>/dev/null || echo '(no git history)')"
+        )
+    if include_tree:
+        parts.append(
+            f'echo "" && echo "=== DIRECTORY TREE (depth {tree_depth}) ===" && '
+            f"(find . -maxdepth {tree_depth} -not -path '*/\\.*' -not -path '*/node_modules/*' "
+            f"-not -path '*/__pycache__/*' -not -path '*/venv/*' "
+            f"| head -80 || ls -la)"
+        )
+    parts.append(
+        'echo "" && echo "=== BACKGROUND PROCESSES ===" && '
+        "(ps aux 2>/dev/null | head -20 || echo '(ps not available)')"
+    )
+    return " && ".join(parts)
+
+
+def _build_powershell_command(
+    include_git: bool, include_tree: bool, tree_depth: int
+) -> str:
+    """Build PowerShell command for Windows."""
+    depth = max(0, tree_depth - 1)
+    parts: list[str] = []
+
+    if include_git:
+        parts.append(
+            "Write-Output '=== GIT STATUS ==='; "
+            "$g=git status --short 2>$null; "
+            "if($LASTEXITCODE -ne 0){'(not a git repo)'}else{$g}; "
+            "Write-Output ''; Write-Output '=== RECENT COMMITS ==='; "
+            "$l=git log --oneline -5 2>$null; "
+            "if($LASTEXITCODE -ne 0){'(no git history)'}else{$l}"
+        )
+    if include_tree:
+        parts.append(
+            f"Write-Output ''; Write-Output '=== DIRECTORY TREE (depth {tree_depth}) ==='; "
+            f"Get-ChildItem -Recurse -Depth {depth} -ErrorAction SilentlyContinue | "
+            r"Where-Object { $_.FullName -notmatch 'node_modules|__pycache__|venv|\.git' } | "
+            "Select-Object -First 80 | ForEach-Object { $_.FullName }"
+        )
+    parts.append(
+        "Write-Output ''; Write-Output '=== BACKGROUND PROCESSES ==='; "
+        "Get-Process -ErrorAction SilentlyContinue | "
+        "Select-Object -First 20 | "
+        'ForEach-Object { "$($_.Id) $($_.ProcessName)" }'
+    )
+    return "; ".join(parts)
+
+
 def build_workspace_status_action(arguments: dict):
     """Build a CmdRunAction that gathers workspace state in one command."""
     from backend.events.action.commands import CmdRunAction
@@ -53,32 +114,12 @@ def build_workspace_status_action(arguments: dict):
     if not isinstance(tree_depth, int) or tree_depth < 1:
         tree_depth = 2
 
-    parts: list[str] = []
+    if sys.platform == "win32":
+        command = _build_powershell_command(include_git, include_tree, tree_depth)
+    else:
+        command = _build_bash_command(include_git, include_tree, tree_depth)
 
-    if include_git:
-        parts.append(
-            'echo "=== GIT STATUS ===" && '
-            "(git status --short 2>/dev/null || echo '(not a git repo)') && "
-            'echo "" && echo "=== RECENT COMMITS ===" && '
-            "(git log --oneline -5 2>/dev/null || echo '(no git history)')"
-        )
-
-    if include_tree:
-        parts.append(
-            f'echo "" && echo "=== DIRECTORY TREE (depth {tree_depth}) ===" && '
-            f"(find . -maxdepth {tree_depth} -not -path '*/\\.*' -not -path '*/node_modules/*' "
-            f"-not -path '*/__pycache__/*' -not -path '*/venv/*' "
-            f"| head -80 || ls -la)"
-        )
-
-    # Always show running bg processes
-    parts.append(
-        'echo "" && echo "=== BACKGROUND PROCESSES ===" && '
-        "(ps aux 2>/dev/null | head -20 || echo '(ps not available)')"
-    )
-
-    combined = " && ".join(parts)
     return CmdRunAction(
-        command=combined,
+        command=command,
         thought="Gathering workspace status snapshot",
     )

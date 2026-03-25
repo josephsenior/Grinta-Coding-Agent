@@ -63,6 +63,12 @@ UNINITIALIZED_PROMPT_MANAGER = _UninitializedPromptManager()
 """Module-level sentinel instance — import this instead of duplicating the class."""
 
 
+def _content_has_forge_identity(content: str) -> bool:
+    """True when the rendered system prompt already identifies as Forge (skip duplicate prefix)."""
+    head = content.lstrip()[:80].lower()
+    return head.startswith("you are forge")
+
+
 class PromptManager:
     """Manages prompt templates and includes information from the user's workspace micro-agents and global micro-agents.
 
@@ -84,17 +90,28 @@ class PromptManager:
             raise ValueError(msg)
         self.prompt_dir: str = prompt_dir
 
-        # We always include a shared prompts directory as a fallback
+        # We include orchestrator prompts as a shared fallback for common templates.
+        # IMPORTANT: system prompts must always come from the engine's own prompt_dir,
+        # otherwise a missing engine prompt could accidentally fall back to the
+        # orchestrator's system prompt.
         shared_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "engines", "shared", "prompts"
+            os.path.dirname(os.path.dirname(__file__)),
+            "engines",
+            "orchestrator",
+            "prompts",
         )
         search_paths = [prompt_dir]
-        if os.path.isdir(shared_dir):
+        if os.path.isdir(shared_dir) and shared_dir not in search_paths:
             search_paths.append(shared_dir)
 
         # nosec B701 - Template rendering for prompts (not HTML), autoescape enabled
         self.env = Environment(loader=FileSystemLoader(search_paths), autoescape=True)
-        self.system_template: Template = self._load_template(system_prompt_filename)
+        self._system_env = Environment(
+            loader=FileSystemLoader([prompt_dir]), autoescape=True
+        )
+        self.system_template = self._load_template(
+            system_prompt_filename, env=self._system_env, template_dir=prompt_dir
+        )
         self.user_template: Template = self._load_template("user_prompt.j2")
         self.additional_info_template: Template = self._load_template(
             "additional_info.j2"
@@ -104,7 +121,13 @@ class PromptManager:
             "knowledge_base_info.j2"
         )
 
-    def _load_template(self, template_name: str) -> Template:
+    def _load_template(
+        self,
+        template_name: str,
+        *,
+        env: Environment | None = None,
+        template_dir: str | None = None,
+    ) -> Template:
         """Load a template from the prompt directory.
 
         Args:
@@ -117,12 +140,15 @@ class PromptManager:
             FileNotFoundError: If the template file is not found.
 
         """
+        env = env or self.env
+        template_dir = template_dir or self.prompt_dir
         try:
-            return self.env.get_template(template_name)
+            return env.get_template(template_name)
         except Exception as e:
-            template_path = os.path.join(self.prompt_dir, template_name)
+            template_path = os.path.join(template_dir, template_name)
             msg = f"Prompt file {template_path} not found"
             raise FileNotFoundError(msg) from e
+
 
     def get_system_message(self, **context) -> str:
         """Render system prompt with optional context and apply refinement helpers."""
@@ -238,12 +264,38 @@ class OrchestratorPromptManager(PromptManager):
         system_prompt_filename: str = "system_prompt.j2",
         *,
         config: object | None = None,
+        resolved_llm_model_id: str | None = None,
+        forge_config: object | None = None,
     ) -> None:
         super().__init__(prompt_dir, system_prompt_filename)
         self._config = config
+        # Runtime-resolved model id (ForgeConfig + user settings live on LLMRegistry; AgentConfig often only references "llm").
+        self._resolved_llm_model_id = (resolved_llm_model_id or "").strip()
+        self._forge_config = forge_config
         # Populated dynamically by the orchestrator after MCP tools connect
         self.mcp_tool_names: list[str] = []
         self.mcp_tool_descriptions: dict[str, str] = {}
+        # Per-server usage_hint lines from Forge MCP config (see MCPServerConfig.usage_hint)
+        self.mcp_server_hints: list[dict[str, str]] = []
+
+    def _active_llm_model_id(self) -> str:
+        """Model id for self-identification in the system prompt."""
+        if self._resolved_llm_model_id:
+            return self._resolved_llm_model_id
+        if self._forge_config is not None and self._config is not None:
+            try:
+                llm_cfg = getattr(
+                    self._forge_config,
+                    "get_llm_config_from_agent_config",
+                    None,
+                )
+                if callable(llm_cfg):
+                    resolved = llm_cfg(self._config)
+                    if resolved and hasattr(resolved, "model") and resolved.model:
+                        return str(resolved.model).strip()
+            except Exception:
+                pass
+        return ""
 
     def get_system_message(self, **context: object) -> str:
         """Render with orchestrator defaults (config, cli_mode, identity prefix)."""
@@ -258,8 +310,11 @@ class OrchestratorPromptManager(PromptManager):
         context.setdefault("is_windows", _on_windows and not shutil.which("bash"))
         context.setdefault("mcp_tool_names", self.mcp_tool_names)
         context.setdefault("mcp_tool_descriptions", self.mcp_tool_descriptions)
+        context.setdefault("mcp_server_hints", self.mcp_server_hints)
+        context.setdefault("active_llm_model", self._active_llm_model_id())
         content = super().get_system_message(**context)
-        if self._IDENTITY_PREFIX.strip() not in content:
+        # Avoid duplicating identity: system_prompt.j2 already opens with "You are Forge, ..."
+        if not _content_has_forge_identity(content):
             content = self._IDENTITY_PREFIX + content
         content = self._inject_scratchpad(content)
         tier = getattr(self, "_prompt_tier", "base")
@@ -270,13 +325,15 @@ class OrchestratorPromptManager(PromptManager):
     def _inject_lessons_learned(self, content: str) -> str:
         """Inject lessons learned from .Forge/lessons.md into the system prompt."""
         try:
-            # Try to locate the lessons file in the project root
-            # We assume the CWD or a known parent contains .Forge
-            lessons_path = os.path.join(".Forge", "lessons.md")
-            if not os.path.exists(lessons_path):
-                # Fallback to repository memory path
-                lessons_path = os.path.join("memories", "repo", "lessons.md")
-                if not os.path.exists(lessons_path):
+            from backend.core.workspace_resolution import get_effective_workspace_root
+
+            root = get_effective_workspace_root()
+            if root is None:
+                return content
+            lessons_path = root / ".Forge" / "lessons.md"
+            if not lessons_path.is_file():
+                lessons_path = root / "memories" / "repo" / "lessons.md"
+                if not lessons_path.is_file():
                     return content
 
             with open(lessons_path, "r", encoding="utf-8") as f:
@@ -300,28 +357,38 @@ class OrchestratorPromptManager(PromptManager):
             return content
 
     def _inject_scratchpad(self, content: str) -> str:
-        """Append persistent scratchpad notes so they survive context condensation."""
+        """Append persistent scratchpad and working memory so they survive condensation."""
         try:
-            from backend.engines.orchestrator.tools.note import _load_notes
-
-            notes = _load_notes()
-            if not notes:
-                return content
-            lines: list[str] = []
-            char_budget = 2000
-            for key, value in notes.items():
-                line = f"  [{key}]: {value}"
-                if len("\n".join(lines + [line])) > char_budget:
-                    lines.append("  ... (additional notes truncated)")
-                    break
-                lines.append(line)
-            scratchpad_block = "\n".join(lines)
-            return (
-                f"{content}\n\n"
-                f"<WORKING_SCRATCHPAD>\n"
-                f"Your persistent notes (survive context condensation):\n"
-                f"{scratchpad_block}\n"
-                f"</WORKING_SCRATCHPAD>"
+            from backend.engines.orchestrator.tools.note import (
+                scratchpad_entries_for_prompt,
             )
+            from backend.engines.orchestrator.tools.working_memory import (
+                get_working_memory_prompt_block,
+            )
+
+            entries = scratchpad_entries_for_prompt()
+            memory_blocks: list[str] = []
+            if entries:
+                lines: list[str] = []
+                char_budget = 2000
+                for key, value in entries:
+                    line = f"  [{key}]: {value}"
+                    if len("\n".join(lines + [line])) > char_budget:
+                        lines.append("  ... (additional notes truncated)")
+                        break
+                    lines.append(line)
+                scratchpad_block = "\n".join(lines)
+                memory_blocks.append(
+                    "<WORKING_SCRATCHPAD>\n"
+                    "Your persistent notes (survive context condensation):\n"
+                    f"{scratchpad_block}\n"
+                    "</WORKING_SCRATCHPAD>"
+                )
+            working_memory_block = get_working_memory_prompt_block()
+            if working_memory_block:
+                memory_blocks.append(working_memory_block)
+            if not memory_blocks:
+                return content
+            return f"{content}\n\n" + "\n\n".join(memory_blocks)
         except Exception:
             return content

@@ -1,4 +1,4 @@
-"""Tests for backend.memory.condenser.impl.semantic_condenser module.
+"""Tests for backend.memory.condenser.strategies.semantic_condenser module.
 
 Tests SemanticCondenser initialization, event scoring, selection, and
 coherence logic without requiring LLM or external services.
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 from backend.events.action import Action, MessageAction
 from backend.events.observation import Observation
 from backend.memory.condenser.condenser import Condensation
-from backend.memory.condenser.impl.semantic_condenser import (
+from backend.memory.condenser.strategies.semantic_condenser import (
     EventImportance,
     SemanticCondenser,
 )

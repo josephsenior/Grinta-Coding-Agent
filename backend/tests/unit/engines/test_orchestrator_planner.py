@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
 
+from backend.core.enums import ActionSecurityRisk
+from backend.engines.orchestrator.orchestrator import Orchestrator
 from backend.engines.orchestrator.planner import (
     OrchestratorPlanner,
+    _shorten_tool_description,
 )
 from backend.engines.orchestrator.behavioral_hints import BehavioralHintsBuilder
-from backend.engines.orchestrator.error_learner import (
-    SessionErrorLearner,
-)
+from backend.engines.orchestrator.error_learner import SessionErrorLearner
+from backend.events.action.files import FileEditAction, FileWriteAction
+from backend.events.observation import ErrorObservation
 
 
 # We test the static/pure methods by creating a planner with minimal mocks.
@@ -129,12 +133,14 @@ class TestScanToolResultsForLearning:
                 "tool_call_id": "tc_1",
                 "name": "str_replace_editor",
                 "content": "[ERROR type=match]\nNo match found\n[Error occurred]",
+                "forge_tool_ok": False,
             },
             {
                 "role": "tool",
                 "tool_call_id": "tc_2",
                 "name": "str_replace_editor",
                 "content": "[ERROR type=match]\nNo match found\n[Error occurred]",
+                "forge_tool_ok": False,
             },
         ]
         planner._scan_tool_results_for_learning(messages)
@@ -149,6 +155,7 @@ class TestScanToolResultsForLearning:
                 "tool_call_id": "tc_1",
                 "name": "cmd_run",
                 "content": "[ERROR] not found",
+                "forge_tool_ok": False,
             },
         ]
         planner._scan_tool_results_for_learning(messages)
@@ -167,6 +174,7 @@ class TestScanToolResultsForLearning:
                 "tool_call_id": "tc_ok",
                 "name": "cmd_run",
                 "content": "Command executed successfully.",
+                "forge_tool_ok": True,
             },
         ]
         planner._scan_tool_results_for_learning(messages)
@@ -181,6 +189,111 @@ class TestScanToolResultsForLearning:
         ]
         planner._scan_tool_results_for_learning(messages)
         assert len(planner._error_learner._failures) == 0
+
+    def test_forge_tool_ok_false_without_error_substring(self):
+        planner = _make_planner()
+        planner._error_learner = SessionErrorLearner()
+        messages = [
+            {
+                "role": "tool",
+                "tool_call_id": "tc_x",
+                "name": "noop",
+                "content": "benign output",
+                "forge_tool_ok": False,
+            },
+        ]
+        planner._scan_tool_results_for_learning(messages)
+        assert len(planner._error_learner._failures) == 1
+
+    def test_forge_tool_ok_true_ignores_error_word_in_content(self):
+        planner = _make_planner()
+        planner._error_learner = SessionErrorLearner()
+        messages = [
+            {
+                "role": "tool",
+                "tool_call_id": "tc_y",
+                "name": "noop",
+                "content": "logged an error handler change",
+                "forge_tool_ok": True,
+            },
+        ]
+        planner._scan_tool_results_for_learning(messages)
+        assert len(planner._error_learner._failures) == 0
+
+    def test_untyped_tool_message_is_ignored_for_learning(self):
+        planner = _make_planner()
+        planner._error_learner = SessionErrorLearner()
+        messages = [
+            {
+                "role": "tool",
+                "tool_call_id": "tc_untyped",
+                "name": "ext_tool",
+                "content": "[ERROR] looked scary but had no typed status",
+            },
+        ]
+        planner._scan_tool_results_for_learning(messages)
+        assert len(planner._error_learner._failures) == 0
+
+
+class TestShortenToolDescription:
+    def test_preserves_dr_and_url_without_splitting_first_period(self):
+        long_tail = "x" * 120
+        desc = f"Call Dr. Smith at https://ex.com/a.b. Second sentence.{long_tail}"
+        out = _shorten_tool_description(desc, max_len=80)
+        assert "Dr." in out
+        assert len(out) <= 85
+
+class TestApplyDescriptionTiers:
+    def test_trims_long_description_for_used_tool(self):
+        p = _make_planner()
+        p._tools_used_this_session = {"used_tool"}
+        long_desc = (
+            "Does something useful. Also handles Dr. edge cases. " + "word " * 40
+        )
+        tools = [
+            {
+                "type": "function",
+                "function": {"name": "used_tool", "description": long_desc},
+            },
+        ]
+        out = p._apply_description_tiers(tools)
+        trimmed = out[0]["function"]["description"]
+        assert len(trimmed) <= 85
+        assert "Dr." in trimmed
+
+
+class TestOrchestratorPromptTierFromHistory:
+    def test_debug_when_error_observation_in_window(self):
+        orch = Orchestrator.__new__(Orchestrator)
+        mock_pm = MagicMock()
+        object.__setattr__(orch, "_prompt_manager", mock_pm)
+        state = MagicMock()
+        state.history = [
+            FileEditAction(path="a.py", security_risk=ActionSecurityRisk.LOW),
+            ErrorObservation(content="tool blew up"),
+        ]
+        orch._set_prompt_tier_from_recent_history(state)
+        mock_pm.set_prompt_tier.assert_called_with("debug")
+
+    def test_base_when_only_low_risk_file_edit(self):
+        orch = Orchestrator.__new__(Orchestrator)
+        mock_pm = MagicMock()
+        object.__setattr__(orch, "_prompt_manager", mock_pm)
+        state = MagicMock()
+        state.history = [FileEditAction(path="a.py", security_risk=ActionSecurityRisk.LOW)]
+        orch._set_prompt_tier_from_recent_history(state)
+        mock_pm.set_prompt_tier.assert_called_with("base")
+
+    def test_debug_when_file_write_high_security_risk(self):
+        orch = Orchestrator.__new__(Orchestrator)
+        mock_pm = MagicMock()
+        object.__setattr__(orch, "_prompt_manager", mock_pm)
+        state = MagicMock()
+        state.history = [
+            FileWriteAction(path="x.sh", content="", security_risk=ActionSecurityRisk.HIGH),
+        ]
+        orch._set_prompt_tier_from_recent_history(state)
+        mock_pm.set_prompt_tier.assert_called_with("debug")
 
 
 class TestBuildBehavioralHintsWithLearner:

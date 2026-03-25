@@ -1,10 +1,10 @@
-"""Tests for backend.events.serialization.utils — remove_fields helper."""
+"""Tests for backend.events.serialization.serialization_utils — remove_fields helper."""
 
 from typing import Any, cast
 
 import pytest
 
-from backend.events.serialization.utils import remove_fields
+from backend.events.serialization.serialization_utils import remove_fields
 
 
 class TestRemoveFields:

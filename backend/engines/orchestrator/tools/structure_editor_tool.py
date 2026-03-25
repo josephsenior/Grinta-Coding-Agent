@@ -21,42 +21,42 @@ KEY ADVANTAGES over string matching:
 
 COMMANDS:
 
-1. `edit_function` - Edit a function by name (any language)
-   Required: file_path, function_name, new_body
+1. `edit_symbol_body` - Edit a function by name (any language)
+    Required: path, function_name, new_body
    Example: Edit function "process_data" in Python/JS/Go/Rust/etc.
 
 2. `rename_symbol` - Rename a symbol throughout a file
-   Required: file_path, old_name, new_name
+    Required: path, old_name, new_name
    Example: Rename variable "oldName" to "newName" everywhere
 
 3. `find_symbol` - Find a symbol's location
-   Required: file_path, symbol_name
+    Required: path, symbol_name
    Optional: symbol_type ("function", "class", "method")
    Supports dot notation: "MyClass.method_name"
 
 4. `replace_range` - Replace lines with new code
-   Required: file_path, start_line, end_line, new_code
+    Required: path, start_line, end_line, new_code
    Auto-indents new code to match context
 
 5. `normalize_indent` - Fix indentation in a file
-   Required: file_path
+    Required: path
    Optional: style ("spaces" or "tabs"), size (2, 4, 8)
    Automatically detects and normalizes to project standards
 
 6. `create_file` - Create a new file with content
-   Required: file_path, content
+    Required: path, file_text
    Creates parent directories if needed
 
 7. `view_file` - View a file's contents
-   Required: file_path
+    Required: path
    Returns the file's full content
 
-8. `insert_code` - Insert code after a specific line
-   Required: file_path, new_code, insert_line
+8. `insert_text` - Insert code after a specific line
+    Required: path, new_str, insert_line
    insert_line=0 inserts at the beginning of the file
 
 9. `undo_last_edit` - Undo the most recent edit to a file
-   Required: file_path
+    Required: path
    Reverts the last change made by the editor
 
 FEATURES:
@@ -67,7 +67,7 @@ FEATURES:
 - Whitespace intelligence: Never fails on tabs vs. spaces
 
 BEST PRACTICES:
-1. Use `edit_function` instead of line-based replacements when possible
+1. Use `edit_symbol_body` instead of line-based replacements when possible
 2. Use `find_symbol` first to verify symbol exists
 3. Trust the auto-indentation - it matches your file's style
 4. For typos, check error messages - they suggest corrections
@@ -75,8 +75,8 @@ BEST PRACTICES:
 
 _SHORT_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
 
-Commands: edit_function, rename_symbol, find_symbol, replace_range, normalize_indent,
-          create_file, view_file, insert_code, undo_last_edit
+Commands: edit_symbol_body, rename_symbol, find_symbol, replace_range, normalize_indent,
+          create_file, view_file, replace_text, insert_text, undo_last_edit
 - Edits by symbol name (function/class), not line numbers
 - Auto-indents code to match file style
 - Validates syntax before saving
@@ -103,31 +103,32 @@ def create_structure_editor_tool(
     )
 
     return create_tool_definition(
-        name="structure_editor",
+        name="ast_code_editor",
         description=description,
         properties={
             "command": get_command_param(
                 "The command to execute",
                 [
-                    "edit_function",
+                    "edit_symbol_body",
                     "rename_symbol",
                     "find_symbol",
                     "replace_range",
                     "normalize_indent",
                     "create_file",
                     "view_file",
-                    "insert_code",
+                    "replace_text",
+                    "insert_text",
                     "undo_last_edit",
                 ],
             ),
-            "file_path": get_path_param("Path to the file to edit"),
+            "path": get_path_param("Path to the file to edit"),
             "function_name": {
                 "type": "string",
-                "description": "Name of the function to edit (required for edit_function)",
+                "description": "Name of the function to edit (required for edit_symbol_body)",
             },
             "new_body": {
                 "type": "string",
-                "description": "New content for the function (required for edit_function)",
+                "description": "New content for the function (required for edit_symbol_body)",
             },
             "old_name": {
                 "type": "string",
@@ -167,15 +168,19 @@ def create_structure_editor_tool(
                 "type": "integer",
                 "description": "Indentation size (2, 4, 8) for normalize_indent",
             },
-            "content": {
+            "file_text": {
                 "description": "Content to write to the file (for create_file command)",
                 "type": "string",
             },
+            "new_str": {
+                "description": "Text to insert (for insert_text command)",
+                "type": "string",
+            },
             "insert_line": {
-                "description": "Line number to insert after (0 for beginning of file, for insert_code command)",
+                "description": "Line number to insert after (0 for beginning of file, for insert_text command)",
                 "type": "integer",
             },
             "security_risk": get_security_risk_param(),
         },
-        required=["command", "file_path"],
+        required=["command", "path"],
     )

@@ -29,8 +29,15 @@ from backend.core.errors import (
     LLMNoResponseError,
     UserCancelledError,
 )
-from backend.core.logger import forge_logger as logger
 from backend.api.types import LLMAuthenticationError
+from backend.api.utils.error_patterns import (
+    check_auth_pattern,
+    check_file_not_found_pattern,
+    check_network_pattern,
+    check_permission_pattern,
+    check_rate_limit_pattern,
+)
+from backend.core.logger import forge_logger as logger
 
 
 class ErrorAction:
@@ -487,43 +494,6 @@ ERROR_FORMATTERS = {
 }
 
 
-def _check_rate_limit_pattern(error_message: str) -> bool:
-    """Check if error message indicates rate limiting."""
-    return "rate limit" in error_message or "too many requests" in error_message
-
-
-def _check_auth_pattern(error_message: str) -> bool:
-    """Check if error message indicates authentication failure."""
-    return any(
-        keyword in error_message
-        for keyword in [
-            "authentication",
-            "unauthorized",
-            "invalid token",
-            "api key",
-            "check your api key",
-            "authentication with the llm provider",
-        ]
-    )
-
-
-def _check_network_pattern(error_message: str) -> bool:
-    """Check if error message indicates network error."""
-    return any(
-        keyword in error_message for keyword in ["connection", "timeout", "network"]
-    )
-
-
-def _check_file_not_found_pattern(error_message: str) -> bool:
-    """Check if error message indicates file not found."""
-    return "file not found" in error_message or "no such file" in error_message
-
-
-def _check_permission_pattern(error_message: str) -> bool:
-    """Check if error message indicates permission error."""
-    return "permission denied" in error_message or "forbidden" in error_message
-
-
 def _format_by_pattern(
     error: Exception, context: dict[str, Any] | None
 ) -> dict[str, Any] | None:
@@ -541,14 +511,14 @@ def _format_by_pattern(
 
     # Define pattern checkers and their corresponding formatters
     pattern_handlers = [
-        (_check_rate_limit_pattern, format_rate_limit_error),
+        (check_rate_limit_pattern, format_rate_limit_error),
         (
-            _check_auth_pattern,
+            check_auth_pattern,
             format_llm_authentication_error,
         ),  # Use LLM-specific formatter for API key errors
-        (_check_network_pattern, format_network_error),
-        (_check_file_not_found_pattern, format_file_not_found_error),
-        (_check_permission_pattern, format_permission_error),
+        (check_network_pattern, format_network_error),
+        (check_file_not_found_pattern, format_file_not_found_error),
+        (check_permission_pattern, format_permission_error),
     ]
 
     # Check each pattern and use its formatter if matched

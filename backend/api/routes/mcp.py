@@ -30,14 +30,14 @@ from backend.api.user_auth import (
 # Lazy import to avoid circular dependency issues during config loading
 def get_server_config():
     """Return server configuration module lazily to avoid circular import."""
-    from backend.api.shared import server_config
+    from backend.api.app_accessors import server_config
 
     return server_config
 
 
 def get_config():
     """Return Forge configuration without importing at module import time."""
-    from backend.api.shared import config
+    from backend.api.app_accessors import config
 
     return config
 

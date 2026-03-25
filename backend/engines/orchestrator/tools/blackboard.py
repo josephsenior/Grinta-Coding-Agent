@@ -10,7 +10,7 @@ from backend.engines.orchestrator.contracts import ChatCompletionToolParam
 from backend.engines.orchestrator.tools.common import create_tool_definition
 from backend.events.action.agent import BlackboardAction
 
-BLACKBOARD_TOOL_NAME = "blackboard"
+BLACKBOARD_TOOL_NAME = "shared_task_board"
 
 _DESCRIPTION = (
     "Read or write the shared blackboard. When running sub-agents (via delegate_task) in the background, "

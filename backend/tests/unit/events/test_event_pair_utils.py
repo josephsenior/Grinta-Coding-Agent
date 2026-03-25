@@ -1,11 +1,11 @@
-"""Tests for backend.events.utils — action/observation pair extraction."""
+"""Tests for backend.events.event_utils — action/observation pair extraction."""
 
 from typing import Any
 
 from backend.events.action.empty import NullAction
 from backend.events.action.message import MessageAction
 from backend.events.observation import CmdOutputObservation, NullObservation
-from backend.events.utils import (
+from backend.events.event_utils import (
     _add_action_observation_pairs,
     _add_orphaned_observations,
     _build_action_and_observation_maps,

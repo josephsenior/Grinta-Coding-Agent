@@ -1,4 +1,4 @@
-"""Tests for backend.storage.local — LocalFileStore."""
+"""Tests for backend.storage.local_file_store — LocalFileStore."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from backend.storage.local import LocalFileStore
+from backend.storage.local_file_store import LocalFileStore
 
 
 @pytest.fixture()
@@ -109,3 +109,4 @@ class TestGetFullPath:
     def test_strips_leading_slash(self, store):
         full = store.get_full_path("/leading.txt")
         assert store.root in full
+

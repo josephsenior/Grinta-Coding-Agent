@@ -1,4 +1,4 @@
-"""Tests for backend.memory.condenser.impl.structured_summary_condenser."""
+"""Tests for backend.memory.condenser.strategies.structured_summary_condenser."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from backend.events.action import MessageAction
 from backend.events.event import Event, EventSource
 from backend.events.observation.agent import AgentCondensationObservation
 from backend.memory.condenser.condenser import Condensation
-from backend.memory.condenser.impl.structured_summary_condenser import (
+from backend.memory.condenser.strategies.structured_summary_condenser import (
     StateSummary,
     StructuredSummaryCondenser,
 )

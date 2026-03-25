@@ -1,4 +1,4 @@
-"""Tests for backend.runtime.factory — runtime class loading and resolution."""
+"""Tests for backend.runtime.runtime_factory — runtime class loading and resolution."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.runtime.factory import (
+from backend.runtime.runtime_factory import (
     _DEFAULT_RUNTIME_IMPORTS,
     _lazy_import,
     get_runtime_cls,
@@ -26,7 +26,7 @@ class TestLazyImport:
 
     def test_imports_function(self):
         """Test importing a function from a module."""
-        result = _lazy_import("backend.runtime.factory", "get_runtime_cls")
+        result = _lazy_import("backend.runtime.runtime_factory", "get_runtime_cls")
         assert callable(result)
         assert result.__name__ == "get_runtime_cls"
 
@@ -40,7 +40,7 @@ class TestLazyImport:
         with pytest.raises(AttributeError):
             _lazy_import("backend.runtime.base", "NonExistentClass")
 
-    @patch("backend.runtime.factory.importlib.import_module")
+    @patch("backend.runtime.runtime_factory.importlib.import_module")
     def test_calls_importlib(self, mock_import):
         """Test uses importlib.import_module."""
         mock_module = MagicMock()
@@ -78,7 +78,7 @@ class TestGetRuntimeCls:
         with pytest.raises(ValueError, match="known are"):
             get_runtime_cls("nonexistent")
 
-    @patch("backend.runtime.factory._lazy_import")
+    @patch("backend.runtime.runtime_factory._lazy_import")
     def test_uses_lazy_import_for_builtin(self, mock_lazy):
         """Test uses lazy import for built-in runtimes."""
         mock_lazy.return_value = MagicMock()
@@ -89,7 +89,7 @@ class TestGetRuntimeCls:
         module_path, attr = _DEFAULT_RUNTIME_IMPORTS["local"]
         mock_lazy.assert_called_once_with(module_path, attr)
 
-    @patch("backend.runtime.factory.get_impl")
+    @patch("backend.runtime.runtime_factory.get_impl")
     def test_falls_back_to_get_impl(self, mock_get_impl):
         """Test falls back to get_impl for custom runtime classes."""
         from backend.runtime.base import Runtime
@@ -102,7 +102,7 @@ class TestGetRuntimeCls:
         mock_get_impl.assert_called_once_with(Runtime, "custom.runtime.MyRuntime")
         assert result == mock_runtime
 
-    @patch("backend.runtime.factory.get_impl")
+    @patch("backend.runtime.runtime_factory.get_impl")
     def test_get_impl_failure_reraises_with_context(self, mock_get_impl):
         """Test get_impl failure is re-raised as ValueError with context."""
         mock_get_impl.side_effect = ImportError("Module not found")
@@ -135,3 +135,4 @@ class TestDefaultRuntimeImports:
             assert len(value) == 2
             assert isinstance(value[0], str)  # module path
             assert isinstance(value[1], str)  # attribute name
+

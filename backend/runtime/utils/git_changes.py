@@ -85,7 +85,7 @@ def _main() -> None:
     try:
         changes = get_git_changes(os.getcwd())
         try:
-            from backend.core.io import print_json_stdout
+            from backend.core.json_stdout import print_json_stdout
         except Exception:
             sys.stdout.write(json.dumps(changes) + "\n")
             sys.stdout.flush()

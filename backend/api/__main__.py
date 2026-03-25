@@ -20,16 +20,25 @@ def main() -> None:
 
     Production Deployment:
         For production with multiple workers, use gunicorn:
-        gunicorn backend.api.listen:app \
+        gunicorn backend.api.socketio_asgi_app:app \
             --workers 4 \
             --worker-class uvicorn.workers.UvicornWorker \
             --bind 0.0.0.0:3000 \
             --timeout 300
+
+        For Socket.IO / WebSockets on websockets>=15, subclass UvicornWorker and set
+        CONFIG_KWARGS to include ws="websockets-sansio" (same as python -m backend.api).
     """
     warnings.filterwarnings("ignore", category=SyntaxWarning, module="pydub\\.utils")
-    port = int(os.environ.get("port") or os.environ.get("PORT") or "3000")
+    try:
+        port = int(os.environ.get("port") or os.environ.get("PORT") or "3000")
+    except ValueError:
+        port = 3000
     host = os.environ.get("HOST") or "0.0.0.0"
-    workers = int(os.environ.get("WORKERS") or "1")
+    try:
+        workers = int(os.environ.get("WORKERS") or "1")
+    except ValueError:
+        workers = 1
 
     # Suppress Uvicorn's default startup message and show custom one
     import sys
@@ -77,7 +86,7 @@ def main() -> None:
         },
     }
     uvicorn.run(
-        "backend.api.listen:app",
+        "backend.api.socketio_asgi_app:app",
         host=host,  # nosec B104 - Safe: web server intentionally accessible on all interfaces
         port=port,
         log_config=log_config,
@@ -86,9 +95,11 @@ def main() -> None:
         workers=workers,  # Single worker for development, use gunicorn for production
         loop="asyncio",
         http="httptools",  # Faster HTTP parser
+        ws="websockets-sansio",
         access_log=False,  # Disable access logs in production
     )
 
 
 if __name__ == "__main__":
     main()
+

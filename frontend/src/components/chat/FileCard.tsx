@@ -8,10 +8,16 @@ import { useParams } from "react-router-dom";
 import { getFileContent, getGitDiff } from "@/api/files";
 import { toast } from "sonner";
 import { CardCollapsibleSection } from "./CardCollapsibleSection";
-import { CardSectionLabel } from "./CardSectionLabel";
+import { ideToolShell, ideCaption } from "./chat-ide-styles";
+import { cn } from "@/lib/utils";
 
 interface FileCardProps {
   event: ActionEvent;
+}
+
+function lineCount(text: string): number {
+  if (!text.trim()) return 0;
+  return text.split("\n").length;
 }
 
 export function FileCard({ event }: FileCardProps) {
@@ -62,16 +68,16 @@ export function FileCard({ event }: FileCardProps) {
         <button
           type="button"
           onClick={handleOpenFile}
-          className="w-full rounded-lg border p-1.5 text-xs text-left text-muted-foreground hover:bg-accent transition-colors"
+          className={cn(ideToolShell, "w-full transition-colors hover:bg-muted/40")}
         >
-          <CardSectionLabel
-            label="Analyze Asset"
-            icon={<FileText className="h-3.5 w-3.5 shrink-0" />}
-          />
-          <span>
-            Read <code className="rounded bg-muted px-1 font-mono">{path}</code>
+          <div className={cn(ideCaption, "mb-0.5 flex items-center gap-1.5")}>
+            <FileText className="h-3 w-3 opacity-50" />
+            <span>Read</span>
+          </div>
+          <code className="block break-all font-mono text-[11px] text-foreground/90">
+            {path}
             {lineRange}
-          </span>
+          </code>
         </button>
       );
 
@@ -80,53 +86,66 @@ export function FileCard({ event }: FileCardProps) {
         <button
           type="button"
           onClick={handleOpenFile}
-          className="w-full rounded-lg border p-1.5 text-xs text-left text-muted-foreground hover:bg-accent transition-colors"
+          className={cn(ideToolShell, "w-full transition-colors hover:bg-muted/40")}
         >
-          <CardSectionLabel
-            label="Generate Asset"
-            icon={<FilePlus className="h-3.5 w-3.5 shrink-0 text-green-500" />}
-          />
-          <span>
-            Created <code className="rounded bg-muted px-1 font-mono">{path}</code>
-          </span>
+          <div className={cn(ideCaption, "mb-0.5 flex items-center gap-1.5")}>
+            <FilePlus className="h-3 w-3 opacity-50" />
+            <span>Created</span>
+          </div>
+          <code className="block break-all font-mono text-[11px] text-foreground/90">{path}</code>
         </button>
       );
 
     case ActionType.EDIT:
       return (
-        <div className="rounded-lg border p-1.5">
-          <div className="flex w-full items-center justify-between">
+        <div className={cn(ideToolShell, "p-2.5")}>
+          <div className="flex w-full items-start justify-between gap-2">
             <button
               type="button"
               onClick={handleOpenDiff}
-              className="text-left text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="min-w-0 flex-1 text-left transition-opacity hover:opacity-90"
             >
-              <CardSectionLabel
-                label="Mutate Asset"
-                icon={<Pencil className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
-                className="mb-0"
-              />
-              <span>
-                Edited <code className="rounded bg-muted px-1 font-mono">{path}</code>
-              </span>
+              <div className={cn(ideCaption, "mb-0.5 flex flex-wrap items-center gap-1.5")}>
+                <Pencil className="h-3 w-3 opacity-50" />
+                <span>Edited</span>
+                {oldText && newText && (
+                  <>
+                    {lineCount(newText) > 0 && (
+                      <span className="tabular-nums text-emerald-600 dark:text-emerald-400">
+                        +{lineCount(newText)}
+                      </span>
+                    )}
+                    {lineCount(oldText) > 0 && (
+                      <span className="tabular-nums text-red-500 dark:text-red-400">
+                        −{lineCount(oldText)}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+              <code className="block break-all font-mono text-[11px] text-foreground/90">{path}</code>
             </button>
             {event.args?.confidence !== undefined && (
-              <Badge variant={Number(event.args.confidence) >= 0.7 ? "success" : "warning"} className="text-[10px] py-0 h-5" title={`Model Confidence: ${Math.round(Number(event.args.confidence) * 100)}%`}>
-                {Math.round(Number(event.args.confidence) * 100)}% Confidence
+              <Badge
+                variant={Number(event.args.confidence) >= 0.7 ? "secondary" : "outline"}
+                className="h-5 shrink-0 px-1.5 text-[10px] font-normal"
+                title={`Confidence ${Math.round(Number(event.args.confidence) * 100)}%`}
+              >
+                {Math.round(Number(event.args.confidence) * 100)}%
               </Badge>
             )}
           </div>
           {event.args?.old_text != null && event.args?.new_text != null && (
-            <div className="mt-1.5 space-y-1 text-xs font-mono">
-              <div className="rounded bg-red-500/10 p-1 text-red-600 dark:text-red-400">
+            <div className="mt-2 space-y-1.5 font-mono text-[11px]">
+              <div className="rounded border border-border/40 bg-red-500/5 p-2 text-red-700/90 dark:text-red-400/85">
                 <CardCollapsibleSection
-                  label="Lines Excised"
+                  label="Removed"
                   lines={oldText.split("\n").map((line) => `- ${line}`)}
                 />
               </div>
-              <div className="rounded bg-green-500/10 p-1 text-green-600 dark:text-green-400">
+              <div className="rounded border border-border/40 bg-emerald-500/5 p-2 text-emerald-800/90 dark:text-emerald-400/80">
                 <CardCollapsibleSection
-                  label="Lines Injected"
+                  label="Added"
                   lines={newText.split("\n").map((line) => `+ ${line}`)}
                 />
               </div>

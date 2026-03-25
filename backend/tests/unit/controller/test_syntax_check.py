@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 
-from backend.controller.tool_pipeline import (
+from backend.controller.middleware.auto_check import (
     _collect_syntax_errors,
     _treesitter_syntax_check,
 )
@@ -28,6 +28,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".py", "def hello():\n    return 42\n")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, detail = result
         self.assertTrue(is_valid)
 
@@ -35,6 +36,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".py", "def hello(\n    return 42\n")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, detail = result
         self.assertFalse(is_valid)
         self.assertIn("line", detail)
@@ -45,6 +47,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".js", "function hello() { return 42; }\n")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -52,6 +55,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".js", "function hello( { return 42; }\n")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, detail = result
         self.assertFalse(is_valid)
         self.assertIn("line", detail)
@@ -62,6 +66,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".ts", "const x: number = 42;\n")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -69,6 +74,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".ts", "const x: number = ;\n")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, detail = result
         self.assertFalse(is_valid)
 
@@ -79,6 +85,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".tsx", code)
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -88,6 +95,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".json", '{"key": "value"}\n')
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -95,6 +103,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".json", '{"key": "value",}\n')
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, detail = result
         self.assertFalse(is_valid)
 
@@ -105,6 +114,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".go", code)
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -113,6 +123,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".go", code)
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, detail = result
         self.assertFalse(is_valid)
 
@@ -123,6 +134,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".rs", code)
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -132,6 +144,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".yaml", "key: value\nlist:\n  - item1\n")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -141,6 +154,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".html", "<html><body><h1>Hi</h1></body></html>")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -150,6 +164,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".css", "body { color: red; }\n")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -159,6 +174,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".sh", "#!/bin/bash\necho hello\n")
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, _ = result
         self.assertTrue(is_valid)
 
@@ -184,6 +200,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".py", code)
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, detail = result
         self.assertFalse(is_valid)
         self.assertIn("line 3", detail)
@@ -194,6 +211,7 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         path = self._write_temp(".py", code)
         result = _treesitter_syntax_check(path)
         self.assertIsNotNone(result)
+        assert result is not None
         is_valid, detail = result
         self.assertFalse(is_valid)
         # Should be capped at 5 errors
@@ -207,12 +225,14 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         # Use a fake path that doesn't exist — only the extension matters
         result = _treesitter_syntax_check("/sandbox/fake.py", content)
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertTrue(result[0])
 
     def test_content_passed_directly_invalid_js(self):
         content = b"function hello( { return 42; }\n"
         result = _treesitter_syntax_check("/sandbox/fake.js", content)
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertFalse(result[0])
         self.assertIn("line", result[1])
 
@@ -220,36 +240,42 @@ class TestTreeSitterSyntaxCheck(unittest.TestCase):
         content = b"const x: number = 42;\nexport default x;\n"
         result = _treesitter_syntax_check("/sandbox/fake.ts", content)
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertTrue(result[0])
 
     def test_content_passed_directly_valid_json(self):
         content = b'{"key": "value", "num": 123}\n'
         result = _treesitter_syntax_check("/sandbox/fake.json", content)
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertTrue(result[0])
 
     def test_content_passed_directly_invalid_json(self):
         content = b'{"key": "value",}\n'
         result = _treesitter_syntax_check("/sandbox/fake.json", content)
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertFalse(result[0])
 
     def test_content_passed_directly_valid_go(self):
         content = b'package main\n\nfunc main() {\n}\n'
         result = _treesitter_syntax_check("/sandbox/fake.go", content)
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertTrue(result[0])
 
     def test_content_passed_directly_valid_tsx(self):
         content = b"const App = () => <div>hello</div>;\nexport default App;\n"
         result = _treesitter_syntax_check("/sandbox/fake.tsx", content)
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertTrue(result[0])
 
     def test_content_passed_directly_valid_css(self):
         content = b"body { color: red; }\n.btn { padding: 8px; }\n"
         result = _treesitter_syntax_check("/sandbox/fake.css", content)
         self.assertIsNotNone(result)
+        assert result is not None
         self.assertTrue(result[0])
 
     def test_content_passed_unsupported_ext_returns_none(self):
@@ -264,7 +290,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
     def _run(self, coro):
         import asyncio
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def _make_pipeline_and_ctx(self, action):
         from unittest.mock import MagicMock
@@ -288,7 +314,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
         action = FileEditAction(
             path="/workspace/app.py",
-            command="create",
+            command="create_file",
             file_text="def hello():\n    return 42\n",
         )
         obs = FileEditObservation(content="File created successfully", path="/workspace/app.py")
@@ -303,7 +329,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
         action = FileEditAction(
             path="/workspace/app.py",
-            command="create",
+            command="create_file",
             file_text="def hello(\n    return 42\n",
         )
         obs = FileEditObservation(content="File created successfully", path="/workspace/app.py")
@@ -339,14 +365,14 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
         self._run(pipeline.run_observe(ctx, obs))
         self.assertIn("<SYNTAX_CHECK_FAILED>", obs.content)
 
-    def test_file_edit_str_replace_uses_content_fallback(self):
-        """FileEditAction str_replace — uses content attr as file content."""
+    def test_file_edit_replace_text_uses_content_fallback(self):
+        """FileEditAction replace_text — uses content attr as file content."""
         from backend.events.action.files import FileEditAction
         from backend.events.observation import FileEditObservation
 
         action = FileEditAction(
             path="/workspace/app.py",
-            command="str_replace",
+            command="replace_text",
             old_str="old",
             new_str="new",
             content="def hello():\n    return 42\n",
@@ -363,7 +389,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
         action = FileEditAction(
             path="/workspace/app.py",
-            command="create",
+            command="create_file",
             file_text="def hello():\n",
         )
         obs = ErrorObservation(content="Command failed")
@@ -378,7 +404,7 @@ class TestAutoCheckMiddlewarePipeline(unittest.TestCase):
 
         action = FileEditAction(
             path="/workspace/data.xyz",
-            command="create",
+            command="create_file",
             file_text="some data",
         )
         obs = FileEditObservation(content="File created", path="/workspace/data.xyz")

@@ -1,10 +1,7 @@
 """Integration tests for Forge's comprehensive reliability guardrails.
 
 This module actively verifies the edge cases and interactions between:
-- ErrorRecoveryStrategy
-- CircuitBreaker
-- BudgetGuardService (and Token Governor interactions indirectly)
-- SafetyValidator
+
 """
 
 import asyncio
@@ -13,7 +10,6 @@ from unittest.mock import AsyncMock, patch, MagicMock
 import pytest
 
 from backend.controller.agent_circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitBreakerResult
-from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.controller.safety_validator import SafetyValidator, ExecutionContext
 from backend.controller.services.budget_guard_service import BudgetGuardService
 from backend.controller.rate_governor import LLMRateGovernor
@@ -36,47 +32,6 @@ def mock_controller_context():
 
 class TestReliabilityGuardrailsIntegration:
     """Rigorous audit of Forge's behavioral and token safety constraints."""
-
-    @pytest.mark.asyncio
-    async def test_error_recovery_to_circuit_breaker_pipeline(self):
-        """
-        EDGE CASE: Verify an initial error gives recovery hints, but failing repeatedly
-        eventually trips the hard circuit breaker.
-        """
-        recovery = ErrorRecoveryStrategy()
-        
-        # Configure a tight circuit breaker limit (e.g., 3 consecutive errors)
-        config = CircuitBreakerConfig(enabled=True, max_consecutive_errors=3)
-        circuit_breaker = CircuitBreaker(config=config)
-        
-        # Sequence of observations simulating a loop
-        # Iteration 1: An innocent timeout error
-        obs1 = ErrorObservation(content="Timeout connecting to 127.0.0.1")
-        action1 = CmdRunAction(command="curl http://127.0.0.1:8080")
-        error_to_test = Exception("Timeout connecting to 127.0.0.1")
-        
-        # Check Recovery Output
-        error_type = recovery.classify_error(error_to_test)
-        actions = recovery.get_recovery_actions(error_type, error_to_test)
-        assert len(actions) > 0, "ErrorRecovery should produce a hint for timeouts"
-        
-        # Pass to circuit breaker
-        state_mock = MagicMock()
-        circuit_breaker.record_error(error_to_test)
-        result1 = circuit_breaker.check(state_mock)
-        assert not result1.tripped, "Breaker should not trip on first error"
-        
-        # Iteration 2: Same error
-        circuit_breaker.record_error(error_to_test)
-        result2 = circuit_breaker.check(state_mock)
-        assert not result2.tripped, "Breaker should not trip on second error"
-        
-        # Iteration 3: Final error
-        circuit_breaker.record_error(error_to_test)
-        result3 = circuit_breaker.check(state_mock)
-        assert result3.tripped, "Circuit breaker MUST trip on 3rd consecutive error"
-        assert "consecutive errors" in result3.reason.lower()
-        assert result3.action in ["stop", "switch_context", "pause"]
 
     @pytest.mark.asyncio
     async def test_budget_exhaustion_interception(self, mock_controller_context):

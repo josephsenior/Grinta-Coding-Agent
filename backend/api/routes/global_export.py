@@ -50,7 +50,7 @@ def _load_json_files(directory: str) -> list[dict]:
     but do not halt the operation.
 
     Args:
-        directory: The relative directory path within workspace_base
+        directory: The relative directory path within project_root
             (e.g., "memories", "templates").
 
     Returns:
@@ -61,8 +61,8 @@ def _load_json_files(directory: str) -> list[dict]:
         No exceptions raised; errors are logged at exception level.
 
     """
-    workspace_base = Path(get_app_state().config.workspace_base or ".")
-    dir_path = workspace_base / directory
+    project_root = Path(get_app_state().config.project_root or ".")
+    dir_path = project_root / directory
 
     if not dir_path.exists():
         return []
@@ -86,7 +86,7 @@ def _save_json_files(directory: str, data: list[dict]) -> tuple[int, int]:
     the filename. Tracks import vs update counts based on pre-existence.
 
     Args:
-        directory: The relative directory path within workspace_base
+        directory: The relative directory path within project_root
             where files will be saved (e.g., "memories").
         data: List of dictionaries to persist. Each item must
             contain at least an "id" key. Items without "id" are skipped.
@@ -100,8 +100,8 @@ def _save_json_files(directory: str, data: list[dict]) -> tuple[int, int]:
         No exceptions raised; errors are logged at exception level.
 
     """
-    workspace_base = Path(get_app_state().config.workspace_base or ".")
-    dir_path = workspace_base / directory
+    project_root = Path(get_app_state().config.project_root or ".")
+    dir_path = project_root / directory
     dir_path.mkdir(parents=True, exist_ok=True)
 
     imported = 0

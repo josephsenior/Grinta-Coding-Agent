@@ -8,10 +8,10 @@ from backend.engines.orchestrator.contracts import ChatCompletionToolParam
 _CONDENSATION_REQUEST_DESCRIPTION = "Request a condensation of the conversation history when the context becomes too long or when you need to focus on the most relevant information."
 
 
-def create_condensation_request_tool() -> ChatCompletionToolParam:
-    """Create the condensation request tool for the Orchestrator agent."""
+def create_summarize_context_tool() -> ChatCompletionToolParam:
+    """Create the summarize context tool for the Orchestrator agent."""
     return create_tool_definition(
-        name="request_condensation",
+        name="summarize_context",
         description=_CONDENSATION_REQUEST_DESCRIPTION,
         properties={},
         required=[],

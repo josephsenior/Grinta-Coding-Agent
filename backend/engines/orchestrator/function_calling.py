@@ -16,42 +16,28 @@ from backend.core.logger import forge_logger as logger
 from backend.engines.orchestrator.tools import (
     create_apply_patch_tool,
     create_cmd_run_tool,
-    create_condensation_request_tool,
+    create_summarize_context_tool,
     create_finish_tool,
     create_llm_based_edit_tool,
-    create_note_tool,
-    create_recall_tool,
-    create_run_tests_tool,
-    create_semantic_recall_tool,
     create_str_replace_editor_tool,
     create_structure_editor_tool,
     create_think_tool,
 )
-from backend.engines.orchestrator.tools.terminal import (
-    TERMINAL_OPEN_TOOL_NAME,
-    TERMINAL_INPUT_TOOL_NAME,
-    TERMINAL_READ_TOOL_NAME,
-    build_terminal_open_action,
-    build_terminal_input_action,
-    build_terminal_read_action,
+from backend.engines.orchestrator.tools.terminal_manager import (
+    TERMINAL_MANAGER_TOOL_NAME,
+    handle_terminal_manager_tool,
 )
 from backend.engines.orchestrator.tools.apply_patch import build_apply_patch_action
 from backend.engines.orchestrator.tools.batch_edit import (
     build_batch_edit_action,
     BATCH_EDIT_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.note import (
-    build_note_action,
-    build_recall_action,
+from backend.engines.orchestrator.tools.memory_manager import (
+    MEMORY_MANAGER_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.run_tests import build_run_tests_action
 from backend.engines.orchestrator.tools.search_code import (
     build_search_code_action,
     SEARCH_CODE_TOOL_NAME,
-)
-from backend.engines.orchestrator.tools.web_search import (
-    build_web_search_action,
-    WEB_SEARCH_TOOL_NAME,
 )
 from backend.engines.orchestrator.tools.check_tool_status import (
     build_check_tool_status_action,
@@ -60,37 +46,33 @@ from backend.engines.orchestrator.tools.workspace_status import (
     build_workspace_status_action,
     WORKSPACE_STATUS_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.error_patterns import (
-    build_error_patterns_action,
-    ERROR_PATTERNS_TOOL_NAME,
+from backend.engines.orchestrator.tools.query_error_solutions import (
+    build_query_error_solutions_action,
+    QUERY_ERROR_SOLUTIONS_TOOL_NAME,
 )
 from backend.engines.orchestrator.tools.explore_code import (
     build_explore_tree_structure_action,
-    build_get_entity_contents_action,
+    build_read_symbol_definition_action,
 )
 from backend.engines.orchestrator.tools.checkpoint import (
     build_checkpoint_action,
     CHECKPOINT_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.project_map import (
-    build_project_map_action,
-    PROJECT_MAP_TOOL_NAME,
+from backend.engines.orchestrator.tools.analyze_project_structure import (
+    build_analyze_project_structure_action,
+    ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
 )
 from backend.engines.orchestrator.tools.session_diff import (
     build_session_diff_action,
     SESSION_DIFF_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.verify_state import (
-    build_verify_state_action,
-    VERIFY_STATE_TOOL_NAME,
+from backend.engines.orchestrator.tools.verify_file_lines import (
+    build_verify_file_lines_action,
+    VERIFY_FILE_LINES_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.working_memory import (
-    build_working_memory_action,
-    WORKING_MEMORY_TOOL_NAME,
-)
-from backend.engines.orchestrator.tools.revert_to_safe_state import (
-    build_revert_to_safe_state_action,
-    REVERT_TO_SAFE_STATE_TOOL_NAME,
+from backend.engines.orchestrator.tools.revert_to_checkpoint import (
+    build_revert_to_checkpoint_action,
+    REVERT_TO_CHECKPOINT_TOOL_NAME,
 )
 from backend.engines.orchestrator.tools.delegate_task import (
     build_delegate_task_action,
@@ -112,14 +94,9 @@ from backend.engines.orchestrator.tools.blackboard import (
     build_blackboard_action,
     BLACKBOARD_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.query_toolbox import QUERY_TOOLBOX_TOOL_NAME, build_query_toolbox_action
-from backend.engines.orchestrator.tools.meta_cognition import (
-    UNCERTAINTY_TOOL_NAME,
-    CLARIFICATION_TOOL_NAME,
-    ESCALATE_TOOL_NAME,
-    PROPOSAL_TOOL_NAME,
-)
-from backend.engines.orchestrator.tools.mcp_gateway import MCP_GATEWAY_TOOL_NAME
+from backend.engines.orchestrator.tools.search_available_tools import SEARCH_AVAILABLE_TOOLS_TOOL_NAME, build_search_available_tools_action
+from backend.engines.orchestrator.tools.meta_cognition import COMMUNICATE_TOOL_NAME
+from backend.engines.orchestrator.tools.execute_mcp_tool import EXECUTE_MCP_TOOL_TOOL_NAME
 from backend.engines.common import (
     common_response_to_actions,
 )
@@ -247,68 +224,56 @@ def _handle_finish_tool(arguments: dict) -> PlaybookFinishAction:
     return PlaybookFinishAction(final_thought=arguments["message"], outputs=outputs)
 
 
-def _handle_note_tool(arguments: dict) -> AgentThinkAction:
-    """Handle NOTE_TOOL: store key→value in .forge/agent_notes.json (native)."""
-    key = arguments.get("key", "")
-    value = arguments.get("value", "")
-    if not key:
-        from backend.core.errors import FunctionCallValidationError as _E
+def _handle_memory_manager_tool(arguments: dict) -> AgentThinkAction:
+    """Handle unified memory ops: note, recall, semantic_recall, working_memory."""
+    action = arguments.get("action")
+    if not action:
+        raise FunctionCallValidationError("Missing 'action' in memory_manager tool.")
 
-        raise _E('Missing required argument "key" in tool call note')
-    return build_note_action(key, value)
-
-
-def _handle_recall_tool(arguments: dict) -> AgentThinkAction:
-    """Handle RECALL_TOOL: retrieve key from .forge/agent_notes.json (native)."""
-    key = arguments.get("key", "all")
-    return build_recall_action(key)
-
-
-def _handle_semantic_recall_tool(arguments: dict) -> AgentThinkAction:
-    """Handle SEMANTIC_RECALL_TOOL: query vector memory for related context.
-
-    Returns results tagged as [SEMANTIC_RECALL_RESULT] so the LLM can
-    distinguish retrieved data from its own reasoning.
-    """
-    query = arguments.get("query", "")
-    if not query:
-        raise FunctionCallValidationError(
-            'Missing required argument "query" in tool call semantic_recall'
-        )
-    k = min(int(arguments.get("k", 5)), 10)
-    recall_fn = _semantic_recall_registry.get("fn")
-    if recall_fn is None:
-        return AgentThinkAction(
-            thought="[SEMANTIC_RECALL_RESULT] Vector memory is not available in this session."
-        )
-    results = recall_fn(query, k)
-    if not results:
-        return AgentThinkAction(
-            thought=f"[SEMANTIC_RECALL_RESULT] No results found for query: {query!r}"
-        )
-    parts = [f"[SEMANTIC_RECALL_RESULT] {len(results)} results for query: {query!r}\n"]
-    for i, item in enumerate(results, 1):
-        content = item.get("content_text", item.get("content", ""))
-        role = item.get("role", "unknown")
-        score = item.get("score", "")
-        score_str = f" (score={score:.3f})" if isinstance(score, float) else ""
-        parts.append(f"  [{i}] ({role}{score_str}) {content[:500]}")
-    return AgentThinkAction(thought="\n".join(parts))
-
-
-def _handle_run_tests_tool(arguments: dict) -> CmdRunAction:
-    """Handle RUN_TESTS_TOOL: run pytest and return structured JSON results."""
-    filter_str = arguments.get("filter", "")
-    extra_flags = arguments.get("extra_flags", "")
-    return build_run_tests_action(filter_str=filter_str, extra_flags=extra_flags)
+    if action == "semantic_recall":
+        query = arguments.get("key", "")
+        if not query:
+            raise FunctionCallValidationError('Missing search phrase "key" in memory_manager (semantic_recall)')
+        k = 5
+        recall_fn = _semantic_recall_registry.get("fn")
+        if recall_fn is None:
+            return AgentThinkAction(
+                thought="[SEMANTIC_RECALL_RESULT] Vector memory is not available in this session."
+            )
+        results = recall_fn(query, k)
+        if not results:
+            return AgentThinkAction(
+                thought=f"[SEMANTIC_RECALL_RESULT] No indexed memory results found for query: {query!r}"
+            )
+        parts = [f"[SEMANTIC_RECALL_RESULT] {len(results)} results for query: {query!r}\n"]
+        for i, item in enumerate(results, 1):
+            content = item.get("content_text", item.get("content", ""))
+            role = item.get("role", "unknown")
+            score = item.get("score", "")
+            score_str = f" (score={score:.3f})" if isinstance(score, float) else ""
+            parts.append(f"  [{i}] ({role}{score_str}) {content[:500]}")
+        return AgentThinkAction(thought="\n".join(parts))
+        
+    elif action == "working_memory":
+        from backend.engines.orchestrator.tools.working_memory import build_working_memory_action
+        # Map arguments back to what build_working_memory_action expects
+        wm_args = {
+            "command": arguments.get("update_type", "get"),
+            "section": arguments.get("section", "all"),
+            "content": arguments.get("content", "")
+        }
+        return build_working_memory_action(wm_args)
+        
+    else:
+        raise FunctionCallValidationError(f"Unknown memory_manager action: {action}")
 
 
 def _handle_apply_patch_tool(arguments: dict) -> CmdRunAction:
     """Handle APPLY_PATCH_TOOL: apply a unified diff to the workspace."""
     if "patch" not in arguments:
-        from backend.core.errors import FunctionCallValidationError as _E
-
-        raise _E('Missing required argument "patch" in tool call apply_patch')
+        raise FunctionCallValidationError(
+            'Missing required argument "patch" in tool call apply_patch'
+        )
     check_only = arguments.get("check_only", "false") == "true"
     return build_apply_patch_action(patch=arguments["patch"], check_only=check_only)
 
@@ -325,25 +290,14 @@ def _handle_search_code_tool(arguments: dict) -> CmdRunAction:
     )
 
 
-def _handle_web_search_tool(arguments: dict) -> CmdRunAction:
-    """Handle WEB_SEARCH_TOOL: search the web for information."""
-    query = arguments.get("query", "")
-    if not query:
-        raise FunctionCallValidationError(
-            'Missing required argument "query" in tool call web_search'
-        )
-    num_results = int(arguments.get("num_results", 5))
-    return build_web_search_action(query=query, num_results=num_results)
-
-
 def _handle_workspace_status_tool(arguments: dict) -> CmdRunAction:
     """Handle workspace_status tool: gather project state snapshot."""
     return build_workspace_status_action(arguments)
 
 
-def _handle_error_patterns_tool(arguments: dict) -> AgentThinkAction:
-    """Handle error_patterns tool: store/query error→solution patterns."""
-    return build_error_patterns_action(arguments)
+def _handle_query_error_solutions_tool(arguments: dict) -> AgentThinkAction:
+    """Handle query_error_solutions tool: store/query error→solution patterns."""
+    return build_query_error_solutions_action(arguments)
 
 
 def _handle_checkpoint_tool(arguments: dict) -> AgentThinkAction:
@@ -351,9 +305,9 @@ def _handle_checkpoint_tool(arguments: dict) -> AgentThinkAction:
     return build_checkpoint_action(arguments)
 
 
-def _handle_project_map_tool(arguments: dict) -> CmdRunAction | AgentThinkAction:
-    """Handle project_map tool: structural overview of the workspace."""
-    return build_project_map_action(arguments)
+def _handle_analyze_project_structure_tool(arguments: dict) -> CmdRunAction | AgentThinkAction:
+    """Handle analyze_project_structure tool: structural overview of the workspace."""
+    return build_analyze_project_structure_action(arguments)
 
 
 def _handle_session_diff_tool(arguments: dict) -> CmdRunAction:
@@ -361,14 +315,9 @@ def _handle_session_diff_tool(arguments: dict) -> CmdRunAction:
     return build_session_diff_action(arguments)
 
 
-def _handle_verify_state_tool(arguments: dict) -> AgentThinkAction:
-    """Handle verify_state tool: validate file assertions before editing."""
-    return build_verify_state_action(arguments)
-
-
-def _handle_working_memory_tool(arguments: dict) -> AgentThinkAction:
-    """Handle working_memory tool: structured cognitive workspace."""
-    return build_working_memory_action(arguments)
+def _handle_verify_file_lines_tool(arguments: dict) -> AgentThinkAction:
+    """Handle verify_file_lines tool: validate file assertions before editing."""
+    return build_verify_file_lines_action(arguments)
 
 
 def _handle_llm_based_file_edit_tool(arguments: dict) -> FileEditAction:
@@ -401,10 +350,24 @@ def _validate_str_replace_editor_args(arguments: dict) -> tuple[str, str]:
     if "command" not in arguments:
         msg = f'Missing required argument "command" in tool call {tool_name}'
         raise FunctionCallValidationError(msg)
-    if "path" not in arguments:
+    path = arguments.get("path")
+    if not path:
         msg = f'Missing required argument "path" in tool call {tool_name}'
         raise FunctionCallValidationError(msg)
-    return arguments["path"], arguments["command"]
+    return str(path), str(arguments["command"])
+
+
+def _normalize_file_editor_command_and_args(
+    command: str,
+    arguments: dict[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    """Normalize canonical file editor arguments.
+
+    Canonical-only mode: no legacy command or field aliases are accepted.
+    """
+    normalized_command = str(command or "").strip().lower()
+    normalized_args: dict[str, Any] = dict(arguments)
+    return normalized_command, normalized_args
 
 
 def _filter_valid_editor_kwargs(other_kwargs: dict) -> dict:
@@ -533,14 +496,14 @@ def _old_str_not_found_action(path: str, view_range: Any) -> AgentThinkAction:
         range_suffix = f" (within lines {view_range[0]}-{view_range[1]})"
     return AgentThinkAction(
         thought=f"[VIEW_AND_REPLACE] old_str not found in {path}{range_suffix}. "
-        "Use view command to check the actual content."
+        "Use view_file command to check the actual content."
     )
 
 
 def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
     """Handle the compound view_and_replace command.
 
-    Returns a list of actions: first a FileReadAction (view), then a FileEditAction (replace).
+    Returns a list of actions: first a FileReadAction (view_file), then a FileEditAction (replace_text).
     If old_str/new_str are provided, performs the replacement; otherwise just views.
     """
     import os
@@ -575,7 +538,7 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
             if err:
                 return [
                     AgentThinkAction(
-                        thought=f"[VIEW_AND_REPLACE] {err} Use view command to check the actual content."
+                        thought=f"[VIEW_AND_REPLACE] {err} Use view_file command to check the actual content."
                     )
                 ]
         else:
@@ -593,7 +556,7 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
         ),
         FileEditAction(
             path=path,
-            command="str_replace",
+            command="replace_text",
             impl_source=FileEditSource.FILE_EDITOR,
             **edit_kwargs,
         ),
@@ -603,7 +566,7 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
 def _preview_str_replace_edit(
     path: str, command: str, kwargs: dict
 ) -> AgentThinkAction | CmdRunAction:
-    """Generate a unified diff preview of what a str_replace or insert would produce."""
+    """Generate a unified diff preview of what a replace_text or insert_text would produce."""
     import difflib
     import os
 
@@ -618,12 +581,12 @@ def _preview_str_replace_edit(
 
     new_lines = list(original_lines)
 
-    if command == "str_replace":
+    if command == "replace_text":
         old_str = kwargs.get("old_str", "")
         new_str = kwargs.get("new_str", "")
         if not old_str:
             return AgentThinkAction(
-                thought="[PREVIEW] old_str is required for str_replace preview"
+                thought="[PREVIEW] old_str is required for replace_text preview"
             )
         original_text = "".join(original_lines)
         count = original_text.count(old_str)
@@ -635,7 +598,7 @@ def _preview_str_replace_edit(
             )
         new_text = original_text.replace(old_str, new_str, 1)
         new_lines = new_text.splitlines(keepends=True)
-    elif command == "insert":
+    elif command == "insert_text":
         insert_line = int(kwargs.get("insert_line", 0))
         new_str = kwargs.get("new_str", "")
         insert_text = new_str if new_str.endswith("\n") else new_str + "\n"
@@ -699,19 +662,40 @@ def _is_preview_enabled(raw: Any) -> bool:
 def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     """Handle str_replace_editor tool call."""
     path, command = _validate_str_replace_editor_args(arguments)
-    other_kwargs = {k: v for k, v in arguments.items() if k not in ["command", "path"]}
+    command, normalized_args = _normalize_file_editor_command_and_args(
+        command, arguments
+    )
+    valid_commands = {
+        "view_file",
+        "create_file",
+        "replace_text",
+        "insert_text",
+        "undo_last_edit",
+        "view_and_replace",
+    }
+    if command not in valid_commands:
+        raise FunctionCallValidationError(
+            f"Unknown command '{command}' for str_replace_editor tool. "
+            f"Valid commands: {sorted(valid_commands)}"
+        )
+    path = str(normalized_args.get("path", path))
+    other_kwargs = {
+        k: v
+        for k, v in normalized_args.items()
+        if k not in ["command", "path"]
+    }
 
     _apply_confidence_preview_override(other_kwargs, path)
 
     raw_preview = other_kwargs.pop("preview", False)
-    if _is_preview_enabled(raw_preview) and command in ("str_replace", "insert"):
+    if _is_preview_enabled(raw_preview) and command in ("replace_text", "insert_text"):
         return _preview_str_replace_edit(path, command, other_kwargs)
 
     if command == "view_and_replace":
         actions = _handle_view_and_replace(path, other_kwargs)
         return actions[0]
 
-    if command == "view":
+    if command == "view_file":
         return FileReadAction(
             path=path,
             impl_source=FileReadSource.FILE_EDITOR,
@@ -720,7 +704,7 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
 
     view_range = other_kwargs.pop("view_range", None)
     valid_kwargs = _filter_valid_editor_kwargs(other_kwargs)
-    if command == "str_replace" and view_range is not None:
+    if command == "replace_text" and view_range is not None:
         valid_kwargs["view_range"] = view_range
 
     action = FileEditAction(
@@ -750,28 +734,23 @@ def _handle_think_tool(arguments: dict) -> AgentThinkAction:
     return AgentThinkAction(thought=arguments["thought"])
 
 
-def _handle_condensation_request_tool(arguments: dict) -> CondensationRequestAction:
-    """Handle CondensationRequestTool tool call."""
+def _handle_summarize_context_tool(arguments: dict) -> CondensationRequestAction:
+    """Handle Summarize Context tool call."""
     return CondensationRequestAction()
 
 
 def _normalize_task_tracker_step(s: dict, idx: int) -> dict:
     """Normalize a single task step dict. Raises FunctionCallValidationError on invalid input."""
+    from backend.controller.state.state import normalize_plan_step_payload
+
     if not isinstance(s, dict):
         raise FunctionCallValidationError(
             f"Task item must be a dictionary, got {type(s)}"
         )
-    return {
-        "id": s.get("id", f"step-{idx}"),
-        "description": s.get("description", s.get("title", "Untitled step")),
-        "status": s.get("status", "pending"),
-        "result": s.get("result", s.get("notes", None)),
-        "tags": s.get("tags", []),
-        "subtasks": [
-            _normalize_task_tracker_step(sub, i)
-            for i, sub in enumerate(s.get("subtasks", []))
-        ],
-    }
+    try:
+        return normalize_plan_step_payload(s, idx)
+    except TypeError as e:
+        raise FunctionCallValidationError(str(e)) from e
 
 
 def _normalize_task_tracker_list(raw_list: list) -> list[dict]:
@@ -787,7 +766,7 @@ def _normalize_task_tracker_list(raw_list: list) -> list[dict]:
         raise FunctionCallValidationError(f"Invalid task list structure: {e}") from e
 
 
-def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
+def _handle_task_tracker_tool(arguments: dict) -> Action:
     """Handle TASK_TRACKER_TOOL tool call."""
     if "command" not in arguments:
         raise FunctionCallValidationError(
@@ -805,9 +784,18 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
 
     tracker = TaskTracker()
 
+    existing_normalized_task_list: list[dict] = []
     if command == "view":
         raw_task_list = tracker.load_from_file()
     else:
+        # Capture the current persisted plan so we can detect no-op updates
+        # that otherwise create tool-call loops without advancing execution.
+        existing_raw = tracker.load_from_file()
+        if isinstance(existing_raw, list):
+            try:
+                existing_normalized_task_list = _normalize_task_tracker_list(existing_raw)
+            except FunctionCallValidationError:
+                existing_normalized_task_list = []
         raw_task_list = arguments.get("task_list", [])
 
     if not isinstance(raw_task_list, list):
@@ -816,6 +804,20 @@ def _handle_task_tracker_tool(arguments: dict) -> TaskTrackingAction:
         )
 
     normalized_task_list = _normalize_task_tracker_list(raw_task_list)
+
+    if (
+        command == "update"
+        and normalized_task_list
+        and normalized_task_list == existing_normalized_task_list
+    ):
+        logger.info("Ignoring no-op task_tracker update: unchanged task_list")
+        return AgentThinkAction(
+            thought=(
+                "[TASK_TRACKER] Update skipped because the plan is unchanged. "
+                "Do a concrete next action now (edit, run command/tests, or read a targeted file), "
+                "and refresh tracking only after status/result changes."
+            )
+        )
 
     if command == "update":
         tracker.save_to_file(normalized_task_list)
@@ -841,7 +843,7 @@ def _handle_mcp_tool(
     return MCPAction(name=tool_call_name, arguments=normalized_args)
 
 
-def _handle_mcp_gateway_tool(arguments: dict[str, Any]) -> MCPAction:
+def _handle_execute_mcp_tool_tool(arguments: dict[str, Any]) -> MCPAction:
     """Handle the call_mcp_tool gateway — route to the real MCP tool."""
     tool_name = arguments.get("tool_name", "")
     if not tool_name:
@@ -855,7 +857,7 @@ def _handle_mcp_gateway_tool(arguments: dict[str, Any]) -> MCPAction:
     return MCPAction(name=tool_name, arguments=dict(inner_args))
 
 
-def _validate_structure_editor_args(arguments: dict, tool_name: str) -> tuple[str, str]:
+def _validate_ast_code_editor_args(arguments: dict, tool_name: str) -> tuple[str, str]:
     """Validate required arguments for structure editor.
 
     Args:
@@ -863,7 +865,7 @@ def _validate_structure_editor_args(arguments: dict, tool_name: str) -> tuple[st
         tool_name: Name of the tool
 
     Returns:
-        Tuple of (command, file_path)
+        Tuple of (command, path)
 
     Raises:
         FunctionCallValidationError: If validation fails
@@ -874,34 +876,48 @@ def _validate_structure_editor_args(arguments: dict, tool_name: str) -> tuple[st
             f'Missing required argument "command" in tool call {tool_name}'
         )
 
-    if "file_path" not in arguments:
+    path = arguments.get("path")
+    if not path:
         raise FunctionCallValidationError(
-            f'Missing required argument "file_path" in tool call {tool_name}'
+            f'Missing required argument "path" in tool call {tool_name}'
         )
 
-    return arguments["command"], arguments["file_path"]
+    return str(arguments["command"]), str(path)
 
 
-def _handle_edit_function_command(editor, file_path: str, arguments: dict) -> Action:
-    """Handle edit_function command."""
+def _normalize_ast_code_editor_alias(
+    command: str,
+    arguments: dict,
+) -> tuple[str, dict[str, Any]]:
+    """Normalize ast_code_editor command casing.
+
+    Canonical-only mode: no legacy command or field aliases are accepted.
+    """
+    normalized_args: dict[str, Any] = dict(arguments)
+    normalized_command = str(command or "").strip().lower()
+    return normalized_command, normalized_args
+
+
+def _handle_edit_symbol_body_command(editor, path: str, arguments: dict) -> Action:
+    """Handle edit_symbol_body command."""
     function_name = arguments.get("function_name")
     new_body = arguments.get("new_body")
 
     if not function_name or not new_body:
         raise FunctionCallValidationError(
-            "edit_function requires 'function_name' and 'new_body' arguments"
+            "edit_symbol_body requires 'function_name' and 'new_body' arguments"
         )
 
-    result = editor.edit_function(file_path, function_name, new_body)
+    result = editor.edit_function(path, function_name, new_body)
 
     if result.success:
         return FileReadAction(
-            path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
+            path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
     return MessageAction(content=f"❌ Edit failed: {result.message}")
 
 
-def _handle_rename_symbol_command(editor, file_path: str, arguments: dict) -> Action:
+def _handle_rename_symbol_command(editor, path: str, arguments: dict) -> Action:
     """Handle rename_symbol command."""
     old_name = arguments.get("old_name")
     new_name = arguments.get("new_name")
@@ -911,37 +927,37 @@ def _handle_rename_symbol_command(editor, file_path: str, arguments: dict) -> Ac
             "rename_symbol requires 'old_name' and 'new_name' arguments"
         )
 
-    result = editor.rename_symbol(file_path, old_name, new_name)
+    result = editor.rename_symbol(path, old_name, new_name)
 
     if result.success:
         return FileReadAction(
-            path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
+            path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
     return MessageAction(content=f"❌ Rename failed: {result.message}")
 
 
-def _handle_find_symbol_command(editor, file_path: str, arguments: dict) -> Action:
+def _handle_find_symbol_command(editor, path: str, arguments: dict) -> Action:
     """Handle find_symbol command."""
     symbol_name = arguments.get("symbol_name")
     if not symbol_name:
         raise FunctionCallValidationError("find_symbol requires 'symbol_name' argument")
 
     symbol_type = arguments.get("symbol_type")
-    result = editor.find_symbol(file_path, symbol_name, symbol_type)
+    result = editor.find_symbol(path, symbol_name, symbol_type)
 
     if result:
         message = (
-            f"✓ Found '{symbol_name}' in {file_path}:\n"
+            f"✓ Found '{symbol_name}' in {path}:\n"
             f"  Type: {result.node_type}\n"
             f"  Lines: {result.line_start}-{result.line_end}"
         )
         if result.parent_name:
             message += f"\n  Parent: {result.parent_name}"
         return MessageAction(content=message)
-    return MessageAction(content=f"❌ Symbol '{symbol_name}' not found in {file_path}")
+    return MessageAction(content=f"❌ Symbol '{symbol_name}' not found in {path}")
 
 
-def _handle_replace_range_command(editor, file_path: str, arguments: dict) -> Action:
+def _handle_replace_range_command(editor, path: str, arguments: dict) -> Action:
     """Handle replace_range command."""
     start_line = arguments.get("start_line")
     end_line = arguments.get("end_line")
@@ -952,76 +968,105 @@ def _handle_replace_range_command(editor, file_path: str, arguments: dict) -> Ac
             "replace_range requires 'start_line', 'end_line', and 'new_code' arguments"
         )
 
-    result = editor.replace_code_range(file_path, start_line, end_line, new_code)
+    result = editor.replace_code_range(path, start_line, end_line, new_code)
 
     if result.success:
         return FileReadAction(
-            path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
+            path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
     return MessageAction(content=f"❌ Replace failed: {result.message}")
 
 
-def _handle_normalize_indent_command(editor, file_path: str, arguments: dict) -> Action:
+def _handle_normalize_indent_command(editor, path: str, arguments: dict) -> Action:
     """Handle normalize_indent command."""
     style = arguments.get("style")
     size = arguments.get("size")
-    result = editor.normalize_file_indent(file_path, style, size)
+    result = editor.normalize_file_indent(path, style, size)
 
     if result.success:
         return FileReadAction(
-            path=file_path, impl_source=FileReadSource.DEFAULT, thought=result.message
+            path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
     return MessageAction(content=f"❌ Normalization failed: {result.message}")
 
 
-def _handle_create_file_command(file_path: str, arguments: dict) -> Action:
-    """Handle create_file command — delegates to str_replace_editor create."""
-    content = arguments.get("content", "")
+def _handle_create_file_command(path: str, arguments: dict) -> Action:
+    """Handle create_file command — delegates to str_replace_editor create_file."""
+    file_text = arguments.get("file_text", "")
     return FileEditAction(
-        path=file_path,
-        command="create",
-        file_text=content,
+        path=path,
+        command="create_file",
+        file_text=file_text,
         impl_source=FileEditSource.FILE_EDITOR,
     )
 
 
-def _handle_view_file_command(file_path: str) -> Action:
+def _handle_view_file_command(path: str) -> Action:
     """Handle view_file command — reads file contents."""
-    return FileReadAction(path=file_path, impl_source=FileReadSource.FILE_EDITOR)
+    return FileReadAction(path=path, impl_source=FileReadSource.FILE_EDITOR)
 
 
-def _handle_insert_code_command(file_path: str, arguments: dict) -> Action:
-    """Handle insert_code command — inserts code after a line number."""
-    new_code = arguments.get("new_code")
+def _handle_insert_text_command(path: str, arguments: dict) -> Action:
+    """Handle insert_text command — inserts text after a line number."""
+    new_str = arguments.get("new_str")
     insert_line = arguments.get("insert_line")
-    if new_code is None or insert_line is None:
+    if new_str is None or insert_line is None:
         raise FunctionCallValidationError(
-            "insert_code requires 'new_code' and 'insert_line' arguments"
+            "insert_text requires 'new_str' and 'insert_line' arguments"
         )
     return FileEditAction(
-        path=file_path,
-        command="insert",
+        path=path,
+        command="insert_text",
         insert_line=int(insert_line),
-        new_str=new_code,
+        new_str=new_str,
         impl_source=FileEditSource.FILE_EDITOR,
     )
 
 
-def _handle_undo_last_edit_command(file_path: str) -> Action:
+def _handle_undo_last_edit_command(path: str) -> Action:
     """Handle undo_last_edit command — reverts last edit to file."""
     return FileEditAction(
-        path=file_path,
-        command="undo_edit",
+        path=path,
+        command="undo_last_edit",
         impl_source=FileEditSource.FILE_EDITOR,
     )
 
 
-def _handle_structure_editor_tool(arguments: dict) -> Action:
+def _handle_ast_code_editor_tool(arguments: dict) -> Action:
     """Handle StructureEditor tool call."""
     tool_name = create_structure_editor_tool()["function"]["name"]
 
     # Validate arguments
-    command, file_path = _validate_structure_editor_args(arguments, tool_name)
+    command, path = _validate_ast_code_editor_args(arguments, tool_name)
+    command, normalized_args = _normalize_ast_code_editor_alias(command, arguments)
+
+    file_editor_commands = {
+        "create_file",
+        "view_file",
+        "replace_text",
+        "insert_text",
+        "view_and_replace",
+        "undo_last_edit",
+    }
+    if command in file_editor_commands:
+        passthrough_args: dict[str, Any] = {
+            "command": command,
+            "path": path,
+        }
+        for key in (
+            "file_text",
+            "old_str",
+            "new_str",
+            "insert_line",
+            "view_range",
+            "normalize_ws",
+            "preview",
+            "confidence",
+            "security_risk",
+        ):
+            if key in normalized_args:
+                passthrough_args[key] = normalized_args[key]
+        return _handle_str_replace_editor_tool(passthrough_args)
 
     # Initialize editor
     try:
@@ -1035,7 +1080,7 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
 
     # Command dispatch map — editor-powered commands use the StructureEditor instance
     editor_command_handlers = {
-        "edit_function": _handle_edit_function_command,
+        "edit_symbol_body": _handle_edit_symbol_body_command,
         "rename_symbol": _handle_rename_symbol_command,
         "find_symbol": _handle_find_symbol_command,
         "replace_range": _handle_replace_range_command,
@@ -1045,7 +1090,7 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
     simple_command_handlers = {
         "create_file": lambda fp, args: _handle_create_file_command(fp, args),
         "view_file": lambda fp, _args: _handle_view_file_command(fp),
-        "insert_code": lambda fp, args: _handle_insert_code_command(fp, args),
+        "insert_text": lambda fp, args: _handle_insert_text_command(fp, args),
         "undo_last_edit": lambda fp, _args: _handle_undo_last_edit_command(fp),
     }
 
@@ -1053,14 +1098,14 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
     try:
         if command in editor_command_handlers:
             handler = editor_command_handlers[command]
-            return handler(editor, file_path, arguments)
+            return handler(editor, path, normalized_args)
         elif command in simple_command_handlers:
             simple_handler = simple_command_handlers[command]
-            return simple_handler(file_path, arguments)
+            return simple_handler(path, normalized_args)
         else:
             all_cmds = list(editor_command_handlers) + list(simple_command_handlers)
             raise FunctionCallValidationError(
-                f"Unknown command '{command}' for structure_editor tool. "
+                f"Unknown command '{command}' for ast_code_editor tool. "
                 f"Valid commands: {all_cmds}"
             )
 
@@ -1068,62 +1113,55 @@ def _handle_structure_editor_tool(arguments: dict) -> Action:
         return MessageAction(content=f"❌ Structure Editor error: {str(e)}")
 
 
-def _handle_uncertainty_tool(arguments: dict) -> Action:
-    """Handle uncertainty tool — let the LLM flag doubt rather than guess."""
-    from backend.events.action.agent import UncertaintyAction
-
-    level = arguments.get("uncertainty_level", 0.5)
-    thought = arguments.get("thought", "")
-    concerns = arguments.get("specific_concerns", [])
-    requested = arguments.get("requested_information", "")
-    return UncertaintyAction(
-        uncertainty_level=float(level),
-        thought=thought,
-        specific_concerns=list(concerns) if concerns else [],
-        requested_information=requested or "",
-    )
-
-
-def _handle_clarification_tool(arguments: dict) -> Action:
-    """Handle clarification tool — pause and surface question to user."""
-    from backend.events.action.agent import ClarificationRequestAction
-
-    question = arguments.get("question", "")
+def _handle_communicate_tool(arguments: dict) -> Action:
+    """Route the unified communicate tool to the specific Action class based on intent."""
+    intent = arguments.get("intent", "clarification")
+    message = arguments.get("message", "")
+    options = arguments.get("options", [])
     context = arguments.get("context", "")
-    options = arguments.get("options", [])
-    if not question:
-        raise FunctionCallValidationError(
-            'Missing required argument "question" in tool call clarification'
+    thought = arguments.get("thought", "")
+
+    if intent == "uncertainty":
+        from backend.events.action.agent import UncertaintyAction
+        return UncertaintyAction(
+            uncertainty_level=0.5,
+            specific_concerns=[message],
+            requested_information=context,
+            thought=thought,
         )
-    return ClarificationRequestAction(
-        question=question,
-        context=context or "",
-        options=list(options) if options else [],
-        thought=question,
-    )
-
-
-def _handle_proposal_tool(arguments: dict) -> Action:
-    """Handle proposal tool — present options before committing."""
-    from backend.events.action.agent import ProposalAction
-
-    options = arguments.get("options", [])
-    rationale = arguments.get("rationale", "")
-    recommended = arguments.get("recommended")
-    if not options:
-        raise FunctionCallValidationError(
-            'Missing required argument "options" in tool call proposal'
+        
+    elif intent == "proposal":
+        from backend.events.action.agent import ProposalAction
+        # Format the options cleanly for the existing UI
+        formatted_options = [{"approach": opt, "pros": [], "cons": []} for opt in options] if options else [{"approach": message}]
+        return ProposalAction(
+            options=formatted_options,
+            rationale=context or message,
+            thought=thought,
+            recommended=0
         )
-    return ProposalAction(
-        options=list(options),
-        recommended=int(recommended) if recommended is not None else 0,
-        rationale=rationale or "",
-        thought=rationale or "",
-    )
+        
+    elif intent == "escalate":
+        from backend.events.action.agent import EscalateToHumanAction
+        return EscalateToHumanAction(
+            reason=message,
+            attempts_made=[context] if context else [],
+            specific_help_needed="",
+            thought=thought,
+        )
+        
+    else: # Default to clarification
+        from backend.events.action.agent import ClarificationRequestAction
+        return ClarificationRequestAction(
+            question=message,
+            options=options,
+            context=context,
+            thought=thought,
+        )
 
 
 def _handle_batch_edit_tool(arguments: dict) -> CmdRunAction:
-    """Handle batch_edit tool call — atomic multi-file str_replace with rollback."""
+    """Handle batch_edit tool call — atomic multi-file replace_text with rollback."""
     edits = arguments.get("edits")
     if not edits or not isinstance(edits, list):
         raise FunctionCallValidationError(
@@ -1133,37 +1171,17 @@ def _handle_batch_edit_tool(arguments: dict) -> CmdRunAction:
     return build_batch_edit_action(edits, preview=bool(preview))
 
 
-def _handle_escalate_tool(arguments: dict) -> Action:
-    """Handle escalate_to_human tool — request human intervention."""
-    from backend.events.action.agent import EscalateToHumanAction
-
-    reason = arguments.get("reason", "")
-    attempts = arguments.get("attempts_made", [])
-    help_needed = arguments.get("specific_help_needed", "")
-    if not reason:
-        raise FunctionCallValidationError(
-            'Missing required argument "reason" in tool call escalate_to_human'
-        )
-    return EscalateToHumanAction(
-        reason=reason,
-        attempts_made=list(attempts) if attempts else [],
-        specific_help_needed=help_needed or "",
-        thought=reason,
-    )
-
-
-
-def _handle_query_toolbox_tool(
+def _handle_search_available_tools_tool(
     arguments: dict,
     mcp_tool_names: list[str] | None = None,
     mcp_tools: list[dict] | None = None
 ) -> Action:
-    return build_query_toolbox_action(arguments)
+    return build_search_available_tools_action(arguments)
 
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
-        QUERY_TOOLBOX_TOOL_NAME: _handle_query_toolbox_tool,
+        SEARCH_AVAILABLE_TOOLS_TOOL_NAME: _handle_search_available_tools_tool,
         create_cmd_run_tool()["function"]["name"]: _handle_cmd_run_tool,
         create_finish_tool()["function"]["name"]: _handle_finish_tool,
         create_llm_based_edit_tool()["function"][
@@ -1174,48 +1192,38 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         ]: _handle_str_replace_editor_tool,
         create_structure_editor_tool()["function"][
             "name"
-        ]: _handle_structure_editor_tool,
+        ]: _handle_ast_code_editor_tool,
         create_think_tool()["function"]["name"]: _handle_think_tool,
-        create_condensation_request_tool()["function"][
+        create_summarize_context_tool()["function"][
             "name"
-        ]: _handle_condensation_request_tool,
+        ]: _handle_summarize_context_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
-        create_note_tool()["function"]["name"]: _handle_note_tool,
-        create_recall_tool()["function"]["name"]: _handle_recall_tool,
-        create_semantic_recall_tool()["function"]["name"]: _handle_semantic_recall_tool,
-        create_run_tests_tool()["function"]["name"]: _handle_run_tests_tool,
+        MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
         create_apply_patch_tool()["function"]["name"]: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
-        WEB_SEARCH_TOOL_NAME: _handle_web_search_tool,
         "check_tool_status": lambda args: _handle_check_tool_status_tool(
             args, {}
         ),  # Simplified for static map
         WORKSPACE_STATUS_TOOL_NAME: _handle_workspace_status_tool,
-        ERROR_PATTERNS_TOOL_NAME: _handle_error_patterns_tool,
+        QUERY_ERROR_SOLUTIONS_TOOL_NAME: _handle_query_error_solutions_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
-        PROJECT_MAP_TOOL_NAME: _handle_project_map_tool,
-        REVERT_TO_SAFE_STATE_TOOL_NAME: build_revert_to_safe_state_action,
+        ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
+        REVERT_TO_CHECKPOINT_TOOL_NAME: build_revert_to_checkpoint_action,
         SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,
-        VERIFY_STATE_TOOL_NAME: _handle_verify_state_tool,
-        WORKING_MEMORY_TOOL_NAME: _handle_working_memory_tool,
+        VERIFY_FILE_LINES_TOOL_NAME: _handle_verify_file_lines_tool,
         DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
         LSP_QUERY_TOOL_NAME: build_lsp_query_action,
         SIGNAL_PROGRESS_TOOL_NAME: build_signal_progress_action,
         VERIFY_UI_CHANGE_TOOL_NAME: build_verify_ui_change_action,
         BLACKBOARD_TOOL_NAME: build_blackboard_action,
         BATCH_EDIT_TOOL_NAME: _handle_batch_edit_tool,
-        TERMINAL_OPEN_TOOL_NAME: build_terminal_open_action,
-        TERMINAL_INPUT_TOOL_NAME: build_terminal_input_action,
-        TERMINAL_READ_TOOL_NAME: build_terminal_read_action,
+        TERMINAL_MANAGER_TOOL_NAME: handle_terminal_manager_tool,
         "explore_tree_structure": build_explore_tree_structure_action,
-        "get_entity_contents": build_get_entity_contents_action,
+        "read_symbol_definition": build_read_symbol_definition_action,
         # Meta-cognition tools
-        UNCERTAINTY_TOOL_NAME: _handle_uncertainty_tool,
-        CLARIFICATION_TOOL_NAME: _handle_clarification_tool,
-        PROPOSAL_TOOL_NAME: _handle_proposal_tool,
-        ESCALATE_TOOL_NAME: _handle_escalate_tool,
+        COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
         # MCP gateway
-        MCP_GATEWAY_TOOL_NAME: _handle_mcp_gateway_tool,
+        EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
     }
 
 

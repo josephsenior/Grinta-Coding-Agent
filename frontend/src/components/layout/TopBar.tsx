@@ -1,7 +1,5 @@
-import { Link, useLocation } from "react-router-dom";
-import { Hammer, Settings, Sun, Moon, Search, BookOpen, Plus, Loader2 } from "lucide-react";
+import { Settings, Sun, Moon, BookOpen, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -9,15 +7,21 @@ import {
 } from "@/components/ui/tooltip";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
-import { CommandMenu } from "@/components/common/CommandMenu";
+import { useEffect } from "react";
 import { useBackendHealth } from "@/hooks/use-backend-health";
 import { useNewConversation } from "@/hooks/use-new-conversation";
+import { useAppStore } from "@/stores/app-store";
 
-const navItems = [
-  { to: "/", icon: Hammer, label: "Home" },
-  { to: "/knowledge", icon: BookOpen, label: "Knowledge" },
-];
+/** Compact primary actions: light = high-contrast pill; dark = soft card surface (no pure white). */
+function topNavPill(active?: boolean) {
+  return cn(
+    "h-7 shrink-0 gap-1 rounded-md border px-2 text-xs font-medium shadow-sm transition-colors",
+    "border-transparent bg-neutral-950 text-white hover:bg-neutral-800 hover:text-white",
+    "dark:border-border/55 dark:bg-card dark:text-foreground dark:shadow-none dark:hover:bg-muted dark:hover:text-foreground",
+    "[&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-current",
+    active && "ring-1 ring-primary/50 ring-offset-1 ring-offset-background dark:ring-offset-background",
+  );
+}
 
 function formatUptime(s: number): string {
   if (s < 60) return `${Math.round(s)}s`;
@@ -27,10 +31,12 @@ function formatUptime(s: number): string {
 
 export function TopBar() {
   const { theme, toggleTheme } = useTheme();
-  const location = useLocation();
-  const [commandOpen, setCommandOpen] = useState(false);
   const { connected, uptime_seconds } = useBackendHealth();
   const { create: handleCreate, isPending: isCreating } = useNewConversation();
+  const settingsWindowOpen = useAppStore((s) => s.settingsWindowOpen);
+  const setSettingsWindowOpen = useAppStore((s) => s.setSettingsWindowOpen);
+  const knowledgeWindowOpen = useAppStore((s) => s.knowledgeWindowOpen);
+  const setKnowledgeWindowOpen = useAppStore((s) => s.setKnowledgeWindowOpen);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -45,39 +51,23 @@ export function TopBar() {
 
   return (
     <>
-      <header className="flex h-14 shrink-0 items-center justify-between border-b px-4">
-        {/* Left: Logo + Nav */}
-        <div className="flex items-center gap-1">
-          <Link
-            to="/"
-            className="mr-4 flex items-center gap-2 font-bold text-lg"
-          >
-            <Hammer className="h-5 w-5 text-primary" />
-            <span>Forge</span>
-          </Link>
-
-          <nav className="flex items-center gap-0.5">
-            {navItems.map(({ to, icon: Icon, label }) => (
-              <Tooltip key={to}>
-                <TooltipTrigger asChild>
-                  <Link
-                    to={to}
-                    className={cn(
-                      "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
-                      location.pathname === to
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="hidden md:inline">{label}</span>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent>{label}</TooltipContent>
-              </Tooltip>
-            ))}
-
-            <Separator orientation="vertical" className="mx-1 h-6 shrink-0" />
+      <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
+        <nav className="flex min-w-0 flex-1 items-center gap-2" aria-label="Main">
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setKnowledgeWindowOpen(true)}
+                  className={topNavPill(knowledgeWindowOpen)}
+                >
+                  <BookOpen className="shrink-0" />
+                  <span className="hidden md:inline">Knowledge</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Knowledge base</TooltipContent>
+            </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
@@ -86,26 +76,25 @@ export function TopBar() {
                   size="sm"
                   onClick={handleCreate}
                   disabled={isCreating}
-                  className="h-8 gap-1.5 px-3 text-primary hover:text-primary"
+                  className={topNavPill(false)}
                 >
                   {isCreating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="shrink-0 animate-spin" />
                   ) : (
-                    <Plus className="h-4 w-4" />
+                    <Plus className="shrink-0" />
                   )}
                   <span className="hidden sm:inline">New</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>New Conversation (Ctrl+N)</TooltipContent>
             </Tooltip>
-          </nav>
-        </div>
+          </div>
+        </nav>
 
-        {/* Right: Status + Search + Theme + Settings */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="flex h-8 w-8 items-center justify-center cursor-default">
+              <span className="flex h-7 w-7 items-center justify-center cursor-default">
                 <span
                   className={cn(
                     "h-2 w-2 rounded-full transition-colors",
@@ -129,24 +118,11 @@ export function TopBar() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCommandOpen(true)}
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Search (Ctrl+K)</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={toggleTheme}>
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={toggleTheme}>
                 {theme === "dark" ? (
-                  <Sun className="h-4 w-4" />
+                  <Sun className="h-3.5 w-3.5" />
                 ) : (
-                  <Moon className="h-4 w-4" />
+                  <Moon className="h-3.5 w-3.5" />
                 )}
               </Button>
             </TooltipTrigger>
@@ -155,25 +131,23 @@ export function TopBar() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link
-                to="/settings"
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSettingsWindowOpen(true)}
                 className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 transition-colors hover:bg-accent hover:text-accent-foreground",
-                  location.pathname.startsWith("/settings")
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground",
+                  "h-7 gap-1.5 px-2 text-xs text-muted-foreground",
+                  settingsWindowOpen && "bg-accent text-accent-foreground",
                 )}
               >
-                <Settings className="h-4 w-4" />
-                <span className="hidden md:inline text-sm font-medium">Settings</span>
-              </Link>
+                <Settings className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden md:inline">Settings</span>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>
         </div>
       </header>
-
-      <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} />
     </>
   );
 }

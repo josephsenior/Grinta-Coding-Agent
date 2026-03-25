@@ -33,18 +33,6 @@ class TestInitializeToolPipeline:
             len(middlewares) >= 5
         )  # at least safety, idempotency, cb, cost, rollback, ...
 
-    def test_includes_planning_middleware_when_enabled(self):
-        config = SimpleNamespace(
-            enable_planning_middleware=True,
-            enable_reflection_middleware=False,
-        )
-        ctx = _make_context(agent_config=config)
-        svc = TelemetryService(ctx)
-        svc.initialize_tool_pipeline()
-        middlewares = ctx.initialize_tool_pipeline.call_args[0][0]
-        class_names = [type(m).__name__ for m in middlewares]
-        assert "PlanningMiddleware" in class_names
-
     def test_includes_reflection_middleware_when_enabled(self):
         config = SimpleNamespace(
             enable_planning_middleware=False,

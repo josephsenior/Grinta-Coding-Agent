@@ -20,7 +20,7 @@ from backend.events.action.agent import (
     EscalateToHumanAction,
     PlaybookFinishAction,
     ProposalAction,
-    QueryToolboxAction,
+    SearchAvailableToolsAction,
     RecallAction,
     TaskTrackingAction,
     UncertaintyAction,
@@ -63,7 +63,7 @@ actions = (
     EscalateToHumanAction,
     DelegateTaskAction,
     BlackboardAction,
-    QueryToolboxAction,
+    SearchAvailableToolsAction,
 )
 ACTION_TYPE_TO_CLASS = {action_class.action: action_class for action_class in actions}
 

@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import backend
+from backend.core.constants import RECALL_PIPELINE_TIMEOUT_SECONDS
 from backend.core.logger import forge_logger as logger
 from backend.events.action.agent import RecallAction
 from backend.core.enums import RecallType
@@ -21,7 +23,7 @@ from backend.events.observation.agent import (
     RecallObservation,
 )
 from backend.events.stream import EventStream, EventStreamSubscriber
-from backend.knowledge import KnowledgeBaseManager
+from backend.knowledge_base import KnowledgeBaseManager
 from backend.core.enums import RuntimeStatus
 from backend.utils.async_utils import run_or_schedule
 from backend.utils.prompt import ConversationInstructions, RepositoryInfo, RuntimeInfo
@@ -88,17 +90,43 @@ class Memory:
         try:
             if not isinstance(event, RecallAction):
                 return
-            observation = await self._process_recall_with_retry(event)
-            if observation is None:
-                observation = cast(
-                    RecallObservation, self._build_failure_observation(event)
+            # KB / vector search is synchronous and can block for minutes. Running it on the
+            # default event loop stalls the whole session (pending RecallAction never clears).
+            try:
+                observation = await asyncio.wait_for(
+                    asyncio.to_thread(self._complete_recall_pipeline_sync, event),
+                    timeout=RECALL_PIPELINE_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Recall pipeline timed out after %.0fs (event id=%s, type=%s)",
+                    RECALL_PIPELINE_TIMEOUT_SECONDS,
+                    getattr(event, "id", None),
+                    event.recall_type,
+                )
+                observation = RecallFailureObservation(
+                    recall_type=event.recall_type,
+                    error_message="Recall timed out",
+                    content=(
+                        f"Recall timed out after {RECALL_PIPELINE_TIMEOUT_SECONDS:.0f}s "
+                        "(knowledge-base / vector search may be overloaded)."
+                    ),
                 )
             observation.cause = event.id
             self.event_stream.add_event(observation, EventSource.ENVIRONMENT)
         except Exception as exc:
             await self._handle_recall_exception(event, exc)
 
-    async def _process_recall_with_retry(
+    def _complete_recall_pipeline_sync(self, event: RecallAction) -> RecallObservation | RecallFailureObservation:
+        """Run retry loop in a worker thread (see _on_event). Always returns an observation."""
+        observation = self._process_recall_with_retry_sync(event)
+        if observation is None:
+            # No playbook/KB hits (or unsupported recall shape) is success with nothing to add —
+            # not a user-visible "Recall failed" (see _on_playbook_recall / _on_workspace_context_recall).
+            return self._empty_recall_success(event)
+        return observation
+
+    def _process_recall_with_retry_sync(
         self, event: RecallAction, max_attempts: int = 3
     ) -> RecallObservation | None:
         attempt = 0
@@ -117,7 +145,7 @@ class Memory:
                         exc,
                     )
                     break
-                await self._backoff_retry(attempt, exc)
+                self._backoff_retry_sync(attempt, exc)
         return None
 
     def _process_recall_once(
@@ -143,7 +171,7 @@ class Memory:
             return self._on_playbook_recall(event)
         return None
 
-    async def _backoff_retry(self, attempt: int, exc: Exception) -> None:
+    def _backoff_retry_sync(self, attempt: int, exc: Exception) -> None:
         backoff = min(0.8, 0.2 * (2 ** (attempt - 1)))
         jitter = 0.05 * attempt
         sleep_time = backoff + jitter
@@ -153,15 +181,34 @@ class Memory:
             exc,
             sleep_time,
         )
-        await asyncio.sleep(sleep_time)
+        time.sleep(sleep_time)
 
-    def _build_failure_observation(
-        self, event: RecallAction
-    ) -> RecallFailureObservation:
-        return RecallFailureObservation(
-            recall_type=event.recall_type,
-            error_message="Recall failed after retries",
-            content="Recall failure",
+    def _empty_recall_success(self, event: RecallAction) -> RecallObservation:
+        """Recall completed with nothing to inject into the prompt (not a failure)."""
+        if event.recall_type == RecallType.WORKSPACE_CONTEXT:
+            repo_info = self._get_repo_info_fields()
+            runtime_info = self._get_runtime_info_fields()
+            conversation_instructions = self._get_conversation_instructions()
+            return RecallObservation(
+                recall_type=RecallType.WORKSPACE_CONTEXT,
+                repo_name=repo_info["repo_name"],
+                repo_directory=repo_info["repo_directory"],
+                repo_branch=repo_info["repo_branch"],
+                repo_instructions="",
+                runtime_hosts=runtime_info["runtime_hosts"],
+                additional_agent_instructions=runtime_info["additional_agent_instructions"],
+                playbook_knowledge=[],
+                content="",
+                date=runtime_info["date"],
+                custom_secrets_descriptions=runtime_info["custom_secrets_descriptions"],
+                conversation_instructions=conversation_instructions,
+                working_dir=runtime_info["working_dir"],
+            )
+        return RecallObservation(
+            recall_type=RecallType.KNOWLEDGE,
+            playbook_knowledge=[],
+            knowledge_base_results=[],
+            content="",
         )
 
     async def _handle_recall_exception(self, event: Event, exc: Exception) -> None:
@@ -296,18 +343,31 @@ class Memory:
         # Find playbook knowledge based on query
         playbook_knowledge = self._find_playbook_knowledge(event.query)
 
-        # Check if we should create a recall observation
-        if not self._should_create_recall_observation(
-            repo_instructions, playbook_knowledge
-        ):
-            return None
-
-        # Get all required fields
+        # Get all required fields (always emit an observation so the pipeline never treats
+        # "no repo/runtime yet" as RecallFailure; prompt_assembly drops empty content.)
         repo_info = self._get_repo_info_fields()
         runtime_info = self._get_runtime_info_fields()
         conversation_instructions = self._get_conversation_instructions()
 
-        # Create and return the recall observation
+        if not self._should_create_recall_observation(
+            repo_instructions, playbook_knowledge
+        ):
+            return RecallObservation(
+                recall_type=RecallType.WORKSPACE_CONTEXT,
+                repo_name=repo_info["repo_name"],
+                repo_directory=repo_info["repo_directory"],
+                repo_branch=repo_info["repo_branch"],
+                repo_instructions="",
+                runtime_hosts=runtime_info["runtime_hosts"],
+                additional_agent_instructions=runtime_info["additional_agent_instructions"],
+                playbook_knowledge=[],
+                content="",
+                date=runtime_info["date"],
+                custom_secrets_descriptions=runtime_info["custom_secrets_descriptions"],
+                conversation_instructions=conversation_instructions,
+                working_dir=runtime_info["working_dir"],
+            )
+
         return RecallObservation(
             recall_type=RecallType.WORKSPACE_CONTEXT,
             repo_name=repo_info["repo_name"],
@@ -362,7 +422,12 @@ class Memory:
                 knowledge_base_results=kb_results,
                 content="Retrieved knowledge from playbooks and knowledge base",
             )
-        return None
+        return RecallObservation(
+            recall_type=RecallType.KNOWLEDGE,
+            playbook_knowledge=[],
+            knowledge_base_results=[],
+            content="",
+        )
 
     def set_knowledge_base_settings(self, settings: KnowledgeBaseSettings) -> None:
         """Update knowledge base settings for this memory instance."""

@@ -15,7 +15,6 @@ from .lifecycle_service import LifecycleService
 from .metrics_service import MetricsService
 from .observation_service import ObservationService
 from .pending_action_service import PendingActionService
-from .recovery_service import RecoveryService
 from .retry_service import RetryService
 from .safety_service import SafetyService
 from .state_transition_service import (
@@ -49,7 +48,6 @@ __all__ = [
     "MetricsService",
     "ObservationService",
     "PendingActionService",
-    "RecoveryService",
     "SafetyService",
     "StateTransitionService",
     "RetryService",

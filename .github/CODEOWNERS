@@ -1,10 +1,6 @@
 # CODEOWNERS file for Forge repository
 # See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
-# TUI code owners
-/backend/tui/ @amanape
-
-
 # Evaluation code owners
 /evaluation/ @xingyaoww @neubig
 

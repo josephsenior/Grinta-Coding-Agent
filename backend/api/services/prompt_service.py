@@ -1,6 +1,6 @@
 """Prompt generation service for conversation context recall.
 
-Extracted from ``manage_conversations.py`` to keep route handlers thin.
+Extracted from ``conversation_collection.py`` to keep route handlers thin.
 Contains template rendering, LLM prompt generation, and contextual event
 retrieval for the ``remember-prompt`` endpoint.
 """
@@ -17,7 +17,7 @@ from backend.events.event_filter import EventFilter
 from backend.events.event_store import EventStore
 from backend.events.observation import AgentStateChangedObservation, NullObservation
 from backend.api.services.event_query_service import get_contextual_events_text
-from backend.api.shared import get_conversation_manager_impl
+from backend.api.app_accessors import get_conversation_manager_impl
 
 
 def get_contextual_events(event_store: EventStore, event_id: int) -> str:

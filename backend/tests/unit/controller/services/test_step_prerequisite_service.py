@@ -7,6 +7,8 @@ from backend.controller.services.step_prerequisite_service import (
     StepPrerequisiteService,
 )
 from backend.core.schemas import AgentState
+from backend.events import RecallType
+from backend.events.action.agent import RecallAction
 
 
 class TestStepPrerequisiteService(unittest.TestCase):
@@ -96,6 +98,19 @@ class TestStepPrerequisiteService(unittest.TestCase):
         # Should log with 'unknown' id
         call_args = self.mock_controller.log.call_args[0]
         self.assertIn("unknown", call_args[1])
+
+    def test_can_step_allows_pending_recall_action(self):
+        """Recall actions should not block the main step path."""
+        self.mock_controller.get_agent_state.return_value = AgentState.RUNNING
+        self.mock_context.pending_action = RecallAction(
+            query="q", recall_type=RecallType.KNOWLEDGE
+        )
+
+        result = self.service.can_step()
+
+        self.assertTrue(result)
+        call_kwargs = self.mock_controller.log.call_args[1]
+        self.assertEqual(call_kwargs["extra"]["msg_type"], "STEP_ALLOWED_PENDING_RECALL")
 
     def test_can_step_log_message_type_state(self):
         """Test can_step logs correct message type for state block."""

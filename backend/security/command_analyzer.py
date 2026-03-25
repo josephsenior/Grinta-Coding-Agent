@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from backend.validation.command_classification import argv_tokens
+
 logger = logging.getLogger(__name__)
 
 
@@ -256,14 +258,20 @@ class CommandAnalyzer:
         """Higher-level wrapper returning a :class:`CommandAssessment`.
 
         Delegates to :meth:`analyze` and enriches the result with boolean
-        convenience flags expected by integration tests.
+        convenience flags expected by integration tests. Risk policy remains
+        regex-oriented here; tokenization is shared with validation so both
+        layers reason over the same argv splitting rules.
         """
         risk, reason, recs = self.analyze(command)
         cmd = (command or "").strip()
-        is_network = bool(
-            re.search(r"\bcurl\b|\bwget\b|\bnc\b|\bscp\b|\brsync\b", cmd, re.I)
+        tokens = [t.lower() for t in argv_tokens(cmd)]
+        is_network = any(
+            tok in {"curl", "wget", "nc", "ncat", "netcat", "scp", "rsync"}
+            for tok in tokens
         )
-        is_encoded = bool(re.search(r"\bbase64\b|\bxxd\b|\b\\x[0-9a-f]", cmd, re.I))
+        is_encoded = any(tok in {"base64", "xxd"} for tok in tokens) or bool(
+            re.search(r"\b\\x[0-9a-f]", cmd, re.I)
+        )
 
         risk, reason = _escalate_encoded_risk(risk, reason, is_encoded)
         reason = _enrich_reason_with_keywords(risk, reason, is_network, is_encoded)

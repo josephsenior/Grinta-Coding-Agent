@@ -22,7 +22,7 @@ from backend.core.config.security_config import SecurityConfig
 from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
-    from backend.core.config.utils import ConfigLoadSummary
+    from backend.core.config.config_loader import ConfigLoadSummary
 
 
 def process_core_section(
@@ -232,7 +232,6 @@ def check_unknown_sections(toml_config: dict, toml_file: str) -> None:
         "runtime",
         "condenser",
         "mcp",
-        "model_aliases",
         "api_keys",
     }
     for key in toml_config:

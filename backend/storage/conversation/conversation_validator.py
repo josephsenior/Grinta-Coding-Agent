@@ -6,9 +6,10 @@ import os
 from datetime import UTC, datetime
 from typing import Literal
 
-from backend.core.config.utils import load_forge_config
+from backend.core.config.config_loader import load_forge_config
 from backend.core.logger import forge_logger as logger
 from backend.api.config.server_config import ServerConfig
+from backend.api.user_auth import get_current_user_id
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.data_models.conversation_metadata import ConversationMetadata
 from backend.utils.conversation_summary import get_default_conversation_title
@@ -82,9 +83,14 @@ class ConversationValidator:
         if self._mode == "strict":
             return await self._validate_strict(conversation_id, user_id)
 
-        # Permissive — original behaviour
-        metadata = await self._ensure_metadata_exists(conversation_id, user_id)
-        return metadata.user_id
+        # Permissive: when the socket is anonymous, use the same default user id as
+        # REST (`get_user_id` / `get_current_user_id`, e.g. oss_user). Otherwise
+        # metadata and events were stored under `sessions/` or `users/dev-user/`
+        # while the API listed and loaded history under `users/oss_user/`, so the
+        # UI saw an empty thread and replay logged "Replayed 0 events".
+        effective_id = user_id or get_current_user_id()
+        await self._ensure_metadata_exists(conversation_id, effective_id)
+        return effective_id
 
     # ------------------------------------------------------------------
     # Strict-mode helpers

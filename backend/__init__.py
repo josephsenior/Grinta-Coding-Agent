@@ -9,31 +9,38 @@ __package_name__ = "forge-ai"
 
 
 def get_version() -> str:
-    """Get the package version from metadata or pyproject.toml fallback.
+    """Get the package version from metadata or pyproject.toml fallback."""
+    from_metadata = _version_from_metadata()
+    if from_metadata:
+        return from_metadata
+    from_pyproject = _version_from_pyproject()
+    if from_pyproject:
+        return from_pyproject
+    return "0.55.0"
 
-    Returns:
-        Version string or 'unknown' if version cannot be determined
 
-    """
-    # 1. Try metadata (installed package)
+def _version_from_metadata() -> str | None:
+    """Try to get version from installed package metadata."""
     try:
         return version(__package_name__)
     except PackageNotFoundError:
-        pass
+        return None
 
-    # 2. Try pyproject.toml (local dev)
+
+def _version_from_pyproject() -> str | None:
+    """Try to get version from pyproject.toml (local dev)."""
     try:
         root_dir = Path(__file__).resolve().parent.parent
         pyproject_path = root_dir / "pyproject.toml"
-        if pyproject_path.exists():
-            with open(pyproject_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip().startswith("version ="):
-                        return line.split("=", 1)[1].strip().strip('"').strip("'")
+        if not pyproject_path.exists():
+            return None
+        with open(pyproject_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip().startswith("version ="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
     except Exception:
         pass
-
-    return "0.55.0" # Default fallback
+    return None
 
 
 try:

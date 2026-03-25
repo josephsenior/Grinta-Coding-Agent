@@ -405,10 +405,10 @@ class BlackboardAction(Action):
 
 
 @dataclass
-class QueryToolboxAction(Action):
+class SearchAvailableToolsAction(Action):
     """An action where the agent queries the full registry of tools based on semantic tags or keywords."""
     capability_query: str = ""
-    action: ClassVar[str] = ActionType.QUERY_TOOLBOX
+    action: ClassVar[str] = ActionType.SEARCH_AVAILABLE_TOOLS
     runnable: ClassVar[bool] = False
 
     @property

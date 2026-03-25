@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 def _get_templates_dir() -> PathLib:
     """Get templates directory."""
-    workspace_base = PathLib(get_app_state().config.workspace_base or ".")
-    templates_dir = workspace_base / "templates"
+    project_root = PathLib(get_app_state().config.project_root or ".")
+    templates_dir = project_root / "templates"
     templates_dir.mkdir(parents=True, exist_ok=True)
     return templates_dir
 

@@ -122,19 +122,9 @@ Forge automatically discovers running local providers (Ollama, LM Studio, vLLM):
 2. Set `llm_model = "ollama/llama3.2"` (or `lmstudio/...`) in `settings.json`.
 3. Forge probes localhost ports (:11434, :1234, :8000) and routes locally with ZERO manual configuration.
 
-### Model Aliases
+### Model identifiers
 
-Define semantic aliases in `settings.json` to swap models without changing code:
-
-```json
-"model_aliases": {
-  "coding": "claude-3-7-sonnet",
-  "fast": "gpt-4o-mini",
-  "local": "ollama/qwen2.5-coder"
-}
-```
-
-Then use `llm_model = "coding"` in your settings or agent config.
+Use the provider’s canonical model id in `llm_model` (and in LLM config), for example `ollama/llama3.2` or `claude-3-7-sonnet-20250219`. There is no separate alias map.
 
 ---
 
@@ -181,7 +171,7 @@ Forge detects if the agent is looping by analyzing action patterns, semantic int
 
 ## 📖 Documentation
 
-- [User Guide](docs/USER_GUIDE.md) — LLM setup, autonomy modes, playbooks, and TUI usage.
+- [User Guide](docs/USER_GUIDE.md) — LLM setup, autonomy modes, playbooks, and web UI usage.
 - [Architecture](docs/ARCHITECTURE.md) — Deeper dive into the controller, events, and engine layers.
 - [Developer Guide](docs/DEVELOPER.md) — For contributors: project layout, internals, and patterns.
 - [API Reference](openapi.json) — Full OpenAPI 3.1 spec for the backend.

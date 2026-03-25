@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from starlette.requests import Request
 
-from backend.api.routes.manage_conversations import (
+from backend.api.routes.conversation_collection import (
     ConversationResponse,
     InitSessionRequest,
     UpdateConversationRequest,
@@ -45,7 +46,11 @@ async def test_create_conversation_handler_success() -> None:
 
     with (
         patch(
-            "backend.api.routes.manage_conversations.extract_request_data",
+            "backend.core.workspace_resolution.get_effective_workspace_root",
+            return_value=Path("/tmp"),
+        ),
+        patch(
+            "backend.api.routes.conversation_collection.extract_request_data",
             return_value=(
                 None,
                 None,
@@ -59,27 +64,27 @@ async def test_create_conversation_handler_success() -> None:
             ),
         ),
         patch(
-            "backend.api.routes.manage_conversations.determine_conversation_trigger",
+            "backend.api.routes.conversation_collection.determine_conversation_trigger",
             return_value=(ConversationTrigger.GUI, None, None),
         ),
         patch(
-            "backend.api.routes.manage_conversations.apply_conversation_overrides",
+            "backend.api.routes.conversation_collection.apply_conversation_overrides",
             return_value=(None, None, "hello"),
         ),
         patch(
-            "backend.api.routes.manage_conversations.validate_remote_api_request",
+            "backend.api.routes.conversation_collection.validate_remote_api_request",
             return_value=None,
         ),
         patch(
-            "backend.api.routes.manage_conversations.prepare_conversation_params",
+            "backend.api.routes.conversation_collection.prepare_conversation_params",
             return_value=("user-1", {}, None),
         ),
         patch(
-            "backend.api.routes.manage_conversations.resolve_conversation_id",
+            "backend.api.routes.conversation_collection.resolve_conversation_id",
             return_value="conv-1",
         ),
         patch(
-            "backend.api.routes.manage_conversations.handle_regular_conversation",
+            "backend.api.routes.conversation_collection.handle_regular_conversation",
             AsyncMock(return_value=SimpleNamespace(status=ConversationStatus.STARTING)),
         ),
     ):
@@ -105,15 +110,15 @@ async def test_search_conversations_handler_success() -> None:
 
     with (
         patch(
-            "backend.api.routes.manage_conversations.get_user_id",
+            "backend.api.routes.conversation_collection.get_user_id",
             MagicMock(return_value="user-1"),
         ),
         patch(
-            "backend.api.routes.manage_conversations.get_conversation_store",
+            "backend.api.routes.conversation_collection.get_conversation_store",
             AsyncMock(return_value=MagicMock()),
         ),
         patch(
-            "backend.api.routes.manage_conversations._search_conversations_impl",
+            "backend.api.routes.conversation_collection._search_conversations_impl",
             AsyncMock(return_value=expected),
         ) as search_impl,
     ):
@@ -138,19 +143,19 @@ async def test_get_update_delete_handlers() -> None:
 
     with (
         patch(
-            "backend.api.routes.manage_conversations.get_user_id",
+            "backend.api.routes.conversation_collection.get_user_id",
             MagicMock(return_value="user-1"),
         ),
         patch(
-            "backend.api.routes.manage_conversations.get_conversation_store",
+            "backend.api.routes.conversation_collection.get_conversation_store",
             AsyncMock(return_value=store),
         ),
         patch(
-            "backend.api.routes.manage_conversations.get_conversation_details",
+            "backend.api.routes.conversation_collection.get_conversation_details",
             AsyncMock(return_value={"conversation_id": "conv-1"}),
         ) as get_impl,
         patch(
-            "backend.api.routes.manage_conversations.delete_conversation_entry",
+            "backend.api.routes.conversation_collection.delete_conversation_entry",
             AsyncMock(return_value=True),
         ) as delete_impl,
     ):
@@ -169,3 +174,4 @@ async def test_get_update_delete_handlers() -> None:
     get_impl.assert_awaited_once()
     delete_impl.assert_awaited_once()
     store.save_metadata.assert_awaited_once()
+

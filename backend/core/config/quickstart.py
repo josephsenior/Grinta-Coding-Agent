@@ -45,12 +45,11 @@ def generate_quickstart_config(
         A JSON-formatted configuration string.
     """
     config = {
-        "workspace_base": "./workspace",
+        "project_root": "./workspace",
         "max_budget_per_task": max_budget,
         "llm_model": model,
         "llm_api_key": api_key,
         "llm_base_url": base_url or "",
-        "model_aliases": {"coding": model, "fast": model},
     }
     return json.dumps(config, indent=2)
 

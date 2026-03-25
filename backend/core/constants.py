@@ -27,17 +27,21 @@ def _parse_bool_env(var: str, default: str = "false") -> bool:
 # ── Core Identity & Limits ──────────────────────────────────────────
 FORGE_DEFAULT_AGENT = "Orchestrator"
 FORGE_MAX_ITERATIONS = (
-    500  # Increased from 100 for complex tasks with dynamic iteration management
+    10000  # effectively unlimited flexibility
 )
 
 # ── Workspace & Paths ───────────────────────────────────────────────
 JWT_SECRET_FILE = ".jwt_secret"
-DEFAULT_WORKSPACE_BASE = "~/.Forge"
+# Default disk root for LocalFileStore when settings do not set ``local_data_root``.
+DEFAULT_LOCAL_DATA_ROOT = "storage"
+
 DEFAULT_CONFIG_FILE = "settings.json"
 
 # ── URLs ────────────────────────────────────────────────────────────
 GUIDE_URL = "https://docs.forge.dev/guide"
 TROUBLESHOOTING_URL = "https://docs.forge.dev/usage/troubleshooting"
+# Host:port for the Forge MCP HTTP endpoint (same process as default dev API :3000)
+DEFAULT_MCP_HOST = "localhost:3000"
 
 # ── Security ────────────────────────────────────────────────────────
 SECRET_PLACEHOLDER = "**********"
@@ -47,7 +51,18 @@ SETTINGS_CACHE_TTL = 60  # seconds
 
 # ── Timeouts & Thresholds ───────────────────────────────────────────
 GENERAL_TIMEOUT = 15
+# Closing agent sessions during "Open workspace" (MCP teardown, runtime) often exceeds GENERAL_TIMEOUT.
+WORKSPACE_SWITCH_SESSION_CLOSE_TIMEOUT = 180
 COMPLETION_TIMEOUT = 30.0
+# Sync bridge for metadata updates: title path sleeps 5s then calls an LLM; 15s is too tight.
+CONVERSATION_METADATA_UPDATE_SYNC_TIMEOUT = 180.0
+# Recall runs KB / vector search synchronously; cap wall time so pending RecallAction always resolves.
+RECALL_PIPELINE_TIMEOUT_SECONDS = 90.0
+# Max seconds waiting for an observation matching a tool call before timing out.
+# 0 or negative = disabled (no timeout error, no watchdog).
+DEFAULT_PENDING_ACTION_TIMEOUT = 0.0
+# MCP (stdio/SSE) can exceed the default (npx cold start, slow servers). Pending actions use max(base, this).
+MCP_PENDING_ACTION_TIMEOUT_FLOOR = 0.0
 
 # ── Threshold Constants ─────────────────────────────────────────────
 MAX_LINES_TO_EDIT = 300
@@ -82,24 +97,28 @@ DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_ENABLE_BROWSER = True
 
 # ── Runtime Defaults ────────────────────────────────────────────────
-DEFAULT_RUNTIME_TIMEOUT = 120
+DEFAULT_RUNTIME_TIMEOUT = 900
 DEFAULT_RUNTIME_CLOSE_DELAY = 60
 DEFAULT_RUNTIME_AUTO_LINT_ENABLED = True
-DEFAULT_RUNTIME_KEEP_ALIVE = False
+DEFAULT_RUNTIME_KEEP_ALIVE = True
 
 # ── LLM Defaults ────────────────────────────────────────────────────
-DEFAULT_LLM_MODEL = "gemini-2.5-flash"
+# No default model until settings.json (llm_model) or env (LLM_MODEL) supplies one.
+# Flat settings.json llm_model overrides env when both are set (see load_from_json).
+DEFAULT_LLM_MODEL: str | None = None
 DEFAULT_LLM_NUM_RETRIES = 5
 DEFAULT_LLM_RETRY_MULTIPLIER = 8
 DEFAULT_LLM_RETRY_MIN_WAIT = 8
 DEFAULT_LLM_RETRY_MAX_WAIT = 64
 DEFAULT_LLM_MAX_MESSAGE_CHARS = 15000
-DEFAULT_LLM_TEMPERATURE = 0.0
-DEFAULT_LLM_TOP_P = 1.0
+DEFAULT_LLM_TEMPERATURE = 0.5
+DEFAULT_LLM_TOP_P = 0.95
 DEFAULT_LLM_CORRECT_NUM = 5
 
 # ── File Upload ─────────────────────────────────────────────────────
 DEFAULT_MAX_FILE_UPLOAD_SIZE_MB = 100
+DEFAULT_FILE_UPLOAD_RESTRICT_TYPES = False
+DEFAULT_FILE_UPLOAD_ALLOWED_EXTENSIONS = {".*"}
 FILES_TO_IGNORE = [
     ".git/",
     ".DS_Store",
@@ -116,8 +135,8 @@ CURRENT_AGENT_CONFIG_SCHEMA_VERSION = "2025-11-14"
 DEFAULT_AGENT_MEMORY_ENABLED = True
 DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED = True
 DEFAULT_AGENT_BROWSING_ENABLED = True
-DEFAULT_AGENT_VECTOR_MEMORY_ENABLED = False
-DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED = False
+DEFAULT_AGENT_VECTOR_MEMORY_ENABLED = True
+DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED = True
 DEFAULT_AGENT_PROMPT_CACHING_ENABLED = True
 DEFAULT_AGENT_AUTO_LINT_ENABLED = True
 DEFAULT_AGENT_CONFIRM_ACTIONS = False
@@ -126,10 +145,7 @@ DEFAULT_AGENT_AUTONOMY_LEVEL = "balanced"
 DEFAULT_AGENT_CMD_ENABLED = True
 DEFAULT_AGENT_THINK_ENABLED = True
 DEFAULT_AGENT_FINISH_ENABLED = True
-DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = False
-DEFAULT_AGENT_EDITOR_ENABLED = True
-DEFAULT_AGENT_LLM_EDITOR_ENABLED = False
-DEFAULT_AGENT_ULTIMATE_EDITOR_ENABLED = False
+DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = True
 DEFAULT_AGENT_HISTORY_TRUNCATION_ENABLED = True
 DEFAULT_AGENT_PLAN_MODE_ENABLED = True
 DEFAULT_AGENT_MCP_ENABLED = True
@@ -146,15 +162,38 @@ DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS = 0
 DEFAULT_AGENT_STUCK_DETECTION_ENABLED = False
 DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS = 0
 DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED = True
-DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = False
+DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = True
 DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME = "system_prompt.j2"
 DEFAULT_AGENT_CLI_MODE = False
+DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT = True
+DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY = False
+# Heuristic keyword/turn-based tool filtering (ToolSelector); default off for reliability.
+DEFAULT_AGENT_ENABLE_PROGRESSIVE_TOOLS = False
 DEFAULT_FORGE_MCP_CONFIG_CLS = "backend.core.config.mcp_config.ForgeMCPConfig"
 DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS = 5
 DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS = 10
 DEFAULT_AGENT_MAX_STUCK_DETECTIONS = 15
 DEFAULT_AGENT_MAX_ERROR_RATE = 0.5
 DEFAULT_AGENT_ERROR_RATE_WINDOW = 10
+
+# ── Knowledge Base Defaults ─────────────────────────────────────────
+DEFAULT_KB_ENABLED = True
+DEFAULT_KB_ACTIVE_COLLECTION_IDS: list[str] = []
+DEFAULT_KB_SEARCH_TOP_K = 5
+DEFAULT_KB_RELEVANCE_THRESHOLD = 0.7
+DEFAULT_KB_AUTO_SEARCH = True
+DEFAULT_KB_SEARCH_STRATEGY = "hybrid"
+
+# ── Graph RAG Defaults ──────────────────────────────────────────────
+DEFAULT_GRAPH_RAG_ENABLED = False
+DEFAULT_GRAPH_RAG_PERSISTENCE_PATH = "storage/graph_rag"
+DEFAULT_GRAPH_RAG_GRAPH_DEPTH = 2
+DEFAULT_GRAPH_RAG_MAX_SEED_RESULTS = 10
+
+# ── Trajectory / Replay Defaults ────────────────────────────────────
+DEFAULT_REPLAY_TRAJECTORY_PATH = None
+DEFAULT_SAVE_TRAJECTORY_PATH = None
+DEFAULT_SAVE_SCREENSHOTS_IN_TRAJECTORY = False
 
 # ── API & Server ────────────────────────────────────────────────────
 API_VERSION_V1 = "v1"
@@ -230,7 +269,6 @@ TASK_TRACKER_TOOL_NAME = "task_tracker"
 NOTE_TOOL_NAME = "note"
 RECALL_TOOL_NAME = "recall"
 SEMANTIC_RECALL_TOOL_NAME = "semantic_recall"
-RUN_TESTS_TOOL_NAME = "run_tests"
 APPLY_PATCH_TOOL_NAME = "apply_patch"
 # ── Security Risk ───────────────────────────────────────────────────
 SECURITY_RISK_DESC = (
@@ -386,7 +424,7 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     "OTEL_LOG_CORRELATION": ("<OTEL_ENABLED>", "Attach OTEL trace/span IDs to logs"),
     "OTEL_ENABLED": ("false", "Master switch for OpenTelemetry integration"),
     "LOG_TO_FILE": ("<true when DEBUG>", "Write logs to a file in addition to stdout"),
-    "LOG_ALL_EVENTS": ("false", "Log every event processed by the event stream"),
+    "LOG_ALL_EVENTS": ("True", "Log every event processed by the event stream"),
     "DEBUG_RUNTIME": ("false", "Extra runtime container debug output"),
     # API versioning
     "FORGE_PERMISSIVE_API": (

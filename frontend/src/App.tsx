@@ -1,24 +1,14 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useLayoutEffect } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/query-client";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { Layout } from "@/components/layout/Layout";
-import Home from "@/pages/Home";
+import { ChatShellLayout } from "@/components/layout/ChatShellLayout";
 import Chat from "@/pages/Chat";
-import Settings from "@/pages/Settings";
-import KnowledgeBase from "@/pages/KnowledgeBase";
-import { useEffect } from "react";
 import { useAppStore } from "@/stores/app-store";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5000,
-      retry: 1,
-    },
-  },
-});
 
 function ThemeInitializer() {
   const theme = useAppStore((s) => s.theme);
@@ -26,6 +16,17 @@ function ThemeInitializer() {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
   return null;
+}
+
+/** Old bookmarks to /settings or /knowledge open the overlay then land on home. */
+function OpenWindowRedirect({ kind }: { kind: "settings" | "knowledge" }) {
+  const setSettings = useAppStore((s) => s.setSettingsWindowOpen);
+  const setKnowledge = useAppStore((s) => s.setKnowledgeWindowOpen);
+  useLayoutEffect(() => {
+    if (kind === "settings") setSettings(true);
+    else setKnowledge(true);
+  }, [kind, setKnowledge, setSettings]);
+  return <Navigate to="/chat/new" replace />;
 }
 
 export default function App() {
@@ -37,10 +38,12 @@ export default function App() {
           <ErrorBoundary>
             <Routes>
               <Route element={<Layout />}>
-                <Route path="/" element={<Home />} />
-                <Route path="/chat/:id" element={<Chat />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/knowledge" element={<KnowledgeBase />} />
+                <Route element={<ChatShellLayout />}>
+                  <Route path="/" element={<Navigate to="/chat/new" replace />} />
+                  <Route path="/chat/:id" element={<Chat />} />
+                </Route>
+                <Route path="/settings" element={<OpenWindowRedirect kind="settings" />} />
+                <Route path="/knowledge" element={<OpenWindowRedirect kind="knowledge" />} />
               </Route>
             </Routes>
           </ErrorBoundary>

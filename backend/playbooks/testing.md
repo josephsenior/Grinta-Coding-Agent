@@ -1,166 +1,63 @@
 ---
 name: Testing
 type: knowledge
-version: 1.0.0
+version: 2.0.0
 agent: Orchestrator
 triggers:
-  - test
-  - testing
-  - pytest
-  - jest
-  - unittest
-  - vitest
+  - /testing
 ---
 
-# Testing Best Practices
+# Testing discipline
 
-## Python (pytest)
+Use when the user invokes **`/testing`**. Prefer the **project’s** configured runner (`pytest`, `jest`, `vitest`, etc.).
 
-### Basic Structure
+## Principles
+
+- **AAA:** Arrange → Act → Assert; one logical behaviour per test.
+- **Names:** `test_<behaviour>_<condition>` — not `test_foo`.
+- **Independence:** No order dependency; each test sets up its own data.
+- **Fast feedback:** `pytest path/to/test.py -x -v` or equivalent while iterating.
+
+## Python (pytest) — minimal patterns
+
 ```python
-# test_calculator.py
 import pytest
 
-def test_add():
-    assert add(2, 3) == 5
-
-def test_divide_by_zero():
-    with pytest.raises(ZeroDivisionError):
-        divide(1, 0)
-```
-
-### Fixtures
-```python
 @pytest.fixture
-def db_session():
-    session = create_session()
-    yield session
-    session.close()
+def db():
+    s = make_session()
+    yield s
+    s.close()
 
-def test_user_creation(db_session):
-    user = User(name="John")
-    db_session.add(user)
-    assert user.id is not None
+@pytest.mark.parametrize("n,expected", [(2, 4), (3, 9)])
+def test_square(n, expected):
+    assert n * n == expected
+
+def test_api_mocked():
+    with patch("mymod.requests.get") as m:
+        m.return_value.json.return_value = {"ok": True}
+        assert fetch()["ok"] is True
 ```
 
-### Parametrize
-```python
-@pytest.mark.parametrize("input,expected", [
-    (2, 4),
-    (3, 9),
-    (4, 16),
-])
-def test_square(input, expected):
-    assert square(input) == expected
-```
+## JS/TS (Vitest/Jest) — minimal patterns
 
-### Mocking
-```python
-from unittest.mock import Mock, patch
-
-def test_api_call():
-    with patch('requests.get') as mock_get:
-        mock_get.return_value.json.return_value = {'data': 'test'}
-        result = fetch_data('url')
-        assert result == {'data': 'test'}
-```
-
-## JavaScript/TypeScript (Jest/Vitest)
-
-### Basic Structure
 ```typescript
-// calculator.test.ts
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from "vitest";
 
-describe('Calculator', () => {
-  it('adds two numbers', () => {
-    expect(add(2, 3)).toBe(5);
-  });
+describe("math", () => {
+  it("adds", () => expect(add(2, 3)).toBe(5));
+});
 
-  it('throws on divide by zero', () => {
-    expect(() => divide(1, 0)).toThrow();
-  });
+it("mocks fetch", async () => {
+  global.fetch = vi.fn().mockResolvedValue({ json: () => ({ x: 1 }) });
+  expect((await load()).x).toBe(1);
 });
 ```
 
-### React Testing
-```typescript
-import { render, screen, fireEvent } from '@testing-library/react';
+## React (component)
 
-test('button click updates count', () => {
-  render(<Counter />);
-  const button = screen.getByRole('button');
+Use **Testing Library**: render → query by role/label → `userEvent` / `fireEvent` → assert visible state. Prefer stable queries (`getByRole`) over brittle CSS.
 
-  fireEvent.click(button);
+## Before merge
 
-  expect(screen.getByText('Count: 1')).toBeInTheDocument();
-});
-```
-
-### Mocking
-```typescript
-import { vi } from 'vitest';
-
-test('calls API', async () => {
-  const mockFetch = vi.fn().mockResolvedValue({ data: 'test' });
-  global.fetch = mockFetch;
-
-  await fetchData('url');
-
-  expect(mockFetch).toHaveBeenCalledWith('url');
-});
-```
-
-## Best Practices
-
-### AAA Pattern
-```python
-def test_user_login():
-    # Arrange
-    user = User(email="test@example.com")
-
-    # Act
-    result = login(user)
-
-    # Assert
-    assert result.success is True
-```
-
-### Test Naming
-```python
-# ✅ Good: Descriptive
-def test_user_cannot_login_with_invalid_password():
-    ...
-
-# ❌ Bad: Vague
-def test_login():
-    ...
-```
-
-### One Assertion Focus
-```python
-# ✅ Good: Tests one thing
-def test_user_email_is_lowercase():
-    user = User(email="TEST@Example.com")
-    assert user.email == "test@example.com"
-
-# ❌ Bad: Tests multiple things
-def test_user():
-    user = User(email="TEST@Example.com")
-    assert user.email == "test@example.com"
-    assert user.is_active is True
-    assert len(user.tokens) == 1
-```
-
-### Test Independence
-```python
-# ✅ Good: Independent tests
-def test_create_user():
-    user = create_user()
-    assert user.id is not None
-
-def test_delete_user():
-    user = create_user()  # Own setup
-    delete_user(user.id)
-    assert get_user(user.id) is None
-```
+Run the **widest** suite the project uses for PRs (full `pytest`, `npm test`, CI parity).

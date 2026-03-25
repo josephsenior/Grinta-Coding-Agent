@@ -112,3 +112,74 @@ async def test_cmd_run_background_spawns_session(mock_executor):
 
     # Verify input was written
     mock_session.write_input.assert_called_with("long_running_task\n")
+
+
+@pytest.mark.asyncio
+async def test_windows_with_bash_does_not_rewrite_python3(mock_executor):
+    """When Git Bash is available on Windows, keep python3 command unchanged."""
+    mock_session = MagicMock()
+    mock_obs = CmdOutputObservation(
+        content="ok",
+        command="python3 --version",
+        metadata={"exit_code": 0},
+    )
+    mock_session.execute.return_value = mock_obs
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_executor.session_manager.tool_registry = MagicMock(
+        has_bash=True,
+        has_powershell=True,
+    )
+
+    action = CmdRunAction(command="python3 --version")
+    with patch("sys.platform", "win32"):
+        await mock_executor.run(action)
+
+    assert action.command == "python3 --version"
+
+
+@pytest.mark.asyncio
+async def test_windows_powershell_rewrites_python3(mock_executor):
+    """When bash is unavailable on Windows, rewrite python3 to python."""
+    mock_session = MagicMock()
+    mock_obs = CmdOutputObservation(
+        content="ok",
+        command="python --version",
+        metadata={"exit_code": 0},
+    )
+    mock_session.execute.return_value = mock_obs
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_executor.session_manager.tool_registry = MagicMock(
+        has_bash=False,
+        has_powershell=True,
+    )
+
+    action = CmdRunAction(command="python3 --version")
+    with patch("sys.platform", "win32"):
+        await mock_executor.run(action)
+
+    assert action.command == "python --version"
+
+
+@pytest.mark.asyncio
+async def test_repeated_identical_failures_add_pivot_hint(mock_executor):
+    """Second identical command failure should include repeated-failure guidance."""
+    mock_session = MagicMock()
+    mock_executor.session_manager.get_session.return_value = mock_session
+
+    def _mk_fail_obs() -> CmdOutputObservation:
+        return CmdOutputObservation(
+            content="[ERROR STREAM]\n/bin/bash: line 1: python: command not found",
+            command="python --version",
+            metadata={"exit_code": 127},
+        )
+
+    mock_session.execute.side_effect = [_mk_fail_obs(), _mk_fail_obs()]
+
+    action1 = CmdRunAction(command="python --version")
+    action2 = CmdRunAction(command="python --version")
+
+    first = await mock_executor.run(action1)
+    second = await mock_executor.run(action2)
+
+    assert "REPEATED_COMMAND_FAILURE" not in first.content
+    assert "REPEATED_COMMAND_FAILURE" in second.content

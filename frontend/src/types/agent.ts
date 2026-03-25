@@ -1,4 +1,4 @@
-/** Agent lifecycle states — mirrors backend AgentState enum. */
+/** Agent lifecycle states — mirrors the curated backend contract in `backend/core/agent_contract.py`. */
 export enum AgentState {
   LOADING = "loading",
   RUNNING = "running",
@@ -41,6 +41,7 @@ export enum ActionType {
   SEND_PR = "send_pr",
   RECALL = "recall",
   CONDENSATION = "condensation",
+  SUMMARIZE_CONTEXT = "summarize_context",
   CONDENSATION_REQUEST = "condensation_request",
   TASK_TRACKING = "task_tracking",
   STREAMING_CHUNK = "streaming_chunk",
@@ -49,6 +50,10 @@ export enum ActionType {
   CLARIFICATION = "clarification",
   ESCALATE = "escalate",
   DELEGATE_TASK = "delegate_task",
+  BLACKBOARD = "blackboard",
+  SEARCH_AVAILABLE_TOOLS = "search_available_tools",
+  LSP_QUERY = "lsp_query",
+  SIGNAL_PROGRESS = "signal_progress",
 }
 
 /** Observation types — mirrors backend ObservationType enum. */
@@ -76,6 +81,8 @@ export enum ObservationType {
   STATUS = "status",
   TERMINAL = "terminal",
   DELEGATE_TASK_RESULT = "delegate_task_result",
+  LSP_QUERY_RESULT = "lsp_query_result",
+  SIGNAL_PROGRESS = "signal_progress",
 }
 
 /** Security risk level for actions. */
@@ -122,8 +129,8 @@ export enum RuntimeStatus {
   ERROR_LLM_INTERNAL_SERVER_ERROR = "STATUS$ERROR_LLM_INTERNAL_SERVER_ERROR",
   ERROR_LLM_OUT_OF_CREDITS = "STATUS$ERROR_LLM_OUT_OF_CREDITS",
   ERROR_LLM_CONTENT_POLICY_VIOLATION = "STATUS$ERROR_LLM_CONTENT_POLICY_VIOLATION",
-  AGENT_RATE_LIMITED = "CHAT_INTERFACE$AGENT_RATE_LIMITED_STOPPED_MESSAGE",
-  GIT_PROVIDER_AUTH_ERROR = "STATUS$GIT_PROVIDER_AUTHENTICATION_ERROR",
+  AGENT_RATE_LIMITED_STOPPED_MESSAGE = "CHAT_INTERFACE$AGENT_RATE_LIMITED_STOPPED_MESSAGE",
+  GIT_PROVIDER_AUTHENTICATION_ERROR = "STATUS$GIT_PROVIDER_AUTHENTICATION_ERROR",
   LLM_RETRY = "STATUS$LLM_RETRY",
   ERROR_MEMORY = "STATUS$ERROR_MEMORY",
 }

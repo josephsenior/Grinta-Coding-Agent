@@ -18,12 +18,10 @@ Forge's LLM system provides a robust, provider-agnostic abstraction layer using 
 
 ### Provider Auto-Resolver Pattern
 
-Forge uses an intelligent routing system that automatically detects providers, discovers local endpoints, and resolves model aliases:
+Forge uses an intelligent routing system that automatically detects providers and discovers local endpoints:
 
 ```
-User specifies model: "coding-model" (alias)
-   ↓
-ModelAliasManager resolves: "ollama/qwen2.5-coder"
+User specifies model: "ollama/qwen2.5-coder" (canonical id)
    ↓
 ProviderResolver detects provider: "ollama"
    ↓
@@ -44,12 +42,7 @@ Response + cost tracking + metrics
    - Resolves base URLs with intelligent priority
    - Strips provider prefixes for API calls
 
-2. **ModelAliasManager** (`model_aliases.py`)
-   - Define semantic aliases in `config.toml`
-   - Switch between cloud/local models seamlessly
-   - Store user preferences persistently
-
-3. **Local Endpoint Discovery**
+2. **Local Endpoint Discovery**
    - Auto-probes Ollama (`:11434`), LM Studio (`:1234`), vLLM (`:8000`)
    - Environment variable override support
    - No manual configuration needed for standard setups
@@ -87,7 +80,6 @@ response = llm.completion(
 - Function calling (when supported)
 - Vision support (when supported)
 - Prompt caching (when supported)
-- **Model alias resolution** (NEW)
 - **Auto-discovery of local endpoints** (NEW)
 
 ### 1.5 Working with Local Models
@@ -126,34 +118,6 @@ python -m backend.llm.discover_models status
 # ✓ OLLAMA          RUNNING
 # ✗ LM STUDIO       NOT FOUND
 # ✗ VLLM            NOT FOUND
-```
-
-**Model Aliases:**
-```toml
-# config.toml
-[model_aliases]
-coding-model = "claude-sonnet-4-5-20250929"
-fast-chat = "ollama/llama3.2"
-experiments = "ollama/qwen2.5-coder"
-```
-
-```python
-# Use aliases in code
-llm = LLM(model="coding-model")  # → claude-sonnet-4-5-20250929
-
-# Switch to local without code changes
-# Just edit config.toml:
-# coding-model = "ollama/qwen2.5-coder"
-```
-
-**List Aliases:**
-```bash
-python -m backend.llm.discover_models aliases
-
-# Output:
-# coding-model     → claude-sonnet-4-5-20250929
-# fast-chat        → ollama/llama3.2
-# experiments      → ollama/qwen2.5-coder
 ```
 
 ### 2. API Key Manager (`api_key_manager.py`)
@@ -337,13 +301,6 @@ native_tool_calling = true # Use native function calling
 # Cost control
 max_message_chars = 30000  # Truncate long messages
 
-# Model Aliases (NEW)
-[model_aliases]
-main-model = "claude-sonnet-4-5-20250929"
-fallback = "gpt-4o-mini"
-local-coding = "ollama/qwen2.5-coder"
-local-chat = "ollama/llama3.2"
-experiments = "lmstudio/mistral-7b"
 ```
 
 ### Via Environment Variables
@@ -351,9 +308,6 @@ experiments = "lmstudio/mistral-7b"
 ```bash
 # Model selection
 LLM_MODEL=claude-sonnet-4-20250514
-
-# Or use alias
-LLM_MODEL=main-model
 
 # API keys (cloud providers)
 ANTHROPIC_API_KEY=sk-ant-...
@@ -596,20 +550,6 @@ export OLLAMA_HOST="http://localhost:11434"
 python -m backend.llm.discover_models status
 ```
 
-### "Model alias not found"
-
-```bash
-# List all defined aliases
-python -m backend.llm.discover_models aliases
-
-# Add alias to config.toml
-[model_aliases]
-your-alias = "target-model"
-
-# Or check what's resolving
-python -c "from backend.llm.model_aliases import get_alias_manager; print(get_alias_manager().resolve_alias('your-alias'))"
-```
-
 ### "No API key found"
 
 ```bash
@@ -658,33 +598,7 @@ print(f"Function calling: {features.supports_function_calling}")
 
 ## Best Practices
 
-### 0. Use Model Aliases for Flexibility
-
-**Problem:** Hardcoding model names makes switching between providers difficult.
-
-**Solution:** Use semantic aliases in `config.toml`:
-
-```toml
-[model_aliases]
-# Define by use case, not provider
-coding-model = "claude-sonnet-4-5-20250929"
-review-model = "gpt-4o"
-fast-model = "claude-haiku-4-5-20251001"
-
-# Easy switch to local for development
-local-coding = "ollama/qwen2.5-coder"
-local-chat = "ollama/llama3.2"
-```
-
-```python
-# Code uses semantic names
-llm = LLM(model="coding-model")
-
-# Switch providers by editing config, not code
-# coding-model = "ollama/qwen2.5-coder"  # Now local!
-```
-
-### 0.5 Leverage Local Models for Development
+### 0. Leverage Local Models for Development
 
 **Use local models to:**
 - Reduce API costs during development
@@ -698,17 +612,10 @@ ollama serve
 # Pull coding-optimized model
 ollama pull qwen2.5-coder
 
-# Configure as default for dev
-[model_aliases]
-dev-model = "ollama/qwen2.5-coder"
 ```
 
 ```python
-# Use in development
-if os.getenv("ENV") == "development":
-    llm = LLM(model="dev-model")  # Local
-else:
-    llm = LLM(model="coding-model")  # Cloud
+# Point LLM config at a local model id, e.g. ollama/qwen2.5-coder
 ```
 
 ### 1. Choose the Right Model
@@ -844,7 +751,6 @@ OLLAMA_BASE_URL=http://localhost:11434
 | `llm_utils.py` | Utility functions |
 | `llm_registry.py` | Model registry |
 | **`provider_resolver.py`** | **Provider detection & local discovery (NEW)** |
-| **`model_aliases.py`** | **Model alias management (NEW)** |
 | **`catalog_loader.py`** | **Model catalog & metadata (NEW)** |
 | **`discover_models.py`** | **CLI tool for local model discovery (NEW)** |
 

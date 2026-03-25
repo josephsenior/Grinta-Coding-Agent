@@ -10,7 +10,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from backend.core.cache._serializer import deserialize_model, serialize_model
-from backend.core.cache.utils import (
+from backend.core.cache.cache_utils import (
     extract_redis_stats,
     get_redis_connection_params,
     merge_settings_with_cache,
@@ -149,7 +149,7 @@ class AsyncSmartCache:
                 return config
 
             # Cache miss - load from file
-            from backend.core.config.utils import load_forge_config
+            from backend.core.config.config_loader import load_forge_config
 
             config = load_forge_config()
 
@@ -178,7 +178,7 @@ class AsyncSmartCache:
             return self._global_config_cache
 
         # Cache miss - load from file
-        from backend.core.config.utils import load_forge_config
+        from backend.core.config.config_loader import load_forge_config
 
         config = load_forge_config()
 

@@ -31,20 +31,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install poetry via pipx
-        run: pipx install poetry
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
 
       - name: Install dependencies
-        run: poetry install --with dev,test,runtime
+        run: uv sync --group dev --group test --group runtime
 
       - name: Compile backend (syntax gate)
-        run: poetry run python -m compileall backend
+        run: uv run python -m compileall backend
 
       - name: Start backend (Linux)
         if: runner.os != 'Windows'
@@ -54,7 +55,7 @@ jobs:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
         run: |
-          poetry run uvicorn backend.api.listen:app \
+          uv run uvicorn backend.api.socketio_asgi_app:app \
             --host 127.0.0.1 --port 3000 &
           for i in $(seq 1 30); do
             curl -sf http://127.0.0.1:3000/api/health/live && break || sleep 1
@@ -70,8 +71,8 @@ jobs:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
         run: |
-          Start-Process -NoNewWindow -FilePath "poetry" `
-            -ArgumentList "run","uvicorn","backend.api.listen:app","--host","127.0.0.1","--port","3000"
+          Start-Process -NoNewWindow -FilePath "uv" `
+            -ArgumentList "run","uvicorn","backend.api.socketio_asgi_app:app","--host","127.0.0.1","--port","3000"
           for ($i = 0; $i -lt 30; $i++) {
             try {
               Invoke-WebRequest -Uri http://127.0.0.1:3000/api/health/live -UseBasicParsing -TimeoutSec 2 | Out-Null
@@ -84,7 +85,7 @@ jobs:
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
-        run: poetry run pytest backend/tests/e2e/test_agent_loop_e2e.py -m integration -v --timeout=180
+        run: uv run pytest backend/tests/e2e/test_agent_loop_e2e.py -m integration -v --timeout=180
 
       - name: Cleanup (Linux)
         if: always() && runner.os != 'Windows'

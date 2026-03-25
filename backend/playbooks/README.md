@@ -1,68 +1,64 @@
 # Playbooks
 
-Specialized prompts that provide domain-specific knowledge.
+**Purpose:** On-demand procedural and domain guidance. They inject only when a **recall/knowledge** query matches a trigger (see `Memory._find_playbook_knowledge`).
 
-## How It Works
+**Not here:** General agent behaviour, tool frugality, security rules, memory-tool choice, or error-recovery for shell — that lives in the orchestrator **system prompt** (`backend/engines/orchestrator/prompts/`). Do not duplicate it in playbooks.
 
-**Global playbooks:** This folder (shareable knowledge)
-**Repo-specific:** `.Forge/playbooks/repo.md` (project context)
+## Trigger policy (quality / focus)
 
-## Loading
+1. **Prefer slash commands** (`/debug`, `/feature`, …) so playbooks fire when the user *asks* for that mode, not on every substring mention (`pytest`, `ssh`, `fastapi` in normal chat caused noisy injections).
+2. **Optional second triggers** only when they are **long, distinctive phrases** (not single common words).
+3. **Target &lt; ~100 lines** per playbook; examples over rules; one clear workflow per file.
 
-1. Load repo-specific `.Forge/playbooks/repo.md` (if exists)
-2. Load relevant playbooks based on trigger keywords
+## Locations
 
-## Types
+| Source | Path |
+|--------|------|
+| Global (shipped) | This directory |
+| Per-user | `~/.Forge/playbooks/` |
+| Per-repo | `.Forge/playbooks/repo.md` (auto context; different loader) |
 
-### Knowledge Agents
-Triggered by keywords (e.g., "github", "database", "ssh")
+## Inventory (global)
 
-Example:
+| File | Intent |
+|------|--------|
+| `add_agent.md` | How to add a playbook (meta) |
+| `add_repo_inst.md` | Scaffold `.Forge/playbooks/repo.md` |
+| `address_pr_comments.md` | `/address_pr_comments` workflow |
+| `agent_memory.md` | `/remember` — lessons.md vs vector recall |
+| `api.md` | `/api` — REST/FastAPI patterns |
+| `code-review.md` | `/codereview` |
+| `codereview-roasted.md` | `/codereview-roasted` |
+| `database.md` | `/database` |
+| `debug.md` | `/debug` |
+| `documentation.md` | `/docs` |
+| `feature.md` | `/feature` |
+| `react.md` | `/react` |
+| `refactoring.md` | `/refactor` |
+| `ssh.md` | `/ssh` |
+| `testing.md` | `/testing` |
+| `update_pr_description.md` | `/update_pr_description` |
+| `update_test.md` | `/update_test` |
+
+## Authoring template
+
 ```markdown
 ---
-name: github
+name: my_playbook
+type: knowledge
+version: 1.0.0
+agent: Orchestrator
 triggers:
-  - github
-  - pull request
+  - /my_playbook
 ---
 
-# GitHub Guide
-[Instructions here]
+# Title
+
+One paragraph: what this playbook is for.
+
+## Steps or checklist
+...
+
+## One minimal example
+...
 ```
-
-### Repository Agents
-Auto-loaded for specific repos
-
-Example `.Forge/playbooks/repo.md`:
-```markdown
-# My Project
-
-## Build
-npm run build
-
-## Test
-npm test
-
-## Deploy
-npm run deploy
-```
-
-## Creating Playbooks
-
-See [add_agent.md](./add_agent.md) for template and examples.
-
-## Available Playbooks
-
-- `github.md` - GitHub operations
-- `code-review.md` - PR reviews
-- `database.md` - Database setup
-- `ssh.md` - SSH connections
-- `agent_memory.md` - Memory system guide
-- And more...
-
-## Best Practices
-
-- Keep under 100 lines
-- Show examples, not rules
-- Specific triggers
-- Test thoroughly

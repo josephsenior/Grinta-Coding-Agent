@@ -16,7 +16,7 @@ from backend.core.provider_types import (
     ProviderType,
 )
 from backend.api.session.conversation_init_data import ConversationInitData
-from backend.api.shared import (
+from backend.api.app_accessors import (
     ConversationStoreImpl,
     SettingsStoreImpl,
     config,

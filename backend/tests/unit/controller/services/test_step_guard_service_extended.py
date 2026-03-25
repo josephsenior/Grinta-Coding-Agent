@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import MagicMock, AsyncMock
 from backend.controller.services.step_guard_service import StepGuardService
 from backend.events import EventSource
-from backend.events.action import AgentThinkAction
+from backend.events.observation.error import ErrorObservation
 
 class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -43,34 +43,44 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         state = MagicMock()
         self.controller.state = state
 
+        cb = MagicMock()
+        cb.circuit_breaker.stuck_detection_count = 1
+        self.controller.circuit_breaker_service = cb
+
         # Run first attempt
         result = await self.service._handle_stuck_detection(self.controller)
 
         # Verify
         self.assertTrue(result)
-        self.assertEqual(self.service._replan_attempts, 1)
+        cb.record_stuck_detection.assert_called_once()
 
         # Check event emitted
         self.controller.event_stream.add_event.assert_called()
         args, kwargs = self.controller.event_stream.add_event.call_args
-        self.assertIsInstance(args[0], AgentThinkAction)
-        self.assertIn("STUCK LOOP DETECTED", args[0].thought)
-        self.assertEqual(args[1], EventSource.AGENT)
+        self.assertIsInstance(args[0], ErrorObservation)
+        self.assertIn("STUCK LOOP DETECTED", args[0].content)
+        self.assertEqual(args[1], EventSource.ENVIRONMENT)
 
-    async def test_handle_stuck_detection_exhausts_replan_attempts(self):
+    async def test_handle_stuck_detection_auto_finish_after_repeated_stuck(self):
         # Setup mocks
         stuck_svc = MagicMock()
+        stuck_svc.compute_repetition_score.return_value = 1.0
         stuck_svc.is_stuck.return_value = True
         self.controller.stuck_service = stuck_svc
-        self.controller._react_to_exception = AsyncMock()
+        self.controller.state = MagicMock()
 
-        # Set attempts to max
-        self.service._replan_attempts = 2
+        cb = MagicMock()
+        cb.circuit_breaker.stuck_detection_count = 3
+        self.controller.circuit_breaker_service = cb
+
+        self.service._try_auto_finish = AsyncMock(return_value=True)  # type: ignore[method-assign]
+
+        self.controller.event_stream = MagicMock()
 
         # Run
         result = await self.service._handle_stuck_detection(self.controller)
 
         # Verify
         self.assertFalse(result)
-        self.assertEqual(self.service._replan_attempts, 0)
-        self.controller._react_to_exception.assert_awaited_once()
+        cb.record_stuck_detection.assert_called_once()
+        self.service._try_auto_finish.assert_awaited_once_with(self.controller)  # type: ignore[attr-defined]

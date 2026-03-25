@@ -59,6 +59,11 @@ backend/workspace/
 workspace/users/
 workspace/sessions/
 
+# Local Forge storage (generated user conversation/event state)
+storage/users/
+storage/sessions/
+storage/forge.db
+
 # Test coverage reports
 coverage/
 .coverage

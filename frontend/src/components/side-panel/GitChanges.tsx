@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useRefetchWhenBackendRecovers } from "@/hooks/use-refetch-when-backend-recovers";
 import { GitBranch, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -40,17 +41,25 @@ interface GitChangesProps {
 export function GitChanges({ conversationId }: GitChangesProps) {
   const [changes, setChanges] = useState<GitChange[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const openDiff = useContextPanelStore((s) => s.openDiff);
   const setContextPanelOpen = useAppStore((s) => s.setContextPanelOpen);
 
-  const load = useCallback(async () => {
-    if (!conversationId) return;
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!conversationId || conversationId === "new") return;
     setLoading(true);
+    setLoadError(false);
     try {
       const result = await getGitChanges(conversationId);
       setChanges(result);
     } catch {
-      toast.error("Could not load git changes");
+      setLoadError(true);
+      setChanges([]);
+      if (!opts?.silent) {
+        toast.error("Could not load git changes", {
+          description: "Backend or git may be unavailable. Try Refresh after fixing the server.",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -59,6 +68,18 @@ export function GitChanges({ conversationId }: GitChangesProps) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useRefetchWhenBackendRecovers(() => load({ silent: true }), true, loadError);
+
+  if (conversationId === "new") {
+    return (
+      <div className="flex h-full flex-col items-center justify-center px-4 py-6 text-center">
+        <p className="text-xs text-muted-foreground">
+          Git changes appear after you send your first message.
+        </p>
+      </div>
+    );
+  }
 
   const handleClick = async (change: GitChange) => {
     if (change.status.toUpperCase() === "D") {
@@ -88,7 +109,13 @@ export function GitChanges({ conversationId }: GitChangesProps) {
             </Badge>
           )}
         </div>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={load} title="Refresh">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={() => void load()}
+          title="Refresh"
+        >
           <RefreshCw className="h-3 w-3" />
         </Button>
       </div>
@@ -98,10 +125,21 @@ export function GitChanges({ conversationId }: GitChangesProps) {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
+          ) : loadError ? (
+            <div className="space-y-2 px-3 py-4">
+              <p className="text-xs font-medium text-destructive">Couldn&apos;t load changes</p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Git may be unavailable for this workspace. Check the backend, then press{" "}
+                <span className="font-medium text-foreground/80">Refresh</span>.
+              </p>
+            </div>
           ) : changes.length === 0 ? (
-            <p className="px-3 py-4 text-xs text-muted-foreground">
-              Source tree strictly unmodified
-            </p>
+            <div className="space-y-1.5 px-3 py-4">
+              <p className="text-xs text-muted-foreground">Working tree matches HEAD — no local changes.</p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground/90">
+                When the agent edits files, modified paths will appear here. Click one to open a diff.
+              </p>
+            </div>
           ) : (
             changes.map((change) => {
               const { label, color, title } = statusLabel(change.status);

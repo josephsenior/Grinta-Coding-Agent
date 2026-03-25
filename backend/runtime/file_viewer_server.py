@@ -4,7 +4,6 @@ This server has no authentication and only listens to localhost traffic.
 """
 
 import os
-import sys
 import threading
 
 from fastapi import FastAPI, Request
@@ -12,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from uvicorn import Config, Server
 
 from backend.core.logger import forge_logger as logger
+from backend.runtime.utils.file_viewer import generate_file_viewer_html
 
 
 def create_app() -> FastAPI:
@@ -58,8 +58,7 @@ def create_app() -> FastAPI:
                 status_code=400,
             )
         try:
-            html_generator = getattr(sys.modules[__name__], "generate_file_viewer_html")
-            html_content = html_generator(path)
+            html_content = generate_file_viewer_html(path)
             return HTMLResponse(content=html_content)
         except Exception as e:
             return HTMLResponse(
@@ -88,7 +87,13 @@ def start_file_viewer_server(port: int) -> tuple[str, threading.Thread]:
     logger.info("File viewer server URL saved to /tmp/oh-server-url: %s", server_url)
     logger.info("Starting file viewer server on port %s", port)
     app = create_app()
-    config = Config(app=app, host="127.0.0.1", port=port, log_level="error")
+    config = Config(
+        app=app,
+        host="127.0.0.1",
+        port=port,
+        log_level="error",
+        ws="websockets-sansio",
+    )
     server = Server(config=config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()

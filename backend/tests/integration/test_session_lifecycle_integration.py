@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.api.routes.manage_conversations import (
+from backend.api.routes.conversation_collection import (
     ConversationResponse,
     ProvidersSetModel,
     start_conversation,
@@ -108,3 +108,4 @@ async def test_stop_conversation_when_not_running_is_noop() -> None:
     assert response.status == "ok"
     assert response.message == "Conversation was not running"
     manager.close_session.assert_not_awaited()
+

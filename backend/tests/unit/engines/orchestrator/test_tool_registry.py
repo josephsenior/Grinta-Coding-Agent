@@ -16,19 +16,18 @@ def _make_config(**kwargs):
     cfg.enable_think = True
     cfg.enable_finish = True
     cfg.enable_editor = True
-    cfg.enable_note = True
     cfg.enable_run_tests = True
     cfg.enable_apply_patch = True
     cfg.enable_task_tracker = True
     cfg.enable_search_code = True
     cfg.enable_check_tool_status = True
     cfg.enable_workspace_status = True
-    cfg.enable_error_patterns = True
+    cfg.enable_query_error_solutions = True
     cfg.enable_checkpoints = True
-    cfg.enable_project_map = True
+    cfg.enable_analyze_project_structure = True
     cfg.enable_session_diff = True
     cfg.enable_working_memory = True
-    cfg.enable_verify_state = True
+    cfg.enable_verify_file_lines = True
 
     for k, v in kwargs.items():
         setattr(cfg, k, v)

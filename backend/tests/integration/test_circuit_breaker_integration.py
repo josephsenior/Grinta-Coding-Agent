@@ -38,7 +38,7 @@ class TestCircuitBreakerIntegration:
             reason="Stuck loop detected (2)",
             action="switch_context",
             system_message="SYSTEM INTERVENTION: Switch context immediately.",
-            recommendation="Use escalate() or project_map()."
+            recommendation="Use escalate() or analyze_project_structure()."
         )
 
         # Execute

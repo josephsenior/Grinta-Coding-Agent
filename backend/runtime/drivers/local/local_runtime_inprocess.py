@@ -74,7 +74,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         headless_mode: bool = True,
         user_id: str | None = None,
         vcs_provider_tokens: ProviderTokenType | None = None,
-        workspace_base: str | None = None,
+        project_root: str | None = None,
     ) -> None:
         """Initialize in-process local runtime."""
         # Initialize parent
@@ -98,7 +98,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         )
 
         # Setup workspace
-        self._temp_workspace: str | None = workspace_base
+        self._temp_workspace: str | None = project_root
         self.status_callback = status_callback
 
         # ActionExecutor instance (created in connect()).  Typed against the
@@ -125,7 +125,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             headless_mode,
             user_id,
             vcs_provider_tokens,
-            workspace_base=workspace_base,
+            project_root=project_root,
         )
 
     async def connect(self) -> None:
@@ -190,8 +190,8 @@ class LocalRuntimeInProcess(ActionExecutionClient):
     def _setup_workspace_directory(self) -> None:
         """Create temporary workspace directory."""
         if self._temp_workspace is None:
-            # If workspace_base is provided in init, use it; otherwise create temp
-            base = getattr(self, "workspace_base", None)
+            # If project_root is provided in init, use it; otherwise create temp
+            base = getattr(self, "project_root", None)
             if base:
                 self._temp_workspace = base
                 os.makedirs(base, exist_ok=True)

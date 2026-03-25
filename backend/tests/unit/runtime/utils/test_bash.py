@@ -376,7 +376,7 @@ EOF"""
 
     def test_heredoc_with_node_parts(self):
         """Test heredoc node with parts attribute."""
-        cmd = """cat <<EOF
+        cmd = r"""cat <<EOF
 line with \; escaped
 EOF"""
         result = escape_bash_special_chars(cmd)

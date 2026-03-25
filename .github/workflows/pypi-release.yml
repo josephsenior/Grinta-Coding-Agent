@@ -16,36 +16,35 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
       - uses: useblacksmith/setup-python@v6
         with:
           python-version: 3.12
-      - name: Install Poetry
-        uses: snok/install-poetry@v1.4.1
-        with:
-          virtualenvs-in-project: true
       - name: Install dependencies
-        run: poetry install --with dev,test --no-interaction
+        run: uv sync --group dev --group test
       - name: Run type checks
-        run: poetry run mypy --config-file mypy.ini
+        run: uv run mypy --config-file mypy.ini
       - name: Run unit tests
-        run: poetry run pytest backend/tests/unit -q
+        run: uv run pytest backend/tests/unit -q
 
   release:
     needs: pre-release-tests
     runs-on: blacksmith-4vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
       - uses: useblacksmith/setup-python@v6
         with:
           python-version: 3.12
-      - name: Install Poetry
-        uses: snok/install-poetry@v1.4.1
-        with:
-          virtualenvs-in-project: true
-          virtualenvs-path: ~/.virtualenvs
-      - name: Install Poetry Dependencies
-        run: poetry install --no-interaction --no-root
-      - name: Build poetry project
-        run: ./build.sh
-      - name: publish
-        run: poetry publish -u __token__ -p ${{ secrets.PYPI_TOKEN }}
+      - name: Install dependencies
+        run: uv sync
+      - name: Build package
+        run: uv build
+      - name: Publish to PyPI
+        run: uv publish --token ${{ secrets.PYPI_TOKEN }}

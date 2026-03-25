@@ -52,9 +52,32 @@ class TestGetNextAction:
         confirmed_action = MagicMock()
         ctx.confirmation_service = MagicMock()
         ctx.confirmation_service.get_next_action.return_value = confirmed_action
+        mock_controller = MagicMock()
+        mock_controller._replay_manager.should_replay.return_value = True
+        ctx.get_controller.return_value = mock_controller
         svc = ActionExecutionService(ctx)
         result = await svc.get_next_action()
         assert result is confirmed_action
+        ctx.agent.step.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_live_run_prefers_astep_over_confirmation_sync_step(self):
+        """When not in replay, confirmation must not route to agent.step (streaming uses astep)."""
+        ctx = _make_context()
+        ctx.confirmation_service = MagicMock()
+        mock_controller = MagicMock()
+        mock_controller._replay_manager.should_replay.return_value = False
+        ctx.get_controller.return_value = mock_controller
+        action = MagicMock()
+
+        async def mock_astep(_state):
+            return action
+
+        ctx.agent.astep = mock_astep
+        svc = ActionExecutionService(ctx)
+        result = await svc.get_next_action()
+        assert result is action
+        ctx.confirmation_service.get_next_action.assert_not_called()
         ctx.agent.step.assert_not_called()
 
     @pytest.mark.asyncio

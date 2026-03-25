@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, cast
 from unittest.mock import MagicMock
 
+import pytest
+
 
 from backend.core.message import Message, TextContent
+from backend.events.action import MessageAction
+from backend.events.action.mcp import MCPAction
+from backend.events.event import EventSource
+from backend.events.observation.commands import CmdOutputObservation
+from backend.events.observation.mcp import MCPObservation
+from backend.events.observation import ErrorObservation
+from backend.events.tool import ToolCallMetadata
+from backend.mcp_client.mcp_utils import call_tool_mcp
 from backend.memory.conversation_memory import ConversationMemory
 from backend.memory.memory_types import DecisionType
 from backend.memory.message_formatting import (
@@ -57,6 +68,128 @@ def _text_msg(role: str, text: str) -> Message:
 # ---------------------------------------------------------------------------
 # Static helpers
 # ---------------------------------------------------------------------------
+
+
+class TestErrorObservationNotifyUiOnly:
+    def test_notify_ui_only_skips_llm_message(self):
+        mem = _make_memory()
+        obs = ErrorObservation(
+            content="Authentication Error\n\ndetails",
+            notify_ui_only=True,
+        )
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message={},
+            max_message_chars=None,
+        )
+        assert out == []
+
+    def test_default_error_still_converted_for_llm(self):
+        mem = _make_memory()
+        obs = ErrorObservation(content="MCP server unreachable")
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message={},
+            max_message_chars=None,
+        )
+        assert len(out) == 1
+        assert out[0].role == "user"
+
+
+class TestToolResultPropagation:
+    def test_tool_result_ok_is_propagated_to_forge_tool_ok(self):
+        mem = _make_memory()
+        obs = MCPObservation(content='{"ok": true}', name="remote_tool", arguments={"x": 1})
+        obs.tool_result = {"ok": True, "retryable": False}
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name="remote_tool",
+            tool_call_id="call_1",
+            model_response={"id": "resp_1"},
+            total_calls_in_response=1,
+        )
+        tool_messages: dict[str, Message] = {}
+
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message=tool_messages,
+            max_message_chars=None,
+        )
+
+        assert out == []
+        assert tool_messages["call_1"].forge_tool_ok is True
+
+    def test_tool_result_failure_is_propagated_to_forge_tool_ok(self):
+        mem = _make_memory()
+        obs = MCPObservation(content='{"ok": false}', name="remote_tool", arguments={})
+        obs.tool_result = {"ok": False, "retryable": True, "error_code": "TIMEOUT"}
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name="remote_tool",
+            tool_call_id="call_2",
+            model_response={"id": "resp_2"},
+            total_calls_in_response=1,
+        )
+        tool_messages: dict[str, Message] = {}
+
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message=tool_messages,
+            max_message_chars=None,
+        )
+
+        assert out == []
+        assert tool_messages["call_2"].forge_tool_ok is False
+
+    def test_cmd_output_exit_code_zero_propagates_success(self):
+        mem = _make_memory()
+        obs = CmdOutputObservation(
+            content="tests passed",
+            command="pytest",
+            metadata={"exit_code": 0},
+        )
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name="cmd_run",
+            tool_call_id="call_3",
+            model_response={"id": "resp_3"},
+            total_calls_in_response=1,
+        )
+        tool_messages: dict[str, Message] = {}
+
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message=tool_messages,
+            max_message_chars=None,
+        )
+
+        assert out == []
+        assert tool_messages["call_3"].forge_tool_ok is True
+
+    @pytest.mark.asyncio
+    async def test_mcp_failure_envelope_reaches_tool_message_cleanly(self):
+        mem = _make_memory()
+        action = MCPAction(name="remote_tool", arguments={"query": "x"})
+
+        obs = await call_tool_mcp([], action)
+        assert isinstance(obs, MCPObservation)
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name="remote_tool",
+            tool_call_id="call_4",
+            model_response={"id": "resp_4"},
+            total_calls_in_response=1,
+        )
+
+        tool_messages: dict[str, Message] = {}
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message=tool_messages,
+            max_message_chars=None,
+        )
+
+        assert out == []
+        assert tool_messages["call_4"].forge_tool_ok is False
+        payload = json.loads(obs.content)
+        assert payload["error_code"] == "MCP_NO_CLIENTS"
+        assert payload["retryable"] is True
+        assert payload["ok"] is False
 
 
 class TestStaticHelpers:
@@ -370,3 +503,34 @@ class TestMemoryStoreRecall:
         result = mem.recall_from_memory("query", k=3)
         assert len(result) == 1
         cast(Any, mem._ctx).vector_store.search.assert_called_once_with("query", k=3)
+
+    def test_process_events_indexes_high_value_events_for_semantic_recall(self):
+        mem = _make_memory()
+        user_msg = MessageAction(content="Need a migration plan for auth tables")
+        user_msg.source = EventSource.USER
+        user_msg.id = 11
+
+        cast(Any, mem._ctx).vector_store = MagicMock()
+        cast(Any, mem._ctx).delete_by_ids = MagicMock()
+
+        mem.process_events([user_msg], initial_user_action=user_msg)
+
+        cast(Any, mem._ctx).vector_store.add.assert_called_once()
+        add_kwargs = cast(Any, mem._ctx).vector_store.add.call_args.kwargs
+        assert add_kwargs["step_id"] == "event_11"
+        assert add_kwargs["role"] == "user"
+        assert "migration plan" in add_kwargs["content_text"]
+
+    def test_process_events_does_not_reindex_same_event_twice_in_session(self):
+        mem = _make_memory()
+        user_msg = MessageAction(content="Remember this requirement")
+        user_msg.source = EventSource.USER
+        user_msg.id = 12
+
+        cast(Any, mem._ctx).vector_store = MagicMock()
+        cast(Any, mem._ctx).delete_by_ids = MagicMock()
+
+        mem.process_events([user_msg], initial_user_action=user_msg)
+        mem.process_events([user_msg], initial_user_action=user_msg)
+
+        cast(Any, mem._ctx).vector_store.add.assert_called_once()

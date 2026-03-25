@@ -2,7 +2,7 @@
 
 This script checks:
 1. All route modules can be imported without errors
-2. All routers are properly registered in app.py
+2. All routers are properly registered in route_registry.py
 3. Route definitions are syntactically correct
 4. Health endpoints are accessible
 5. No obvious configuration issues
@@ -14,42 +14,30 @@ import sys
 import traceback
 from pathlib import Path
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# Expected routers from app.py
 EXPECTED_ROUTERS = {
-    "auth_router": "forge.server.routes.auth",
-    "user_management_router": "forge.server.routes.user_management",
-    "public_api_router": "forge.server.routes.public",
-    "files_api_router": "forge.server.routes.files",
-    "security_api_router": "forge.server.routes.security",
-    "feedback_api_router": "forge.server.routes.feedback",
-    "conversation_api_router": "forge.server.routes.conversation",
-    "manage_conversation_api_router": "forge.server.routes.manage_conversations",
-    "settings_router": "forge.server.routes.settings",
-    "secrets_router": "forge.server.routes.secrets",
-    "database_connections_router": "forge.server.routes.database_connections",
-    "memory_router": "forge.server.routes.memory",
-    "monitoring_router": "forge.server.routes.monitoring",
-    "knowledge_base_router": "forge.server.routes.knowledge_base",
-    "analytics_router": "forge.server.routes.analytics",
-    "templates_router": "forge.server.routes.templates",
-    "global_export_router": "forge.server.routes.global_export",
-    "slack_router": "forge.server.routes.slack",
-    "git_api_router": "forge.server.routes.git",
-    "trajectory_router": "forge.server.routes.trajectory",
-    "billing_router": "forge.server.routes.billing",
-    "dashboard_router": "forge.server.routes.dashboard",
-    "profile_router": "forge.server.routes.profile",
-    "notifications_router": "forge.server.routes.notifications",
-    "search_router": "forge.server.routes.search",
-    "activity_router": "forge.server.routes.activity",
+    "conversation_api_router": "backend.api.routes.conversation",
+    "manage_conversation_api_router": "backend.api.routes.conversation_collection",
+    "features_router": "backend.api.routes.features",
+    "feedback_api_router": "backend.api.routes.feedback",
+    "files_api_router": "backend.api.routes.files",
+    "global_export_router": "backend.api.routes.global_export",
+    "knowledge_base_router": "backend.api.routes.knowledge_base",
+    "memory_router": "backend.api.routes.memory",
+    "monitoring_router": "backend.api.routes.monitoring",
+    "notifications_router": "backend.api.routes.notifications",
+    "public_api_router": "backend.api.routes.public",
+    "search_router": "backend.api.routes.search",
+    "secrets_router": "backend.api.routes.secrets",
+    "settings_router": "backend.api.routes.settings",
+    "templates_router": "backend.api.routes.templates",
+    "trajectory_router": "backend.api.routes.trajectory",
+    "workspace_router": "backend.api.routes.workspace",
 }
 
-# Routes directory
-ROUTES_DIR = project_root / "forge" / "server" / "routes"
+ROUTES_DIR = project_root / "backend" / "api" / "routes"
 
 
 def check_syntax(file_path: Path) -> tuple[bool, str]:
@@ -109,13 +97,16 @@ def verify_router_imports() -> dict[str, tuple[bool, str]]:
         try:
             module = importlib.import_module(module_path)
 
-            # Check if router or app is exported
-            has_router = hasattr(module, "router") or hasattr(module, "app")
+            has_router = (
+                hasattr(module, "router")
+                or hasattr(module, "sub_router")
+                or hasattr(module, "app")
+            )
 
             if not has_router:
                 results[router_name] = (
                     False,
-                    f"Module {module_path} does not export 'router' or 'app'",
+                    f"Module {module_path} does not export 'router', 'sub_router', or 'app'",
                 )
             else:
                 results[router_name] = (True, "OK")
@@ -152,7 +143,7 @@ def check_all_route_files() -> dict[str, tuple[bool, list[str]]]:
 
 
 def verify_app_registration() -> tuple[bool, list[str]]:
-    """Verify that app.py can be imported and all routers are registered.
+    """Verify that route_registry.py registers all expected routers.
 
     Returns:
         Tuple of (is_valid, list_of_issues)
@@ -160,35 +151,24 @@ def verify_app_registration() -> tuple[bool, list[str]]:
     issues = []
 
     try:
-        # Check app.py syntax
-        app_file = project_root / "forge" / "server" / "app.py"
-        is_valid, error = check_syntax(app_file)
+        registry_file = project_root / "backend" / "api" / "route_registry.py"
+        is_valid, error = check_syntax(registry_file)
         if not is_valid:
-            issues.append(f"app.py syntax error: {error}")
+            issues.append(f"route_registry.py syntax error: {error}")
             return False, issues
 
-        # Try to parse app.py to check router registrations
-        with open(app_file, encoding="utf-8") as f:
+        with open(registry_file, encoding="utf-8") as f:
             source = f.read()
 
-        # Check for all expected router includes
-        for router_name in EXPECTED_ROUTERS:
-            if (
-                f"include_router({router_name}" not in source
-                and f"include_router({router_name.replace('_router', '')}" not in source
-            ):
-                # Some routers might have different names in app.py
-                # Check for partial matches
-                router_base = router_name.replace("_router", "").replace(
-                    "_api_router", ""
+        for router_name, module_path in EXPECTED_ROUTERS.items():
+            module_short = module_path.rsplit(".", 1)[-1]
+            if module_short not in source and router_name not in source:
+                issues.append(
+                    f"Router {router_name} ({module_path}) may not be registered in route_registry.py"
                 )
-                if router_base not in source.lower():
-                    issues.append(
-                        f"Router {router_name} may not be registered in app.py"
-                    )
 
     except Exception as e:
-        issues.append(f"Error checking app.py: {str(e)}")
+        issues.append(f"Error checking route_registry.py: {str(e)}")
 
     return not issues, issues
 
@@ -207,8 +187,8 @@ def main():
     all_passed &= _run_final_import_check()
 
     print("=" * 80)
-    print("✅ ALL CHECKS PASSED - API routes are healthy!" if all_passed
-          else "❌ SOME CHECKS FAILED - Please review the issues above")
+    print("ALL CHECKS PASSED - API routes are healthy!" if all_passed
+          else "SOME CHECKS FAILED - Please review the issues above")
     print("=" * 80)
     return 0 if all_passed else 1
 
@@ -221,15 +201,15 @@ def _run_route_files_check() -> bool:
     route_issues = sum(1 for v, _ in route_files.values() if not v)
     for file_name, (is_valid, issues) in route_files.items():
         if not is_valid:
-            print(f"  ❌ {file_name}:")
+            print(f"  FAIL {file_name}:")
             for issue in issues:
                 print(f"     - {issue}")
         else:
-            print(f"  ✅ {file_name}")
+            print(f"  OK   {file_name}")
     if route_issues == 0:
-        print(f"  ✅ All {len(route_files)} route files passed syntax check")
+        print(f"  All {len(route_files)} route files passed syntax check")
     else:
-        print(f"  ❌ {route_issues} route file(s) have issues")
+        print(f"  {route_issues} route file(s) have issues")
     print()
     return route_issues == 0
 
@@ -242,32 +222,32 @@ def _run_router_imports_check() -> bool:
     import_issues = sum(1 for v, _ in router_results.values() if not v)
     for router_name, (is_valid, message) in router_results.items():
         if not is_valid:
-            print(f"  ❌ {router_name}: {message}")
+            print(f"  FAIL {router_name}: {message}")
         else:
-            print(f"  ✅ {router_name}")
+            print(f"  OK   {router_name}")
     if import_issues == 0:
-        print(f"  ✅ All {len(router_results)} routers can be imported")
+        print(f"  All {len(router_results)} routers can be imported")
     else:
-        print(f"  ❌ {import_issues} router(s) have import issues")
+        print(f"  {import_issues} router(s) have import issues")
     print()
     return import_issues == 0
 
 
 def _run_app_registration_check() -> bool:
-    """Verify app.py router registration; return True if valid."""
-    print("3. Verifying app.py router registration...")
+    """Verify route_registry.py router registration; return True if valid."""
+    print("3. Verifying route_registry.py router registration...")
     print("-" * 80)
     app_valid, app_issues = verify_app_registration()
     if app_valid:
-        print("  ✅ app.py syntax is valid")
+        print("  OK   route_registry.py syntax is valid")
         if app_issues:
-            print("  ⚠️  Potential registration issues (may be false positives):")
+            print("  WARN Potential registration issues (may be false positives):")
             for issue in app_issues:
                 print(f"     - {issue}")
         else:
-            print("  ✅ All routers appear to be registered")
+            print("  OK   All routers appear to be registered")
     else:
-        print("  ❌ app.py has issues:")
+        print("  FAIL route_registry.py has issues:")
         for issue in app_issues:
             print(f"     - {issue}")
     print()
@@ -281,15 +261,15 @@ def _run_final_import_check() -> bool:
     try:
         from backend.api.app import app
         route_count = len(app.routes)
-        print("  ✅ FastAPI app imported successfully")
-        print(f"  ✅ App has {route_count} registered routes")
+        print("  OK   FastAPI app imported successfully")
+        print(f"  OK   App has {route_count} registered routes")
         health_routes = [r for r in app.routes if hasattr(r, "path") and "health" in r.path.lower()]
         if health_routes:
-            print(f"  ✅ Found {len(health_routes)} health endpoint(s)")
+            print(f"  OK   Found {len(health_routes)} health endpoint(s)")
         else:
-            print("  ⚠️  No health endpoints found (may be registered differently)")
+            print("  WARN No health endpoints found (may be registered differently)")
     except Exception as e:
-        print("  ❌ Failed to import FastAPI app:")
+        print("  FAIL Failed to import FastAPI app:")
         print(f"     {str(e)}")
         print("\n  Full traceback:")
         traceback.print_exc()
@@ -299,7 +279,6 @@ def _run_final_import_check() -> bool:
 
 
 if __name__ == "__main__":
-    # Fix Windows console encoding
     if sys.platform == "win32":
         import codecs
 

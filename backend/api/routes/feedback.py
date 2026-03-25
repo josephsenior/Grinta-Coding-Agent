@@ -8,7 +8,7 @@ from backend.events.async_event_store_wrapper import AsyncEventStoreWrapper
 from backend.events.event_filter import EventFilter
 from backend.events.serialization import event_to_dict
 from backend.api.schemas.feedback import FeedbackDataModel, store_feedback
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.api.session.conversation import ServerConversation
 from backend.api.utils import get_conversation
 from backend.utils.async_utils import call_sync_from_async
@@ -89,3 +89,4 @@ async def submit_feedback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": "Failed to submit feedback"},
         )
+

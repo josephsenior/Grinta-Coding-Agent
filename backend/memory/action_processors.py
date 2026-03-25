@@ -341,7 +341,7 @@ def _merge_tool_metadata_thought(action: PlaybookFinishAction) -> None:
 def _handle_message_action(
     action: MessageAction, vision_is_active: bool
 ) -> list[Message]:
-    """Handle MessageAction with optional image content."""
+    """Handle MessageAction with optional file paths and image content."""
     src = getattr(action, "source", None)
     src_value: str
     if isinstance(src, EventSource):
@@ -352,7 +352,17 @@ def _handle_message_action(
     if role_value not in {"user", "system", "assistant", "tool"}:
         role_value = "assistant"
     role = cast(Literal["user", "system", "assistant", "tool"], role_value)
-    content: list[TextContent | ImageContent] = [TextContent(text=action.content or "")]
+
+    text = action.content or ""
+    if action.file_urls:
+        lines = "\n".join(f"- {u}" for u in action.file_urls)
+        suffix = (
+            "Attached files (workspace paths; use your file-read tools as needed):\n"
+            f"{lines}"
+        )
+        text = f"{text}\n\n{suffix}" if text.strip() else suffix
+
+    content: list[TextContent | ImageContent] = [TextContent(text=text)]
 
     if action.image_urls:
         if role == "user":

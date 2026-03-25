@@ -181,3 +181,24 @@ class TestEventStoreCachePage:
         # 30 % 25 = 5, so start = 25
         assert page.start == 25
         assert page.end == 50
+
+
+class TestEventStoreSearch:
+    def test_search_events_ignores_stale_shutdown_flag(self):
+        import backend.utils.shutdown_listener as shutdown_mod
+
+        action_dict = {
+            "id": 0,
+            "action": "message",
+            "args": {"content": "hello", "image_urls": [], "wait_for_response": False},
+            "message": "hello",
+        }
+        fs = MagicMock()
+        fs.read.return_value = json.dumps([action_dict])
+        store = EventStore(sid="s1", file_store=fs, user_id=None)
+        store._cur_id = 1
+        shutdown_mod._should_exit = True
+
+        events = list(store.search_events(start_id=0, end_id=0))
+
+        assert len(events) == 1

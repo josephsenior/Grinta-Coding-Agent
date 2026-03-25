@@ -16,6 +16,9 @@ Specific rules enforced:
   4. memory/ must NOT import from server/
   5. events/ must NOT import from server/ or controller/
   6. core/ must NOT import from server/, controller/, engines/, or memory/
+     Exception: ``backend/core/bootstrap/`` is the composition root; those
+     modules are listed in EXEMPTIONS. ``backend/core/config/config_loader.py``
+     may register custom agent classes (also exempt).
 """
 
 from __future__ import annotations
@@ -50,11 +53,11 @@ RULES: list[tuple[str, str, str]] = [
 
 # Known exemptions (module path → reason).  Keep this list SMALL.
 EXEMPTIONS: dict[str, str] = {
-    # Bootstrap / application-wiring modules that inherently cross layers:
-    "backend.core.loop": "Bootstrap: agent control loop wiring",
-    "backend.core.main": "Bootstrap: application entry point",
-    "backend.core.setup": "Bootstrap: creates agent, controller, memory, runtime",
-    "backend.core.config.utils": "Bootstrap: registers custom agent classes",
+    # Bootstrap / application-wiring modules that inherently cross layers.
+    "backend.core.bootstrap.agent_control_loop": "Bootstrap: agent control loop wiring",
+    "backend.core.bootstrap.main": "Bootstrap: application entry point",
+    "backend.core.bootstrap.setup": "Bootstrap: creates agent, controller, memory, runtime",
+    "backend.core.config.config_loader": "Bootstrap: registers custom agent classes",
 }
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]  # backend/
@@ -148,7 +151,7 @@ def main() -> None:
     """CLI entry point."""
     violations = check()
     if violations:
-        print(f"\n✗ {len(violations)} layer boundary violation(s) found:\n")
+        print(f"\nFAIL: {len(violations)} layer boundary violation(s) found:\n")
         for v in violations:
             print(v)
         print(
@@ -156,7 +159,7 @@ def main() -> None:
         )
         sys.exit(1)
     else:
-        print("✓ No layer boundary violations found.")
+        print("OK: No layer boundary violations found.")
         sys.exit(0)
 
 

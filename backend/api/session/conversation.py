@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 from backend.core.logger import forge_logger as logger
 from backend.llm.llm_registry import LLMRegistry
 from backend.runtime import get_runtime_cls
-from backend.api.shared import get_event_service_adapter
+from backend.api.app_accessors import get_event_service_adapter
 
 if TYPE_CHECKING:
     from backend.core.config import ForgeConfig

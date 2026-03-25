@@ -247,7 +247,44 @@ class OpenAIClient(DirectLLMClient):
         if isinstance(exc, (openai.APIConnectionError, httpx.RequestError)):
             return APIConnectionError(str(exc), llm_provider="openai", model=self.model_name)
         if isinstance(exc, openai.RateLimitError):
-            return RateLimitError(str(exc), llm_provider="openai", model=self.model_name)
+            # OpenAI uses HTTP 429 for both transient rate limits and non-transient
+            # "insufficient_quota" (billing/credits). The latter should NOT be retried.
+            code = getattr(exc, "code", None)
+            message = str(exc)
+
+            # The OpenAI SDK may not surface the provider error code directly
+            # on the exception, but it typically includes a parsed response body.
+            body = getattr(exc, "body", None)
+            if not code and isinstance(body, dict):
+                err = body.get("error")
+                if isinstance(err, dict):
+                    code = err.get("code") or err.get("type") or code
+                    body_msg = err.get("message")
+                    if isinstance(body_msg, str) and body_msg:
+                        message = body_msg
+
+            lowered = message.lower()
+            status_code = getattr(exc, "status_code", None) or 429
+            if isinstance(code, str) and code and f"code={code}" not in message:
+                message = f"{message} (code={code})"
+
+            if code == "insufficient_quota" or "insufficient_quota" in lowered:
+                return AuthenticationError(
+                    message,
+                    llm_provider="openai",
+                    model=self.model_name,
+                    status_code=status_code,
+                    code=code,
+                    body=body,
+                )
+            return RateLimitError(
+                message,
+                llm_provider="openai",
+                model=self.model_name,
+                status_code=status_code,
+                code=code,
+                body=body,
+            )
         if isinstance(exc, openai.AuthenticationError):
             return AuthenticationError(str(exc), llm_provider="openai", model=self.model_name)
         if isinstance(exc, openai.BadRequestError):
@@ -287,6 +324,23 @@ class OpenAIClient(DirectLLMClient):
         first = response.choices[0]
         msg = first.message
         tool_calls = self._extract_openai_tool_calls(msg)
+
+        # Some OpenAI-compatible APIs (or parameter combos) can yield a response
+        # where `content` is empty and no tool call is present. This is almost
+        # always a provider-side anomaly, so capture enough context to debug.
+        content_value = getattr(msg, "content", None)
+        if (content_value is None or (isinstance(content_value, str) and not content_value.strip())) and not tool_calls:
+            try:
+                msg_dump = msg.model_dump() if hasattr(msg, "model_dump") else str(msg)
+            except Exception:
+                msg_dump = str(msg)
+            logger.warning(
+                "OpenAI-compatible completion returned empty message (no tool calls). "
+                "model=%s finish_reason=%s msg=%s",
+                self.model_name,
+                getattr(first, "finish_reason", None),
+                msg_dump,
+            )
         return LLMResponse(
             content=msg.content or "",
             model=response.model,
@@ -342,6 +396,7 @@ class OpenAIClient(DirectLLMClient):
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
+        # OpenAI-compatible APIs require stream=True for token streaming.
         kwargs["stream"] = True
         kwargs.pop("model", None)
         try:
@@ -551,7 +606,12 @@ class GeminiClient(DirectLLMClient):
     """Client for Google Gemini."""
 
     def __init__(self, model_name: str, api_key: str):
-        logger.error(f"INITIALIZING GEMINI CLIENT WITH KEY: {repr(api_key[:10])}...{repr(api_key[-5:])} (len={len(api_key)})")
+        # Never log secrets (even partial key prefixes/suffixes).
+        logger.debug(
+            "Initializing Gemini client (api_key_set=%s, api_key_len=%s)",
+            bool(api_key),
+            len(api_key) if api_key else 0,
+        )
         self._model_name = model_name
         self.api_key = api_key
         
@@ -696,6 +756,19 @@ class GeminiClient(DirectLLMClient):
 
         if isinstance(exc, APIError):
             error_str = str(exc).lower()
+
+            # Google Gemini sometimes returns 400 INVALID_ARGUMENT for invalid/unknown keys
+            # (e.g., "API Key not found"), and the message can contain "not found" which
+            # would otherwise be misclassified as a 404.
+            if "api key" in error_str and (
+                "not found" in error_str
+                or "invalid api key" in error_str
+                or "api_key_invalid" in error_str
+            ):
+                return AuthenticationError(
+                    str(exc), llm_provider="google", model=self.model_name
+                )
+
             if exc.code == 429 or "quota" in error_str or "rate limit" in error_str:
                 return RateLimitError(str(exc), llm_provider="google", model=self.model_name)
             if exc.code == 401 or "unauthorized" in error_str or "invalid api key" in error_str:

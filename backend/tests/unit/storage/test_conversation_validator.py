@@ -97,16 +97,18 @@ class TestValidatePermissive:
         validator._ensure_metadata_exists = AsyncMock(return_value=mock_meta)
 
         result = await validator.validate("conv-1", "", None)
-        assert result is None  # user_id from metadata
-        validator._ensure_metadata_exists.assert_awaited_once_with("conv-1", None)
+        # Anonymous: same id as REST (`get_current_user_id`, e.g. oss_user)
+        assert result == "oss_user"
+        validator._ensure_metadata_exists.assert_awaited_once_with("conv-1", "oss_user")
 
-    async def test_permissive_returns_user_id_from_metadata(self, validator):
+    async def test_permissive_returns_extracted_user_id(self, validator):
         mock_meta = MagicMock()
-        mock_meta.user_id = "user-42"
         validator._ensure_metadata_exists = AsyncMock(return_value=mock_meta)
+        validator._extract_user_id = MagicMock(return_value="user-42")
 
-        result = await validator.validate("conv-1", "", None)
+        result = await validator.validate("conv-1", "", "Bearer tok")
         assert result == "user-42"
+        validator._ensure_metadata_exists.assert_awaited_once_with("conv-1", "user-42")
 
 
 # ── validate (strict) ────────────────────────────────────────────────

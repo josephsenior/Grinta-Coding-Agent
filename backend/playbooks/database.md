@@ -1,77 +1,33 @@
 ---
 name: database
 type: knowledge
-version: 1.0.0
+version: 2.0.0
 agent: Orchestrator
 triggers:
-  - postgresql
-  - postgres
-  - mysql
-  - mongodb
-  - redis
-  - database
-  - sql
+  - /database
 ---
 
-# Database Setup
+# Database setup
 
-**Core principle:** Simple first.
+**Principle:** Simplest thing that works — usually **SQLite** for local dev unless the user needs a specific engine.
 
-## Quick Decision
+## Ask once
 
-User mentions database? **Ask first:**
+Offer **SQLite (dev)** vs **user-managed server** (Postgres, MySQL, Mongo, etc.). Do not assume a server is installed.
 
-```
-I can set up [DATABASE] in a few ways:
+## Prefer lighter options when prototyping
 
-1. SQLite (Recommended for dev)
-   - No installation, works immediately
+| User says | Often start with |
+|-----------|------------------|
+| Postgres / MySQL | SQLite for dev, or their existing local instance |
+| Mongo | Local Mongo or embedded doc store per stack |
 
-2. Local [DATABASE]
-   - You install locally, I create connection code
+## Snippets (reference)
 
-Which do you prefer?
-```
-
-## Lightweight Alternatives
-
-**PostgreSQL** → SQLite
-**MySQL** → SQLite or MariaDB
-**MongoDB** → NeDB or local MongoDB
-**Redis** → In-memory store or local Redis
-
-## Examples
-
-### SQLite (Node.js)
-```javascript
-// npm install better-sqlite3
-const Database = require('better-sqlite3');
-const db = new Database('dev.db');
-
-db.exec(`CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY,
-  username TEXT NOT NULL,
-  email TEXT UNIQUE
-)`);
-```
-
-### PostgreSQL Connection (User Installs)
-```javascript
-// npm install pg
-const { Pool } = require('pg');
-const pool = new Pool({
-  host: 'localhost',
-  database: 'myapp',
-  user: 'postgres',
-  password: 'password'
-});
-```
+**SQLite (Node):** `better-sqlite3` — open file, `CREATE TABLE IF NOT EXISTS`, parameterized queries.  
+**Postgres (Node):** `pg` `Pool` — never hardcode passwords; use env vars.
 
 ## Rules
 
-**DON'T:**
-- Assume a specific database is installed.
-
-**DO:**
-- Present options first.
-- Recommend simplest (SQLite for dev).
+- No secrets in source; use env + system security rules.
+- Parameterized queries only (SQL injection).

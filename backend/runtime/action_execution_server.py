@@ -36,6 +36,7 @@ from backend.events.observation import (
     FileEditObservation,
     FileReadObservation,
     FileWriteObservation,
+    LspQueryObservation,
     Observation,
 )
 from backend.events.action.code_nav import LspQueryAction
@@ -62,8 +63,10 @@ from backend.runtime.file_operations import (
     truncate_large_text,
     write_file_content,
 )
+from backend.runtime.browser_init import init_browser
 from backend.runtime.file_viewer_server import start_file_viewer_server
 from backend.runtime.mcp.proxy import MCPProxyManager
+from backend.runtime.plugin_loader import init_plugins
 from backend.runtime.plugins import ALL_PLUGINS, Plugin
 from backend.runtime.server_routes import (
     register_exception_handlers,
@@ -147,9 +150,16 @@ class ActionExecutor:
         # Ensure downloads directory exists
         os.makedirs(self.downloads_directory, exist_ok=True)
 
+        # Track repeated identical command failures to nudge strategy pivots
+        # before the circuit breaker is the only recovery mechanism.
+        self._last_cmd_failure_signature: tuple[str, int, str] | None = None
+        self._same_cmd_failure_count: int = 0
+
         # MCP clients are created lazily on first use.
         self._mcp_config = mcp_config
         self._mcp_clients: list[Any] | None = None
+        # Same server list passed to create_mcps (after Windows stdio filter), for diagnostics.
+        self._mcp_servers_resolved: list[Any] | None = None
 
     @property
     def initial_cwd(self) -> str:
@@ -158,18 +168,7 @@ class ActionExecutor:
 
     async def _init_browser_async(self) -> None:
         """Initialize the browser asynchronously."""
-        if not self.enable_browser:
-            return
-
-        try:
-            logger.info("Initializing browser environment...")
-            from backend.runtime.browser.browser_env import BrowserEnv
-
-            self.browser = BrowserEnv()
-            logger.info("Browser environment initialized successfully")
-        except Exception as e:
-            logger.error("Failed to initialize browser: %s", e)
-            self.browser = None
+        self.browser = await init_browser(self.enable_browser)
 
     async def _ensure_browser_ready(self) -> None:
         """Ensure the browser is ready for use."""
@@ -230,8 +229,7 @@ class ActionExecutor:
 
             # Step 3: Initialize plugins
             logger.info("Step 3/5: Initializing plugins...")
-            for plugin in self.plugins_to_load:
-                await self._init_plugin(plugin)
+            self.plugins = await init_plugins(self.plugins_to_load, self.username)
 
             # Step 4: Initialize bash commands/aliases
             logger.info("Step 4/5: Setting up bash commands...")
@@ -256,11 +254,6 @@ class ActionExecutor:
     def initialized(self) -> bool:
         """Check if action execution server has completed initialization."""
         return self._initialized
-
-    async def _init_plugin(self, plugin: Plugin):
-        self.plugins[plugin.name] = plugin
-        await plugin.initialize(self.username)
-        logger.info("Plugin %s initialized", plugin.name)
 
     def _init_bash_commands(self):
         # We need to set up some aliases and functions in bash for better UX
@@ -294,7 +287,10 @@ class ActionExecutor:
         if hasattr(obs, "path") and isinstance(obs.path, str):
             obs.path = self._denormalize_obs_text(obs.path)
         if hasattr(obs, "message") and isinstance(obs.message, str):
-            obs.message = self._denormalize_obs_text(obs.message)
+            try:
+                obs.message = self._denormalize_obs_text(obs.message)
+            except AttributeError:
+                pass  # message is read-only (e.g. MCPObservation); content already denormalized
         return obs
 
     def _normalize_workspace_path(self, path: str) -> str:
@@ -346,6 +342,70 @@ class ActionExecutor:
         )
         return text
 
+    def _should_rewrite_python3_to_python(self) -> bool:
+        """Return True only when running in Windows PowerShell mode.
+
+        On Windows with Git Bash available, commands should remain bash-native,
+        and python3 should not be rewritten.
+        """
+        if sys.platform != "win32":
+            return False
+
+        tool_registry = getattr(self.session_manager, "tool_registry", None)
+        if tool_registry is not None:
+            has_bash = bool(getattr(tool_registry, "has_bash", False))
+            if has_bash:
+                return False
+            has_powershell = bool(getattr(tool_registry, "has_powershell", False))
+            if has_powershell:
+                return True
+
+        # Fallback when tool registry details are unavailable in tests/mocks.
+        default_session = self.session_manager.get_session("default")
+        session_name = default_session.__class__.__name__.lower() if default_session else ""
+        return "powershell" in session_name
+
+    @staticmethod
+    def _extract_failure_signature(content: str) -> str:
+        """Build a compact error signature for repeated-failure detection."""
+        if not content:
+            return ""
+        lines = [line.strip().lower() for line in content.splitlines() if line.strip()]
+        if not lines:
+            return ""
+        # Prefer the tail where shell errors usually appear.
+        tail = " | ".join(lines[-3:])
+        return tail[:300]
+
+    def _maybe_mark_repeated_cmd_failure(
+        self, action: CmdRunAction, observation: CmdOutputObservation
+    ) -> None:
+        """Annotate repeated identical command failures to force a strategy pivot."""
+        exit_code = int(getattr(observation.metadata, "exit_code", 0) or 0)
+        if exit_code == 0:
+            self._last_cmd_failure_signature = None
+            self._same_cmd_failure_count = 0
+            return
+
+        signature = (
+            action.command.strip(),
+            exit_code,
+            self._extract_failure_signature(observation.content),
+        )
+        if signature == self._last_cmd_failure_signature:
+            self._same_cmd_failure_count += 1
+        else:
+            self._last_cmd_failure_signature = signature
+            self._same_cmd_failure_count = 1
+
+        if self._same_cmd_failure_count >= 2:
+            observation.content += (
+                "\n\n[REPEATED_COMMAND_FAILURE] "
+                f"The same command failed {self._same_cmd_failure_count} times with the same error signature. "
+                "Do NOT retry unchanged. Pivot now: inspect available tools/interpreters, "
+                "adjust environment, or choose a different command/tool."
+            )
+
     async def run(
         self, action: CmdRunAction
     ) -> CmdOutputObservation | ErrorObservation | TerminalObservation:
@@ -368,9 +428,8 @@ class ActionExecutor:
                     action.command,
                 )
 
-            # On Windows, python3 is not on PATH — only python exists.
-            import sys as _sys
-            if _sys.platform == "win32" and action.command:
+            # Rewrite python3->python only in Windows PowerShell mode.
+            if self._should_rewrite_python3_to_python() and action.command:
                 import re as _re
                 action.command = _re.sub(
                     r"\bpython3\b", "python", action.command
@@ -382,6 +441,8 @@ class ActionExecutor:
             observation = await self._run_foreground_cmd(action)
             if isinstance(observation, ErrorObservation):
                 return observation
+
+            self._maybe_mark_repeated_cmd_failure(action, observation)
 
             if action.grep_pattern and isinstance(observation.content, str):
                 observation.content = self._apply_grep_filter(
@@ -593,7 +654,7 @@ class ActionExecutor:
         """Handle file reading using the FILE_EDITOR implementation."""
         result_str, _ = execute_file_editor(
             self.file_editor,
-            command="view",
+            command="view_file",
             path=action.path,
             view_range=action.view_range,
         )
@@ -610,8 +671,8 @@ class ActionExecutor:
         # Translate /workspace/ virtual paths to the actual workspace directory.
         action.path = self._normalize_workspace_path(action.path)
 
-        # Check for binary files
-        if is_binary(action.path):
+        # Check for binary files (skip probe if path is missing — avoids noisy errors)
+        if os.path.isfile(action.path) and is_binary(action.path):
             return ErrorObservation("ERROR_BINARY_FILE")
 
         # Handle FILE_EDITOR implementation
@@ -666,7 +727,7 @@ class ActionExecutor:
         """Return directory view observation if path is dir and viewable; else None."""
         try:
             if os.path.isdir(filepath) and (
-                action.command == "view" or not action.command
+                action.command == "view_file" or not action.command
             ):
                 return handle_directory_view(filepath, path_for_obs)
         except Exception:
@@ -696,7 +757,7 @@ class ActionExecutor:
         result_str = truncate_large_text(result_str, max_chars, label="edit")
         # P1-B: Append a short unified diff to the observation so the LLM can
         # confirm what changed without a follow-up view call.
-        if old_content is not None and new_content is not None and command != "view":
+        if old_content is not None and new_content is not None and command != "view_file":
             try:
                 diff = get_diff(old_content, new_content, action.path)
                 if diff:
@@ -705,18 +766,13 @@ class ActionExecutor:
                 pass  # diff is a nice-to-have; never block the observation
         # Blast Radius Hook
         # If the edit is successful and there's new content, check symbol references
-        if old_content is not None and new_content is not None and command != "view":
+        if old_content is not None and new_content is not None and command != "view_file":
             try:
-                from backend.engines.orchestrator.tools.structure_editor import (
-                    StructureEditor,
-                )
+                from backend.utils.blast_radius import check_blast_radius_from_code
 
-                editor_instance = StructureEditor()
-                dummy_result = type("DummyResult", (), {"message": result_str})()
-                editor_instance._check_blast_radius_from_code(
-                    action.path, new_content, dummy_result
-                )  # type: ignore
-                result_str = dummy_result.message
+                warning = check_blast_radius_from_code(action.path, new_content)
+                if warning:
+                    result_str += warning
             except Exception as e:
                 logger.debug("Failed to check blast radius: %s", e)
 
@@ -750,18 +806,13 @@ class ActionExecutor:
             diff = get_diff(old_content, new_content, action.path)
 
             # Blast Radius Hook
-            if command != "view":
+            if command != "view_file":
                 try:
-                    from backend.engines.orchestrator.tools.structure_editor import (
-                        StructureEditor,
-                    )
+                    from backend.utils.blast_radius import check_blast_radius_from_code
 
-                    editor_instance = StructureEditor()
-                    dummy_result = type("DummyResult", (), {"message": diff})()
-                    editor_instance._check_blast_radius_from_code(
-                        action.path, new_content, dummy_result
-                    )  # type: ignore
-                    diff = dummy_result.message
+                    warning = check_blast_radius_from_code(action.path, new_content)
+                    if warning:
+                        diff += warning
                 except Exception as e:
                     logger.debug("Failed to check blast radius: %s", e)
 
@@ -774,18 +825,13 @@ class ActionExecutor:
                 impl_source=FileEditSource.LLM_BASED_EDIT,
             )
         # Blast Radius Hook
-        if old_content is not None and new_content is not None and command != "view":
+        if old_content is not None and new_content is not None and command != "view_file":
             try:
-                from backend.engines.orchestrator.tools.structure_editor import (
-                    StructureEditor,
-                )
+                from backend.utils.blast_radius import check_blast_radius_from_code
 
-                editor_instance = StructureEditor()
-                dummy_result = type("DummyResult", (), {"message": result_str})()
-                editor_instance._check_blast_radius_from_code(
-                    action.path, new_content, dummy_result
-                )  # type: ignore
-                result_str = dummy_result.message
+                warning = check_blast_radius_from_code(action.path, new_content)
+                if warning:
+                    result_str += warning
             except Exception as e:
                 logger.debug("Failed to check blast radius: %s", e)
 
@@ -824,12 +870,12 @@ class ActionExecutor:
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
         """Execute an MCP tool call using Forge's MCP client integration."""
         try:
-            from backend.mcp_integration.utils import (
+            from backend.mcp_client.mcp_utils import (
                 call_tool_mcp,
                 create_mcps,
             )
             from backend.core.config.mcp_config import _filter_windows_stdio_servers
-            from backend.core.config.utils import load_forge_config
+            from backend.core.config.config_loader import load_forge_config
 
             if self._mcp_clients is None:
                 # Prefer injected config (e.g. in-process runtime), fallback to load.
@@ -842,9 +888,20 @@ class ActionExecutor:
                 # config loading so that explicitly-allowed stdio servers are
                 # kept while unknown ones are still blocked.
                 servers = _filter_windows_stdio_servers(list(servers))
+                self._mcp_servers_resolved = list(servers)
                 self._mcp_clients = await create_mcps(servers)
+                from backend.mcp_client.mcp_tool_aliases import (
+                    prepare_mcp_tool_exposed_names,
+                )
 
-            observation = await call_tool_mcp(self._mcp_clients, action)  # type: ignore[arg-type]
+                _reserved = getattr(cfg, "mcp_exposed_name_reserved", None) or frozenset()
+                prepare_mcp_tool_exposed_names(self._mcp_clients, set(_reserved))
+
+            observation = await call_tool_mcp(
+                self._mcp_clients,
+                action,
+                configured_servers=self._mcp_servers_resolved,
+            )  # type: ignore[arg-type]
 
             # Apply truncation to large MCP outputs
             if hasattr(observation, "content") and isinstance(observation.content, str):
@@ -867,8 +924,9 @@ class ActionExecutor:
 
     async def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute an LSP query using the lsp_client."""
-        from backend.engines.orchestrator.tools.lsp_client import LspClient
+        from backend.utils.lsp_client import LspClient
 
+        start = time.perf_counter()
         try:
             client = LspClient()
             result = client.query(
@@ -878,12 +936,42 @@ class ActionExecutor:
                 column=action.column,
                 symbol=getattr(action, "symbol", ""),
             )
-            return Observation(content=result.format_text(action.command))
+
+            latency_ms = int((time.perf_counter() - start) * 1000)
+            obs = LspQueryObservation(
+                content=result.format_text(action.command),
+                available=bool(result.available),
+            )
+            obs.tool_result = {
+                "tool": "lsp_query",
+                "command": action.command,
+                "file": action.file,
+                "latency_ms": latency_ms,
+                "available": bool(result.available),
+                "has_error": bool(result.error),
+            }
+            logger.info(
+                "LSP query completed: command=%s available=%s latency_ms=%d",
+                action.command,
+                bool(result.available),
+                latency_ms,
+            )
+            return obs
         except Exception as e:
+            latency_ms = int((time.perf_counter() - start) * 1000)
             logger.error("LSP query failed: %s", e, exc_info=True)
-            return ErrorObservation(
+            err = ErrorObservation(
                 f"LSP query failed: {e}. Check if python-lsp-server is installed."
             )
+            err.tool_result = {
+                "tool": "lsp_query",
+                "command": action.command,
+                "file": action.file,
+                "latency_ms": latency_ms,
+                "available": False,
+                "has_error": True,
+            }
+            return err
 
     async def signal_progress(self, action: SignalProgressAction) -> Observation:
         """Handle a progress signal from the agent."""
@@ -892,6 +980,30 @@ class ActionExecutor:
 
     def close(self) -> None:
         """Clean up resources owned by the in-process executor."""
+        if self._mcp_clients:
+            _clients = list(self._mcp_clients)
+            self._mcp_clients = None
+
+            async def _disconnect_mcp() -> None:
+                for c in _clients:
+                    try:
+                        await c.disconnect()
+                    except asyncio.CancelledError:
+                        raise
+                    except BaseExceptionGroup as eg:
+                        logger.debug("MCP executor disconnect (exception group): %s", eg)
+                    except Exception as e:
+                        logger.debug("MCP executor disconnect: %s", e, exc_info=True)
+                    await asyncio.sleep(0)
+
+            try:
+                from backend.core.constants import GENERAL_TIMEOUT
+                from backend.utils.async_utils import call_async_from_sync
+
+                call_async_from_sync(_disconnect_mcp, GENERAL_TIMEOUT)
+            except Exception as exc:
+                logger.debug("MCP disconnect during ActionExecutor.close: %s", exc)
+
         try:
             self.session_manager.close_all()
         except Exception:
@@ -1085,7 +1197,7 @@ if __name__ == "__main__":
                     api_key=None,
                     logger_level=logger.getEffectiveLevel(),
                 )
-                from backend.core.config.utils import load_forge_config
+                from backend.core.config.config_loader import load_forge_config
 
                 forge_config = load_forge_config()
                 mcp_proxy_manager.initialize(forge_config.mcp.servers)

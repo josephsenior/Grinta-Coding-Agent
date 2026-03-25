@@ -22,7 +22,7 @@ python start_server.py
 Or directly:
 
 ```sh
-uvicorn backend.api.listen:app --reload --port 3000
+uvicorn backend.api.socketio_asgi_app:app --reload --port 3000
 ```
 
 ## Test the Server
@@ -131,9 +131,9 @@ The `conversation_manager.py` file defines the `ConversationManager` class, whic
 - Sending messages to specific conversations
 - Cleaning up inactive conversations
 
-### 4. listen.py
+### 4. socketio_asgi_app.py
 
-The `listen.py` file is the main server file that sets up the FastAPI application and defines various API endpoints. Key features include:
+The `socketio_asgi_app.py` file is the Socket.IO ASGI entrypoint that mounts the FastAPI application. Key features include:
 
 - Setting up CORS middleware
 - Handling WebSocket connections
@@ -143,7 +143,7 @@ The `listen.py` file is the main server file that sets up the FastAPI applicatio
 ## Workflow Description
 
 1. **Server Initialization**:
-   - The FastAPI application is created and configured in `listen.py`.
+  - The FastAPI application is created in `app.py` and mounted for Socket.IO in `socketio_asgi_app.py`.
    - CORS middleware and static file serving are set up.
    - The `ConversationManager` is initialized.
 
@@ -177,3 +177,4 @@ The `listen.py` file is the main server file that sets up the FastAPI applicatio
    - Various API endpoints are provided for agent interactions, file operations, and retrieving configuration defaults.
 
 This server architecture allows for managing multiple client sessions, each with its own agent instance, runtime environment, and security analyzer. The event-driven design facilitates real-time communication between clients and agents, while the modular structure allows for easy extension and maintenance of different components.
+

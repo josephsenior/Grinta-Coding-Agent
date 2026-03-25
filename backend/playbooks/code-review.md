@@ -1,89 +1,44 @@
 ---
 name: code_review
 type: knowledge
-version: 2.0.0
+version: 3.0.0
 agent: Orchestrator
 triggers:
   - /codereview
-  - code review
-  - review code
-  - review pr
 ---
 
-# Code Review Guide
+# Code review (PR/MR)
 
-Use provider MCP tools (or provider API) for PR reviews. Provider token env var: `GIT_PROVIDER_TOKEN`.
+Use provider **MCP tools** or API with `GIT_PROVIDER_TOKEN` (or provider-specific env). Follow workspace **SECURITY** — never post secrets in comments.
 
-## Quick Workflow
+## Workflow
 
-1. Fetch PR/MR details from your provider via MCP tooling
-2. Get diff/patch from provider API or MCP tool output
-3. Review code (focus: security, bugs, clarity)
-4. Post comments via provider API/MCP
-5. Submit review (APPROVE, REQUEST_CHANGES, or COMMENT)
+1. Load PR/MR metadata and **diff** (or patches).  
+2. Review: correctness, edge cases, readability, tests.  
+3. Leave inline comments on specific lines when the API supports it.  
+4. Submit review: **APPROVE**, **REQUEST_CHANGES**, or **COMMENT**.
 
-## Review Template
+## Comment template
 
 ```markdown
-## Code Review
+## Summary
+Briefly what changed.
 
-**Critical Issues 🚨**
-[Must fix before merge]
+**Must fix**
+- …
 
-**Suggestions 💡**
-[Nice to have improvements]
+**Suggestions**
+- …
 
-**Highlights ✅**
-[What's done well]
+**Nice**
+- …
 ```
 
-## Examples
+## API examples (adjust host/path to provider)
 
-### Post Comment
-```bash
-curl -X POST \
-  -H "Authorization: token $GIT_PROVIDER_TOKEN" \
-  -H "Content-Type: application/json" \
-  "https://<provider-api>/repos/OWNER/REPO/issues/PR_NUMBER/comments" \
-  -d '{"body": "Security issue in auth.py line 102: SQL injection risk. Use parameterized queries."}'
-```
+Post comment / submit review via provider REST; use the same auth header pattern your MCP tools use. Prefer **MCP** when available — fewer raw URL mistakes.
 
-### Submit Review
-```bash
-# Approve
-curl -X POST \
-  -H "Authorization: token $GIT_PROVIDER_TOKEN" \
-  "https://<provider-api>/repos/OWNER/REPO/pulls/PR_NUMBER/reviews" \
-  -d '{"body": "LGTM! ✅", "event": "APPROVE"}'
+## Review lens
 
-# Request changes
-curl -X POST \
-  -H "Authorization: token $GIT_PROVIDER_TOKEN" \
-  "https://<provider-api>/repos/OWNER/REPO/pulls/PR_NUMBER/reviews" \
-  -d '{"body": "Please fix security issues.", "event": "REQUEST_CHANGES"}'
-```
-
-### Inline Comment on Specific Line
-```bash
-curl -X POST \
-  -H "Authorization: token $GIT_PROVIDER_TOKEN" \
-  "https://<provider-api>/repos/OWNER/REPO/pulls/PR_NUMBER/comments" \
-  -d '{
-    "body": "🔒 SQL injection: Use cursor.execute(\"SELECT * FROM users WHERE id = %s\", (user_id,))",
-    "commit_id": "COMMIT_SHA",
-    "path": "src/auth.py",
-    "line": 102
-  }'
-```
-
-## Focus Areas
-
-**Security:** SQL injection, XSS, hardcoded secrets, weak crypto
-**Bugs:** Null checks, error handling, edge cases
-**Clarity:** Function length, nesting depth, naming
-
-## Review Status
-
-- `APPROVE` - Ready to merge
-- `REQUEST_CHANGES` - Must fix issues
-- `COMMENT` - Suggestions only
+- **Risk:** authz, injection (SQL/XSS), unsafe deserialization, resource limits.  
+- **Quality:** error handling, null/empty cases, naming, test coverage for new logic.

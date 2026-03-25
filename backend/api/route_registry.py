@@ -24,7 +24,7 @@ def register_routes(app: FastAPI) -> None:
     from backend.api.routes.global_export import router as global_export_router
     from backend.api.routes.health import add_health_endpoints
     from backend.api.routes.knowledge_base import router as knowledge_base_router
-    from backend.api.routes.manage_conversations import (
+    from backend.api.routes.conversation_collection import (
         sub_router as manage_conversation_api_router,
     )
     from backend.api.routes.memory import router as memory_router
@@ -36,6 +36,7 @@ def register_routes(app: FastAPI) -> None:
     from backend.api.routes.settings import router as settings_router
     from backend.api.routes.templates import router as templates_router
     from backend.api.routes.trajectory import router as trajectory_router
+    from backend.api.routes.workspace import router as workspace_router
 
     app.include_router(public_api_router, tags=["v1", "public"])
     app.include_router(features_router, tags=["v1", "features"])
@@ -53,6 +54,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(trajectory_router, tags=["v1", "trajectory"])
     app.include_router(notifications_router, tags=["v1", "notifications"])
     app.include_router(search_router, tags=["v1", "search"])
+    app.include_router(workspace_router, tags=["v1", "workspace"])
     add_health_endpoints(app)
 
     # Debug endpoint — gated behind FORGE_DEBUG env var
@@ -111,3 +113,4 @@ def _register_sampling_debug(app: FastAPI) -> None:
             return JSONResponse(payload)
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=500)
+

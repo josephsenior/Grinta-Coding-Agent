@@ -36,7 +36,7 @@ class TestUniversalTimeout(unittest.TestCase):
         from backend.events.action import CmdRunAction
 
         action = MagicMock(spec=CmdRunAction)
-        action.__class__ = CmdRunAction
+        action.__class__ = CmdRunAction  # type: ignore[assignment]
         action.command = command
         action.timeout = timeout
         return action

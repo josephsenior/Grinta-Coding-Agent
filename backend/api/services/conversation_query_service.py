@@ -1,6 +1,6 @@
 """Conversation query and lifecycle operations.
 
-Extracted from ``manage_conversations.py`` to keep route handlers thin.
+Extracted from ``conversation_collection.py`` to keep route handlers thin.
 Contains filtering, search, detail retrieval, deletion, and info assembly.
 """
 
@@ -16,10 +16,10 @@ from backend.api.schemas.conversation_info import ConversationInfo
 from backend.api.schemas.conversation_info_result_set import (
     ConversationInfoResultSet,
 )
-from backend.api.services.shared_dependencies import (
+from backend.api.services.service_dependencies import (
     require_conversation_manager as _require_conversation_manager,
 )
-from backend.api.shared import ConversationStoreImpl, config
+from backend.api.app_accessors import ConversationStoreImpl, config
 from backend.api.store_factory import get_conversation_store_instance
 from backend.storage.conversation.conversation_store import ConversationStore
 from backend.storage.data_models.conversation_metadata import (
@@ -318,3 +318,4 @@ async def delete_all_conversations(
 
     await store.delete_all_metadata()
     return True
+

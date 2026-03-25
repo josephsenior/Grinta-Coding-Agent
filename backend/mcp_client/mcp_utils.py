@@ -1,0 +1,705 @@
+"""Utility helpers for configuring and invoking Model Context Protocol clients in Forge."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import shutil
+import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.controller.agent import Agent
+    from backend.events.action.mcp import MCPAction
+    from backend.events.observation.observation import Observation
+    from backend.memory.agent_memory import Memory
+    from backend.runtime.base import Runtime
+from mcp import McpError
+
+from backend.core.config.mcp_config import (
+    MCPConfig,
+    MCPServerConfig,
+)
+from backend.core.logger import forge_logger as logger
+from backend.core.pydantic_compat import model_dump_with_options
+from backend.events.observation.mcp import MCPObservation
+from backend.mcp_client.cache import get_cached, set_cache
+from backend.mcp_client.client import MCPClient
+from backend.mcp_client.error_collector import mcp_error_collector
+from backend.mcp_client.mcp_bootstrap_status import (
+    MCPBootstrapStatus,
+    get_mcp_bootstrap_status,
+    set_mcp_bootstrap_status,
+)
+from backend.mcp_client.wrappers import WRAPPER_TOOL_REGISTRY, wrapper_tool_params
+
+# Populated by ``convert_mcps_to_tools`` for the current fetch cycle (cleared in ``fetch_mcp_tools_from_config``).
+_last_mcp_conversion_errors: list[str] = []
+from backend.runtime import LocalRuntimeInProcess
+
+
+def _get_mcp_connect_timeout_sec() -> float:
+    """Return MCP server connect timeout in seconds.
+
+    Default is generous for cold ``npx``/``uvx`` first installs; override with
+    ``FORGE_MCP_CONNECT_TIMEOUT_SEC``.
+    """
+    raw = os.getenv("FORGE_MCP_CONNECT_TIMEOUT_SEC", "60")
+    try:
+        timeout = float(raw)
+        return timeout if timeout > 0 else 60.0
+    except (TypeError, ValueError):
+        return 60.0
+
+
+def _is_windows_stdio_mcp_disabled() -> bool:
+    """Return True when stdio MCP should be bypassed on Windows.
+
+    HTTP/SSE MCP remains enabled by default on Windows.
+    """
+    return sys.platform == "win32" and not os.getenv("FORGE_ENABLE_WINDOWS_MCP")
+
+
+def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
+    """Converts a list of MCPClient instances to ChatCompletionToolParam format.
+
+    that can be used by Orchestrator.
+
+    Args:
+        mcps: List of MCPClient instances or None
+
+    Returns:
+        List of dicts of tools ready to be used by Orchestrator
+
+    """
+    if mcps is None:
+        logger.warning("mcps is None, returning empty list")
+        return []
+    global _last_mcp_conversion_errors
+    _last_mcp_conversion_errors = []
+    all_mcp_tools: list[dict] = []
+    server_tool_names: list[str] = []
+    conversion_errors: list[str] = []
+
+    for client in mcps:
+        try:
+            tools_iter = getattr(client, "tools", None) or []
+            tools_list = list(tools_iter)
+        except Exception as e:
+            err = f"list client tools: {e}"
+            conversion_errors.append(err)
+            logger.error("convert_mcps_to_tools: %s", err, exc_info=True)
+            mcp_error_collector.add_error(
+                server_name="general",
+                server_type="conversion",
+                error_message=err,
+                exception_details=str(e),
+            )
+            continue
+
+        for tool in tools_list:
+            try:
+                mcp_tools = tool.to_param()
+                all_mcp_tools.append(mcp_tools)
+                server_tool_names.append(tool.name)
+            except Exception as e:
+                tname = getattr(tool, "name", "<unknown>")
+                err = f"tool {tname!r} to_param: {e}"
+                conversion_errors.append(err)
+                logger.error("convert_mcps_to_tools: %s", err, exc_info=True)
+                mcp_error_collector.add_error(
+                    server_name="general",
+                    server_type="conversion",
+                    error_message=err,
+                    exception_details=str(e),
+                )
+
+    try:
+        all_mcp_tools.extend(wrapper_tool_params(server_tool_names))
+    except Exception as e:
+        err = f"wrapper_tool_params: {e}"
+        conversion_errors.append(err)
+        logger.error("convert_mcps_to_tools: %s", err, exc_info=True)
+        mcp_error_collector.add_error(
+            server_name="general",
+            server_type="conversion",
+            error_message=err,
+            exception_details=str(e),
+        )
+
+    _last_mcp_conversion_errors = conversion_errors
+    return all_mcp_tools
+
+
+async def create_mcps(
+    servers: list[MCPServerConfig],
+    conversation_id: str | None = None,
+) -> list[MCPClient]:
+    """Create MCP clients for configured servers.
+
+    Args:
+        servers: List of all MCP server configurations
+        conversation_id: Optional conversation ID for grouping
+
+    Returns:
+        List of successfully connected MCPClient instances
+    """
+    if not servers:
+        return []
+
+    # Connect to servers in parallel so one slow server does not stall
+    # overall MCP bootstrap for the conversation.
+    connect_tasks = [_connect_to_server(server, conversation_id) for server in servers]
+    results = await asyncio.gather(*connect_tasks)
+    return [client for client in results if client is not None]
+
+
+async def _connect_to_server(
+    server: MCPServerConfig,
+    conversation_id: str | None,
+) -> MCPClient | None:
+    """Connect to a single MCP server based on its type.
+
+    Returns the connected client or None if connection failed.
+    """
+    if server.type == "stdio":
+        return await _connect_stdio_server(server)
+    if server.type in ("sse", "shttp"):
+        return await _connect_http_server(server, conversation_id)
+    logger.error("Unknown MCP server type: %s", server.type)
+    return None
+
+
+async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
+    """Connect to an MCP stdio server."""
+    # Validate command availability
+    if not server.command or not shutil.which(server.command):
+        logger.error(
+            'Skipping MCP stdio server "%s": command "%s" not found. '
+            "Please install %s or remove this server from your configuration.",
+            server.name,
+            server.command,
+            server.command,
+        )
+        return None
+
+    logger.info("Initializing MCP agent for %s with stdio connection...", server.name)
+    client = MCPClient()
+    timeout_sec = _get_mcp_connect_timeout_sec()
+
+    try:
+        await asyncio.wait_for(client.connect_stdio(server), timeout=timeout_sec)
+        _log_successful_connection(client, server.name, "STDIO")
+        return client
+    except TimeoutError:
+        logger.warning(
+            "Timed out connecting to stdio MCP server '%s' after %.1fs; skipping.",
+            server.name,
+            timeout_sec,
+        )
+        return None
+    except Exception as e:
+        logger.error("Failed to connect to %s: %s", server.name, str(e), exc_info=True)
+        return None
+
+
+async def _connect_http_server(
+    server: MCPServerConfig,
+    conversation_id: str | None,
+) -> MCPClient | None:
+    """Connect to an MCP HTTP-based server (SSE or sHTTP)."""
+    connection_type = server.type.upper()
+
+    logger.info(
+        "Initializing MCP agent for %s with %s connection...", server.name, connection_type
+    )
+    client = MCPClient()
+    timeout_sec = _get_mcp_connect_timeout_sec()
+
+    try:
+        await asyncio.wait_for(
+            client.connect_http(server, conversation_id=conversation_id),
+            timeout=timeout_sec,
+        )
+        _log_successful_connection(client, server.url or "", connection_type)
+        return client
+    except TimeoutError:
+        logger.warning(
+            "Timed out connecting to %s MCP server '%s' after %.1fs; skipping.",
+            connection_type,
+            server.name,
+            timeout_sec,
+        )
+        return None
+    except Exception as e:
+        logger.error("Failed to connect to %s: %s", server.url, str(e), exc_info=True)
+        return None
+
+
+def _log_successful_connection(
+    client: MCPClient, server_identifier: str, connection_type: str
+) -> None:
+    """Log successful MCP server connection with tool details."""
+    tool_names = [tool.name for tool in client.tools]
+    logger.debug(
+        "Successfully connected to MCP %s server %s - provides %s tools: %s",
+        connection_type,
+        server_identifier,
+        len(tool_names),
+        tool_names,
+    )
+
+
+async def fetch_mcp_tools_from_config(
+    mcp_config: MCPConfig,
+    conversation_id: str | None = None,
+    use_stdio: bool = False,
+    reserved_tool_names: frozenset[str] | None = None,
+) -> list[dict]:
+    """Retrieves the list of MCP tools from the MCP clients.
+
+    Args:
+        mcp_config: The MCP configuration
+        conversation_id: Optional conversation ID to associate with the MCP clients
+        use_stdio: Whether to use stdio servers for MCP clients, set to True when running from a CLI runtime
+
+    Returns:
+        A list of tool dictionaries. Returns an empty list if no connections could be established.
+
+    """
+    global _last_mcp_conversion_errors
+    _last_mcp_conversion_errors = []
+
+    if not getattr(mcp_config, "enabled", False):
+        set_mcp_bootstrap_status(
+            MCPBootstrapStatus(
+                state="mcp_disabled",
+                mcp_enabled=False,
+                configured_server_count=len(mcp_config.servers or []),
+            )
+        )
+        return []
+
+    # Filter servers: only include stdio if use_stdio is True
+    servers_to_connect = (
+        mcp_config.servers
+        if use_stdio
+        else [s for s in mcp_config.servers if s.type != "stdio"]
+    )
+    configured_n = len(mcp_config.servers or [])
+    attempted_n = len(servers_to_connect)
+
+    if configured_n == 0:
+        set_mcp_bootstrap_status(
+            MCPBootstrapStatus(
+                state="no_servers_configured",
+                mcp_enabled=True,
+                configured_server_count=0,
+                attempted_server_count=0,
+            )
+        )
+        return []
+
+    mcps: list[MCPClient] = []
+    mcp_tools: list[dict] = []
+    try:
+        logger.debug("Creating MCP clients with config: %s", mcp_config)
+
+        mcps = await create_mcps(servers_to_connect, conversation_id)
+        if not mcps:
+            logger.warning(
+                "No MCP clients were successfully connected; exposing degraded capability status tool only"
+            )
+            set_mcp_bootstrap_status(
+                MCPBootstrapStatus(
+                    state="no_clients_connected",
+                    mcp_enabled=True,
+                    configured_server_count=configured_n,
+                    attempted_server_count=attempted_n,
+                    connected_client_count=0,
+                    remote_tool_param_count=0,
+                )
+            )
+            return wrapper_tool_params([])
+
+        from backend.mcp_client.mcp_tool_aliases import prepare_mcp_tool_exposed_names
+
+        reserved = set(reserved_tool_names or ()) | set(
+            getattr(mcp_config, "mcp_exposed_name_reserved", frozenset()) or frozenset()
+        )
+        prepare_mcp_tool_exposed_names(mcps, reserved)
+        mcp_tools = convert_mcps_to_tools(mcps)
+        remote_tool_count = sum(len(getattr(c, "tools", ()) or ()) for c in mcps)
+        conv_errs = list(_last_mcp_conversion_errors)
+        if remote_tool_count == 0:
+            boot_state = "connected_no_remote_tools"
+        elif conv_errs:
+            boot_state = "partial_tool_conversion"
+        else:
+            boot_state = "healthy"
+        set_mcp_bootstrap_status(
+            MCPBootstrapStatus(
+                state=boot_state,
+                mcp_enabled=True,
+                configured_server_count=configured_n,
+                attempted_server_count=attempted_n,
+                connected_client_count=len(mcps),
+                remote_tool_param_count=remote_tool_count,
+                conversion_errors=conv_errs,
+                last_error=conv_errs[-1] if conv_errs else None,
+            )
+        )
+    except Exception as e:
+        error_msg = f"Error fetching MCP tools: {e!s}"
+        logger.error(error_msg)
+        mcp_error_collector.add_error(
+            server_name="general",
+            server_type="fetch",
+            error_message=error_msg,
+            exception_details=str(e),
+        )
+        set_mcp_bootstrap_status(
+            MCPBootstrapStatus(
+                state="fetch_failed",
+                mcp_enabled=True,
+                configured_server_count=configured_n,
+                attempted_server_count=attempted_n,
+                connected_client_count=0,
+                last_error=str(e),
+            )
+        )
+        # Degraded but explicit: keep diagnostics wrapper tools so the agent/UI can see state.
+        return wrapper_tool_params([])
+    finally:
+        # Probe clients are only used to list tools; keeping them alive orphans fastmcp tasks
+        # (stdio/session runners) and triggers "Task was destroyed but it is pending".
+        # Sequential teardown: parallel gather races stdio subprocess shutdown on Windows
+        # and can leave _stdio_transport_connect_task to finish later with
+        # "Task exception was never retrieved".
+        if mcps:
+            for c in mcps:
+                try:
+                    await c.disconnect()
+                except asyncio.CancelledError:
+                    raise
+                except BaseExceptionGroup as eg:
+                    logger.debug("MCP probe disconnect (exception group): %s", eg)
+                except Exception as e:
+                    logger.debug("MCP probe disconnect: %s", e, exc_info=True)
+                await asyncio.sleep(0)
+            await asyncio.sleep(0.05)
+    logger.debug("MCP tools: %s", mcp_tools)
+    return mcp_tools
+
+
+def _serialize_result_to_json(result_dict: dict) -> str:
+    """Serialize result dictionary to JSON string with fallbacks."""
+    try:
+        return json.dumps(result_dict, ensure_ascii=False, default=str)
+    except Exception:
+        try:
+            return repr(result_dict)
+        except Exception:
+            return '{"error":"unserializable_result"}'
+
+
+def _normalize_mcp_success_payload(result_dict: dict) -> dict:
+    """Attach stable success metadata without discarding existing payload fields."""
+    payload = dict(result_dict)
+    is_error = bool(payload.get("isError")) or payload.get("ok") is False
+    payload["ok"] = not is_error
+    payload["isError"] = is_error
+    payload.setdefault("retryable", False)
+    return payload
+
+
+def _build_mcp_error_payload(
+    *,
+    action_name: str,
+    message: str,
+    code: str,
+    retryable: bool,
+) -> dict:
+    """Build a stable MCP error envelope."""
+    return {
+        "ok": False,
+        "isError": True,
+        "error": message,
+        "error_code": code,
+        "retryable": retryable,
+        "tool": action_name,
+        "content": [],
+    }
+
+
+def _make_mcp_observation(action: MCPAction, payload: dict) -> MCPObservation:
+    """Create an MCPObservation with aligned structured tool_result metadata."""
+    obs = MCPObservation(
+        content=_serialize_result_to_json(payload),
+        name=action.name,
+        arguments=action.arguments,
+    )
+    obs.tool_result = {
+        "ok": bool(payload.get("ok", not payload.get("isError", False))),
+        "retryable": bool(payload.get("retryable", False)),
+        "error_code": payload.get("error_code"),
+        "action": getattr(action, "action", None),
+        "observation": obs.observation,
+    }
+    return obs
+
+
+async def _execute_wrapper_tool(
+    action: MCPAction,
+    mcps: list[MCPClient],
+    *,
+    configured_servers: list | None = None,
+) -> MCPObservation:
+    """Execute a wrapper tool and return observation."""
+    try:
+
+        async def _call_underlying(tool_name: str, args: dict):
+            from types import SimpleNamespace
+
+            inner_action = SimpleNamespace(name=tool_name, arguments=args)
+            return await _call_mcp_raw(mcps, inner_action)
+
+        if action.name == "mcp_capabilities_status":
+            from backend.mcp_client.wrappers import mcp_capabilities_status
+
+            result_dict = await mcp_capabilities_status(
+                mcps,
+                action.arguments,
+                _call_underlying,
+                configured_servers=configured_servers,
+            )
+        else:
+            wrapper_fn = WRAPPER_TOOL_REGISTRY[action.name]
+            result_dict = await wrapper_fn(mcps, action.arguments, _call_underlying)
+        return _make_mcp_observation(
+            action, _normalize_mcp_success_payload(result_dict)
+        )
+    except Exception as e:
+        logger.error("Wrapper tool %s failed: %s", action.name, e, exc_info=True)
+        return _make_mcp_observation(
+            action,
+            _build_mcp_error_payload(
+                action_name=action.name,
+                message=str(e),
+                code="WRAPPER_EXECUTION_FAILED",
+                retryable=False,
+            ),
+        )
+
+
+def _find_matching_mcp(mcps: list[MCPClient], action_name: str) -> MCPClient:
+    """Find MCP client that supports the requested tool."""
+    logger.debug("MCP clients: %s", mcps)
+    logger.debug("MCP action name: %s", action_name)
+
+    for client in mcps:
+        logger.debug("MCP client tools: %s", client.tools)
+        if _resolve_exposed_tool_name(client, action_name) is not None:
+            logger.debug("Matching client: %s", client)
+            return client
+
+    msg = f"No matching MCP agent found for tool name: {action_name}"
+    raise ValueError(msg)
+
+
+def _resolve_exposed_tool_name(client: MCPClient, action_name: str) -> str | None:
+    """Resolve either an exposed or protocol tool name to the exposed name."""
+    tool_names = {tool.name for tool in getattr(client, "tools", [])}
+    if action_name in tool_names:
+        return action_name
+
+    exposed_to_protocol = getattr(client, "exposed_to_protocol", {}) or {}
+    for exposed_name, protocol_name in exposed_to_protocol.items():
+        if protocol_name == action_name and exposed_name in tool_names:
+            return exposed_name
+    return None
+
+
+async def _execute_direct_tool(
+    action: MCPAction, matching_client: MCPClient
+) -> MCPObservation:
+    """Execute a direct MCP tool call and return observation."""
+    try:
+        if cached := get_cached(action.name, action.arguments):
+            logger.debug("Cache hit for MCP tool %s", action.name)
+            return _make_mcp_observation(
+                action, _normalize_mcp_success_payload(cached)
+            )
+
+        # Call tool
+        response = await matching_client.call_tool(action.name, action.arguments)
+        logger.debug("MCP response: %s", response)
+        result_dict = model_dump_with_options(response, mode="json")
+
+        # Cache result
+        try:
+            set_cache(action.name, action.arguments, result_dict)
+        except Exception as cache_exc:
+            logger.debug("Cache set skipped for %s: %s", action.name, cache_exc)
+
+        # Serialize and return
+        return _make_mcp_observation(
+            action, _normalize_mcp_success_payload(result_dict)
+        )
+    except McpError as e:
+        logger.error("MCP error when calling tool %s: %s", action.name, e)
+        return _make_mcp_observation(
+            action,
+            _build_mcp_error_payload(
+                action_name=action.name,
+                message=(
+                    f"MCP tool '{action.name}' returned an error: {e}\n"
+                    "You can try:\n"
+                    "  1. Re-call the tool with corrected arguments\n"
+                    "  2. Use bash (execute_bash) as a fallback to accomplish the same task\n"
+                    "  3. Use mcp_capabilities_status to check current MCP server health"
+                ),
+                code="MCP_TOOL_ERROR",
+                retryable=False,
+            ),
+        )
+    except Exception as e:
+        # Catch-all for connection failures, timeouts, and unexpected errors
+        logger.error(
+            "MCP tool '%s' failed unexpectedly: %s", action.name, e, exc_info=True
+        )
+        return _make_mcp_observation(
+            action,
+            _build_mcp_error_payload(
+                action_name=action.name,
+                message=(
+                    f"MCP server for tool '{action.name}' is unavailable (reason: "
+                    f"{type(e).__name__}: {e}).\n"
+                    "The MCP server may be disconnected or experiencing issues.\n"
+                    "Fallback options:\n"
+                    "  1. Use bash (execute_bash) to accomplish the same task\n"
+                    "  2. Use mcp_capabilities_status to inspect current MCP availability\n"
+                    "  3. Continue with non-MCP tools"
+                ),
+                code="MCP_SERVER_UNAVAILABLE",
+                retryable=True,
+            ),
+        )
+
+
+async def call_tool_mcp(
+    mcps: list[MCPClient],
+    action: MCPAction,
+    *,
+    configured_servers: list | None = None,
+) -> Observation:
+    """Call a tool on an MCP server and return the observation.
+
+    Args:
+        mcps: The list of MCP clients to execute the action on
+        action: The MCP action to execute
+        configured_servers: Servers Forge attempted to connect (for diagnostics tools)
+
+    Returns:
+        The observation from the MCP server
+
+    """
+    logger.debug("MCP action received: %s", action)
+
+    # Handle wrapper tools
+    if action.name in WRAPPER_TOOL_REGISTRY:
+        return await _execute_wrapper_tool(
+            action, mcps, configured_servers=configured_servers
+        )
+
+    if not mcps:
+        return _make_mcp_observation(
+            action,
+            _build_mcp_error_payload(
+                action_name=action.name,
+                message=(
+                    "No MCP clients are currently connected. "
+                    "Use mcp_capabilities_status to inspect availability and continue "
+                    "with non-MCP tools."
+                ),
+                code="MCP_NO_CLIENTS",
+                retryable=True,
+            ),
+        )
+
+    # Handle direct tools with graceful fallback on client lookup failure
+    try:
+        matching_client = _find_matching_mcp(mcps, action.name)
+    except ValueError:
+        return _make_mcp_observation(
+            action,
+            _build_mcp_error_payload(
+                action_name=action.name,
+                message=(
+                    f"MCP tool '{action.name}' is not available on any connected MCP "
+                    "server.\n"
+                    "This may mean the server that provides this tool is disconnected.\n"
+                    "Use mcp_capabilities_status to check which tools are currently "
+                    "available, or use bash (execute_bash) as a fallback."
+                ),
+                code="MCP_TOOL_UNAVAILABLE",
+                retryable=True,
+            ),
+        )
+    return await _execute_direct_tool(action, matching_client)
+
+
+async def _call_mcp_raw(mcps: list[MCPClient], action) -> dict:
+    matching_client: MCPClient | None = None
+    resolved_exposed_name: str | None = None
+    for client in mcps:
+        resolved = _resolve_exposed_tool_name(client, action.name)
+        if resolved is not None:
+            matching_client = client
+            resolved_exposed_name = resolved
+            break
+    if not matching_client or resolved_exposed_name is None:
+        msg = f"Underlying tool {action.name} not found for wrapper"
+        raise ValueError(msg)
+    if cached := get_cached(action.name, action.arguments):
+        return cached
+    response = await matching_client.call_tool(resolved_exposed_name, action.arguments)
+    result_dict = model_dump_with_options(response, mode="json")
+    set_cache(action.name, action.arguments, result_dict)
+    return result_dict
+
+
+async def add_mcp_tools_to_agent(
+    agent: Agent, runtime: Runtime, memory: Memory
+) -> MCPConfig | None:
+    """Add MCP tools to an agent."""
+    assert runtime.runtime_initialized, (
+        "Runtime must be initialized before adding MCP tools"
+    )
+    extra_servers = []
+    playbook_mcp_configs = memory.get_playbook_mcp_tools()
+    for mcp_config in playbook_mcp_configs:
+        # Convert playbook servers to unified format
+        for server in mcp_config.servers:
+            if server not in extra_servers:
+                extra_servers.append(server)
+                logger.warning("Added playbook MCP server: %s (%s)", server.name, server.type)
+
+    updated_mcp_config = runtime.get_mcp_config(extra_servers)
+
+    from backend.engines.orchestrator.tool_registry import _extract_tool_names
+
+    reserved = frozenset(_extract_tool_names(agent.tools))
+    if updated_mcp_config is not None:
+        updated_mcp_config.mcp_exposed_name_reserved = reserved
+    mcp_tools = await fetch_mcp_tools_from_config(
+        updated_mcp_config,
+        use_stdio=isinstance(runtime, LocalRuntimeInProcess),
+        reserved_tool_names=reserved,
+    )
+    tool_names = [tool["function"]["name"] for tool in mcp_tools]
+    logger.info("Loaded %s MCP tools: %s", len(mcp_tools), tool_names)
+    agent.set_mcp_tools(mcp_tools)
+    agent.mcp_capability_status = get_mcp_bootstrap_status()
+    return updated_mcp_config

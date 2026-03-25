@@ -1,4 +1,4 @@
-"""Unit tests for backend.events.utils — action/observation pairing."""
+"""Unit tests for backend.events.event_utils — action/observation pairing."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from backend.events.observation import (
     NullObservation,
     Observation,
 )
-from backend.events.utils import (
+from backend.events.event_utils import (
     _add_action_observation_pairs,
     _add_orphaned_observations,
     _build_action_and_observation_maps,

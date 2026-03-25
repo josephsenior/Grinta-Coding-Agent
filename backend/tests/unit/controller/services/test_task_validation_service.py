@@ -184,21 +184,6 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result)
         mock_validator.validate_completion.assert_not_called()
 
-    async def test_handle_finish_allows_explicit_test_skip_with_reason(self):
-        """Test finish can proceed when tests are explicitly marked not applicable."""
-        action = PlaybookFinishAction(
-            outputs={
-                "tests_not_applicable": True,
-                "tests_not_applicable_reason": "No executable test harness exists for this configuration-only change.",
-            }
-        )
-        self.mock_controller.state.history = [MagicMock(action="edit")]
-        self.mock_controller.task_validator = None
-
-        result = await self.service.handle_finish(action)
-
-        self.assertTrue(result)
-
     async def test_handle_finish_blocks_when_completion_validation_enabled_without_validator(self):
         """Test finish is blocked when completion validation is enabled but validator is missing."""
         action = PlaybookFinishAction(outputs={})

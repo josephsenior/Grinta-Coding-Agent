@@ -2,6 +2,16 @@ import { io, type Socket } from "socket.io-client";
 import { WS_URL } from "@/lib/constants";
 import type { ForgeEvent, UserAction } from "@/types/events";
 
+/** Normalize wire payloads so `id` is always a number for dedup / ordering. */
+export function coerceForgeEvent(raw: ForgeEvent): ForgeEvent {
+  const id =
+    typeof raw.id === "number" && Number.isFinite(raw.id) ? raw.id : Number(raw.id);
+  if (!Number.isFinite(id) || id < 0) {
+    return { ...raw, id: -1 } as ForgeEvent;
+  }
+  return id === raw.id ? raw : ({ ...raw, id } as ForgeEvent);
+}
+
 let socket: Socket | null = null;
 
 export interface ConnectOptions {
@@ -48,13 +58,19 @@ export function disconnectSocket(): void {
   socket = null;
 }
 
-/** Register an event listener for forge events. */
-export function onForgeEvent(
+/**
+ * Register `forge_event` on this socket instance immediately (before connect resolves).
+ * Coerces `event.id` to a number so dedup logic stays consistent with the REST API.
+ */
+export function registerForgeEventListener(
+  sock: Socket,
   callback: (event: ForgeEvent) => void,
 ): () => void {
-  const handler = (data: ForgeEvent) => callback(data);
-  socket?.on("forge_event", handler);
+  const handler = (data: ForgeEvent) => {
+    callback(coerceForgeEvent(data));
+  };
+  sock.on("forge_event", handler);
   return () => {
-    socket?.off("forge_event", handler);
+    sock.off("forge_event", handler);
   };
 }

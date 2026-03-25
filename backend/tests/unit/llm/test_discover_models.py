@@ -5,10 +5,9 @@ from __future__ import annotations
 import sys
 from io import StringIO
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from backend.llm.discover_models import (
-    aliases_command,
     discover_command,
     main,
     print_section,
@@ -43,7 +42,6 @@ class TestPrintSection(TestCase):
             output = fake_out.getvalue()
 
         lines = output.strip().split("\n")
-        # Should have 3 lines: blank, equals, title, equals
         self.assertGreaterEqual(len(lines), 3)
 
 
@@ -104,7 +102,7 @@ class TestDiscoverCommand(TestCase):
             output = fake_out.getvalue()
 
         self.assertIn("ollama/llama3.2", output)
-        self.assertIn("model_aliases", output)
+        self.assertIn("llm_model", output)
 
 
 class TestStatusCommand(TestCase):
@@ -161,64 +159,6 @@ class TestStatusCommand(TestCase):
         self.assertIn("No local providers are running", output)
 
 
-class TestAliasesCommand(TestCase):
-    """Test aliases_command function."""
-
-    @patch("backend.llm.discover_models.get_alias_manager")
-    def test_aliases_no_aliases(self, mock_get_manager):
-        """Test aliases when no aliases are defined."""
-        mock_manager = MagicMock()
-        mock_manager.get_all_aliases.return_value = {}
-        mock_get_manager.return_value = mock_manager
-
-        with patch("sys.stdout", new=StringIO()) as fake_out:
-            aliases_command()
-            output = fake_out.getvalue()
-
-        self.assertIn("No model aliases defined", output)
-        self.assertIn("model_aliases", output)
-        self.assertIn("settings.json", output)
-
-    @patch("backend.llm.discover_models.get_alias_manager")
-    def test_aliases_with_aliases(self, mock_get_manager):
-        """Test aliases with defined aliases."""
-        mock_manager = MagicMock()
-        mock_manager.get_all_aliases.return_value = {
-            "my-model": "claude-3-7-sonnet",
-            "local-llm": "ollama/llama3.2",
-        }
-        mock_get_manager.return_value = mock_manager
-
-        with patch("sys.stdout", new=StringIO()) as fake_out:
-            aliases_command()
-            output = fake_out.getvalue()
-
-        self.assertIn("2 aliases defined", output)
-        self.assertIn("my-model", output)
-        self.assertIn("claude-3-7-sonnet", output)
-        self.assertIn("local-llm", output)
-        self.assertIn("ollama/llama3.2", output)
-        self.assertIn("→", output)
-
-    @patch("backend.llm.discover_models.get_alias_manager")
-    def test_aliases_formatting(self, mock_get_manager):
-        """Test that aliases are formatted with proper alignment."""
-        mock_manager = MagicMock()
-        mock_manager.get_all_aliases.return_value = {
-            "short": "target1",
-            "very-long-alias-name": "target2",
-        }
-        mock_get_manager.return_value = mock_manager
-
-        with patch("sys.stdout", new=StringIO()) as fake_out:
-            aliases_command()
-            output = fake_out.getvalue()
-
-        # Both aliases should be present
-        self.assertIn("short", output)
-        self.assertIn("very-long-alias-name", output)
-
-
 class TestMain(TestCase):
     """Test main entry point function."""
 
@@ -249,15 +189,6 @@ class TestMain(TestCase):
         mock_status.assert_called_once()
         self.assertEqual(result, 0)
 
-    @patch("backend.llm.discover_models.aliases_command")
-    def test_main_aliases_command(self, mock_aliases):
-        """Test main with aliases command."""
-        with patch.object(sys, "argv", ["discover_models.py", "aliases"]):
-            result = main()
-
-        mock_aliases.assert_called_once()
-        self.assertEqual(result, 0)
-
     def test_main_unknown_command(self):
         """Test main with unknown command."""
         with patch.object(sys, "argv", ["discover_models.py", "unknown"]):
@@ -269,7 +200,6 @@ class TestMain(TestCase):
         self.assertIn("Unknown command", output)
         self.assertIn("discover", output)
         self.assertIn("status", output)
-        self.assertIn("aliases", output)
 
     @patch("backend.llm.discover_models.discover_command")
     @patch("backend.llm.discover_models.logger")
@@ -280,10 +210,9 @@ class TestMain(TestCase):
         with patch.object(sys, "argv", ["discover_models.py", "discover"]):
             with patch("sys.stdout", new=StringIO()) as fake_out:
                 result = main()
-                output = fake_out.getvalue()
+                fake_out.getvalue()
 
         self.assertEqual(result, 1)
-        self.assertIn("Error", output)
         mock_logger.error.assert_called_once()
 
     def test_main_case_insensitive_commands(self):

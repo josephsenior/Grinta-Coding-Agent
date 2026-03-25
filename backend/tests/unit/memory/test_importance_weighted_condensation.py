@@ -9,7 +9,7 @@ from backend.events.action.files import FileEditAction, FileWriteAction
 from backend.events.action.message import MessageAction, SystemMessageAction
 from backend.events.event import EventSource
 from backend.events.observation import Observation
-from backend.memory.condenser.impl.conversation_window_condenser import (
+from backend.memory.condenser.strategies.conversation_window_condenser import (
     ConversationWindowCondenser,
 )
 from backend.memory.view import View
@@ -21,7 +21,7 @@ def _ev(eid, cls=MessageAction, source=EventSource.AGENT, **kwargs):
     ev.id = eid
     ev.source = source
     ev.content = kwargs.get("content", f"event-{eid}")
-    ev.__class__ = cls
+    ev.__class__ = cls  # type: ignore[assignment]
     # Default: no cause
     ev.cause = kwargs.get("cause", None)
     return ev
@@ -33,7 +33,7 @@ def _obs(eid, cause_id):
     ob.id = eid
     ob.source = EventSource.ENVIRONMENT
     ob.content = f"obs-{eid}"
-    ob.__class__ = Observation
+    ob.__class__ = Observation  # type: ignore[assignment]
     ob.cause = cause_id
     return ob
 
@@ -92,7 +92,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
 
         # Event 5 should NOT be forgotten
         forgotten = set(action.forgotten_event_ids or [])
-        if action.forgotten_events_start_id is not None:
+        if action.forgotten_events_start_id is not None and action.forgotten_events_end_id is not None:
             forgotten = set(range(
                 action.forgotten_events_start_id,
                 action.forgotten_events_end_id + 1,
@@ -113,7 +113,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         forgotten = set(action.forgotten_event_ids or [])
-        if action.forgotten_events_start_id is not None:
+        if action.forgotten_events_start_id is not None and action.forgotten_events_end_id is not None:
             forgotten = set(range(
                 action.forgotten_events_start_id,
                 action.forgotten_events_end_id + 1,
@@ -134,7 +134,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         forgotten = set(action.forgotten_event_ids or [])
-        if action.forgotten_events_start_id is not None:
+        if action.forgotten_events_start_id is not None and action.forgotten_events_end_id is not None:
             forgotten = set(range(
                 action.forgotten_events_start_id,
                 action.forgotten_events_end_id + 1,
@@ -153,7 +153,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         forgotten = set(action.forgotten_event_ids or [])
-        if action.forgotten_events_start_id is not None:
+        if action.forgotten_events_start_id is not None and action.forgotten_events_end_id is not None:
             forgotten = set(range(
                 action.forgotten_events_start_id,
                 action.forgotten_events_end_id + 1,
@@ -171,7 +171,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         forgotten = set(action.forgotten_event_ids or [])
-        if action.forgotten_events_start_id is not None:
+        if action.forgotten_events_start_id is not None and action.forgotten_events_end_id is not None:
             forgotten = set(range(
                 action.forgotten_events_start_id,
                 action.forgotten_events_end_id + 1,
@@ -194,7 +194,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         forgotten = set(action.forgotten_event_ids or [])
-        if action.forgotten_events_start_id is not None:
+        if action.forgotten_events_start_id is not None and action.forgotten_events_end_id is not None:
             forgotten = set(range(
                 action.forgotten_events_start_id,
                 action.forgotten_events_end_id + 1,

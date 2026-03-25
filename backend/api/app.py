@@ -41,8 +41,8 @@ from backend.api.middleware.security_headers import (
 from backend.api.middleware.audit_logger import AuditLoggerMiddleware
 from backend.api.route_registry import register_routes
 from backend.api.routes.mcp import mcp_server
-from backend.api.shared import config as _forge_config
-from backend.api.shared import (
+from backend.api.app_accessors import config as _forge_config
+from backend.api.app_accessors import (
     get_conversation_manager,
 )
 from backend.api.versioning import version_middleware
@@ -200,14 +200,15 @@ def _check_config_file_existence(warnings: list[str]) -> None:
         )
 
 def _check_mcp_host_config(warnings: list[str]) -> None:
-    """Warn on missing mcp_host configuration."""
-    mcp_host = getattr(_forge_config, "mcp_host", None)
-    if not mcp_host:
+    """Warn when mcp_host is empty or disabled (default is localhost:3000 in ForgeConfig)."""
+    raw = getattr(_forge_config, "mcp_host", None)
+    normalized = (raw or "").strip()
+    if not normalized or normalized.lower() in {"none", "null"}:
         warnings.append(
-            "mcp_host is not set in settings.json. The internal Forge MCP server "
-            "will be disabled. AI agents will not have access to built-in "
-            "workspace tools like search and file reading. Set mcp_host=\"localhost:8000\" "
-            "(or your server's host:port) to enable internal tools."
+            "mcp_host is not set. The internal Forge MCP server will be disabled. "
+            "AI agents will not have access to built-in workspace tools like search and file reading. "
+            "The default is localhost:3000; override in settings.json (e.g. \"mcp_host\": \"host:port\") "
+            "if your MCP endpoint runs elsewhere."
         )
 
 @asynccontextmanager
@@ -216,11 +217,14 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
     # Register the main event loop so background threads (EventStream
     # dispatch, etc.) can schedule coroutines on it via run_or_schedule.
     from backend.utils.async_utils import set_main_event_loop
+    from backend.utils.shutdown_listener import reset_shutdown_state
+
+    reset_shutdown_state()
     set_main_event_loop()
 
     # ── Config validation (fail fast on misconfiguration) ───────────────
     # Reload config to ensure it picks up any changes made to settings.json
-    from backend.core.config.utils import load_forge_config
+    from backend.core.config.config_loader import load_forge_config
     fastapi_app.state.config = load_forge_config()
 
     _validate_config()
@@ -262,7 +266,7 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
             from backend.storage.conversation.database_conversation_store import (
                 DatabaseConversationStore,
             )
-            from backend.storage.db_pool import get_db_pool
+            from backend.storage.database_pool import get_db_pool
             from backend.storage.knowledge_base.database_knowledge_base_store import (
                 DatabaseKnowledgeBaseStore,
             )
@@ -303,7 +307,7 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
     async def cleanup_socketio():
         """Close Socket.IO connections gracefully."""
         try:
-            from backend.api.shared import sio
+            from backend.api.app_accessors import sio
 
             logger.info("Closing Socket.IO connections...")
             await sio.shutdown()
@@ -603,3 +607,4 @@ if observability_enabled:
 
 register_exception_handlers(app)
 register_routes(app)
+

@@ -17,7 +17,7 @@ from backend.core.constants import (
     KNOWLEDGE_BASE_SEARCH_TOP_K_DEFAULT,
     KNOWLEDGE_BASE_SEARCH_TOP_K_MAX,
 )
-from backend.knowledge import KnowledgeBaseManager
+from backend.knowledge_base import KnowledgeBaseManager
 from backend.api.utils.responses import error, success
 from backend.storage.data_models.knowledge_base import (
     KnowledgeBaseCollection,

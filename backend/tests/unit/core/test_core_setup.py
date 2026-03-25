@@ -1,11 +1,11 @@
-"""Tests for backend.core.setup — generate_sid and filter_plugins_by_config."""
+"""Tests for backend.core.bootstrap.setup — generate_sid and filter_plugins_by_config."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 
 
-from backend.core.setup import generate_sid
+from backend.core.bootstrap.setup import generate_sid
 
 
 class TestGenerateSid:

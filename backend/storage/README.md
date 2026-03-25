@@ -24,7 +24,7 @@ Local file storage saves files to the local filesystem.
 **Environment Variables:**
 
 - None specific to this storage option
-- Files are stored at the path specified by `file_store_path` in the configuration
+- Files are stored under `local_data_root` in `ForgeConfig`
 
 ### 2. In-Memory Storage (`memory`)
 
@@ -40,7 +40,7 @@ S3 storage uses Amazon S3 or compatible services for file storage.
 
 **Environment Variables:**
 
-- The bucket name is specified by `file_store_path` in the configuration with a fallback to the `AWS_S3_BUCKET` environment variable.
+- The bucket name is specified by `local_data_root` with a fallback to the `AWS_S3_BUCKET` environment variable.
 - `AWS_ACCESS_KEY_ID`: Your AWS access key
 - `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
 - `AWS_S3_ENDPOINT`: Optional custom endpoint for S3-compatible services (Allows overriding the default)
@@ -52,7 +52,7 @@ Google Cloud Storage uses Google Cloud Storage buckets for file storage.
 
 **Environment Variables:**
 
-- The bucket name is specified by `file_store_path` in the configuration with a fallback to the `GOOGLE_CLOUD_BUCKET_NAME` environment variable.
+- The bucket name is specified by `local_data_root` with a fallback to the `GOOGLE_CLOUD_BUCKET_NAME` environment variable.
 - `GOOGLE_APPLICATION_CREDENTIALS`: Path to Google Cloud credentials JSON file
 
 ## Webhook Protocol
@@ -112,8 +112,8 @@ To configure the storage module in Forge, use the following configuration option
 # File store type: "local", "memory", "s3", "google_cloud"
 file_store = "local"
 
-# Path for local file store
-file_store_path = "/tmp/file_store"
+# Disk root for local file store
+local_data_root = "/tmp/file_store"
 
 # Optional webhook URL
 file_store_web_hook_url = "https://example.com/api/files"

@@ -6,7 +6,7 @@ from backend.engines.orchestrator.tools.finish import create_finish_tool
 from backend.engines.orchestrator.tools.think import create_think_tool
 from backend.engines.orchestrator.tools.task_tracker import create_task_tracker_tool
 from backend.engines.orchestrator.tools.condensation_request import (
-    create_condensation_request_tool,
+    create_summarize_context_tool,
 )
 from backend.llm.tool_names import FINISH_TOOL_NAME, TASK_TRACKER_TOOL_NAME
 
@@ -72,15 +72,15 @@ class TestCreateTaskTrackerTool:
 
 class TestCreateCondensationRequestTool:
     def test_type(self):
-        tool = create_condensation_request_tool()
+        tool = create_summarize_context_tool()
         assert tool["type"] == "function"
 
     def test_name(self):
-        tool = create_condensation_request_tool()
-        assert tool["function"]["name"] == "request_condensation"
+        tool = create_summarize_context_tool()
+        assert tool["function"]["name"] == "summarize_context"
 
     def test_no_required_params(self):
-        tool = create_condensation_request_tool()
+        tool = create_summarize_context_tool()
         params = tool["function"]["parameters"]
         assert params["required"] == []
         assert params["properties"] == {}

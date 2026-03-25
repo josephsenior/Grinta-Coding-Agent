@@ -31,11 +31,9 @@ def test_llm_records_context_window_from_limits():
     with (
         patch("backend.llm.llm.get_direct_client") as mock_get_client,
         patch("backend.llm.llm.get_features") as mock_get_features,
-        patch("backend.llm.model_aliases.get_alias_manager") as mock_alias_mgr,
         patch("backend.llm.provider_resolver.get_resolver") as mock_resolver,
         patch.object(LLM, "_extract_api_key", return_value="test-key"),
     ):
-        mock_alias_mgr.return_value.resolve_alias.return_value = "gpt-4"
         mock_resolver.return_value.is_local_model.return_value = False
         mock_resolver.return_value.resolve_base_url.return_value = None
         mock_get_features.return_value = Mock(

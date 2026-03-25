@@ -77,9 +77,9 @@ class TestRunProductionHealthCheck:
                 result = run_production_health_check(raise_on_failure=False)
 
         assert result["overall_status"] == "HEALTHY"
-        assert result["structure_editor"]["status"] == "PASS"
-        assert result["structure_editor"]["message"] == "UE OK"
-        assert result["structure_editor"]["critical"] is True
+        assert result["ast_code_editor"]["status"] == "PASS"
+        assert result["ast_code_editor"]["message"] == "UE OK"
+        assert result["ast_code_editor"]["critical"] is True
         assert result["atomic_refactor"]["status"] == "PASS"
         assert result["atomic_refactor"]["message"] == "AR OK"
         assert result["atomic_refactor"]["critical"] is False
@@ -98,7 +98,7 @@ class TestRunProductionHealthCheck:
 
         # Should still be healthy since atomic refactor is not critical
         assert result["overall_status"] == "HEALTHY"
-        assert result["structure_editor"]["status"] == "PASS"
+        assert result["ast_code_editor"]["status"] == "PASS"
         assert result["atomic_refactor"]["status"] == "FAIL"
         assert result["atomic_refactor"]["critical"] is False
 
@@ -115,8 +115,8 @@ class TestRunProductionHealthCheck:
                 result = run_production_health_check(raise_on_failure=False)
 
         assert result["overall_status"] == "CRITICAL_FAILURE"
-        assert result["structure_editor"]["status"] == "FAIL"
-        assert result["structure_editor"]["message"] == "UE failed"
+        assert result["ast_code_editor"]["status"] == "FAIL"
+        assert result["ast_code_editor"]["message"] == "UE failed"
 
     def test_critical_failure_raises_with_flag(self):
         """Test that critical failure raises RuntimeError when raise_on_failure=True."""
@@ -159,7 +159,7 @@ class TestRunProductionHealthCheck:
                 result = run_production_health_check(raise_on_failure=False)
 
         assert result["overall_status"] == "CRITICAL_FAILURE"
-        assert result["structure_editor"]["status"] == "FAIL"
+        assert result["ast_code_editor"]["status"] == "FAIL"
         assert result["atomic_refactor"]["status"] == "FAIL"
 
     def test_result_structure_complete(self):
@@ -176,11 +176,11 @@ class TestRunProductionHealthCheck:
 
         # Check all required keys exist
         assert "overall_status" in result
-        assert "structure_editor" in result
+        assert "ast_code_editor" in result
         assert "atomic_refactor" in result
 
         # Check component structure
-        for component_key in ["structure_editor", "atomic_refactor"]:
+        for component_key in ["ast_code_editor", "atomic_refactor"]:
             component = result[component_key]
             assert isinstance(component, dict)
             assert "status" in component

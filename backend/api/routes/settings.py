@@ -16,7 +16,7 @@ from backend.core.logger import forge_logger as logger
 # Import these at runtime so FastAPI can resolve them in Annotated types
 from backend.core.provider_types import ProviderTokenType, ProviderType
 from backend.core.pydantic_compat import model_dump_with_options
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.api.settings import GETSettingsModel
 from backend.api.app_state import get_app_state
 from backend.api.user_auth import (
@@ -50,6 +50,7 @@ _PROVIDER_TOKEN_MAPPING: dict[str, str] = {
     "anthropic": "ANTHROPIC_API_KEY",
     "google": "GOOGLE_API_KEY",
     "groq": "GROQ_API_KEY",
+    "nvidia": "NVIDIA_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
     "mistral": "MISTRAL_API_KEY",
     "together": "TOGETHER_API_KEY",
@@ -310,17 +311,23 @@ def _process_llm_model_configuration(settings: Settings) -> None:
 def _apply_runtime_and_git_overrides(settings: Settings) -> None:
     forge_config = get_app_state().config
     git_config_updated = False
-    if settings.vcs_user_name is not None:
-        forge_config.vcs_user_name = settings.vcs_user_name
+
+    # Some deployments/versions use a leaner Settings model that doesn't include
+    # VCS identity fields.
+    vcs_user_name = getattr(settings, "vcs_user_name", None)
+    vcs_user_email = getattr(settings, "vcs_user_email", None)
+
+    if vcs_user_name is not None:
+        forge_config.vcs_user_name = vcs_user_name
         git_config_updated = True
-    if settings.vcs_user_email is not None:
-        forge_config.vcs_user_email = settings.vcs_user_email
+    if vcs_user_email is not None:
+        forge_config.vcs_user_email = vcs_user_email
         git_config_updated = True
     if git_config_updated:
         logger.info(
             "Updated global git configuration: name=%s, email=%s",
-            forge_config.vcs_user_name,
-            forge_config.vcs_user_email,
+            getattr(forge_config, "vcs_user_name", None),
+            getattr(forge_config, "vcs_user_email", None),
         )
 
 
@@ -416,6 +423,7 @@ async def load_settings(
         user_secrets = settings.secrets_store
         provider_tokens_set = _build_provider_tokens_set(user_secrets, provider_tokens)
 
+        settings = _merge_forge_mcp_for_api(settings)
         response = _build_settings_response(settings, provider_tokens_set)
 
         # 🚀 PERFORMANCE FIX: Cache the response with user_id key
@@ -458,6 +466,48 @@ def _build_provider_tokens_set(
     return provider_tokens_set
 
 
+def _merge_forge_mcp_for_api(settings: Settings) -> Settings:
+    """Merge ``ForgeConfig.mcp`` into settings for GET /settings responses.
+
+    Persisted ``settings.json`` is intentionally lean and often omits ``mcp_config``
+    even when MCP servers are defined in forge config (or defaults). Without this,
+    the UI shows zero servers while the runtime uses forge MCP.
+    """
+    try:
+        from backend.core.config.config_loader import load_forge_config
+
+        forge_mcp = load_forge_config().mcp
+    except Exception as exc:
+        logger.debug("Forge MCP merge skipped: %s", exc)
+        return settings
+    if forge_mcp is None:
+        return settings
+
+    # Shallow copy only: deep=True can raise "cannot pickle 'mappingproxy' object"
+    # when copying frozen UserSecrets / nested immutables, which forces GET /settings
+    # into the exception path and the UI shows llm_api_key_set=False despite settings.json.
+    mcp_config = getattr(settings, "mcp_config", None)
+    if mcp_config is None:
+        merged_mcp = forge_mcp
+    else:
+        merged_mcp = forge_mcp.merge(mcp_config)
+    return settings.model_copy(update={"mcp_config": merged_mcp})
+
+
+def _llm_model_supports_vision(llm_model: str | None) -> bool:
+    """Whether ``catalog.json`` marks the model as vision-capable (for UI gating)."""
+    try:
+        from backend.llm.catalog_loader import lookup
+
+        model = (llm_model or "").strip()
+        if not model:
+            return False
+        entry = lookup(model)
+        return bool(entry and entry.supports_vision)
+    except Exception:
+        return False
+
+
 def _build_settings_response(
     settings: Settings,
     provider_tokens_set: dict[ProviderType, str | None] | None,
@@ -477,10 +527,12 @@ def _build_settings_response(
         getattr(settings, "user_id", "unknown"),
         getattr(settings, "autonomy_level", "NOT_FOUND"),
     )
+    api_key_raw = _secret_value(settings.llm_api_key)
     settings_with_token_data = GETSettingsModel(
         **model_dump_with_options(settings, exclude={"secrets_store"}),
-        llm_api_key_set=settings.llm_api_key is not None and bool(settings.llm_api_key),
+        llm_api_key_set=bool(api_key_raw and str(api_key_raw).strip()),
         provider_tokens_set=provider_tokens_set or None,
+        llm_model_supports_vision=_llm_model_supports_vision(settings.llm_model),
     )
 
     # Mask sensitive data without mutating original instance
@@ -589,10 +641,14 @@ async def store_settings(
             settings = await store_llm_settings(
                 settings, settings_store, existing_settings=existing_settings
             )
-            if settings.user_consents_to_analytics is None:
-                settings.user_consents_to_analytics = (
-                    existing_settings.user_consents_to_analytics
-                )
+            # Some deployments/versions use a leaner Settings model that
+            # doesn't include analytics consent fields.
+            if "user_consents_to_analytics" in Settings.model_fields:
+                current_consent = getattr(settings, "user_consents_to_analytics", None)
+                if current_consent is None:
+                    settings.user_consents_to_analytics = getattr(
+                        existing_settings, "user_consents_to_analytics", None
+                    )
 
         _apply_runtime_and_git_overrides(settings)
 
@@ -772,6 +828,7 @@ def _build_default_settings_response() -> GETSettingsModel:
         **model_dump_with_options(default_settings, exclude={"secrets_store"}),
         llm_api_key_set=False,
         provider_tokens_set=None,
+        llm_model_supports_vision=_llm_model_supports_vision(default_settings.llm_model),
     )
 
     return settings_with_token_data.model_copy(
@@ -779,3 +836,4 @@ def _build_default_settings_response() -> GETSettingsModel:
             "llm_api_key": None,
         },
     )
+

@@ -19,6 +19,7 @@ from backend.events.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
 )
+from backend.events.observation.code_nav import LspQueryObservation
 from backend.events.observation.empty import NullObservation
 from backend.events.observation.error import ErrorObservation
 from backend.events.observation.file_download import FileDownloadObservation
@@ -52,6 +53,7 @@ observations = (
     FileDownloadObservation,
     TaskTrackingObservation,
     StatusObservation,
+    LspQueryObservation,
 )
 
 

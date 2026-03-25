@@ -9,7 +9,7 @@ from typing import Any
 
 # Verified models for CLI and configuration — derived from catalog.toml.
 # Uses lazy loading to avoid circular imports (constants ← config ← models).
-VERIFIED_PROVIDERS = ["anthropic", "openai", "mistral"]
+VERIFIED_PROVIDERS = ["anthropic", "openai", "mistral", "groq"]
 
 
 def _get_verified(provider: str) -> list[str]:
@@ -57,6 +57,7 @@ class _LazyModelList:
 VERIFIED_OPENAI_MODELS: Any = _LazyModelList("openai")
 VERIFIED_ANTHROPIC_MODELS: Any = _LazyModelList("anthropic")
 VERIFIED_MISTRAL_MODELS: Any = _LazyModelList("mistral")
+VERIFIED_GROQ_MODELS: Any = _LazyModelList("groq")
 
 
 # Provider extraction patterns
@@ -65,12 +66,16 @@ PROVIDER_PREFIX_PATTERNS = {
     "anthropic": ["anthropic/", "claude-"],
     "google": ["google/", "gemini/"],
     "xai": ["xai/", "grok-"],
+    "groq": ["groq/"],
     "openrouter": ["openrouter/"],
+    "nvidia": ["nvidia/", "moonshotai/"],
 }
 
 PROVIDER_KEYWORD_PATTERNS = {
     "google": ["gemini"],
     "xai": ["grok"],
+    "groq": ["llama-3.1", "llama-3.3", "qwen3"],
+    "nvidia": ["kimi-k2.5", "moonshotai/kimi-k2-5"],
 }
 
 PROVIDER_FALLBACK_PATTERNS = {
@@ -78,6 +83,8 @@ PROVIDER_FALLBACK_PATTERNS = {
     "anthropic": ["claude"],
     "google": ["gemini"],
     "xai": ["grok"],
+    "groq": ["llama", "qwen"],
+    "nvidia": ["kimi", "moonshotai"],
 }
 
 # Provider and API Key constants
@@ -168,6 +175,27 @@ PROVIDER_CONFIGURATIONS: dict[str, dict[str, Any]] = {
         "handles_own_routing": False,
         "requires_custom_llm_provider": False,
     },
+    "groq": {
+        "name": "groq",
+        "env_var": "GROQ_API_KEY",
+        "requires_protocol": True,
+        "supports_streaming": True,
+        "required_params": {"api_key", "model"},
+        "optional_params": {
+            "base_url",
+            "timeout",
+            "temperature",
+            "max_tokens",
+            "top_p",
+            "seed",
+            "drop_params",
+        },
+        "forbidden_params": {"custom_llm_provider"},
+        "api_key_prefixes": ["gsk_"],
+        "api_key_min_length": 20,
+        "handles_own_routing": False,
+        "requires_custom_llm_provider": False,
+    },
     "openrouter": {
         "name": "openrouter",
         "env_var": "OPENROUTER_API_KEY",
@@ -185,6 +213,27 @@ PROVIDER_CONFIGURATIONS: dict[str, dict[str, Any]] = {
         },
         "forbidden_params": {"custom_llm_provider"},
         "api_key_prefixes": ["sk-or-"],
+        "api_key_min_length": 20,
+        "handles_own_routing": False,
+        "requires_custom_llm_provider": False,
+    },
+    "nvidia": {
+        "name": "nvidia",
+        "env_var": "NVIDIA_API_KEY",
+        "requires_protocol": True,
+        "supports_streaming": True,
+        "required_params": {"api_key", "model"},
+        "optional_params": {
+            "base_url",
+            "timeout",
+            "temperature",
+            "max_tokens",
+            "top_p",
+            "seed",
+            "drop_params",
+        },
+        "forbidden_params": {"custom_llm_provider"},
+        "api_key_prefixes": [],
         "api_key_min_length": 20,
         "handles_own_routing": False,
         "requires_custom_llm_provider": False,

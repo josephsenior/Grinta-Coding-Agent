@@ -50,7 +50,7 @@ class TestTaskTrackingMixin(TestCase):
         result_obs = cast(TaskTrackingObservation, result)
         self.assertEqual(result_obs.command, "plan")
         self.assertEqual(result_obs.task_list, task_list)
-        self.assertIn("2 items", result.content)
+        self.assertIn("2 tasks", result.content)
         self.mixin.event_stream.file_store.write.assert_called_once()
 
     def test_handle_task_tracking_view_command(self):
@@ -65,7 +65,10 @@ class TestTaskTrackingMixin(TestCase):
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
         self.assertEqual(result_obs.command, "view")
-        self.assertEqual(result.content, stored_content)
+        self.assertEqual(
+            result.content,
+            stored_content + "\n\n→ Now implement the first pending (⏳) task.",
+        )
         self.mixin.event_stream.file_store.read.assert_called_once()
 
     def test_handle_task_tracking_unknown_command(self):
@@ -90,8 +93,7 @@ class TestTaskTrackingMixin(TestCase):
         result_obs = cast(TaskTrackingObservation, result)
         self.assertEqual(result_obs.command, "plan")
         self.assertEqual(result_obs.task_list, task_list)
-        self.assertIn("1 items", result.content)
-        self.assertIn(task_file_path, result.content)
+        self.assertIn("1 tasks", result.content)
         self.mixin.event_stream.file_store.write.assert_called_once()
 
     def test_handle_task_plan_action_write_failure(self):
@@ -115,7 +117,7 @@ class TestTaskTrackingMixin(TestCase):
         result = self.mixin._handle_task_plan_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
-        self.assertIn("0 items", result.content)
+        self.assertIn("0 tasks", result.content)
 
     def test_handle_task_view_action_successful(self):
         """Test successful task view action."""
@@ -129,7 +131,10 @@ class TestTaskTrackingMixin(TestCase):
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
         self.assertEqual(result_obs.command, "view")
-        self.assertEqual(result.content, stored_content)
+        self.assertEqual(
+            result.content,
+            stored_content + "\n\n→ Now implement the first pending (⏳) task.",
+        )
         self.assertEqual(result_obs.task_list, [])
 
     def test_handle_task_view_action_file_not_found(self):

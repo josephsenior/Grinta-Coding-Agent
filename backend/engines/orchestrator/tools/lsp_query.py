@@ -27,7 +27,10 @@ def create_lsp_query_tool() -> dict[str, Any]:
             "name": LSP_QUERY_TOOL_NAME,
             "description": (
                 "Query the language server for code navigation. "
-                "Use instead of grep when you need precise cross-file navigation.\n\n"
+                "Use this when you already know the file and symbol position and need precise cross-file navigation. "
+                "If the location is still unknown, use search_code first. "
+                "If the task is architectural dependency exploration rather than exact references, "
+                "use read_symbol_definition or explore_tree_structure.\n\n"
                 "Commands:\n"
                 "  find_definition – jump to where a symbol is defined\n"
                 "  find_references – find every usage of a symbol in the project\n"

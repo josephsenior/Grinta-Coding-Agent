@@ -25,6 +25,7 @@ from backend.controller.memory_pressure import MemoryPressureMonitor
 from backend.controller.rate_governor import LLMRateGovernor
 from backend.controller.state.state import State
 from backend.controller.tool_pipeline import ToolInvocationContext
+from backend.core.constants import DEFAULT_PENDING_ACTION_TIMEOUT
 from backend.core.enums import LifecyclePhase
 from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
@@ -66,7 +67,7 @@ class AgentController:
     _cached_first_user_message: MessageAction | None = None
     state_tracker: StateTracker
     _replay_manager: ReplayManager
-    PENDING_ACTION_TIMEOUT: float = 120.0
+    PENDING_ACTION_TIMEOUT: float = DEFAULT_PENDING_ACTION_TIMEOUT
     _step_task: asyncio.Task[None] | None = None
     rate_governor: LLMRateGovernor
     memory_pressure: MemoryPressureMonitor
@@ -194,11 +195,11 @@ class AgentController:
             self._main_loop = None
 
         # Attributes set by telemetry service during pipeline initialization
-        self._planning_middleware_enabled: bool = False
         self._reflection_middleware_enabled: bool = False
         self._file_state_tracker: Any = None
 
         # --- Service wiring (order matters) ---
+        self.PENDING_ACTION_TIMEOUT = config.pending_action_timeout
         self.services = ControllerServices(self)
 
         # Rate governor and memory monitor
@@ -330,6 +331,9 @@ class AgentController:
             self._step_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._step_task
+        pending_service = getattr(self, "pending_action_service", None)
+        if pending_service is not None:
+            pending_service.shutdown()
         if set_stop_state:
             await self.set_agent_state_to(AgentState.STOPPED)
         self.state_tracker.close(self.event_stream)

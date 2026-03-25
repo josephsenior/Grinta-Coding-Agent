@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 
+from backend.api.utils.error_patterns import (
+    check_auth_pattern,
+    check_file_not_found_pattern,
+    check_network_pattern,
+    check_permission_pattern,
+    check_rate_limit_pattern,
+)
 from backend.core.enums import ErrorCategory, ErrorSeverity
 from backend.core.errors import (
     AgentRuntimeUnavailableError,
@@ -15,11 +22,6 @@ from backend.core.errors import (
 from backend.api.utils.error_formatter import (
     ErrorAction,
     UserFriendlyError,
-    _check_auth_pattern,
-    _check_file_not_found_pattern,
-    _check_network_pattern,
-    _check_permission_pattern,
-    _check_rate_limit_pattern,
     format_agent_stuck_error,
     format_context_window_error,
     format_error_for_user,
@@ -111,30 +113,30 @@ class TestUserFriendlyError:
 
 class TestPatternCheckers:
     def test_rate_limit(self):
-        assert _check_rate_limit_pattern("rate limit exceeded") is True
-        assert _check_rate_limit_pattern("too many requests") is True
-        assert _check_rate_limit_pattern("normal error") is False
+        assert check_rate_limit_pattern("rate limit exceeded") is True
+        assert check_rate_limit_pattern("too many requests") is True
+        assert check_rate_limit_pattern("normal error") is False
 
     def test_auth_pattern(self):
-        assert _check_auth_pattern("authentication failed") is True
-        assert _check_auth_pattern("invalid token") is True
-        assert _check_auth_pattern("check your api key") is True
-        assert _check_auth_pattern("normal") is False
+        assert check_auth_pattern("authentication failed") is True
+        assert check_auth_pattern("invalid token") is True
+        assert check_auth_pattern("check your api key") is True
+        assert check_auth_pattern("normal") is False
 
     def test_network_pattern(self):
-        assert _check_network_pattern("connection refused") is True
-        assert _check_network_pattern("timeout error") is True
-        assert _check_network_pattern("normal") is False
+        assert check_network_pattern("connection refused") is True
+        assert check_network_pattern("timeout error") is True
+        assert check_network_pattern("normal") is False
 
     def test_file_not_found_pattern(self):
-        assert _check_file_not_found_pattern("file not found") is True
-        assert _check_file_not_found_pattern("no such file or directory") is True
-        assert _check_file_not_found_pattern("normal") is False
+        assert check_file_not_found_pattern("file not found") is True
+        assert check_file_not_found_pattern("no such file or directory") is True
+        assert check_file_not_found_pattern("normal") is False
 
     def test_permission_pattern(self):
-        assert _check_permission_pattern("permission denied") is True
-        assert _check_permission_pattern("forbidden access") is True
-        assert _check_permission_pattern("normal") is False
+        assert check_permission_pattern("permission denied") is True
+        assert check_permission_pattern("forbidden access") is True
+        assert check_permission_pattern("normal") is False
 
 
 # ---------------------------------------------------------------------------

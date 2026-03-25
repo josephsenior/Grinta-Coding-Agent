@@ -98,7 +98,7 @@ AGENT_LEVEL_ACTIONS: frozenset[str] = frozenset(
         "condensation",
         "condensation_request",
         "task_tracking",
-        "query_toolbox",
+        "search_available_tools",
         "uncertainty",
         "proposal",
         "clarification",
@@ -185,7 +185,7 @@ class Runtime(
     runtime_status: RuntimeStatus | None
     _runtime_initialized: bool = False
     security_analyzer: SecurityAnalyzer | None = None
-    workspace_base: str | None = None
+    project_root: str | None = None
     capabilities: RuntimeCapabilities | None = None
     """Frozen capability snapshot, populated during ``connect()``."""
 
@@ -202,7 +202,7 @@ class Runtime(
         headless_mode: bool = False,
         user_id: str | None = None,
         vcs_provider_tokens: ProviderTokenType | None = None,
-        workspace_base: str | None = None,
+        project_root: str | None = None,
     ) -> None:
         """Initialize runtime state, subscriptions, plugins, and provider credentials."""
         self.git_handler = GitHandler(
@@ -211,7 +211,7 @@ class Runtime(
         )
         self.sid = sid
         self.event_stream = event_stream
-        self.workspace_base = workspace_base
+        self.project_root = project_root
         if event_stream:
             # Unsubscribe first if already exists (handles reconnection cases)
             try:
@@ -276,16 +276,16 @@ class Runtime(
 
         Subclasses (e.g. LocalRuntimeInProcess) override this to expose their
         internal workspace tracking attribute.  The base implementation falls
-        back to ``workspace_base`` when set, and ``Path.cwd()`` otherwise so
+        back to ``project_root`` when set, and ``Path.cwd()`` otherwise so
         that every call-site can rely on a single, always-valid property.
         """
-        if self.workspace_base:
-            return Path(self.workspace_base)
+        if self.project_root:
+            return Path(self.project_root)
         return Path.cwd()
 
     @workspace_root.setter
     def workspace_root(self, value: Path) -> None:
-        self.workspace_base = str(value)
+        self.project_root = str(value)
 
     @property
     def runtime_initialized(self) -> bool:
@@ -515,12 +515,22 @@ class Runtime(
         except Exception:
             exit_code = None
 
+        existing_tool_result = (
+            observation.tool_result if isinstance(observation.tool_result, dict) else {}
+        )
         observation.tool_result = {
-            "ok": not isinstance(observation, ErrorObservation),
-            "retryable": isinstance(observation, ErrorObservation),
-            "exit_code": exit_code,
-            "action": getattr(event, "action", None),
-            "observation": getattr(observation, "observation", None),
+            **existing_tool_result,
+            "ok": existing_tool_result.get(
+                "ok", not isinstance(observation, ErrorObservation)
+            ),
+            "retryable": existing_tool_result.get(
+                "retryable", isinstance(observation, ErrorObservation)
+            ),
+            "exit_code": existing_tool_result.get("exit_code", exit_code),
+            "action": existing_tool_result.get("action", getattr(event, "action", None)),
+            "observation": existing_tool_result.get(
+                "observation", getattr(observation, "observation", None)
+            ),
         }
 
         if isinstance(observation, NullObservation):
@@ -550,6 +560,30 @@ class Runtime(
             )
         except PermissionError as e:
             observation = ErrorObservation(content=str(e))
+        except ValueError as e:
+            from backend.core.workspace_resolution import (
+                WORKSPACE_NOT_OPEN_ERROR_ID,
+                is_workspace_not_open_error,
+            )
+
+            if is_workspace_not_open_error(e):
+                observation = ErrorObservation(
+                    content=str(e),
+                    error_id=WORKSPACE_NOT_OPEN_ERROR_ID,
+                )
+            else:
+                self._handle_runtime_error(event, e, is_network_error=False)
+                observation = ErrorObservation(
+                    content=f"Unexpected error during action execution: {type(e).__name__}: {e}"
+                )
+                logger.warning(
+                    "[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s",
+                    self.sid,
+                    action_type,
+                    action_id,
+                    type(e).__name__,
+                    e,
+                )
         except (httpx.NetworkError, AgentRuntimeDisconnectedError) as e:
             self._handle_runtime_error(event, e, is_network_error=True)
             # Always emit an observation so the controller isn't stuck

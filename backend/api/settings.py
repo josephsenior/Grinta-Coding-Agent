@@ -39,6 +39,8 @@ class GETSettingsModel(Settings):
 
     provider_tokens_set: dict[ProviderType, str | None] | None = None
     llm_api_key_set: bool
+    #: From ``catalog.json`` for the configured ``llm_model`` (for chat image attachments).
+    llm_model_supports_vision: bool = False
     model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)
 
 

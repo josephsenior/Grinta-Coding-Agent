@@ -8,8 +8,10 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
+from backend.core.enums import FileReadSource
 from backend.events.action import CmdRunAction
 from backend.events.observation import CmdOutputObservation
+from backend.events.observation.files import FileReadObservation
 from backend.validation.task_validator import (
     CompositeValidator,
     DiffValidator,
@@ -29,15 +31,18 @@ def _make_state(history=None):
 
 
 def _cmd_action(cmd: str) -> MagicMock:
-    a = MagicMock(spec=CmdRunAction)
-    a.command = cmd
+    a = CmdRunAction(command=cmd)
+    a.id = 1
     return a
 
 
-def _cmd_obs(content: str, exit_code: int = 0) -> MagicMock:
-    o = MagicMock(spec=CmdOutputObservation)
-    o.content = content
-    o.exit_code = exit_code
+def _cmd_obs(content: str, exit_code: int = 0, *, cause: int = 1, command: str = ""):
+    o = CmdOutputObservation(
+        content=content,
+        command=command or "<test-command>",
+        exit_code=exit_code,
+    )
+    o.cause = cause
     return o
 
 
@@ -78,25 +83,30 @@ class TestTestPassingValidatorExt(unittest.IsolatedAsyncioTestCase):
 
     async def test_passing_tests(self):
         v = TestPassingValidator()
+        action = _cmd_action("pytest tests/")
         result = await v.validate_completion(
             Task("fix"),
-            _make_state([_cmd_action("pytest tests/"), _cmd_obs("ok", exit_code=0)]),
+            _make_state([action, _cmd_obs("ok", exit_code=0, cause=1, command=action.command)]),
         )
         self.assertTrue(result.passed)
 
     async def test_failing_tests(self):
         v = TestPassingValidator()
+        action = _cmd_action("pytest tests/")
         result = await v.validate_completion(
             Task("fix"),
-            _make_state([_cmd_action("pytest tests/"), _cmd_obs("FAIL", exit_code=1)]),
+            _make_state(
+                [action, _cmd_obs("FAIL", exit_code=1, cause=1, command=action.command)]
+            ),
         )
         self.assertFalse(result.passed)
 
     async def test_npm_test_recognized(self):
         v = TestPassingValidator()
+        action = _cmd_action("npm test")
         result = await v.validate_completion(
             Task("fix"),
-            _make_state([_cmd_action("npm test"), _cmd_obs("ok", exit_code=0)]),
+            _make_state([action, _cmd_obs("ok", exit_code=0, cause=1, command=action.command)]),
         )
         self.assertTrue(result.passed)
 
@@ -113,16 +123,20 @@ class TestDiffValidatorExt(unittest.IsolatedAsyncioTestCase):
             ["diff --git a/f b/f", "--- a/f", "+++ b/f"]
             + [f"+code_{i}" for i in range(10)]
         )
+        action = _cmd_action("git diff")
         result = await v.validate_completion(
-            Task("change"), _make_state([_cmd_action("git diff"), _cmd_obs(diff)])
+            Task("change"),
+            _make_state([action, _cmd_obs(diff, cause=1, command=action.command)]),
         )
         self.assertTrue(result.passed)
 
     async def test_trivial_diff(self):
         v = DiffValidator()
         diff = "diff --git a/f b/f\n--- a/f\n+++ b/f\n+x\n-y"
+        action = _cmd_action("git diff")
         result = await v.validate_completion(
-            Task("change"), _make_state([_cmd_action("git diff"), _cmd_obs(diff)])
+            Task("change"),
+            _make_state([action, _cmd_obs(diff, cause=1, command=action.command)]),
         )
         self.assertFalse(result.passed)
 
@@ -159,7 +173,16 @@ class TestFileExistsValidatorExt(unittest.IsolatedAsyncioTestCase):
     async def test_file_found(self):
         v = FileExistsValidator(expected_files=["out.txt"])
         result = await v.validate_completion(
-            Task("gen"), _make_state([_cmd_action("cat out.txt")])
+            Task("gen"),
+            _make_state(
+                [
+                    FileReadObservation(
+                        path="out.txt",
+                        content="ok",
+                        impl_source=FileReadSource.DEFAULT,
+                    )
+                ]
+            ),
         )
         self.assertTrue(result.passed)
 

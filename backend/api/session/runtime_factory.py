@@ -13,8 +13,8 @@ from types import MappingProxyType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.errors import AgentRuntimeUnavailableError
-from backend.core.main import _setup_runtime_and_repo
-from backend.core.setup import initialize_repository_for_runtime
+from backend.core.bootstrap.main import _setup_runtime_and_repo
+from backend.core.bootstrap.setup import initialize_repository_for_runtime
 from backend.events.stream import EventStream
 from backend.core.provider_types import (
     CustomSecretsType,
@@ -216,7 +216,7 @@ async def _create_direct(
     selected_repository: str | None,
     selected_branch: str | None,
 ) -> RuntimeResult:
-    from backend.core.setup import filter_plugins_by_config
+    from backend.core.bootstrap.setup import filter_plugins_by_config
 
     plugins = filter_plugins_by_config(
         plugins=list(agent.runtime_plugins),

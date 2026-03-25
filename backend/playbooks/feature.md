@@ -1,99 +1,32 @@
 ---
 name: feature
 type: knowledge
-version: 1.0.0
+version: 2.0.0
 agent: Orchestrator
 triggers:
-  - implement feature
-  - add feature
-  - new feature
-  - feature implementation
-  - build feature
+  - /feature
 ---
 
-# Structured Feature Development
+# Structured feature work
 
-## 1. Understand Before Building
+Align with system **EXECUTION_DISCIPLINE** and **TASK_MANAGEMENT** (task_tracker for 3+ steps).
 
-Read the relevant existing code before writing a single line:
+## 1. Discover
 
-- What data flows in and out?
-- What existing patterns does the codebase use?
-- Is there a similar feature already implemented?
+Read existing code for patterns, similar features, and data flow **before** writing new code. Use **search_code** / targeted reads — avoid repeated directory listings.
 
-```bash
-# Find related code
-grep -r "related_term" backend/ --include="*.py" -l
-```
+## 2. Shape the API
 
-## 2. Design the Interface First
+Sketch types/signatures and error cases **before** filling bodies. If the signature feels wrong, fix design first.
 
-Write the function/class signature with types, not the body:
+## 3. Tests
 
-```python
-def new_feature(
-    input_data: InputType,
-    config: FeatureConfig,
-) -> OutputType:
-    """One-sentence description of what this does.
+Add tests that describe acceptance; run them **red** then implement **green**. Prefer the project’s real test stack (`pytest`, `vitest`, etc.).
 
-    Args:
-        input_data: What it processes
-        config: Configuration controlling behaviour
+## 4. Integrate
 
-    Returns:
-        What the caller gets back
-    """
-    raise NotImplementedError
-```
+Check routes, schemas, config, exports, and docs in the **same** change set when the feature touches them.
 
-Review the signature before implementing. If it feels awkward, the design is wrong.
+## 5. Done
 
-## 3. Write the Test First
-
-```python
-def test_new_feature_happy_path():
-    result = new_feature(valid_input, default_config)
-    assert result.status == "success"
-    assert result.value == expected_value
-
-def test_new_feature_edge_case():
-    result = new_feature(empty_input, default_config)
-    assert result.status == "empty"
-```
-
-Run the tests to confirm they **fail** before implementing.
-
-## 4. Implement in Small Steps
-
-1. Make the simplest thing that could possibly work
-2. Run tests after each meaningful chunk
-3. Refactor only once tests are green
-
-```bash
-# Run just the new tests while building
-pytest tests/unit/test_new_feature.py -x -v
-```
-
-## 5. Integration Points
-
-Check every place the feature connects to the rest of the system:
-
-- [ ] API route added or updated?
-- [ ] Schema/model updated?
-- [ ] Settings/config field added if configurable?
-- [ ] Import added to `__init__.py`?
-- [ ] Docs updated?
-
-## 6. Before Marking Done
-
-```bash
-# Full suite — no regressions
-pytest -x --tb=short
-
-# Type check
-mypy backend/path/to/new_module.py
-
-# Lint
-ruff check backend/path/to/new_module.py
-```
+Full test run + project lint/typecheck if configured. No secrets in code or logs (system **SECURITY**).

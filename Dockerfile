@@ -56,7 +56,7 @@ USER forge
 # Runtime environment
 ENV FORGE_HOST=0.0.0.0 \
     FORGE_PORT=3000 \
-    WORKSPACE_BASE=/app/workspace
+    PROJECT_ROOT=/app/workspace
 
 EXPOSE 3000/tcp
 

@@ -39,13 +39,13 @@ class TestSettingsDefaults:
         assert s.llm_api_key is not None
         assert s.llm_api_key.get_secret_value() == "sk-test"
 
-    @pytest.mark.parametrize(
-        "legacy_name",
-        ["CodeActAgent", "CodeAct", "codact", "orchestrator"],
-    )
-    def test_legacy_agent_names_are_normalized(self, legacy_name: str):
-        s = Settings(agent=legacy_name)
+    def test_agent_name_is_stripped_not_rewritten(self):
+        s = Settings(agent="  Orchestrator  ")
         assert s.agent == "Orchestrator"
+
+    def test_agent_aliases_are_not_mapped(self):
+        s = Settings(agent="CodeActAgent")
+        assert s.agent == "CodeActAgent"
 
 
 class TestKnowledgeBaseProperty:

@@ -152,7 +152,7 @@ conversation_window, no_op, pipeline.
 
 **Status:** Accepted  
 **Date:** 2024-12  
-**Context:** Need real-time bidirectional communication between TUI/frontend
+**Context:** Need real-time bidirectional communication between UI clients/frontend
 and backend for streaming agent actions.
 
 **Decision:** Use Socket.IO instead of raw WebSocket for its built-in:
@@ -295,16 +295,19 @@ well with Socket.IO and provides automatic API documentation.
 
 ## ADR-015: Textual TUI over Web Frontend
 
-**Status:** Accepted  
-**Date:** 2025-01  
+**Status:** Superseded — the Textual TUI was removed; the **React web UI** is the
+primary interface. The Python package **`forge_client`** retains
+`ForgeClient` for tests and automation.
+
+**Date:** 2025-01 (superseded 2026-03)  
 **Context:** Developers using a coding agent likely prefer a terminal-native
 interface over a browser-based one. A TUI avoids Node.js dependencies and
 integrates naturally into terminal workflows.
 
-**Decision:** Build the primary UI as a Textual TUI. A web frontend exists
+**Decision (historical):** Build the primary UI as a Textual TUI. A web frontend exists
 as an alternative but the TUI is the recommended interface.
 
-**Consequences:**
+**Consequences (historical):**
 - ✅ Zero Node.js/browser dependency for TUI users
 - ✅ Native terminal integration
 - ✅ Keyboard-driven workflow

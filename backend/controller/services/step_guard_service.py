@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.core.errors import AgentStuckInLoopError
 from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
 from backend.events import EventSource
-import os
 
 from backend.events.action import FileEditAction, FileWriteAction
 from backend.events.observation import ErrorObservation
@@ -26,11 +24,12 @@ class StepGuardService:
     async def ensure_can_step(self) -> bool:
         """Return False if circuit breaker/stuck detection block execution."""
         controller = self._context.get_controller()
-        # Stuck detection first — it emits targeted recovery messages.
-        # Circuit breaker second — it only decides whether to stop the agent.
-        if await self._handle_stuck_detection(controller) is False:
-            return False
+        # Circuit breaker is authoritative for pause/stop decisions.
+        # Stuck detection runs only if stepping is still allowed, where it can
+        # inject recovery guidance without overriding a hard stop/pause.
         if await self._check_circuit_breaker(controller) is False:
+            return False
+        if await self._handle_stuck_detection(controller) is False:
             return False
         return True
 
@@ -73,27 +72,12 @@ class StepGuardService:
         if state and hasattr(state, "turn_signals"):
             state.turn_signals.repetition_score = rep_score
 
-        # Recreation auto-finish: if the agent is in a sustained recreation
-        # loop (only re-creating existing files, no new ones), auto-finish
-        # the task if enough files have been created.  This bypasses the
-        # normal stuck-detection → replan → circuit-breaker path because
-        # weak models ignore replan directives and the error injection makes
-        # things worse.
-        if await self._check_recreation_auto_finish(controller):
-            return False  # Stop stepping — we finished the task
-
         if not stuck_service.is_stuck():
             return True
 
         cb_service = getattr(controller, "circuit_breaker_service", None)
         if cb_service:
             cb_service.record_stuck_detection()
-
-        # Check if we should auto-finish instead of sending another message
-        # the agent ignores.
-        stuck_count = cb_service.circuit_breaker.stuck_detection_count if cb_service else 0
-        if stuck_count >= 3 and await self._try_auto_finish(controller):
-            return False  # Stop stepping — we finished the task
 
         # Inject a replan directive; let the circuit breaker handle
         # escalation and eventual stopping.
@@ -109,24 +93,6 @@ class StepGuardService:
             p = p[len("workspace/"):]
         return p.strip("/")
 
-    @staticmethod
-    def _extract_task_files(text: str) -> set[str]:
-        """Extract file paths from a task description.
-
-        Handles paths with special characters like [...nextauth] and
-        dotfiles like .env.example.
-        """
-        import re
-        # Match paths like src/app/page.tsx, .env.example, [...nextauth]/route.ts
-        # Must start with a word char, '/', '[', or '.' (for dotfiles)
-        pattern = r'(?<![.\w])[\w./\[\]]+\.(?:py|html|css|js|jsx|ts|tsx|json|txt|md|yaml|yml|toml|cfg|ini|sh|sql|prisma|env|mjs|cjs|svelte|vue|rs|go|java|rb|php|c|cpp|h|hpp|example)\b'
-        paths = set(re.findall(pattern, text))
-        # Also match dotfiles like .env.example
-        dotfiles = set(re.findall(r'(?:^|\s)(\.[\w]+\.[\w]+)', text, re.MULTILINE))
-        paths.update(dotfiles)
-        # Normalize all paths
-        return {p.replace("\\", "/").strip("/").strip() for p in paths if p.strip()}
-
     def _inject_replan_directive(self, controller) -> None:
         """Inject a directive that forces the LLM to take real action.
 
@@ -134,185 +100,49 @@ class StepGuardService:
         reaches the LLM.  SystemMessageAction is silently dropped by
         _dedupe_system_messages in conversation_memory.
         """
-        from backend.events.action import MessageAction
-
-        # Collect files already created (using normalized full paths)
         state = getattr(controller, "state", None)
         history = getattr(state, "history", []) if state else []
-        created_files = set()
-        for e in history:
-            if isinstance(e, (FileWriteAction, FileEditAction)):
-                p = getattr(e, "path", "") or ""
-                if p:
-                    created_files.add(self._normalize_path(p))
 
-        # Extract file paths mentioned in the original user task
-        task_files: set[str] = set()
-        for e in history:
-            if isinstance(e, MessageAction) and getattr(e, "source", None) == EventSource.USER:
-                text = getattr(e, "content", "") or ""
-                if text:
-                    task_files = self._extract_task_files(text)
-                break
+        created_files = self._collect_created_files(history)
+        msg, planning = self._build_stuck_recovery_message(created_files)
 
-        # Match task files to created files using suffix matching
-        # (task says "src/app/page.tsx", agent creates "/workspace/src/app/page.tsx")
-        missing = set()
-        for tf in task_files:
-            if not any(cf == tf or cf.endswith("/" + tf) for cf in created_files):
-                missing.add(tf)
-
-        if created_files and not missing:
-            msg = (
-                "STUCK LOOP DETECTED — You are repeating read-only commands without progress.\n"
-                f"You have already created these files: {', '.join(sorted(created_files))}.\n"
-                "All required files are written. Do NOT re-read or re-create them.\n"
-                "YOUR VERY NEXT ACTION MUST BE: call finish() to complete the task.\n"
-                "Do NOT run any more commands. Just call finish() NOW."
-            )
-            planning = "STUCK RECOVERY: All files done. Call finish() now."
-        elif created_files and missing:
-            msg = (
-                "STUCK LOOP DETECTED — You are repeating read-only commands without progress.\n"
-                f"Files ALREADY created (do NOT re-create): {', '.join(sorted(created_files))}.\n"
-                f"Files STILL MISSING (create these NOW): {', '.join(sorted(missing))}.\n"
-                "YOUR VERY NEXT ACTION MUST BE: create one of the missing files using str_replace_editor.\n"
-                "Do NOT run ls, cat, Get-Content, or any read command. Create the file immediately."
-            )
-            planning = f"STUCK RECOVERY: Create missing files: {', '.join(sorted(missing))}. No ls/cat."
-        else:
-            msg = (
-                "STUCK LOOP DETECTED — You are repeating read-only commands without progress.\n"
-                "MANDATORY RECOVERY:\n"
-                "1. Do NOT run ls, dir, cat, Get-Content, or view.\n"
-                "2. Create the required files using str_replace_editor create.\n"
-                "3. When all files are created, call finish().\n"
-                "YOUR VERY NEXT ACTION MUST BE a file create or edit — nothing else."
-            )
-            planning = "STUCK RECOVERY: Create files now. No ls/cat/view."
-
-        # Use ErrorObservation so it renders as role='user' and survives
-        # _dedupe_system_messages (which drops all but the first system msg).
         error_obs = ErrorObservation(content=msg, error_id="STUCK_LOOP_RECOVERY")
         controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
-        state = getattr(controller, "state", None)
         if state and hasattr(state, "set_planning_directive"):
             state.set_planning_directive(planning, source="StepGuardService")
 
-    async def _check_recreation_auto_finish(self, controller) -> bool:
-        """Auto-finish if the agent is in a sustained file recreation loop.
-
-        Checks whether the agent has stopped creating new files and is only
-        re-creating existing ones.  If so and enough files have been created,
-        auto-finish the task without injecting any error messages.
-
-        Returns True if auto-finish was triggered.
-        """
-        from backend.events.observation.files import FileEditObservation
-
-        state = getattr(controller, "state", None)
-        if not state or not hasattr(state, "history"):
-            return False
-
-        # Only check after enough events — give the model time to work.
-        # 500 events ≈ 10 minutes, enough for the model to create 16+ files.
-        if len(state.history) < 500:
-            return False
-
-        # Look at a wide window of recent events for sustained recreation
-        recent = state.history[-80:]
-        recreate_count = 0
-        new_create_count = 0
-
-        for ev in recent:
-            if isinstance(ev, FileEditObservation):
-                old = getattr(ev, "old_content", None)
-                new = getattr(ev, "new_content", None)
-                if old is not None and old == new:
-                    recreate_count += 1
-                elif old is not None or new is not None:
-                    new_create_count += 1
-
-        # Only fire if re-creates dominate and few/no new files are being created
-        if recreate_count < 8 or new_create_count > 2:
-            return False
-
-        logger.warning(
-            "Sustained recreation loop: %d re-creates, %d new creates "
-            "in last 80 events after %d total events — trying auto-finish",
-            recreate_count,
-            new_create_count,
-            len(state.history),
-        )
-        return await self._try_auto_finish(controller)
-
-    async def _try_auto_finish(self, controller) -> bool:
-        """Auto-finish the task if all expected files are created.
-
-        After multiple stuck detections, the agent has proven it cannot
-        follow "call finish()" instructions.  If all task files exist,
-        emit a PlaybookFinishAction directly to end the loop.
-
-        Returns True if auto-finish was triggered.
-        """
-        from backend.events.action import MessageAction
-        from backend.events.action.agent import PlaybookFinishAction
-
-        state = getattr(controller, "state", None)
-        history = getattr(state, "history", []) if state else []
-
-        # Collect created files (full normalized paths)
-        created_files = set()
+    def _collect_created_files(self, history: list) -> set[str]:
+        """Collect normalized paths of files created via FileWrite/FileEdit."""
+        created = set()
         for e in history:
             if isinstance(e, (FileWriteAction, FileEditAction)):
                 p = getattr(e, "path", "") or ""
                 if p:
-                    created_files.add(self._normalize_path(p))
+                    created.add(self._normalize_path(p))
+        return created
 
-        if not created_files:
-            return False
-
-        # Extract expected files from the user task (full paths)
-        task_files: set[str] = set()
-        for e in history:
-            if isinstance(e, MessageAction) and getattr(e, "source", None) == EventSource.USER:
-                text = getattr(e, "content", "") or ""
-                if text:
-                    task_files = self._extract_task_files(text)
-                break
-
-        if not task_files:
-            return False
-
-        # Check missing using suffix matching
-        missing = set()
-        for tf in task_files:
-            if not any(cf == tf or cf.endswith("/" + tf) for cf in created_files):
-                missing.add(tf)
-
-        if not missing:
-            # All expected files created — auto-finish
-            logger.warning(
-                "Auto-finishing: all %d task files created, agent stuck",
-                len(created_files),
+    def _build_stuck_recovery_message(
+        self,
+        created_files: set[str],
+    ) -> tuple[str, str]:
+        """Build a generic stuck recovery message without task-text heuristics."""
+        created_str = ", ".join(sorted(created_files))
+        if created_files:
+            return (
+                "STUCK LOOP DETECTED — You are repeating actions without progress.\n"
+                f"Files already touched in this session: {created_str}.\n"
+                "Do NOT assume the task is complete based on file names alone.\n"
+                "YOUR VERY NEXT ACTION MUST BE: perform one concrete unfinished task step, "
+                "or verify the current state before changing course.",
+                "STUCK RECOVERY: stop repeating, verify current state, then do the next unfinished step.",
             )
-        elif len(created_files) >= len(task_files) * 0.6:
-            # At least 60% of files created and agent is stuck in loops —
-            # the weak model can't make further progress, so finish with
-            # what we have.
-            logger.warning(
-                "Auto-finishing: %d/%d task files created (%.0f%%), agent stuck",
-                len(task_files) - len(missing),
-                len(task_files),
-                (len(task_files) - len(missing)) / len(task_files) * 100,
-            )
-        else:
-            return False
-        finish_action = PlaybookFinishAction(
-            thought="All required files have been created. Task complete.",
-            outputs={"content": f"Created files: {', '.join(sorted(created_files))}"},
-            force_finish=True,
+        return (
+            "STUCK LOOP DETECTED — You are repeating actions without progress.\n"
+            "MANDATORY RECOVERY:\n"
+            "1. Stop repeating the same read-only or no-op action.\n"
+            "2. Verify the current state using a concrete tool result.\n"
+            "3. Execute one specific unfinished step.\n"
+            "YOUR VERY NEXT ACTION MUST BE a real progress-making action.",
+            "STUCK RECOVERY: verify state, then make one concrete next-step action.",
         )
-        controller.event_stream.add_event(finish_action, EventSource.AGENT)
-        return True

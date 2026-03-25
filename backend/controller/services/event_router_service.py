@@ -25,7 +25,7 @@ from backend.events.action.agent import (
     DelegateTaskAction,
     EscalateToHumanAction,
     ProposalAction,
-    QueryToolboxAction,
+    SearchAvailableToolsAction,
     RecallAction,
     UncertaintyAction,
 )
@@ -65,8 +65,12 @@ class EventRouterService:
             from backend.core.plugin import get_plugin_registry
 
             await get_plugin_registry().dispatch_event(event)
-        except Exception:
-            pass
+        except Exception as exc:
+            self._ctrl.log(
+                "warning",
+                f"Plugin event_emitted hook failed for {type(event).__name__}: {exc}",
+                extra={"msg_type": "PLUGIN_EVENT_HOOK"},
+            )
 
         # StreamingChunkAction events are transient display hints — they
         # must NOT be added to the history that the LLM sees on the next
@@ -104,8 +108,8 @@ class EventRouterService:
             await self._handle_task_tracking_action(action)
         elif isinstance(action, DelegateTaskAction):
             await self._handle_delegate_task_action(action)
-        elif isinstance(action, QueryToolboxAction):
-            await self._handle_query_toolbox_action(action)
+        elif isinstance(action, SearchAvailableToolsAction):
+            await self._handle_search_available_tools_action(action)
         elif isinstance(
             action,
             (ClarificationRequestAction, ProposalAction, UncertaintyAction, EscalateToHumanAction),
@@ -114,113 +118,27 @@ class EventRouterService:
 
     async def _handle_task_tracking_action(self, action: TaskTrackingAction) -> None:
         """Handle task tracking action to update active plan."""
-        from backend.controller.state.state import ActivePlan, PlanStep
+        from backend.controller.state.state import build_active_plan_from_payload
 
         try:
-            # Recursive helper to build steps
-            def _build_step(d: dict) -> PlanStep:
-                return PlanStep(
-                    id=d.get("id", ""),
-                    description=d.get("description", d.get("title", "")),
-                    status=d.get("status", "pending"),
-                    result=d.get("result", d.get("notes")),
-                    tags=d.get("tags", []),
-                    subtasks=[_build_step(s) for s in d.get("subtasks", [])],
-                )
-
             current_plan = self._ctrl.state.plan
             current_title = current_plan.title if current_plan else "Current Plan"
-
-            steps = [_build_step(t) for t in action.task_list]
-            self._ctrl.state.plan = ActivePlan(
-                steps=steps,
+            self._ctrl.state.plan = build_active_plan_from_payload(
+                action.task_list,
                 title=current_title,
             )
-            self._ctrl.log("info", f"Plan updated with {len(steps)} steps.")
+            self._ctrl.log("info", f"Plan updated with {len(action.task_list)} steps.")
         except Exception as e:
             self._ctrl.log("error", f"Failed to update plan: {e}")
 
     async def _handle_finish_action(self, action: PlaybookFinishAction) -> None:
         """Handle agent finish action with completion validation."""
-        # Reject premature finish if task files are not all created
-        if not getattr(action, "force_finish", False):
-            missing = self._get_missing_task_files()
-            if missing:
-                from backend.events.observation.error import ErrorObservation
-
-                msg = (
-                    f"FINISH BLOCKED: {len(missing)} files from your task "
-                    f"have not been created yet:\n"
-                    + "\n".join(f"  - {f}" for f in sorted(missing))
-                    + "\n\nCreate the remaining files before finishing."
-                )
-                error_obs = ErrorObservation(content=msg)
-                error_obs.error_id = "INCOMPLETE_TASK"
-                self._ctrl.event_stream.add_event(
-                    error_obs, EventSource.ENVIRONMENT
-                )
-                return
         if not await self._ctrl.task_validation_service.handle_finish(action):
             return
         self._ctrl.state.set_outputs(action.outputs, source="EventRouterService.finish")
         await self._ctrl.set_agent_state_to(AgentState.FINISHED)
         await self._ctrl.log_task_audit(status="success")
         await self._run_critics()
-
-    def _get_missing_task_files(self) -> set[str]:
-        """Return task files that haven't been created yet."""
-        import re
-
-        from backend.events.action.files import FileEditAction, FileWriteAction
-
-        state = self._ctrl.state
-        history = list(state.history) if state else []
-
-        # Collect created file paths (normalized)
-        created: set[str] = set()
-        for e in history:
-            if isinstance(e, (FileWriteAction, FileEditAction)):
-                p = getattr(e, "path", "") or ""
-                if p:
-                    p = p.replace("\\", "/").strip("/")
-                    if p.startswith("workspace/"):
-                        p = p[len("workspace/"):]
-                    created.add(p)
-
-        # Extract expected files from user task
-        task_files: set[str] = set()
-        for e in history:
-            if isinstance(e, MessageAction) and getattr(e, "source", None) == EventSource.USER:
-                text = getattr(e, "content", "") or ""
-                if text:
-                    pattern = r'(?<![.\w])[\w./\[\]]+\.(?:py|html|css|js|jsx|ts|tsx|json|txt|md|yaml|yml|toml|cfg|ini|sh|sql|prisma|env|mjs|cjs|svelte|vue|example)\b'
-                    paths = set(re.findall(pattern, text))
-                    # Also match dotfiles
-                    dotfiles = set(re.findall(r'(?:^|\s)(\.[\w]+\.[\w]+)', text, re.MULTILINE))
-                    paths.update(dotfiles)
-                    task_files = {
-                        p.replace("\\", "/").strip("/").strip()
-                        for p in paths if p.strip()
-                    }
-                    # Remove false positives (framework names like Next.js)
-                    task_files = {
-                        f for f in task_files
-                        if "/" in f or not any(
-                            f.lower().startswith(fw)
-                            for fw in ("next.js", "node.js", "vue.js", "react.js")
-                        )
-                    }
-                break
-
-        if not task_files:
-            return set()
-
-        # Find missing using suffix match
-        missing: set[str] = set()
-        for tf in task_files:
-            if not any(cf == tf or cf.endswith("/" + tf) for cf in created):
-                missing.add(tf)
-        return missing
 
     async def _run_critics(self) -> None:
         """Run all critics against the completed task's event history and log scores.
@@ -346,15 +264,11 @@ class EventRouterService:
 
                 user_id = getattr(parent_config, "user_id", None)
 
-                # Find the agent config for 'coder' or fallback to the parent's agent config
                 agent_configs = getattr(parent_config, "agent_configs", None) or {}
-                worker_agent_config = agent_configs.get("coder")
+                worker_agent_config = getattr(self._ctrl.agent, "config", None)
                 if worker_agent_config is None:
-                    # Fall back to the currently running agent's config.
-                    worker_agent_config = getattr(self._ctrl.agent, "config", None)
-
+                    worker_agent_config = agent_configs.get("Orchestrator")
                 if worker_agent_config is None:
-                    # Last-ditch: try to construct a minimal config targeting Orchestrator.
                     worker_agent_config = AgentConfig(name="Orchestrator")
 
                 # Ensure config is a proper AgentConfig instance.
@@ -370,9 +284,7 @@ class EventRouterService:
                 agent_to_llm_config = (
                     getattr(parent_config, "agent_to_llm_config", None) or {}
                 )
-                llm_cfg = agent_to_llm_config.get("coder") or agent_to_llm_config.get(
-                    worker_agent_config.name
-                )
+                llm_cfg = agent_to_llm_config.get(worker_agent_config.name)
                 if llm_cfg is not None:
                     worker_agent_config = worker_agent_config.model_copy(
                         deep=True, update={"llm_config": llm_cfg}
@@ -406,8 +318,8 @@ class EventRouterService:
                         parent_context_lines.append(
                             f"\n\nPARENT WORKING MEMORY (read-only context):\n{wm}"
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    self._ctrl.log("warning", f"Failed to inherit parent working memory: {e}")
 
                 # --- inherit parent notes ---
                 try:
@@ -422,8 +334,8 @@ class EventRouterService:
                         parent_context_lines.append(
                             f"\n\nPARENT NOTES (key-value context):\n{notes_text}"
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    self._ctrl.log("warning", f"Failed to inherit parent notes: {e}")
 
                 # --- inherit parent task plan ---
                 try:
@@ -442,8 +354,8 @@ class EventRouterService:
                                 f" ({t.get('status', 'pending')})"
                             )
                         parent_context_lines.append("\n\n" + "\n".join(task_lines))
-                except Exception:
-                    pass
+                except Exception as e:
+                    self._ctrl.log("warning", f"Failed to inherit parent task plan: {e}")
 
                 # We need to reuse the same file store/workspace as the parent
                 llm_registry = getattr(self._ctrl.agent, "llm_registry", None)
@@ -483,6 +395,7 @@ class EventRouterService:
                     confirmation_mode=False,
                     security_analyzer=parent_config.security_analyzer,
                     blackboard=shared_blackboard,
+                    pending_action_timeout=parent_config.pending_action_timeout,
                 )
 
                 worker_controller = AgentController(worker_config)
@@ -627,8 +540,8 @@ class EventRouterService:
             )
             await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
 
-    async def _handle_query_toolbox_action(self, action: QueryToolboxAction) -> None:
-        """Handle query_toolbox: return available tools matching the query."""
+    async def _handle_search_available_tools_action(self, action: SearchAvailableToolsAction) -> None:
+        """Handle search_available_tools: return available tools matching the query."""
         from backend.events.observation import NullObservation
 
         query = (action.capability_query or "").lower()

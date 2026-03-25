@@ -7,8 +7,14 @@ import pytest
 from backend.core.config.mcp_config import (
     MCPConfig,
     MCPServerConfig,
+    NO_BUNDLED_MCP_DEFAULTS_ENV,
     _validate_mcp_url,
 )
+
+
+def _disable_bundled_mcp_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Turn off repo ``config.json`` MCP defaults; tests that need this call it explicitly."""
+    monkeypatch.setenv(NO_BUNDLED_MCP_DEFAULTS_ENV, "1")
 
 
 # ── _validate_mcp_url ───────────────────────────────────────────────
@@ -166,6 +172,20 @@ class TestMCPServerConfigStdio:
         with pytest.raises(Exception, match="key cannot be empty"):
             MCPServerConfig(name="s1", type="stdio", command="npx", env="=value")
 
+    def test_usage_hint_stripped_and_truncated(self):
+        cfg = MCPServerConfig(
+            name="s1",
+            type="stdio",
+            command="npx",
+            usage_hint="  Use for docs.  ",
+        )
+        assert cfg.usage_hint == "Use for docs."
+        long_hint = "x" * 900
+        cfg2 = MCPServerConfig(
+            name="s2", type="stdio", command="npx", usage_hint=long_hint
+        )
+        assert len(cfg2.usage_hint or "") == 800
+
     def test_equality_same(self):
         a = MCPServerConfig(name="s", type="stdio", command="npx", args=["a"], env={"K": "V"})
         b = MCPServerConfig(name="s", type="stdio", command="npx", args=["a"], env={"K": "V"})
@@ -221,23 +241,17 @@ class TestMCPServerConfigStdio:
         with open(config_json, "w") as f:
             f.write("invalid json")
 
-        import os
-        monkeypatch.setattr("os.path.exists", lambda p: True if p == os.path.join("backend", "runtime", "mcp", "config.json") else os.path.exists(p))
+        from backend.core.config import mcp_config as mcp_config_mod
 
-        original_open = open
-        def mock_open(file, *args, **kwargs):
-            if file == os.path.join("backend", "runtime", "mcp", "config.json"):
-                return original_open(config_json, *args, **kwargs)
-            return original_open(file, *args, **kwargs)
+        monkeypatch.setattr(mcp_config_mod, "_bundled_mcp_json_path", lambda: config_json)
 
-        monkeypatch.setattr("builtins.open", mock_open)
-
-        # Should not raise, just log/print error
+        # Should not raise; invalid JSON yields no bundled servers
         mapping = MCPConfig.from_toml_section({"enabled": True, "servers": []})
         assert mapping["mcp"].servers == []
 
-    def test_from_toml_section_with_dict_servers(self):
+    def test_from_toml_section_with_dict_servers(self, monkeypatch):
         """Test from_toml_section with a single dict instead of a list for servers."""
+        _disable_bundled_mcp_defaults(monkeypatch)
         mapping = MCPConfig.from_toml_section({
             "enabled": True,
             "servers": {"name": "s1", "type": "sse", "url": "http://localhost/sse"}
@@ -271,6 +285,7 @@ class TestMCPServerConfigStdio:
 
         monkeypatch.setattr("os.path.exists", lambda p: False) # No config.json
         monkeypatch.delenv("FORGE_ENABLE_WINDOWS_MCP", raising=False)
+        _disable_bundled_mcp_defaults(monkeypatch)
 
         data = {
             "enabled": True,
@@ -331,12 +346,14 @@ class TestMCPConfig:
         merged = a.merge(b)
         assert len(merged.servers) == 2
 
-    def test_from_toml_section_empty(self):
+    def test_from_toml_section_empty(self, monkeypatch):
+        _disable_bundled_mcp_defaults(monkeypatch)
         mapping = MCPConfig.from_toml_section({})
         assert "mcp" in mapping
         assert mapping["mcp"].servers == []
 
-    def test_from_toml_section_sse(self):
+    def test_from_toml_section_sse(self, monkeypatch):
+        _disable_bundled_mcp_defaults(monkeypatch)
         mapping = MCPConfig.from_toml_section(
             {
                 "servers": [{"name": "s1", "type": "sse", "url": "http://localhost:3000/sse"}],
@@ -345,7 +362,8 @@ class TestMCPConfig:
         assert len(mapping["mcp"].servers) == 1
         assert mapping["mcp"].servers[0].transport == "sse"
 
-    def test_from_toml_section_stdio(self):
+    def test_from_toml_section_stdio(self, monkeypatch):
+        _disable_bundled_mcp_defaults(monkeypatch)
         mapping = MCPConfig.from_toml_section(
             {
                 "servers": [{"name": "s1", "type": "stdio", "command": "npx"}],
@@ -355,7 +373,8 @@ class TestMCPConfig:
         # stdio may be filtered on Windows — just check the list type
         assert isinstance(stdio, list)
 
-    def test_from_toml_section_shttp(self):
+    def test_from_toml_section_shttp(self, monkeypatch):
+        _disable_bundled_mcp_defaults(monkeypatch)
         mapping = MCPConfig.from_toml_section(
             {
                 "servers": [{"name": "s1", "type": "shttp", "url": "http://localhost:3000/mcp"}],
@@ -382,8 +401,7 @@ class TestMCPConfig:
         assert len(cfg.shttp_servers) == 0
 
     def test_from_toml_section_loads_json_config(self, tmp_path, monkeypatch):
-        """Test that from_toml_section also loads from backend/runtime/mcp/config.json."""
-        # Setup mock config.json
+        """Bundled defaults path is merged into from_toml_section (same rule as finalize_config)."""
         mcp_dir = tmp_path / "backend" / "runtime" / "mcp"
         mcp_dir.mkdir(parents=True)
         config_json = mcp_dir / "config.json"
@@ -396,19 +414,9 @@ class TestMCPConfig:
                 }
             }, f)
 
-        # Mock the path in the code to use our temp file
-        import os
+        from backend.core.config import mcp_config as mcp_config_mod
 
-        monkeypatch.setattr("os.path.exists", lambda p: True if p == os.path.join("backend", "runtime", "mcp", "config.json") else os.path.exists(p))
-
-        # We need to mock open to return our temp file content when that specific path is requested
-        original_open = open
-        def mock_open(file, *args, **kwargs):
-            if file == os.path.join("backend", "runtime", "mcp", "config.json"):
-                return original_open(config_json, *args, **kwargs)
-            return original_open(file, *args, **kwargs)
-
-        monkeypatch.setattr("builtins.open", mock_open)
+        monkeypatch.setattr(mcp_config_mod, "_bundled_mcp_json_path", lambda: config_json)
         monkeypatch.setenv("FORGE_ENABLE_WINDOWS_MCP", "1")
 
         mapping = MCPConfig.from_toml_section({"enabled": True, "servers": []})

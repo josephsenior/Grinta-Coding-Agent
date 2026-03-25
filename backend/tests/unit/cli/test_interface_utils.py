@@ -1,4 +1,4 @@
-"""Tests for backend.cli.utils — ModelInfo, ProviderInfo, extract helpers."""
+"""Tests for backend.cli.cli_utils — ModelInfo, ProviderInfo, extract helpers."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.cli.utils import (
+from backend.cli.cli_utils import (
     ModelInfo,
     ProviderInfo,
     _add_model_to_provider,
@@ -186,22 +186,22 @@ class TestExtractModelAndProvider:
         assert result.model == "mistral-large"
         assert result.separator == "."
 
-    @patch("backend.cli.utils.VERIFIED_OPENAI_MODELS", ["gpt-4o"])
+    @patch("backend.cli.cli_utils.VERIFIED_OPENAI_MODELS", ["gpt-4o"])
     def test_known_openai_model(self):
         result = extract_model_and_provider("gpt-4o")
         assert result.provider == "openai"
         assert result.model == "gpt-4o"
 
-    @patch("backend.cli.utils.VERIFIED_ANTHROPIC_MODELS", ["claude-3-opus"])
-    @patch("backend.cli.utils.VERIFIED_OPENAI_MODELS", [])
+    @patch("backend.cli.cli_utils.VERIFIED_ANTHROPIC_MODELS", ["claude-3-opus"])
+    @patch("backend.cli.cli_utils.VERIFIED_OPENAI_MODELS", [])
     def test_known_anthropic_model(self):
         result = extract_model_and_provider("claude-3-opus")
         assert result.provider == "anthropic"
         assert result.model == "claude-3-opus"
 
-    @patch("backend.cli.utils.VERIFIED_OPENAI_MODELS", [])
-    @patch("backend.cli.utils.VERIFIED_ANTHROPIC_MODELS", [])
-    @patch("backend.cli.utils.VERIFIED_MISTRAL_MODELS", [])
+    @patch("backend.cli.cli_utils.VERIFIED_OPENAI_MODELS", [])
+    @patch("backend.cli.cli_utils.VERIFIED_ANTHROPIC_MODELS", [])
+    @patch("backend.cli.cli_utils.VERIFIED_MISTRAL_MODELS", [])
     def test_unknown_bare_model(self):
         result = extract_model_and_provider("some-random-model")
         assert result.provider == ""
@@ -231,9 +231,9 @@ class TestOrganizeModelsAndProviders:
         result = organize_models_and_providers(models)
         assert "anthropic" not in result
 
-    @patch("backend.cli.utils.VERIFIED_OPENAI_MODELS", [])
-    @patch("backend.cli.utils.VERIFIED_ANTHROPIC_MODELS", [])
-    @patch("backend.cli.utils.VERIFIED_MISTRAL_MODELS", [])
+    @patch("backend.cli.cli_utils.VERIFIED_OPENAI_MODELS", [])
+    @patch("backend.cli.cli_utils.VERIFIED_ANTHROPIC_MODELS", [])
+    @patch("backend.cli.cli_utils.VERIFIED_MISTRAL_MODELS", [])
     def test_unknown_goes_to_other(self):
         models = ["unknown-model"]
         result = organize_models_and_providers(models)

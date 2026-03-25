@@ -10,7 +10,7 @@ import backend.engines.echo  # noqa: F401 - registers Echo agent
 from backend.controller.agent import Agent
 from backend.llm.model_catalog import get_supported_llm_models
 from backend.security.options import SecurityAnalyzers
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.api.app_state import get_app_state
 
 router = APIRouter(prefix="/api/v1/options", dependencies=get_dependencies(), tags=["options"])
@@ -98,7 +98,7 @@ async def get_config() -> dict[str, Any]:
             with structure depending on server_config implementation:
             - app_mode: Application mode ("SAAS", "STANDALONE", etc.)
             - api_base_url: Base URL for API endpoints
-            - workspace_base: Base path for workspace directory
+            - project_root: Open project directory (agent workspace)
             - feature_flags: Enabled features
             - Other server-specific settings
 
@@ -107,7 +107,7 @@ async def get_config() -> dict[str, Any]:
         {
             "app_mode": "SAAS",
             "api_base_url": "https://api.example.com",
-            "workspace_base": "/data/workspace",
+            "project_root": "/data/workspace",
             ...
         }
 
@@ -117,3 +117,4 @@ async def get_config() -> dict[str, Any]:
 
     """
     return get_app_state().server_config.get_config()
+

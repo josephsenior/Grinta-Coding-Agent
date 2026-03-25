@@ -1,11 +1,11 @@
-"""Unit tests for backend.core.cache.utils — Redis cache utilities."""
+"""Unit tests for backend.core.cache.cache_utils — Redis cache utilities."""
 
 from __future__ import annotations
 
 from typing import Any
 from unittest.mock import MagicMock
 
-from backend.core.cache.utils import (
+from backend.core.cache.cache_utils import (
     extract_redis_stats,
     merge_settings_with_cache,
     get_redis_connection_params,

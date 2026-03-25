@@ -25,6 +25,8 @@ def _make_config(**kwargs):
     cfg.enable_condensation_request = False
     cfg.enable_browsing = False
     cfg.enable_editor = True
+    cfg.enable_first_turn_orientation_prompt = True
+    cfg.merge_control_system_into_primary = False
     for k, v in kwargs.items():
         setattr(cfg, k, v)
     return cfg
@@ -229,10 +231,10 @@ class TestDetermineToolChoice:
         messages = [{"role": "user", "content": "create a file"}]
         assert p._determine_tool_choice(messages, self.state) == "auto"
 
-    def test_plain_chat_returns_none(self):
+    def test_plain_chat_returns_auto(self):
         p = _make_planner()
         messages = [{"role": "user", "content": "say hello back please"}]
-        assert p._determine_tool_choice(messages, self.state) == "none"
+        assert p._determine_tool_choice(messages, self.state) == "auto"
 
     def test_generic_message_returns_auto(self):
         """Messages that aren't plain chat default to 'auto'."""
@@ -334,7 +336,8 @@ class TestBuildLlmParams:
 
         assert p._checked_tools_cache is checked
         assert isinstance(p._checked_tools_model, str)
-        assert p._checked_tools_model.startswith(p._llm.config.model + ":")
+        model = (p._llm.config.model or "").strip()
+        assert p._checked_tools_model.startswith(f"{model}:")
         assert params["tools"] is checked
         mock_ct.assert_called_once()
 
@@ -426,6 +429,36 @@ class TestBuildLlmParams:
         assert "memory_pressure=WARNING" in out[-2]["content"]
         assert "<FORGE_DIRECTIVE>" in out[-2]["content"]
 
+    def test_merges_control_into_primary_system_when_configured(self):
+        p = _make_planner(config=_make_config(merge_control_system_into_primary=True))
+        state = _make_state()
+        it = MagicMock()
+        it.current_value = 1
+        it.max_value = 3
+        state.iteration_flag = it
+        ts = MagicMock()
+        ts.planning_directive = "[AUTO-PLAN] do planning"
+        ts.memory_pressure = "WARNING"
+        ts.repetition_score = 0.0
+        state.turn_signals = ts
+
+        messages = [
+            {"role": "system", "content": "base sys"},
+            {"role": "user", "content": "task"},
+        ]
+        with patch("backend.engines.orchestrator.planner.check_tools", return_value=[]):
+            params = p.build_llm_params(messages, state, [])
+
+        out = params["messages"]
+        assert len(out) == 2
+        assert out[0]["role"] == "system"
+        assert out[0]["content"].startswith("base sys")
+        assert "<FORGE_CONTEXT_STATUS" in out[0]["content"]
+        assert "memory_pressure=WARNING" in out[0]["content"]
+        assert "<FORGE_DIRECTIVE>" in out[0]["content"]
+        assert out[-1]["role"] == "user"
+        assert out[-1]["content"] == "task"
+
     def test_tool_choice_not_set_for_unsupported_model(self):
         p = _make_planner(llm=_make_llm("some-unknown-model"))
         state = _make_state()
@@ -460,24 +493,3 @@ class TestBuildLlmParams:
 # ---------------------------------------------------------------------------
 
 
-class TestMetaCognitionTools:
-    def test_meta_cognition_tools_added_by_default(self):
-        p = _make_planner()
-        tools: list[Any] = []
-        p._add_core_tools(tools, use_short_tool_desc=True)
-        names = [t.get("function", {}).get("name") for t in tools]
-        assert "uncertainty" in names
-        assert "clarification" in names
-        assert "escalate_to_human" in names
-        assert "proposal" in names
-
-    def test_meta_cognition_tools_can_be_disabled(self):
-        cfg = _make_config(enable_meta_cognition=False)
-        p = _make_planner(config=cfg)
-        tools: list[Any] = []
-        p._add_core_tools(tools, use_short_tool_desc=True)
-        names = [t.get("function", {}).get("name") for t in tools]
-        assert "uncertainty" not in names
-        assert "clarification" not in names
-        assert "escalate_to_human" not in names
-        assert "proposal" not in names

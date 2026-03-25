@@ -4,7 +4,6 @@
 Usage:
     python -m backend.llm.discover_models          # Discover all local models
     python -m backend.llm.discover_models status   # Check provider status
-    python -m backend.llm.discover_models aliases  # List model aliases
 """
 
 from __future__ import annotations
@@ -12,7 +11,6 @@ from __future__ import annotations
 import sys
 
 from backend.core.logger import forge_logger as logger
-from backend.llm.model_aliases import get_alias_manager
 from backend.llm.provider_resolver import (
     check_local_providers,
     discover_all_local_models,
@@ -52,10 +50,7 @@ def discover_command() -> None:
     print("\n💡 Usage examples:")
     if "ollama" in models and models["ollama"]:
         sample_model = models["ollama"][0]
-        print(f'   - Direct: config.model = "ollama/{sample_model}"')
-        print('   - Alias:  config.model = "my-local-model"')
-        print("             [model_aliases]")
-        print(f'             my-local-model = "ollama/{sample_model}"')
+        print(f'   Set llm_model (or LLM config model) to "ollama/{sample_model}"')
 
 
 def status_command() -> None:
@@ -76,29 +71,6 @@ def status_command() -> None:
         print("  ollama serve")
 
 
-def aliases_command() -> None:
-    """List all model aliases."""
-    print_section("Model Aliases")
-
-    alias_manager = get_alias_manager()
-    aliases = alias_manager.get_all_aliases()
-
-    if not aliases:
-        print("\n❌ No model aliases defined.")
-        print("\nTo define aliases, add to settings.json:")
-        print('  "model_aliases": {')
-        print('    "my-coding-model": "claude-3-7-sonnet",')
-        print('    "fast-chat": "ollama/llama3.2"')
-        print("  }")
-        return
-
-    print(f"\n✓ {len(aliases)} aliases defined:\n")
-    max_alias_len = max(len(a) for a in aliases)
-
-    for alias, target in aliases.items():
-        print(f"  {alias:<{max_alias_len}} → {target}")
-
-
 def main() -> int:
     """Main entry point."""
     if len(sys.argv) < 2:
@@ -109,7 +81,6 @@ def main() -> int:
     commands = {
         "discover": discover_command,
         "status": status_command,
-        "aliases": aliases_command,
     }
 
     if command not in commands:

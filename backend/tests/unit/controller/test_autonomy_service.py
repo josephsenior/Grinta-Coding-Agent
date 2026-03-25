@@ -58,7 +58,7 @@ class TestAutonomyServiceInitialize:
         assert ctrl.autonomy_controller is None
         assert ctrl.safety_validator is None
         assert ctrl.task_validator is None
-        assert ctrl.PENDING_ACTION_TIMEOUT == 120.0
+        assert ctrl.PENDING_ACTION_TIMEOUT == 0.0
 
     def test_wrong_type_agent_config(self):
         from backend.controller.services.autonomy_service import AutonomyService
@@ -148,7 +148,7 @@ class TestInitializeTaskValidator:
 
         svc._initialize_task_validator(agent)
         assert ctrl.task_validator is None
-        assert ctrl.PENDING_ACTION_TIMEOUT == 120.0
+        assert ctrl.PENDING_ACTION_TIMEOUT == 0.0
 
     def test_enabled_validation(self):
         from backend.controller.services.autonomy_service import AutonomyService
@@ -164,5 +164,5 @@ class TestInitializeTaskValidator:
             svc._initialize_task_validator(agent)
             mock_cv.assert_called_once()
             assert ctrl.task_validator == mock_cv.return_value
-            assert ctrl.PENDING_ACTION_TIMEOUT == 120.0
+            assert ctrl.PENDING_ACTION_TIMEOUT == 0.0
             ctrl._add_system_message.assert_called_once()

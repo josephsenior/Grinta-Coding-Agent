@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import json
 
 from backend.core import logger
+from backend.core.app_paths import get_app_settings_root
 from backend.core.config.forge_config import ForgeConfig
 from backend.core.config.llm_config import LLMConfig
 
@@ -79,17 +80,19 @@ def _resolve_llm_config_from_cli(
 
 
 def _try_user_config_llm(llm_config_name: str, config_file: str) -> LLMConfig | None:
-    """Try to load LLM config from user settings file."""
-    user_config = os.path.join(os.path.expanduser("~"), ".Forge", "settings.json")
-    if config_file == user_config or not os.path.exists(user_config):
+    """Try LLM keys from canonical ``settings.json`` if the primary file had no LLM block."""
+    canonical = os.path.join(get_app_settings_root(), "settings.json")
+    canonical_abs = os.path.abspath(os.path.normpath(canonical))
+    primary_abs = os.path.abspath(os.path.normpath(config_file))
+    if primary_abs == canonical_abs or not os.path.isfile(canonical_abs):
         return None
 
     logger.forge_logger.debug(
-        "Trying to load LLM config '%s' from user config: %s",
+        "Trying to load LLM config '%s' from canonical settings: %s",
         llm_config_name,
-        user_config,
+        canonical_abs,
     )
-    return get_llm_config_arg(llm_config_name, user_config)
+    return get_llm_config_arg(llm_config_name, canonical_abs)
 
 
 def apply_llm_config_override(config: ForgeConfig, args: argparse.Namespace) -> None:

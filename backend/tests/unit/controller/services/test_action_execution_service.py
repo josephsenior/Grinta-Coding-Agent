@@ -59,12 +59,15 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.mock_context.agent.step.assert_called_once_with(self.mock_context.state)
 
     async def test_get_next_action_from_confirmation_service(self):
-        """Test get_next_action uses confirmation service when available."""
+        """Test get_next_action uses confirmation only during trajectory replay."""
         mock_action = MagicMock(spec=Action)
 
         mock_confirmation = MagicMock()
         mock_confirmation.get_next_action.return_value = mock_action
         self.mock_context.confirmation_service = mock_confirmation
+        mock_controller = MagicMock()
+        mock_controller._replay_manager.should_replay.return_value = True
+        self.mock_context.get_controller.return_value = mock_controller
 
         result = await self.service.get_next_action()
 
@@ -182,6 +185,9 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         # Should create context and run plan
         mock_pipeline.create_context.assert_called_once_with(
             mock_action, self.mock_context.state
+        )
+        self.mock_context.register_action_context.assert_called_once_with(
+            mock_action, mock_ctx
         )
         mock_pipeline.run_plan.assert_called_once_with(mock_ctx)
 

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shlex
-from typing import TYPE_CHECKING, Literal
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 from pydantic import (
@@ -24,6 +26,10 @@ from backend.core.logger import forge_logger as logger
 if TYPE_CHECKING:
     from backend.core.config.forge_config import ForgeConfig
 from backend.utils.import_utils import get_impl
+
+# When set (1/true/yes), ``load_bundled_mcp_server_configs`` returns []. Unit tests that
+# assert exact MCP server lists should set this env var; production leaves it unset.
+NO_BUNDLED_MCP_DEFAULTS_ENV = "FORGE_NO_BUNDLED_MCP_DEFAULTS"
 
 
 def _validate_mcp_url(url: str) -> str:
@@ -71,6 +77,7 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         url: Server URL (sse and shttp only)
         api_key: Optional API key (sse and shttp only)
         transport: Transport protocol for shttp (sse or shttp, defaults to sse)
+        usage_hint: Optional one-line guidance for the agent system prompt (when to use this server).
 
     """
 
@@ -82,6 +89,13 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     url: str | None = None
     api_key: str | None = None
     transport: Literal["sse", "shttp"] = "sse"
+    usage_hint: str | None = Field(
+        default=None,
+        description=(
+            "Short sentence injected into the agent system prompt under the MCP server name "
+            "(e.g. when to prefer Context7 vs browser vs fetch)."
+        ),
+    )
 
     @field_validator("name", mode="before")
     @classmethod
@@ -161,6 +175,18 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             env[key] = value
         return env
 
+    @field_validator("usage_hint", mode="before")
+    @classmethod
+    def strip_usage_hint(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        if len(s) > 800:
+            return s[:800].rstrip()
+        return s
+
     @field_validator("url", mode="before")
     @classmethod
     def validate_url(cls, v: str | None) -> str | None:
@@ -208,6 +234,7 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             and self.url == other.url
             and self.api_key == other.api_key
             and self.transport == other.transport
+            and self.usage_hint == other.usage_hint
         )
 
 
@@ -225,8 +252,10 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     """
 
-    enabled: bool = False
+    enabled: bool = True
     servers: list[MCPServerConfig] = Field(default_factory=list)
+    #: Internal orchestrator tool names reserved when exposing MCP tools (runtime + API must match).
+    mcp_exposed_name_reserved: frozenset[str] = Field(default_factory=frozenset)
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="before")
@@ -307,7 +336,7 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             if isinstance(servers_data, dict):
                 servers_data = [servers_data]
             servers = [MCPServerConfig(**s) for s in servers_data]
-            servers = _load_servers_from_config_json(servers)
+            extend_mcp_servers_with_bundled_defaults(servers)
             servers = _filter_windows_stdio_servers(servers)
             mcp_config = cls(enabled=enabled, servers=servers)
             mcp_config.validate_servers()
@@ -320,6 +349,8 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         return MCPConfig(
             enabled=self.enabled or other.enabled,
             servers=self.servers + other.servers,
+            mcp_exposed_name_reserved=self.mcp_exposed_name_reserved
+            | other.mcp_exposed_name_reserved,
         )
 
     @property
@@ -338,27 +369,100 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         return [s for s in self.servers if s.type == "shttp"]
 
 
-def _load_servers_from_config_json(servers: list) -> list:
-    """Load additional MCP servers from backend/runtime/mcp/config.json if it exists."""
-    import json
+def _bundled_mcp_defaults_disabled() -> bool:
+    v = (os.getenv(NO_BUNDLED_MCP_DEFAULTS_ENV) or "").strip().lower()
+    return v in ("1", "true", "yes")
 
-    mcp_json_path = os.path.join("backend", "runtime", "mcp", "config.json")
-    if not os.path.exists(mcp_json_path):
-        return servers
+
+def _bundled_mcp_json_path() -> Path | None:
+    """Location of packaged ``backend/runtime/mcp/config.json`` (single source for path)."""
     try:
-        with open(mcp_json_path, encoding="utf-8") as f:
+        backend_root = Path(__file__).resolve().parent.parent.parent
+        candidate = backend_root / "runtime" / "mcp" / "config.json"
+        if candidate.is_file():
+            return candidate
+    except Exception:
+        pass
+    try:
+        cwd_candidate = Path("backend") / "runtime" / "mcp" / "config.json"
+        if cwd_candidate.is_file():
+            return cwd_candidate.resolve()
+    except Exception:
+        pass
+    return None
+
+
+def load_bundled_mcp_server_configs() -> list[MCPServerConfig]:
+    """Read default MCP servers from bundled ``config.json`` (single source of truth).
+
+    Returns the bundled entries only, after the same Windows stdio policy as the rest
+    of MCP config. Returns ``[]`` when disabled via :data:`NO_BUNDLED_MCP_DEFAULTS_ENV`,
+    when the file is missing, or when JSON is invalid.
+    """
+    if _bundled_mcp_defaults_disabled():
+        return []
+    path = _bundled_mcp_json_path()
+    if path is None:
+        return []
+    try:
+        with path.open(encoding="utf-8") as f:
             mcp_json = json.load(f)
-        if "mcpServers" not in mcp_json:
-            return servers
-        existing_names = {s.name for s in servers}
-        for name, srv_data in mcp_json["mcpServers"].items():
-            if name == "default" or name in existing_names:
+        srvs = mcp_json.get("mcpServers") or {}
+        out: list[MCPServerConfig] = []
+        for name, srv_data in srvs.items():
+            if name == "default" or not isinstance(srv_data, dict):
                 continue
-            servers.append(MCPServerConfig.from_dict(name, srv_data))
-            print(f"Loaded MCP server '{name}' from {mcp_json_path}")
+            out.append(MCPServerConfig.from_dict(name, srv_data))
+        return _filter_windows_stdio_servers(out)
     except Exception as e:
-        print(f"Failed to load MCP servers from {mcp_json_path}: {e}")
-    return servers
+        logger.warning("Bundled MCP defaults not loaded from %s: %s", path, e)
+        return []
+
+
+def extend_mcp_servers_with_bundled_defaults(servers: list[MCPServerConfig]) -> None:
+    """Append bundled defaults for any server name not already in ``servers`` (in place).
+
+    Used by :meth:`MCPConfig.from_toml_section` and :func:`finalize_config` so there is
+    one merge rule for the concept “add repo defaults without clobbering explicit config”.
+    """
+    existing = {s.name for s in servers}
+    for srv in load_bundled_mcp_server_configs():
+        if srv.name not in existing:
+            servers.append(srv)
+            existing.add(srv.name)
+            logger.debug("Applied bundled MCP default server '%s'", srv.name)
+
+
+def dedupe_forge_mcp_http_servers(mcp: MCPConfig) -> None:
+    """Keep a single ``forge-mcp`` server row (first wins) after user merges."""
+    seen = False
+    kept: list[MCPServerConfig] = []
+    for s in mcp.servers:
+        if s.name == "forge-mcp":
+            if seen:
+                continue
+            seen = True
+        kept.append(s)
+    mcp.servers = kept
+
+
+def ensure_default_forge_mcp_http_server(cfg: Any) -> None:
+    """Ensure the default Forge SHTTP MCP server exists once (single source of truth)."""
+    dedupe_forge_mcp_http_servers(cfg.mcp)
+    default, stdio_extra = ForgeMCPConfigImpl.create_default_mcp_server_config(
+        cfg.mcp_host,
+        cfg,
+        None,
+    )
+    if default is None:
+        return
+    if any(s.name == "forge-mcp" for s in cfg.mcp.servers):
+        return
+    if default.url and any(getattr(s, "url", None) == default.url for s in cfg.mcp.servers):
+        return
+    cfg.mcp.servers.append(default)
+    if stdio_extra:
+        cfg.mcp.servers.extend(stdio_extra)
 
 
 def _filter_windows_stdio_servers(servers: list) -> list:
@@ -430,4 +534,9 @@ __all__ = [
     "MCPConfig",
     "ForgeMCPConfig",
     "ForgeMCPConfigImpl",
+    "NO_BUNDLED_MCP_DEFAULTS_ENV",
+    "dedupe_forge_mcp_http_servers",
+    "ensure_default_forge_mcp_http_server",
+    "extend_mcp_servers_with_bundled_defaults",
+    "load_bundled_mcp_server_configs",
 ]

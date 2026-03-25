@@ -29,7 +29,6 @@ class AutonomyService:
             controller.autonomy_controller = None
             controller.safety_validator = None
             controller.task_validator = None
-            controller.PENDING_ACTION_TIMEOUT = 120.0
             controller.retry_service.reset_retry_metrics()
             return
 
@@ -79,5 +78,4 @@ class AutonomyService:
             )
             logger.debug("TaskValidator enabled for completion checking")
 
-        controller.PENDING_ACTION_TIMEOUT = 120.0
         controller._add_system_message()

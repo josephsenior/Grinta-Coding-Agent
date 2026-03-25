@@ -41,7 +41,7 @@ Think → Act → Observe → Repeat
 | **File editing** | `str_replace_editor`, `llm_based_edit`, `atomic_refactor`, `whitespace_handler` |
 | **Commands** | `bash` |
 | **Browser** | `MCP Browser (browser-use)` |
-| **Reasoning** | `think`, `finish`, `task_tracker`, `condensation_request` |
+| **Reasoning** | `think`, `finish`, `task_tracker`, `summarize_context` |
 | **Code quality** | `smart_errors`, `health_check` |
 | **Security** | `security_utils` |
 | **Utilities** | `prompt`, `server_readiness_helper`, `database` |
@@ -136,7 +136,7 @@ Parse Codebase → Build Graph → LLM Multi-Hop Reasoning → Locate Target
 | Tool | Purpose |
 |------|---------|
 | `search_code_snippets` | Search for code patterns |
-| `get_entity_contents` | Retrieve entity source code |
+| `read_symbol_definition` | Retrieve entity source code |
 | `explore_tree_structure` | Navigate code hierarchy |
 
 ### Key Components

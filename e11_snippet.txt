@@ -1,5 +1,0 @@
-\AppData\Local\Temp\FORGE_workspace_5e174af7c88449ffa295008f8.
-
-
-[ERROR STREAM]
-Get-ChildItem: Parameter cannot be processed because the parameter name 'F' is ambiguous. Possible matches include: -Filter -Force.

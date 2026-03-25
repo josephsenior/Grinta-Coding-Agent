@@ -1,18 +1,43 @@
-"""Unit tests for backend.controller.state.state_tracker — StateTracker."""
+"""Unit tests for backend.controller.state.state_tracker."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-
 from backend.controller.state.state import State
-from backend.controller.state.state_tracker import (
-    MAX_HISTORY_EVENTS,
-    StateTracker,
-)
+from backend.controller.state.state_tracker import MAX_HISTORY_EVENTS, StateTracker
 from backend.events.action import MessageAction
 from backend.events.action.empty import NullAction
 from backend.events.observation.empty import NullObservation
+
+
+class TestStateTrackerInitHistory:
+    def test_init_history_uses_persisted_range(self):
+        tracker = StateTracker(sid="sid-1", file_store=None, user_id="user-1")
+        tracker.state = State(start_id=5, end_id=8)
+        event_stream = MagicMock()
+        event_stream.search_events.return_value = ["e1", "e2"]
+
+        tracker._init_history(event_stream)
+
+        assert tracker.state.start_id == 5
+        assert tracker.state.history == ["e1", "e2"]
+        event_stream.search_events.assert_called_once()
+        kwargs = event_stream.search_events.call_args.kwargs
+        assert kwargs["start_id"] == 5
+        assert kwargs["end_id"] == 8
+        assert kwargs["reverse"] is False
+
+    def test_init_history_invalid_range_clears_history(self):
+        tracker = StateTracker(sid="sid-1", file_store=None, user_id="user-1")
+        tracker.state = State(start_id=9, end_id=3)
+        tracker.state.history = ["stale"]
+        event_stream = MagicMock()
+
+        tracker._init_history(event_stream)
+
+        assert tracker.state.history == []
+        event_stream.search_events.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

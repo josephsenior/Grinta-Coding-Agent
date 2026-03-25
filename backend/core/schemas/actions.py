@@ -88,7 +88,7 @@ class FileEditActionSchema(ActionSchemaV1):
         default=None, description="File content for create command"
     )
     old_str: str | None = Field(
-        default=None, description="String to replace (str_replace command)"
+        default=None, description="String to replace (replace_text command)"
     )
     new_str: str | None = Field(default=None, description="Replacement string")
     insert_line: int | None = Field(

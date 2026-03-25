@@ -1,11 +1,6 @@
 """Main entry point for Forge CLI with subcommand support."""
 
 import sys
-import os
-import subprocess
-import time
-import signal
-from pathlib import Path
 
 from backend.core.config import get_cli_parser
 from backend.cli.gui_launcher import launch_gui_server
@@ -31,102 +26,13 @@ def _handle_version_request(args) -> None:
         sys.exit(0)
 
 
-def _launch_all_in_one() -> None:
-    """Launch both backend server and TUI in the same terminal session."""
-    import httpx
-    from tui.app import ForgeApp
-    from tui.client import ForgeClient
-
-    # 1. Start backend server in background
-    env = os.environ.copy()
-    env["FORGE_RUNTIME"] = "local"
-
-    server_cmd = [
-        sys.executable,
-        "-m",
-        "uvicorn",
-        "backend.api.listen:app",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        "3000",
-        "--log-level",
-        "warning",  # Keep logs quiet so they don't corrupt TUI
-    ]
-
-    # Redirection to a log file instead of a pipe avoids uvicorn blocking
-    # when the stdout pipe buffer fills up, which is common during startup.
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
-    server_log = open(log_dir / "server.log", "w", encoding="utf-8")
-
-    server_proc = subprocess.Popen(
-        server_cmd, env=env, stdout=server_log, stderr=subprocess.STDOUT, text=True
-    )
-
-    def cleanup(sig=None, frame=None):
-        print("\nCleanup: Stopping server...")
-        server_proc.terminate()
-        server_proc.wait()
-        server_log.close()
-        sys.exit(0)
-
-    # Register cleanup handlers
-    try:
-        signal.signal(signal.SIGINT, cleanup)
-        signal.signal(signal.SIGTERM, cleanup)
-    except (ValueError, RuntimeError):
-        # On Windows or non-main threads, some signals may not be available
-        pass
-
-    # 2. Wait for server to be ready
-    print("[*] Waiting for backend to initialize...")
-    max_retries = 30
-    ready = False
-    for i in range(max_retries):
-        if server_proc.poll() is not None:
-            print("[ERROR] Backend process exited prematurely.")
-            server_log.close()
-            with open(log_dir / "server.log", "r", encoding="utf-8") as f:
-                print("\nBackend output:")
-                print("-" * 40)
-                print(f.read())
-                print("-" * 40)
-            sys.exit(1)
-
-        try:
-            with httpx.Client() as client:
-                response = client.get("http://localhost:3000/api/health/ready")
-                if response.status_code == 200:
-                    ready = True
-                    break
-        except Exception:
-            pass
-        time.sleep(0.5)
-        if i % 5 == 0 and i > 0:
-            print(f"   Still waiting ({i / 2}s elapsed)...")
-
-    if not ready:
-        print("[ERROR] Backend failed to start. Aborting.")
-        server_proc.terminate()
-        sys.exit(1)
-
-    # 3. Launch TUI in foreground
-    print("[OK] Backend ready! Launching TUI...")
-    try:
-        forge_client = ForgeClient(base_url="http://localhost:3000")
-        app = ForgeApp(forge_client)
-        app.run()
-    finally:
-        cleanup()
-
-
 def _execute_command(args, parser) -> None:
     """Execute the appropriate command based on parsed arguments."""
     if args.command == "serve":
         launch_gui_server()
     elif args.command in ("all", "start"):
-        _launch_all_in_one()
+        # Historical alias: same as serve (web UI only).
+        launch_gui_server()
     elif args.command == "health":
         # Import dynamically to avoid loading heavy modules if not requested
         from backend.cli.cli.health_check import run_health_check  # type: ignore[import-not-found]

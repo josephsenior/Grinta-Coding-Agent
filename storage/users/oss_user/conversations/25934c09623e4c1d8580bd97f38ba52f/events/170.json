@@ -1,1 +1,0 @@
-{"id": 170, "timestamp": "2026-03-10T17:16:44.625770", "source": "environment", "message": "duplicate_action:1233f6355906", "cause": -1, "observation": "error", "content": "duplicate_action:1233f6355906", "extras": {"truncation_strategy": null, "error_id": "TOOL_PIPELINE_BLOCKED"}}

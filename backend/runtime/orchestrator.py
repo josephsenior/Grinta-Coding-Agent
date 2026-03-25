@@ -9,7 +9,7 @@ from backend.core.constants import (
     IDLE_RECLAIM_SPIKE_THRESHOLD,
 )
 from backend.core.logger import forge_logger as logger
-from backend.runtime.pool import (
+from backend.runtime.runtime_pool import (
     PooledRuntime,
     RuntimePool,
     WarmPoolPolicy,
@@ -67,7 +67,7 @@ class RuntimeOrchestrator:
         env_vars: dict[str, str] | None = None,
         user_id: str | None = None,
     ) -> RuntimeAcquireResult:
-        from backend.core.setup import create_runtime  # lazy import to avoid cycles
+        from backend.core.bootstrap.setup import create_runtime  # lazy import to avoid cycles
 
         key = config.runtime
         pooled = self._pool.acquire(key)
@@ -103,6 +103,12 @@ class RuntimeOrchestrator:
             session_id=session_id,
         )
         return result
+
+    def drain_pooled_runtimes(self) -> None:
+        """Clear warm pool so the next acquire creates a runtime in the new workspace."""
+        pool = getattr(self._pool, "drain_all", None)
+        if callable(pool):
+            pool()
 
     def release(self, result: RuntimeAcquireResult, key: str | None = None) -> None:
         key = key or result.runtime.config.runtime  # type: ignore[attr-defined]
@@ -230,3 +236,4 @@ class RuntimeOrchestrator:
 
 
 runtime_orchestrator = RuntimeOrchestrator()
+

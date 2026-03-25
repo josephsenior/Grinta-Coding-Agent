@@ -28,9 +28,7 @@ from backend.events.persistence import EventPersistence
 from backend.events.secret_masker import SecretMasker
 from backend.events.serialization.event import event_from_dict, event_to_dict
 from backend.storage.locations import get_conversation_dir
-from backend.utils.async_utils import call_sync_from_async
-from backend.utils.shutdown_listener import should_continue
-
+from backend.utils.async_utils import call_sync_from_async, run_or_schedule
 if TYPE_CHECKING:
     from backend.storage import FileStore
 
@@ -383,8 +381,36 @@ class EventStream(EventStore):
         if sanitized_event.id is not None:
             self._persist.persist_event(payload, sanitized_event.id, cache_payload)
 
-        self._enqueue_serialized_event(sanitized_event)
+        if source == EventSource.USER:
+            self._dispatch_event_inline(sanitized_event)
+        else:
+            self._enqueue_serialized_event(sanitized_event)
         self._notify_activity_listeners()
+
+    def _dispatch_event_inline(self, event: Event) -> None:
+        """Deliver a critical event immediately to current subscribers.
+
+        User-originated events are part of the control plane: if they were to
+        depend solely on the background queue thread, a stale worker could
+        persist the message without ever waking the controller or echoing the
+        UI. Inline delivery keeps that first hop deterministic while background
+        delivery remains in place for the high-volume agent/environment stream.
+        """
+        callbacks = self._snapshot_subscribers()
+        if not callbacks:
+            return
+        for subscriber_id, callback_id, callback in callbacks:
+            try:
+                result = callback(event)
+                if inspect.isawaitable(result):
+                    run_or_schedule(result)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.error(
+                    "Error in inline event callback %s for subscriber %s: %s",
+                    callback_id,
+                    subscriber_id,
+                    exc,
+                )
 
     def _should_drop_due_to_shutdown(self, event: Event, source: EventSource) -> bool:
         if not self._stop_flag.is_set():
@@ -528,17 +554,22 @@ class EventStream(EventStore):
         queue = self._async_queue
         # Keep draining the queue even during shutdown so that
         # `_initiate_shutdown()` can reliably `await queue.join()`.
-        while should_continue():
+        while True:
             try:
                 event = await queue.get()
             except asyncio.CancelledError:
                 break
+            except Exception as e:
+                logger.error("Error retrieving event from queue: %s", e)
+                continue
             if event is self._stop_sentinel:
                 queue.task_done()
                 break
             try:
                 if not self._stop_flag.is_set():
                     await self._dispatch_event(cast(Event, event))
+            except Exception as e:
+                logger.error("Error dispatching event: %s", e)
             finally:
                 queue.task_done()
                 self._bp.queue_size = queue.qsize()

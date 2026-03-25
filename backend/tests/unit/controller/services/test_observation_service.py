@@ -132,6 +132,42 @@ class TestObservationService(unittest.IsolatedAsyncioTestCase):
 
         # Should not proceed
         self.mock_context.pop_action_context.assert_not_called()
+        self.mock_controller.log.assert_called_once()
+        log_args = self.mock_controller.log.call_args[0]
+        self.assertEqual(log_args[0], "warning")
+        self.assertIn("did not match pending action", log_args[1])
+
+    async def test_late_observation_after_timeout_only_logs_mismatch(self):
+        """A late observation after timeout should not clear or re-resolve pending state."""
+        mock_observation = MagicMock(spec=Observation)
+        mock_observation.cause = "action-123"
+
+        self.mock_pending_service.get.return_value = None
+
+        await self.service._handle_pending_action_observation(mock_observation)
+
+        self.mock_pending_service.set.assert_not_called()
+        self.mock_context.trigger_step.assert_not_called()
+        self.mock_controller.log.assert_called_once()
+        self.assertIn("did not match pending action", self.mock_controller.log.call_args[0][1])
+
+    async def test_handle_pending_action_observation_matches_int_like_ids(self):
+        """Cause matching should tolerate int/string normalization."""
+        mock_observation = MagicMock(spec=Observation)
+        mock_observation.cause = 123
+
+        mock_pending_action = MagicMock()
+        mock_pending_action.id = "123"
+        self.mock_pending_service.get.return_value = mock_pending_action
+
+        self.mock_controller.state = MagicMock()
+        self.mock_controller.state.agent_state = AgentState.RUNNING
+        self.mock_context.pop_action_context.return_value = None
+
+        with patch("backend.core.plugin.get_plugin_registry"):
+            await self.service._handle_pending_action_observation(mock_observation)
+
+        self.mock_pending_service.set.assert_called_once_with(None)
 
     @patch("backend.core.plugin.get_plugin_registry")
     async def test_handle_pending_action_observation_plugin_hook(
@@ -235,6 +271,32 @@ class TestObservationService(unittest.IsolatedAsyncioTestCase):
         mock_confirmation.handle_observation_for_pending_action.assert_called_once_with(
             mock_observation, mock_ctx
         )
+        self.mock_context.trigger_step.assert_called_once_with()
+
+    async def test_matching_observation_clears_pending_before_single_step_trigger(self):
+        """Resolved observations should clear pending state and advance exactly once."""
+        mock_observation = MagicMock(spec=Observation)
+        mock_observation.cause = "action-123"
+
+        mock_pending_action = MagicMock()
+        mock_pending_action.id = "action-123"
+        self.mock_pending_service.get.return_value = mock_pending_action
+
+        self.mock_controller.state = MagicMock()
+        self.mock_controller.state.agent_state = AgentState.RUNNING
+        self.mock_controller.confirmation_service = self.mock_confirmation_service
+
+        mock_ctx = MagicMock()
+        self.mock_context.pop_action_context.return_value = mock_ctx
+
+        with patch("backend.core.plugin.get_plugin_registry"):
+            await self.service._handle_pending_action_observation(mock_observation)
+
+        self.mock_pending_service.set.assert_called_once_with(None)
+        self.mock_confirmation_service.handle_observation_for_pending_action.assert_called_once_with(
+            mock_observation, mock_ctx
+        )
+        self.mock_context.trigger_step.assert_called_once_with()
 
     @patch(
         "backend.controller.services.observation_service.transition_agent_state_logic"
@@ -266,6 +328,7 @@ class TestObservationService(unittest.IsolatedAsyncioTestCase):
         mock_transition.assert_called_once_with(
             self.mock_controller, mock_ctx, mock_observation
         )
+        self.mock_context.trigger_step.assert_called_once_with()
 
     async def test_handle_pending_action_observation_none_cause(self):
         """Test _handle_pending_action_observation handles None cause."""

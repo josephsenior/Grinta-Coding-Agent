@@ -13,7 +13,7 @@ import shutil
 import sys
 import tempfile
 import time
-import traceback
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from zipfile import ZipFile
 
@@ -34,6 +34,19 @@ from backend.runtime.utils.system_stats import (
 
 if TYPE_CHECKING:
     pass
+
+
+def _ensure_path_in_workspace(path: str, workspace_root: str) -> str:
+    """Validate path is within workspace and return resolved path. Raises HTTPException on violation."""
+    try:
+        workspace = Path(workspace_root).resolve()
+        resolved = Path(path).resolve()
+        resolved.relative_to(workspace)
+        return str(resolved)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Path traversal detected") from None
+    except (OSError, RuntimeError) as e:
+        raise HTTPException(status_code=400, detail=f"Invalid path: {e}") from e
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -106,8 +119,11 @@ def register_routes(
             observation = await client.run_action(action)
             return event_to_dict(observation)
         except Exception as e:
-            logger.error("Error while running /execute_action: %s", str(e))
-            raise HTTPException(status_code=500, detail=traceback.format_exc()) from e
+            logger.exception("Error while running /execute_action: %s", str(e))
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred. Please try again later.",
+            ) from e
         finally:
             update_last_execution_time()
 
@@ -199,16 +215,20 @@ def register_routes(
 
     @app.get("/download_files")
     def download_file(path: str):
+        client = get_client()
+        assert client is not None
+        workspace_root = client.initial_cwd
         try:
             if not os.path.isabs(path):
                 raise HTTPException(
                     status_code=400, detail="Path must be an absolute path"
                 )
-            if not os.path.exists(path):
+            safe_path = _ensure_path_in_workspace(path, workspace_root)
+            if not os.path.exists(safe_path):
                 raise HTTPException(status_code=404, detail="File not found")
             with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp_zip:
                 with ZipFile(temp_zip, "w") as zipf:
-                    for root, _, files in os.walk(path):
+                    for root, _, files in os.walk(safe_path):
                         for file in files:
                             file_path = os.path.join(root, file)
                             zipf.write(
@@ -227,6 +247,7 @@ def register_routes(
     async def list_files(request: Request):
         client = get_client()
         assert client is not None
+        workspace_root = client.initial_cwd
         try:
             from backend.runtime.server_utils import (
                 _get_sorted_directory_entries,
@@ -240,6 +261,7 @@ def register_routes(
                 or not os.path.isdir(full_path)
             ):
                 return JSONResponse(content=[])
+            full_path = _ensure_path_in_workspace(full_path, workspace_root)
             sorted_entries = _get_sorted_directory_entries(full_path)
             return JSONResponse(content=sorted_entries)
         except Exception as e:

@@ -15,7 +15,7 @@ from backend.core.provider_types import (
     ProviderToken,
     ProviderType,
 )
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.api.settings import (
     CustomSecretModel,
     CustomSecretWithoutValueModel,
@@ -441,3 +441,4 @@ async def delete_custom_secret(
 # Provide router-scoped app export for tests
 secrets_test_app = FastAPI()
 secrets_test_app.include_router(router)
+

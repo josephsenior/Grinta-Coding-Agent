@@ -55,7 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_kb_doc_hash ON knowledge_base_documents(content_h
 # Global factory helper for lazy pool access
 async def get_kb_db_pool() -> Pool:
     """Get the shared database pool from the application."""
-    from backend.storage.db_pool import get_db_pool
+    from backend.storage.database_pool import get_db_pool
 
     return await get_db_pool()
 
@@ -352,3 +352,4 @@ class DatabaseKnowledgeBaseStore:
             if row["uploaded_at"].tzinfo is None
             else row["uploaded_at"],
         )
+

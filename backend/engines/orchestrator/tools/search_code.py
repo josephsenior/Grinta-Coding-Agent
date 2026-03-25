@@ -21,6 +21,11 @@ Use this instead of execute_bash + grep when you need to:
 - Discover which files match a glob pattern
 - Find error messages or log strings
 
+Prefer this when the target location is unknown or you need literal text/regex search.
+If you already know the file and symbol position and need precise references/definitions,
+use `lsp_query` instead. If you need architecture or dependency traversal,
+use `read_symbol_definition` / `explore_tree_structure`.
+
 MODES:
 
 1. **Text / regex search** (default) — finds lines matching `pattern` across files.

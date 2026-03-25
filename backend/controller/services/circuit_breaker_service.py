@@ -7,6 +7,11 @@ from backend.controller.agent_circuit_breaker import (
     CircuitBreakerConfig,
     CircuitBreakerResult,
 )
+from backend.core.constants import (
+    DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS,
+    DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS,
+    DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
+)
 from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
@@ -43,9 +48,21 @@ class CircuitBreakerService:
 
         config_kwargs: dict[str, Any] = {
             "enabled": True,
-            "max_consecutive_errors": getattr(agent_config, "max_consecutive_errors", 5),
-            "max_high_risk_actions": getattr(agent_config, "max_high_risk_actions", 10),
-            "max_stuck_detections": getattr(agent_config, "max_stuck_detections", 15),
+            "max_consecutive_errors": getattr(
+                agent_config,
+                "max_consecutive_errors",
+                DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS,
+            ),
+            "max_high_risk_actions": getattr(
+                agent_config,
+                "max_high_risk_actions",
+                DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS,
+            ),
+            "max_stuck_detections": getattr(
+                agent_config,
+                "max_stuck_detections",
+                DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
+            ),
         }
 
         max_error_rate = getattr(agent_config, "max_error_rate", None)
@@ -60,7 +77,7 @@ class CircuitBreakerService:
 
         self._circuit_breaker = CircuitBreaker(cb_config)
         setattr(self.controller, "circuit_breaker", self._circuit_breaker)
-        logger.debug("Circuit breaker enabled for anomaly detection")
+        logger.info("Circuit breaker enabled for anomaly detection")
 
     # ------------------------------------------------------------------ #
     # Circuit breaker interactions
@@ -74,7 +91,7 @@ class CircuitBreakerService:
         """Run circuit breaker check for current controller state."""
         if not self._circuit_breaker:
             return None
-        return self._circuit_breaker.check()
+        return self._circuit_breaker.check(getattr(self.controller, "state", None))
 
     def record_error(self, error: Exception) -> None:
         """Record an error with the circuit breaker."""

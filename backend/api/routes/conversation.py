@@ -3,34 +3,37 @@
 from __future__ import annotations
 
 import os
+import re
 import json
+import shutil
 from json import JSONDecodeError
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from backend.controller.error_recovery import ErrorRecoveryStrategy, ErrorType
 from backend.core.config.llm_config import LLMConfig
 from backend.core.errors import SessionInvariantError
 from backend.core.logger import forge_logger as logger
 from backend.core.pydantic_compat import model_to_dict
+from backend.events.action.files import FileWriteAction
 from backend.events.event_filter import EventFilter
 from backend.events.event_store import EventStore
 from backend.events.serialization.event import event_to_dict
+from backend.playbook_engine.playbook import BasePlaybook
 from backend.playbook_engine.types import InputMetadata
-from backend.api.dependencies import get_dependencies
+from backend.api.route_dependencies import get_dependencies
 from backend.api.services.completion_service import (
     CompletionRequest,
     CompletionResult,
-    format_error_message,
 )
 from backend.api.services.completion_service import (
     get_code_completion as _run_completion,
 )
 from backend.api.services.raw_event_service import dispatch_raw_message_event
-from backend.api.services.shared_dependencies import (
+from backend.api.services.service_dependencies import (
     require_conversation_manager,
 )
 from backend.api.app_state import get_app_state
@@ -329,9 +332,61 @@ class PlaybookResponse(BaseModel):
     name: str
     type: str
     content: str
+    source: str = ""
+    description: str = ""
     triggers: list[str] = []
     inputs: list[InputMetadata] = []
     tools: list[str] = []
+
+
+class UpdatePlaybookRequest(BaseModel):
+    """Body for updating playbook markdown on disk (workspace playbooks only)."""
+
+    content: str
+    name: str | None = Field(
+        default=None,
+        description="If set, renames the playbook (only under .Forge/playbooks).",
+    )
+
+
+def _validate_playbook_name_key(raw: str) -> str:
+    """Return normalized playbook key (no .md); raises HTTPException if invalid."""
+    s = raw.strip().strip("/")
+    if not s or ".." in s:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid playbook name",
+        )
+    parts = PurePosixPath(s).parts
+    for p in parts:
+        if not p or p in (".", ".."):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid playbook name",
+            )
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", p):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Playbook name segments may only contain letters, digits, hyphen, and underscore",
+            )
+    return "/".join(parts)
+
+
+def _forge_playbooks_root(workspace_root: str) -> str:
+    return os.path.normpath(os.path.join(workspace_root, ".Forge", "playbooks"))
+
+
+def _is_under_forge_playbooks(workspace_root: str, file_path: str) -> bool:
+    root_pb = _forge_playbooks_root(workspace_root)
+    fp_n = os.path.normpath(file_path)
+    return fp_n == root_pb or fp_n.startswith(root_pb + os.sep)
+
+
+def _playbook_load_parent_dir(workspace_root: str, file_path: str) -> Path:
+    """Directory to pass as playbook_dir when reloading a file from disk."""
+    if _is_under_forge_playbooks(workspace_root, file_path):
+        return Path(_forge_playbooks_root(workspace_root))
+    return Path(os.path.dirname(os.path.normpath(file_path)))
 
 
 @sub_router.get("/playbooks")
@@ -373,6 +428,176 @@ async def get_playbooks(
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": f"Error getting playbooks: {e}"},
+        )
+
+
+def _playbook_workspace_relative_path(runtime: Any, source: str) -> str | None:
+    """Return path relative to workspace root, or None if source is outside the workspace."""
+    root = os.path.normpath(runtime.config.workspace_mount_path_in_runtime)
+    src = os.path.normpath(source)
+    try:
+        common = os.path.commonpath([root, src])
+    except ValueError:
+        return None
+    if common != root:
+        return None
+    rel = os.path.relpath(src, root).replace("\\", "/")
+    return rel if rel and not rel.startswith("..") else None
+
+
+def _find_playbook(memory: Memory, name: str) -> tuple[Any, str] | tuple[None, None]:
+    if name in memory.repo_playbooks:
+        return memory.repo_playbooks[name], "repo"
+    if name in memory.knowledge_playbooks:
+        return memory.knowledge_playbooks[name], "knowledge"
+    return None, None
+
+
+@sub_router.put("/playbooks/{name:path}")
+async def update_playbook(
+    name: str,
+    body: UpdatePlaybookRequest,
+    conversation: ServerConversation = Depends(get_conversation),
+) -> JSONResponse:
+    """Write updated playbook content to the backing file in the conversation workspace."""
+    try:
+        if not conversation.runtime:
+            return error(
+                message="Runtime not ready yet, please try again",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                error_code="RUNTIME_NOT_READY",
+            )
+        memory = _get_conversation_memory(conversation)
+        pb, kind = _find_playbook(memory, name)
+        if pb is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playbook not found")
+
+        rel = _playbook_workspace_relative_path(conversation.runtime, pb.source)
+        if rel is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This playbook is not stored in the conversation workspace (cannot edit here).",
+            )
+
+        runtime = conversation.runtime
+        root = runtime.config.workspace_mount_path_in_runtime
+        if not root:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workspace root not available")
+        old_fp = os.path.normpath(os.path.join(root, rel))
+        if not old_fp.startswith(os.path.normpath(root)):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
+
+        raw_new = (body.name or "").strip()
+        new_key = _validate_playbook_name_key(raw_new) if raw_new else name
+        if new_key != name and not _is_under_forge_playbooks(root, old_fp):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Renaming is only supported for playbooks under .Forge/playbooks",
+            )
+
+        if new_key != name:
+            pb_root = _forge_playbooks_root(root)
+            parts = tuple(PurePosixPath(new_key).parts)
+            filename = f"{parts[-1]}.md"
+            new_fp = os.path.normpath(os.path.join(pb_root, *parts[:-1], filename))
+            if not new_fp.startswith(os.path.normpath(root)):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
+            if new_key in memory.repo_playbooks or new_key in memory.knowledge_playbooks:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A playbook with that name already exists",
+                )
+            if new_fp != old_fp:
+                if os.path.exists(new_fp):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Target playbook path already exists",
+                    )
+                parent = os.path.dirname(new_fp)
+                if parent:
+                    os.makedirs(parent, exist_ok=True)
+                if not os.path.isfile(old_fp):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Cannot rename: playbook file is missing",
+                    )
+                shutil.move(old_fp, new_fp)
+            target_fp = new_fp
+        else:
+            target_fp = old_fp
+
+        write_action = FileWriteAction(path=target_fp, content=body.content)
+        await call_sync_from_async(runtime.run_action, write_action)
+
+        load_dir = _playbook_load_parent_dir(root, target_fp)
+        reloaded = BasePlaybook.load(Path(target_fp), load_dir)
+
+        if kind == "repo":
+            memory.repo_playbooks.pop(name, None)
+            memory.repo_playbooks[reloaded.name] = cast("Any", reloaded)
+        else:
+            memory.knowledge_playbooks.pop(name, None)
+            memory.knowledge_playbooks[reloaded.name] = cast("Any", reloaded)
+
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"ok": True})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error updating playbook %s: %s", name, e)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Error updating playbook: {e}"},
+        )
+
+
+@sub_router.delete("/playbooks/{name:path}")
+async def delete_playbook(
+    name: str,
+    conversation: ServerConversation = Depends(get_conversation),
+) -> JSONResponse:
+    """Remove playbook file from the workspace and unload it from session memory."""
+    try:
+        if not conversation.runtime:
+            return error(
+                message="Runtime not ready yet, please try again",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                error_code="RUNTIME_NOT_READY",
+            )
+        memory = _get_conversation_memory(conversation)
+        pb, kind = _find_playbook(memory, name)
+        if pb is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playbook not found")
+
+        rel = _playbook_workspace_relative_path(conversation.runtime, pb.source)
+        if rel is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This playbook is not stored in the conversation workspace (cannot delete here).",
+            )
+
+        root = conversation.runtime.config.workspace_mount_path_in_runtime
+        if not root:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Workspace root not available")
+        full_path = os.path.normpath(os.path.join(root, rel))
+        if not full_path.startswith(os.path.normpath(root)):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
+
+        if os.path.isfile(full_path):
+            os.remove(full_path)
+
+        if kind == "repo":
+            del memory.repo_playbooks[name]
+        else:
+            del memory.knowledge_playbooks[name]
+
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"ok": True})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error deleting playbook %s: %s", name, e)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Error deleting playbook: {e}"},
         )
 
 
@@ -464,10 +689,13 @@ def _build_knowledge_playbook(name: str, k_agent) -> PlaybookResponse:
         PlaybookResponse object
 
     """
+    desc = getattr(k_agent.metadata, "description", None) or ""
     return PlaybookResponse(
         name=name,
         type="knowledge",
         content=k_agent.content,
+        source=k_agent.source,
+        description=str(desc),
         triggers=k_agent.triggers,
         inputs=k_agent.metadata.inputs,
         tools=_extract_mcp_tools(k_agent),
@@ -559,18 +787,27 @@ def _build_completion_success_content(result: CompletionResult) -> dict[str, Any
 
 def _build_completion_error_response(exc: Exception) -> JSONResponse:
     """Build JSONResponse for completion exception."""
-    error_type = ErrorRecoveryStrategy.classify_error(exc)
-    logger.error("Completion error (%s): %s", error_type.value, exc, exc_info=True)
-    status_map = {
-        ErrorType.NETWORK_ERROR: status.HTTP_503_SERVICE_UNAVAILABLE,
-        ErrorType.TIMEOUT_ERROR: status.HTTP_504_GATEWAY_TIMEOUT,
-        ErrorType.PERMISSION_ERROR: status.HTTP_403_FORBIDDEN,
-    }
+    import asyncio
+
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    error_type = "INTERNAL_ERROR"
+
+    if isinstance(exc, (ConnectionError, TimeoutError)):
+        status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        error_type = "NETWORK_ERROR"
+    elif isinstance(exc, asyncio.TimeoutError):
+        status_code = status.HTTP_504_GATEWAY_TIMEOUT
+        error_type = "TIMEOUT_ERROR"
+    elif isinstance(exc, PermissionError):
+        status_code = status.HTTP_403_FORBIDDEN
+        error_type = "PERMISSION_ERROR"
+
+    logger.error("Completion error (%s): %s", error_type, exc, exc_info=True)
     return JSONResponse(
-        status_code=status_map.get(error_type, status.HTTP_500_INTERNAL_SERVER_ERROR),
+        status_code=status_code,
         content={
-            "error": format_error_message(exc, error_type),
-            "errorType": error_type.value,
+            "error": str(exc) or "Unknown completion error",
+            "errorType": error_type,
             "completion": "",
             "stopReason": "error",
         },
@@ -586,18 +823,14 @@ async def get_code_completion(
 ) -> JSONResponse:
     """Get code completion suggestions for the current position in a file.
 
-    Delegates all resilience logic (circuit breaker, retry, budget, security,
-    anti-hallucination) to ``CompletionService``.
+    Delegates all resilience logic (circuit breaker, retry, budget, security)
+    to ``CompletionService``.
     """
-    from backend.engines.orchestrator.file_verification_guard import (
-        FileVerificationGuard,
-    )
 
     llm_config, config_error = await _load_completion_llm_config(request, user_id)
     if config_error is not None:
         return config_error
 
-    anti_hallucination = FileVerificationGuard()
     manager = require_conversation_manager()
     req = CompletionRequest(
         file_path=request_body.filePath,
@@ -616,7 +849,6 @@ async def get_code_completion(
             user_id=user_id,
             llm_config=llm_config,
             manager=manager,
-            anti_hallucination=anti_hallucination,
         )
         content = _build_completion_success_content(result)
         return JSONResponse(status_code=result.status_code, content=content)
@@ -624,3 +856,4 @@ async def get_code_completion(
         raise
     except Exception as e:
         return _build_completion_error_response(e)
+

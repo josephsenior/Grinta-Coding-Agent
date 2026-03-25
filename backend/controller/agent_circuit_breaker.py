@@ -16,6 +16,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from backend.controller.state.state import State
 
+from backend.core.constants import (
+    DEFAULT_AGENT_ERROR_RATE_WINDOW,
+    DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS,
+    DEFAULT_AGENT_MAX_ERROR_RATE,
+    DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS,
+    DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
+)
 from backend.core.logger import forge_logger as logger
 from backend.events.action import ActionSecurityRisk
 from backend.events.observation import ErrorObservation
@@ -26,15 +33,11 @@ class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
 
     enabled: bool = True
-    max_consecutive_errors: int = (
-        3  # Reduced from 5 — 3 consecutive errors is already a bad loop
-    )
-    max_high_risk_actions: int = (
-        5  # Reduced from 10 — 5 high-risk actions warrants intervention
-    )
-    max_stuck_detections: int = 8
-    max_error_rate: float = 0.5  # 50% of last N actions
-    error_rate_window: int = 10  # Look at last 10 actions
+    max_consecutive_errors: int = DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS
+    max_high_risk_actions: int = DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS
+    max_stuck_detections: int = DEFAULT_AGENT_MAX_STUCK_DETECTIONS
+    max_error_rate: float = DEFAULT_AGENT_MAX_ERROR_RATE
+    error_rate_window: int = DEFAULT_AGENT_ERROR_RATE_WINDOW
 
     # Adaptive scaling — when enabled, thresholds scale with task complexity
     # and iteration budget so that complex tasks get more breathing room.

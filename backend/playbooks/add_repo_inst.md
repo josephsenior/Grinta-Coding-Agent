@@ -24,7 +24,7 @@ agent: Orchestrator
 ---
 
 This repository contains the code for Forge, an automated AI software engineer. It has a Python backend
-(in the `backend` directory) with a Textual TUI (in `tui`).
+(in the `backend` directory) and a React web UI, plus a small `forge_client` package for HTTP/Socket.IO from Python.
 
 ## General Setup:
 
@@ -48,11 +48,14 @@ Backend:
   - To test new code, run `poetry run pytest backend/tests/unit/test_xxx.py` where `xxx` is the appropriate file for the current functionality
   - Write all tests with pytest
 
-TUI (Terminal User Interface):
+Web UI:
 
-- Located in `tui`
-- Launch: `python -m tui` or `forge-tui`
-- Built with Textual framework (Python)
+- Served with the backend (default http://localhost:3000)
+- Launch server: `uv run forge serve` or `python start_server.py`
+
+Python API client:
+
+- Package `forge_client` — use `ForgeClient` in tests and scripts
 ```
 
 Now, please write a similar markdown for the current repository.

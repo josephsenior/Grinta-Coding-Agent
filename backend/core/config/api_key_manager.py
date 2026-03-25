@@ -69,7 +69,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             object.__setattr__(self, "suppress_env_export", previous)
 
     def get_api_key_for_model(
-        self, model: str, provided_key: SecretStr | None = None
+        self, model: str | None, provided_key: SecretStr | None = None
     ) -> SecretStr | None:
         """Get the correct API key for a given model, following provider conventions.
 
@@ -92,6 +92,9 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             SecretStr containing the correct API key for the model's provider,
             or None if no key found. Keys are never logged in plaintext.
 
+        Note:
+            If *model* is unset, returns None (no provider to resolve).
+
         Example:
             >>> # Get key for OpenRouter model
             >>> key = manager.get_api_key_for_model('openrouter/gpt-4o')
@@ -106,27 +109,32 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             >>> # Returns: ANTHROPIC_API_KEY from environment (corrected)
 
         """
+        if not model or not str(model).strip():
+            return None
+
         provider = self._extract_provider(model)
 
-        # Check if provided key is correct for this provider
+        # If a key is provided and it matches the provider, trust it.
+        # If it does NOT match, prefer environment/stored provider keys first.
+        # This avoids misrouting when a user switches models/providers but their
+        # settings still contain an old provider key (e.g., OpenRouter -> Gemini).
+        fallback_key: SecretStr | None = None
         if provided_key:
             key_value = provided_key.get_secret_value()
             if self._is_correct_provider_key(provided_key, provider):
                 logger.debug("Using provided API key for %s", provider)
                 return provided_key
-            if (
-                key_value and len(key_value) > 10
-            ):  # Fallback: if it's a substantial key, use it
-                logger.info(
-                    "Using provided API key as fallback for %s (key length: %s)",
+            if key_value and len(key_value) > 10:
+                fallback_key = provided_key
+                logger.warning(
+                    "Provided API key does not match provider %s; will try env/stored keys first",
                     provider,
-                    len(key_value),
                 )
-                return provided_key
-            logger.warning(
-                "Provided API key appears to be for wrong provider. Expected %s",
-                provider,
-            )
+            else:
+                logger.warning(
+                    "Provided API key appears to be for wrong provider. Expected %s",
+                    provider,
+                )
 
         # Try to get key from environment variables
         env_key = self._get_provider_key_from_env(provider)
@@ -138,6 +146,18 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if provider in self.provider_api_keys:
             logger.debug("Using stored %s API key", provider)
             return self.provider_api_keys[provider]
+
+        # If we still haven't found a provider-specific key, fall back to any
+        # substantial key that was provided, even if it didn't match expected
+        # format. This is a last resort and may still fail at the provider.
+        if fallback_key:
+            key_value = fallback_key.get_secret_value()
+            logger.info(
+                "Using provided API key as last-resort fallback for %s (key length: %s)",
+                provider,
+                len(key_value) if key_value else 0,
+            )
+            return fallback_key
 
         # As a last-resort fallback (especially during early startup before full
         # config loading), try to read the default JSON settings file directly so
@@ -154,13 +174,22 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
                 raw_key = data.get("llm_api_key")
                 if raw_key:
                     key = SecretStr(str(raw_key))
-                    # Cache for future lookups so subsequent calls don't need to
-                    # hit the filesystem again.
-                    self.set_api_key(model, key)
+                    # Prefer llm_model from the same file so the key is indexed and
+                    # logged under the user's chosen provider (not e.g. default gemini).
+                    file_model_raw = data.get("llm_model")
+                    file_model = (
+                        str(file_model_raw).strip()
+                        if file_model_raw is not None
+                        else ""
+                    )
+                    model_for_store = file_model or model
+                    store_provider = self._extract_provider(model_for_store)
+                    self.set_api_key(model_for_store, key)
                     logger.info(
-                        "Loaded API key for provider %s from %s",
-                        provider,
+                        "Loaded API key from %s for provider %s (model %s)",
                         cfg_path.name,
+                        store_provider,
+                        model_for_store,
                     )
                     return key
         except Exception as exc:  # pragma: no cover - best-effort fallback
@@ -186,8 +215,10 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         )
         return None
 
-    def set_api_key(self, model: str, api_key: SecretStr) -> None:
+    def set_api_key(self, model: str | None, api_key: SecretStr) -> None:
         """Set API key for a model's provider."""
+        if not model or not str(model).strip():
+            return
         provider = self._extract_provider(model)
         self.provider_api_keys[provider] = api_key
         logger.debug("Set API key for %s", provider)
@@ -206,6 +237,10 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             logger.debug(
                 "Skipping environment variable export for %s (suppressed)", model
             )
+            return
+
+        if not model or not str(model).strip():
+            logger.debug("Skipping environment variable export (no model set)")
             return
 
         provider = self._extract_provider(model)
