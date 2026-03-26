@@ -137,7 +137,9 @@ def _set_api_cache_headers(path: str, response: "Response", cacheable_paths: dic
             response.headers["Cache-Control"] = f"public, max-age={cache_time}, must-revalidate"
             response.headers["Vary"] = "Accept-Encoding"
             if hasattr(response, "body"):
-                response.headers["ETag"] = f'"{hash(response.body)}"'
+                import hashlib
+                etag = hashlib.sha256(response.body).hexdigest()[:16]
+                response.headers["ETag"] = f'"{etag}"'
             return True
     return False
 
@@ -156,8 +158,13 @@ def _is_compressible_content_type(content_type: str) -> bool:
 def _response_too_small(response: "Response", min_size: int) -> bool:
     """True if response body is smaller than min_size."""
     content_length = response.headers.get("content-length")
-    if content_length and int(content_length) < min_size:
-        return True
+    if content_length:
+        try:
+            if int(content_length) < min_size:
+                return True
+        except (ValueError, OverflowError):
+            # Invalid Content-Length header, skip size check
+            pass
     if not hasattr(response, "body") or not response.body:
         return True
     return len(response.body) < min_size

@@ -25,9 +25,8 @@ PromHistogram = Any
 
 try:  # pragma: no cover - optional dependency
     _prometheus_client: Any = importlib.import_module("prometheus_client")
-
     _PROMETHEUS_AVAILABLE = True
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     _PROMETHEUS_AVAILABLE = False
     _prometheus_client = None
 

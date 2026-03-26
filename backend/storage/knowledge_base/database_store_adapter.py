@@ -109,7 +109,9 @@ class DatabaseStoreAdapter:
         """Get storage statistics."""
         # Database store doesn't have get_stats, so compute it
         # This is a simple implementation - could be optimized with a SQL query
-        collections = self.list_collections("default")  # TODO: get actual user_id
+        # Use user_id from db_store if available, otherwise fall back to "default"
+        user_id = getattr(self._db_store, 'user_id', None) or "default"
+        collections = self.list_collections(user_id)
         total_docs = sum(c.document_count for c in collections)
         total_size = sum(c.total_size_bytes for c in collections)
 

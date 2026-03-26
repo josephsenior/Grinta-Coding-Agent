@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-03-26 11:58:37",
-  "events_condensed": 106,
+  "timestamp": "2026-03-26 12:19:47",
+  "events_condensed": 45,
   "files_touched": {},
   "recent_errors": [
     "Timeout: Fallback completion timed out after 45.0 seconds\n\nThe agent step failed with the error above. Adjust strategy (different tool, smaller change, or confirm configuration) and continue.",
@@ -9,9 +9,9 @@
     "Timeout: Fallback completion timed out after 45.0 seconds\n\nThe agent step failed with the error above. Adjust strategy (different tool, smaller change, or confirm configuration) and continue.",
     "Timeout: Fallback completion timed out after 45.0 seconds\n\nThe agent step failed with the error above. Adjust strategy (different tool, smaller change, or confirm configuration) and continue.",
     "Timeout: Fallback completion timed out after 45.0 seconds\n\nThe agent step failed with the error above. Adjust strategy (different tool, smaller change, or confirm configuration) and continue.",
+    "CIRCUIT BREAKER WARNING\n\nReason: Too many consecutive errors (5)\nAction if escalated: PAUSE\nRecommendation: The agent has encountered 5 consecutive errors. Please review the error logs and adjust the approach before continuing.\nYou must change strategy now.\nWarning attempt: 1/3",
     "Timeout: Fallback completion timed out after 45.0 seconds\n\nThe agent step failed with the error above. Adjust strategy (different tool, smaller change, or confirm configuration) and continue.",
-    "Timeout: Fallback completion timed out after 45.0 seconds\n\nThe agent step failed with the error above. Adjust strategy (different tool, smaller change, or confirm configuration) and continue.",
-    "Timeout: Fallback completion timed out after 45.0 seconds\n\nThe agent step failed with the error above. Adjust strategy (different tool, smaller change, or confirm configuration) and continue.",
+    "CIRCUIT BREAKER WARNING\n\nReason: Too many consecutive errors (6)\nAction if escalated: PAUSE\nRecommendation: The agent has encountered 6 consecutive errors. Please review the error logs and adjust the approach before continuing.\nYou must change strategy now.\nWarning attempt: 1/3",
     "Timeout: Fallback completion timed out after 45.0 seconds\n\nThe agent step failed with the error above. Adjust strategy (different tool, smaller change, or confirm configuration) and continue."
   ],
   "decisions": [],

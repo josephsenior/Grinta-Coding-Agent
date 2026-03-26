@@ -633,7 +633,14 @@ class Session:
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
-                    self.logger.error("Error in publish queue handler: %s", getattr(e, 'message', str(e)))
+                    self.logger.error(
+                        "Error in publish queue handler: %s", 
+                        str(e), 
+                        exc_info=True
+                    )
+                    # Break on fatal errors to prevent zombie event loop
+                    self.is_alive = False
+                    break
         except asyncio.CancelledError:
             return
 

@@ -231,14 +231,22 @@ class KnowledgeBaseStore:
             # Remove from collection's document list
             if document.collection_id in self._collection_documents:
                 doc_list = self._collection_documents[document.collection_id]
-                if document_id in doc_list:
+                try:
                     doc_list.remove(document_id)
+                except ValueError:
+                    # Document ID not in list - already removed or corrupted state
+                    logger.warning(
+                        "Document %s not found in collection %s document list",
+                        document_id,
+                        document.collection_id
+                    )
 
-            # Update collection stats
+            # Update collection stats with validation
             collection = self._collections.get(document.collection_id)
             if collection:
-                collection.document_count -= 1
-                collection.total_size_bytes -= document.file_size_bytes
+                # Prevent negative counts from corrupting state
+                collection.document_count = max(0, collection.document_count - 1)
+                collection.total_size_bytes = max(0, collection.total_size_bytes - document.file_size_bytes)
                 from datetime import datetime
 
                 collection.updated_at = datetime.now(UTC)
