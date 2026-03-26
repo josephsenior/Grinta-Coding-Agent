@@ -1,6 +1,8 @@
 """Health and diagnostics endpoints for the Forge server."""
 
 import os
+import shutil
+import socket
 import sys
 import time
 
@@ -42,6 +44,76 @@ def _check_config() -> dict:
         return {"status": "error", "detail": str(exc)}
 
 
+def _check_dependency_endpoint(host: str, port: int, timeout: float = 1.0) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _check_redis() -> dict:
+    host = os.environ.get('REDIS_HOST', '').strip()
+    url = os.environ.get('REDIS_URL', '').strip()
+    if not host and not url:
+        return {"status": "not_configured"}
+
+    if host:
+        try:
+            port = int(os.environ.get('REDIS_PORT', '6379'))
+        except ValueError:
+            port = 6379
+        reachable = _check_dependency_endpoint(host, port)
+        return {
+            "status": "ok" if reachable else "degraded",
+            "host": host,
+            "port": port,
+            "reachable": reachable,
+        }
+
+    return {"status": "configured", "url": "set", "reachable": "unknown"}
+
+
+def _check_database() -> dict:
+    storage_mode = os.environ.get('KB_STORAGE_TYPE', 'file').strip().lower()
+    if storage_mode not in {'database', 'db'}:
+        return {"status": "not_configured", "mode": storage_mode or 'file'}
+
+    db_url = os.environ.get('DATABASE_URL', '').strip()
+    if not db_url:
+        return {
+            "status": "error",
+            "mode": storage_mode,
+            "detail": "DATABASE_URL missing",
+        }
+
+    host = os.environ.get('POSTGRES_HOST', 'postgres').strip()
+    try:
+        port = int(os.environ.get('POSTGRES_PORT', '5432'))
+    except ValueError:
+        port = 5432
+    reachable = _check_dependency_endpoint(host, port)
+    return {
+        "status": "ok" if reachable else "degraded",
+        "mode": storage_mode,
+        "host": host,
+        "port": port,
+        "reachable": reachable,
+    }
+
+
+def _check_tmux() -> dict:
+    tmux_path = shutil.which('tmux')
+    if tmux_path is None:
+        return {"status": "degraded", "available": False}
+    return {
+        "status": "ok",
+        "available": True,
+        "path": tmux_path,
+        "tmux_tmpdir": os.environ.get('TMUX_TMPDIR', ''),
+    }
+
+
 _start_time = time.monotonic()
 
 
@@ -74,18 +146,29 @@ def add_health_endpoints(app: FastAPI) -> None:
     async def health_ready():
         """Readiness probe endpoint.
 
-        Checks that critical subsystems (config, file store) are operational.
-        Returns 200 if all checks pass, 503 if any critical check fails.
+        Checks critical subsystems (config, file store) and includes non-critical
+        dependency diagnostics (redis/database/tmux) for debugging.
+
+        Returns 200 if critical checks pass, 503 if a critical check fails.
         """
         config_check = _check_config()
         storage_check = _check_storage()
+        redis_check = _check_redis()
+        database_check = _check_database()
+        tmux_check = _check_tmux()
 
         checks = {
             "config": config_check,
             "storage": storage_check,
+            "redis": redis_check,
+            "database": database_check,
+            "tmux": tmux_check,
         }
 
-        all_ok = all(c.get("status") == "ok" for c in checks.values())
+        all_ok = all(
+            c.get("status") == "ok"
+            for c in (config_check, storage_check)
+        )
         status_code = 200 if all_ok else 503
 
         return JSONResponse(

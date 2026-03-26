@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from backend.core.logger import forge_logger as logger
 from backend.core.message import Message, TextContent
 from backend.events.action import MessageAction
+from backend.llm.prompt_caching import model_supports_prompt_cache_hints
 from backend.memory.condenser import Condenser
 from backend.memory.conversation_memory import ConversationMemory
 from backend.memory.pre_condensation_snapshot import (
@@ -185,18 +186,21 @@ class ConversationMemoryManager:
         if not messages:
             return messages
 
-        first_message = messages[0]
-        for item in first_message.content:
-            if isinstance(item, TextContent):
-                item.cache_prompt = True
-                break
+        model = getattr(llm_config, "model", None) or ""
+        caching_on = bool(getattr(llm_config, "caching_prompt", True))
+        if caching_on and model_supports_prompt_cache_hints(str(model)):
+            first_message = messages[0]
+            for item in first_message.content:
+                if isinstance(item, TextContent):
+                    item.cache_prompt = True
+                    break
 
-        for message in reversed(messages):
-            if message.role == "user":
-                for item in message.content:
-                    if isinstance(item, TextContent):
-                        item.cache_prompt = True
-                        break
-                break
+            for message in reversed(messages):
+                if message.role == "user":
+                    for item in message.content:
+                        if isinstance(item, TextContent):
+                            item.cache_prompt = True
+                            break
+                    break
 
         return messages

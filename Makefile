@@ -22,6 +22,26 @@ test-e2e: pretest
 test-stress: pretest
 	@uv run pytest backend/tests/stress -v
 
+.PHONY: reliability-gate
+reliability-gate: pretest
+	@uv run python backend/scripts/verify/reliability_gate.py --phase full
+
+.PHONY: reliability-gate-integration
+reliability-gate-integration: pretest
+	@uv run python backend/scripts/verify/reliability_gate.py --phase full --include-integration
+
+.PHONY: docker-up
+docker-up:
+	@FORGE_KB_STORAGE_TYPE=database docker compose up --build
+
+.PHONY: docker-up-detached
+docker-up-detached:
+	@FORGE_KB_STORAGE_TYPE=database docker compose up --build -d
+
+.PHONY: docker-up-no-db
+docker-up-no-db:
+	@FORGE_KB_STORAGE_TYPE=file docker compose up --build
+
 # Makefile for Forge project
 SHELL=/usr/bin/env bash
 

@@ -195,6 +195,10 @@ class InteractivePromptDetector:
         if not output or not output.strip():
             return None
 
+        # Strip ANSI escape sequences to prevent them from interfering with regex matching
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        output = ansi_escape.sub('', output)
+
         # Focus on the last N lines where prompts typically appear
         lines = output.split("\n")
         recent_output = "\n".join(lines[-last_n_lines:])
@@ -210,13 +214,6 @@ class InteractivePromptDetector:
                     pattern.confidence,
                 )
                 return pattern
-
-        # Check for generic prompt indicators
-        if self._looks_like_prompt(recent_output):
-            logger.warning(
-                "⚠️ Detected potential interactive prompt but no pattern match. "
-                "Output may require manual intervention or new pattern definition.",
-            )
 
         return None
 
@@ -304,11 +301,6 @@ NONINTERACTIVE_COMMAND_TRANSFORMS = {
     r"^apt-get\s+install": "apt-get install -y",
     r"^apt\s+upgrade": "apt upgrade -y",
     r"^apt-get\s+upgrade": "apt-get upgrade -y",
-    # pip commands
-    r"^pip\s+install": "pip install --yes",
-    r"^pip3\s+install": "pip3 install --yes",
-    # rm commands (use with caution!)
-    r"^rm\s+": "rm -f ",
 }
 
 

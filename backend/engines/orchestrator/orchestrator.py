@@ -183,73 +183,65 @@ class Orchestrator(Agent):
     def reset(self, state: State | None = None) -> None:
         super().reset()
         self.pending_actions.clear()
+        self._consecutive_context_errors = 0
 
     def step(self, state: State) -> Action:
+        """Thin synchronous wrapper around astep() to avoid maintaining duplicate logic."""
+        import asyncio
+        import concurrent.futures
         try:
-            exit_action = self._check_exit_command(state)
-            if exit_action:
-                return exit_action
-
-            pending = self._consume_pending_action()
-            if pending:
-                return pending
-
-
-            condensed = self.memory_manager.condense_history(state)
-            return self._execute_llm_step(state, condensed)
-
-        except ContextLimitError:
-            # Auto-heal: condense once and retry before giving up
-            logger.warning(
-                "Auto-Healing: Context limit reached. Attempting condensation + retry."
-            )
-            try:
-                condensed = self.memory_manager.condense_history(state)
-                return self._execute_llm_step(state, condensed)
-            except Exception:
-                logger.warning(
-                    "Auto-Healing retry failed after condensation. Falling back to think action."
-                )
-                return AgentThinkAction(
-                    thought="I have reached the context limit. I must condense my memory before proceeding.",
-                )
-
-        except ToolExecutionError as e:
-            logger.warning("Auto-Healing: Tool Execution Error: %s", e)
-            return AgentThinkAction(
-                thought=f"I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.",
-            )
-
-        except (ModelProviderError, LLMError):
-            raise
-
-        except Exception as e:
-            logger.error("Critical Failure in Orchestrator.step: %s", e, exc_info=True)
-            # Wrap generic exceptions in AgentRuntimeError for standardized handling upstream
-            raise AgentRuntimeError(f"Critical agent failure: {str(e)}") from e
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop, create and run a new one
+            return asyncio.run(self.astep(state))
+        else:
+            # Already in an async context; create a task and run in a new thread
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, self.astep(state))
+                return future.result()
 
     async def astep(self, state: State) -> Action:
-        """Async version of step() that uses real LLM streaming."""
+        """Async version of step() with hard circuit breaker for consecutive ContextLimitErrors."""
         try:
             exit_action = self._check_exit_command(state)
             if exit_action:
+                self._consecutive_context_errors = 0
                 return exit_action
 
             pending = self._consume_pending_action()
             if pending:
+                self._consecutive_context_errors = 0
                 return pending
 
-
             condensed = self.memory_manager.condense_history(state)
-            return await self._execute_llm_step_async(state, condensed)
+            action = await self._execute_llm_step_async(state, condensed)
+            # Successful step: reset the circuit breaker counter
+            self._consecutive_context_errors = 0
+            return action
 
         except ContextLimitError:
+            self._consecutive_context_errors = getattr(self, "_consecutive_context_errors", 0) + 1
             logger.warning(
-                "Auto-Healing: Context limit reached. Attempting condensation + retry."
+                "ContextLimitError encountered (%d/3). Attempting condensation + retry.",
+                self._consecutive_context_errors,
             )
+
+            # Circuit breaker: fail hard if we hit >3 consecutive ContextLimitErrors
+            if self._consecutive_context_errors > 3:
+                raise AgentRuntimeError(
+                    "Circuit breaker: continuous ContextLimitErrors"
+                ) from None
+
+            # Try auto-heal: condense once and retry
             try:
                 condensed = self.memory_manager.condense_history(state)
-                return await self._execute_llm_step_async(state, condensed)
+                action = await self._execute_llm_step_async(state, condensed)
+                # Successful retry: reset the counter
+                self._consecutive_context_errors = 0
+                return action
+            except ContextLimitError:
+                # Re-raise to trigger circuit breaker check on next attempt
+                raise
             except Exception:
                 logger.warning(
                     "Auto-Healing retry failed after condensation. Falling back to think action."
@@ -259,15 +251,18 @@ class Orchestrator(Agent):
                 )
 
         except ToolExecutionError as e:
+            self._consecutive_context_errors = 0
             logger.warning("Auto-Healing: Tool Execution Error: %s", e)
             return AgentThinkAction(
                 thought=f"I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.",
             )
 
         except (ModelProviderError, LLMError):
+            self._consecutive_context_errors = 0
             raise
 
         except Exception as e:
+            self._consecutive_context_errors = 0
             logger.error("Critical Failure in Orchestrator.astep: %s", e, exc_info=True)
             raise AgentRuntimeError(f"Critical agent failure: {str(e)}") from e
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import re
 import sys
 import time
 import uuid
@@ -78,9 +79,15 @@ from backend.runtime.utils.file_editor import FileEditor
 from backend.runtime.utils.memory_monitor import MemoryMonitor
 from backend.runtime.utils.session_manager import SessionManager
 from backend.utils.async_utils import call_sync_from_async
+from backend.utils.regex_limits import try_compile_user_regex
 
 if TYPE_CHECKING:
     from backend.runtime.browser.browser_env import BrowserEnv
+
+
+WORKSPACE_VIRTUAL_ROOT = "/workspace"
+_WORKSPACE_TOKEN_RE = re.compile(r"/workspace(?=/|$)")
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 # Note: Import is deferred to avoid executing windows_bash.py on non-Windows platforms
 if sys.platform == "win32":
@@ -302,14 +309,21 @@ class ActionExecutor:
         this method strips it and returns the corresponding absolute path
         inside the real workspace root.
         """
-        import os as _os
         norm = path.replace("\\", "/")
-        if norm == "/workspace":
+        if norm == WORKSPACE_VIRTUAL_ROOT:
             return self._initial_cwd
-        if norm.startswith("/workspace/"):
-            rel = norm[len("/workspace/"):]
-            return _os.path.join(self._initial_cwd, rel)
+        workspace_prefix = f"{WORKSPACE_VIRTUAL_ROOT}/"
+        if norm.startswith(workspace_prefix):
+            rel = norm[len(workspace_prefix):]
+            return os.path.join(self._initial_cwd, rel)
         return path
+
+    def _rewrite_workspace_tokens(self, text: str) -> str:
+        """Replace virtual /workspace path tokens with the actual workspace path."""
+        if not text or WORKSPACE_VIRTUAL_ROOT not in text:
+            return text
+        workspace_root = self._initial_cwd.replace("\\", "/")
+        return _WORKSPACE_TOKEN_RE.sub(workspace_root, text)
 
     def _denormalize_obs_text(self, text: str) -> str:
         """Replace the real workspace temp path with /workspace in observation text.
@@ -325,8 +339,7 @@ class ActionExecutor:
         if not text:
             return text
         # Strip ANSI escape codes from PowerShell / terminal output.
-        import re as _re
-        text = _re.sub(r"\x1b\[[0-9;]*m", "", text)
+        text = _ANSI_ESCAPE_RE.sub("", text)
         if not self._initial_cwd:
             return text
         # Replace both forward-slash and backslash variants of the temp path.
@@ -335,9 +348,9 @@ class ActionExecutor:
         text = text.replace(ws_back, "/workspace")
         text = text.replace(ws, "/workspace")
         # Also replace any mixed-slash variant: normalize then replace.
-        text = _re.sub(
-            _re.escape(self._initial_cwd).replace("\\\\", r"[/\\]"),
-            "/workspace",
+        text = re.sub(
+            re.escape(self._initial_cwd).replace("\\\\", r"[/\\]"),
+            WORKSPACE_VIRTUAL_ROOT,
             text,
         )
         return text
@@ -419,19 +432,12 @@ class ActionExecutor:
         try:
             # Replace /workspace virtual path with the real workspace directory.
             # Outside containers /workspace doesn't point at the temp workspace.
-            if action.command and "/workspace" in action.command:
-                ws = self._initial_cwd.replace("\\", "/")
-                import re as _re
-                action.command = _re.sub(
-                    r"/workspace(?=/|$)",
-                    ws,
-                    action.command,
-                )
+            if action.command:
+                action.command = self._rewrite_workspace_tokens(action.command)
 
             # Rewrite python3->python only in Windows PowerShell mode.
             if self._should_rewrite_python3_to_python() and action.command:
-                import re as _re
-                action.command = _re.sub(
+                action.command = re.sub(
                     r"\bpython3\b", "python", action.command
                 )
 
@@ -480,7 +486,6 @@ class ActionExecutor:
             "Starting background task in session %s: %s", session_id, action.command
         )
         session.write_input(action.command + "\n")
-        import asyncio
         await asyncio.sleep(0.5)
         content = session.read_output()
         return TerminalObservation(
@@ -532,18 +537,16 @@ class ActionExecutor:
         Returns only lines matching the regex. On invalid pattern, prepends
         an error message to the content.
         """
-        import re
-
-        try:
-            pattern = re.compile(pattern_str)
-            lines = content.splitlines()
-            filtered = [line for line in lines if pattern.search(line)]
-            result = "\n".join(filtered)
-            return result or f"[Grep: No lines matched pattern '{pattern_str}']"
-        except re.error as e:
+        pattern, err = try_compile_user_regex(pattern_str)
+        if pattern is None:
             return (
-                f"[Grep Error: Invalid regex pattern '{pattern_str}': {e}]\n{content}"
+                f"[Grep Error: Invalid regex pattern '{pattern_str}': {err}]\n{content}"
             )
+
+        lines = content.splitlines()
+        filtered = [line for line in lines if pattern.search(line)]
+        result = "\n".join(filtered)
+        return result or f"[Grep: No lines matched pattern '{pattern_str}']"
 
     def _attach_detected_server(
         self, observation: CmdOutputObservation, bash_session: Any
@@ -623,7 +626,6 @@ class ActionExecutor:
 
             session.write_input(write_content, is_control=action.is_control)
             # Wait briefly for output to appear
-            import asyncio
             await asyncio.sleep(0.2)
             content = session.read_output()
             return TerminalObservation(session_id=action.session_id, content=content)
@@ -737,9 +739,7 @@ class ActionExecutor:
     def _edit_via_file_editor(self, action: FileEditAction) -> Observation:
         """Execute FILE_EDITOR-style edit and return observation."""
         command = action.command or "write"
-        enable_lint = bool(
-            os.environ.get("ENABLE_AUTO_LINT", "").lower() in {"1", "true", "yes"}
-        )
+        enable_lint = self._is_auto_lint_enabled()
         result_str, (old_content, new_content) = execute_file_editor(
             self.file_editor,
             command=command,
@@ -766,15 +766,12 @@ class ActionExecutor:
                 pass  # diff is a nice-to-have; never block the observation
         # Blast Radius Hook
         # If the edit is successful and there's new content, check symbol references
-        if old_content is not None and new_content is not None and command != "view_file":
-            try:
-                from backend.utils.blast_radius import check_blast_radius_from_code
-
-                warning = check_blast_radius_from_code(action.path, new_content)
-                if warning:
-                    result_str += warning
-            except Exception as e:
-                logger.debug("Failed to check blast radius: %s", e)
+        result_str = self._append_blast_radius_warning(
+            result_str,
+            command=command,
+            action_path=action.path,
+            new_content=new_content,
+        )
 
         return FileEditObservation(
             content=result_str,
@@ -788,9 +785,7 @@ class ActionExecutor:
     def _edit_via_llm(self, action: FileEditAction) -> Observation:
         """Execute LLM-based range edit and return observation."""
         command = action.command or "edit"
-        enable_lint = bool(
-            os.environ.get("ENABLE_AUTO_LINT", "").lower() in {"1", "true", "yes"}
-        )
+        enable_lint = self._is_auto_lint_enabled()
         result_str, (old_content, new_content) = execute_file_editor(
             self.file_editor,
             command=command,
@@ -805,16 +800,12 @@ class ActionExecutor:
         if old_content and new_content:
             diff = get_diff(old_content, new_content, action.path)
 
-            # Blast Radius Hook
-            if command != "view_file":
-                try:
-                    from backend.utils.blast_radius import check_blast_radius_from_code
-
-                    warning = check_blast_radius_from_code(action.path, new_content)
-                    if warning:
-                        diff += warning
-                except Exception as e:
-                    logger.debug("Failed to check blast radius: %s", e)
+            diff = self._append_blast_radius_warning(
+                diff,
+                command=command,
+                action_path=action.path,
+                new_content=new_content,
+            )
 
             return FileEditObservation(
                 content=diff,
@@ -824,16 +815,12 @@ class ActionExecutor:
                 new_content=new_content,
                 impl_source=FileEditSource.LLM_BASED_EDIT,
             )
-        # Blast Radius Hook
-        if old_content is not None and new_content is not None and command != "view_file":
-            try:
-                from backend.utils.blast_radius import check_blast_radius_from_code
-
-                warning = check_blast_radius_from_code(action.path, new_content)
-                if warning:
-                    result_str += warning
-            except Exception as e:
-                logger.debug("Failed to check blast radius: %s", e)
+        result_str = self._append_blast_radius_warning(
+            result_str,
+            command=command,
+            action_path=action.path,
+            new_content=new_content,
+        )
 
         return FileEditObservation(
             content=result_str,
@@ -843,6 +830,35 @@ class ActionExecutor:
             new_content=new_content,
             impl_source=FileEditSource.LLM_BASED_EDIT,
         )
+
+    def _append_blast_radius_warning(
+        self,
+        base_content: str,
+        *,
+        command: str,
+        action_path: str,
+        new_content: str | None,
+    ) -> str:
+        """Append blast-radius warning text when available, without interrupting edits."""
+        if command == "view_file" or new_content is None:
+            return base_content
+        try:
+            from backend.utils.blast_radius import check_blast_radius_from_code
+
+            warning = check_blast_radius_from_code(action_path, new_content)
+            if warning:
+                return base_content + warning
+        except Exception as e:
+            logger.debug("Failed to check blast radius: %s", e)
+        return base_content
+
+    def _is_auto_lint_enabled(self) -> bool:
+        """Return whether auto-lint should run after editor mutations."""
+        return os.environ.get("ENABLE_AUTO_LINT", "").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
 
     async def edit(self, action: FileEditAction) -> Observation:
         """Edit a file (FILE_EDITOR or LLM-based) and return an observation."""

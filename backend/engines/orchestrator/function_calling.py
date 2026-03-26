@@ -46,9 +46,9 @@ from backend.engines.orchestrator.tools.workspace_status import (
     build_workspace_status_action,
     WORKSPACE_STATUS_TOOL_NAME,
 )
-from backend.engines.orchestrator.tools.query_error_solutions import (
-    build_query_error_solutions_action,
-    QUERY_ERROR_SOLUTIONS_TOOL_NAME,
+from backend.engines.orchestrator.tools.error_recovery_memory import (
+    build_error_recovery_memory_action,
+    ERROR_RECOVERY_MEMORY_TOOL_NAME,
 )
 from backend.engines.orchestrator.tools.explore_code import (
     build_explore_tree_structure_action,
@@ -172,22 +172,33 @@ def set_security_risk(action: Action, arguments: dict) -> None:
             )
 
 
+def _parse_bool_argument(raw: Any) -> bool:
+    """Parse bool-ish tool arguments consistently."""
+    return raw is True or (isinstance(raw, str) and raw.lower() == "true")
+
+
+def _require_tool_argument(
+    arguments: Mapping[str, Any], key: str, tool_name: str
+) -> Any:
+    """Return a required argument value or raise a standardized validation error."""
+    if key not in arguments:
+        raise FunctionCallValidationError(
+            f'Missing required argument "{key}" in tool call {tool_name}'
+        )
+    return arguments[key]
+
+
 def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
     """Handle CmdRunTool (Bash) tool call."""
-    if "command" not in arguments:
-        msg = f'Missing required argument "command" in tool call {create_cmd_run_tool()["function"]["name"]}'
-        raise FunctionCallValidationError(
-            msg,
-        )
+    tool_name = create_cmd_run_tool()["function"]["name"]
+    command = _require_tool_argument(arguments, "command", tool_name)
     raw_is_input = arguments.get("is_input", False)
-    is_input = raw_is_input is True or (
-        isinstance(raw_is_input, str) and raw_is_input.lower() == "true"
-    )
+    is_input = _parse_bool_argument(raw_is_input)
     is_background = arguments.get("is_background", False)
     grep_pattern = arguments.get("grep_pattern")
 
     action = CmdRunAction(
-        command=arguments["command"],
+        command=command,
         is_input=is_input,
         is_background=is_background,
         grep_pattern=grep_pattern,
@@ -207,11 +218,8 @@ def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
 
 def _handle_finish_tool(arguments: dict) -> PlaybookFinishAction:
     """Handle FinishTool tool call."""
-    if "message" not in arguments:
-        msg = f'Missing required argument "message" in tool call {create_finish_tool()["function"]["name"]}'
-        raise FunctionCallValidationError(
-            msg,
-        )
+    tool_name = create_finish_tool()["function"]["name"]
+    message = _require_tool_argument(arguments, "message", tool_name)
     outputs: dict = {}
     if "completed" in arguments:
         outputs["completed"] = arguments["completed"]
@@ -221,7 +229,7 @@ def _handle_finish_tool(arguments: dict) -> PlaybookFinishAction:
         outputs["next_steps"] = arguments["next_steps"]
     if "lessons_learned" in arguments:
         outputs["lessons_learned"] = arguments["lessons_learned"]
-    return PlaybookFinishAction(final_thought=arguments["message"], outputs=outputs)
+    return PlaybookFinishAction(final_thought=message, outputs=outputs)
 
 
 def _handle_memory_manager_tool(arguments: dict) -> AgentThinkAction:
@@ -295,9 +303,9 @@ def _handle_workspace_status_tool(arguments: dict) -> CmdRunAction:
     return build_workspace_status_action(arguments)
 
 
-def _handle_query_error_solutions_tool(arguments: dict) -> AgentThinkAction:
-    """Handle query_error_solutions tool: store/query error→solution patterns."""
-    return build_query_error_solutions_action(arguments)
+def _handle_error_recovery_memory_tool(arguments: dict) -> AgentThinkAction:
+    """Handle error_recovery_memory tool: retrieve/store structured recovery guidance."""
+    return build_error_recovery_memory_action(arguments)
 
 
 def _handle_checkpoint_tool(arguments: dict) -> AgentThinkAction:
@@ -347,14 +355,12 @@ def _handle_llm_based_file_edit_tool(arguments: dict) -> FileEditAction:
 def _validate_str_replace_editor_args(arguments: dict) -> tuple[str, str]:
     """Validate required arguments for str_replace_editor tool."""
     tool_name = create_str_replace_editor_tool()["function"]["name"]
-    if "command" not in arguments:
-        msg = f'Missing required argument "command" in tool call {tool_name}'
-        raise FunctionCallValidationError(msg)
+    command = _require_tool_argument(arguments, "command", tool_name)
     path = arguments.get("path")
     if not path:
         msg = f'Missing required argument "path" in tool call {tool_name}'
         raise FunctionCallValidationError(msg)
-    return str(path), str(arguments["command"])
+    return str(path), str(command)
 
 
 def _normalize_file_editor_command_and_args(
@@ -656,7 +662,7 @@ def _apply_confidence_preview_override(kwargs: dict, path: str) -> None:
 
 def _is_preview_enabled(raw: Any) -> bool:
     """Parse preview flag from tool arguments."""
-    return raw is True or (isinstance(raw, str) and raw.lower() == "true")
+    return _parse_bool_argument(raw)
 
 
 def _handle_str_replace_editor_tool(arguments: dict) -> Action:
@@ -726,12 +732,9 @@ def _handle_check_tool_status_tool(
 
 def _handle_think_tool(arguments: dict) -> AgentThinkAction:
     """Handle ThinkTool tool call."""
-    if "thought" not in arguments:
-        msg = f'Missing required argument "thought" in tool call {create_think_tool()["function"]["name"]}'
-        raise FunctionCallValidationError(
-            msg,
-        )
-    return AgentThinkAction(thought=arguments["thought"])
+    tool_name = create_think_tool()["function"]["name"]
+    thought = _require_tool_argument(arguments, "thought", tool_name)
+    return AgentThinkAction(thought=thought)
 
 
 def _handle_summarize_context_tool(arguments: dict) -> CondensationRequestAction:
@@ -768,12 +771,7 @@ def _normalize_task_tracker_list(raw_list: list) -> list[dict]:
 
 def _handle_task_tracker_tool(arguments: dict) -> Action:
     """Handle TASK_TRACKER_TOOL tool call."""
-    if "command" not in arguments:
-        raise FunctionCallValidationError(
-            f'Missing required argument "command" in tool call {TASK_TRACKER_TOOL_NAME}'
-        )
-
-    command = arguments["command"]
+    command = _require_tool_argument(arguments, "command", TASK_TRACKER_TOOL_NAME)
     if command == "plan":
         command = "update"
 
@@ -845,11 +843,7 @@ def _handle_mcp_tool(
 
 def _handle_execute_mcp_tool_tool(arguments: dict[str, Any]) -> MCPAction:
     """Handle the call_mcp_tool gateway — route to the real MCP tool."""
-    tool_name = arguments.get("tool_name", "")
-    if not tool_name:
-        raise FunctionCallValidationError(
-            'Missing required argument "tool_name" in call_mcp_tool'
-        )
+    tool_name = _require_tool_argument(arguments, "tool_name", "call_mcp_tool")
     inner_args = arguments.get("arguments", {})
     if not isinstance(inner_args, Mapping):
         inner_args = {}
@@ -871,18 +865,9 @@ def _validate_ast_code_editor_args(arguments: dict, tool_name: str) -> tuple[str
         FunctionCallValidationError: If validation fails
 
     """
-    if "command" not in arguments:
-        raise FunctionCallValidationError(
-            f'Missing required argument "command" in tool call {tool_name}'
-        )
-
-    path = arguments.get("path")
-    if not path:
-        raise FunctionCallValidationError(
-            f'Missing required argument "path" in tool call {tool_name}'
-        )
-
-    return str(arguments["command"]), str(path)
+    command = _require_tool_argument(arguments, "command", tool_name)
+    path = _require_tool_argument(arguments, "path", tool_name)
+    return str(command), str(path)
 
 
 def _normalize_ast_code_editor_alias(
@@ -1001,7 +986,7 @@ def _handle_create_file_command(path: str, arguments: dict) -> Action:
     )
 
 
-def _handle_view_file_command(path: str) -> Action:
+def _handle_view_file_command(path: str, _arguments: dict | None = None) -> Action:
     """Handle view_file command — reads file contents."""
     return FileReadAction(path=path, impl_source=FileReadSource.FILE_EDITOR)
 
@@ -1023,7 +1008,7 @@ def _handle_insert_text_command(path: str, arguments: dict) -> Action:
     )
 
 
-def _handle_undo_last_edit_command(path: str) -> Action:
+def _handle_undo_last_edit_command(path: str, _arguments: dict | None = None) -> Action:
     """Handle undo_last_edit command — reverts last edit to file."""
     return FileEditAction(
         path=path,
@@ -1088,10 +1073,10 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
     }
     # File I/O commands delegate directly to runtime actions (no StructureEditor needed)
     simple_command_handlers = {
-        "create_file": lambda fp, args: _handle_create_file_command(fp, args),
-        "view_file": lambda fp, _args: _handle_view_file_command(fp),
-        "insert_text": lambda fp, args: _handle_insert_text_command(fp, args),
-        "undo_last_edit": lambda fp, _args: _handle_undo_last_edit_command(fp),
+        "create_file": _handle_create_file_command,
+        "view_file": _handle_view_file_command,
+        "insert_text": _handle_insert_text_command,
+        "undo_last_edit": _handle_undo_last_edit_command,
     }
 
     # Execute command
@@ -1205,7 +1190,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
             args, {}
         ),  # Simplified for static map
         WORKSPACE_STATUS_TOOL_NAME: _handle_workspace_status_tool,
-        QUERY_ERROR_SOLUTIONS_TOOL_NAME: _handle_query_error_solutions_tool,
+        ERROR_RECOVERY_MEMORY_TOOL_NAME: _handle_error_recovery_memory_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         REVERT_TO_CHECKPOINT_TOOL_NAME: build_revert_to_checkpoint_action,

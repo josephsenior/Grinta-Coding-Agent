@@ -27,6 +27,7 @@ class SafetyValidatorMiddleware(ToolInvocationMiddleware):
         from backend.controller.safety_validator import ExecutionContext
         from backend.events.event import EventSource
         from backend.events.observation import ErrorObservation
+        from backend.events.observation_cause import attach_observation_cause
 
         context = ExecutionContext(
             session_id=self.controller.id or "",
@@ -55,6 +56,8 @@ class SafetyValidatorMiddleware(ToolInvocationMiddleware):
             content=f"ACTION BLOCKED FOR SAFETY:\n{validation.blocked_reason}",
             error_id="SAFETY_VALIDATOR_BLOCKED",
         )
-        error_obs.cause = getattr(ctx.action, "id", None)
+        attach_observation_cause(
+            error_obs, ctx.action, context="safety_validator.blocked"
+        )
         self.controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
         self.controller._pending_action = None

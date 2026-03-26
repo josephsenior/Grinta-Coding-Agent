@@ -51,7 +51,7 @@ Missing: {e}
 
 PRODUCTION DEPLOYMENT FIX:
 1. Ensure pyproject.toml has Tree-sitter as required dependency (NOT optional)
-2. Reinstall dependencies with: poetry install
+2. Reinstall dependencies with: uv sync
 3. Verify with: python -c "import tree_sitter; print('OK')"
 
 For immediate fix: pip install tree-sitter tree-sitter-language-pack

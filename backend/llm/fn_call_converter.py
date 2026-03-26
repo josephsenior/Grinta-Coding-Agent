@@ -3,12 +3,45 @@
 
 This will inject prompts so that models that doesn't support function calling
 can still be used with function calling agents.
+
+**Pseudo-XML tool call contract (non-native / string mode)**
+
+Models emit a single call per assistant message, shaped like::
+
+    <function=name>
+    <parameter=key>value</parameter>
+    ...
+    </function>
+
+- Whitespace is allowed around ``=``, tags, and names by strict tag parsing.
+- Tag names are case-sensitive as written; patterns allow flexible spacing.
+- Parameter bodies use non-greedy matching up to the first literal
+  ``</parameter>``; avoid embedding that substring inside values.
+- ``STOP_WORDS`` (e.g. ``"</function"``) is used for streaming boundaries only.
+    ``_fix_stopword`` no longer mutates outputs.
+
+**Tool result lines**
+
+User-side history uses strict structured payload blocks::
+
+    <forge_tool_result_json>{"tool_name":"...","content":...}</forge_tool_result_json>
+
+This avoids ambiguous free-text parsing and guarantees deterministic round-trip.
+
+**Native tool calls**
+
+When the stack uses provider-native tool calls, this markup is bypassed; these
+patterns apply only to the string conversion paths. Prefer models and providers
+that expose native function/tool calling so traffic stays on structured tool
+messages instead of this pseudo-XML path.
+
+Tool result line syntax is shared via :mod:`backend.llm.tool_result_format`.
 """
 
 import copy
 import json
-import re
 import sys
+from threading import Lock
 from collections.abc import Iterable
 from typing import Any
 
@@ -22,9 +55,50 @@ from backend.llm.tool_names import (
     LLM_BASED_EDIT_TOOL_NAME,
     STR_REPLACE_EDITOR_TOOL_NAME,
 )
+from backend.llm.tool_result_format import (
+    TOOL_RESULT_BLOCK_PREFIX,
+    TOOL_RESULT_BLOCK_SUFFIX,
+    decode_tool_result_payload,
+    encode_tool_result_payload,
+)
 
 SYSTEM_PROMPT_SUFFIX_TEMPLATE = "\nYou have access to the following functions:\n\n{description}\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<function=example_function_name>\n<parameter=example_parameter_1>value_1</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format, start with <function= and end with </function>\n- Required parameters MUST be specified\n- Only call one function at a time\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n"
 STOP_WORDS = ["</function"]
+
+_STRICT_PARSE_SUCCESS = "strict_parse_success"
+_STRICT_PARSE_FAILURE = "strict_parse_failure"
+_MALFORMED_PAYLOAD_REJECTION = "malformed_payload_rejection"
+_FN_CALL_PARSE_COUNTER_KEYS = (
+    _STRICT_PARSE_SUCCESS,
+    _STRICT_PARSE_FAILURE,
+    _MALFORMED_PAYLOAD_REJECTION,
+)
+_fn_call_parse_counters_lock = Lock()
+_fn_call_parse_counters: dict[str, int] = {
+    key: 0 for key in _FN_CALL_PARSE_COUNTER_KEYS
+}
+
+
+def _increment_parse_counter(counter_name: str) -> None:
+    """Increment one parse telemetry counter in a threadsafe way."""
+    with _fn_call_parse_counters_lock:
+        _fn_call_parse_counters[counter_name] += 1
+
+
+def get_fn_call_parse_telemetry_counters() -> dict[str, int]:
+    """Return a snapshot of strict parser telemetry counters."""
+    with _fn_call_parse_counters_lock:
+        return dict(_fn_call_parse_counters)
+
+
+def reset_fn_call_parse_telemetry_counters() -> None:
+    """Reset strict parser telemetry counters.
+
+    Primarily used by unit tests to keep assertions isolated.
+    """
+    with _fn_call_parse_counters_lock:
+        for key in _FN_CALL_PARSE_COUNTER_KEYS:
+            _fn_call_parse_counters[key] = 0
 
 
 def refine_prompt(prompt: str) -> str:
@@ -216,11 +290,6 @@ def _build_example_footer() -> str:
 
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = get_example_for_tools
 IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX = "\n--------------------- END OF NEW TASK DESCRIPTION ---------------------\n\nPLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PER MESSAGE.\n"
-FN_REGEX_PATTERN = "<function=([^>]+)>\\n(.*?)</function>"
-FN_PARAM_REGEX_PATTERN = "<parameter=([^>]+)>(.*?)</parameter>"
-TOOL_RESULT_REGEX_PATTERN = "EXECUTION RESULT of \\[(.*?)\\]:\\n(.*)"
-
-
 def convert_tool_call_to_string(tool_call: dict) -> str:
     """Convert tool call to content in string format.
 
@@ -386,10 +455,7 @@ def _process_system_message(content: Any, system_prompt_suffix: str) -> dict:
         else:
             content.append({"type": "text", "text": system_prompt_suffix})
     else:
-        msg = f"Unexpected content type {type(content)}. Expected str or list. Content: {content}"
-        raise FunctionCallConversionError(
-            msg,
-        )
+        _raise_unexpected_content_type(content)
     return {"role": "system", "content": content}
 
 
@@ -416,10 +482,7 @@ def _add_in_context_learning_example(content: Any, tools: list[dict]) -> Any:
         return example + content
     if isinstance(content, list):
         return _add_example_to_list_content(content, example)
-    msg = f"Unexpected content type {type(content)}. Expected str or list. Content: {content}"
-    raise FunctionCallConversionError(
-        msg,
-    )
+    _raise_unexpected_content_type(content)
 
 
 def _add_example_to_list_content(content: list, example: str) -> list:
@@ -486,11 +549,7 @@ def _convert_single_message(
 
 
 def _convert_assistant_message(content: Any) -> dict:
-    if (
-        isinstance(content, str)
-        and "<function=" in content
-        and ("</function>" in content)
-    ):
+    if isinstance(content, str) and _parse_function_call_from_text(content):
         return {"role": "assistant", "content": content, "tool_calls": []}
     return {"role": "assistant", "content": content}
 
@@ -504,21 +563,11 @@ def _convert_tool_message(message: dict) -> dict:
 
 
 def _format_tool_content(content: Any, tool_name: str) -> list[dict]:
-    prefix = f"EXECUTION RESULT of [{tool_name}]:\n"
-    if isinstance(content, str):
-        return [{"type": "text", "text": f"{prefix}{content}"}]
-    if isinstance(content, list):
-        cloned_content = copy.deepcopy(content)
-        for item in cloned_content:
-            if item.get("type") == "text":
-                item["text"] = f"{prefix}{item['text']}"
-                break
-        return cloned_content
-    return [{"type": "text", "text": f"{prefix}{str(content)}"}]
+    return [{"type": "text", "text": encode_tool_result_payload(tool_name, content)}]
 
 
 def _extract_and_validate_params(
-    matching_tool: dict, param_matches: Iterable[re.Match], fn_name: str
+    matching_tool: dict, param_matches: Iterable[Any], fn_name: str
 ) -> dict:
     """Extract and validate parameters from function call matches."""
     # Extract parameter schema information
@@ -531,6 +580,13 @@ def _extract_and_validate_params(
     for param_match in param_matches:
         param_name = param_match.group(1)
         param_value = param_match.group(2)
+
+        if param_name in found_params:
+            msg = (
+                f"Duplicate parameter '{param_name}' provided for function '{fn_name}'. "
+                "Each parameter may appear at most once."
+            )
+            raise FunctionCallValidationError(msg)
 
         # Validate parameter is allowed
         _validate_parameter_allowed(param_name, param_schema["allowed_params"], fn_name)
@@ -657,39 +713,17 @@ def _validate_required_parameters(
 
 
 def _fix_stopword(content: str) -> str:
-    """Fix the issue when some LLM would NOT return the stopword."""
-    if "<function=" in content and content.count("<function=") == 1:
-        if content.endswith("</"):
-            content = f"{content.rstrip()}function>"
-        else:
-            content += "\n</function>"
-    return content
+    """Return content unchanged.
 
-
-def _normalize_parameter_tags(fn_body: str) -> str:
-    """Normalize malformed parameter tags to the canonical format.
-
-    Some models occasionally emit malformed parameter tags like:
-        <parameter=name=value</parameter>
-    instead of the correct:
-        <parameter=name>value</parameter>
-
-    This function rewrites the malformed form into the correct one to allow
-    downstream parsing to succeed.
+    Strict mode: malformed/truncated function-call payloads are no longer
+    auto-repaired and must fail parsing as-is.
     """
-    return re.sub(
-        "<parameter=([a-zA-Z0-9_]+)=([^<]*)</parameter>",
-        "<parameter=\\1>\\2</parameter>",
-        fn_body,
-    )
+    return content
 
 
 def _process_system_message_reverse(content: Any, system_prompt_suffix: str) -> dict:
     """Process system message by removing the tool suffix (for reverse conversion)."""
-    if isinstance(content, str):
-        content = content.split(system_prompt_suffix)[0]
-    elif isinstance(content, list) and content and content[-1]["type"] == "text":
-        content[-1]["text"] = content[-1]["text"].split(system_prompt_suffix)[0]
+    content = _trim_system_prompt_suffix(content, system_prompt_suffix)
     return {"role": "system", "content": content}
 
 
@@ -701,14 +735,10 @@ def _process_user_message_reverse(content: Any, tools: list[dict]) -> dict:
     """
     content = _remove_in_context_learning_examples(content, tools)
 
-    # Check if this user message is actually a tool result that should have 'tool' role
-    is_tool_result = _find_tool_result_match(content)
-
-    content = _convert_tool_results(content)
-
-    # If it's a tool result, return with 'tool' role for proper round-trip conversion
-    if is_tool_result:
-        return {"role": "tool", "content": content}
+    # Structured tool result blocks are the only accepted non-native format.
+    if parsed := _extract_structured_tool_result(content):
+        tool_name, tool_content = parsed
+        return {"role": "tool", "name": tool_name, "content": tool_content}
 
     return {"role": "user", "content": content}
 
@@ -719,10 +749,7 @@ def _remove_in_context_learning_examples(content: Any, tools: list[dict]) -> Any
         return _remove_examples_from_string(content, tools)
     if isinstance(content, list):
         return _remove_examples_from_list(content, tools)
-    msg = f"Unexpected content type {type(content)}. Expected str or list. Content: {content}"
-    raise FunctionCallConversionError(
-        msg,
-    )
+    _raise_unexpected_content_type(content)
 
 
 def _remove_examples_from_string(content: str, tools: list[dict]) -> str:
@@ -749,56 +776,39 @@ def _remove_examples_from_list(content: list, tools: list[dict]) -> list:
     return content
 
 
-def _convert_tool_results(content: Any) -> Any:
-    """Convert tool results in content."""
-    if _find_tool_result_match(content):
-        return _apply_tool_result_conversion(content)
-    return content
-
-
 def _find_tool_result_match(content: Any) -> Any:
-    """Find tool result match in content."""
+    """Return decoded structured tool-result payload or None."""
+    return _extract_structured_tool_result(content)
+
+
+def _extract_structured_tool_result(content: Any) -> tuple[str, Any] | None:
+    """Decode strict structured tool result payload from string or text list."""
     if isinstance(content, str):
-        return re.search(TOOL_RESULT_REGEX_PATTERN, content, re.DOTALL)
-    if isinstance(content, list):
-        return next(
-            (
-                _match
-                for item in content
-                if item.get("type") == "text"
-                and (
-                    _match := re.search(
-                        TOOL_RESULT_REGEX_PATTERN, item["text"], re.DOTALL
-                    )
-                )
-            ),
-            None,
-        )
-    msg = f"Unexpected content type {type(content)}. Expected str or list. Content: {content}"
-    raise FunctionCallConversionError(
-        msg,
-    )
-
-
-def _apply_tool_result_conversion(content: Any) -> Any:
-    """Apply tool result conversion to content."""
+        decoded = decode_tool_result_payload(content)
+        if decoded is None and _looks_like_tool_result_candidate(content):
+            _increment_parse_counter(_MALFORMED_PAYLOAD_REJECTION)
+        return decoded
     if isinstance(content, list):
         for item in content:
-            if item.get("type") == "text":
-                item["text"] = re.sub(
-                    TOOL_RESULT_REGEX_PATTERN,
-                    "<tool_result><tool_name>\\1</tool_name><content>\\2</content></tool_result>",
-                    item["text"],
-                    flags=re.DOTALL,
-                )
-    else:
-        content = re.sub(
-            TOOL_RESULT_REGEX_PATTERN,
-            "<tool_result><tool_name>\\1</tool_name><content>\\2</content></tool_result>",
-            content,
-            flags=re.DOTALL,
-        )
-    return content
+            if item.get("type") != "text":
+                continue
+            text = item.get("text", "")
+            decoded = decode_tool_result_payload(text)
+            if decoded is None and _looks_like_tool_result_candidate(text):
+                _increment_parse_counter(_MALFORMED_PAYLOAD_REJECTION)
+            if decoded is not None:
+                return decoded
+        return None
+    _raise_unexpected_content_type(content)
+
+
+def _looks_like_tool_result_candidate(text: str) -> bool:
+    """Return whether text appears to be intended as a structured tool-result block."""
+    stripped = (text or "").strip()
+    return (
+        TOOL_RESULT_BLOCK_PREFIX in stripped
+        or TOOL_RESULT_BLOCK_SUFFIX in stripped
+    )
 
 
 def _trim_system_prompt_suffix(content: Any, system_prompt_suffix: str) -> Any:
@@ -810,28 +820,111 @@ def _trim_system_prompt_suffix(content: Any, system_prompt_suffix: str) -> Any:
     return content
 
 
+def _find_char(text: str, char: str, start: int = 0) -> int:
+    """Find ``char`` in ``text`` at/after ``start``; returns -1 when absent."""
+    try:
+        return text.index(char, start)
+    except ValueError:
+        return -1
+
+
+def _parse_named_open_tag(text: str, tag: str, start: int = 0) -> tuple[str, int, int] | None:
+    """Parse ``<tag=name>`` with optional whitespace around tokens.
+
+    Returns ``(name, open_start_index, open_end_index)`` where end index points
+    right after ``>``.
+    """
+    search = start
+    while True:
+        open_idx = _find_char(text, "<", search)
+        if open_idx < 0:
+            return None
+        close_idx = _find_char(text, ">", open_idx + 1)
+        if close_idx < 0:
+            return None
+        inner = text[open_idx + 1 : close_idx].strip()
+        if not inner.startswith(tag):
+            search = close_idx + 1
+            continue
+        remainder = inner[len(tag) :].lstrip()
+        if not remainder.startswith("="):
+            search = close_idx + 1
+            continue
+        name = remainder[1:].strip()
+        if not name:
+            search = close_idx + 1
+            continue
+        return name, open_idx, close_idx + 1
+
+
+def _find_named_close_tag(text: str, tag: str, start: int) -> tuple[int, int] | None:
+    """Find closing tag ``</tag>`` with optional whitespace.
+
+    Returns ``(close_start_index, close_end_index)`` where end index points
+    right after ``>``.
+    """
+    search = start
+    while True:
+        open_idx = _find_char(text, "<", search)
+        if open_idx < 0:
+            return None
+        close_idx = _find_char(text, ">", open_idx + 1)
+        if close_idx < 0:
+            return None
+        inner = text[open_idx + 1 : close_idx].strip()
+        if inner.startswith("/") and inner[1:].strip() == tag:
+            return open_idx, close_idx + 1
+        search = close_idx + 1
+
+
+def _parse_function_call_from_text(text: str) -> dict[str, Any] | None:
+    """Parse the first strict function-call block from plain text."""
+    open_tag = _parse_named_open_tag(text, "function", 0)
+    if open_tag is None:
+        return None
+    fn_name, open_start, open_end = open_tag
+    close_tag = _find_named_close_tag(text, "function", open_end)
+    if close_tag is None:
+        _increment_parse_counter(_STRICT_PARSE_FAILURE)
+        return None
+    close_start, close_end = close_tag
+    fn_body = text[open_end:close_start]
+    return {
+        "fn_name": fn_name,
+        "fn_body": fn_body,
+        "start": open_start,
+        "end": close_end,
+    }
+
+
 def _find_tool_call_match(content: Any) -> Any:
-    """Find tool call match in content."""
+    """Find parsed tool call payload in content.
+
+    Returns a dict with parsed fields and source location, or ``None``.
+    """
     if isinstance(content, str):
-        return re.search(FN_REGEX_PATTERN, content, re.DOTALL)
+        parsed = _parse_function_call_from_text(content)
+        if parsed is None:
+            return None
+        parsed["container"] = "str"
+        return parsed
     if isinstance(content, list):
-        return next(
-            (
-                _match
-                for item in content
-                if item.get("type") == "text"
-                and (_match := re.search(FN_REGEX_PATTERN, item["text"], re.DOTALL))
-            ),
-            None,
-        )
+        for idx, item in enumerate(content):
+            if item.get("type") != "text":
+                continue
+            parsed = _parse_function_call_from_text(item.get("text", ""))
+            if parsed is None:
+                continue
+            parsed["container"] = "list"
+            parsed["item_index"] = idx
+            return parsed
+        return None
     return None
 
 
 def _extract_tool_call_info(tool_call_match: Any) -> tuple[str, str]:
-    """Extract function name and body from tool call match."""
-    fn_name = tool_call_match.group(1)
-    fn_body = _normalize_parameter_tags(tool_call_match.group(2))
-    return fn_name, fn_body
+    """Extract function name and body from parsed tool call payload."""
+    return str(tool_call_match["fn_name"]), str(tool_call_match["fn_body"])
 
 
 def _find_matching_tool(fn_name: str, tools: list[dict]) -> dict:
@@ -857,8 +950,11 @@ def _create_tool_call(
     fn_name: str, fn_body: str, matching_tool: dict, tool_call_counter: int
 ) -> tuple[dict, int]:
     """Create tool call object and increment counter."""
-    param_matches = re.finditer(FN_PARAM_REGEX_PATTERN, fn_body, re.DOTALL)
-    params = _extract_and_validate_params(matching_tool, param_matches, fn_name)
+    params = _extract_and_validate_params(
+        matching_tool,
+        _iter_parameter_matches(fn_body),
+        fn_name,
+    )
     tool_call_id = f"toolu_{tool_call_counter:02d}"
     tool_call = {
         "index": 1,
@@ -869,22 +965,64 @@ def _create_tool_call(
     return tool_call, tool_call_counter + 1
 
 
-def _trim_content_before_function(content: Any) -> Any:
+def _iter_parameter_matches(fn_body: str) -> Iterable[Any]:
+    """Yield regex-like parameter matches parsed via strict tag scanning."""
+    class _PseudoMatch:
+        def __init__(self, name: str, value: str) -> None:
+            self._name = name
+            self._value = value
+
+        def group(self, index: int) -> str:
+            if index == 1:
+                return self._name
+            if index == 2:
+                return self._value
+            raise IndexError(index)
+
+    pos = 0
+    last_close_end = 0
+    while True:
+        open_tag = _parse_named_open_tag(fn_body, "parameter", pos)
+        if open_tag is None:
+            break
+        param_name, _open_start, open_end = open_tag
+        close_tag = _find_named_close_tag(fn_body, "parameter", open_end)
+        if close_tag is None:
+            raise FunctionCallValidationError(
+                "Malformed parameter block: missing closing </parameter> tag"
+            )
+        close_start, close_end = close_tag
+        param_value = fn_body[open_end:close_start]
+        yield _PseudoMatch(param_name, param_value)
+        pos = close_end
+        last_close_end = close_end
+
+    trailing = fn_body[last_close_end:] if last_close_end else fn_body
+    if trailing.strip():
+        raise FunctionCallValidationError(
+            "Unexpected trailing text after last parameter inside function block"
+        )
+
+
+def _trim_content_before_function(content: Any, tool_call_match: Any) -> Any:
     """Trim content before function call."""
     if isinstance(content, list):
-        if not content:
+        item_index = tool_call_match.get("item_index")
+        if item_index is None:
             return content
-        if content[-1].get("type") != "text":
-            return content
-        content[-1]["text"] = content[-1]["text"].split("<function=")[0].strip()
+        text = content[item_index].get("text", "")
+        content[item_index]["text"] = text[: int(tool_call_match["start"])].strip()
     elif isinstance(content, str):
-        content = content.split("<function=")[0].strip()
+        content = content[: int(tool_call_match["start"])].strip()
     else:
-        msg = f"Unexpected content type {type(content)}. Expected str or list. Content: {content}"
-        raise FunctionCallConversionError(
-            msg,
-        )
+        _raise_unexpected_content_type(content)
     return content
+
+
+def _raise_unexpected_content_type(content: Any) -> None:
+    """Raise a consistent conversion error for unsupported message content types."""
+    msg = f"Unexpected content type {type(content)}. Expected str or list. Content: {content}"
+    raise FunctionCallConversionError(msg)
 
 
 def _process_assistant_message_for_conversion(
@@ -899,24 +1037,29 @@ def _process_assistant_message_for_conversion(
     content = _trim_system_prompt_suffix(content, system_prompt_suffix)
 
     if tool_call_match := _find_tool_call_match(content):
-        # Extract tool call information
-        fn_name, fn_body = _extract_tool_call_info(tool_call_match)
+        try:
+            # Extract tool call information
+            fn_name, fn_body = _extract_tool_call_info(tool_call_match)
 
-        # Find matching tool and validate
-        matching_tool = _find_matching_tool(fn_name, tools)
+            # Find matching tool and validate
+            matching_tool = _find_matching_tool(fn_name, tools)
 
-        # Create tool call
-        tool_call, tool_call_counter = _create_tool_call(
-            fn_name, fn_body, matching_tool, tool_call_counter
-        )
+            # Create tool call
+            tool_call, tool_call_counter = _create_tool_call(
+                fn_name, fn_body, matching_tool, tool_call_counter
+            )
 
-        # Trim content before function call
-        content = _trim_content_before_function(content)
+            # Trim content before function call
+            content = _trim_content_before_function(content, tool_call_match)
 
-        # Add to converted messages
-        converted_messages.append(
-            {"role": "assistant", "content": content, "tool_calls": [tool_call]}
-        )
+            # Add to converted messages
+            converted_messages.append(
+                {"role": "assistant", "content": content, "tool_calls": [tool_call]}
+            )
+            _increment_parse_counter(_STRICT_PARSE_SUCCESS)
+        except (FunctionCallValidationError, FunctionCallConversionError):
+            _increment_parse_counter(_STRICT_PARSE_FAILURE)
+            raise
     else:
         # No tool call found, add as regular message
         converted_messages.append({"role": "assistant", "content": content})

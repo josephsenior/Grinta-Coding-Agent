@@ -38,6 +38,7 @@ from backend.runtime import RuntimeAcquireResult, runtime_orchestrator
 from backend.api.app_accessors import get_event_service_adapter
 from backend.api.types import LLMAuthenticationError
 from backend.api.utils.error_formatter import format_error_for_user
+from backend.llm.fn_call_converter import get_fn_call_parse_telemetry_counters
 from backend.storage.data_models.user_secrets import UserSecrets
 from backend.utils.async_utils import EXECUTOR, call_sync_from_async
 from backend.utils.shutdown_listener import should_continue
@@ -245,12 +246,7 @@ class AgentSession:
             )
 
             if not ctx.runtime_connected:
-                msg = "Runtime failed to connect"
-                self.logger.warning(
-                    "Runtime failed to connect — skipping controller setup"
-                )
-                ctx.fail(msg)
-                raise RuntimeConnectError(msg)
+                self._handle_runtime_connect_failure(ctx)
 
             # Phase: MEMORY
             ctx.phase = StartupPhase.MEMORY
@@ -299,16 +295,27 @@ class AgentSession:
             ctx.finished = True
 
         except Exception as e:
-            if ctx.error_msg is None:
-                ctx.fail(str(e), e)
-            if ctx.error_exception is None:
-                ctx.error_exception = e
-            # Preserve error context on the exception for upstream handlers
-            if ctx.error_context and hasattr(e, "__dict__"):
-                e.__dict__.update(ctx.error_context)
+            self._capture_startup_exception(ctx, e)
             raise
         finally:
             await self._finalize_session_startup(ctx)
+
+    def _handle_runtime_connect_failure(self, ctx: StartupContext) -> None:
+        """Record and raise runtime-connection startup failures consistently."""
+        msg = "Runtime failed to connect"
+        self.logger.warning("Runtime failed to connect — skipping controller setup")
+        ctx.fail(msg)
+        raise RuntimeConnectError(msg)
+
+    def _capture_startup_exception(self, ctx: StartupContext, exc: Exception) -> None:
+        """Persist startup failure details and copy contextual fields onto exception."""
+        if ctx.error_msg is None:
+            ctx.fail(str(exc), exc)
+        if ctx.error_exception is None:
+            ctx.error_exception = exc
+        # Preserve error context on the exception for upstream handlers.
+        if ctx.error_context and hasattr(exc, "__dict__"):
+            exc.__dict__.update(ctx.error_context)
 
     def _validate_session_state(self) -> bool:
         """Validate that the session can be started."""
@@ -332,18 +339,6 @@ class AgentSession:
         """
         # Validate API key presence and non-emptiness
         if not llm_config.api_key or llm_config.api_key.get_secret_value().isspace():
-            model_name = llm_config.model or "the selected model"
-            # Extract provider name from model if possible
-            if "/" in model_name:
-                model_name = model_name.split("/")[0].title()
-            elif (
-                "claude" in model_name.lower()
-                or "gpt" in model_name.lower()
-                or "openai" in model_name.lower()
-                or "gemini" in model_name.lower()
-            ):
-                pass
-
             raise LLMAuthenticationError(
                 "Error authenticating with the LLM provider. Please check your API key"
             )
@@ -366,19 +361,6 @@ class AgentSession:
                     llm_config.model,
                 )
                 raise
-
-    def _determine_provider_name(self, model_name: str) -> str:
-        """Determine the provider name from a model string."""
-        if "/" in model_name:
-            return model_name.split("/")[0].title()
-        model_lower = model_name.lower()
-        if "claude" in model_lower:
-            return "Anthropic (Claude)"
-        if "gpt" in model_lower or "openai" in model_lower:
-            return "OpenAI"
-        if "gemini" in model_lower:
-            return "Google (Gemini)"
-        return "Unknown"
 
     async def _handle_plugin_phase(self) -> None:
         """Handle the PLUGIN phase of session startup."""
@@ -426,15 +408,20 @@ class AgentSession:
             selected_repository=selected_repository,
             selected_branch=selected_branch,
         )
-        if result.success:
-            self.runtime = result.runtime
-            self._runtime_acquire_result = result.acquire_result
-            self._repo_directory = result.repo_directory
+        self._apply_runtime_result(result)
 
         # Setup provider handlers
         await self._setup_provider_handlers(vcs_provider_tokens, custom_secrets)
 
         return result.success
+
+    def _apply_runtime_result(self, result: RuntimeAcquireResult) -> None:
+        """Copy successful runtime acquisition result onto session fields."""
+        if not result.success:
+            return
+        self.runtime = result.runtime
+        self._runtime_acquire_result = result.acquire_result
+        self._repo_directory = result.repo_directory
 
     async def _setup_provider_handlers(
         self, vcs_provider_tokens, custom_secrets
@@ -576,13 +563,7 @@ class AgentSession:
         success = ctx.finished and ctx.runtime_connected
         self._startup_failed = not success
 
-        log_metadata = {
-            "signal": "agent_session_start",
-            "success": success,
-            "phase": ctx.phase.value,
-            "duration": ctx.duration,
-            "restored_state": ctx.restored_state,
-        }
+        log_metadata = self._build_startup_log_metadata(ctx, success)
 
         if success:
             self.logger.info(
@@ -595,6 +576,19 @@ class AgentSession:
                 extra=log_metadata,
             )
             await self._handle_startup_failure_observations(ctx)
+
+    def _build_startup_log_metadata(
+        self, ctx: StartupContext, success: bool
+    ) -> dict[str, Any]:
+        """Build structured startup log metadata payload."""
+        return {
+            "signal": "agent_session_start",
+            "success": success,
+            "phase": ctx.phase.value,
+            "duration": ctx.duration,
+            "restored_state": ctx.restored_state,
+            "strict_parse_telemetry": get_fn_call_parse_telemetry_counters(),
+        }
 
     async def _handle_startup_failure_observations(self, ctx: StartupContext) -> None:
         """Handle error observations when session startup fails."""

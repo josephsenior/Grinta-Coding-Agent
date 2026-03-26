@@ -4,7 +4,7 @@ from .apply_patch import create_apply_patch_tool
 from .bash import create_cmd_run_tool
 from .checkpoint import create_checkpoint_tool
 from .condensation_request import create_summarize_context_tool
-from .query_error_solutions import create_query_error_solutions_tool
+from .error_recovery_memory import create_error_recovery_memory_tool
 from .explore_code import (
     create_explore_tree_structure_tool,
     create_read_symbol_definition_tool,
@@ -50,7 +50,7 @@ __all__ = [
     "create_signal_progress_tool",
     "create_think_tool",
     "create_cmd_run_tool",
-    "create_query_error_solutions_tool",
+    "create_error_recovery_memory_tool",
     "create_str_replace_editor_tool",
     "create_structure_editor_tool",
     "create_task_tracker_tool",

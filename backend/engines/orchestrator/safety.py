@@ -10,8 +10,10 @@ if TYPE_CHECKING:
 class OrchestratorSafetyManager:
     """Deterministic safety manager.
 
-    The previous anti-hallucination layer was removed; this class now acts as a
-    no-op safety shim that preserves the orchestrator integration points.
+    DEPRECATED: The legacy anti-hallucination layer was removed because structural
+    function calling effectively mitigates hallucinations at the provider level. 
+    This class now acts as a minimal safety shim, preserving orchestrator integration
+    points so the architecture can introduce new safety constraints in the future.
     """
 
     def __init__(self, *args, **kwargs) -> None:

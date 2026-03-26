@@ -5,12 +5,12 @@ This is a WebSocket server that executes tasks using an agent.
 ## Prerequisites
 
 - Python 3.12+
-- Poetry
+- uv
 
 ## Install
 
 ```sh
-poetry install
+uv sync
 ```
 
 ## Start the Server

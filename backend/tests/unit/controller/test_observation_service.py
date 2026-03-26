@@ -166,11 +166,14 @@ class TestHandleObservation:
         pending_svc.set.assert_called_with(None)
 
     @pytest.mark.asyncio
-    async def test_non_matching_cause_skips(self):
+    async def test_non_matching_cause_recovers(self):
         ctx = _make_context()
         pending_action = SimpleNamespace(id=42)
         pending_svc = _make_pending_service(action=pending_action)
         svc = ObservationService(ctx, pending_svc)
         obs = _make_observation(content="other", cause=99)  # different cause
         await svc.handle_observation(obs)
-        pending_svc.set.assert_not_called()
+        pending_svc.set.assert_called_once_with(None)
+        ctx.discard_invocation_context_for_action.assert_called_once_with(pending_action)
+        ctx.emit_event.assert_called_once()
+        ctx.trigger_step.assert_called_once_with()

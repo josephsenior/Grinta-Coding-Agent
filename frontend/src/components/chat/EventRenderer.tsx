@@ -27,16 +27,17 @@ import { ThinkCard } from "./ThinkCard";
 
 interface EventCardProps {
   event: ForgeEvent;
+  thinkDurationMs?: number;
 }
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({ event, thinkDurationMs }: EventCardProps) {
   // Actions
   if ("action" in event) {
     const action = event as ActionEvent;
     const renderAction = () => {
       switch (action.action) {
       case ActionType.MESSAGE:
-        return <MessageBubble event={action} />;
+        return <MessageBubble event={action} thoughtDurationMs={thinkDurationMs} />;
       case ActionType.READ:
       case ActionType.WRITE:
       case ActionType.EDIT:
@@ -73,7 +74,7 @@ export function EventCard({ event }: EventCardProps) {
         return null;
 
       case ActionType.THINK:
-        return <ThinkCard event={action} />;
+        return <ThinkCard event={action} durationMs={thinkDurationMs} />;
 
       // Silent / internal actions
       case ActionType.NULL:

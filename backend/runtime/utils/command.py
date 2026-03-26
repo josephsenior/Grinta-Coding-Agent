@@ -120,7 +120,7 @@ def get_action_execution_server_startup_command(
         server_port: The port number for the server.
         plugins: List of plugin requirements.
         app_config: Forge configuration object.
-        python_prefix: Python command prefix (default: micromamba with poetry).
+        python_prefix: Python command prefix (default: micromamba with uv).
         override_user_id: Override user ID for the server process.
         override_username: Override username for the server process.
         main_module: Main module to execute (default: action_execution_server).

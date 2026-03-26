@@ -28,7 +28,7 @@ This repository contains the code for Forge, an automated AI software engineer. 
 
 ## General Setup:
 
-To set up the entire repo, run `make build` (or `poetry install` on Windows).
+To set up the entire repo, run `make build` (or `uv sync` on Windows).
 You don't need to do this unless the user asks you to, or if you're trying to run the entire application.
 
 Before pushing any changes, you should ensure that any lint errors or simple test errors have been fixed.
@@ -45,7 +45,7 @@ Backend:
 - Located in the `backend` directory
 - Testing:
   - All tests are in `backend/tests/unit/test_*.py`
-  - To test new code, run `poetry run pytest backend/tests/unit/test_xxx.py` where `xxx` is the appropriate file for the current functionality
+  - To test new code, run `uv run pytest backend/tests/unit/test_xxx.py` where `xxx` is the appropriate file for the current functionality
   - Write all tests with pytest
 
 Web UI:

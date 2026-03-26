@@ -7,6 +7,17 @@ interface MermaidBlockProps {
   chart: string;
 }
 
+type MermaidRenderResult = {
+  svg: string;
+  bindFunctions?: (target: HTMLDivElement | SVGElement) => void;
+};
+
+// Cache Mermaid render results by (theme, chart) so React re-renders (e.g. during streaming)
+// don't repeatedly call `mermaid.render()` or accidentally clear the container without re-rendering.
+const mermaidRenderCache = new Map<string, MermaidRenderResult>();
+const mermaidRenderInFlight = new Map<string, Promise<MermaidRenderResult>>();
+let lastInitializedTheme: string | null = null;
+
 /**
  * Renders a ```mermaid fenced block from chat markdown as an SVG diagram.
  */
@@ -32,23 +43,52 @@ export function MermaidBlock({ chart }: MermaidBlockProps) {
     const seq = ++renderSeq.current;
     setError(null);
 
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: theme === "dark" ? "dark" : "default",
-      securityLevel: "strict",
-      fontFamily: "inherit",
-    });
+    const mermaidTheme = theme === "dark" ? "dark" : "default";
+    if (lastInitializedTheme !== mermaidTheme) {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: mermaidTheme,
+        securityLevel: "strict",
+        fontFamily: "inherit",
+      });
+      lastInitializedTheme = mermaidTheme;
+    }
+
+    const renderKey = `${mermaidTheme}::${trimmed}`;
 
     const renderId = `mmd-${reactId}-${seq}-${Math.random().toString(36).slice(2, 8)}`;
 
     void (async () => {
       try {
-        const { svg, bindFunctions } = await mermaid.render(renderId, trimmed);
+        const cached = mermaidRenderCache.get(renderKey);
+        if (cached) {
+          if (cancelled || seq !== renderSeq.current) return;
+          const target = containerRef.current;
+          if (!target) return;
+          target.innerHTML = cached.svg;
+          cached.bindFunctions?.(target);
+          return;
+        }
+
+        const inFlight = mermaidRenderInFlight.get(renderKey);
+        const promise =
+          inFlight ??
+          (async () => {
+            const { svg, bindFunctions } = await mermaid.render(renderId, trimmed);
+            const result: MermaidRenderResult = { svg, bindFunctions };
+            mermaidRenderCache.set(renderKey, result);
+            return result;
+          })();
+
+        mermaidRenderInFlight.set(renderKey, promise);
+        const result = await promise;
+        mermaidRenderInFlight.delete(renderKey);
+
         if (cancelled || seq !== renderSeq.current) return;
         const target = containerRef.current;
         if (!target) return;
-        target.innerHTML = svg;
-        bindFunctions?.(target);
+        target.innerHTML = result.svg;
+        result.bindFunctions?.(target);
       } catch (e) {
         if (!cancelled && seq === renderSeq.current) {
           setError(e instanceof Error ? e.message : String(e));

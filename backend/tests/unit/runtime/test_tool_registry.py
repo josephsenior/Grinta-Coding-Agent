@@ -114,6 +114,15 @@ class TestRegistryProperties:
         reg = self._build_registry({"shell": ToolInfo("pwsh", True)})
         assert reg.has_bash is False
 
+    def test_has_bash_true_when_windows_separate_bash_tool_exists(self):
+        reg = self._build_registry(
+            {
+                "shell": ToolInfo("pwsh", True),
+                "bash": ToolInfo("bash", True),
+            }
+        )
+        assert reg.has_bash is True
+
     def test_has_powershell(self):
         reg = self._build_registry({"shell": ToolInfo("pwsh", True)})
         assert reg.has_powershell is True
@@ -169,3 +178,19 @@ class TestRegistryProperties:
         assert reg.has_git is False
         assert reg.has_tmux is False
         assert reg.has_bash is False
+
+
+class TestRuntimeContextProperties:
+    def test_is_container_runtime_property(self):
+        reg = object.__new__(ToolRegistry)
+        reg._tools = {}
+        reg._is_container = True
+        reg._is_wsl = False
+        assert reg.is_container_runtime is True
+
+    def test_is_wsl_runtime_property(self):
+        reg = object.__new__(ToolRegistry)
+        reg._tools = {}
+        reg._is_container = False
+        reg._is_wsl = True
+        assert reg.is_wsl_runtime is True

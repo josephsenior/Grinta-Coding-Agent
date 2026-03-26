@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -134,6 +135,22 @@ class ControllerContext:
         if mapping is None:
             return None
         return mapping.pop(event_id, None)
+
+    def discard_invocation_context_for_action(self, action: Any) -> None:
+        """Remove tool invocation bookkeeping for *action*'s event id (int or opaque key)."""
+        ctrl = self._controller
+        aid = getattr(action, "id", None)
+        if aid is None:
+            return
+        ctx = None
+        with contextlib.suppress(TypeError, ValueError):
+            ctx = self.pop_action_context(int(aid))
+        if ctx is None:
+            mapping = getattr(ctrl, "_action_contexts_by_event_id", None)
+            if mapping is not None and aid in mapping:
+                ctx = mapping.pop(aid, None)
+        if ctx is not None:
+            ctrl._cleanup_action_context(ctx)
 
     async def set_agent_state(self, agent_state: AgentState) -> None:
         """Proxy to `AgentController.set_agent_state_to`."""

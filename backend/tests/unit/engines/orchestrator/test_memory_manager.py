@@ -330,6 +330,8 @@ class TestBuildMessages:
         llm_config = MagicMock()
         llm_config.max_message_chars = None
         llm_config.vision_is_active = False
+        llm_config.model = "claude-4-sonnet"
+        llm_config.caching_prompt = True
 
         m.build_messages([], MagicMock(), llm_config)
         assert tc.cache_prompt is True
@@ -348,6 +350,47 @@ class TestBuildMessages:
         llm_config = MagicMock()
         llm_config.max_message_chars = None
         llm_config.vision_is_active = False
+        llm_config.model = "anthropic/claude-4-sonnet"
+        llm_config.caching_prompt = True
 
         m.build_messages([], MagicMock(), llm_config)
         assert user_tc.cache_prompt is True
+
+    def test_does_not_set_cache_prompt_for_openai_model(self):
+        from backend.core.message import Message, TextContent
+
+        m = _make_manager()
+        system_tc = TextContent(text="sys")
+        user_tc = TextContent(text="user msg")
+        sys_msg = Message(role="system", content=[system_tc])
+        user_msg = Message(role="user", content=[user_tc])
+        m.conversation_memory = MagicMock()
+        m.conversation_memory.process_events.return_value = [sys_msg, user_msg]
+
+        llm_config = MagicMock()
+        llm_config.max_message_chars = None
+        llm_config.vision_is_active = False
+        llm_config.model = "gpt-4o"
+        llm_config.caching_prompt = True
+
+        m.build_messages([], MagicMock(), llm_config)
+        assert system_tc.cache_prompt is False
+        assert user_tc.cache_prompt is False
+
+    def test_does_not_set_cache_prompt_when_caching_disabled(self):
+        from backend.core.message import Message, TextContent
+
+        m = _make_manager()
+        tc = TextContent(text="system prompt")
+        msg = Message(role="system", content=[tc])
+        m.conversation_memory = MagicMock()
+        m.conversation_memory.process_events.return_value = [msg]
+
+        llm_config = MagicMock()
+        llm_config.max_message_chars = None
+        llm_config.vision_is_active = False
+        llm_config.model = "claude-4-sonnet"
+        llm_config.caching_prompt = False
+
+        m.build_messages([], MagicMock(), llm_config)
+        assert tc.cache_prompt is False

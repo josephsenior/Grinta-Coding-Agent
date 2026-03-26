@@ -26,7 +26,7 @@
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | Python | 3.12+ | [python.org](https://python.org) |
-| Poetry | 1.7+ | [python-poetry.org](https://python-poetry.org/docs/#installation) |
+| uv | 1.7+ | [docs.astral.sh/uv](https://docs.astral.sh/uv/) |
 | Git | 2.30+ | [git-scm.com](https://git-scm.com/downloads) |
 
 ### Step 1: Clone and Install
@@ -34,7 +34,7 @@
 ```bash
 git clone https://github.com/josephsenior/Forge.git
 cd Forge
-poetry install
+uv sync
 ```
 
 ### Step 2: Configure

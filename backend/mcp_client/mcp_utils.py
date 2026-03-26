@@ -54,11 +54,8 @@ def _get_mcp_connect_timeout_sec() -> float:
 
 
 def _is_windows_stdio_mcp_disabled() -> bool:
-    """Return True when stdio MCP should be bypassed on Windows.
-
-    HTTP/SSE MCP remains enabled by default on Windows.
-    """
-    return sys.platform == "win32" and not os.getenv("FORGE_ENABLE_WINDOWS_MCP")
+    """Always return False (OS agnosticism)."""
+    return False
 
 
 def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
@@ -562,6 +559,22 @@ async def _execute_direct_tool(
                 ),
                 code="MCP_TOOL_ERROR",
                 retryable=False,
+            ),
+        )
+    except asyncio.TimeoutError as e:
+        logger.error("MCP tool %s timed out: %s", action.name, e)
+        return _make_mcp_observation(
+            action,
+            _build_mcp_error_payload(
+                action_name=action.name,
+                message=(
+                    f"MCP tool '{action.name}' timed out (server did not respond in time).\n"
+                    "The tool may be waiting on a slow network call or the MCP server may be stuck.\n"
+                    "Try: mcp_capabilities_status, a narrower query, or non-MCP tools.\n"
+                    "Tune limits: FORGE_MCP_CALL_TOTAL_BUDGET_SEC, FORGE_MCP_RECONNECT_SESSION_TIMEOUT_SEC."
+                ),
+                code="MCP_TOOL_TIMEOUT",
+                retryable=True,
             ),
         )
     except Exception as e:

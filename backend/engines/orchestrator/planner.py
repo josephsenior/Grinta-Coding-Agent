@@ -1,8 +1,6 @@
 from __future__ import annotations
 import logging
 import os
-from collections import defaultdict
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from backend.llm.llm_utils import check_tools
@@ -107,15 +105,7 @@ class OrchestratorPlanner:
         # Lazy cache for check_tools output (model-scoped)
         self._checked_tools_cache: list[ChatCompletionToolParam] | None = None
         self._checked_tools_model: str | None = None
-        # Progressive tool disclosure
-        from backend.engines.orchestrator.tool_selector import ToolSelector
-
-        self._tool_selector = ToolSelector()
         self._tools_used_this_session: set[str] = set()
-        # Within-conversation error learning
-        from backend.engines.orchestrator.error_learner import SessionErrorLearner
-
-        self._error_learner = SessionErrorLearner()
 
     # ------------------------------------------------------------------ #
     # Tool assembly
@@ -233,9 +223,14 @@ class OrchestratorPlanner:
         from backend.engines.orchestrator.tools.signal_progress import (
             create_signal_progress_tool,
         )
+        from backend.engines.orchestrator.tools.error_recovery_memory import (
+            create_error_recovery_memory_tool,
+        )
 
         if getattr(self._config, "enable_check_tool_status", False):
             tools.append(create_check_tool_status_tool())
+
+        tools.append(create_error_recovery_memory_tool())
 
         # Optional feature tools remain flag-gated; note that enable_lsp_query
         # currently defaults to True in AgentConfig while the others below are
@@ -262,12 +257,11 @@ class OrchestratorPlanner:
                     "create_workspace_status_tool",
                 ),
                 (
-                    "enable_query_error_solutions",
+                    "enable_checkpoints",
                     False,
-                    "query_error_solutions",
-                    "create_query_error_solutions_tool",
+                    "checkpoint",
+                    "create_checkpoint_tool",
                 ),
-                ("enable_checkpoints", False, "checkpoint", "create_checkpoint_tool"),
                 ("enable_analyze_project_structure", False, "analyze_project_structure", "create_analyze_project_structure_tool"),
                 (
                     "enable_session_diff",
@@ -350,11 +344,6 @@ class OrchestratorPlanner:
         """Record that a tool was used this session (for description tiers)."""
         self._tools_used_this_session.add(tool_name)
 
-    @property
-    def tool_selector(self):
-        """Expose the tool selector for external notification (e.g. condensation)."""
-        return self._tool_selector
-
     def build_llm_params(
         self,
         messages: list,
@@ -365,14 +354,6 @@ class OrchestratorPlanner:
 
         # NOTE: We inject control/status messages *after* tool selection so
         # tool selection heuristics see the original user/assistant content.
-
-        # Reliability-first tool selection (opt-in): ToolSelector now only
-        # deduplicates the tool list and intentionally avoids contextual unlock
-        # heuristics that change behavior across similar requests.
-        # Must be actual bool True — MagicMock configs must not accidentally enable this.
-        _ept = getattr(self._config, "enable_progressive_tools", False)
-        if _ept is True:
-            tools = self._tool_selector.select_tools(tools, state, messages)
 
         # Apply three-tier tool descriptions
         tools = self._apply_description_tiers(tools)
@@ -597,7 +578,8 @@ class OrchestratorPlanner:
                 "1. STOP and use think() to analyze why your current approach isn't working\n"
                 "2. Try a fundamentally different approach\n"
                 "3. If editing files, re-read the file first with view command\n"
-                "4. Do not repeat unchanged tracking updates"
+                "4. Do not repeat unchanged tracking updates\n"
+                "5. Optional: error_recovery_memory(query) to retrieve stored fixes for similar errors"
             )
         if rep_score >= 0.45:
             return (
@@ -679,55 +661,6 @@ class OrchestratorPlanner:
                 break
         msgs.insert(insert_at, {"role": "system", "content": status})
         return msgs
-
-    def _get_tool_hints(self, messages: list) -> str:
-        """Tool hints are disabled in reliability-first mode.
-
-        The planner may still collect telemetry from recent tool results for
-        debugging or future offline analysis, but it must not inject
-        heuristic guidance into the critical action-selection prompt.
-        """
-        self._scan_tool_results_for_learning(messages)
-        return ""
-
-    def _scan_tool_results_for_learning(self, messages: list) -> None:
-        """Scan tool response messages to record failures/successes for error learning.
-
-        Reliability-first behavior only trusts structured outcome markers:
-        ``forge_tool_ok`` on serialized tool dicts, or a JSON object body with
-        an explicit ``ok`` field. Free-form content parsing is intentionally not
-        used to steer future model behavior.
-        """
-        if not hasattr(self, "_error_learner"):
-            return
-        seen: set[str] = getattr(self, "_seen_tool_call_ids", set())
-
-        for i, msg in enumerate(messages):
-            if not isinstance(msg, dict) or msg.get("role") != "tool":
-                continue
-            tc_id = msg.get("tool_call_id", "")
-            if not tc_id or tc_id in seen:
-                continue
-            seen.add(tc_id)
-            tool_name = msg.get("name", "")
-            structured = msg.get("forge_tool_ok")
-            if structured is True:
-                is_error = False
-            elif structured is False:
-                is_error = True
-            else:
-                logger.debug(
-                    "Planner skipped untyped tool-result learning for %s (tool_call_id=%s)",
-                    tool_name,
-                    tc_id,
-                )
-                continue
-            if is_error:
-                self._error_learner.record_failure(tool_name, str(msg.get("content", "")), i)
-            else:
-                self._error_learner.record_success(tool_name, i)
-
-        self._seen_tool_call_ids = seen
 
     def _determine_tool_choice(self, messages: list, state: State) -> str | dict | None:
         last_user_msg = self._get_last_user_message(messages)

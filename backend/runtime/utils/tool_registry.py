@@ -6,6 +6,7 @@ Inspired by VS Code's approach to cross-platform compatibility.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -37,7 +38,32 @@ class ToolRegistry:
     def __init__(self) -> None:
         """Initialize and detect all tools."""
         self._tools: dict[str, ToolInfo] = {}
+        self._is_container = self._detect_container_runtime()
+        self._is_wsl = self._detect_wsl_runtime()
         self._detect_all_tools()
+
+    def _detect_container_runtime(self) -> bool:
+        if os.getenv("FORGE_RUNTIME_IS_CONTAINER", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            return True
+        if os.getenv("container", "").strip():
+            return True
+        return os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
+
+    def _detect_wsl_runtime(self) -> bool:
+        if not sys.platform.startswith("linux"):
+            return False
+        if os.getenv("WSL_DISTRO_NAME") or os.getenv("WSL_INTEROP"):
+            return True
+        try:
+            with open("/proc/version", encoding="utf-8") as f:
+                return "microsoft" in f.read().lower()
+        except OSError:
+            return False
 
     def _detect_all_tools(self) -> None:
         """Detect all tools at once during initialization."""
@@ -265,6 +291,12 @@ class ToolRegistry:
 
     def _log_detection_summary(self) -> None:
         """Log a summary of detected tools."""
+        logger.info(
+            "Runtime context: platform=%s container=%s wsl=%s",
+            sys.platform,
+            self._is_container,
+            self._is_wsl,
+        )
         for tool_name, tool_info in self._tools.items():
             if tool_info.available:
                 version_str = f" ({tool_info.version})" if tool_info.version else ""
@@ -331,6 +363,16 @@ class ToolRegistry:
     def has_ripgrep(self) -> bool:
         """Check if ripgrep is available."""
         return self._tools.get("search", ToolInfo("", False)).name == "ripgrep"
+
+    @property
+    def is_container_runtime(self) -> bool:
+        """True when running in a containerized runtime."""
+        return self._is_container
+
+    @property
+    def is_wsl_runtime(self) -> bool:
+        """True when running under Windows Subsystem for Linux."""
+        return self._is_wsl
 
     def get_tool_info(self, tool_name: str) -> ToolInfo | None:
         """Get detailed information about a tool."""

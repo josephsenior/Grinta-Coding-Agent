@@ -386,5 +386,50 @@ _RECOMMENDATIONS: dict[RiskCategory, list[str]] = {
     ],
 }
 
+# Reflection middleware historically blocked these before execution. Kept so
+# behavior stays at least as strict as the old inline regex list while CRITICAL
+# covers most overlap (mkfs, many rm/dd variants, etc.).
+_REFLECTION_LEGACY_BLOCK_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\brm\s+-rf\s+/", re.I), "recursive forced delete toward root path"),
+    (re.compile(r"\bdd\s+if=", re.I), "dd with explicit if="),
+    (re.compile(r"\bmkfs\s+", re.I), "filesystem format (mkfs)"),
+    (re.compile(r"\bformat\s+", re.I), "format-style disk operation"),
+    (re.compile(r">\s+/dev/", re.I), "shell redirect into /dev"),
+]
 
-__all__ = ["CommandAnalyzer", "CommandAssessment", "RiskCategory"]
+
+def reflection_precheck_should_block(
+    command: str, *, analyzer: CommandAnalyzer | None = None
+) -> tuple[bool, str]:
+    """Return whether reflection middleware should block *command* before runtime.
+
+    Combines :class:`CommandAnalyzer` **CRITICAL** tier with a small legacy
+    pattern set that matched the pre-dedupe reflection list, so we do not
+    regress on edge cases that were HIGH/MEDIUM in the analyzer but still
+    blocked in reflection (e.g. ``dd if=file`` without ``of=/dev/``).
+
+    Returns:
+        ``(True, reason)`` to block, else ``(False, "")``.
+    """
+    cmd = (command or "").strip()
+    if not cmd:
+        return False, ""
+
+    inst = analyzer if analyzer is not None else CommandAnalyzer()
+    risk, reason, _ = inst.analyze(cmd)
+    if risk == RiskCategory.CRITICAL:
+        return True, reason
+
+    for pattern, description in _REFLECTION_LEGACY_BLOCK_PATTERNS:
+        if pattern.search(cmd):
+            return True, description
+
+    return False, ""
+
+
+__all__ = [
+    "CommandAnalyzer",
+    "CommandAssessment",
+    "RiskCategory",
+    "reflection_precheck_should_block",
+]

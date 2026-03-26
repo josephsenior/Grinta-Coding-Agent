@@ -47,6 +47,7 @@ COPY --from=builder /build/settings.template.json /build/start_server.py ./
 
 # Default config: copy template if no settings.json mounted
 RUN cp settings.template.json settings.json && \
+    mkdir -p /app/.tmux && \
     mkdir -p /app/workspace && \
     chown -R forge:forge /app
 
@@ -56,7 +57,8 @@ USER forge
 # Runtime environment
 ENV FORGE_HOST=0.0.0.0 \
     FORGE_PORT=3000 \
-    PROJECT_ROOT=/app/workspace
+    PROJECT_ROOT=/app/workspace \
+    TMUX_TMPDIR=/app/.tmux
 
 EXPOSE 3000/tcp
 

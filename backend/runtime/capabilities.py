@@ -8,9 +8,11 @@ checks with a single structured source of truth.
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +31,12 @@ class RuntimeCapabilities:
     is_windows: bool = False
     """True when running on Windows (any variant)."""
 
+    is_container: bool = False
+    """True when running inside a containerized runtime."""
+
+    is_wsl: bool = False
+    """True when running under Windows Subsystem for Linux."""
+
     # -- tools --------------------------------------------------------------
     has_git: bool = False
     has_tmux: bool = False
@@ -38,8 +46,8 @@ class RuntimeCapabilities:
     can_browse: bool = False
     """True when browser interactions are enabled for this runtime."""
 
-    can_mcp: bool = False
-    """True when MCP stdio servers can be spawned (not Windows currently)."""
+    can_mcp: bool = True
+    """True when MCP tooling is available for the runtime."""
 
     can_copy_from_runtime: bool = True
     """True when ``copy_from`` is available (always True for local runtime)."""
@@ -47,6 +55,31 @@ class RuntimeCapabilities:
     # -- summary ------------------------------------------------------------
     missing_tools: tuple[str, ...] = ()
     """Names of tools that are expected but missing."""
+
+
+def _env_true(name: str) -> bool:
+    value = os.getenv(name, "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+def _is_container_runtime() -> bool:
+    """Best-effort container detection with env override support."""
+    if _env_true("FORGE_RUNTIME_IS_CONTAINER"):
+        return True
+    if os.getenv("container", "").strip():
+        return True
+    return Path("/.dockerenv").exists() or Path("/run/.containerenv").exists()
+
+
+def _is_wsl_runtime(platform: str) -> bool:
+    if not platform.startswith("linux"):
+        return False
+    if os.getenv("WSL_DISTRO_NAME") or os.getenv("WSL_INTEROP"):
+        return True
+    try:
+        return "microsoft" in Path("/proc/version").read_text(encoding="utf-8").lower()
+    except OSError:
+        return False
 
 
 def detect_capabilities(
@@ -62,6 +95,8 @@ def detect_capabilities(
     """
     platform = sys.platform
     is_windows = platform == "win32"
+    is_container = _is_container_runtime()
+    is_wsl = _is_wsl_runtime(platform)
 
     has_git = shutil.which("git") is not None
     has_tmux = shutil.which("tmux") is not None
@@ -73,9 +108,6 @@ def detect_capabilities(
 
     # MCP can be supported either via HTTP/SSE servers (cross-platform) or via
     # stdio servers (requires spawning npx/uvx or other commands).
-    shutil.which("npx") is not None
-    shutil.which("uvx") is not None
-
     # MCP is always enabled; the ActionExecutionServer already filters out
     # unsupported stdio servers on Windows and wrapper tools (e.g.
     # mcp_capabilities_status) work without any real MCP servers.
@@ -91,6 +123,8 @@ def detect_capabilities(
     return RuntimeCapabilities(
         platform=platform,
         is_windows=is_windows,
+        is_container=is_container,
+        is_wsl=is_wsl,
         has_git=has_git,
         has_tmux=has_tmux,
         has_bash=has_bash,

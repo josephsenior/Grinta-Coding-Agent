@@ -217,9 +217,13 @@ class TestExceptionHandlerService(unittest.IsolatedAsyncioTestCase):
 
         await self.service.handle_step_exception(exc)
 
-        # Should log debug traceback
-        mock_logger.debug.assert_called_once()
-        call_args = mock_logger.debug.call_args[0]
+        # Should log error traceback
+        mock_logger.error.assert_called()
+        
+        # Verify right message logged
+        error_calls = [c for c in mock_logger.error.mock_calls if "traceback" in c[1][0]]
+        self.assertTrue(len(error_calls) > 0)
+        call_args = error_calls[0][1]
         self.assertIn("test-controller", call_args[1])
 
     @patch("backend.controller.services.exception_handler_service.logger")

@@ -25,7 +25,7 @@ class TestRuntimeCapabilities:
         assert cap.has_tmux is False
         assert cap.has_bash is False
         assert cap.can_browse is False
-        assert cap.can_mcp is False
+        assert cap.can_mcp is True
         assert cap.can_copy_from_runtime is True
         assert cap.missing_tools == ()
 
@@ -92,7 +92,7 @@ class TestDetectCapabilities:
         cap = detect_capabilities()
         assert cap.platform == "win32"
         assert cap.is_windows is True
-        assert cap.can_mcp is False  # disabled on windows
+        assert cap.can_mcp is True
 
     @patch("backend.runtime.capabilities.shutil.which")
     @patch("backend.runtime.capabilities.sys")

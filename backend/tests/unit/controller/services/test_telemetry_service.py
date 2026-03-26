@@ -119,7 +119,7 @@ class TestTelemetryService(unittest.TestCase):
     def test_handle_blocked_invocation(self, mock_error_obs, mock_tool_telemetry):
         """Test handle_blocked_invocation emits error and cleans up."""
         mock_action = MagicMock()
-        mock_action.id = "action-123"
+        mock_action.id = 123
 
         mock_ctx = MagicMock()
         mock_ctx.blocked = True
@@ -149,7 +149,7 @@ class TestTelemetryService(unittest.TestCase):
         call_kwargs = mock_error_obs.call_args[1]
         self.assertIn("Security risk detected", call_kwargs["content"])
         self.assertEqual(call_kwargs["error_id"], "TOOL_PIPELINE_BLOCKED")
-        self.assertEqual(mock_obs.cause, "action-123")
+        self.assertEqual(mock_obs.cause, 123)
 
         # Should emit event
         self.mock_context.emit_event.assert_called_once()

@@ -229,7 +229,7 @@ max_message_chars = 20000  # Less context = faster + cheaper
 ### Enable Debug Logging
 
 ```bash
-LOG_LEVEL=DEBUG poetry run python -m Forge.server.listen
+LOG_LEVEL=DEBUG uv run python -m Forge.server.listen
 ```
 
 ### Trace Agent Steps

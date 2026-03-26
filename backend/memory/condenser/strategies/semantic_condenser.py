@@ -27,7 +27,7 @@ _ACTION_SCORE_RULES: list[tuple[tuple[str, ...], str, float, str]] = [
     (("file",), "action", 0.4, "file_operation"),
     (("delegate",), "action", 0.4, "delegation"),
     (("finish", "complete"), "action", 0.4, "completion"),
-    (("install", "pip", "npm", "yarn", "poetry", "conda"), "command", 0.3, "setup_command"),
+    (("install", "pip", "npm", "yarn", "uv", "conda"), "command", 0.3, "setup_command"),
 ]
 
 

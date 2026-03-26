@@ -6,12 +6,15 @@ Targets 23.1% coverage (78 statements) by testing BaseShellSession.
 from __future__ import annotations
 
 import os
+import sys
+import types
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from backend.runtime.utils.unified_shell import BaseShellSession
+from backend.runtime.utils.unified_shell import create_shell_session
 
 
 # -----------------------------------------------------------
@@ -166,3 +169,80 @@ class TestUpdateCwdFromOutput:
             original_cwd = shell._cwd
             shell._update_cwd_from_output(["pwd"])
         assert shell._cwd == original_cwd
+
+
+class _DummySession:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+
+class _DummyTools:
+    def __init__(
+        self,
+        *,
+        has_bash: bool,
+        has_tmux: bool,
+        has_powershell: bool = False,
+        shell_type: str = "bash",
+    ):
+        self.has_bash = has_bash
+        self.has_tmux = has_tmux
+        self.has_powershell = has_powershell
+        self.shell_type = shell_type
+        self.is_container_runtime = False
+        self.is_wsl_runtime = False
+
+
+class TestCreateShellSession:
+    def test_unix_prefers_tmux_bash_session(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("backend.runtime.utils.unified_shell.os.name", "posix")
+        monkeypatch.setitem(
+            sys.modules,
+            "backend.runtime.utils.bash",
+            types.SimpleNamespace(BashSession=_DummySession),
+        )
+
+        tools = _DummyTools(has_bash=True, has_tmux=True)
+        session = create_shell_session(
+            work_dir=str(tmp_path),
+            tools=tools,
+            cancellation_service=MagicMock(),
+        )
+        assert isinstance(session, _DummySession)
+
+    def test_unix_falls_back_to_simple_bash_without_tmux(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("backend.runtime.utils.unified_shell.os.name", "posix")
+        monkeypatch.setitem(
+            sys.modules,
+            "backend.runtime.utils.simple_bash",
+            types.SimpleNamespace(SimpleBashSession=_DummySession),
+        )
+
+        tools = _DummyTools(has_bash=True, has_tmux=False)
+        session = create_shell_session(
+            work_dir=str(tmp_path),
+            tools=tools,
+            cancellation_service=MagicMock(),
+        )
+        assert isinstance(session, _DummySession)
+
+    def test_windows_prefers_bash_when_available(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("backend.runtime.utils.unified_shell.os.name", "nt")
+        monkeypatch.setitem(
+            sys.modules,
+            "backend.runtime.utils.simple_bash",
+            types.SimpleNamespace(SimpleBashSession=_DummySession),
+        )
+
+        tools = _DummyTools(
+            has_bash=True,
+            has_tmux=False,
+            has_powershell=True,
+            shell_type="pwsh",
+        )
+        session = create_shell_session(
+            work_dir=str(tmp_path),
+            tools=tools,
+            cancellation_service=MagicMock(),
+        )
+        assert isinstance(session, _DummySession)

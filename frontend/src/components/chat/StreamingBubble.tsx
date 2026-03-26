@@ -39,15 +39,26 @@ export function StreamingBubble({ content }: StreamingBubbleProps) {
           <button
             type="button"
             onClick={() => setThoughtOpen((v) => !v)}
-            className="mb-0.5 flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70 hover:text-muted-foreground"
+            className="mb-0.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70 hover:text-muted-foreground"
           >
             <ChevronRight
               className={cn("h-3 w-3 transition-transform", thoughtOpen && "rotate-90")}
             />
-            thinking
+            <span className="flex items-center gap-2">
+              <span>thinking</span>
+              <span className="flex items-center gap-[6px]">
+                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/45 animate-pulse delay-75" />
+                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 animate-pulse delay-150" />
+              </span>
+            </span>
           </button>
           {thoughtOpen && (
-            <div className="whitespace-pre-wrap wrap-break-word">{thought}</div>
+            <div className="whitespace-pre-wrap wrap-break-word">
+              <div className="rounded-md bg-muted/5 px-2 py-1 transition-opacity duration-300 ease-out animate-pulse">
+                {thought}
+              </div>
+            </div>
           )}
         </div>
       )}

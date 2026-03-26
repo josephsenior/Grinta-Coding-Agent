@@ -35,6 +35,8 @@ class PlaybookMetadata(BaseModel):
     triggers: list[str] = []
     inputs: list[InputMetadata] = []
     mcp_tools: MCPConfig | None = None
+    #: When True, only explicit substring trigger matches apply (no word-overlap tier).
+    strict_trigger_matching: bool = False
 
 
 class PlaybookResponse(BaseModel):

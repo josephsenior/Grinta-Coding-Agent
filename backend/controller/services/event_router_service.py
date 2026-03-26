@@ -34,6 +34,7 @@ from backend.events.observation import (
     Observation,
 )
 from backend.events.observation.agent import DelegateTaskObservation
+from backend.events.observation_cause import attach_observation_cause
 
 if TYPE_CHECKING:
     from backend.controller.agent_controller import AgentController
@@ -221,6 +222,9 @@ class EventRouterService:
         recall_type = RecallType.WORKSPACE_CONTEXT if is_first else RecallType.KNOWLEDGE
         recall_action = RecallAction(query=action.content, recall_type=recall_type)
 
+        # Assign stream id before pending so pending always references a stable id
+        # (recall observations arrive later, after async recall work).
+        self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
         pending_service = getattr(self._ctrl, "pending_action_service", None)
         if pending_service is not None:
             pending_service.set(recall_action)
@@ -228,7 +232,6 @@ class EventRouterService:
             action_service = getattr(self._ctrl, "action_service", None)
             if action_service is not None:
                 action_service.set_pending_action(recall_action)
-        self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
         if self._ctrl.get_agent_state() != AgentState.RUNNING:
             await self._ctrl.set_agent_state_to(AgentState.RUNNING)
 
@@ -499,8 +502,12 @@ class EventRouterService:
                     error_message=error_message,
                 )
 
-            # Ensure the observation maps to the exact action that requested it
-            obs.cause = None if getattr(action, "run_in_background", False) else action.id
+            # Final delegate result: omit cause when background (early obs already cleared pending).
+            attach_observation_cause(
+                obs,
+                None if getattr(action, "run_in_background", False) else action,
+                context="event_router.delegate_task",
+            )
             obs.tool_call_metadata = action.tool_call_metadata
             self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
 
@@ -510,7 +517,9 @@ class EventRouterService:
                 content="Worker(s) started in background. Use the blackboard to coordinate.",
                 error_message="",
             )
-            early_obs.cause = action.id
+            attach_observation_cause(
+                early_obs, action, context="event_router.delegate_task_early"
+            )
             early_obs.tool_call_metadata = action.tool_call_metadata
             self._ctrl.event_stream.add_event(early_obs, EventSource.ENVIRONMENT)
 
@@ -571,7 +580,9 @@ class EventRouterService:
         )
 
         obs = NullObservation(content=content)
-        obs.cause = action.id
+        attach_observation_cause(
+            obs, action, context="event_router.search_available_tools"
+        )
         obs.tool_call_metadata = action.tool_call_metadata
         self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
 

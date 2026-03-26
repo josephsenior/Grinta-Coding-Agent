@@ -235,6 +235,11 @@ def create_shell_session(
     logger.info("Creating shell session for platform: %s", sys.platform)
     logger.info("Detected shell: %s", tools.shell_type)
     logger.info("Has tmux: %s", tools.has_tmux)
+    logger.info(
+        "Runtime context: container=%s wsl=%s",
+        getattr(tools, "is_container_runtime", False),
+        getattr(tools, "is_wsl_runtime", False),
+    )
 
     # Common session arguments
     session_kwargs: dict[str, Any] = {
@@ -252,13 +257,18 @@ def create_shell_session(
         if tools.has_bash:
             from backend.runtime.utils.simple_bash import SimpleBashSession
 
-            logger.info("Using SimpleBashSession (Git Bash on Windows)")
+            logger.info(
+                "Using SimpleBashSession (Linux-style command path via Git Bash on Windows)"
+            )
             return SimpleBashSession(**session_kwargs)
 
         # Fallback: no bash found — use PowerShell
         from backend.runtime.utils.windows_bash import WindowsPowershellSession
 
-        logger.info("Using WindowsPowershellSession (no bash found)")
+        logger.warning(
+            "Bash unavailable on Windows; falling back to PowerShell session. "
+            "For full Linux runtime behavior (tmux/interactivity), use Docker or WSL."
+        )
         return WindowsPowershellSession(
             **session_kwargs,  # type: ignore[arg-type]
             powershell_exe=tools.shell_type if tools.has_powershell else None,

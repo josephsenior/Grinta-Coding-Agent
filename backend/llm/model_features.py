@@ -99,6 +99,11 @@ PROMPT_CACHE_PATTERNS: list[str] = [
     "claude-opus-4*",
     "claude-4*",
     "deepseek*",
+    # Google Gemini explicit context cache (see GeminiClient + gemini_cache)
+    "gemini/gemini-1.5-*",
+    "gemini/gemini-2.0-*",
+    "gemini-2.5-*",
+    "gemini-3*",
 ]
 SUPPORTS_STOP_WORDS_FALSE_PATTERNS: list[str] = [
     "o1*",
@@ -141,6 +146,19 @@ def get_features(model: str) -> ModelFeatures:
         ModelFeatures object with capability flags
 
     """
+    from backend.llm.catalog_loader import lookup
+
+    if entry := lookup(model):
+        return ModelFeatures(
+            max_input_tokens=entry.max_input_tokens,
+            max_output_tokens=entry.max_output_tokens,
+            supports_function_calling=entry.supports_function_calling,
+            supports_reasoning_effort=entry.supports_reasoning_effort,
+            supports_prompt_cache=entry.supports_prompt_cache,
+            supports_stop_words=entry.supports_stop_words,
+            supports_response_schema=entry.supports_response_schema,
+        )
+
     max_input, max_output = get_model_token_limits(model)
     return ModelFeatures(
         max_input_tokens=max_input,

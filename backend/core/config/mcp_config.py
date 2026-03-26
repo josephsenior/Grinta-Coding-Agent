@@ -466,20 +466,8 @@ def ensure_default_forge_mcp_http_server(cfg: Any) -> None:
 
 
 def _filter_windows_stdio_servers(servers: list) -> list:
-    """Filter out stdio servers on Windows unless FORGE_ENABLE_WINDOWS_MCP is set."""
-    import platform
-
-    if platform.system() != "Windows" or os.getenv("FORGE_ENABLE_WINDOWS_MCP"):
-        return servers
-    allowed_stdio = ("browser-use", "context7", "shadcn", "github", "fetch", "duckduckgo", "magic", "rigour")
-    filtered = [s for s in servers if s.type != "stdio" or s.name in allowed_stdio]
-    skipped = len(servers) - len(filtered)
-    if skipped > 0:
-        logger.info(
-            "Windows stdlib MCP disabled by default: filtered out %s stdio server(s); HTTP/SSE MCP remains enabled.",
-            skipped,
-        )
-    return filtered
+    """Return servers unconditionally (OS agnosticism)."""
+    return servers
 
 
 class ForgeMCPConfig:

@@ -160,12 +160,28 @@ def _validate_search_events_params(
     limit: int, start_id: int, end_id: int | None
 ) -> None:
     """Validate search_events parameters. Raises SessionInvariantError on failure."""
-    if limit < 1 or limit > 100:
-        raise SessionInvariantError("limit must be between 1 and 100")
-    if start_id < 0:
-        raise SessionInvariantError("start_id must be non-negative")
+    _validate_int_range(limit, min_value=1, max_value=100, field_name="limit")
+    _validate_int_range(start_id, min_value=0, field_name="start_id")
     if end_id is not None and end_id < start_id:
         raise SessionInvariantError("end_id must be >= start_id")
+
+
+def _validate_int_range(
+    value: int,
+    *,
+    min_value: int,
+    field_name: str,
+    max_value: int | None = None,
+) -> None:
+    """Validate integer range with consistent SessionInvariantError messages."""
+    if max_value is None:
+        if value < min_value:
+            raise SessionInvariantError(f"{field_name} must be non-negative")
+        return
+    if value < min_value or value > max_value:
+        raise SessionInvariantError(
+            f"{field_name} must be between {min_value} and {max_value}"
+        )
 
 
 def _parse_event_filter(filter_json: str | None) -> EventFilter | None:

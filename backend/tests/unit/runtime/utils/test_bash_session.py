@@ -69,6 +69,20 @@ class TestBashSession:
         with pytest.raises(RuntimeError, match="Failed to create tmux session"):
             s.initialize()
 
+    def test_initialize_fails_when_tmux_tmpdir_unwritable(self, tmp_path, monkeypatch):
+        s = BashSession(work_dir=str(tmp_path))
+        monkeypatch.setenv("TMUX_TMPDIR", str(tmp_path / "tmux"))
+        with patch("os.access", return_value=False):
+            with pytest.raises(RuntimeError, match="TMUX_TMPDIR .* is not writable"):
+                s.initialize()
+
+    def test_initialize_creates_tmux_tmpdir(self, mock_tmux, tmp_path, monkeypatch):
+        s = BashSession(work_dir=str(tmp_path))
+        monkeypatch.setenv("TMUX_TMPDIR", str(tmp_path / "tmux"))
+        with patch("os.makedirs") as mock_makedirs, patch("os.access", return_value=True):
+            s.initialize()
+        mock_makedirs.assert_called()
+
     def test_close(self, session, mock_tmux):
         session.close()
         mock_tmux["session"].kill.assert_called_once()

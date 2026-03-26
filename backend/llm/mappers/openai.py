@@ -1,5 +1,6 @@
 """OpenAI-specific LLM data adapters and mappers."""
 
+import copy
 from typing import Any
 
 
@@ -51,3 +52,23 @@ def extract_tool_calls(message: Any) -> list[dict[str, Any]] | None:
             ]
 
     return None
+
+
+def _strip_cache_control_recursive(obj: Any) -> None:
+    if isinstance(obj, dict):
+        obj.pop("cache_control", None)
+        for v in obj.values():
+            _strip_cache_control_recursive(v)
+    elif isinstance(obj, list):
+        for item in obj:
+            _strip_cache_control_recursive(item)
+
+
+def strip_prompt_cache_hints_from_messages(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Remove Anthropic-style cache markers; OpenAI-compatible APIs do not accept them."""
+    cleaned = copy.deepcopy(messages)
+    for m in cleaned:
+        _strip_cache_control_recursive(m)
+    return cleaned

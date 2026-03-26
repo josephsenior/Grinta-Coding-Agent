@@ -44,13 +44,11 @@ class TestParseGitStatusLine:
         result = _parse_git_status_line("??\tuntracked.py", [])
         assert result == [{"status": "A", "path": "untracked.py"}]
 
-    def test_empty_line_raises(self):
-        with pytest.raises(RuntimeError, match="unexpected_value"):
-            _parse_git_status_line("", [])
+    def test_empty_line_is_ignored(self):
+        assert _parse_git_status_line("", []) == []
 
-    def test_single_token_raises(self):
-        with pytest.raises(RuntimeError, match="unexpected_value"):
-            _parse_git_status_line("M", [])
+    def test_single_token_is_ignored(self):
+        assert _parse_git_status_line("M", []) == []
 
 
 # ---------------------------------------------------------------------------

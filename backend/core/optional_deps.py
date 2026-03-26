@@ -18,7 +18,7 @@ def require_optional(module: str, *, extra: str) -> object:
 
     Args:
         module: Top-level module name to import.
-        extra: Poetry/Python extra name users should install.
+        extra: uv/Python extra name users should install.
 
     Returns:
         Imported module.

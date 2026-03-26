@@ -230,8 +230,7 @@ class TestSuggestNoninteractiveCommand:
 
     def test_rm_command(self):
         result = suggest_noninteractive_command("rm somefile.txt")
-        assert result is not None
-        assert "-f" in result
+        assert result is None
 
     def test_already_force_flag(self):
         result = suggest_noninteractive_command("rm --force somefile.txt")

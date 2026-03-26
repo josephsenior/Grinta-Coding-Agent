@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from backend.llm.model_features import (
@@ -11,6 +13,7 @@ from backend.llm.model_features import (
     RESPONSE_SCHEMA_PATTERNS,
     SUPPORTS_STOP_WORDS_FALSE_PATTERNS,
     ModelFeatures,
+    get_features,
     model_matches,
     normalize_model_name,
 )
@@ -139,7 +142,12 @@ class TestPatternSanity:
 
     @pytest.mark.parametrize(
         "model",
-        ["claude-3.5-sonnet-20241022", "claude-3-haiku-20240307"],
+        [
+            "claude-3.5-sonnet-20241022",
+            "claude-3-haiku-20240307",
+            "gemini/gemini-2.0-flash",
+            "gemini-2.5-pro",
+        ],
     )
     def test_prompt_cache_models(self, model):
         assert model_matches(model, PROMPT_CACHE_PATTERNS)
@@ -163,3 +171,46 @@ class TestPatternSanity:
         assert not model_matches(model, FUNCTION_CALLING_PATTERNS)
         assert not model_matches(model, REASONING_EFFORT_PATTERNS)
         assert not model_matches(model, PROMPT_CACHE_PATTERNS)
+
+
+class TestGetFeatures:
+    def test_prefers_catalog_entry_over_patterns(self, monkeypatch):
+        import backend.llm.catalog_loader as catalog_loader
+
+        # Deliberately contradict pattern defaults to verify catalog-first behavior.
+        fake_entry = SimpleNamespace(
+            max_input_tokens=111,
+            max_output_tokens=222,
+            supports_function_calling=False,
+            supports_reasoning_effort=False,
+            supports_prompt_cache=False,
+            supports_stop_words=False,
+            supports_response_schema=False,
+        )
+        monkeypatch.setattr(catalog_loader, "lookup", lambda _model: fake_entry)
+
+        features = get_features("gpt-5")
+
+        assert features.max_input_tokens == 111
+        assert features.max_output_tokens == 222
+        assert features.supports_function_calling is False
+        assert features.supports_reasoning_effort is False
+        assert features.supports_prompt_cache is False
+        assert features.supports_stop_words is False
+        assert features.supports_response_schema is False
+
+    def test_falls_back_to_patterns_when_model_unknown(self, monkeypatch):
+        import backend.llm.catalog_loader as catalog_loader
+
+        monkeypatch.setattr(catalog_loader, "lookup", lambda _model: None)
+        monkeypatch.setattr(catalog_loader, "get_token_limits", lambda _model: (333, 444))
+
+        features = get_features("o1-preview")
+
+        assert features.max_input_tokens == 333
+        assert features.max_output_tokens == 444
+        assert features.supports_function_calling is True
+        assert features.supports_reasoning_effort is True
+        assert features.supports_prompt_cache is False
+        assert features.supports_stop_words is False
+        assert features.supports_response_schema is True

@@ -107,10 +107,27 @@ async def generate_prompt(
         llm_config,
         messages,
     )
+    # Try string search first for robust extraction without regex performance issues
+    start_tag = "<update_prompt>"
+    end_tag = "</update_prompt>"
+    
+    # Try exact match
+    start_idx = raw_prompt.lower().find(start_tag)
+    if start_idx != -1:
+        start_idx += len(start_tag)
+        end_idx = raw_prompt.lower().find(end_tag, start_idx)
+        if end_idx == -1:
+            end_idx = len(raw_prompt)
+        return raw_prompt[start_idx:end_idx].strip()
+    
+    # Fallback to regex for things like < update_prompt >
     if prompt := re.search(
-        "<update_prompt>(.*?)</update_prompt>", raw_prompt, re.DOTALL
+        r"<\s*update_prompt\s*>([\s\S]*?)<\s*/\s*update_prompt\s*>",
+        raw_prompt,
+        re.IGNORECASE,
     ):
         return prompt[1].strip()
+    
     msg = "No valid prompt found in the response."
     raise ValueError(msg)
 

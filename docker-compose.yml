@@ -4,7 +4,7 @@
 # Quick start:   docker compose up
 # With rebuild:  docker compose up --build
 # Background:    docker compose up -d
-# With extras:   docker compose --profile database up
+# Emergency file-storage mode: FORGE_KB_STORAGE_TYPE=file docker compose up
 # ============================================================================
 
 services:
@@ -16,12 +16,21 @@ services:
       - ./workspace:/app/workspace          # Persist agent workspace
       - ./settings.json:/app/settings.json  # Mount your host config
       - forge_data:/home/forge/.Forge       # Persist KB and Memory
+      - tmux_socket:/app/.tmux              # Persist tmux sockets for session continuity
     environment:
       - FORGE_HOST=0.0.0.0
       - FORGE_PORT=3000
+      - KB_STORAGE_TYPE=${FORGE_KB_STORAGE_TYPE:-database}
+      - DATABASE_URL=postgresql://forge:${POSTGRES_PASSWORD:-forge_dev}@postgres:5432/forge
       - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379/0
+      - TMUX_TMPDIR=/app/.tmux
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway" # Access host providers (Ollama, etc.)
     restart: unless-stopped
@@ -32,11 +41,9 @@ services:
       start_period: 10s
       retries: 3
 
-  # Optional: PostgreSQL for conversation/KB storage
-  # Activate with: docker compose --profile database up
+  # Default: PostgreSQL for conversation/KB storage
   postgres:
     image: postgres:16-alpine
-    profiles: ["database"]
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
@@ -72,3 +79,4 @@ services:
 volumes:
   pgdata:
   forge_data:
+  tmux_socket:

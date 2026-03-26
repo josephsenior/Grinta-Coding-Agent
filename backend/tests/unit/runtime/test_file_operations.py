@@ -25,6 +25,7 @@ from backend.runtime.file_operations import (
     read_video_file,
     resolve_path,
     set_file_permissions,
+    truncate_cmd_output,
     truncate_large_text,
     write_file_content,
 )
@@ -68,6 +69,15 @@ class TestTruncateLargeText:
 
     def test_max_chars_zero(self):
         assert truncate_large_text("hello", 0, label="test") == "hello"
+
+
+class TestTruncateCmdOutput:
+    def test_truncate_cmd_output_head_tail_notice(self):
+        output = "".join(f"line-{i}\n" for i in range(200))
+        truncated = truncate_cmd_output(output, max_chars=300)
+        assert "[FORGE: Output truncated" in truncated
+        assert "line-0" in truncated
+        assert "line-199" in truncated
 
 
 # ---------------------------------------------------------------------------

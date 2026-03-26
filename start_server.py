@@ -61,6 +61,25 @@ def _load_dotenv_local() -> None:
                 os.environ[key] = val
 
 
+def _validate_storage_contract() -> None:
+    """Validate storage-mode contract before starting the server.
+
+    In Docker-first mode we default to database-backed storage, so missing
+    DATABASE_URL should fail fast with an explicit error.
+    """
+    storage_mode = os.environ.get('KB_STORAGE_TYPE', 'file').strip().lower()
+    if storage_mode not in {'database', 'db'}:
+        return
+
+    db_url = os.environ.get('DATABASE_URL', '').strip()
+    if db_url:
+        return
+
+    print('ERROR: KB_STORAGE_TYPE is set to database but DATABASE_URL is empty.')
+    print('Set DATABASE_URL or switch KB_STORAGE_TYPE=file for emergency local fallback.')
+    raise SystemExit(2)
+
+
 _load_dotenv_local()
 
 # Set environment variables
@@ -74,6 +93,8 @@ os.environ.setdefault('FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '8')
 import uvicorn  # noqa: E402
 
 if __name__ == '__main__':
+    _validate_storage_contract()
+
     host = os.environ.get('FORGE_HOST', os.environ.get('HOST', '127.0.0.1'))
     requested_port = int(os.environ.get('PORT', '3000'))
     port = _find_available_port(host, requested_port)

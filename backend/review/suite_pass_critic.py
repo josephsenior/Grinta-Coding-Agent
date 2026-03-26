@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
 from backend.core.logger import forge_logger as logger
+from backend.runtime.utils.test_output_summary import parse_pytest_pass_fail_counts
 from backend.review.base import BaseCritic, CriticResult
 
 if TYPE_CHECKING:
@@ -70,9 +71,7 @@ def _run_pytest(test_dirs: list[Path], workspace_root: str) -> tuple[int, int, s
             cwd=workspace_root,
         )
         output = result.stdout + result.stderr
-        # Parse "N passed, M failed" from pytest summary line.
-        passed = int(m.group(1)) if (m := re.search(r"(\d+) passed", output)) else 0
-        failed = int(m.group(1)) if (m := re.search(r"(\d+) failed", output)) else 0
+        passed, failed = parse_pytest_pass_fail_counts(output)
         # Last non-empty line is the concise summary.
         summary = next((l for l in reversed(output.splitlines()) if l.strip()), "")
         return passed, failed, summary

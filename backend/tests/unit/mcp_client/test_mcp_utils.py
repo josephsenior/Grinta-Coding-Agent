@@ -26,23 +26,9 @@ from backend.mcp_client.mcp_utils import (
 # _is_windows_stdio_mcp_disabled
 # ---------------------------------------------------------------------------
 class TestIsWindowsMcpDisabled:
-    def test_non_windows(self):
-        with patch.object(sys, "platform", "linux"):
-            assert _is_windows_stdio_mcp_disabled() is False
-
-    def test_windows_no_env(self):
-        with (
-            patch.object(sys, "platform", "win32"),
-            patch.dict("os.environ", {}, clear=True),
-        ):
-            assert _is_windows_stdio_mcp_disabled() is True
-
-    def test_windows_with_env(self):
-        with (
-            patch.object(sys, "platform", "win32"),
-            patch.dict("os.environ", {"FORGE_ENABLE_WINDOWS_MCP": "1"}),
-        ):
-            assert _is_windows_stdio_mcp_disabled() is False
+    def test_always_returns_false(self):
+        """_is_windows_stdio_mcp_disabled always returns False for OS agnosticism."""
+        assert _is_windows_stdio_mcp_disabled() is False
 
 
 # ---------------------------------------------------------------------------
@@ -269,22 +255,20 @@ class TestAsyncHelpers:
         from backend.mcp_client.mcp_utils import call_tool_mcp
 
         action = self._as_action(SimpleNamespace(name="tool1", arguments={}))
-        with patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=True):
-            obs = await call_tool_mcp([], action)
-            # Windows-disabled or empty clients — either message is fine
-            assert obs.content
+        obs = await call_tool_mcp([], action)
+        # Empty clients
+        assert obs.content
 
     @pytest.mark.asyncio
     async def test_call_tool_mcp_no_clients(self):
         from backend.mcp_client.mcp_utils import call_tool_mcp
 
         action = self._as_action(SimpleNamespace(name="tool1", arguments={}))
-        with patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=False):
-            obs = await call_tool_mcp([], action)
-            data = json.loads(obs.content)
-            assert data["ok"] is False
-            assert data["error_code"] == "MCP_NO_CLIENTS"
-            assert obs.tool_result["ok"] is False
+        obs = await call_tool_mcp([], action)
+        data = json.loads(obs.content)
+        assert data["ok"] is False
+        assert data["error_code"] == "MCP_NO_CLIENTS"
+        assert obs.tool_result["ok"] is False
 
     @pytest.mark.asyncio
     async def test_call_tool_mcp_wrapper_dispatch(self):
@@ -298,12 +282,9 @@ class TestAsyncHelpers:
         mock_client = MagicMock()
         mock_client.tools = []
 
-        with (
-            patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=False),
-            patch.dict(
-                "backend.mcp_client.mcp_utils.WRAPPER_TOOL_REGISTRY",
-                {"wrap_tool": fake_wrapper},
-            ),
+        with patch.dict(
+            "backend.mcp_client.mcp_utils.WRAPPER_TOOL_REGISTRY",
+            {"wrap_tool": fake_wrapper},
         ):
             obs = await call_tool_mcp([mock_client], action)
             data = json.loads(obs.content)
@@ -339,17 +320,15 @@ class TestAsyncHelpers:
     async def test_create_mcps_windows_disabled(self):
         from backend.mcp_client.mcp_utils import create_mcps
 
-        with patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=True):
-            result = await create_mcps([])
-            assert result == []
+        result = await create_mcps([])
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_create_mcps_empty(self):
         from backend.mcp_client.mcp_utils import create_mcps
 
-        with patch("backend.mcp_client.mcp_utils._is_windows_stdio_mcp_disabled", return_value=False):
-            result = await create_mcps([])
-            assert result == []
+        result = await create_mcps([])
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_fetch_mcp_tools_disabled_records_state(self):

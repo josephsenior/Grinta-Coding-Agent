@@ -15,32 +15,28 @@ from backend.cli.gui_launcher import ensure_config_dir_exists, launch_gui_server
 class TestEnsureConfigDirExists(unittest.TestCase):
     """Tests for ensure_config_dir_exists() configuration directory setup."""
 
-    @patch("pathlib.Path.home")
-    @patch("pathlib.Path.mkdir")
-    def test_creates_config_dir(self, mock_mkdir: Mock, mock_home: Mock) -> None:
-        """Test creates .Forge directory in user home."""
-        mock_home_path = MagicMock(spec=Path)
-        mock_home.return_value = mock_home_path
+    @patch("backend.cli.gui_launcher.get_app_settings_root")
+    @patch("backend.cli.gui_launcher.Path")
+    def test_creates_config_dir(self, mock_path_cls: Mock, mock_get_root: Mock) -> None:
+        """Test creates settings directory."""
+        mock_get_root.return_value = "/fake/root"
         mock_config_path = MagicMock(spec=Path)
-        mock_home_path.__truediv__.return_value = mock_config_path
+        mock_path_cls.return_value = mock_config_path
 
         result = ensure_config_dir_exists()
 
-        mock_home_path.__truediv__.assert_called_once_with(".Forge")
-        mock_config_path.mkdir.assert_called_once_with(exist_ok=True)
+        mock_path_cls.assert_called_once_with("/fake/root")
+        mock_config_path.mkdir.assert_called_once_with(parents=True, exist_ok=True)
         self.assertEqual(result, mock_config_path)
 
-    @patch("pathlib.Path.home")
-    def test_returns_config_dir_path(self, mock_home: Mock) -> None:
+    @patch("backend.cli.gui_launcher.get_app_settings_root")
+    def test_returns_config_dir_path(self, mock_get_root: Mock) -> None:
         """Test returns Path object for config directory."""
-        mock_home_path = MagicMock(spec=Path)
-        mock_home.return_value = mock_home_path
-        mock_config_path = MagicMock(spec=Path)
-        mock_home_path.__truediv__.return_value = mock_config_path
-
+        mock_get_root.return_value = "/fake/root/dir"
         result = ensure_config_dir_exists()
 
-        self.assertIsInstance(result, type(mock_config_path))
+        self.assertIsInstance(result, Path)
+        self.assertEqual(str(result), str(Path("/fake/root/dir")))
 
 
 class TestLaunchGUIServer(unittest.TestCase):

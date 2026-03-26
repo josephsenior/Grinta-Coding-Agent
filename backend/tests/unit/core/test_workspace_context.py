@@ -140,7 +140,7 @@ class TestWriteContextTemplate:
 
     def test_template_contains_fingerprint(self, tmp_path: Path) -> None:
         # Create pyproject.toml to trigger fingerprint detection
-        (tmp_path / "pyproject.toml").write_text("[tool.poetry]\n", encoding="utf-8")
+        (tmp_path / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
         path = write_context_template(tmp_path)
         content = path.read_text(encoding="utf-8")
         assert "Python" in content

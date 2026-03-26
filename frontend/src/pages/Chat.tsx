@@ -120,7 +120,6 @@ const CHAT_ATTACH_ACCEPT = [
 ].join(",");
 const CHAT_IMAGE_ACCEPT = "image/jpeg,image/png,image/gif,image/webp";
 const CHAT_FILE_INPUT_ACCEPT = `${CHAT_ATTACH_ACCEPT},${CHAT_IMAGE_ACCEPT}`;
-const TIMELINE_SEPARATOR_GAP_MS = 4 * 60 * 1000;
 
 interface OptimisticUserMessage {
   clientId: string;
@@ -151,36 +150,41 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function deriveTimelineSeparator(
-  previous: ForgeEvent | undefined,
-  current: ForgeEvent,
-): string | null {
-  if (!previous) return null;
-
-  const prevTs = Date.parse(previous.timestamp || "");
-  const currTs = Date.parse(current.timestamp || "");
-  if (!Number.isFinite(prevTs) || !Number.isFinite(currTs)) return null;
-
-  const diffMs = currTs - prevTs;
-  if (diffMs < TIMELINE_SEPARATOR_GAP_MS) return null;
-
-  const diffMinutes = Math.round(diffMs / 60000);
-  if (diffMinutes < 60) {
-    return `${diffMinutes} min later`;
-  }
-
-  const diffHours = Math.round(diffMinutes / 60);
-  return `${diffHours} hr later`;
+function parseEventTimestampMs(event: ForgeEvent): number | null {
+  const ts = Date.parse(event.timestamp || "");
+  return Number.isFinite(ts) ? ts : null;
 }
 
-function TimelineSeparator({ label }: { label: string }) {
-  return (
-    <div className="my-1 flex items-center gap-2 text-[10px] text-muted-foreground/75">
-      <div className="h-px flex-1 bg-border/45" />
-      <span className="rounded-full bg-muted/50 px-2 py-0.5">{label}</span>
-      <div className="h-px flex-1 bg-border/45" />
-    </div>
-  );
+/**
+ * Computes think durations by event id using event timestamps.
+ * - THINK action(s) open a pending thought window.
+ * - Next agent MESSAGE closes the window.
+ * - Duration is assigned to each THINK id and to the closing MESSAGE id.
+ */
+function computeThinkDurationByEventId(events: ForgeEvent[]): Map<number, number> {
+  const out = new Map<number, number>();
+  const pending: Array<{ id: number; ts: number }> = [];
+
+  for (const ev of events) {
+    const ts = parseEventTimestampMs(ev);
+    if (ts == null) continue;
+
+    if ("action" in ev && ev.source === "agent" && ev.action === ActionType.THINK) {
+      pending.push({ id: Number(ev.id), ts });
+      continue;
+    }
+
+    if ("action" in ev && ev.source === "agent" && ev.action === ActionType.MESSAGE && pending.length > 0) {
+      const firstTs = pending[0]?.ts ?? ts;
+      out.set(Number(ev.id), Math.max(0, ts - firstTs));
+      for (const p of pending) {
+        out.set(p.id, Math.max(0, ts - p.ts));
+      }
+      pending.length = 0;
+    }
+  }
+
+  return out;
 }
 
 // --- Inline Tasks Strip ---
@@ -856,6 +860,7 @@ export default function Chat() {
   }, [events, streamingContent, isRunning]);
 
   const showActivityStrip = !!liveActivity && (isRunning || !!streamingContent);
+  const thinkDurationByEventId = useMemo(() => computeThinkDurationByEventId(events), [events]);
   const stateConfidence = useMemo(
     () =>
       deriveStateConfidenceInfo(events, {
@@ -1136,13 +1141,12 @@ export default function Chat() {
               )}
 
               {events.map((event, i) => {
-                const previous = i > 0 ? events[i - 1] : undefined;
-                const separatorLabel = deriveTimelineSeparator(previous, event);
-
                 return (
                   <Fragment key={event.id != null ? `e-${event.id}` : `i-${i}`}>
-                    {separatorLabel && <TimelineSeparator label={separatorLabel} />}
-                    <EventCard event={event} />
+                    <EventCard
+                      event={event}
+                      thinkDurationMs={thinkDurationByEventId.get(Number(event.id))}
+                    />
                   </Fragment>
                 );
               })}

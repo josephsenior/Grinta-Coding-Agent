@@ -93,8 +93,8 @@ class LLMResponse:
         self.model = model
         self.usage = usage
         self.id = kwargs.get("response_id", kwargs.get("id", response_id))
-        self.finish_reason = finish_reason
-        self.tool_calls = tool_calls
+        self.finish_reason = self._normalize_finish_reason(finish_reason)
+        self.tool_calls = self._normalize_tool_calls(tool_calls)
 
         # Build nested structure for attribute-style access
         class ToolCallFunction:
@@ -108,7 +108,7 @@ class LLMResponse:
         class ToolCall:
             def __init__(self, tc_dict: dict[str, Any]):
                 self.id = tc_dict.get("id")
-                self.type = tc_dict.get("type")
+                self.type = tc_dict.get("type", "function")
                 func_dict = tc_dict.get("function", {})
                 self.function = ToolCallFunction(
                     name=func_dict.get("name", ""),
@@ -141,7 +141,58 @@ class LLMResponse:
                 self.message = Message(content, role, tool_calls_dict)
                 self.finish_reason = finish_reason
 
-        self.choices = [Choice(content, "assistant", finish_reason, tool_calls)]
+        self.choices = [Choice(self.content, "assistant", self.finish_reason, self.tool_calls)]
+
+    @staticmethod
+    def _normalize_finish_reason(reason: str | None) -> str:
+        if not reason:
+            return "stop"
+        reason = str(reason).strip().lower()
+        mapping = {
+            "end_turn": "stop",
+            "max_tokens": "length",
+            "tool_use": "tool_calls",
+        }
+        return mapping.get(reason, reason)
+
+    @staticmethod
+    def _normalize_tool_calls(tool_calls: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+        if not tool_calls:
+            return None
+        import json
+        normalized = []
+        for i, tc in enumerate(tool_calls):
+            # Ensure function arguments are JSON strings
+            func = tc.get("function", {})
+            args = func.get("arguments", "{}")
+            if isinstance(args, dict):
+                args_str = json.dumps(args)
+            elif isinstance(args, str):
+                try:
+                    # just to validate
+                    json.loads(args)
+                    args_str = args
+                except json.JSONDecodeError:
+                    args_str = "{}" if not args.strip() else args
+            elif args is None:
+                args_str = "{}"
+            else:
+                try:
+                    args_str = str(args)
+                    json.loads(args_str)
+                except Exception:
+                    args_str = "{}"
+            
+            normalized_tc = {
+                "id": tc.get("id", f"call_{i}"),
+                "type": tc.get("type", "function"),
+                "function": {
+                    "name": str(func.get("name", "")),
+                    "arguments": args_str,
+                }
+            }
+            normalized.append(normalized_tc)
+        return normalized
 
     def to_dict(self) -> dict[str, Any]:
         message: dict[str, Any] = {"content": self.content, "role": "assistant"}
@@ -176,11 +227,11 @@ class DirectLLMClient(ABC):
         pass
 
     @abstractmethod
-    def astream(
+    async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream responses asynchronously. Returns an async iterator."""
-        pass
+        yield {} # type: ignore
 
     def __init_subclass__(cls, **kwargs):
         """Ensure subclasses define model_name attribute."""
@@ -306,6 +357,9 @@ class OpenAIClient(DirectLLMClient):
         return exc
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
+        from backend.llm.mappers.openai import strip_prompt_cache_hints_from_messages
+
+        messages = strip_prompt_cache_hints_from_messages(messages)
         kwargs["model"] = self.model_name
         try:
             response = self.client.chat.completions.create(
@@ -359,6 +413,9 @@ class OpenAIClient(DirectLLMClient):
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
+        from backend.llm.mappers.openai import strip_prompt_cache_hints_from_messages
+
+        messages = strip_prompt_cache_hints_from_messages(messages)
         kwargs.pop("model", None)
         try:
             response = await self.async_client.chat.completions.create(
@@ -396,6 +453,9 @@ class OpenAIClient(DirectLLMClient):
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
+        from backend.llm.mappers.openai import strip_prompt_cache_hints_from_messages
+
+        messages = strip_prompt_cache_hints_from_messages(messages)
         # OpenAI-compatible APIs require stream=True for token streaming.
         kwargs["stream"] = True
         kwargs.pop("model", None)
@@ -743,10 +803,13 @@ class GeminiClient(DirectLLMClient):
         import aiohttp
 
         logger.error("=" * 80)
-        logger.error(f"GOOGLE GENAI EXCEPTION: {type(exc)} {exc}")
-        if hasattr(exc, "code"): logger.error(f"CODE: {exc.code}")
-        if hasattr(exc, "message"): logger.error(f"MESSAGE: {exc.message}")
-        if hasattr(exc, "details"): logger.error(f"DETAILS: {exc.details}")
+        logger.error("GOOGLE GENAI EXCEPTION: %s %s", type(exc), exc)
+        if hasattr(exc, "code"):
+            logger.error("CODE: %s", exc.code)
+        if hasattr(exc, "message"):
+            logger.error("MESSAGE: %s", exc.message)
+        if hasattr(exc, "details"):
+            logger.error("DETAILS: %s", exc.details)
         logger.error("=" * 80)
 
         if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
@@ -942,7 +1005,7 @@ class GeminiClient(DirectLLMClient):
                                 args_dict = _args
 
                             if hasattr(args_dict, "pb") and hasattr(args_dict, "items"):
-                                args_dict = {k: v for k, v in args_dict.items()}  # type: ignore[union-attr]
+                                args_dict = dict(args_dict.items())  # type: ignore[union-attr]
 
                             if isinstance(args_dict, dict):
                                 args_str = json.dumps(args_dict)

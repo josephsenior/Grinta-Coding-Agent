@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logger import forge_logger as logger  # noqa: E402
 from backend.core.schemas import AgentState  # noqa: E402
 from backend.events import EventSource  # noqa: E402
+from backend.events.action.agent import PlaybookFinishAction  # noqa: E402
 
 if TYPE_CHECKING:
     from backend.controller.services.controller_context import ControllerContext
-    from backend.events.action.agent import PlaybookFinishAction
 
 
 class TaskValidationService:
@@ -78,11 +78,23 @@ class TaskValidationService:
         except Exception as e:
             logger.warning("Failed to save lessons learned: %s", e)
 
-    async def _emit_finish_block(self, message: str, error_id: str) -> bool:
+    async def _emit_finish_block(
+        self,
+        message: str,
+        error_id: str,
+        *,
+        cause_action: Any | None = None,
+    ) -> bool:
         from backend.events.observation import ErrorObservation
+        from backend.events.observation_cause import attach_observation_cause
 
         controller = self._context.get_controller()
         error_obs = ErrorObservation(content=message, error_id=error_id)
+        attach_observation_cause(
+            error_obs,
+            cause_action,
+            context="task_validation_service.finish_block",
+        )
         controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
         if controller.state.agent_state != AgentState.RUNNING:
@@ -115,6 +127,7 @@ class TaskValidationService:
             "⚠️ FINISH BLOCKED: Completion validation is enabled but the validator is unavailable. "
             "Please continue working or retry once validation is restored.",
             error_id="TASK_VALIDATOR_UNAVAILABLE",
+            cause_action=action,
         )
 
     async def _should_validate(self, action: PlaybookFinishAction) -> bool:
@@ -141,15 +154,18 @@ class TaskValidationService:
         validation = await validator.validate_completion(task, controller.state)
 
         if not validation.passed:
-            await self._handle_failure(validation)
+            await self._handle_failure(action, validation)
             return False
 
         logger.info("Task completion validation passed: %s", validation.reason)
         return True
 
-    async def _handle_failure(self, validation: Any) -> None:
+    async def _handle_failure(
+        self, action: PlaybookFinishAction, validation: Any
+    ) -> None:
         """Emit an error observation and resume the agent on validation failure."""
         from backend.events.observation import ErrorObservation
+        from backend.events.observation_cause import attach_observation_cause
 
         controller = self._context.get_controller()
         logger.warning("Task completion validation failed: %s", validation.reason)
@@ -158,6 +174,11 @@ class TaskValidationService:
         error_obs = ErrorObservation(
             content=feedback,
             error_id="TASK_VALIDATION_FAILED",
+        )
+        attach_observation_cause(
+            error_obs,
+            action,
+            context="task_validation_service.validation_failed",
         )
         controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 

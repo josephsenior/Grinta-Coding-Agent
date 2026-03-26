@@ -417,11 +417,10 @@ def format_user_cancelled_error(error: UserCancelledError) -> UserFriendlyError:
     )
 
 
-def format_llm_authentication_error(
-    error: Exception, context: dict[str, Any] | None = None
-) -> UserFriendlyError:
-    """Format LLM authentication/API key errors with helpful guidance."""
-    # Extract model/provider info if available
+def _extract_provider_context(
+    error: Exception, context: dict[str, Any] | None
+) -> tuple[str, str]:
+    """Extract display-friendly model and provider names from context and error text."""
     model_name = "the AI model"
     provider_name = "your AI provider"
 
@@ -429,14 +428,22 @@ def format_llm_authentication_error(
         model_name = context.get("model", model_name)
         provider_name = context.get("provider", provider_name)
 
-    # Try to extract from error message
-    error_str = str(error)
-    if "anthropic" in error_str.lower():
+    error_str = str(error).lower()
+    if "anthropic" in error_str:
         provider_name = "Anthropic (Claude)"
-    elif "openai" in error_str.lower() or "gpt" in error_str.lower():
+    elif "openai" in error_str or "gpt" in error_str:
         provider_name = "OpenAI"
-    elif "gemini" in error_str.lower() or "google" in error_str.lower():
+    elif "gemini" in error_str or "google" in error_str:
         provider_name = "Google (Gemini)"
+
+    return model_name, provider_name
+
+
+def format_llm_authentication_error(
+    error: Exception, context: dict[str, Any] | None = None
+) -> UserFriendlyError:
+    """Format LLM authentication/API key errors with helpful guidance."""
+    model_name, provider_name = _extract_provider_context(error, context)
 
     return UserFriendlyError(
         title="API Key Required",

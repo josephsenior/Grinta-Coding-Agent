@@ -58,6 +58,9 @@ class ActionService:
 
         await self._confirmation_service.evaluate_action(action)
 
+        # Pending must be registered before the action is added to the stream: the runtime
+        # may emit an observation as soon as the action is enqueued, before the caller
+        # regains control (see EventStream delivery workers).
         self.set_pending_action(action)
 
     async def _finalize_action(

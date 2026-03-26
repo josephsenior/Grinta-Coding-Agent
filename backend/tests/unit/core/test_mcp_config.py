@@ -277,14 +277,9 @@ class TestMCPServerConfigStdio:
         assert "mcp" in mapping
         assert mapping["mcp"].enabled is True
 
-    def test_from_toml_section_windows_filtering(self, monkeypatch):
-        """Test that stdio servers are filtered on Windows unless allowed."""
-        import platform
-        if platform.system() != "Windows":
-            pytest.skip("This test is specific to Windows filtering logic")
-
-        monkeypatch.setattr("os.path.exists", lambda p: False) # No config.json
-        monkeypatch.delenv("FORGE_ENABLE_WINDOWS_MCP", raising=False)
+    def test_from_toml_section_all_servers_loaded(self, monkeypatch):
+        """Test that all servers are loaded regardless of OS (OS agnosticism)."""
+        monkeypatch.setattr("os.path.exists", lambda p: False)  # No config.json
         _disable_bundled_mcp_defaults(monkeypatch)
 
         data = {
@@ -299,7 +294,8 @@ class TestMCPServerConfigStdio:
         mapping = MCPConfig.from_toml_section(data)
         names = [s.name for s in mapping["mcp"].servers]
 
-        assert "generic-stdio" not in names
+        # All servers should be loaded (no Windows filtering)
+        assert "generic-stdio" in names
         assert "browser-use" in names
         assert "my-sse" in names
 
@@ -417,7 +413,6 @@ class TestMCPConfig:
         from backend.core.config import mcp_config as mcp_config_mod
 
         monkeypatch.setattr(mcp_config_mod, "_bundled_mcp_json_path", lambda: config_json)
-        monkeypatch.setenv("FORGE_ENABLE_WINDOWS_MCP", "1")
 
         mapping = MCPConfig.from_toml_section({"enabled": True, "servers": []})
         server_names = [s.name for s in mapping["mcp"].servers]

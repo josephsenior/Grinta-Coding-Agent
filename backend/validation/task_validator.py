@@ -34,6 +34,9 @@ class Task:
     description: str
     requirements: list[str] = field(default_factory=list)
     acceptance_criteria: list[str] = field(default_factory=list)
+    #: Explicit output paths from structured task metadata (see ``task_metadata``).
+    #: ``None`` = not provided; fall back to validator init / prose regex hints.
+    expected_output_files: list[str] | None = None
 
 
 @dataclass
@@ -295,21 +298,23 @@ class FileExistsValidator(TaskValidator):
             ValidationResult for file existence
 
         """
-        if not self.expected_files:
-            # Try to extract expected files from task description
-            self.expected_files = self._extract_expected_files(task.description)
+        if task.expected_output_files is not None:
+            files_to_check = list(task.expected_output_files)
+        elif self.expected_files:
+            files_to_check = list(self.expected_files)
+        else:
+            files_to_check = self._extract_expected_files(task.description)
 
-        if not self.expected_files:
-            # Can't validate without knowing expected files
+        if not files_to_check:
             logger.debug("FileExistsValidator: No expected files specified")
             return ValidationResult(
-                passed=True,  # Don't block if we can't determine requirements
+                passed=True,
                 reason="No expected files specified",
-                confidence=0.5,
+                confidence=0.9 if task.expected_output_files is not None else 0.5,
             )
 
         missing_files = []
-        for file_path in self.expected_files:
+        for file_path in files_to_check:
             if not self._check_file_exists(state, file_path):
                 missing_files.append(file_path)
 
@@ -332,9 +337,10 @@ class FileExistsValidator(TaskValidator):
     def _extract_expected_files(self, task_description: str) -> list[str]:
         """Try to extract expected file names from task description.
 
-        Patterns are intentionally narrow (quoted paths, or explicit
-        create/file/output/save phrasing) to reduce false positives from
-        incidental ``word.ext`` mentions in prose.
+        Best-effort only: prose is ambiguous; prefer explicit structured task
+        fields when adding new validation. Patterns are intentionally narrow
+        (quoted paths, or explicit create/file/output/save phrasing) to reduce
+        false positives from incidental ``word.ext`` mentions in prose.
 
         Args:
             task_description: Task description text

@@ -85,6 +85,16 @@ Run the helper script to setup config and launch:
 .\DOCKER_START.ps1  # Windows
 ```
 
+Default Docker flow starts the full Linux runtime stack: Forge + Redis + PostgreSQL.
+
+Emergency fallback (file-backed mode):
+
+```bash
+./docker_start.sh --no-db
+# or
+.\DOCKER_START.ps1 -NoDatabase
+```
+
 ### 🪟 Windows (Local)
 
 Run the bootstrap script at the repository root. It installs dependencies, sets up the environment, and starts the app:

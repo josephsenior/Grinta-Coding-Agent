@@ -46,13 +46,36 @@ def _extract_code(string: str) -> str | None:
         str | None: The extracted code content or None if not found.
 
     """
-    pattern = "<updated_code>(.*?)</updated_code>"
-    matches = re.findall(pattern, string, re.DOTALL)
-    if not matches:
+    start_tag = "<updated_code>"
+    end_tag = "</updated_code>"
+    
+    start_idx = string.find(start_tag)
+    if start_idx == -1:
+        # Fallback to case-insensitive or minor variances if possible
+        start_idx = string.lower().find(start_tag)
+    
+    if start_idx == -1:
         return None
-    content = str(matches[0])
+        
+    start_idx += len(start_tag)
+    end_idx = string.rfind(end_tag)  # rfind handles nested tags by grabbing the outermost end
+    if end_idx == -1:
+        end_idx = len(string)
+        
+    content = string[start_idx:end_idx].strip()
+    
+    # Strip markdown formatting often returned by models
+    if content.startswith("```python"):
+        content = content[len("```python"):].lstrip()
+    elif content.startswith("```"):
+        content = content[len("```"):].lstrip()
+        
+    if content.endswith("```"):
+        content = content[:-len("```")].rstrip()
+    
     if content.startswith("#EDIT:"):
-        content = content[content.find("\n") + 1 :]
+        content = content[content.find("\n") + 1:]
+        
     return content
 
 

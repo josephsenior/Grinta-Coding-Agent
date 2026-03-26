@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from backend._canonical import CanonicalModelMetaclass
 
@@ -24,7 +31,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_CLI_MODE,
     DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
     DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY,
-    DEFAULT_AGENT_ENABLE_PROGRESSIVE_TOOLS,
     DEFAULT_AGENT_CMD_ENABLED,
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
@@ -40,6 +46,8 @@ from backend.core.constants import (
     DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
     DEFAULT_AGENT_MAX_ERROR_RATE,
     DEFAULT_AGENT_ERROR_RATE_WINDOW,
+    DEFAULT_AGENT_WARNING_FIRST_TRIP_ENABLED,
+    DEFAULT_AGENT_WARNING_FIRST_TRIP_LIMIT,
     DEFAULT_AGENT_MCP_ENABLED,
     DEFAULT_AGENT_MEMORY_ENABLED,
     DEFAULT_AGENT_MEMORY_MAX_THREADS,
@@ -47,7 +55,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_PLAN_MODE_ENABLED,
     DEFAULT_AGENT_PLANNING_COMPLEXITY_THRESHOLD,
     DEFAULT_AGENT_PLANNING_MIDDLEWARE_ENABLED,
-    DEFAULT_AGENT_PROMPT_CACHING_ENABLED,
     DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED,
     DEFAULT_AGENT_REFLECTION_ENABLED,
     DEFAULT_AGENT_REFLECTION_MAX_ATTEMPTS,
@@ -119,10 +126,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED,
         description="Enable hybrid retrieval for vector memory",
     )
-    enable_prompt_caching: bool = Field(
-        default=DEFAULT_AGENT_PROMPT_CACHING_ENABLED,
-        description="Enable prompt caching hints for LLMs",
-    )
     disabled_playbooks: list[str] = Field(
         default_factory=list, description="List of playbooks disabled for this agent"
     )
@@ -160,7 +163,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_blackboard: bool = Field(default=True)
     enable_rollback: bool = Field(default=True)
     enable_workspace_status: bool = Field(default=True)
-    enable_query_error_solutions: bool = Field(default=True)
     enable_checkpoints: bool = Field(default=True)
     enable_analyze_project_structure: bool = Field(default=True)
     enable_session_diff: bool = Field(default=True)
@@ -258,6 +260,18 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "high-risk actions). Disable only for debugging."
         ),
     )
+    warning_first_trip_enabled: bool = Field(
+        default=DEFAULT_AGENT_WARNING_FIRST_TRIP_ENABLED,
+        description=(
+            "When true, circuit/stuck trips are first surfaced as structured "
+            "agent guidance before hard pause/stop is enforced."
+        ),
+    )
+    warning_first_trip_limit: int = Field(
+        default=DEFAULT_AGENT_WARNING_FIRST_TRIP_LIMIT,
+        ge=1,
+        description="Number of warning-only circuit trips before hard enforcement",
+    )
     enable_graceful_shutdown: bool = Field(
         default=True,
         description=(
@@ -282,14 +296,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "Append FORGE control/status text to the first system message instead of "
             "inserting a second system message (some providers handle a single system "
             "message better)"
-        ),
-    )
-    enable_progressive_tools: bool = Field(
-        default=DEFAULT_AGENT_ENABLE_PROGRESSIVE_TOOLS,
-        description=(
-            "If true, OrchestratorPlanner filters tools each turn via ToolSelector "
-            "(turn counts, keyword regex, errors). Default off: expose full built "
-            "toolset for predictable behavior."
         ),
     )
     max_consecutive_errors: int = Field(
@@ -318,6 +324,15 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         ge=3,
         description="Rolling window size for circuit breaker error-rate checks",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_legacy_enable_prompt_caching(cls, data: Any) -> Any:
+        """Ignore removed agent-level flag (use LLMConfig.caching_prompt instead)."""
+        if isinstance(data, dict):
+            data = dict(data)
+            data.pop("enable_prompt_caching", None)
+        return data
 
     @field_validator("name", "autonomy_level", "system_prompt_filename")
     @classmethod

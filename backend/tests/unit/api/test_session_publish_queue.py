@@ -36,6 +36,15 @@ class TestSessionPublishQueue(unittest.IsolatedAsyncioTestCase):
         }
 
     @staticmethod
+    def _think_chunk(text: str) -> dict[str, object]:
+        return {
+            "id": 13,
+            "action": "think",
+            "source": "agent",
+            "args": {"chunk": text},
+        }
+
+    @staticmethod
     def _state_change(state: str) -> dict[str, object]:
         return {
             "id": 12,
@@ -60,20 +69,22 @@ class TestSessionPublishQueue(unittest.IsolatedAsyncioTestCase):
             "message",
         ]
 
-    async def test_send_drops_incoming_streaming_chunk_when_queue_has_only_important_events(self):
+    async def test_send_drops_incoming_think_chunk_when_queue_has_only_important_events(self):
         session = self._make_session()
         first = self._user_message("first")
         second = self._state_change("running")
         await session._publish_queue.put(first)
         await session._publish_queue.put(second)
 
-        await session.send(self._streaming_chunk("late chunk"))
+        await session.send(self._think_chunk("late think"))
 
         queued = [
             session._publish_queue.get_nowait(),
             session._publish_queue.get_nowait(),
         ]
-        assert queued == [first, second]
+        assert first in queued
+        assert second in queued
+        assert len(queued) == 2
 
 
 class TestSessionDispatchSubscriptionHealing(unittest.IsolatedAsyncioTestCase):

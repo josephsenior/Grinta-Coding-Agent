@@ -216,7 +216,14 @@ class BashSession(BaseShellSession):
 
     def initialize(self) -> None:
         """Initialize tmux server and session for bash runtime."""
-        server = libtmux.Server()
+        self._prepare_tmux_tmpdir()
+        try:
+            server = libtmux.Server()
+        except Exception as exc:
+            raise RuntimeError(
+                "Failed to initialize tmux server. Ensure tmux is installed and "
+                "TMUX_TMPDIR is writable in this runtime."
+            ) from exc
         self.server = server
         _shell_command = "/bin/bash"
         if self._should_use_su():
@@ -261,6 +268,20 @@ class BashSession(BaseShellSession):
         logger.debug("Bash session initialized with work dir: %s", self.work_dir)
         self._cwd = os.path.abspath(self.work_dir)
         self._initialized = True
+
+    def _prepare_tmux_tmpdir(self) -> None:
+        """Validate and prepare TMUX_TMPDIR when explicitly configured."""
+        tmpdir = os.environ.get("TMUX_TMPDIR", "").strip()
+        if not tmpdir:
+            return
+        try:
+            os.makedirs(tmpdir, exist_ok=True)
+        except OSError as exc:
+            raise RuntimeError(
+                f"TMUX_TMPDIR '{tmpdir}' could not be created"
+            ) from exc
+        if not os.access(tmpdir, os.W_OK):
+            raise RuntimeError(f"TMUX_TMPDIR '{tmpdir}' is not writable")
 
     def _hard_kill_tmux_session(self) -> None:
         session = self.session

@@ -79,39 +79,34 @@ class ReflectionMiddleware(ToolInvocationMiddleware):
         if not command:
             return
 
-        # Check for destructive operations
-        destructive_patterns = [
-            r"\brm\s+-rf\s+/",
-            r"\bdd\s+if=",
-            r"\bmkfs\s+",
-            r"\bformat\s+",
-            r">\s+/dev/",
-        ]
+        # Destructive operations: align with CommandAnalyzer CRITICAL tier plus
+        # legacy patterns (see reflection_precheck_should_block docstring).
+        from backend.events.event import EventSource
+        from backend.events.observation import ErrorObservation
+        from backend.events.observation_cause import attach_observation_cause
+        from backend.security.command_analyzer import reflection_precheck_should_block
 
-        import re
-
-        for pattern in destructive_patterns:
-            if re.search(pattern, command):
-                from backend.events.event import EventSource
-                from backend.events.observation import ErrorObservation
-
-                logger.warning(
-                    "Reflection blocked destructive command: %s",
-                    command,
-                )
-                ctx.block("reflection_blocked_destructive_command")
-                ctx.metadata["handled"] = True
-                error_obs = ErrorObservation(
-                    content=(
-                        "ACTION BLOCKED: Reflection middleware detected a potentially destructive command.\n"
-                        f"Command: {command}"
-                    ),
-                    error_id="REFLECTION_BLOCKED_DESTRUCTIVE_COMMAND",
-                )
-                error_obs.cause = getattr(ctx.action, "id", None)
-                self.controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
-                self.controller._pending_action = None
-                return
+        should_block, _block_reason = reflection_precheck_should_block(command)
+        if should_block:
+            logger.warning(
+                "Reflection blocked destructive command: %s",
+                command,
+            )
+            ctx.block("reflection_blocked_destructive_command")
+            ctx.metadata["handled"] = True
+            error_obs = ErrorObservation(
+                content=(
+                    "ACTION BLOCKED: Reflection middleware detected a potentially destructive command.\n"
+                    f"Command: {command}"
+                ),
+                error_id="REFLECTION_BLOCKED_DESTRUCTIVE_COMMAND",
+            )
+            attach_observation_cause(
+                error_obs, ctx.action, context="reflection.blocked"
+            )
+            self.controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
+            self.controller._pending_action = None
+            return
 
         logger.debug("✅ Reflection: Command action verified: %s", command)
 

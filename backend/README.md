@@ -29,7 +29,7 @@ Most application code lives under `backend/`. The CLI entry point is `backend/cl
 
 From the project root:
 ```bash
-poetry run pytest backend/tests
+uv run pytest backend/tests
 ```
 
 Or use the Makefile:
@@ -56,4 +56,4 @@ python backend/scripts/database/setup_database.py
 
 ## Development
 
-All Python imports should continue to use `from forge.` - the package structure is abstracted by Poetry's package configuration.
+All Python imports should continue to use `from forge.` - the package structure is abstracted by uv's package configuration.

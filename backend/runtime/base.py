@@ -45,6 +45,7 @@ from backend.events.observation import (
     NullObservation,
     Observation,
 )
+from backend.events.observation_cause import attach_observation_cause
 from backend.events.serialization.action import ACTION_TYPE_TO_CLASS
 from backend.api.provider_handler import ProviderHandler
 from backend.runtime.capabilities import RuntimeCapabilities
@@ -505,7 +506,9 @@ class Runtime(
             True if observation should be added to stream, False otherwise
 
         """
-        observation.cause = event.id
+        attach_observation_cause(
+            observation, event, context="runtime._process_observation"
+        )
         observation.tool_call_metadata = event.tool_call_metadata
 
         # Attach a structured result payload for downstream consumers.

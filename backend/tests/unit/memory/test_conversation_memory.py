@@ -39,7 +39,6 @@ def _make_config(**overrides):
     """Create a minimal AgentConfig-like object."""
     cfg = MagicMock()
     cfg.enable_vector_memory = False
-    cfg.enable_prompt_caching = True
     cfg.enable_som_visual_browsing = False
     cfg.cli_mode = False
     cfg.enable_hybrid_retrieval = False
@@ -313,36 +312,6 @@ class TestContextSummary:
         summary = mem.get_context_summary()
         assert "Decisions" in summary
         assert "use Python" in summary
-
-
-# ---------------------------------------------------------------------------
-# Prompt caching
-# ---------------------------------------------------------------------------
-
-
-class TestPromptCaching:
-    def test_apply_prompt_caching_sets_flags(self):
-        mem = _make_memory()
-        msgs = [
-            _text_msg("system", "system prompt"),
-            _text_msg("user", "question"),
-        ]
-        mem.apply_prompt_caching(msgs)
-        # First system message should have cache_prompt=True
-        assert msgs[0].content[0].cache_prompt is True
-        # Last user message should have cache_prompt=True
-        assert msgs[1].content[0].cache_prompt is True
-
-    def test_caching_disabled(self):
-        mem = _make_memory(enable_prompt_caching=False)
-        msgs = [_text_msg("system", "prompt")]
-        mem.apply_prompt_caching(msgs)
-        # Should not modify when disabled
-        # (the method returns early)
-
-    def test_caching_empty_messages(self):
-        mem = _make_memory()
-        mem.apply_prompt_caching([])  # should not raise
 
 
 # ---------------------------------------------------------------------------

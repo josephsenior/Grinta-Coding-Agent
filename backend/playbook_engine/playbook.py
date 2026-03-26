@@ -289,6 +289,9 @@ class KnowledgePlaybook(BasePlaybook):
             if trigger.lower() in message_lower:
                 return trigger
 
+        if getattr(self.metadata, "strict_trigger_matching", False):
+            return None
+
         # Tier 2: word-overlap similarity (lightweight semantic fallback)
         threshold = 0.55
         message_words = set(re.findall(r"\w+", message_lower))

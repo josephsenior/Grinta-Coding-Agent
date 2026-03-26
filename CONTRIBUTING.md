@@ -17,7 +17,7 @@ git clone https://github.com/josephsenior/Forge.git
 cd Forge
 
 # Backend
-poetry install
+uv sync
 python start_server.py
 
 # Web UI: start the server, then open http://localhost:3000

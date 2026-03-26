@@ -1,9 +1,9 @@
-"""Orchestrate batch D205 fixes using Poetry+ruff and fix_d205_tokens.py.
+"""Orchestrate batch D205 fixes using uv+ruff and fix_d205_tokens.py.
 
 Usage: python scripts/auto_fix_d205.py
 
 This script will:
-- run `poetry run ruff check --select D205` to enumerate D205 findings
+- run `uv run ruff check --select D205` to enumerate D205 findings
 - parse file paths, chunk into batches (default 5)
 - for each batch: run fix_d205_tokens.py --dry-run, show diffs, apply fixes, then run ruff on the batch
 - if new syntax errors or new D2xx issues appear, revert the batch using git
@@ -33,8 +33,8 @@ def run_cmd(cmd: list[str], cwd: Path = ROOT) -> subprocess.CompletedProcess:
 
 
 def enumerate_d205() -> list[Path]:
-    print("Enumerating D205 issues with: poetry run ruff check --select D205")
-    res = run_cmd(["poetry", "run", "ruff", "check", "--select", "D205"])
+    print("Enumerating D205 issues with: uv run ruff check --select D205")
+    res = run_cmd(["uv", "run", "ruff", "check", "--select", "D205"])
     out = res.stdout or ""
     files = []
     for line in out.splitlines():
@@ -74,7 +74,7 @@ def run_batch(batch: list[Path]) -> bool:
     apply_res = run_cmd(apply_cmd)
     print(apply_res.stdout)
     paths = [str(p.relative_to(ROOT)) for p in batch]
-    verify_cmd = ["poetry", "run", "ruff", "check"] + paths
+    verify_cmd = ["uv", "run", "ruff", "check"] + paths
     print("Verifying with ruff:", " ".join(verify_cmd))
     verify = run_cmd(verify_cmd)
     print(verify.stdout)

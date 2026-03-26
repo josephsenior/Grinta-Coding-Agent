@@ -21,6 +21,7 @@ class BlackboardMiddleware(ToolInvocationMiddleware):
         from backend.events.action.agent import BlackboardAction
         from backend.events.event import EventSource
         from backend.events.observation import AgentThinkObservation, ErrorObservation
+        from backend.events.observation_cause import attach_observation_cause
 
         if not isinstance(ctx.action, BlackboardAction):
             return
@@ -37,7 +38,9 @@ class BlackboardMiddleware(ToolInvocationMiddleware):
                 content="[BLACKBOARD] No shared blackboard in this session.",
                 error_id="BLACKBOARD_UNAVAILABLE",
             )
-            err.cause = getattr(ctx.action, "id", None)
+            attach_observation_cause(
+                err, ctx.action, context="blackboard.unavailable"
+            )
             err.tool_call_metadata = getattr(ctx.action, "tool_call_metadata", None)
             self.controller.event_stream.add_event(err, EventSource.ENVIRONMENT)
             return
@@ -64,7 +67,7 @@ class BlackboardMiddleware(ToolInvocationMiddleware):
             else:
                 content = f"[BLACKBOARD] unknown command: {cmd}"
             obs = AgentThinkObservation(content=content)
-            obs.cause = getattr(ctx.action, "id", None)
+            attach_observation_cause(obs, ctx.action, context="blackboard.result")
             obs.tool_call_metadata = getattr(ctx.action, "tool_call_metadata", None)
             self.controller.event_stream.add_event(obs, EventSource.ENVIRONMENT)
             ctx.block("blackboard_handled")
@@ -76,6 +79,8 @@ class BlackboardMiddleware(ToolInvocationMiddleware):
                 content=f"[BLACKBOARD] Error: {e}",
                 error_id="BLACKBOARD_ERROR",
             )
-            err.cause = getattr(ctx.action, "id", None)
+            attach_observation_cause(
+                err, ctx.action, context="blackboard.exception"
+            )
             err.tool_call_metadata = getattr(ctx.action, "tool_call_metadata", None)
             self.controller.event_stream.add_event(err, EventSource.ENVIRONMENT)

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from backend.events.action import CmdRunAction
 from backend.events.observation import CmdOutputObservation
 from backend.runtime.action_execution_server import ActionExecutor
+from backend.utils.regex_limits import MAX_USER_REGEX_PATTERN_CHARS
 
 @pytest.fixture
 def mock_executor():
@@ -88,6 +89,27 @@ async def test_cmd_run_grep_pattern_invalid_regex(mock_executor):
     obs = await mock_executor.run(action)
     assert "[Grep Error: Invalid regex pattern '('" in obs.content
     assert "line1" in obs.content  # Should return original content on error
+
+
+@pytest.mark.asyncio
+async def test_cmd_run_grep_pattern_oversized_regex(mock_executor):
+    """Test grep_pattern with oversized regex rejected by guardrail."""
+    mock_session = MagicMock()
+    mock_obs = CmdOutputObservation(
+        content="line1\nline2",
+        command_id=0,
+        command="echo test"
+    )
+    mock_session.execute.return_value = mock_obs
+    mock_executor.session_manager.get_session.return_value = mock_session
+
+    large_pattern = "a" * (MAX_USER_REGEX_PATTERN_CHARS + 1)
+    action = CmdRunAction(command="echo test", grep_pattern=large_pattern)
+
+    obs = await mock_executor.run(action)
+    assert "[Grep Error: Invalid regex pattern" in obs.content
+    assert "pattern exceeds maximum length" in obs.content
+    assert "line1" in obs.content
 
 @pytest.mark.asyncio
 async def test_cmd_run_background_spawns_session(mock_executor):

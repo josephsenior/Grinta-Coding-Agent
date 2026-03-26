@@ -131,6 +131,38 @@ async def test_generate_prompt_multiple_tags(mock_get_manager):
 
     assert result == "First"
 
+
+@pytest.mark.asyncio
+@patch("backend.api.services.prompt_service.get_conversation_manager_impl")
+async def test_generate_prompt_tolerates_tag_whitespace(mock_get_manager):
+    """Test extraction still works when update_prompt tags include extra whitespace."""
+    mock_manager = AsyncMock()
+    mock_get_manager.return_value = mock_manager
+    mock_manager.request_llm_completion = AsyncMock(
+        return_value="< update_prompt >  Keep this note  </ update_prompt >"
+    )
+
+    llm_config = LLMConfig(model="gpt-4")
+    result = await generate_prompt(llm_config, "template", "conv1")
+
+    assert result == "Keep this note"
+
+
+@pytest.mark.asyncio
+@patch("backend.api.services.prompt_service.get_conversation_manager_impl")
+async def test_generate_prompt_tolerates_tag_case(mock_get_manager):
+    """Test extraction works with upper-case update_prompt tags."""
+    mock_manager = AsyncMock()
+    mock_get_manager.return_value = mock_manager
+    mock_manager.request_llm_completion = AsyncMock(
+        return_value="prefix <UPDATE_PROMPT>Remember this</UPDATE_PROMPT> suffix"
+    )
+
+    llm_config = LLMConfig(model="gpt-4")
+    result = await generate_prompt(llm_config, "template", "conv1")
+
+    assert result == "Remember this"
+
 @pytest.mark.asyncio
 @patch("backend.api.services.prompt_service.EventStore")
 @patch("backend.api.services.prompt_service.get_contextual_events")
@@ -156,8 +188,8 @@ async def test_build_remember_prompt_partial_settings(mock_gen_prompt, mock_get_
         )
 
     llm_config = mock_gen_prompt.call_args[0][0]
-    # LLMConfig should have defaults if settings were None
-    assert llm_config.model is not None  # Default in LLMConfig
+    # With no user overrides, model may remain unset and resolve later via runtime defaults.
+    assert isinstance(llm_config, LLMConfig)
     assert llm_config.api_key is None
 
 @pytest.mark.asyncio

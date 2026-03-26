@@ -20,17 +20,17 @@ Common issues, their causes, and proven solutions.
 
 ## Installation Issues
 
-### Poetry not found
+### uv not found
 
-**Symptom:** `poetry: command not found` or `'poetry' is not recognized`
+**Symptom:** `uv: command not found` or `'uv' is not recognized`
 
 **Fix:**
 ```powershell
 # Windows — add to PATH for current session
 $env:Path += ";$env:APPDATA\Python\Scripts"
 
-# Or install Poetry globally
-pip install poetry
+# Or install uv globally
+pip install uv
 ```
 
 ### Python version mismatch
@@ -44,12 +44,12 @@ python --version   # Must be 3.12+
 
 ### Lock file / dependency drift
 
-**Symptom:** `poetry install` fails with dependency resolution errors
+**Symptom:** `uv sync` fails with dependency resolution errors
 
 **Fix:**
 ```bash
-poetry lock --no-update
-poetry install --no-root
+uv lock
+uv sync --no-install-project
 ```
 
 ### Git not found
@@ -375,8 +375,7 @@ $PSVersionTable.PSVersion   # Should be 5.1+
 ```bash
 # Verify Python and dependencies
 python --version
-poetry --version
-poetry check
+uv --version
 
 # Verify Git
 git --version
@@ -385,7 +384,7 @@ git --version
 python start_server.py --help
 
 # Run tests
-poetry run pytest backend/tests/unit/ --tb=short -q
+uv run pytest backend/tests/unit/ --tb=short -q
 ```
 
 ### Check server status
@@ -416,8 +415,8 @@ cp config.template.toml config.toml
 rm -rf /tmp/cache /tmp/file_store
 
 # Reset dependencies
-poetry lock --no-update
-poetry install
+uv lock
+uv sync
 ```
 
 ---
@@ -430,7 +429,7 @@ If none of the above resolves your issue:
 2. **Open** a new issue with:
    - Steps to reproduce
    - Expected vs actual behavior
-   - Output of `python --version` and `poetry --version`
+   - Output of `python --version` and `uv --version`
    - Relevant log output
    - Operating system and version
 3. **Ask** in [GitHub Discussions](https://github.com/josephsenior/Forge/discussions)

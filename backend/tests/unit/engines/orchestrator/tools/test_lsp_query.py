@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from unittest.mock import MagicMock
 
@@ -75,3 +77,25 @@ def test_lsp_client_graceful_degradation(monkeypatch):
     assert not res.available
     assert "LSP is not available" in res.format_text("hover")
     assert client.query("list_symbols", "file.py").symbols == []
+
+
+def test_lsp_client_parse_content_length_framing() -> None:
+    client = LspClient()
+    msg = {"jsonrpc": "2.0", "id": 1, "result": {"capabilities": {}}}
+    raw = json.dumps(msg)
+    blob = f"Content-Length: {len(raw)}\r\n\r\n{raw}"
+    parsed = client._parse_lsp_responses(blob)
+    assert len(parsed) == 1
+    assert parsed[0]["id"] == 1
+
+
+def test_lsp_client_parse_multiple_messages() -> None:
+    client = LspClient()
+    a = json.dumps({"jsonrpc": "2.0", "id": 1, "result": 1})
+    b = json.dumps({"jsonrpc": "2.0", "id": 2, "result": 2})
+    blob = (
+        f"Content-Length: {len(a)}\r\n\r\n{a}"
+        f"Content-Length: {len(b)}\r\n\r\n{b}"
+    )
+    parsed = client._parse_lsp_responses(blob)
+    assert [x["id"] for x in parsed] == [1, 2]

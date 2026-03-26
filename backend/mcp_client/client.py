@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import TYPE_CHECKING, Any
 
 from fastmcp import Client
@@ -27,6 +28,32 @@ if TYPE_CHECKING:
 
 _MAX_RECONNECT_ATTEMPTS = 5
 _BASE_BACKOFF_S = 0.5
+
+
+def _mcp_call_total_budget_sec() -> float:
+    """Max wall-clock time for one ``call_tool`` (attempt + reconnect + retry).
+
+    Override with ``FORGE_MCP_CALL_TOTAL_BUDGET_SEC``.
+    """
+    raw = os.getenv("FORGE_MCP_CALL_TOTAL_BUDGET_SEC", "180")
+    try:
+        v = float(raw)
+        return v if v > 0 else 180.0
+    except (TypeError, ValueError):
+        return 180.0
+
+
+def _mcp_reconnect_session_timeout_sec() -> float:
+    """Per-attempt cap for ``_open_session`` + ``_populate_tools`` during reconnect.
+
+    Override with ``FORGE_MCP_RECONNECT_SESSION_TIMEOUT_SEC``.
+    """
+    raw = os.getenv("FORGE_MCP_RECONNECT_SESSION_TIMEOUT_SEC", "90")
+    try:
+        v = float(raw)
+        return v if v > 0 else 90.0
+    except (TypeError, ValueError):
+        return 90.0
 
 
 class MCPClient(BaseModel):
@@ -127,9 +154,16 @@ class MCPClient(BaseModel):
             [t.name for t in tools],
         )
 
+    async def _resync_session_after_disconnect(self) -> None:
+        """Re-enter session and refresh tool list (used after transport drop)."""
+        await self._open_session()
+        await self._populate_tools()
+        self._reapply_mcp_tool_aliases()
+
     async def _reconnect(self) -> None:
         """Attempt to reconnect with exponential back-off."""
         await self._close_session()
+        session_timeout = _mcp_reconnect_session_timeout_sec()
         for attempt in range(1, _MAX_RECONNECT_ATTEMPTS + 1):
             delay = _BASE_BACKOFF_S * (2 ** (attempt - 1))
             logger.warning(
@@ -140,11 +174,18 @@ class MCPClient(BaseModel):
             )
             await asyncio.sleep(delay)
             try:
-                await self._open_session()
-                await self._populate_tools()
-                self._reapply_mcp_tool_aliases()
+                await asyncio.wait_for(
+                    self._resync_session_after_disconnect(),
+                    timeout=session_timeout,
+                )
                 logger.info("MCP reconnected on attempt %d", attempt)
                 return
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "MCP reconnect attempt %d: session sync timed out after %.1fs",
+                    attempt,
+                    session_timeout,
+                )
             except Exception as exc:
                 logger.warning("MCP reconnect attempt %d failed: %s", attempt, exc)
         raise RuntimeError(
@@ -273,9 +314,10 @@ class MCPClient(BaseModel):
     async def call_tool(self, tool_name: str, args: dict) -> CallToolResult:
         """Call a tool on the MCP server, reconnecting if the session dropped.
 
-        Each call is wrapped in an ``asyncio.wait_for`` with ``CALL_TIMEOUT``
-        seconds to prevent hanging on unresponsive servers.  After a timeout
-        or connection error, the client reconnects and retries once.
+        Each attempt uses ``asyncio.wait_for`` with ``CALL_TIMEOUT`` seconds.
+        Reconnect steps are also bounded (see ``FORGE_MCP_RECONNECT_SESSION_TIMEOUT_SEC``).
+        The entire invoke+reconnect+retry sequence is capped by
+        ``FORGE_MCP_CALL_TOTAL_BUDGET_SEC`` so a dead server cannot stall the agent.
         """
         if tool_name not in self.tool_map:
             msg = f"Tool {tool_name} not found."
@@ -293,26 +335,40 @@ class MCPClient(BaseModel):
                 timeout=self.CALL_TIMEOUT,
             )
 
-        try:
+        async def _invoke_with_retry() -> CallToolResult:
+            try:
+                return await _call_once()
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "MCP call_tool(%s) timed out after %.1fs — reconnect + single retry",
+                    tool_name,
+                    self.CALL_TIMEOUT,
+                )
+            except (ConnectionError, OSError) as exc:
+                # Transport-level drops only; do not retry arbitrary exceptions (risk of
+                # duplicate side effects on mutating tools if the server already applied the call).
+                logger.warning(
+                    "MCP call_tool(%s) transport error (%s): %s — reconnect + single retry",
+                    tool_name,
+                    type(exc).__name__,
+                    exc,
+                )
+
+            await self._reconnect()
             return await _call_once()
+
+        budget = _mcp_call_total_budget_sec()
+        try:
+            return await asyncio.wait_for(_invoke_with_retry(), timeout=budget)
         except asyncio.TimeoutError:
-            logger.warning(
-                "MCP call_tool(%s) timed out after %.1fs — reconnect + single retry",
+            logger.error(
+                "MCP call_tool(%s) exceeded total budget %.1fs "
+                "(per-attempt timeout %.1fs; includes reconnect/retry)",
                 tool_name,
+                budget,
                 self.CALL_TIMEOUT,
             )
-        except (ConnectionError, OSError) as exc:
-            # Transport-level drops only; do not retry arbitrary exceptions (risk of
-            # duplicate side effects on mutating tools if the server already applied the call).
-            logger.warning(
-                "MCP call_tool(%s) transport error (%s): %s — reconnect + single retry",
-                tool_name,
-                type(exc).__name__,
-                exc,
-            )
-
-        await self._reconnect()
-        return await _call_once()
+            raise
 
     # ------------------------------------------------------------------
     # Public API — disconnect

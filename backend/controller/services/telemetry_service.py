@@ -85,6 +85,7 @@ class TelemetryService:
         from backend.controller.tool_telemetry import ToolTelemetry
         from backend.events import EventSource
         from backend.events.observation import ErrorObservation
+        from backend.events.observation_cause import attach_observation_cause
 
         context = self._context
         context.get_controller()
@@ -101,7 +102,9 @@ class TelemetryService:
                 content=error_content,
                 error_id="TOOL_PIPELINE_BLOCKED",
             )
-            error_obs.cause = getattr(action, "id", None)
+            attach_observation_cause(
+                error_obs, action, context="telemetry.handle_blocked_invocation"
+            )
             context.emit_event(error_obs, EventSource.ENVIRONMENT)
 
         context.clear_pending_action()

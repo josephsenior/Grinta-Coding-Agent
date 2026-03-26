@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 from backend.controller.state.state import AgentState
 from backend.core.logger import forge_logger as logger
-from backend.events.observation import Observation
+from backend.events import EventSource
+from backend.events.observation import ErrorObservation, Observation
 from backend.events.serialization.event import truncate_content
 
 if TYPE_CHECKING:
@@ -69,6 +70,10 @@ class ObservationService:
                     pending_action=pending_action,
                     observation=observation,
                 )
+                if pending_action is not None:
+                    await self._recover_from_pending_observation_mismatch(
+                        observation, pending_action
+                    )
             return
 
         # Plugin hook: action_post
@@ -139,6 +144,34 @@ class ObservationService:
         )
         logger.warning(message)
         controller.log("warning", message, extra={"msg_type": "OBSERVATION_MISMATCH"})
+
+    async def _recover_from_pending_observation_mismatch(
+        self,
+        observation: Observation,
+        pending_action,
+    ) -> None:
+        """Clear stale pending state and give the model explicit recovery guidance.
+
+        Without this, a wrong ``cause`` id leaves pending set and the loop stalls
+        even though the mismatched observation is already in history.
+        """
+        self._context.discard_invocation_context_for_action(pending_action)
+        self._pending_service.set(None)
+        pid = getattr(pending_action, "id", None)
+        oc = getattr(observation, "cause", None)
+        msg = (
+            "The environment reported an observation that does not match the action "
+            "the agent is waiting on. Pending action id was "
+            f"{pid!r}; observation referred to {oc!r}. "
+            "Treat any in-flight tool work as uncertain: verify the workspace before "
+            "continuing, then choose a new approach if needed."
+        )
+        err = ErrorObservation(
+            content=msg,
+            error_id="OBSERVATION_PENDING_MISMATCH",
+        )
+        self._context.emit_event(err, EventSource.ENVIRONMENT)
+        self._trigger_post_resolution_step()
 
     def _trigger_post_resolution_step(self) -> None:
         """Advance exactly once after a pending action is resolved in server mode."""

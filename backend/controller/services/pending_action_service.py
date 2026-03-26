@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import math
 import time
 from typing import TYPE_CHECKING
@@ -13,6 +12,7 @@ from backend.core.logger import forge_logger as logger
 from backend.events import EventSource
 from backend.events.action import Action
 from backend.events.observation import ErrorObservation
+from backend.events.observation_cause import attach_observation_cause
 
 if TYPE_CHECKING:
     from backend.controller.services.controller_context import ControllerContext
@@ -126,11 +126,9 @@ class PendingActionService:
             ),
             error_id="PENDING_ACTION_TIMEOUT",
         )
-        cause_value: int | None = None
-        if action_id != "unknown":
-            with contextlib.suppress(TypeError, ValueError):
-                cause_value = int(action_id)
-        timeout_obs.cause = cause_value
+        attach_observation_cause(
+            timeout_obs, action, context="pending_action_service.timeout"
+        )
         controller.event_stream.add_event(timeout_obs, EventSource.ENVIRONMENT)
 
     def _schedule_watchdog(self) -> None:

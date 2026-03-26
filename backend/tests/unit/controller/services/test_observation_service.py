@@ -8,7 +8,7 @@ from backend.controller.services.observation_service import (
     transition_agent_state_logic,
 )
 from backend.controller.state.state import AgentState
-from backend.events.observation import Observation
+from backend.events.observation import ErrorObservation, Observation
 
 
 class TestObservationService(unittest.IsolatedAsyncioTestCase):
@@ -120,7 +120,7 @@ class TestObservationService(unittest.IsolatedAsyncioTestCase):
         self.mock_context.pop_action_context.assert_not_called()
 
     async def test_handle_pending_action_observation_cause_mismatch(self):
-        """Test _handle_pending_action_observation when cause doesn't match."""
+        """Mismatch clears pending, emits recovery ErrorObservation, and advances step."""
         mock_observation = MagicMock(spec=Observation)
         mock_observation.cause = "action-123"
 
@@ -128,9 +128,22 @@ class TestObservationService(unittest.IsolatedAsyncioTestCase):
         mock_pending_action.id = "action-456"
         self.mock_pending_service.get.return_value = mock_pending_action
 
+        self.mock_context.discard_invocation_context_for_action = MagicMock()
+        self.mock_context.emit_event = MagicMock()
+        self.mock_context.trigger_step = MagicMock()
+
         await self.service._handle_pending_action_observation(mock_observation)
 
-        # Should not proceed
+        self.mock_context.discard_invocation_context_for_action.assert_called_once_with(
+            mock_pending_action
+        )
+        self.mock_pending_service.set.assert_called_once_with(None)
+        emit_args = self.mock_context.emit_event.call_args[0]
+        self.assertIsInstance(emit_args[0], ErrorObservation)
+        self.assertEqual(emit_args[0].error_id, "OBSERVATION_PENDING_MISMATCH")
+        self.assertIn("Pending action id was", emit_args[0].content)
+        self.mock_context.trigger_step.assert_called_once_with()
+
         self.mock_context.pop_action_context.assert_not_called()
         self.mock_controller.log.assert_called_once()
         log_args = self.mock_controller.log.call_args[0]

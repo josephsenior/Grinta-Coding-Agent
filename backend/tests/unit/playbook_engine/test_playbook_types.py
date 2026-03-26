@@ -60,6 +60,7 @@ class TestPlaybookMetadata:
         assert m.triggers == []
         assert m.inputs == []
         assert m.mcp_tools is None
+        assert m.strict_trigger_matching is False
 
     def test_custom(self):
         m = PlaybookMetadata(
@@ -81,6 +82,11 @@ class TestPlaybookMetadata:
         m2 = PlaybookMetadata(**data)
         assert m2.name == m.name
         assert m2.triggers == m.triggers
+
+    def test_strict_trigger_matching_roundtrip(self):
+        m = PlaybookMetadata(name="x", strict_trigger_matching=True)
+        m2 = PlaybookMetadata(**m.model_dump())
+        assert m2.strict_trigger_matching is True
 
 
 # ── PlaybookResponse ─────────────────────────────────────────────────

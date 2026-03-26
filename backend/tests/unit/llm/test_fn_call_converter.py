@@ -15,18 +15,15 @@ from backend.core.errors import (
 )
 from backend.llm.fn_call_converter import (
     ExampleStepBuilder,
-    FN_PARAM_REGEX_PATTERN,
-    FN_REGEX_PATTERN,
     STOP_WORDS,
-    TOOL_RESULT_REGEX_PATTERN,
     _convert_parameter_value,
     _convert_to_array,
     _convert_to_integer,
     _extract_parameter_schema,
+    _find_tool_result_match,
     _fix_stopword,
     _format_parameter,
     _format_tool_call_string,
-    _normalize_parameter_tags,
     _parse_tool_call_arguments,
     _validate_enum_constraint,
     _validate_parameter_allowed,
@@ -34,10 +31,23 @@ from backend.llm.fn_call_converter import (
     _validate_tool_call_structure,
     convert_from_multiple_tool_calls_to_single_tool_call_messages,
     convert_fncall_messages_to_non_fncall_messages,
+    convert_non_fncall_messages_to_fncall_messages,
     convert_tool_call_to_string,
     convert_tools_to_description,
+    get_fn_call_parse_telemetry_counters,
     refine_prompt,
+    reset_fn_call_parse_telemetry_counters,
 )
+from backend.llm.tool_result_format import (
+    decode_tool_result_payload,
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_parse_telemetry_counters():
+    reset_fn_call_parse_telemetry_counters()
+    yield
+    reset_fn_call_parse_telemetry_counters()
 
 
 # ── refine_prompt ──────────────────────────────────────────────────────
@@ -240,15 +250,13 @@ class TestConvertToolsToDescription:
 
 
 class TestFixStopword:
-    def test_adds_closing_when_missing(self):
+    def test_missing_closing_is_unchanged(self):
         s = "<function=foo>\n<parameter=x>1</parameter>"
-        result = _fix_stopword(s)
-        assert result.endswith("\n</function>")
+        assert _fix_stopword(s) == s
 
-    def test_ends_with_partial_closing(self):
+    def test_partial_closing_is_unchanged(self):
         s = "<function=foo>\n<parameter=x>1</parameter>\n</"
-        result = _fix_stopword(s)
-        assert result.endswith("</function>")
+        assert _fix_stopword(s) == s
 
     def test_no_function_tag_unchanged(self):
         s = "just plain text"
@@ -259,24 +267,40 @@ class TestFixStopword:
         assert _fix_stopword(s) == s
 
 
-# ── _normalize_parameter_tags ──────────────────────────────────────────
+# ── strict malformed parameter handling ────────────────────────────────
 
 
-class TestNormalizeParameterTags:
-    def test_malformed_tag(self):
-        body = "<parameter=name=value</parameter>"
-        result = _normalize_parameter_tags(body)
-        assert result == "<parameter=name>value</parameter>"
+class TestMalformedParameterHandling:
+    def test_malformed_parameter_tag_is_rejected(self):
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "my_fn",
+                    "description": "test",
+                    "parameters": {
+                        "properties": {"cmd": {"type": "string", "description": "c"}},
+                        "required": ["cmd"],
+                    },
+                },
+            }
+        ]
+        messages = [
+            {
+                "role": "assistant",
+                "content": (
+                    "<function=my_fn>"
+                    "<parameter=cmd=ls</parameter>"
+                    "</function>"
+                ),
+            }
+        ]
 
-    def test_already_correct(self):
-        body = "<parameter=name>value</parameter>"
-        assert _normalize_parameter_tags(body) == body
-
-    def test_multiple_malformed(self):
-        body = "<parameter=a=1</parameter>\n<parameter=b=2</parameter>"
-        result = _normalize_parameter_tags(body)
-        assert "<parameter=a>1</parameter>" in result
-        assert "<parameter=b>2</parameter>" in result
+        with pytest.raises(
+            FunctionCallValidationError,
+            match="Malformed parameter block",
+        ):
+            convert_non_fncall_messages_to_fncall_messages(messages, tools)
 
 
 # ── _convert_to_integer / _convert_to_array ────────────────────────────
@@ -460,7 +484,120 @@ class TestConvertFncallToNonFncall:
             messages, tools, add_in_context_learning_example=False
         )
         assert result[0]["role"] == "user"
-        assert "EXECUTION RESULT" in result[0]["content"][0]["text"]
+        payload = decode_tool_result_payload(result[0]["content"][0]["text"])
+        assert payload is not None
+        assert payload[0] == "my_fn"
+        assert payload[1] == "result here"
+
+    def test_assistant_malformed_function_tag_not_marked_as_tool_call(self):
+        tools = [self._make_tool()]
+        messages = [
+            {
+                "role": "assistant",
+                "content": "<function=my_fn><parameter=cmd>ls</parameter>",
+            }
+        ]
+        result = convert_fncall_messages_to_non_fncall_messages(messages, tools)
+        assert result[0]["role"] == "assistant"
+        assert "tool_calls" not in result[0]
+
+    def test_duplicate_parameter_is_rejected(self):
+        tools = [self._make_tool()]
+        messages = [
+            {
+                "role": "assistant",
+                "content": (
+                    "<function=my_fn>"
+                    "<parameter=cmd>ls</parameter>"
+                    "<parameter=cmd>pwd</parameter>"
+                    "</function>"
+                ),
+            }
+        ]
+        with pytest.raises(FunctionCallValidationError, match="Duplicate parameter"):
+            convert_non_fncall_messages_to_fncall_messages(messages, tools)
+
+    def test_trailing_text_after_last_parameter_is_rejected(self):
+        tools = [self._make_tool()]
+        messages = [
+            {
+                "role": "assistant",
+                "content": (
+                    "<function=my_fn>"
+                    "<parameter=cmd>ls</parameter>"
+                    " trailing-junk "
+                    "</function>"
+                ),
+            }
+        ]
+        with pytest.raises(FunctionCallValidationError, match="Unexpected trailing text"):
+            convert_non_fncall_messages_to_fncall_messages(messages, tools)
+
+
+class TestParseTelemetryCounters:
+    def _make_tool(self, name="my_fn"):
+        return {
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": "test",
+                "parameters": {
+                    "properties": {"cmd": {"type": "string", "description": "c"}},
+                    "required": ["cmd"],
+                },
+            },
+        }
+
+    def test_strict_parse_success_counter_increments(self):
+        tools = [self._make_tool()]
+        messages = [
+            {
+                "role": "assistant",
+                "content": "<function=my_fn><parameter=cmd>ls</parameter></function>",
+            }
+        ]
+
+        convert_non_fncall_messages_to_fncall_messages(messages, tools)
+
+        counters = get_fn_call_parse_telemetry_counters()
+        assert counters["strict_parse_success"] == 1
+        assert counters["strict_parse_failure"] == 0
+        assert counters["malformed_payload_rejection"] == 0
+
+    def test_strict_parse_failure_counter_increments_for_unclosed_function_tag(self):
+        tools = [self._make_tool()]
+        messages = [
+            {
+                "role": "assistant",
+                "content": "<function=my_fn><parameter=cmd>ls</parameter>",
+            }
+        ]
+
+        convert_non_fncall_messages_to_fncall_messages(messages, tools)
+
+        counters = get_fn_call_parse_telemetry_counters()
+        assert counters["strict_parse_success"] == 0
+        assert counters["strict_parse_failure"] == 1
+        assert counters["malformed_payload_rejection"] == 0
+
+    def test_malformed_payload_rejection_counter_increments(self):
+        tools = [self._make_tool()]
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    "<forge_tool_result_json>{\"tool_name\":\"my_fn\","
+                    "\"content\":</forge_tool_result_json>"
+                ),
+            }
+        ]
+
+        convert_non_fncall_messages_to_fncall_messages(messages, tools)
+
+        counters = get_fn_call_parse_telemetry_counters()
+        assert counters["strict_parse_success"] == 0
+        assert counters["strict_parse_failure"] == 0
+        assert counters["malformed_payload_rejection"] == 1
 
 
 # ── convert_from_multiple_tool_calls_to_single_tool_call_messages ──────
@@ -557,34 +694,73 @@ class TestConvertMultipleToSingle:
         assert isinstance(result, list)
 
 
-# ── Regex patterns ─────────────────────────────────────────────────────
+# ── Structured tool result decode ─────────────────────────────────────
 
 
 class TestRegexPatterns:
-    def test_fn_regex_matches(self):
-        import re
+    def test_tool_result_decode(self):
+        text = "<forge_tool_result_json>{\"tool_name\":\"my_tool\",\"content\":\"some output\"}</forge_tool_result_json>"
+        decoded = decode_tool_result_payload(text)
+        assert decoded is not None
+        assert decoded[0] == "my_tool"
 
-        text = "<function=my_fn>\n<parameter=x>1</parameter>\n</function>"
-        match = re.search(FN_REGEX_PATTERN, text, re.DOTALL)
-        assert match is not None
-        assert match.group(1) == "my_fn"
+    def test_tool_result_decode_tolerates_spacing_variants(self):
+        text = "<forge_tool_result_json> {\"tool_name\":\"my_tool\",\"content\":\"some output\"} </forge_tool_result_json>"
+        decoded = decode_tool_result_payload(text)
+        assert decoded is not None
+        assert decoded[0] == "my_tool"
 
-    def test_fn_param_regex(self):
-        import re
+    def test_convert_non_fncall_message_parses_spaced_function_tag(self):
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "my_fn",
+                    "description": "Test function",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"x": {"type": "string"}},
+                        "required": ["x"],
+                    },
+                },
+            }
+        ]
+        messages = [
+            {
+                "role": "assistant",
+                "content": "prep text <function = my_fn ><parameter = x >value</parameter></function>",
+            }
+        ]
 
-        text = "<parameter=name>value</parameter>"
-        match = re.search(FN_PARAM_REGEX_PATTERN, text, re.DOTALL)
-        assert match is not None
-        assert match.group(1) == "name"
-        assert match.group(2) == "value"
+        result = convert_non_fncall_messages_to_fncall_messages(messages, tools)
 
-    def test_tool_result_regex(self):
-        import re
-
-        text = "EXECUTION RESULT of [my_tool]:\nsome output"
-        match = re.search(TOOL_RESULT_REGEX_PATTERN, text, re.DOTALL)
-        assert match is not None
-        assert match.group(1) == "my_tool"
+        assert len(result) == 1
+        assert result[0]["role"] == "assistant"
+        assert result[0]["tool_calls"][0]["function"]["name"] == "my_fn"
+        assert json.loads(result[0]["tool_calls"][0]["function"]["arguments"]) == {
+            "x": "value"
+        }
+        assert result[0]["content"] == "prep text"
 
     def test_stop_words(self):
         assert "</function" in STOP_WORDS
+
+    def test_tool_result_decode_payload_with_colons_and_urls(self):
+        text = (
+            "<forge_tool_result_json>"
+            "{\"tool_name\":\"browser\",\"content\":\"see https://example.com:8443/path: done\"}"
+            "</forge_tool_result_json>"
+        )
+        decoded = decode_tool_result_payload(text)
+        assert decoded is not None
+        assert decoded[0] == "browser"
+        assert "https://example.com:8443/path" in str(decoded[1])
+
+    def test_find_tool_result_match_on_multiline_list_content(self):
+        content = [
+            {
+                "type": "text",
+                "text": "<forge_tool_result_json>{\"tool_name\":\"t\",\"content\":\"out:line\"}</forge_tool_result_json>",
+            },
+        ]
+        assert _find_tool_result_match(content) is not None

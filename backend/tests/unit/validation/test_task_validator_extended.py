@@ -17,7 +17,7 @@ from backend.validation.task_validator import (
 from backend.core.enums import FileReadSource
 from backend.events.action import CmdRunAction
 from backend.events.observation import CmdOutputObservation
-from backend.events.observation.files import FileReadObservation
+from backend.events.observation.files import FileReadObservation, FileWriteObservation
 
 
 # ---------------------------------------------------------------------------
@@ -31,6 +31,7 @@ class TestTaskDataclass:
         assert t.description == "Build feature X"
         assert t.requirements == []
         assert t.acceptance_criteria == []
+        assert t.expected_output_files is None
 
     def test_custom(self):
         t = Task(
@@ -199,6 +200,25 @@ class TestFileExistsValidator:
             "Create a file 'main.py' and save to 'output.txt'"
         )
         assert "main.py" in files or "output.txt" in files
+
+    async def test_expected_output_files_on_task_skips_prose_regex(self):
+        v = FileExistsValidator()
+        ev = FileWriteObservation(path="out.txt", content="ok")
+        state = self._make_state([ev])
+        task = Task(
+            description='Quoted "ghost.json" should not be required',
+            expected_output_files=["out.txt"],
+        )
+        result = await v.validate_completion(task, state)
+        assert result.passed is True
+
+    async def test_explicit_empty_expected_output_files_high_confidence(self):
+        v = FileExistsValidator()
+        state = self._make_state([])
+        task = Task(description="any", expected_output_files=[])
+        result = await v.validate_completion(task, state)
+        assert result.passed is True
+        assert result.confidence == 0.9
 
 
 # ---------------------------------------------------------------------------

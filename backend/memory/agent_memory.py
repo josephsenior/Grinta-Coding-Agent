@@ -17,6 +17,7 @@ from backend.core.logger import forge_logger as logger
 from backend.events.action.agent import RecallAction
 from backend.core.enums import RecallType
 from backend.events.event import Event, EventSource
+from backend.events.observation_cause import attach_observation_cause
 from backend.events.observation.agent import (
     PlaybookKnowledge,
     RecallFailureObservation,
@@ -112,7 +113,7 @@ class Memory:
                         "(knowledge-base / vector search may be overloaded)."
                     ),
                 )
-            observation.cause = event.id
+            attach_observation_cause(observation, event, context="agent_memory.recall")
             self.event_stream.add_event(observation, EventSource.ENVIRONMENT)
         except Exception as exc:
             await self._handle_recall_exception(event, exc)
@@ -220,7 +221,7 @@ class Memory:
             error_message=error_str,
             content=error_str,
         )
-        failure_obs.cause = getattr(event, "id", None)
+        attach_observation_cause(failure_obs, event, context="agent_memory.recall_failure")
         try:
             self.event_stream.add_event(failure_obs, EventSource.ENVIRONMENT)
         except Exception:

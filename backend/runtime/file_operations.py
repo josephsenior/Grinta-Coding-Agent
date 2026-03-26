@@ -21,6 +21,7 @@ from backend.events.observation import (
     FileReadObservation,
 )
 from backend.runtime.utils.files import insert_lines, read_lines
+from backend.runtime.utils.test_output_summary import extract_test_summary
 
 if TYPE_CHECKING:
     pass
@@ -138,21 +139,6 @@ def truncate_large_text(value: str, max_chars: int, *, label: str) -> str:
 # Default max chars for bash command output (configurable via env var).
 _DEFAULT_MAX_CMD_OUTPUT_CHARS = 40_000
 
-_ERROR_KEYWORDS = (
-    "error",
-    "traceback",
-    "exception",
-    "fatal",
-    "fail",
-    "panic",
-    "abort",
-    "critical",
-    "stderr",
-    "assert",
-    "warning",
-)
-
-
 def _get_max_cmd_output_chars(max_chars: int | None) -> int:
     """Resolve max_chars from arg or env."""
     if max_chars is not None:
@@ -165,9 +151,9 @@ def _get_max_cmd_output_chars(max_chars: int | None) -> int:
 
 
 def _extract_truncation_lines(
-    lines: list[str], head_budget: int, tail_budget: int, error_budget: int
-) -> tuple[list[str], list[str], list[str]]:
-    """Extract head, tail, and error lines within budgets."""
+    lines: list[str], head_budget: int, tail_budget: int
+) -> tuple[list[str], list[str]]:
+    """Extract head and tail lines within fixed budgets."""
     head_lines: list[str] = []
     head_chars = 0
     for line in lines:
@@ -184,104 +170,7 @@ def _extract_truncation_lines(
         tail_lines.insert(0, line)
         tail_chars += len(line)
 
-    error_lines: list[str] = []
-    error_chars = 0
-    for line in lines:
-        if any(kw in line.lower() for kw in _ERROR_KEYWORDS):
-            if error_chars + len(line) <= error_budget:
-                error_lines.append(line)
-                error_chars += len(line)
-
-    return head_lines, tail_lines, error_lines
-
-
-_TEST_FRAMEWORK_PATTERNS = [
-    # pytest: "5 passed, 2 failed, 1 error" / "PASSED" / "FAILED" / "ERROR"
-    (r"(\d+) passed", "pytest"),
-    (r"(\d+) failed", "pytest"),
-    (r"PASSED|FAILED|ERROR|pytest", "pytest"),
-    # jest: "Tests: N failed, N passed, N total"
-    (r"Tests:\s+\d+\s+\w+", "jest"),
-    # cargo test: "test result: FAILED. N passed; N failed"
-    (r"test result:\s+(ok|FAILED)\.", "cargo"),
-    # go test: "--- FAIL" / "ok  	package"
-    (r"--- FAIL:", "go"),
-]
-
-_FAILURE_LINE_PATTERNS = [
-    r"FAILED\s+",  # pytest failed test line
-    r"--- FAIL:",  # go test
-    r"FAIL\s+",  # cargo
-    r"✕\s+",  # jest
-    r"×\s+",  # jest unicode
-    r"AssertionError",
-    r"Error:",
-    r"FAILED\[",
-]
-
-
-def _extract_test_summary(output: str) -> str | None:
-    """Extract a structured test summary from pytest/jest/go/cargo test output.
-
-    Returns a [TEST_SUMMARY] block string, or None if no test output detected.
-    """
-    import re
-
-    lines = output.splitlines()
-
-    # Check if this looks like test output
-    is_test_output = any(
-        re.search(pat, output, re.IGNORECASE) for pat, _ in _TEST_FRAMEWORK_PATTERNS
-    )
-    if not is_test_output:
-        return None
-
-    # Find the summary line (usually the last line with counts)
-    summary_lines: list[str] = []
-    failure_lines: list[str] = []
-
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-
-        # Summary lines (test result totals)
-        if re.search(r"\d+ (passed|failed|error|skipped)", stripped, re.IGNORECASE):
-            summary_lines.append(stripped)
-        elif re.search(r"test result:\s+(ok|FAILED)\.", stripped):
-            summary_lines.append(stripped)
-        elif re.search(r"Tests:\s+\d+", stripped):
-            summary_lines.append(stripped)
-        elif re.search(r"^ok\s+\S+\s+\d", stripped):  # go test ok line
-            summary_lines.append(stripped)
-
-        # Failure lines
-        if any(
-            re.search(pat, stripped, re.IGNORECASE) for pat in _FAILURE_LINE_PATTERNS
-        ):
-            if (
-                re.search(r"FAILED\s+\S+", stripped)
-                or re.search(r"--- FAIL:", stripped)
-                or re.search(r"AssertionError|Error:", stripped)
-            ):
-                failure_lines.append(stripped)
-
-    if not summary_lines and not failure_lines:
-        return None
-
-    parts = ["[TEST_SUMMARY]"]
-    if summary_lines:
-        # Deduplicate while preserving order
-        seen: set[str] = set()
-        for line in summary_lines:
-            if line not in seen:
-                parts.append(line)
-                seen.add(line)
-    if failure_lines:
-        parts.append("[FAILURES]")
-        for line in failure_lines[:10]:  # Cap at 10 failure lines
-            parts.append(f"  {line}")
-    return "\n".join(parts)
+    return head_lines, tail_lines
 
 
 def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
@@ -307,7 +196,7 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     max_chars = _get_max_cmd_output_chars(max_chars)
 
     # P2-A: Prepend test summary when test output is detected (before truncation).
-    test_summary = _extract_test_summary(output)
+    test_summary = extract_test_summary(output)
     if test_summary:
         output = test_summary + "\n\n" + output
 
@@ -317,32 +206,23 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     lines = output.splitlines(keepends=True)
     total_lines = len(lines)
     head_budget = int(max_chars * 0.20)
-    tail_budget = int(max_chars * 0.60)
-    error_budget = max_chars - head_budget - tail_budget
+    tail_budget = max_chars - head_budget
 
-    head_lines, tail_lines, error_lines = _extract_truncation_lines(
-        lines, head_budget, tail_budget, error_budget
-    )
+    head_lines, tail_lines = _extract_truncation_lines(lines, head_budget, tail_budget)
 
     skipped = total_lines - len(head_lines) - len(tail_lines)
     notice = (
         f"\n[FORGE: Output truncated — {skipped} lines hidden. "
-        f"Showing first {len(head_lines)} lines, last {len(tail_lines)} lines"
+        f"Showing first {len(head_lines)} lines and last {len(tail_lines)} lines]"
     )
-    notice += (
-        f", plus {len(error_lines)} error/warning lines extracted]\n"
-        + "".join(error_lines)
-        if error_lines
-        else "]\n"
-    )
+    notice += "\n"
 
     logger.warning(
-        "Truncated bash output from %d lines (%d chars) → head=%d tail=%d errors=%d",
+        "Truncated bash output from %d lines (%d chars) → head=%d tail=%d",
         total_lines,
         len(output),
         len(head_lines),
         len(tail_lines),
-        len(error_lines),
     )
     return "".join(head_lines) + notice + "".join(tail_lines)
 

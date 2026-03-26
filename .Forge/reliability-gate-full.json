@@ -1,0 +1,67 @@
+{
+  "phase": "full",
+  "generated_at_epoch": 1774453366.735636,
+  "results": [
+    {
+      "name": "release1_orchestrator_units",
+      "command": [
+        "C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "backend/tests/unit/engines/orchestrator"
+      ],
+      "return_code": 0,
+      "duration_seconds": 14.739
+    },
+    {
+      "name": "release1_knowledge_base_units",
+      "command": [
+        "C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "backend/tests/unit/knowledge_base"
+      ],
+      "return_code": 0,
+      "duration_seconds": 3.52
+    },
+    {
+      "name": "release1_step_guard_units",
+      "command": [
+        "C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "backend/tests/unit/controller/services/test_step_guard_service.py"
+      ],
+      "return_code": 0,
+      "duration_seconds": 5.089
+    },
+    {
+      "name": "release1_error_recovery_memory_units",
+      "command": [
+        "C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "backend/tests/unit/engines/orchestrator/tools/test_error_recovery_memory.py"
+      ],
+      "return_code": 0,
+      "duration_seconds": 7.264
+    },
+    {
+      "name": "release2_runtime_units",
+      "command": [
+        "C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "backend/tests/unit/runtime"
+      ],
+      "return_code": 0,
+      "duration_seconds": 29.96
+    }
+  ],
+  "passed": true
+}

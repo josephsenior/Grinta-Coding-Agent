@@ -61,7 +61,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.assertIn("STUCK LOOP DETECTED", args[0].content)
         self.assertEqual(args[1], EventSource.ENVIRONMENT)
 
-    async def test_handle_stuck_detection_auto_finish_after_repeated_stuck(self):
+    async def test_handle_stuck_detection_repeated_stuck_still_replans(self):
         # Setup mocks
         stuck_svc = MagicMock()
         stuck_svc.compute_repetition_score.return_value = 1.0
@@ -73,14 +73,12 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         cb.circuit_breaker.stuck_detection_count = 3
         self.controller.circuit_breaker_service = cb
 
-        self.service._try_auto_finish = AsyncMock(return_value=True)  # type: ignore[method-assign]
-
         self.controller.event_stream = MagicMock()
 
         # Run
         result = await self.service._handle_stuck_detection(self.controller)
 
         # Verify
-        self.assertFalse(result)
+        self.assertTrue(result)
         cb.record_stuck_detection.assert_called_once()
-        self.service._try_auto_finish.assert_awaited_once_with(self.controller)  # type: ignore[attr-defined]
+        self.controller.event_stream.add_event.assert_called_once()

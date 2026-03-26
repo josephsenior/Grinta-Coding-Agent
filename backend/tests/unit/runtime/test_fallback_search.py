@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from backend.runtime.utils.fallbacks.search import PythonSearcher
+from backend.utils.regex_limits import MAX_USER_REGEX_PATTERN_CHARS
 
 
 @pytest.fixture()
@@ -65,6 +66,10 @@ class TestSearchFiles:
     def test_invalid_regex(self, searcher: PythonSearcher, tmp_tree: Path):
         results = searcher.search_files("[invalid", str(tmp_tree))
         assert results == []
+
+    def test_oversized_regex_rejected(self, searcher: PythonSearcher, tmp_tree: Path):
+        huge = "a" * (MAX_USER_REGEX_PATTERN_CHARS + 1)
+        assert searcher.search_files(huge, str(tmp_tree)) == []
 
     def test_case_sensitive(self, searcher: PythonSearcher, tmp_tree: Path):
         results = searcher.search_files("FOO", str(tmp_tree))

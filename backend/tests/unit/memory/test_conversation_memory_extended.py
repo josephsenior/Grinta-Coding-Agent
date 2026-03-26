@@ -24,7 +24,6 @@ from backend.memory.message_formatting import (
 def _make_config(**overrides) -> SimpleNamespace:
     defaults = {
         "enable_vector_memory": False,
-        "enable_prompt_caching": True,
         "enable_som_visual_browsing": False,
         "enable_hybrid_retrieval": False,
         "cli_mode": False,
@@ -147,33 +146,6 @@ class TestDecisionsAndAnchors:
         summary = mem.get_context_summary()
         assert "Critical Context" in summary
         assert "Recent Decisions" in summary
-
-
-# ── apply_prompt_caching ─────────────────────────────────────────────
-
-
-class TestApplyPromptCaching:
-    def test_caches_first_system_and_last_user(self):
-        mem = _make_memory()
-        sys_msg = Message(role="system", content=[TextContent(text="system")])
-        user_msg = Message(role="user", content=[TextContent(text="hello")])
-        msgs = [sys_msg, user_msg]
-        mem.apply_prompt_caching(msgs)
-        c0, c1 = msgs[0].content[0], msgs[1].content[0]
-        assert isinstance(c0, TextContent) and c0.cache_prompt is True
-        assert isinstance(c1, TextContent) and c1.cache_prompt is True
-
-    def test_no_caching_when_disabled(self):
-        mem = _make_memory(enable_prompt_caching=False)
-        sys_msg = Message(role="system", content=[TextContent(text="system")])
-        msgs = [sys_msg]
-        mem.apply_prompt_caching(msgs)
-        # Should not modify since caching disabled
-        # cache_prompt remains its default (False)
-
-    def test_empty_messages_no_error(self):
-        mem = _make_memory()
-        mem.apply_prompt_caching([])
 
 
 # ── _apply_user_message_formatting ───────────────────────────────────

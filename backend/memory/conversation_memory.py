@@ -185,40 +185,6 @@ class ConversationMemory:
             )
             return None
 
-    def apply_prompt_caching(self, messages: list[Message]) -> None:
-        """Set prompt caching hints for the first system message and the latest user message."""
-        if not self._should_cache(messages):
-            return
-        self._reset_cache_flags(messages)
-        self._cache_first_system_message(messages)
-        self._cache_latest_user_message(messages)
-
-    def _should_cache(self, messages: list[Message]) -> bool:
-        return bool(
-            messages and getattr(self.agent_config, "enable_prompt_caching", True)
-        )
-
-    def _reset_cache_flags(self, messages: list[Message]) -> None:
-        for message in messages:
-            for content in getattr(message, "content", []) or []:
-                if is_text_content(content):
-                    content.cache_prompt = False
-
-    def _cache_first_system_message(self, messages: list[Message]) -> None:
-        first_message = messages[0]
-        for content in getattr(first_message, "content", []) or []:
-            if is_text_content(content):
-                content.cache_prompt = True
-
-    def _cache_latest_user_message(self, messages: list[Message]) -> None:
-        for message in reversed(messages):
-            if message.role != "user":
-                continue
-            for content in getattr(message, "content", []) or []:
-                if is_text_content(content):
-                    content.cache_prompt = True
-            break
-
     @staticmethod
     def _is_valid_image_url(url: str | None) -> bool:
         """Check if an image URL is valid and non-empty.

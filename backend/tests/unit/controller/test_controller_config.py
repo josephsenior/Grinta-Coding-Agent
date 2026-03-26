@@ -122,7 +122,7 @@ class TestControllerServices:
     """Tests for ControllerServices container."""
 
     def test_initializes_all_services(self):
-        """Test initializes all 21 service instances."""
+        """Test initializes all wired service instances."""
         mock_controller = MagicMock()
         mock_controller.PENDING_ACTION_TIMEOUT = 30
 
@@ -147,6 +147,7 @@ class TestControllerServices:
         assert services.telemetry is not None
         assert services.metrics is not None
         assert services.retry is not None
+        assert services.recovery is not None
         assert services.circuit_breaker is not None
         assert services.stuck is not None
         assert services.task_validation is not None
@@ -155,7 +156,7 @@ class TestControllerServices:
         assert services.exception_handler is not None
 
     def test_service_count_matches_documentation(self):
-        """Test creates exactly 24 services as documented."""
+        """Test creates exactly 25 services as documented."""
         mock_controller = MagicMock()
         mock_controller.PENDING_ACTION_TIMEOUT = 30
 
@@ -168,7 +169,7 @@ class TestControllerServices:
             if not attr.startswith("_") and not callable(getattr(services, attr))
         ]
 
-        assert len(service_attrs) == 24
+        assert len(service_attrs) == 25
 
     def test_services_receive_controller_reference(self):
         """Test some services receive direct controller reference."""

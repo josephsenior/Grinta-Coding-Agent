@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.api.session.agent_session import AgentSession
+from backend.api.session.agent_session import AgentSession, StartupContext
 from backend.core.schemas import AgentState
 from backend.events.action import MessageAction
 
@@ -128,3 +129,28 @@ class TestAgentSessionStartup(unittest.IsolatedAsyncioTestCase):
         emitted = session.event_stream.add_event.call_args_list[-1].args[0]
         self.assertEqual(emitted.agent_state, AgentState.PAUSED)
         session._init_ready.set.assert_called()
+
+    def test_build_startup_log_metadata_includes_parse_telemetry(self):
+        session = self._make_session()
+        ctx = StartupContext(started_at=time.time() - 0.01, restored_state=True)
+
+        with patch(
+            "backend.api.session.agent_session.get_fn_call_parse_telemetry_counters",
+            return_value={
+                "strict_parse_success": 3,
+                "strict_parse_failure": 1,
+                "malformed_payload_rejection": 2,
+            },
+        ):
+            metadata = session._build_startup_log_metadata(ctx, success=True)
+
+        self.assertEqual(metadata["signal"], "agent_session_start")
+        self.assertTrue(metadata["success"])
+        self.assertEqual(
+            metadata["strict_parse_telemetry"],
+            {
+                "strict_parse_success": 3,
+                "strict_parse_failure": 1,
+                "malformed_payload_rejection": 2,
+            },
+        )

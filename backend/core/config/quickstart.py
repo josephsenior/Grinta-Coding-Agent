@@ -108,7 +108,7 @@ def _interactive_init(dest: Path) -> None:
 
     print(f"\n✅ Configuration saved to {dest}")
     print(f"📁 Workspace initialized at {dest.parent}/workspace/")
-    print("\n👉 To start, run: poetry run forge serve\n")
+    print("\n👉 To start, run: uv run forge serve\n")
 
 
 # ------------------------------------------------------------------ #

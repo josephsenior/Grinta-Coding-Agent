@@ -10,16 +10,102 @@ from backend.events import EventSource
 
 from backend.events.action import FileEditAction, FileWriteAction
 from backend.events.observation import ErrorObservation
+from backend.events.observation_cause import attach_observation_cause
 
 if TYPE_CHECKING:
     from backend.controller.services.controller_context import ControllerContext
 
 
+def _pending_action_for_observation_cause(controller) -> object | None:
+    """Current pending action (if any) for correlating guard observations."""
+    svc = getattr(controller, "pending_action_service", None)
+    if svc is not None:
+        return svc.get()
+    return getattr(controller, "_pending_action", None)
+
+
 class StepGuardService:
     """Ensures controller steps are safe w.r.t. circuit breaker and stuck detection."""
 
+    _WARNING_TRIP_COUNTS_KEY = "__step_guard_warning_trip_counts"
+
     def __init__(self, context: ControllerContext) -> None:
         self._context = context
+
+    def _warning_trip_enabled(self) -> bool:
+        cfg = getattr(self._context, "agent_config", None)
+        if cfg is None:
+            return True
+        return bool(getattr(cfg, "warning_first_trip_enabled", True))
+
+    def _warning_trip_limit(self) -> int:
+        cfg = getattr(self._context, "agent_config", None)
+        if cfg is None:
+            return 3
+        val = getattr(cfg, "warning_first_trip_limit", 3)
+        try:
+            return max(1, int(val))
+        except Exception:
+            return 3
+
+    def _warning_trip_key(self, result) -> str:
+        reason = str(getattr(result, "reason", "unknown") or "unknown")
+        action = str(getattr(result, "action", "unknown") or "unknown")
+        return f"{action}:{reason}"
+
+    def _record_warning_trip(self, controller, result) -> int:
+        state = getattr(controller, "state", None)
+        if state is None:
+            return 1
+
+        if not hasattr(state, "extra_data") or not isinstance(state.extra_data, dict):
+            state.extra_data = {}
+
+        counts = state.extra_data.get(self._WARNING_TRIP_COUNTS_KEY, {})
+        if not isinstance(counts, dict):
+            counts = {}
+
+        key = self._warning_trip_key(result)
+        count = int(counts.get(key, 0)) + 1
+        counts[key] = count
+
+        # Keep extra_data as the source of truth even when set_extra is mocked.
+        state.extra_data[self._WARNING_TRIP_COUNTS_KEY] = counts
+
+        if hasattr(state, "set_extra"):
+            state.set_extra(self._WARNING_TRIP_COUNTS_KEY, counts, source="StepGuardService")
+
+        return count
+
+    def _emit_warning_trip_observation(self, controller, result, warning_count: int, limit: int) -> None:
+        reason = str(getattr(result, "reason", "unknown") or "unknown")
+        action = str(getattr(result, "action", "pause") or "pause").upper()
+        recommendation = str(getattr(result, "recommendation", "") or "")
+        content = (
+            "CIRCUIT BREAKER WARNING\n\n"
+            f"Reason: {reason}\n"
+            f"Action if escalated: {action}\n"
+            f"Recommendation: {recommendation}\n"
+            "You must change strategy now.\n"
+            f"Warning attempt: {warning_count}/{limit}"
+        )
+        warning_obs = ErrorObservation(
+            content=content,
+            error_id="CIRCUIT_BREAKER_WARNING",
+        )
+        attach_observation_cause(
+            warning_obs,
+            _pending_action_for_observation_cause(controller),
+            context="step_guard.circuit_warning",
+        )
+        controller.event_stream.add_event(warning_obs, EventSource.ENVIRONMENT)
+
+        state = getattr(controller, "state", None)
+        if state and hasattr(state, "set_planning_directive"):
+            state.set_planning_directive(
+                "CIRCUIT WARNING: change strategy immediately; avoid repeating failed pattern; produce one concrete progress action next.",
+                source="StepGuardService",
+            )
 
     async def ensure_can_step(self) -> bool:
         """Return False if circuit breaker/stuck detection block execution."""
@@ -42,6 +128,24 @@ class StepGuardService:
         if not result or not result.tripped:
             return True
 
+        if self._warning_trip_enabled():
+            warning_count = self._record_warning_trip(controller, result)
+            limit = self._warning_trip_limit()
+            if warning_count <= limit:
+                logger.warning(
+                    "Circuit breaker warning-only trip (%s/%s): %s",
+                    warning_count,
+                    limit,
+                    result.reason,
+                )
+                self._emit_warning_trip_observation(
+                    controller,
+                    result,
+                    warning_count,
+                    limit,
+                )
+                return True
+
         # Circuit breaker only emits 'stop' for stuck detections now.
         # Step guard handles all recovery messaging separately.
         logger.error("Circuit breaker tripped: %s", result.reason)
@@ -52,6 +156,11 @@ class StepGuardService:
                 f"{result.recommendation}"
             ),
             error_id="CIRCUIT_BREAKER_TRIPPED",
+        )
+        attach_observation_cause(
+            error_obs,
+            _pending_action_for_observation_cause(controller),
+            context="step_guard.circuit_tripped",
         )
         controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
@@ -107,6 +216,11 @@ class StepGuardService:
         msg, planning = self._build_stuck_recovery_message(created_files)
 
         error_obs = ErrorObservation(content=msg, error_id="STUCK_LOOP_RECOVERY")
+        attach_observation_cause(
+            error_obs,
+            _pending_action_for_observation_cause(controller),
+            context="step_guard.stuck_recovery",
+        )
         controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
         if state and hasattr(state, "set_planning_directive"):

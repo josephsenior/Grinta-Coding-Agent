@@ -40,6 +40,7 @@ from backend.events.observation import (
     ErrorObservation,
     Observation,
 )
+from backend.events.observation_cause import attach_observation_cause
 from backend.events.action.signal import SignalProgressAction
 
 TRAFFIC_CONTROL_REMINDER = (
@@ -464,7 +465,9 @@ class AgentController:
         )
         obs = ErrorObservation(content=content, error_id=err_id)
         obs.tool_call_metadata = meta
-        obs.cause = getattr(self._pending_action, "id", None)
+        attach_observation_cause(
+            obs, self._pending_action, context="agent_controller.pending_unmatched"
+        )
         self.event_stream.add_event(obs, EventSource.AGENT)
 
     def _emit_dropped_agent_actions(self) -> None:
@@ -484,7 +487,9 @@ class AgentController:
                 error_id=ERROR_ACTION_NOT_EXECUTED_ERROR_ID,
             )
             obs.tool_call_metadata = meta
-            obs.cause = getattr(dropped, "id", None)
+            attach_observation_cause(
+                obs, dropped, context="agent_controller.dropped_action"
+            )
             self.event_stream.add_event(obs, EventSource.AGENT)
 
     async def stop(self) -> None:
@@ -908,12 +913,19 @@ class AgentController:
         if not first_msg:
             return None
 
+        from backend.validation.task_metadata import parse_task_from_user_message
         from backend.validation.task_validator import Task
 
+        description, meta = parse_task_from_user_message(first_msg.content)
+        raw_expected = meta.get("expected_output_files")
+        expected_files: list[str] | None = None
+        if isinstance(raw_expected, list) and all(isinstance(x, str) for x in raw_expected):
+            expected_files = list(raw_expected)
         return Task(
-            description=first_msg.content,
-            requirements=[],  # Could be extracted from content
+            description=description,
+            requirements=[],
             acceptance_criteria=[],
+            expected_output_files=expected_files,
         )
 
     def save_state(self) -> None:

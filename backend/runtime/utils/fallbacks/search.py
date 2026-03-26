@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from backend.core.logger import forge_logger as logger
+from backend.utils.regex_limits import try_compile_user_regex
 
 
 class PythonSearcher:
@@ -52,12 +53,10 @@ class PythonSearcher:
             logger.warning("Search directory does not exist: %s", directory)
             return []
 
-        # Compile regex pattern
         flags = 0 if self.case_sensitive else re.IGNORECASE
-        try:
-            regex = re.compile(pattern, flags)
-        except re.error as e:
-            logger.error("Invalid regex pattern '%s': %s", pattern, e)
+        regex, err = try_compile_user_regex(pattern, flags)
+        if regex is None:
+            logger.error("Rejected regex pattern '%s': %s", pattern, err)
             return []
 
         results: list[tuple[Path, int, str]] = []
@@ -152,10 +151,9 @@ class PythonSearcher:
             List of (line_number, line_content) tuples
         """
         flags = 0 if self.case_sensitive else re.IGNORECASE
-        try:
-            regex = re.compile(pattern, flags)
-        except re.error as e:
-            logger.error("Invalid regex pattern '%s': %s", pattern, e)
+        regex, err = try_compile_user_regex(pattern, flags)
+        if regex is None:
+            logger.error("Rejected regex pattern '%s': %s", pattern, err)
             return []
 
         results: list[tuple[int, str]] = []

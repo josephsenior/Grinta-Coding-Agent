@@ -23,7 +23,7 @@ from typing import Any
 
 # ── Sentinel-file → label mappings ──────────────────────────────────
 _FINGERPRINTS: list[tuple[str, str]] = [
-    ("pyproject.toml", "Python (Poetry/pyproject)"),
+    ("pyproject.toml", "Python (uv/pyproject)"),
     ("setup.py", "Python (setup.py)"),
     ("setup.cfg", "Python (setup.cfg)"),
     ("requirements.txt", "Python (requirements)"),
@@ -134,7 +134,7 @@ def detect_project_type(cwd: Path | None = None) -> str:
     """Return a human-readable description of the project type.
 
     Probes the directory for well-known sentinel files and returns a
-    comma-separated list of detected labels (e.g. ``"Python (Poetry), Docker"``).
+    comma-separated list of detected labels (e.g. ``"Python (uv), Docker"``).
     Falls back to ``"Unknown project"`` if nothing is recognised.
     """
     base = cwd or Path.cwd()

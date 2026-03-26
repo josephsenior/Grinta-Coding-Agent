@@ -68,6 +68,14 @@ class TestAgentConfigValidation:
         with pytest.raises(ValidationError):
             AgentConfig(**{"nonexistent_field": "value"})
 
+    def test_legacy_enable_prompt_caching_kwarg_dropped(self):
+        cfg = AgentConfig(enable_prompt_caching=False)
+        assert not hasattr(cfg, "enable_prompt_caching")
+
+    def test_legacy_enable_prompt_caching_in_model_validate_dropped(self):
+        cfg = AgentConfig.model_validate({"enable_prompt_caching": True})
+        assert not hasattr(cfg, "enable_prompt_caching")
+
 
 class TestAgentConfigCustom:
     def test_custom_name(self):
