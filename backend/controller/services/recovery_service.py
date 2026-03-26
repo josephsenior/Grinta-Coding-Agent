@@ -80,7 +80,7 @@ class RecoveryService:
             return
 
         history = getattr(state, "history", []) or []
-        recent = history[-10:] if isinstance(history, list) else []
+        recent = history[-3:] if isinstance(history, list) else []
 
         for event in reversed(recent):
             observation_type = str(getattr(event, "observation", "")).lower()

@@ -14,6 +14,7 @@ import os
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from backend.core.logger import forge_logger as logger
@@ -24,6 +25,7 @@ class SecretsManager:
 
     _LEGACY_SALT = b"forge_secrets_salt"
     _FORMAT_PREFIX = "v2"
+    _FORMAT_V3 = "v3"
 
     def __init__(self, master_key: str | None = None):
         """Initialize secrets manager.
@@ -61,10 +63,41 @@ class SecretsManager:
         key = base64.urlsafe_b64encode(kdf.derive(master_key.encode()))
         return Fernet(key)
 
+    def _create_cipher_hkdf(self, master_key: str, salt: bytes) -> Fernet:
+        """Create Fernet cipher using HKDF (fast; suitable for high-entropy keys)."""
+        hkdf = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            info=b"forge-secrets-v3",
+        )
+        key = base64.urlsafe_b64encode(hkdf.derive(master_key.encode()))
+        return Fernet(key)
+
     def _encode_v2_ciphertext(self, salt: bytes, encrypted: bytes) -> str:
         salt_b64 = base64.urlsafe_b64encode(salt).decode()
         token_b64 = base64.urlsafe_b64encode(encrypted).decode()
         return f"{self._FORMAT_PREFIX}:{salt_b64}:{token_b64}"
+
+    def _encode_v3_ciphertext(self, salt: bytes, encrypted: bytes) -> str:
+        salt_b64 = base64.urlsafe_b64encode(salt).decode()
+        token_b64 = base64.urlsafe_b64encode(encrypted).decode()
+        return f"{self._FORMAT_V3}:{salt_b64}:{token_b64}"
+
+    def _decode_v3_ciphertext(self, ciphertext: str) -> tuple[bytes, bytes] | None:
+        if not isinstance(ciphertext, str):
+            return None
+        parts = ciphertext.split(":", 2)
+        if len(parts) != 3 or parts[0] != self._FORMAT_V3:
+            return None
+        try:
+            salt = base64.urlsafe_b64decode(parts[1].encode())
+            encrypted = base64.urlsafe_b64decode(parts[2].encode())
+            if not salt or not encrypted:
+                return None
+            return salt, encrypted
+        except Exception:
+            return None
 
     def _decode_v2_ciphertext(self, ciphertext: str) -> tuple[bytes, bytes] | None:
         if not isinstance(ciphertext, str):
@@ -91,11 +124,11 @@ class SecretsManager:
             Encrypted string (base64 encoded)
         """
         try:
-            # v2 format: unique random salt per secret + encrypted token.
+            # v3 format: unique random salt + HKDF key derivation.
             salt = os.urandom(16)
-            cipher = self._create_cipher(self._master_key, salt)
+            cipher = self._create_cipher_hkdf(self._master_key, salt)
             encrypted = cipher.encrypt(plaintext.encode())
-            return self._encode_v2_ciphertext(salt, encrypted)
+            return self._encode_v3_ciphertext(salt, encrypted)
         except Exception as e:
             logger.error("Encryption failed: %s", e)
             raise ValueError(f"Failed to encrypt secret: {e}") from e
@@ -110,7 +143,15 @@ class SecretsManager:
             Decrypted plaintext
         """
         try:
-            # v2 payloads carry per-secret salt in-band.
+            # v3 payloads use HKDF (fast) with per-secret salt.
+            decoded_v3 = self._decode_v3_ciphertext(ciphertext)
+            if decoded_v3 is not None:
+                salt, encrypted = decoded_v3
+                cipher = self._create_cipher_hkdf(self._master_key, salt)
+                decrypted = cipher.decrypt(encrypted)
+                return decrypted.decode()
+
+            # v2 payloads carry per-secret salt in-band (PBKDF2).
             decoded_v2 = self._decode_v2_ciphertext(ciphertext)
             if decoded_v2 is not None:
                 salt, encrypted = decoded_v2

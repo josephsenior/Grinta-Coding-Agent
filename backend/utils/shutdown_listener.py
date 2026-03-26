@@ -20,6 +20,8 @@ from backend.core.logger import forge_logger as logger
 
 # True once graceful shutdown has been requested for this process.
 _should_exit: bool = False
+# Incremented on each lifespan reset so stale background tasks can detect staleness.
+_lifecycle_generation: int = 0
 _shutdown_listeners: dict[UUID, Callable[[], None]] = {}
 
 
@@ -49,10 +51,22 @@ def should_continue() -> bool:
     return not _should_exit
 
 
+def get_lifecycle_generation() -> int:
+    """Return the current lifecycle generation.
+
+    Background loops can snapshot this at startup and call
+    ``should_continue() and my_gen == get_lifecycle_generation()``
+    to self-identify as stale after a :func:`reset_shutdown_state` call.
+    """
+    return _lifecycle_generation
+
+
 def reset_shutdown_state() -> None:
     """Reset for a new in-process server lifecycle (e.g. lifespan startup)."""
-    global _should_exit
+    global _should_exit, _lifecycle_generation
     _should_exit = False
+    _lifecycle_generation += 1
+    _shutdown_listeners.clear()
 
 
 def sleep_if_should_continue(delay: float) -> None:

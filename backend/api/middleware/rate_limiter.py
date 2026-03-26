@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import random
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 _rate_limit_store: dict[str, list[float]] = defaultdict(list)
 _last_cleanup = 0.0
+_rate_limit_lock = asyncio.Lock()
 
 
 def _purge_expired_keys(max_age: float = 3600.0) -> None:
@@ -119,19 +121,20 @@ class RateLimiter:
         """Check whether a request is within configured limits."""
         _purge_expired_keys(self.hour_window)
 
-        now = time.time()
-        timestamps = self._filtered_timestamps(key, self.hour_window)
-        hour_count = len(timestamps)
-        if hour_count >= self.requests_per_hour:
-            return False
+        async with _rate_limit_lock:
+            now = time.time()
+            timestamps = self._filtered_timestamps(key, self.hour_window)
+            hour_count = len(timestamps)
+            if hour_count >= self.requests_per_hour:
+                return False
 
-        burst_count = len([ts for ts in timestamps if now - ts < self.burst_window])
-        if burst_count >= self.burst_limit:
-            return False
+            burst_count = len([ts for ts in timestamps if now - ts < self.burst_window])
+            if burst_count >= self.burst_limit:
+                return False
 
-        timestamps.append(now)
-        _rate_limit_store[key] = timestamps
-        return True
+            timestamps.append(now)
+            _rate_limit_store[key] = timestamps
+            return True
 
     async def _get_remaining_requests(self, key: str) -> int:
         """Return the number of requests left in the hourly window."""

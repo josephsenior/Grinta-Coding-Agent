@@ -176,7 +176,7 @@ def _validate_int_range(
     """Validate integer range with consistent SessionInvariantError messages."""
     if max_value is None:
         if value < min_value:
-            raise SessionInvariantError(f"{field_name} must be non-negative")
+            raise SessionInvariantError(f"{field_name} must be >= {min_value}")
         return
     if value < min_value or value > max_value:
         raise SessionInvariantError(

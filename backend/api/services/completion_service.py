@@ -396,7 +396,7 @@ async def _run_completion_with_retries(
                 return None, _build_timeout_completion_result(retry)
         except Exception as e:
             last_error = e
-            is_retryable = type(e).__name__ in ("TimeoutError", "ConnectionError")
+            is_retryable = isinstance(e, (TimeoutError, asyncio.TimeoutError, ConnectionError, OSError))
             if is_retryable and attempt < retry["max_retries"]:
                 wait = retry["retry_backoff"] * (2**attempt)
                 logger.warning(

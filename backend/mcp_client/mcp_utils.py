@@ -475,7 +475,7 @@ def _coerce_value_to_schema(value: Any, schema: dict[str, Any]) -> tuple[Any, bo
                     return parsed, True
             except Exception:
                 pass
-        return {}, True
+        return value, False
 
     if expected == "integer":
         if isinstance(value, bool):
@@ -483,7 +483,7 @@ def _coerce_value_to_schema(value: Any, schema: dict[str, Any]) -> tuple[Any, bo
         if isinstance(value, int):
             return value, False
         if isinstance(value, float):
-            return int(value), True
+            return (int(value), True) if value.is_integer() else (value, False)
         if isinstance(value, str):
             try:
                 return int(value.strip()), True

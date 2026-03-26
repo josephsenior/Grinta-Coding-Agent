@@ -396,7 +396,7 @@ class OrchestratorExecutor:
 
                 while True:
                     try:
-                        chunk = await asyncio.wait_for(stream_aiter.__anext__(), timeout=20.0)
+                        chunk = await asyncio.wait_for(anext(stream_aiter), timeout=20.0)
                     except StopAsyncIteration:
                         break
                     except asyncio.TimeoutError:
