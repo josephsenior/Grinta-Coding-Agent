@@ -16,8 +16,6 @@ def try_compile_user_regex(
     Returns:
         ``(compiled, None)`` on success, else ``(None, short error reason)``.
     """
-    if not isinstance(pattern, str):
-        return None, "pattern must be a string"
     if len(pattern) > MAX_USER_REGEX_PATTERN_CHARS:
         return None, "pattern exceeds maximum length"
     try:

@@ -43,7 +43,7 @@ import json
 import sys
 from threading import Lock
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, NoReturn
 
 from backend.core.errors import (
     FunctionCallConversionError,
@@ -1019,7 +1019,7 @@ def _trim_content_before_function(content: Any, tool_call_match: Any) -> Any:
     return content
 
 
-def _raise_unexpected_content_type(content: Any) -> None:
+def _raise_unexpected_content_type(content: Any) -> NoReturn:
     """Raise a consistent conversion error for unsupported message content types."""
     msg = f"Unexpected content type {type(content)}. Expected str or list. Content: {content}"
     raise FunctionCallConversionError(msg)
