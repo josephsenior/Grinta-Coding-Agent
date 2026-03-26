@@ -691,7 +691,14 @@ class LLM(RetryMixin, DebugMixin):
             logger.error(
                 "Error getting token count for\n model %s\n%s", self.config.model, e
             )
-            return 0
+            # Conservative fallback: ~4 chars per token is a safe heuristic.
+            # Returning 0 here would cause downstream code to believe the
+            # context is empty, leading to context-window overflows.
+            try:
+                raw = str(messages)
+                return max(len(raw) // 4, 1)
+            except Exception:
+                return 1
 
     def format_messages_for_llm(self, messages: Message | list[Message]) -> list[dict]:
         if isinstance(messages, Message):

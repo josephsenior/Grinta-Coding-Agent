@@ -48,6 +48,7 @@ class StreamingCheckpoint:
     """
 
     _FILENAME = "streaming_wal.json"
+    _MAX_CHECKPOINT_AGE_SEC: float = 300.0  # 5 minutes
 
     def __init__(self, checkpoint_dir: str) -> None:
         self._dir = Path(checkpoint_dir)
@@ -106,6 +107,20 @@ class StreamingCheckpoint:
             raw = json.loads(self._wal_path.read_text(encoding="utf-8"))
             record = CheckpointRecord(**raw)
             age = time.time() - record.created_at
+
+            # Discard stale checkpoints — if the WAL is older than the
+            # max age it almost certainly belongs to a completed call
+            # whose commit() was missed, not to an in-flight request.
+            if age > self._MAX_CHECKPOINT_AGE_SEC:
+                logger.warning(
+                    "Discarding stale streaming checkpoint %s (age=%.1fs > %.0fs limit)",
+                    record.token,
+                    age,
+                    self._MAX_CHECKPOINT_AGE_SEC,
+                )
+                self._remove_wal()
+                return None
+
             logger.warning(
                 "Recovered uncommitted streaming checkpoint %s (age=%.1fs, attempt=%d)",
                 record.token,

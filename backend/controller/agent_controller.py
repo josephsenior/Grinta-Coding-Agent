@@ -819,7 +819,7 @@ class AgentController:
             bool: True if the agent is stuck, False otherwise.
 
         """
-        return self.stuck_service.is_stuck()
+        return self.stuck_service.is_stuck(headless_mode=self.headless_mode)
 
     def __repr__(self) -> str:
         """Get string representation of controller with key state information.
