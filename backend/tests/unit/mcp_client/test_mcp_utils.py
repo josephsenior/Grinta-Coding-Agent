@@ -251,6 +251,85 @@ class TestAsyncHelpers:
             assert obs.tool_result["ok"] is True
 
     @pytest.mark.asyncio
+    async def test_execute_direct_tool_validation_error_repairs_and_retries(self):
+        from backend.mcp_client.mcp_utils import _execute_direct_tool
+
+        action = self._as_action(
+            SimpleNamespace(name="search-web", arguments={"queries": ["latest ai news"]})
+        )
+
+        class FakeMcpError(Exception):
+            pass
+
+        response = MagicMock()
+        client = AsyncMock()
+        client.call_tool = AsyncMock(side_effect=[FakeMcpError("MCP error -32602: invalid_type expected string"), response])
+        client.tool_map = {
+            "search-web": SimpleNamespace(
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "queries": {"type": "string"}
+                    },
+                }
+            )
+        }
+        client.exposed_to_protocol = {}
+
+        with (
+            patch("backend.mcp_client.mcp_utils.get_cached", return_value=None),
+            patch("backend.mcp_client.mcp_utils.McpError", FakeMcpError),
+            patch(
+                "backend.mcp_client.mcp_utils.model_dump_with_options",
+                return_value={"result": "ok"},
+            ),
+            patch("backend.mcp_client.mcp_utils.set_cache"),
+        ):
+            obs = await _execute_direct_tool(action, client)
+
+        data = json.loads(obs.content)
+        assert data["ok"] is True
+        assert data["mcp_arg_repair_applied"] is True
+        assert data["repaired_arguments"]["queries"] == '["latest ai news"]'
+        assert client.call_tool.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_execute_direct_tool_validation_error_returns_structured_code(self):
+        from backend.mcp_client.mcp_utils import _execute_direct_tool
+
+        action = self._as_action(
+            SimpleNamespace(name="search-web", arguments={"queries": ["latest ai news"]})
+        )
+
+        class FakeMcpError(Exception):
+            pass
+
+        client = AsyncMock()
+        client.call_tool = AsyncMock(side_effect=FakeMcpError("MCP error -32602: Input validation error"))
+        client.tool_map = {
+            "search-web": SimpleNamespace(
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "queries": {"type": "string"}
+                    },
+                }
+            )
+        }
+        client.exposed_to_protocol = {}
+
+        with (
+            patch("backend.mcp_client.mcp_utils.get_cached", return_value=None),
+            patch("backend.mcp_client.mcp_utils.McpError", FakeMcpError),
+        ):
+            obs = await _execute_direct_tool(action, client)
+
+        data = json.loads(obs.content)
+        assert data["ok"] is False
+        assert data["error_code"] == "MCP_TOOL_VALIDATION_ERROR"
+        assert data["retryable"] is True
+
+    @pytest.mark.asyncio
     async def test_call_tool_mcp_windows_disabled(self):
         from backend.mcp_client.mcp_utils import call_tool_mcp
 

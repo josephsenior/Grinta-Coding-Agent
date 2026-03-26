@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useCallback,
   useState,
   useMemo,
@@ -50,7 +49,7 @@ import { sendUserAction } from "@/socket/client";
 import { toast } from "sonner";
 import { AgentState, ActionType } from "@/types/agent";
 import type { ActionEvent, ForgeEvent } from "@/types/events";
-import { EventCard } from "@/components/chat/EventRenderer";
+import { TimelineSteps } from "@/components/chat/TimelineSteps";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { StreamingBubble } from "@/components/chat/StreamingBubble";
 import { DraftWelcomeIllustration } from "@/components/chat/DraftWelcomeIllustration";
@@ -1140,16 +1139,9 @@ export default function Chat() {
                 </div>
               )}
 
-              {events.map((event, i) => {
-                return (
-                  <Fragment key={event.id != null ? `e-${event.id}` : `i-${i}`}>
-                    <EventCard
-                      event={event}
-                      thinkDurationMs={thinkDurationByEventId.get(Number(event.id))}
-                    />
-                  </Fragment>
-                );
-              })}
+              {events.length > 0 && (
+                <TimelineSteps events={events} thinkDurationByEventId={thinkDurationByEventId} />
+              )}
 
               {optimisticUserMessages.map((message) => (
                 <MessageBubble
@@ -1333,3 +1325,4 @@ export default function Chat() {
     </div>
   );
 }
+

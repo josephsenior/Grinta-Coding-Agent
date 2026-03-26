@@ -86,8 +86,8 @@ _load_dotenv_local()
 os.environ.setdefault('PORT', '3000')
 # Prevent prolonged "Working..." when provider calls stall.
 # These can still be overridden via .env.local or process environment.
-os.environ.setdefault('FORGE_LLM_STEP_TIMEOUT_SECONDS', '45')
-os.environ.setdefault('FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '8')
+os.environ.setdefault('FORGE_LLM_STEP_TIMEOUT_SECONDS', '180')
+os.environ.setdefault('FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '25')
 
 # Now import and run uvicorn
 import uvicorn  # noqa: E402

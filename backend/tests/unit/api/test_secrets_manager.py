@@ -5,6 +5,7 @@ Targets the 0% (45 missed lines) coverage gap.
 
 from __future__ import annotations
 
+import base64
 from unittest.mock import patch
 
 import pytest
@@ -53,6 +54,7 @@ class TestEncryptDecrypt:
         sm = SecretsManager(master_key="test-round-trip-key")
         plaintext = "super-secret-password"
         encrypted = sm.encrypt(plaintext)
+        assert encrypted.startswith("v2:")
         assert encrypted != plaintext
         decrypted = sm.decrypt(encrypted)
         assert decrypted == plaintext
@@ -109,6 +111,13 @@ class TestDecryptErrors:
         encrypted = sm1.encrypt("secret")
         with pytest.raises(ValueError, match="Failed to decrypt"):
             sm2.decrypt(encrypted)
+
+    def test_legacy_ciphertext_still_decrypts(self):
+        sm = SecretsManager(master_key="legacy-key")
+        legacy_token = sm._cipher.encrypt("legacy-secret".encode())
+        legacy_ciphertext = base64.urlsafe_b64encode(legacy_token).decode()
+
+        assert sm.decrypt(legacy_ciphertext) == "legacy-secret"
 
 
 # ------------------------------------------------------------------

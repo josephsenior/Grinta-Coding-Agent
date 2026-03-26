@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import os
+import re
 import shutil
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from backend.controller.agent import Agent
@@ -430,6 +432,125 @@ def _build_mcp_error_payload(
     }
 
 
+def _looks_like_mcp_validation_error(message: str) -> bool:
+    """Return True when MCP error text indicates argument/schema mismatch."""
+    text = (message or "").lower()
+    return any(
+        marker in text
+        for marker in (
+            "-32602",
+            "input validation error",
+            "invalid arguments",
+            "invalid_type",
+            "validation error",
+        )
+    )
+
+
+def _coerce_value_to_schema(value: Any, schema: dict[str, Any]) -> tuple[Any, bool]:
+    """Best-effort coercion for common JSON schema field types."""
+    expected = schema.get("type")
+
+    if expected == "string":
+        if isinstance(value, str):
+            return value, False
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, ensure_ascii=False), True
+        return str(value), True
+
+    if expected == "array":
+        if isinstance(value, list):
+            return value, False
+        if isinstance(value, (tuple, set)):
+            return list(value), True
+        return [value], True
+
+    if expected == "object":
+        if isinstance(value, dict):
+            return value, False
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, dict):
+                    return parsed, True
+            except Exception:
+                pass
+        return {}, True
+
+    if expected == "integer":
+        if isinstance(value, bool):
+            return int(value), True
+        if isinstance(value, int):
+            return value, False
+        if isinstance(value, float):
+            return int(value), True
+        if isinstance(value, str):
+            try:
+                return int(value.strip()), True
+            except Exception:
+                return value, False
+        return value, False
+
+    if expected == "number":
+        if isinstance(value, bool):
+            return float(int(value)), True
+        if isinstance(value, float):
+            return value, False
+        if isinstance(value, int):
+            return float(value), True
+        if isinstance(value, str):
+            try:
+                return float(value.strip()), True
+            except Exception:
+                return value, False
+        return value, False
+
+    if expected == "boolean":
+        if isinstance(value, bool):
+            return value, False
+        if isinstance(value, str):
+            s = value.strip().lower()
+            if s in {"true", "1", "yes", "y", "on"}:
+                return True, True
+            if s in {"false", "0", "no", "n", "off"}:
+                return False, True
+            return value, False
+        if isinstance(value, (int, float)):
+            return bool(value), True
+        return value, False
+
+    return value, False
+
+
+def _repair_args_with_schema(
+    args: dict[str, Any], input_schema: dict[str, Any] | None
+) -> tuple[dict[str, Any], bool]:
+    """Repair argument types against the MCP tool's declared input schema."""
+    if not isinstance(args, dict) or not isinstance(input_schema, dict):
+        return args, False
+
+    properties = input_schema.get("properties")
+    if not isinstance(properties, dict) or not properties:
+        return args, False
+
+    repaired = copy.deepcopy(args)
+    changed = False
+    for field, schema in properties.items():
+        if field not in repaired or not isinstance(schema, dict):
+            continue
+        new_val, did_change = _coerce_value_to_schema(repaired[field], schema)
+        if did_change:
+            repaired[field] = new_val
+            changed = True
+    return repaired, changed
+
+
+def _extract_mcp_jsonrpc_error_code(message: str) -> str | None:
+    """Extract JSON-RPC style negative error code from freeform error text."""
+    match = re.search(r"(-\d{4,5})", message or "")
+    return match.group(1) if match else None
+
+
 def _make_mcp_observation(action: MCPAction, payload: dict) -> MCPObservation:
     """Create an MCPObservation with aligned structured tool_result metadata."""
     obs = MCPObservation(
@@ -545,7 +666,49 @@ async def _execute_direct_tool(
             action, _normalize_mcp_success_payload(result_dict)
         )
     except McpError as e:
-        logger.error("MCP error when calling tool %s: %s", action.name, e)
+        err_text = str(e)
+        logger.error("MCP error when calling tool %s: %s", action.name, err_text)
+
+        if _looks_like_mcp_validation_error(err_text):
+            resolved_name = _resolve_exposed_tool_name(matching_client, action.name) or action.name
+            tool_obj = getattr(matching_client, "tool_map", {}).get(resolved_name)
+            schema = getattr(tool_obj, "inputSchema", None) if tool_obj is not None else None
+            repaired_args, changed = _repair_args_with_schema(action.arguments, schema)
+
+            if changed:
+                logger.warning(
+                    "MCP validation failed for %s; retrying once with schema-repaired args",
+                    action.name,
+                )
+                try:
+                    response = await matching_client.call_tool(action.name, repaired_args)
+                    result_dict = model_dump_with_options(response, mode="json")
+                    payload = _normalize_mcp_success_payload(result_dict)
+                    payload["mcp_arg_repair_applied"] = True
+                    payload["repaired_arguments"] = repaired_args
+                    return _make_mcp_observation(action, payload)
+                except Exception as retry_exc:
+                    logger.error(
+                        "MCP validation retry failed for %s: %s",
+                        action.name,
+                        retry_exc,
+                    )
+
+            code = _extract_mcp_jsonrpc_error_code(err_text) or "-32602"
+            return _make_mcp_observation(
+                action,
+                _build_mcp_error_payload(
+                    action_name=action.name,
+                    message=(
+                        f"MCP tool '{action.name}' rejected arguments with validation error ({code}).\n"
+                        "Attempted schema-aware repair and single retry where possible.\n"
+                        "Next step: call the same tool with arguments matching its input schema exactly."
+                    ),
+                    code="MCP_TOOL_VALIDATION_ERROR",
+                    retryable=True,
+                ),
+            )
+
         return _make_mcp_observation(
             action,
             _build_mcp_error_payload(

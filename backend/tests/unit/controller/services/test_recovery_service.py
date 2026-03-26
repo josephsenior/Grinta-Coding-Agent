@@ -78,3 +78,41 @@ class TestRecoveryService:
 
         err_obs = mock_context.emit_event.call_args[0][0]
         assert err_obs.notify_ui_only is True
+
+    @pytest.mark.asyncio
+    async def test_timeout_with_recent_mcp_validation_error_sets_directive(self, mock_context, ctrl):
+        state = MagicMock()
+        state.turn_signals = MagicMock(planning_directive=None)
+        state.history = [
+            MagicMock(
+                observation="mcp",
+                content='{"error_code":"MCP_TOOL_VALIDATION_ERROR","error":"MCP error -32602"}',
+            )
+        ]
+        state.set_planning_directive = MagicMock()
+        ctrl.state = state
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(Timeout("slow"))
+
+        state.set_planning_directive.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_timeout_without_recent_mcp_validation_error_does_not_set_directive(
+        self, mock_context, ctrl
+    ):
+        state = MagicMock()
+        state.turn_signals = MagicMock(planning_directive=None)
+        state.history = [
+            MagicMock(
+                observation="mcp",
+                content='{"error_code":"MCP_TOOL_ERROR","error":"random server error"}',
+            )
+        ]
+        state.set_planning_directive = MagicMock()
+        ctrl.state = state
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(Timeout("slow"))
+
+        state.set_planning_directive.assert_not_called()
