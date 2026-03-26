@@ -202,9 +202,9 @@ class OrchestratorExecutor:
             logger.info("OrchestratorExecutor.async_execute: calling LLM.astream")
             stream_iter = self._llm.astream(**call_params)
 
-            first_chunk_timeout: float | None = 12.0
+            first_chunk_timeout: float | None = 25.0
             first_chunk_timeout_raw = os.getenv(
-                "FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS", "12"
+                "FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS", "25"
             ).strip()
             try:
                 parsed_first_chunk_timeout = float(first_chunk_timeout_raw)
@@ -212,7 +212,7 @@ class OrchestratorExecutor:
                     parsed_first_chunk_timeout if parsed_first_chunk_timeout > 0 else None
                 )
             except ValueError:
-                first_chunk_timeout = 12.0
+                first_chunk_timeout = 25.0
 
             async def _consume_stream():
                 nonlocal content_accumulate
@@ -317,7 +317,20 @@ class OrchestratorExecutor:
 
                         fallback_params = dict(call_params)
                         fallback_params["stream"] = False
-                        fallback = await self._llm.acompletion(**fallback_params)
+                        
+                        fallback_timeout = 45.0
+                        logger.warning("Attempting non-streaming fallback with %.1fs timeout", fallback_timeout)
+                        
+                        try:
+                            fallback = await asyncio.wait_for(
+                                self._llm.acompletion(**fallback_params),
+                                timeout=fallback_timeout,
+                            )
+                        except asyncio.TimeoutError:
+                            logger.error("Fallback non-streaming completion timed out after %.1fs", fallback_timeout)
+                            from backend.llm.exceptions import Timeout as LLMTimeout
+                            model_name = getattr(getattr(self._llm, "config", None), "model", None)
+                            raise LLMTimeout(f"Fallback completion timed out after {fallback_timeout} seconds", model=model_name)
 
                         fallback_content_raw = getattr(fallback, "content", None)
                         fallback_content = (
@@ -381,7 +394,17 @@ class OrchestratorExecutor:
                     if choices:
                         await _process_delta(choices[0].get("delta", {}))
 
-                async for chunk in stream_aiter:
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(stream_aiter.__anext__(), timeout=20.0)
+                    except StopAsyncIteration:
+                        break
+                    except asyncio.TimeoutError:
+                        logger.warning("LLM stream chunk timed out mid-generation after 20 seconds. Streaming stalled.")
+                        from backend.llm.exceptions import Timeout as LLMTimeout
+                        model_name = getattr(getattr(self._llm, "config", None), "model", None)
+                        raise LLMTimeout("LLM stream chunk timed out mid-generation after 20 seconds", model=model_name)
+
                     choices = chunk.get("choices", [])
                     if not choices:
                         continue
@@ -417,12 +440,11 @@ class OrchestratorExecutor:
 
         except asyncio.TimeoutError as exc:
             from backend.llm.exceptions import Timeout as LLMTimeout
-
             model_name = getattr(getattr(self._llm, "config", None), "model", None)
             logger.error("LLM timeout %s", type(exc).__name__)
             cap = timeout_seconds if timeout_seconds is not None else 0.0
             raise LLMTimeout(
-                f"LLM streaming call timed out after {cap} seconds",
+                f"LLM streaming call timed out after {cap} seconds (Full Step Timeout)",
                 model=model_name,
             ) from exc
         except asyncio.CancelledError:
