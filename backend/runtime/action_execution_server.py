@@ -274,6 +274,22 @@ class ActionExecutor:
             )
         )
 
+        # Set up env_check alias for diagnosing environment issues after
+        # cascading failures.  Shows Python version, key packages, disk
+        # usage, and memory stats in one command.
+        bash_session.execute(
+            CmdRunAction(
+                command=(
+                    "alias env_check='"
+                    'echo "=== PYTHON ===" && python3 --version 2>/dev/null || python --version 2>/dev/null && '
+                    'echo "=== KEY PACKAGES ===" && pip list --format=freeze 2>/dev/null | head -30 && '
+                    'echo "=== DISK ===" && df -h . 2>/dev/null && '
+                    'echo "=== MEMORY ===" && free -h 2>/dev/null || vm_stat 2>/dev/null; '
+                    "true'"
+                ),
+            )
+        )
+
         # Initialize plugins commands
         for plugin in self.plugins.values():
             init_cmds = plugin.get_init_bash_commands()
@@ -400,6 +416,21 @@ class ActionExecutor:
             self._same_cmd_failure_count = 0
             return
 
+        # Annotate fatal signals with actionable guidance so the LLM knows
+        # *why* the process died instead of blindly retrying.
+        if exit_code == 137:
+            observation.content += (
+                "\n\n[OOM_KILLED] The command was killed by the kernel (exit 137 — "
+                "out of memory or SIGKILL). Reduce memory usage, process data in "
+                "smaller chunks, or increase available memory before retrying."
+            )
+        elif exit_code == 139:
+            observation.content += (
+                "\n\n[SEGFAULT] The command crashed with a segmentation fault "
+                "(exit 139 — SIGSEGV). This indicates a bug in the program, not "
+                "a configuration issue. Inspect the code for memory errors."
+            )
+
         signature = (
             action.command.strip(),
             exit_code,
@@ -418,6 +449,63 @@ class ActionExecutor:
                 "Do NOT retry unchanged. Pivot now: inspect available tools/interpreters, "
                 "adjust environment, or choose a different command/tool."
             )
+
+    # Patterns for common environment errors → (regex, tag, guidance).
+    _ENV_ERROR_PATTERNS: list[tuple[str, str, str]] = [
+        (
+            r"ModuleNotFoundError:\s*No module named ['\"]?(\S+?)['\"]?",
+            "[MISSING_MODULE]",
+            "Install with: pip install {match}",
+        ),
+        (
+            r"ImportError:\s*cannot import name",
+            "[IMPORT_ERROR]",
+            "Check that the correct package version is installed and the name is spelled correctly.",
+        ),
+        (
+            r"(\S+):\s*command not found",
+            "[MISSING_TOOL]",
+            "Install with: apt-get install {match} (or check PATH)",
+        ),
+        (
+            r"No space left on device",
+            "[DISK_FULL]",
+            "Free disk space before retrying. Check usage with: df -h",
+        ),
+        (
+            r"Permission denied",
+            "[PERMISSION_ERROR]",
+            "Check file ownership/permissions. You may need chmod or to run as a different user.",
+        ),
+    ]
+
+    def _annotate_environment_errors(
+        self, observation: CmdOutputObservation
+    ) -> None:
+        """Detect environment-level errors and append actionable guidance.
+
+        Scans the observation content for common environment failures
+        (missing modules, missing tools, disk full, permission denied)
+        and appends a tagged annotation so the LLM gets explicit guidance
+        instead of having to infer the root cause.
+        """
+        content = observation.content
+        if not content:
+            return
+
+        exit_code = int(getattr(observation.metadata, "exit_code", 0) or 0)
+        if exit_code == 0:
+            return
+
+        for pattern, tag, guidance_template in self._ENV_ERROR_PATTERNS:
+            m = re.search(pattern, content)
+            if m:
+                # Use the first capture group as {match} if available.
+                match_text = m.group(1) if m.lastindex and m.lastindex >= 1 else ""
+                guidance = guidance_template.format(match=match_text)
+                observation.content += f"\n\n{tag} {guidance}"
+                # Only annotate the first matching pattern to avoid noise.
+                return
 
     async def run(
         self, action: CmdRunAction
@@ -456,6 +544,9 @@ class ActionExecutor:
                 )
             if isinstance(observation.content, str):
                 observation.content = truncate_cmd_output(observation.content)
+
+            # Annotate environment-level failures with actionable guidance.
+            self._annotate_environment_errors(observation)
 
             if not action.is_static:
                 self._attach_detected_server(

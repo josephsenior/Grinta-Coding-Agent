@@ -292,6 +292,36 @@ class BashSession(BaseShellSession):
         except Exception:
             logger.debug("Failed to kill tmux session", exc_info=True)
 
+    def _ensure_session_alive(self) -> bool:
+        """Verify the tmux session is still alive; re-create if dead.
+
+        Returns True if the session had to be recovered.
+        """
+        try:
+            # Fast liveness probe: ask tmux for the pane pid
+            self.pane.cmd("display-message", "-p", "#{pane_pid}")
+            return False
+        except Exception:
+            logger.warning("Tmux session died — attempting recovery")
+
+        # Session is dead; re-initialize from scratch
+        old_cwd = self._cwd
+        try:
+            self.initialize()
+            # Restore previous working directory
+            if old_cwd and old_cwd != self.work_dir:
+                self.pane.send_keys(f"cd {old_cwd}")
+                time.sleep(0.2)
+                self._clear_screen()
+            logger.info("Tmux session recovered (cwd=%s)", old_cwd)
+            return True
+        except Exception as exc:
+            logger.error("Tmux session recovery failed", exc_info=True)
+            raise RuntimeError(
+                "Tmux session died and could not be recovered. "
+                "Check that tmux is running and TMUX_TMPDIR is writable."
+            ) from exc
+
     def _should_use_su(self) -> bool:
         """Determine if we should wrap shell command in `su username -`."""
         username = self.username
@@ -347,12 +377,31 @@ class BashSession(BaseShellSession):
         """Get current working directory for bash runtime."""
         return self._cwd
 
+    # Maximum characters to keep from pane capture before PS1 regex matching.
+    # Prevents regex backtracking on multi-MB outputs from commands like `yes`,
+    # `find /`, or `cat` on huge files.
+    _MAX_PANE_CAPTURE_CHARS = 200_000
+
     def _get_pane_content(self) -> str:
-        """Capture the current pane content and update the buffer."""
+        """Capture the current pane content and update the buffer.
+
+        Limits capture to the last HISTORY_LIMIT lines via ``-S``
+        and pre-truncates to ``_MAX_PANE_CAPTURE_CHARS`` to prevent
+        regex backtracking on massive outputs.
+        """
         pane = self._require_pane()
-        return "\n".join(
+        raw = "\n".join(
             line.rstrip() for line in pane.cmd("capture-pane", "-J", "-pS", "-").stdout
         )
+        if len(raw) > self._MAX_PANE_CAPTURE_CHARS:
+            # Keep the tail — PS1 prompt is always at the end.
+            logger.warning(
+                "Pane capture too large (%d chars), truncating to last %d chars",
+                len(raw),
+                self._MAX_PANE_CAPTURE_CHARS,
+            )
+            raw = raw[-self._MAX_PANE_CAPTURE_CHARS:]
+        return raw
 
     def _get_window_and_pane_with_retry(
         self, session: Session, retries: int = 10, delay: float = 0.1
@@ -475,6 +524,45 @@ class BashSession(BaseShellSession):
             content=command_output, command=command, metadata=metadata, hidden=hidden
         )
 
+    def _kill_hung_process(self) -> None:
+        """Escalate kill signals to terminate a hung foreground process.
+
+        Sends SIGINT (Ctrl+C) first, waits briefly for the shell prompt to
+        return.  If the process survives, sends SIGQUIT (Ctrl+\\) and finally
+        falls back to ``kill -9 0`` which terminates the entire foreground
+        process group in the tmux pane.
+        """
+        pane = self._require_pane()
+
+        # Stage 1: SIGINT (Ctrl+C)
+        logger.info("Kill escalation stage 1: sending SIGINT (C-c)")
+        pane.send_keys("C-c", enter=False)
+        time.sleep(2)
+
+        content = self._get_pane_content()
+        if content.rstrip().endswith(CMD_OUTPUT_PS1_END.rstrip()):
+            logger.info("Process terminated after SIGINT")
+            return
+
+        # Stage 2: SIGQUIT (Ctrl+\)
+        logger.info("Kill escalation stage 2: sending SIGQUIT (C-\\)")
+        pane.send_keys("C-\\", enter=False)
+        time.sleep(1)
+
+        content = self._get_pane_content()
+        if content.rstrip().endswith(CMD_OUTPUT_PS1_END.rstrip()):
+            logger.info("Process terminated after SIGQUIT")
+            return
+
+        # Stage 3: kill the foreground process group
+        logger.warning("Kill escalation stage 3: sending kill -9 to foreground pgroup")
+        pane.send_keys("C-c", enter=False)
+        time.sleep(0.3)
+        # Send kill to the foreground job's process group
+        pane.send_keys("kill -9 %1 2>/dev/null; true", enter=True)
+        time.sleep(1)
+        logger.info("Kill escalation complete")
+
     def _handle_nochange_timeout_command(
         self,
         command: str,
@@ -501,6 +589,10 @@ class BashSession(BaseShellSession):
             metadata,
             continue_prefix="[Below is the output of the previous command.]\n",
         )
+
+        # Kill the hung process so the tmux pane is freed for the next command.
+        self._kill_hung_process()
+
         return CmdOutputObservation(
             content=command_output, command=command, metadata=metadata
         )
@@ -530,6 +622,10 @@ class BashSession(BaseShellSession):
             metadata,
             continue_prefix="[Below is the output of the previous command.]\n",
         )
+
+        # Kill the hung process so the tmux pane is freed for the next command.
+        self._kill_hung_process()
+
         return CmdOutputObservation(
             command=command, content=command_output, metadata=metadata
         )
@@ -687,42 +783,57 @@ class BashSession(BaseShellSession):
         cur_pane_output: str,
         ps1_matches: list,
     ) -> CmdOutputObservation | None:
-        """Check for various timeout conditions."""
+        """Check for various timeout conditions.
+
+        Idle-output timeout fires for ALL commands (blocking or not).
+        Blocking commands get a longer idle threshold (2×) to accommodate
+        slow builds/installs that produce periodic output.
+        """
         time_since_last_change = time.time() - last_change_time
+
+        # Idle timeout: fires for ALL commands.  Blocking commands get a
+        # longer grace period (2×) since builds/installs may have long
+        # quiet phases (e.g. linking, compressing).
+        idle_threshold = (
+            self.NO_CHANGE_TIMEOUT_SECONDS * 2
+            if action.blocking
+            else self.NO_CHANGE_TIMEOUT_SECONDS
+        )
         logger.debug(
             "CHECKING NO CHANGE TIMEOUT (%ss): elapsed %s. Action blocking: %s",
-            self.NO_CHANGE_TIMEOUT_SECONDS,
+            idle_threshold,
             time_since_last_change,
             action.blocking,
         )
 
-        if (
-            not action.blocking
-            and time_since_last_change >= self.NO_CHANGE_TIMEOUT_SECONDS
-        ):
+        if time_since_last_change >= idle_threshold:
             return self._handle_nochange_timeout_command(
                 command, pane_content=cur_pane_output, ps1_matches=ps1_matches
             )
 
-        # Skip hard timeout check if timeout is None (long-running commands like servers)
-        if action.timeout is None:
-            logger.debug(
-                "No hard timeout set (long-running command), skipping timeout check"
-            )
-            return None
+        # Hard timeout: always enforced.  If the action has no explicit
+        # timeout we fall back to _SAFETY_NET_TIMEOUT (600s) to prevent
+        # truly pathological hangs.
+        from backend.runtime.command_timeout import _SAFETY_NET_TIMEOUT
+
+        effective_timeout = (
+            min(action.timeout, _SAFETY_NET_TIMEOUT)
+            if action.timeout is not None
+            else _SAFETY_NET_TIMEOUT
+        )
 
         elapsed_time = time.time() - start_time
         logger.debug(
-            "CHECKING HARD TIMEOUT (%ss): elapsed %s", action.timeout, elapsed_time
+            "CHECKING HARD TIMEOUT (%ss): elapsed %s", effective_timeout, elapsed_time
         )
 
-        if action.timeout and elapsed_time >= action.timeout:
+        if elapsed_time >= effective_timeout:
             logger.debug("Hard timeout triggered.")
             return self._handle_hard_timeout_command(
                 command,
                 pane_content=cur_pane_output,
                 ps1_matches=ps1_matches,
-                timeout=action.timeout,
+                timeout=effective_timeout,
             )
 
         return None
@@ -831,6 +942,10 @@ class BashSession(BaseShellSession):
 
         command = action.command.strip()
         is_input: bool = action.is_input
+
+        # Verify tmux session is alive; auto-recover if dead
+        if self._ensure_session_alive():
+            logger.info("[SESSION_RECOVERED] Tmux session was re-created")
 
         # Get initial state
         initial_pane_output = self._get_pane_content()

@@ -12,6 +12,8 @@ import mimetypes
 import os
 from typing import TYPE_CHECKING, Any
 
+import re
+
 from backend.core.logger import forge_logger as logger
 from backend.events.action import FileReadAction, FileWriteAction
 from backend.core.enums import FileEditSource
@@ -173,16 +175,81 @@ def _extract_truncation_lines(
     return head_lines, tail_lines
 
 
+# Regex for lines that likely contain error/failure context worth surfacing.
+_ERROR_LINE_RE = re.compile(
+    r"Error|Exception|Traceback|FAILED|FAIL:|AssertionError|"
+    r"AssertionError|panic|PANIC|ModuleNotFoundError|ImportError|"
+    r"FileNotFoundError|PermissionError|RuntimeError|TypeError|"
+    r"ValueError|KeyError|AttributeError|SyntaxError|IndentationError",
+    re.IGNORECASE,
+)
+
+
+def _extract_error_context(
+    lines: list[str],
+    head_count: int,
+    tail_count: int,
+    budget: int,
+) -> list[str]:
+    """Extract error-context lines from the truncated middle of output.
+
+    Scans the middle section (between head and tail) for lines matching
+    error/traceback keywords and returns up to ``budget`` characters worth,
+    with ±2 surrounding lines for context.
+    """
+    if head_count + tail_count >= len(lines):
+        return []
+
+    middle_start = head_count
+    middle_end = len(lines) - tail_count
+    middle = lines[middle_start:middle_end]
+
+    # Find indices of error lines within the middle slice.
+    error_indices: list[int] = []
+    for i, line in enumerate(middle):
+        if _ERROR_LINE_RE.search(line):
+            error_indices.append(i)
+
+    if not error_indices:
+        return []
+
+    # Expand each error index by ±2 lines for context, dedup via set.
+    selected: set[int] = set()
+    for idx in error_indices:
+        for offset in range(-2, 3):
+            pos = idx + offset
+            if 0 <= pos < len(middle):
+                selected.add(pos)
+
+    # Collect lines in order, respecting budget.
+    result: list[str] = []
+    chars = 0
+    prev_idx = -2  # sentinel for gap detection
+    for idx in sorted(selected):
+        line = middle[idx]
+        if chars + len(line) > budget:
+            break
+        if idx > prev_idx + 1 and result:
+            gap_marker = "  ...\n"
+            if chars + len(gap_marker) + len(line) > budget:
+                break
+            result.append(gap_marker)
+            chars += len(gap_marker)
+        result.append(line)
+        chars += len(line)
+        prev_idx = idx
+
+    return result
+
+
 def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     """Truncate bash command output with error-aware head+tail strategy.
 
-    Unlike generic truncation, this function:
-    - Preserves the first HEAD_LINES lines for command context
-    - Always preserves the last TAIL_LINES lines (final status/results)
-    - Extracts and surfaces any lines containing error/traceback keywords
-      so the LLM sees failure information even mid-truncation
-    - Prepends a [TEST_SUMMARY] block when test runner output is detected
-      (P2-A: structured test result extraction)
+    - Preserves the first lines for command context (15% budget)
+    - Surfaces error/traceback lines from the truncated middle (10% budget)
+    - Always preserves the last lines for final status/results (75% budget)
+    - Appends a [TEST_SUMMARY] block AFTER truncation so it never consumes
+      the truncation budget
 
     Args:
         output: Raw command output string.
@@ -195,36 +262,60 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     """
     max_chars = _get_max_cmd_output_chars(max_chars)
 
-    # P2-A: Prepend test summary when test output is detected (before truncation).
+    # Extract test summary BEFORE truncation but append it AFTER, so
+    # the summary block never inflates the char budget.
     test_summary = extract_test_summary(output)
-    if test_summary:
-        output = test_summary + "\n\n" + output
 
     if max_chars <= 0 or len(output) <= max_chars:
+        if test_summary:
+            return test_summary + "\n\n" + output
         return output
 
     lines = output.splitlines(keepends=True)
     total_lines = len(lines)
-    head_budget = int(max_chars * 0.20)
-    tail_budget = max_chars - head_budget
+
+    # Budget split: 15% head, 10% error context, 75% tail.
+    head_budget = int(max_chars * 0.15)
+    error_budget = int(max_chars * 0.10)
+    tail_budget = max_chars - head_budget - error_budget
 
     head_lines, tail_lines = _extract_truncation_lines(lines, head_budget, tail_budget)
+
+    # Extract error context from the truncated middle.
+    error_context = _extract_error_context(
+        lines, len(head_lines), len(tail_lines), error_budget
+    )
 
     skipped = total_lines - len(head_lines) - len(tail_lines)
     notice = (
         f"\n[FORGE: Output truncated — {skipped} lines hidden. "
-        f"Showing first {len(head_lines)} lines and last {len(tail_lines)} lines]"
+        f"Showing first {len(head_lines)} and last {len(tail_lines)} lines]"
     )
     notice += "\n"
 
     logger.warning(
-        "Truncated bash output from %d lines (%d chars) → head=%d tail=%d",
+        "Truncated bash output from %d lines (%d chars) → head=%d tail=%d error_ctx=%d",
         total_lines,
         len(output),
         len(head_lines),
         len(tail_lines),
+        len(error_context),
     )
-    return "".join(head_lines) + notice + "".join(tail_lines)
+
+    parts = ["".join(head_lines), notice]
+    if error_context:
+        parts.append("[ERROR_CONTEXT from truncated middle]\n")
+        parts.append("".join(error_context))
+        parts.append("\n")
+    parts.append("".join(tail_lines))
+
+    result = "".join(parts)
+
+    # Append test summary AFTER truncation — outside the char budget.
+    if test_summary:
+        result = test_summary + "\n\n" + result
+
+    return result
 
 
 def get_max_edit_observation_chars() -> int:
