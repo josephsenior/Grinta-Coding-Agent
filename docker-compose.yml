@@ -26,6 +26,8 @@ services:
       - REDIS_PORT=6379
       - REDIS_URL=redis://redis:6379/0
       - TMUX_TMPDIR=/app/.tmux
+      - FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS=60
+      - FORGE_LLM_FALLBACK_TIMEOUT_SECONDS=180
     depends_on:
       redis:
         condition: service_healthy

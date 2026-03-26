@@ -318,7 +318,13 @@ class OrchestratorExecutor:
                         fallback_params = dict(call_params)
                         fallback_params["stream"] = False
                         
-                        fallback_timeout = 45.0
+                        fallback_timeout = 120.0
+                        try:
+                            _fb_raw = os.getenv("FORGE_LLM_FALLBACK_TIMEOUT_SECONDS", "120")
+                            _fb_parsed = float(_fb_raw)
+                            fallback_timeout = _fb_parsed if _fb_parsed > 0 else 120.0
+                        except (TypeError, ValueError):
+                            fallback_timeout = 120.0
                         logger.warning("Attempting non-streaming fallback with %.1fs timeout", fallback_timeout)
                         
                         try:

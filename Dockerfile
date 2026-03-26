@@ -19,12 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-# Copy manifest and sync dependencies (using --system to populate site-packages)
-COPY pyproject.toml ./
-RUN /uv/bin/uv pip install --system --no-cache -e .
-
+# Copy full source (hatchling needs README.md + backend/playbooks for force-include)
+COPY pyproject.toml README.md settings.template.json start_server.py ./
 COPY backend/ ./backend/
-COPY settings.template.json start_server.py ./
+RUN /uv/bin/uv pip install --system --no-cache .
 
 # --- Runtime stage: minimal image ---
 FROM python:3.12-slim AS runtime
