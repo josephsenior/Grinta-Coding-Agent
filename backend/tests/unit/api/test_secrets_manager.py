@@ -54,7 +54,8 @@ class TestEncryptDecrypt:
         sm = SecretsManager(master_key="test-round-trip-key")
         plaintext = "super-secret-password"
         encrypted = sm.encrypt(plaintext)
-        assert encrypted.startswith("v2:")
+        # Current encrypt() emits v3 (HKDF + per-secret salt); v2 remains decryptable.
+        assert encrypted.startswith("v3:")
         assert encrypted != plaintext
         decrypted = sm.decrypt(encrypted)
         assert decrypted == plaintext

@@ -17,7 +17,7 @@ import pathlib
 import sys
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 from pydantic import SecretStr, ValidationError
@@ -162,8 +162,10 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
 
         # LLM — merge JSON over existing cfg (env/TOML). If llm_model appears in JSON,
         # it overrides LLM_MODEL from the environment even when both are set.
-        llm_keys = ("llm_model", "llm_api_key", "llm_base_url")
+        llm_keys = ("llm_model", "llm_api_key", "llm_base_url", "llm_provider")
         if any(k in data for k in llm_keys):
+            from backend.llm.provider_resolver import canonicalize_model_selection
+
             base = cfg.llms.get("llm")
             llm_dict = base.model_dump(exclude_none=True) if base else {}
             if "llm_model" in data:
@@ -174,6 +176,7 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
                     llm_dict["model"] = None
             if "llm_api_key" in data and data["llm_api_key"]:
                 llm_dict["api_key"] = data["llm_api_key"]
+            provider = data.get("llm_provider") or llm_dict.get("provider")
             if "llm_base_url" in data and data["llm_base_url"]:
                 raw_url = str(data["llm_base_url"]).strip()
                 model_str = str(llm_dict.get("model") or "").lower()
@@ -186,7 +189,23 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
                 if not _is_google:
                     llm_dict["base_url"] = raw_url
 
-            cfg.set_llm_config(LLMConfig.model_validate(llm_dict))
+            model_value, provider_value = canonicalize_model_selection(
+                cast(str | None, llm_dict.get("model")),
+                str(provider) if provider is not None else None,
+            )
+            if model_value:
+                llm_dict["model"] = model_value
+            if llm_dict.get("model") and not provider_value:
+                msg = (
+                    "llm_provider is required when llm_model does not include a provider prefix"
+                )
+                if strict_config:
+                    raise ValueError(msg)
+                logger.forge_logger.warning(
+                    "Skipping LLM config from %s: %s", json_file, msg
+                )
+            else:
+                cfg.set_llm_config(LLMConfig.model_validate(llm_dict))
 
         # Top-level ForgeConfig fields (mcp_host, project_root, etc.)
         if "mcp_host" in data and data["mcp_host"]:

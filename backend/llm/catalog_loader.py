@@ -176,12 +176,10 @@ def is_openai_compatible(model: str) -> bool:
         # These providers are OpenAI-compatible
         return entry.provider in ["openai", "deepseek", "mistral", "xai"]
 
-    # Heuristic fallback
-    model_lower = model.lower()
-    return any(
-        x in model_lower
-        for x in ["gpt-", "o1-", "o3-", "o4-", "codex", "deepseek", "grok", "mistral"]
-    )
+    from backend.llm.provider_resolver import extract_provider_prefix
+
+    provider = extract_provider_prefix(model)
+    return provider in {"openai", "deepseek", "mistral", "xai"}
 
 
 def supports_tool_choice(model: str) -> bool:
@@ -228,9 +226,11 @@ def get_provider_info(model: str) -> dict[str, Any]:
             "max_output_tokens": entry.max_output_tokens,
         }
 
-    # Return defaults for unknown models
+    from backend.llm.provider_resolver import extract_provider_prefix
+
+    provider = extract_provider_prefix(model)
     return {
-        "provider": "openai",
+        "provider": provider or "unknown",
         "supports_function_calling": False,
         "supports_vision": False,
         "supports_prompt_cache": False,
@@ -245,12 +245,9 @@ def _resolve_provider_for_sanitization(model: str) -> str:
     if entry:
         return entry.provider
 
-    model_lower = model.lower()
-    if any(x in model_lower for x in ("gemini", "google/")):
-        return "google"
-    if "claude" in model_lower or "anthropic" in model_lower:
-        return "anthropic"
-    return "openai"
+    from backend.llm.provider_resolver import extract_provider_prefix
+
+    return extract_provider_prefix(model) or "unknown"
 
 
 def sanitize_call_kwargs_for_provider(model: str, call_kwargs: dict) -> dict:
@@ -324,9 +321,10 @@ def apply_model_param_overrides(
     """
     entry = lookup(model)
     if entry is None:
-        # Unknown model — pass reasoning_effort through if set
-        if reasoning_effort is not None:
-            call_kwargs["reasoning_effort"] = reasoning_effort
+        # Unknown model - keep the call surface conservative.
+        # Optional provider/model-specific knobs like reasoning_effort should
+        # only be sent when the catalog explicitly says the target supports them.
+        call_kwargs.pop("reasoning_effort", None)
         return call_kwargs
 
     # Strip reasoning_effort if the model doesn't support it natively

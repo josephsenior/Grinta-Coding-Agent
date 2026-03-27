@@ -65,6 +65,7 @@ class Settings(BaseModel):
     kb_search_strategy: str = DEFAULT_KB_SEARCH_STRATEGY
 
     llm_model: str | None = None
+    llm_provider: str | None = None
     llm_api_key: SecretStr | None = None
     llm_base_url: str | None = None
     secrets_store: UserSecrets = Field(
@@ -82,6 +83,15 @@ class Settings(BaseModel):
         s = value.strip()
         return s if s else None
 
+    @field_validator("llm_provider")
+    @classmethod
+    def normalize_llm_provider_field(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        from backend.llm.provider_resolver import normalize_provider_name
+
+        return normalize_provider_name(value)
+
     @property
     def knowledge_base(self) -> KnowledgeBaseSettings:
         return KnowledgeBaseSettings(
@@ -92,6 +102,17 @@ class Settings(BaseModel):
             auto_search=self.kb_auto_search,
             search_strategy=self.kb_search_strategy,
         )
+
+    @model_validator(mode="after")
+    def canonicalize_llm_selection(self) -> Settings:
+        from backend.llm.provider_resolver import canonicalize_model_selection
+
+        model, provider = canonicalize_model_selection(
+            self.llm_model, self.llm_provider
+        )
+        object.__setattr__(self, "llm_model", model)
+        object.__setattr__(self, "llm_provider", provider)
+        return self
 
     @field_serializer("llm_api_key")
     def api_key_serializer(self, api_key: SecretStr | None, info: SerializationInfo):

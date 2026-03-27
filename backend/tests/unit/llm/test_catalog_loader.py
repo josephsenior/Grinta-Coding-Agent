@@ -6,6 +6,7 @@ from unittest.mock import patch
 from backend.llm.catalog_loader import (
     ModelEntry,
     _load_raw,
+    apply_model_param_overrides,
     get_catalog,
     _name_index,
     lookup,
@@ -395,6 +396,21 @@ class TestSanitizeCallKwargsForProvider:
         out = sanitize_call_kwargs_for_provider("gpt-4o", kwargs)
 
         assert out == kwargs
+
+
+class TestApplyModelParamOverrides:
+    def test_unknown_model_does_not_add_reasoning_effort(self):
+        kwargs = {"temperature": 0.2}
+
+        out = apply_model_param_overrides(
+            "groq/meta-llama/llama-4-scout-17b-16e-instruct",
+            kwargs,
+            reasoning_effort="high",
+            is_stream=True,
+        )
+
+        assert out["temperature"] == 0.2
+        assert "reasoning_effort" not in out
 
 
 class TestPrefersShortToolDescriptions:

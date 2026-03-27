@@ -5,6 +5,7 @@ Targets the 17.4% (38 missed lines) coverage gap.
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -14,11 +15,35 @@ from backend.runtime.security_enforcement import SecurityEnforcementMixin
 class _FakeRuntime(SecurityEnforcementMixin):
     """Concrete host for the mixin."""
 
-    def __init__(self, analyzer=None, enforce=False, block_high=False):
+    def __init__(
+        self,
+        analyzer=None,
+        enforce=False,
+        block_high=False,
+        *,
+        execution_profile="standard",
+        allow_network=False,
+        allow_package_installs=False,
+        allow_background=False,
+        allow_sensitive_path=False,
+        workspace_root=None,
+        git_allowlist=None,
+        package_allowlist=None,
+        network_allowlist=None,
+    ):
         self.security_analyzer = analyzer
         self.config = MagicMock()
         self.config.security.enforce_security = enforce
         self.config.security.block_high_risk = block_high
+        self.config.security.execution_profile = execution_profile
+        self.config.security.allow_network_commands = allow_network
+        self.config.security.allow_package_installs = allow_package_installs
+        self.config.security.allow_background_processes = allow_background
+        self.config.security.allow_sensitive_path_access = allow_sensitive_path
+        self.config.security.hardened_local_git_allowlist = list(git_allowlist or ["status", "diff", "log", "show", "branch", "rev-parse", "ls-files"])
+        self.config.security.hardened_local_package_allowlist = list(package_allowlist or [])
+        self.config.security.hardened_local_network_allowlist = list(network_allowlist or [])
+        self.workspace_root = Path(workspace_root or Path.cwd())
 
 
 # ------------------------------------------------------------------
@@ -142,3 +167,148 @@ class TestEnforceSecurity:
             with patch("asyncio.run", return_value=ActionSecurityRisk.LOW):
                 result = rt._enforce_security(action)
         assert result is None
+
+    def test_precomputed_high_risk_skips_duplicate_analyzer_call(self):
+        from backend.core.enums import ActionSecurityRisk
+        from backend.events.action import CmdRunAction
+
+        analyzer = MagicMock()
+        analyzer.security_risk = AsyncMock(side_effect=AssertionError("should not run"))
+        rt = _FakeRuntime(analyzer=analyzer, enforce=True, block_high=True)
+        action = CmdRunAction(command="rm -rf tmp")
+        action.security_risk = ActionSecurityRisk.HIGH
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert result.__class__.__name__ == "ErrorObservation"
+        analyzer.security_risk.assert_not_called()
+
+    def test_hardened_local_blocks_background_processes(self):
+        from backend.events.action import CmdRunAction
+
+        rt = _FakeRuntime(
+            analyzer=None,
+            enforce=True,
+            execution_profile="hardened_local",
+        )
+        action = CmdRunAction(command="sleep 100", is_background=True)
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert result.__class__.__name__ == "ErrorObservation"
+        assert "background processes are disabled" in result.content
+
+    def test_hardened_local_blocks_network_commands(self):
+        from backend.events.action import CmdRunAction
+
+        rt = _FakeRuntime(
+            analyzer=None,
+            enforce=True,
+            execution_profile="hardened_local",
+        )
+        action = CmdRunAction(command="curl https://example.com")
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert result.__class__.__name__ == "ErrorObservation"
+        assert "workspace-scoped allowlist" in result.content
+
+    def test_hardened_local_blocks_package_installs(self):
+        from backend.events.action import CmdRunAction
+
+        rt = _FakeRuntime(
+            analyzer=None,
+            enforce=True,
+            execution_profile="hardened_local",
+        )
+        action = CmdRunAction(command="pip install requests")
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert result.__class__.__name__ == "ErrorObservation"
+        assert "workspace-scoped allowlist" in result.content
+
+    def test_hardened_local_blocks_sensitive_file_reads(self):
+        from backend.events.action import FileReadAction
+
+        rt = _FakeRuntime(
+            analyzer=None,
+            enforce=True,
+            execution_profile="hardened_local",
+        )
+        action = FileReadAction(path=".env")
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert result.__class__.__name__ == "ErrorObservation"
+        assert "sensitive file access is disabled" in result.content
+
+    def test_hardened_local_allows_git_subcommand_in_workspace_allowlist(self):
+        from backend.events.action import CmdRunAction
+
+        rt = _FakeRuntime(
+            analyzer=None,
+            enforce=True,
+            execution_profile="hardened_local",
+            workspace_root=Path.cwd(),
+        )
+        action = CmdRunAction(command="git diff", cwd=".")
+
+        result = rt._enforce_security(action)
+
+        assert result is None
+
+    def test_hardened_local_blocks_git_subcommand_outside_workspace(self):
+        from backend.events.action import CmdRunAction
+
+        rt = _FakeRuntime(
+            analyzer=None,
+            enforce=True,
+            execution_profile="hardened_local",
+            workspace_root=Path.cwd(),
+            git_allowlist=["status"],
+        )
+        action = CmdRunAction(command="git status", cwd=str(Path.cwd().parent))
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert "must stay inside the workspace" in result.content
+
+    def test_hardened_local_allows_package_command_from_allowlist(self):
+        from backend.events.action import CmdRunAction
+
+        rt = _FakeRuntime(
+            analyzer=None,
+            enforce=True,
+            execution_profile="hardened_local",
+            workspace_root=Path.cwd(),
+            package_allowlist=["npm_install"],
+        )
+        action = CmdRunAction(command="npm install", cwd=".")
+
+        result = rt._enforce_security(action)
+
+        assert result is None
+
+    def test_hardened_local_blocks_network_command_not_in_allowlist(self):
+        from backend.events.action import CmdRunAction
+
+        rt = _FakeRuntime(
+            analyzer=None,
+            enforce=True,
+            execution_profile="hardened_local",
+            workspace_root=Path.cwd(),
+            network_allowlist=["wget"],
+        )
+        action = CmdRunAction(command="curl https://example.com", cwd=".")
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert "is not in the workspace-scoped allowlist" in result.content

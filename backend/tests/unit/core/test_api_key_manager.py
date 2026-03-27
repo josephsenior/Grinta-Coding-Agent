@@ -26,12 +26,12 @@ class TestExtractProvider:
         assert self.mgr._extract_provider("openai/gpt-4o") == "openai"
 
     def test_gpt_prefix(self):
-        assert self.mgr._extract_provider("gpt-4") == "openai"
+        assert self.mgr._extract_provider("openai/gpt-4") == "openai"
 
     def test_anthropic_prefix(self):
         assert self.mgr._extract_provider("anthropic/claude-3.5-sonnet") == "anthropic"
 
-    def test_claude_prefix(self):
+    def test_exact_catalog_entry(self):
         assert self.mgr._extract_provider("claude-sonnet-4-20250514") == "anthropic"
 
     def test_google_prefix(self):
@@ -44,22 +44,22 @@ class TestExtractProvider:
         assert self.mgr._extract_provider("xai/grok-2") == "xai"
 
     def test_grok_prefix(self):
-        assert self.mgr._extract_provider("grok-4-fast") == "xai"
+        assert self.mgr._extract_provider("xai/grok-4-fast") == "xai"
 
-    def test_keyword_match_gemini(self):
-        assert self.mgr._extract_provider("some-gemini-model") == "google"
+    def test_ambiguous_family_name_returns_unknown(self):
+        assert self.mgr._extract_provider("some-gemini-model") == "unknown"
 
-    def test_keyword_match_grok(self):
-        assert self.mgr._extract_provider("some-grok-model") == "xai"
+    def test_ambiguous_grok_family_name_returns_unknown(self):
+        assert self.mgr._extract_provider("some-grok-model") == "unknown"
 
-    def test_fallback_claude(self):
-        assert self.mgr._extract_provider("my-claude-variant") == "anthropic"
+    def test_ambiguous_claude_family_name_returns_unknown(self):
+        assert self.mgr._extract_provider("my-claude-variant") == "unknown"
 
-    def test_fallback_gpt(self):
-        assert self.mgr._extract_provider("my-gpt-variant") == "openai"
+    def test_ambiguous_gpt_family_name_returns_unknown(self):
+        assert self.mgr._extract_provider("my-gpt-variant") == "unknown"
 
     def test_truly_unknown(self):
-        assert self.mgr._extract_provider("mistral-large-2") == "mistral"
+        assert self.mgr._extract_provider("mistral-large-2") == "unknown"
 
 
 # ===================================================================
@@ -126,10 +126,10 @@ class TestCheckKeywordMatch:
         self.mgr = APIKeyManager()
 
     def test_gemini_keyword(self):
-        assert self.mgr._check_keyword_match("some-gemini-model") == "google"
+        assert self.mgr._check_keyword_match("some-gemini-model") is None
 
     def test_grok_keyword(self):
-        assert self.mgr._check_keyword_match("some-grok-model") == "xai"
+        assert self.mgr._check_keyword_match("some-grok-model") is None
 
     def test_no_keyword_match(self):
         assert self.mgr._check_keyword_match("mistral-large-2") is None
@@ -144,7 +144,7 @@ class TestGetApiKeyForModel:
     def test_returns_correct_provided_key(self):
         mgr = APIKeyManager()
         key = SecretStr("sk-correct123456789")
-        result = mgr.get_api_key_for_model("gpt-4", provided_key=key)
+        result = mgr.get_api_key_for_model("openai/gpt-4", provided_key=key)
         assert result is not None
         assert result.get_secret_value() == "sk-correct123456789"
 
@@ -152,7 +152,7 @@ class TestGetApiKeyForModel:
         mgr = APIKeyManager()
         # Key that doesn't match provider pattern but is "substantial" (>10 chars)
         key = SecretStr("AIzaSyBxxxxxxxxxxxxxxx")  # Google key for OpenAI model
-        result = mgr.get_api_key_for_model("gpt-4", provided_key=key)
+        result = mgr.get_api_key_for_model("openai/gpt-4", provided_key=key)
         assert result is not None  # Falls back
 
     def test_env_var_fallback(self):
@@ -160,7 +160,7 @@ class TestGetApiKeyForModel:
         with patch.object(
             mgr, "_get_provider_key_from_env", return_value="env-key-123"
         ):
-            result = mgr.get_api_key_for_model("gpt-4")
+            result = mgr.get_api_key_for_model("openai/gpt-4")
             assert result is not None
             assert result.get_secret_value() == "env-key-123"
 
@@ -168,15 +168,21 @@ class TestGetApiKeyForModel:
         mgr = APIKeyManager()
         mgr.provider_api_keys["openai"] = SecretStr("stored-key")
         with patch.object(mgr, "_get_provider_key_from_env", return_value=None):
-            result = mgr.get_api_key_for_model("gpt-4")
+            result = mgr.get_api_key_for_model("openai/gpt-4")
             assert result is not None
             assert result.get_secret_value() == "stored-key"
 
     def test_no_key_found(self):
         mgr = APIKeyManager()
         with patch.object(mgr, "_get_provider_key_from_env", return_value=None):
-            result = mgr.get_api_key_for_model("gpt-4")
+            result = mgr.get_api_key_for_model("openai/gpt-4")
             assert result is None
+
+    def test_ambiguous_model_returns_none_even_with_provided_key(self):
+        mgr = APIKeyManager()
+        key = SecretStr("gsk_test12345678901234567890")
+        result = mgr.get_api_key_for_model("some-gemini-model", provided_key=key)
+        assert result is None
 
     def test_wrong_provider_key_too_short(self):
         """Test warning when provided key is wrong provider and too short."""
@@ -184,7 +190,7 @@ class TestGetApiKeyForModel:
         # Key that doesn't match pattern and is too short (<= 10 chars)
         key = SecretStr("short-key")  # Only 9 chars
         with patch.object(mgr, "_get_provider_key_from_env", return_value=None):
-            result = mgr.get_api_key_for_model("gpt-4", provided_key=key)
+            result = mgr.get_api_key_for_model("openai/gpt-4", provided_key=key)
             # Should not return the key, fall back to None
             assert result is None
 
@@ -198,7 +204,7 @@ class TestSetApiKey:
     def test_set_api_key(self):
         mgr = APIKeyManager()
         key = SecretStr("sk-test")
-        mgr.set_api_key("gpt-4", key)
+        mgr.set_api_key("openai/gpt-4", key)
         assert "openai" in mgr.provider_api_keys
         assert mgr.provider_api_keys["openai"].get_secret_value() == "sk-test"
 
@@ -230,7 +236,7 @@ class TestSetEnvironmentVariables:
             pcm.get_environment_variable.return_value = "OPENAI_API_KEY"
             pcm.validate_api_key_format.return_value = None
             with patch.dict(os.environ, {}, clear=True):
-                mgr.set_environment_variables("gpt-4", key)
+                mgr.set_environment_variables("openai/gpt-4", key)
                 assert os.environ.get("OPENAI_API_KEY") == "sk-test-env-var"
                 assert os.environ.get("LLM_API_KEY") == "sk-test-env-var"
 
@@ -272,7 +278,7 @@ class TestSetEnvironmentVariables:
                 {"OPENAI_API_KEY": "env-fallback-key"},
                 clear=True,
             ):
-                mgr.set_environment_variables("gpt-4", None)
+                mgr.set_environment_variables("openai/gpt-4", None)
                 # Should have set env vars with fallback key
                 assert os.environ.get("OPENAI_API_KEY") == "env-fallback-key"
                 assert os.environ.get("LLM_API_KEY") == "env-fallback-key"
@@ -292,7 +298,7 @@ class TestSetEnvironmentVariables:
             with patch.dict(os.environ, {}, clear=True):
                 # Create a fresh instance with no stored keys
                 fresh_mgr = APIKeyManager()
-                fresh_mgr.set_environment_variables("gpt-4", None)
+                fresh_mgr.set_environment_variables("openai/gpt-4", None)
                 # Should not have set OPENAI_API_KEY
                 assert os.environ.get("OPENAI_API_KEY") is None
 
@@ -315,7 +321,7 @@ class TestSetEnvironmentVariables:
                 # Create completely fresh manager
                 test_mgr = APIKeyManager()
                 # Call should trigger critical error path where env_key is None
-                test_mgr.set_environment_variables("gpt-4", None)
+                test_mgr.set_environment_variables("openai/gpt-4", None)
                 # Verify no env vars were set (returned early after FAILED message)
                 assert not os.environ
 
@@ -337,7 +343,7 @@ class TestSetEnvironmentVariables:
                 # Create fresh manager
                 test_mgr = APIKeyManager()
                 # Call without API key
-                test_mgr.set_environment_variables("gpt-4", None)
+                test_mgr.set_environment_variables("openai/gpt-4", None)
                 # Should return early with debug message "API key not required"
                 # Verify no env vars were set
                 assert not os.environ
@@ -356,7 +362,7 @@ class TestValidateAndClean:
             "backend.core.config.api_key_manager.provider_config_manager"
         ) as pcm:
             pcm.validate_and_clean_params.return_value = {"temperature": 0.7}
-            result = mgr.validate_and_clean_completion_params("gpt-4", params)
+            result = mgr.validate_and_clean_completion_params("openai/gpt-4", params)
             assert result == {"temperature": 0.7}
             pcm.validate_and_clean_params.assert_called_once_with("openai", params)
 

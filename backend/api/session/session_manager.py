@@ -79,6 +79,11 @@ class SessionManager:
         with self._lock:
             return self._active_sessions.get(session_id)
 
+    def list_sessions(self) -> list[str]:
+        """Return active session IDs (debug / diagnostics)."""
+        with self._lock:
+            return list(self._active_sessions.keys())
+
     def get_session_count(self) -> int:
         """Get the number of active sessions.
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, cast
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,7 +15,9 @@ from backend.controller.state.state import (
     TrafficControlState,
 )
 from backend.core.schemas import AgentState
+from backend.events.action import MessageAction
 from backend.events.event import Event
+from backend.storage.locations import get_conversation_agent_state_filename
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +197,28 @@ class TestStatePickle:
 
 
 class TestStateViewHelpers:
+    def test_view_rebuilds_on_same_length_history_item_replacement(self):
+        s = State()
+        s.history = [MessageAction(content="first")]
+
+        view1 = s.view
+
+        s.history[0] = MessageAction(content="second")
+        view2 = s.view
+
+        assert view2 is not view1
+
+    def test_view_rebuilds_on_same_length_history_reassignment(self):
+        s = State()
+        s.history = [MessageAction(content="first")]
+
+        view1 = s.view
+
+        s.history = [MessageAction(content="second")]
+        view2 = s.view
+
+        assert view2 is not view1
+
     def test_get_last_agent_message_none(self):
         s = State()
         s.history = []
@@ -214,7 +239,8 @@ class TestStateViewHelpers:
         s = State(session_id="s1", user_id="u1")
         md = s.to_llm_metadata("gpt-4", "agent-1")
         assert md["session_id"] == "s1"
-        assert any("gpt-4" in t for t in md["tags"])
+        assert isinstance(md["tags"], str)
+        assert "gpt-4" in md["tags"]
 
     def test_get_local_step_no_parent(self):
         s = State()
@@ -227,3 +253,43 @@ class TestStateViewHelpers:
         s.iteration_flag.current_value = 15
         s.parent_iteration = 10
         assert s.get_local_step() == 5
+
+
+class TestStateRestoreProvenance:
+    def test_restore_from_primary_sets_provenance(self):
+        sid = "sess-primary"
+        file_store = MagicMock()
+        state = State(session_id=sid)
+        file_store.read.return_value = state._to_json_str()
+
+        restored = State.restore_from_session(sid, file_store)
+
+        assert restored.restore_provenance is not None
+        assert restored.restore_provenance.source == "primary"
+        assert restored.restore_provenance.path == get_conversation_agent_state_filename(
+            sid, None
+        )
+
+    def test_restore_from_checkpoint_sets_provenance(self):
+        sid = "sess-ckpt"
+        file_store = MagicMock()
+        ckpt_dir = State._checkpoint_dir(sid, None)
+        ckpt_name = "999.json"
+        ckpt_path = f"{ckpt_dir}{ckpt_name}"
+        state = State(session_id=sid)
+
+        def _read(path: str):
+            if path == get_conversation_agent_state_filename(sid, None):
+                raise FileNotFoundError
+            if path == ckpt_path:
+                return state._to_json_str()
+            raise FileNotFoundError
+
+        file_store.read.side_effect = _read
+        file_store.list.return_value = [ckpt_name]
+
+        restored = State.restore_from_session(sid, file_store)
+
+        assert restored.restore_provenance is not None
+        assert restored.restore_provenance.source == "checkpoint"
+        assert restored.restore_provenance.path == ckpt_path

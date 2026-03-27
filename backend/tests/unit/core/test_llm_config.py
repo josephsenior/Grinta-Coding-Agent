@@ -179,7 +179,7 @@ class TestAPIKeyHandling:
     def test_api_key_loaded_from_env(self, monkeypatch):
         """Test API key loading from environment."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test123456789012345678901234567890")
-        cfg = LLMConfig(model="gpt-4")
+        cfg = LLMConfig(model="openai/gpt-4")
         # Should have loaded API key from environment
         assert cfg.api_key is not None
 
@@ -188,7 +188,7 @@ class TestAPIKeyHandling:
         from pydantic import SecretStr
 
         monkeypatch.setenv("OPENAI_API_KEY", "sk-env-key")
-        cfg = LLMConfig(model="gpt-4", api_key=SecretStr("sk-explicit-key"))
+        cfg = LLMConfig(model="openai/gpt-4", api_key=SecretStr("sk-explicit-key"))
         # Should preserve explicit key
         assert cfg.api_key is not None
         assert cfg.api_key.get_secret_value() == "sk-explicit-key"
@@ -213,8 +213,8 @@ class TestAPIKeyHandling:
         api_key_manager.provider_api_keys.clear()
 
         # Should create config but log warning about missing key (lines 349-350)
-        cfg = LLMConfig(model="gpt-4")
-        assert cfg.model == "gpt-4"
+        cfg = LLMConfig(model="openai/gpt-4")
+        assert cfg.model == "openai/gpt-4"
         # API key will be None since no key was found anywhere
         assert cfg.api_key is None
 
@@ -222,13 +222,13 @@ class TestAPIKeyHandling:
         """Test API key as plain string (AttributeError path)."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         # Pass plain string as api_key to trigger AttributeError path
-        cfg = LLMConfig(model="gpt-4", api_key="plain-string-key")
+        cfg = LLMConfig(model="openai/gpt-4", api_key="plain-string-key")
         assert cfg.api_key is not None
 
     def test_api_key_from_environment_fallback(self, monkeypatch):
         """Test fallback to environment when api_key_manager doesn't return key."""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test12345678901234567890")
-        cfg = LLMConfig(model="claude-3-5-sonnet-20241022")
+        cfg = LLMConfig(model="anthropic/claude-3-5-sonnet-20241022")
         # Should pick up from environment
         assert cfg.api_key is not None
 
@@ -236,9 +236,9 @@ class TestAPIKeyHandling:
         """Test model_post_init completes successfully."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
         # Create without suppress_llm_env_export to ensure full model_post_init runs
-        cfg = LLMConfig(model="gpt-4")
+        cfg = LLMConfig(model="openai/gpt-4")
         # If model_post_init completed, config should be fully initialized
-        assert cfg.model == "gpt-4"
+        assert cfg.model == "openai/gpt-4"
         assert hasattr(cfg, "_has_explicit_api_key")
 
 

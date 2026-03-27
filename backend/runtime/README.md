@@ -71,6 +71,8 @@ The Local Runtime is the primary and only supported runtime in this architecture
 
 **Important: This runtime provides no isolation as it runs directly on the host machine. All actions are executed with the same permissions as the user running Forge.**
 
+Forge also supports a `hardened_local` execution profile. This adds stricter local policy enforcement for workspace-scoped commands, file access, sensitive paths, network-capable commands, package installs, background processes, and interactive terminal behavior. It improves local safety, but it is still not sandboxing or host isolation.
+
 ## Related Components
 
 - The runtime interacts closely with the event system defined in the `forge.events` module.

@@ -11,7 +11,7 @@ from backend.runtime.utils.process_registry import TaskCancellationService
 from backend.runtime.utils.unified_shell import UnifiedShellSession, create_shell_session
 
 if TYPE_CHECKING:
-    from backend.runtime.tools import ToolRegistry  # type: ignore[import-untyped]
+    from backend.runtime.utils.tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class SessionManager:
         """Ensure tool registry exists."""
         if self.tool_registry is None:
             try:
-                from backend.runtime.tools import ToolRegistry
+                from backend.runtime.utils.tool_registry import ToolRegistry
 
                 self.tool_registry = ToolRegistry()
             except ImportError:

@@ -35,7 +35,7 @@ def _execute_command(args, parser) -> None:
         launch_gui_server()
     elif args.command == "health":
         # Import dynamically to avoid loading heavy modules if not requested
-        from backend.cli.cli.health_check import run_health_check  # type: ignore[import-untyped]
+        from backend.cli.cli.health_check import run_health_check
 
         run_health_check(args)
     elif args.command == "init":

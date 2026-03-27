@@ -120,6 +120,26 @@ def _provider_token_key_for(model: str | None) -> tuple[str | None, str | None]:
     return _PROVIDER_TOKEN_MAPPING.get(provider), provider
 
 
+def _resolve_settings_provider(settings: Settings) -> str | None:
+    if getattr(settings, "llm_provider", None):
+        return str(settings.llm_provider)
+    if settings.llm_model:
+        from backend.llm.provider_resolver import extract_provider_prefix
+
+        return extract_provider_prefix(settings.llm_model)
+    return None
+
+
+def _validate_llm_provider_selection(settings: Settings) -> None:
+    if not settings.llm_model:
+        return
+    if _resolve_settings_provider(settings):
+        return
+    raise ValueError(
+        "llm_provider is required unless llm_model already includes a provider prefix"
+    )
+
+
 def _current_provider_tokens(settings: Settings) -> dict[str, ProviderToken]:
     if not (settings.secrets_store and settings.secrets_store.provider_tokens):
         return {}
@@ -283,6 +303,8 @@ def _process_llm_model_configuration(settings: Settings) -> None:
     if not settings.llm_model or not settings.llm_model.strip():
         return
 
+    _validate_llm_provider_selection(settings)
+
     logger.info("🔧 PROCESSING LLM SETTINGS")
 
     if settings.llm_api_key:
@@ -304,7 +326,7 @@ def _process_llm_model_configuration(settings: Settings) -> None:
             settings.llm_model, settings.llm_api_key, "⚠️ Fallback"
         )
 
-    provider = api_key_manager._extract_provider(settings.llm_model)
+    provider = _resolve_settings_provider(settings)
     _sanitize_llm_base_url(settings, provider)
 
 
@@ -526,11 +548,15 @@ def _build_settings_response(
         getattr(settings, "autonomy_level", "NOT_FOUND"),
     )
     api_key_raw = _secret_value(settings.llm_api_key)
+    startup_snapshot = get_app_state().get_startup_snapshot() or None
+    recovery_snapshot = _build_recovery_snapshot()
     settings_with_token_data = GETSettingsModel(
         **model_dump_with_options(settings, exclude={"secrets_store"}),
         llm_api_key_set=bool(api_key_raw and str(api_key_raw).strip()),
         provider_tokens_set=provider_tokens_set or None,
         llm_model_supports_vision=_llm_model_supports_vision(settings.llm_model),
+        startup_snapshot=startup_snapshot,
+        recovery_snapshot=recovery_snapshot,
     )
 
     # Mask sensitive data without mutating original instance
@@ -831,6 +857,8 @@ def _build_default_settings_response() -> GETSettingsModel:
         llm_api_key_set=False,
         provider_tokens_set=None,
         llm_model_supports_vision=_llm_model_supports_vision(default_settings.llm_model),
+        startup_snapshot=get_app_state().get_startup_snapshot() or None,
+        recovery_snapshot=_build_recovery_snapshot(),
     )
 
     return settings_with_token_data.model_copy(
@@ -838,4 +866,26 @@ def _build_default_settings_response() -> GETSettingsModel:
             "llm_api_key": None,
         },
     )
+
+
+def _build_recovery_snapshot(limit: int = 5) -> dict[str, Any] | None:
+    """Build a compact recovery snapshot for settings/status surfaces."""
+    try:
+        from backend.events.stream_stats import get_aggregated_event_stream_stats
+
+        state_restores = get_app_state().get_state_restore_snapshot(limit=limit)
+        event_streams = get_aggregated_event_stream_stats()
+        health_status = "ok"
+        if event_streams.get("persist_failures", 0) > 0 or event_streams.get(
+            "durable_writer_errors", 0
+        ) > 0:
+            health_status = "degraded"
+        return {
+            "status": health_status,
+            "state_restores": state_restores,
+            "event_streams": event_streams,
+        }
+    except Exception as exc:  # pragma: no cover - defensive status surface
+        logger.debug("Recovery snapshot unavailable: %s", exc)
+        return {"status": "error", "detail": str(exc)}
 

@@ -10,11 +10,6 @@ import json
 from pydantic import BaseModel, Field
 
 from backend.core.app_paths import get_app_settings_root
-from backend.core.providers import (
-    VERIFIED_ANTHROPIC_MODELS,
-    VERIFIED_MISTRAL_MODELS,
-    VERIFIED_OPENAI_MODELS,
-)
 
 if TYPE_CHECKING:
     pass
@@ -132,12 +127,6 @@ def extract_model_and_provider(model: str) -> ModelInfo:
         if split_is_actually_version(split):
             split = [separator.join(split)]
     if len(split) == 1:
-        if split[0] in VERIFIED_OPENAI_MODELS:
-            return ModelInfo(provider="openai", model=split[0], separator="/")
-        if split[0] in VERIFIED_ANTHROPIC_MODELS:
-            return ModelInfo(provider="anthropic", model=split[0], separator="/")
-        if split[0] in VERIFIED_MISTRAL_MODELS:
-            return ModelInfo(provider="mistral", model=split[0], separator="/")
         return ModelInfo(provider="", model=model, separator="")
     provider = split[0]
     model_id = separator.join(split[1:])

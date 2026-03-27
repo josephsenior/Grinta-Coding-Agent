@@ -43,63 +43,50 @@ class TestProviderResolver(TestCase):
             mock_lookup.assert_called_once_with("gpt-4o")
             self.assertEqual(result, "openai")
 
-    def test_resolve_provider_claude(self):
-        """Test resolve_provider identifies Claude models."""
+    def test_resolve_provider_requires_explicit_or_catalog_entry(self):
+        """Bare family names no longer trigger heuristic provider guessing."""
         with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            self.assertEqual(
-                self.resolver.resolve_provider("claude-3-7-sonnet"), "anthropic"
-            )
-            self.assertEqual(
-                self.resolver.resolve_provider("claude-opus-4"), "anthropic"
-            )
-            self.assertEqual(
-                self.resolver.resolve_provider("anthropic-model"), "anthropic"
-            )
+            with self.assertRaises(ValueError):
+                self.resolver.resolve_provider("claude-3-7-sonnet")
+            with self.assertRaises(ValueError):
+                self.resolver.resolve_provider("anthropic-model")
 
-    def test_resolve_provider_gemini(self):
-        """Test resolve_provider identifies Gemini models."""
+    def test_resolve_provider_prefixed_google_model(self):
+        """Explicit provider prefixes remain valid."""
+        self.assertEqual(
+            self.resolver.resolve_provider("google/gemini-2.0-flash"), "google"
+        )
+
+    def test_resolve_provider_catalog_entry_xai(self):
+        """Exact catalog entries remain valid without heuristics."""
+        self.assertEqual(self.resolver.resolve_provider("grok-3"), "xai")
+
+    def test_resolve_provider_prefixed_ollama_model(self):
+        """Prefixed local models resolve by prefix."""
+        self.assertEqual(self.resolver.resolve_provider("ollama/llama3.2"), "ollama")
+
+    def test_resolve_provider_catalog_entry_deepseek(self):
+        """Exact DeepSeek catalog entries remain valid."""
+        self.assertEqual(self.resolver.resolve_provider("deepseek-chat"), "deepseek")
+
+    def test_resolve_provider_catalog_entry_mistral(self):
+        """Exact Mistral catalog entries remain valid."""
+        self.assertEqual(
+            self.resolver.resolve_provider("codestral-latest"), "mistral"
+        )
+
+    def test_resolve_provider_unknown_model_raises(self):
+        """Unknown models must be prefixed explicitly."""
+        with patch("backend.llm.provider_resolver.lookup", return_value=None):
+            with self.assertRaises(ValueError):
+                self.resolver.resolve_provider("unknown-model")
+
+    def test_resolve_provider_prefixed_model_takes_priority(self):
         with patch("backend.llm.provider_resolver.lookup", return_value=None):
             self.assertEqual(
-                self.resolver.resolve_provider("gemini-2.0-flash"), "google"
+                self.resolver.resolve_provider("groq/meta-llama/llama-4-scout"),
+                "groq",
             )
-            self.assertEqual(self.resolver.resolve_provider("google-model"), "google")
-
-    def test_resolve_provider_xai(self):
-        """Test resolve_provider identifies xAI models."""
-        with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            self.assertEqual(self.resolver.resolve_provider("grok-3"), "xai")
-            self.assertEqual(self.resolver.resolve_provider("xai-model"), "xai")
-
-    def test_resolve_provider_ollama(self):
-        """Test resolve_provider identifies Ollama models."""
-        with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            self.assertEqual(
-                self.resolver.resolve_provider("ollama/llama3.2"), "ollama"
-            )
-            self.assertEqual(self.resolver.resolve_provider("ollama-model"), "ollama")
-
-    def test_resolve_provider_deepseek(self):
-        """Test resolve_provider identifies DeepSeek models."""
-        with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            self.assertEqual(
-                self.resolver.resolve_provider("deepseek-chat"), "deepseek"
-            )
-            self.assertEqual(
-                self.resolver.resolve_provider("deepseek-coder"), "deepseek"
-            )
-
-    def test_resolve_provider_mistral(self):
-        """Test resolve_provider identifies Mistral models."""
-        with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            self.assertEqual(self.resolver.resolve_provider("mistral-large"), "mistral")
-            self.assertEqual(
-                self.resolver.resolve_provider("codestral-latest"), "mistral"
-            )
-
-    def test_resolve_provider_default_openai(self):
-        """Test resolve_provider defaults to openai for unknown models."""
-        with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            self.assertEqual(self.resolver.resolve_provider("unknown-model"), "openai")
 
     def test_is_local_model_true(self):
         """Test is_local_model identifies local models."""
@@ -122,24 +109,23 @@ class TestProviderResolver(TestCase):
         )
         self.assertEqual(result, "https://custom.api")
 
-    def test_resolve_base_url_xai(self):
-        """Test resolve_base_url returns xAI endpoint."""
-        with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            result = self.resolver.resolve_base_url("grok-3")
-            self.assertEqual(result, "https://api.x.ai/v1")
+    def test_resolve_base_url_xai_catalog_entry(self):
+        """Catalog-backed models still resolve provider defaults."""
+        result = self.resolver.resolve_base_url("grok-3")
+        self.assertEqual(result, "https://api.x.ai/v1")
 
-    def test_resolve_base_url_deepseek(self):
-        """Test resolve_base_url returns DeepSeek endpoint."""
-        with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            result = self.resolver.resolve_base_url("deepseek-chat")
-            self.assertEqual(result, "https://api.deepseek.com/v1")
+    def test_resolve_base_url_deepseek_catalog_entry(self):
+        """Catalog-backed models still resolve provider defaults."""
+        result = self.resolver.resolve_base_url("deepseek-chat")
+        self.assertEqual(result, "https://api.deepseek.com/v1")
 
     def test_resolve_base_url_cloud_providers(self):
         """Test resolve_base_url returns None for cloud providers."""
-        with patch("backend.llm.provider_resolver.lookup", return_value=None):
-            self.assertIsNone(self.resolver.resolve_base_url("gpt-4o"))
-            self.assertIsNone(self.resolver.resolve_base_url("claude-3-7-sonnet"))
-            self.assertIsNone(self.resolver.resolve_base_url("gemini-2.0-flash"))
+        self.assertIsNone(self.resolver.resolve_base_url("gpt-4o"))
+        self.assertIsNone(
+            self.resolver.resolve_base_url("anthropic/claude-sonnet-4-20250514")
+        )
+        self.assertIsNone(self.resolver.resolve_base_url("google/gemini-2.0-flash"))
 
     def test_resolve_base_url_ollama_from_env(self):
         """Test resolve_base_url uses OLLAMA_HOST environment variable."""

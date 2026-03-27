@@ -229,6 +229,22 @@ class TestLoadFromJson:
         load_from_json(cfg, str(json_file))
         assert cfg.mcp_host == "custom-host:9999"
 
+    def test_load_from_json_requires_provider_for_unprefixed_model(self, tmp_path):
+        json_file = tmp_path / "settings.json"
+        json_file.write_text('{"llm_model": "gpt-4o"}')
+        cfg = ForgeConfig()
+        with patch("backend.core.config.config_loader.logger.forge_logger.warning") as mock_warn:
+            load_from_json(cfg, str(json_file))
+        mock_warn.assert_called()
+        assert cfg.get_llm_config().model is None
+
+    def test_load_from_json_applies_explicit_provider(self, tmp_path):
+        json_file = tmp_path / "settings.json"
+        json_file.write_text('{"llm_model": "meta-llama/llama-4-scout", "llm_provider": "groq"}')
+        cfg = ForgeConfig()
+        load_from_json(cfg, str(json_file))
+        assert cfg.get_llm_config().model == "groq/meta-llama/llama-4-scout"
+
     def test_load_from_json_file_not_found(self):
         cfg = ForgeConfig()
         # Should return silently

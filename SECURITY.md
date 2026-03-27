@@ -37,9 +37,16 @@ If you discover a security vulnerability in Forge, please report it responsibly.
 
 ### Runtime Safety
 - Command analysis before execution (`SecurityAnalyzer`)
+- Optional `hardened_local` execution profile for stricter local policy enforcement
 - Budget guards to prevent runaway LLM costs
 - Circuit breakers for error rate protection
 - Request size limits and timeouts
+
+### Runtime Boundary
+- Forge does not currently provide sandbox or container isolation for local command execution.
+- The local runtime executes with the permissions of the user running Forge.
+- `hardened_local` improves local safety with workspace-scoped policy enforcement, but it is not equivalent to a sandbox.
+- Treat the current runtime as appropriate for trusted local development workflows, not hostile repositories.
 
 ### Data Storage
 - File-based storage (default): data stays on your machine

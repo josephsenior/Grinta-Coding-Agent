@@ -1,8 +1,8 @@
 """Provider resolution and local endpoint discovery.
 
-This module implements the "Provider Auto-Resolver" pattern, automatically
-detecting local LLM endpoints (Ollama, LM Studio, vLLM) and routing models
-to the correct provider without manual configuration.
+Provider resolution is intentionally strict for configured models: Forge trusts
+an explicit provider prefix (``provider/model``) or an exact catalog entry, and
+does not infer providers from model-name patterns.
 """
 
 from __future__ import annotations
@@ -15,19 +15,6 @@ import httpx
 from backend.core.logger import forge_logger as logger
 from backend.llm.catalog_loader import lookup
 
-# (keywords, provider) for heuristic fallback when model not in catalog
-_PROVIDER_KEYWORDS: list[tuple[list[str], str]] = [
-    (["openrouter"], "openrouter"),
-    (["nvidia", "kimi-k2.5", "moonshotai/kimi-k2-5"], "nvidia"),
-    (["groq", "kimi-k2"], "groq"),
-    (["claude", "anthropic"], "anthropic"),
-    (["gemini", "google"], "google"),
-    (["grok", "xai"], "xai"),
-    (["ollama"], "ollama"),
-    (["deepseek"], "deepseek"),
-    (["mistral", "codestral"], "mistral"),
-]
-
 _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     "groq": "https://api.groq.com/openai/v1",
     "xai": "https://api.x.ai/v1",
@@ -35,6 +22,86 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     "openrouter": "https://openrouter.ai/api/v1",
     "nvidia": "https://integrate.api.nvidia.com/v1",
 }
+
+KNOWN_PROVIDER_PREFIXES: set[str] = {
+    "anthropic",
+    "deepinfra",
+    "deepseek",
+    "fireworks",
+    "gemini",
+    "google",
+    "groq",
+    "lm_studio",
+    "lmstudio",
+    "mistral",
+    "nvidia",
+    "ollama",
+    "openai",
+    "openrouter",
+    "perplexity",
+    "replicate",
+    "together",
+    "vllm",
+    "xai",
+}
+
+_PROVIDER_ALIASES: dict[str, str] = {
+    "gemini": "google",
+    "lmstudio": "lm_studio",
+}
+
+
+def normalize_provider_name(provider: str | None) -> str | None:
+    """Normalize user-provided provider names to canonical ids."""
+    if provider is None:
+        return None
+    normalized = str(provider).strip().lower()
+    if not normalized:
+        return None
+    return _PROVIDER_ALIASES.get(normalized, normalized)
+
+
+def extract_provider_prefix(model_name: str | None) -> str | None:
+    """Extract a known provider prefix from a model string if present."""
+    if not model_name or "/" not in model_name:
+        return None
+    prefix = normalize_provider_name(model_name.split("/", 1)[0])
+    if prefix in KNOWN_PROVIDER_PREFIXES:
+        return prefix
+    return None
+
+
+def canonicalize_model_selection(
+    model_name: str | None, provider: str | None
+) -> tuple[str | None, str | None]:
+    """Canonicalize a settings-level provider/model pair.
+
+    Returns a tuple of (model, provider) where model is prefixed with the
+    explicit provider when possible, and provider is inferred from a known
+    prefix if the caller omitted it.
+    """
+    if model_name is None:
+        return None, normalize_provider_name(provider)
+
+    model = str(model_name).strip()
+    if not model:
+        return None, normalize_provider_name(provider)
+
+    normalized_provider = normalize_provider_name(provider)
+    prefixed_provider = extract_provider_prefix(model)
+
+    if normalized_provider:
+        if prefixed_provider:
+            prefix = model.split("/", 1)[0]
+            stripped = model[len(prefix) + 1 :]
+        else:
+            stripped = model
+        return f"{normalized_provider}/{stripped}", normalized_provider
+
+    if prefixed_provider:
+        return model, prefixed_provider
+
+    return model, None
 
 
 def _resolve_ollama_env_url() -> str | None:
@@ -71,21 +138,24 @@ class ProviderResolver:
 
         Returns:
             Provider name (e.g., "openai", "anthropic", "ollama")
+
+        Raises:
+            ValueError: When provider is not explicit and the model is not an
+                exact catalog entry.
         """
-        # OpenRouter prefix takes priority — the model is accessed via OpenRouter
-        # regardless of the underlying model's native provider.
-        if model_name.lower().startswith("openrouter/"):
-            return "openrouter"
+        prefixed_provider = extract_provider_prefix(model_name)
+        if prefixed_provider:
+            return prefixed_provider
 
         entry = lookup(model_name)
         if entry:
             return entry.provider
 
-        model_lower = model_name.lower()
-        for keywords, provider in _PROVIDER_KEYWORDS:
-            if any(kw in model_lower for kw in keywords):
-                return provider
-        return "openai"
+        raise ValueError(
+            "Provider is ambiguous for model "
+            f"'{model_name}'. Use an explicit provider prefix like 'openai/{model_name}' "
+            "or configure llm_provider alongside llm_model."
+        )
 
     def is_local_model(self, model_name: str) -> bool:
         """Check if a model is intended for local execution.
@@ -272,21 +342,8 @@ class ProviderResolver:
         if "/" in model_name:
             parts = model_name.split("/", 1)
             # Only strip if the prefix is actually a known provider
-            prefix = parts[0].lower()
-            if prefix in [
-                "ollama",
-                "openai",
-                "anthropic",
-                "google",
-                "gemini",
-                "xai",
-                "deepseek",
-                "mistral",
-                "nvidia",
-            ]:
-                return parts[1]
-            # OpenRouter models keep the sub-path (e.g., "anthropic/claude-3.5-sonnet")
-            if prefix == "openrouter":
+            prefix = normalize_provider_name(parts[0])
+            if prefix in KNOWN_PROVIDER_PREFIXES:
                 return parts[1]
         return model_name
 

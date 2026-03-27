@@ -18,7 +18,7 @@ The key classes in Forge are:
     - Action: represents a request to e.g. edit a file, run a command, or send a message
     - Observation: represents information collected from the environment, e.g. file contents or command output
 - Runtime: responsible for performing Actions, and sending back Observations
-  - Runtime Environment: the part of the runtime responsible for running commands in an isolated local workspace
+  - Runtime Environment: the part of the runtime responsible for running commands in a local workspace with optional policy hardening
 - Server: brokers Forge sessions over HTTP/WebSocket (web UI and API clients)
   - Session: holds a single EventStream, a single AgentController, and a single Runtime. Generally represents a single task (but potentially including several user prompts)
   - ConversationManager: keeps a list of active sessions, and ensures requests are routed to the correct Session
@@ -53,3 +53,5 @@ flowchart LR
 ## Runtime
 
 Please refer to the [documentation](https://docs.forge.dev/usage/architecture/runtime) to learn more about `Runtime`.
+
+Important: Forge currently provides local policy hardening, not sandbox isolation. The `hardened_local` profile tightens workspace, command, file, and interactive-terminal behavior, but actions still run with host-user permissions.

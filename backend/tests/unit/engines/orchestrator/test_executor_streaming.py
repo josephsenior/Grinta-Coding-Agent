@@ -138,7 +138,7 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
         mcp_tools_provider=lambda: {},
     )
 
-    result = asyncio.run(executor.async_execute({"messages": []}, event_stream))
+    asyncio.run(executor.async_execute({"messages": []}, event_stream))
 
     # Should have emitted streaming chunks (4 content chunks + 1 final marker)
     assert event_stream.add_event.call_count == 5
@@ -220,3 +220,68 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
     assert tc["id"] == "call_abc"
     assert tc["function"]["name"] == "read_file"
     assert tc["function"]["arguments"] == '{"path": "/tmp/test.py"}'
+
+
+def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_progress(
+    monkeypatch, tmp_path
+):
+    from backend.core.enums import AgentState
+    from backend.engines.orchestrator.executor import OrchestratorExecutor
+    from backend.engines.orchestrator.streaming_checkpoint import StreamingCheckpoint
+    from backend.events.observation import AgentStateChangedObservation
+
+    monkeypatch.setenv("FORGE_DATA_DIR", str(tmp_path))
+
+    event_stream = MagicMock()
+    event_stream.sid = "sid-1"
+    control_event = AgentStateChangedObservation("", agent_state=AgentState.FINISHED)
+    control_event.id = 9
+    event_stream.search_events.return_value = [
+        control_event
+    ]
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    checkpoint = StreamingCheckpoint(
+        str(tmp_path / "streaming_checkpoints" / "sid-1")
+    )
+    checkpoint.begin({"messages": []}, anchor_event_id=5)
+
+    resolved = executor._get_checkpoint(event_stream)
+
+    assert resolved.inspect_recovery().status == "clean"
+    assert executor._recovery_blocked_reasons == {}
+
+
+def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
+    monkeypatch, tmp_path
+):
+    from backend.engines.orchestrator.executor import OrchestratorExecutor
+    from backend.engines.orchestrator.streaming_checkpoint import StreamingCheckpoint
+
+    monkeypatch.setenv("FORGE_DATA_DIR", str(tmp_path))
+
+    event_stream = MagicMock()
+    event_stream.sid = "sid-2"
+    event_stream.search_events.return_value = []
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    checkpoint = StreamingCheckpoint(
+        str(tmp_path / "streaming_checkpoints" / "sid-2")
+    )
+    checkpoint.begin({"messages": []}, anchor_event_id=5)
+
+    executor._get_checkpoint(event_stream)
+
+    assert "sid-2" in executor._recovery_blocked_reasons

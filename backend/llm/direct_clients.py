@@ -6,6 +6,7 @@ offering a lightweight and stable alternative to multi-provider abstraction libr
 
 from __future__ import annotations
 
+import json
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
@@ -142,6 +143,109 @@ class LLMResponse:
                 self.finish_reason = finish_reason
 
         self.choices = [Choice(self.content, "assistant", self.finish_reason, self.tool_calls)]
+    
+    @staticmethod
+    def _normalize_finish_reason(reason: str | None) -> str:
+        if not reason:
+            return "stop"
+        reason = str(reason).strip().lower()
+        mapping = {
+            "end_turn": "stop",
+            "max_tokens": "length",
+            "tool_use": "tool_calls",
+        }
+        return mapping.get(reason, reason)
+
+    @staticmethod
+    def _normalize_tool_calls(tool_calls: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+        if not tool_calls:
+            return None
+        normalized = []
+        for i, tc in enumerate(tool_calls):
+            # Ensure function arguments are JSON strings
+            func = tc.get("function", {})
+            args = func.get("arguments", "{}")
+            if isinstance(args, dict):
+                args_str = json.dumps(args)
+            elif isinstance(args, str):
+                args_str = args
+            else:
+                args_str = str(args)
+
+            normalized.append(
+                {
+                    "id": tc.get("id", f"call_{i + 1}"),
+                    "type": tc.get("type", "function"),
+                    "function": {
+                        "name": func.get("name", ""),
+                        "arguments": args_str,
+                    },
+                }
+            )
+        return normalized
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "model": self.model,
+            "choices": [
+                {
+                    "message": {
+                        "content": self.content,
+                        "role": "assistant",
+                        "tool_calls": self.tool_calls,
+                    },
+                    "finish_reason": self.finish_reason,
+                }
+            ],
+            "usage": self.usage,
+        }
+
+    def __getitem__(self, key: str):
+        return self.to_dict()[key]
+
+
+def _stringify_openai_metadata_value(value: Any) -> str:
+    """Normalize metadata values for OpenAI-compatible APIs.
+
+    Several compatible providers reject metadata unless all values are strings.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, (list, tuple, set)):
+        return ",".join(
+            item
+            for item in (_stringify_openai_metadata_value(part) for part in value)
+            if item
+        )
+    if isinstance(value, dict):
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+    return str(value)
+
+
+def _sanitize_openai_compatible_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Normalize request kwargs for OpenAI-compatible APIs."""
+    sanitized = dict(kwargs)
+    extra_body = sanitized.get("extra_body")
+    if not isinstance(extra_body, dict):
+        return sanitized
+    metadata = extra_body.get("metadata")
+    if not isinstance(metadata, dict):
+        return sanitized
+
+    sanitized_extra_body = dict(extra_body)
+    sanitized_extra_body["metadata"] = {
+        str(key): _stringify_openai_metadata_value(value)
+        for key, value in metadata.items()
+    }
+    sanitized["extra_body"] = sanitized_extra_body
+    return sanitized
 
     @staticmethod
     def _normalize_finish_reason(reason: str | None) -> str:
@@ -360,6 +464,7 @@ class OpenAIClient(DirectLLMClient):
         from backend.llm.mappers.openai import strip_prompt_cache_hints_from_messages
 
         messages = strip_prompt_cache_hints_from_messages(messages)
+        kwargs = _sanitize_openai_compatible_kwargs(kwargs)
         kwargs["model"] = self.model_name
         try:
             response = self.client.chat.completions.create(
@@ -416,6 +521,7 @@ class OpenAIClient(DirectLLMClient):
         from backend.llm.mappers.openai import strip_prompt_cache_hints_from_messages
 
         messages = strip_prompt_cache_hints_from_messages(messages)
+        kwargs = _sanitize_openai_compatible_kwargs(kwargs)
         kwargs.pop("model", None)
         try:
             response = await self.async_client.chat.completions.create(
@@ -456,6 +562,7 @@ class OpenAIClient(DirectLLMClient):
         from backend.llm.mappers.openai import strip_prompt_cache_hints_from_messages
 
         messages = strip_prompt_cache_hints_from_messages(messages)
+        kwargs = _sanitize_openai_compatible_kwargs(kwargs)
         # OpenAI-compatible APIs require stream=True for token streaming.
         kwargs["stream"] = True
         kwargs.pop("model", None)
@@ -1038,12 +1145,12 @@ class GeminiClient(DirectLLMClient):
 def get_direct_client(
     model: str, api_key: str, base_url: str | None = None
 ) -> DirectLLMClient:
-    """Factory function to get the correct direct client using catalog-driven routing.
+    """Factory function to get the correct direct client using explicit routing.
 
     This function automatically resolves the provider and base URL based on:
-    1. The model catalog (catalog.toml)
-    2. Local endpoint discovery (Ollama, LM Studio, vLLM)
-    3. Provider heuristics for unknown models
+    1. Explicit provider prefix (``provider/model``)
+    2. Exact model catalog entries (catalog.toml)
+    3. Local endpoint discovery (Ollama, LM Studio, vLLM)
 
     Args:
         model: Model name (e.g., "gpt-4o", "claude-opus-4", "ollama/llama3")
@@ -1060,7 +1167,7 @@ def get_direct_client(
     # Strip provider prefix if present (e.g., "ollama/llama3" → "llama3")
     stripped_model = resolver.strip_provider_prefix(model)
 
-    # Resolve provider from catalog or heuristics
+    # Resolve provider from explicit prefix or exact catalog entry
     provider = resolver.resolve_provider(model)
 
     # Resolve base URL (handles local discovery and environment variables)

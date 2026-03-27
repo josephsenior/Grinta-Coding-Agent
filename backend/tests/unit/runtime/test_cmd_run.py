@@ -1,7 +1,10 @@
 import pytest
 from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
 from backend.events.action import CmdRunAction
-from backend.events.observation import CmdOutputObservation
+from backend.events.action import FileReadAction
+from backend.events.action.terminal import TerminalInputAction, TerminalReadAction
+from backend.events.observation import CmdOutputObservation, ErrorObservation, FileReadObservation
 from backend.runtime.action_execution_server import ActionExecutor
 from backend.utils.regex_limits import MAX_USER_REGEX_PATTERN_CHARS
 
@@ -17,7 +20,8 @@ def mock_executor():
             work_dir="/tmp/test",
             username="testuser",
             user_id=1000,
-            enable_browser=False
+            enable_browser=False,
+            security_config=SimpleNamespace(execution_profile="standard"),
         )
         # Session manager is mocked by patch, but we can refine it
         executor.session_manager = MagicMock()
@@ -205,3 +209,165 @@ async def test_repeated_identical_failures_add_pivot_hint(mock_executor):
 
     assert "REPEATED_COMMAND_FAILURE" not in first.content
     assert "REPEATED_COMMAND_FAILURE" in second.content
+
+
+@pytest.mark.asyncio
+async def test_hardened_local_blocks_command_when_default_session_cwd_outside_workspace(
+    mock_executor, tmp_path
+):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.security_config = SimpleNamespace(execution_profile="hardened_local")
+
+    mock_session = MagicMock(cwd=str(outside))
+    mock_executor.session_manager.get_session.return_value = mock_session
+
+    action = CmdRunAction(command="pwd")
+
+    obs = await mock_executor.run(action)
+
+    assert isinstance(obs, ErrorObservation)
+    assert "must stay inside the workspace" in obs.content
+    mock_session.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_read_blocks_when_session_cwd_drifts_outside_workspace(mock_executor, tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("secret", encoding="utf-8")
+
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.security_config = SimpleNamespace(execution_profile="hardened_local")
+
+    mock_session = MagicMock(cwd=str(outside))
+    mock_executor.session_manager.get_session.return_value = mock_session
+
+    obs = await mock_executor.read(FileReadAction(path="secret.txt"))
+
+    assert isinstance(obs, ErrorObservation)
+    assert "only access paths inside the workspace" in obs.content
+
+
+@pytest.mark.asyncio
+async def test_read_allows_relative_file_within_workspace(mock_executor, tmp_path):
+    workspace = tmp_path / "workspace"
+    nested = workspace / "nested"
+    nested.mkdir(parents=True)
+    (workspace / "allowed.txt").write_text("allowed", encoding="utf-8")
+
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.security_config = SimpleNamespace(execution_profile="hardened_local")
+
+    mock_session = MagicMock(cwd=str(nested))
+    mock_executor.session_manager.get_session.return_value = mock_session
+
+    obs = await mock_executor.read(FileReadAction(path="../allowed.txt"))
+
+    assert isinstance(obs, FileReadObservation)
+    assert obs.content == "allowed"
+
+
+@pytest.mark.asyncio
+async def test_terminal_input_blocks_session_that_escaped_workspace(mock_executor, tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.security_config = SimpleNamespace(execution_profile="hardened_local")
+
+    session = MagicMock(cwd=str(outside))
+    mock_executor.session_manager.get_session.return_value = session
+
+    obs = await mock_executor.terminal_input(
+        TerminalInputAction(session_id="term-1", input="ls")
+    )
+
+    assert isinstance(obs, ErrorObservation)
+    assert "closed by hardened_local policy" in obs.content
+    mock_executor.session_manager.close_session.assert_called_with("term-1")
+    session.write_input.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_terminal_input_blocks_cd_outside_workspace(mock_executor, tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    subdir = workspace / "subdir"
+    subdir.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.security_config = SimpleNamespace(execution_profile="hardened_local")
+
+    session = MagicMock(cwd=str(subdir))
+    mock_executor.session_manager.get_session.return_value = session
+
+    obs = await mock_executor.terminal_input(
+        TerminalInputAction(session_id="term-2", input=f"cd {outside}")
+    )
+
+    assert isinstance(obs, ErrorObservation)
+    assert "cannot change directory outside the workspace" in obs.content
+    session.write_input.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_terminal_input_allows_cd_within_workspace_and_tracks_cwd(mock_executor, tmp_path):
+    workspace = tmp_path / "workspace"
+    nested = workspace / "nested"
+    nested.mkdir(parents=True)
+    target = workspace / "allowed"
+    target.mkdir()
+
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.security_config = SimpleNamespace(
+        execution_profile="hardened_local",
+        allow_background_processes=False,
+        allow_package_installs=False,
+        allow_network_commands=False,
+        hardened_local_git_allowlist=["status", "diff", "log", "show", "branch", "rev-parse", "ls-files"],
+        hardened_local_package_allowlist=[],
+        hardened_local_network_allowlist=[],
+    )
+
+    session = MagicMock(cwd=str(nested))
+    session.read_output.return_value = "ok"
+    mock_executor.session_manager.get_session.return_value = session
+
+    with patch("backend.runtime.action_execution_server.asyncio.sleep", return_value=None):
+        obs = await mock_executor.terminal_input(
+            TerminalInputAction(session_id="term-3", input=f"cd {target}")
+        )
+
+    assert obs.__class__.__name__ == "TerminalObservation"
+    session.write_input.assert_called_once_with(f"cd {target}", is_control=False)
+    assert session._cwd == str(target.resolve())
+
+
+@pytest.mark.asyncio
+async def test_terminal_read_blocks_session_that_escaped_workspace(mock_executor, tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.security_config = SimpleNamespace(execution_profile="hardened_local")
+
+    session = MagicMock(cwd=str(outside))
+    mock_executor.session_manager.get_session.return_value = session
+
+    obs = await mock_executor.terminal_read(TerminalReadAction(session_id="term-4"))
+
+    assert isinstance(obs, ErrorObservation)
+    assert "closed by hardened_local policy" in obs.content
+    mock_executor.session_manager.close_session.assert_called_with("term-4")

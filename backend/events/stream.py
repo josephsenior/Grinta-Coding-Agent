@@ -266,6 +266,7 @@ class EventStream(EventStore):
         snapshot = self._bp.get_snapshot(self._started_at_monotonic)
         # Merge persistence stats
         snapshot.update(self._persist.stats)
+        snapshot.update(self._persist.get_health_snapshot())
         snapshot["persist_failures_window_count"] = int(
             len(self._persist._recent_persist_failures)
         )

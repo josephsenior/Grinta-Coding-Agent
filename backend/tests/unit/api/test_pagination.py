@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.api.utils.pagination import (
+    CursorPaginationParams,
     OffsetPaginationParams,
     PaginatedResponse,
     PaginationParams,
@@ -155,6 +156,23 @@ class TestPaginatedResponse:
         resp: Any = PaginatedResponse.create(items=[], page=1, limit=10)
         assert "total" not in resp.pagination
         assert "total_pages" not in resp.pagination
+
+
+# ---------------------------------------------------------------------------
+# CursorPaginationParams
+# ---------------------------------------------------------------------------
+
+
+class TestCursorPaginationParams:
+    def test_defaults(self) -> None:
+        p = CursorPaginationParams()
+        assert p.cursor is None
+        assert p.limit == 20
+
+    def test_cursor_and_limit(self) -> None:
+        p = CursorPaginationParams(cursor="abc", limit=50)
+        assert p.cursor == "abc"
+        assert p.limit == 50
 
 
 # ---------------------------------------------------------------------------

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 from backend.llm.direct_clients import (
     LLMResponse,
@@ -228,9 +230,9 @@ class TestGetDirectClientRouting:
         "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
     )
     def test_ollama_without_prefix(self, _h, _ah, _oai, _aoai):
-        """Model name containing 'ollama' but not as prefix still routes."""
-        client = get_direct_client("ollama-test-model", api_key="")
-        assert type(client).__name__ == "OpenAIClient"
+        """Ambiguous local-looking names no longer route without an explicit prefix."""
+        with pytest.raises(ValueError, match="Provider is ambiguous"):
+            get_direct_client("ollama-test-model", api_key="")
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
     @patch("backend.llm.direct_clients.OpenAI")
@@ -242,7 +244,20 @@ class TestGetDirectClientRouting:
         "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
     )
     def test_unknown_model_defaults_to_openai(self, _h, _ah, _oai, _aoai):
-        client = get_direct_client("my-custom-model", api_key="key")
+        with pytest.raises(ValueError, match="Provider is ambiguous"):
+            get_direct_client("my-custom-model", api_key="key")
+
+    @patch("backend.llm.direct_clients.AsyncOpenAI")
+    @patch("backend.llm.direct_clients.OpenAI")
+    @patch(
+        "backend.llm.direct_clients.get_shared_async_http_client",
+        return_value=MagicMock(),
+    )
+    @patch(
+        "backend.llm.direct_clients.get_shared_http_client", return_value=MagicMock()
+    )
+    def test_explicit_custom_openai_model_routes(self, _h, _ah, _oai, _aoai):
+        client = get_direct_client("openai/my-custom-model", api_key="key")
         assert type(client).__name__ == "OpenAIClient"
 
     @patch("backend.llm.direct_clients.AsyncOpenAI")
@@ -256,7 +271,7 @@ class TestGetDirectClientRouting:
     )
     def test_custom_base_url_passthrough(self, _h, _ah, _oai, _aoai):
         client = get_direct_client(
-            "my-model", api_key="key", base_url="http://localhost:8080/v1"
+            "openai/my-model", api_key="key", base_url="http://localhost:8080/v1"
         )
         assert type(client).__name__ == "OpenAIClient"
 

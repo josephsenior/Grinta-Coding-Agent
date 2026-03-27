@@ -50,7 +50,7 @@ backend/
 │   ├── context_tracking.py     # Decision/anchor/vector memory tracking
 │   └── condenser/strategies/   # 13 condenser strategies incl. auto-selector
 ├── playbooks/         # Built-in task playbooks (.md files)
-├── runtime/           # Sandboxed command execution
+├── runtime/           # Local command execution and runtime policy enforcement
 ├── security/          # Command analysis + safety config
 ├── api/               # FastAPI app, routes, middleware, sessions
 ├── storage/           # Persistence layer (SQLite, file-based)
@@ -66,7 +66,9 @@ User Input (Web UI / forge_client)
       → SessionManager.get_or_create_session()
         → AgentController.run_loop()
           → Engine.generate_action()     # LLM call → Action
-          → Runtime.execute(action)       # Sandboxed execution → Observation
+          → Runtime.execute(action)       # Local execution + policy enforcement → Observation
+
+Note: the current runtime is not sandboxed. `hardened_local` is a stricter policy profile for local execution, not isolation.
           → EventStream.add_event()       # Persist to WAL
           → StuckDetector.is_stuck()      # 6-strategy check
           → CircuitBreaker.check()        # Safety gate

@@ -18,7 +18,6 @@ from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logger import forge_logger as logger
 from backend.events.action import (
     Action,
-    ActionSecurityRisk,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -164,6 +163,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             enable_browser=self.config.enable_browser,
             tool_registry=self._tool_registry,  # Pass ToolRegistry for cross-platform support
             mcp_config=getattr(self.config, "mcp", None),
+            security_config=self.config.security,
         )
 
         # Initialize ActionExecutor (this sets up bash, plugins, etc.)
@@ -215,18 +215,6 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """Execute action directly via ActionExecutor."""
         if not self._runtime_initialized or self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
-
-        # Security Check
-        try:
-            risk = await self._security_analyzer.security_risk(action)
-            if risk == ActionSecurityRisk.HIGH:
-                from backend.events.observation import ErrorObservation
-
-                return ErrorObservation(
-                    content="Security Violation: Action blocked by security analyzer (High Risk)"
-                )
-        except Exception as e:
-            logger.warning("Security analysis failed: %s", e)
 
         return await self._executor.run_action(action)
 

@@ -939,7 +939,24 @@ class AgentSession:
             restored_state = State.restore_from_session(
                 self.sid, self.file_store, self.user_id
             )
-            self.logger.debug("Restored state from session, sid: %s", self.sid)
+            provenance = getattr(restored_state, "restore_provenance", None)
+            if provenance is not None:
+                from backend.api.app_state import get_app_state
+
+                get_app_state().record_state_restore(
+                    self.sid,
+                    source=provenance.source,
+                    path=provenance.path,
+                    primary_error=provenance.primary_error,
+                )
+                self.logger.info(
+                    "Restored state for sid %s from %s (%s)",
+                    self.sid,
+                    provenance.source,
+                    provenance.path,
+                )
+            else:
+                self.logger.debug("Restored state from session, sid: %s", self.sid)
         except Exception as e:
             if self.event_stream.get_latest_event_id() > 0:  # type: ignore[attr-defined]
                 self.logger.warning("State could not be restored: %s", e)

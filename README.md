@@ -24,6 +24,12 @@ Most AI coding tools stop at the file edit. Forge keeps going:
 - **Safety First:** Per-action risk assessment, rollback checkpoints (no git required), and multi-trip circuit breakers before any destructive action.
 - **Local-First:** Native Ollama and OpenAI-compatible support. Zero cloud required.
 
+## Security Boundary
+
+Forge currently runs actions on the local host. The `hardened_local` execution profile adds stricter local policy gates for commands, file access, workspace scoping, and interactive terminals, but it is not a sandbox and it is not process isolation.
+
+Use Forge as a trusted local agent for your own development workflows. Do not treat the current runtime as safe for hostile repositories or untrusted code.
+
 ---
 
 ## 🏗️ Architecture
@@ -108,7 +114,9 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 1. **Prerequisites:** Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 2. **Install:** `uv sync`
 3. **Setup Config:** `cp settings.template.json settings.json`
-4. **Start:** `uv run forge all`
+4. **Start:** `uv run python start_server.py`
+
+`uv run forge serve`, `uv run forge start`, and `uv run forge all` delegate to the same canonical local startup path.
 
 ---
 

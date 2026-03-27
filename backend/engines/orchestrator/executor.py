@@ -5,6 +5,8 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -16,6 +18,7 @@ from backend.core.errors import ModelProviderError
 from backend.core.logger import forge_logger as logger
 from backend.engines.orchestrator import function_calling as _function_calling_module  # noqa: F401
 from backend.engines.orchestrator.streaming_checkpoint import StreamingCheckpoint
+from backend.events.persistence import EventPersistence
 
 if TYPE_CHECKING:
     from backend.events.action import Action
@@ -95,12 +98,14 @@ class OrchestratorExecutor:
         self._safety = safety_manager
         self._planner = planner
         self._mcp_tools_provider = mcp_tools_provider
-        # Write-ahead checkpoint for crash recovery
-        ckpt_dir = os.path.join(
+        # Write-ahead checkpoint root for crash recovery. Session-specific
+        # checkpoint files are created lazily from the active event stream.
+        self._checkpoint_root = os.path.join(
             os.environ.get("FORGE_DATA_DIR", os.path.expanduser("~/.forge")),
             "streaming_checkpoints",
         )
-        self._checkpoint = StreamingCheckpoint(ckpt_dir)
+        self._checkpoint_cache: dict[str, StreamingCheckpoint] = {}
+        self._recovery_blocked_reasons: dict[str, str] = {}
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -110,6 +115,8 @@ class OrchestratorExecutor:
         params: dict,
         event_stream: EventStream | None,
     ) -> ExecutionResult:
+        checkpoint = self._get_checkpoint(event_stream)
+        self._raise_if_recovery_blocked(event_stream)
         start_time = time.time()
         error_message: str | None = None
         response: ModelResponse | None = None
@@ -122,7 +129,10 @@ class OrchestratorExecutor:
         # source of flakiness. To keep UX responsive without relying on
         # provider-specific streaming, we always fetch a complete response
         # and then emit StreamingChunkAction events derived from the final text.
-        ckpt_token = self._checkpoint.begin(params)
+        ckpt_token = checkpoint.begin(
+            params,
+            anchor_event_id=self._checkpoint_anchor_event_id(event_stream),
+        )
 
         call_params = dict(params)
 
@@ -153,7 +163,7 @@ class OrchestratorExecutor:
             logger.debug("Failed to emit streaming actions: %s", exc)
 
         # Commit checkpoint after a successful completion call.
-        self._checkpoint.commit(ckpt_token)
+        checkpoint.commit(ckpt_token)
 
         execution_time = time.time() - start_time
         actions = self._response_to_actions(response)
@@ -174,6 +184,8 @@ class OrchestratorExecutor:
     ) -> ExecutionResult:
         """Execute LLM call with async interface natively streaming tokens.
         """
+        checkpoint = self._get_checkpoint(event_stream)
+        self._raise_if_recovery_blocked(event_stream)
         import asyncio
         from backend.llm.direct_clients import LLMResponse
         from backend.events.action.message import StreamingChunkAction
@@ -186,7 +198,10 @@ class OrchestratorExecutor:
         call_params.pop("stream", None)
         call_params["stream"] = True
 
-        ckpt_token = self._checkpoint.begin(call_params)
+        ckpt_token = checkpoint.begin(
+            call_params,
+            anchor_event_id=self._checkpoint_anchor_event_id(event_stream),
+        )
 
         from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
 
@@ -467,7 +482,7 @@ class OrchestratorExecutor:
 
         logger.info("OrchestratorExecutor.async_execute done in %.3fs", time.time() - start_time)
 
-        self._checkpoint.commit(ckpt_token)
+        checkpoint.commit(ckpt_token)
 
         execution_time = time.time() - start_time
         actions = self._response_to_actions(response)
@@ -477,6 +492,105 @@ class OrchestratorExecutor:
                 if not str(action_content).strip():
                     raise ModelProviderError("LLM returned an empty message action")
         return ExecutionResult(actions, response, execution_time, error_message)
+
+    def _raise_if_recovery_blocked(self, event_stream: EventStream | None) -> None:
+        session_key = self._checkpoint_session_key(event_stream)
+        reason = self._recovery_blocked_reasons.pop(session_key, None)
+        if not reason:
+            return
+        raise ModelProviderError(
+            "Streaming checkpoint recovery requires manual confirmation before continuing.",
+            context={"recovery_reason": reason},
+        )
+
+    def _get_checkpoint(self, event_stream: EventStream | None) -> StreamingCheckpoint:
+        session_key = self._checkpoint_session_key(event_stream)
+        checkpoint = self._checkpoint_cache.get(session_key)
+        if checkpoint is not None:
+            return checkpoint
+
+        if event_stream is None:
+            checkpoint_dir = self._checkpoint_root
+        else:
+            checkpoint_dir = os.path.join(
+                self._checkpoint_root,
+                self._sanitize_checkpoint_key(session_key),
+            )
+
+        checkpoint = StreamingCheckpoint(checkpoint_dir)
+        inspection = checkpoint.inspect_recovery()
+        if inspection.status == "blocked_uncommitted":
+            if self._checkpoint_is_superseded_by_persisted_control_event(
+                event_stream,
+                inspection.record,
+            ):
+                checkpoint.discard()
+                logger.warning(
+                    "Discarded stale streaming checkpoint for %s because a newer persisted control event proves the session advanced",
+                    session_key,
+                )
+            else:
+                self._recovery_blocked_reasons[session_key] = inspection.reason
+                checkpoint.discard()
+                logger.error(
+                    "Discarded uncommitted streaming checkpoint for %s and blocked next LLM call: %s",
+                    session_key,
+                    inspection.reason,
+                )
+        self._checkpoint_cache[session_key] = checkpoint
+        return checkpoint
+
+    @staticmethod
+    def _checkpoint_anchor_event_id(event_stream: EventStream | None) -> int | None:
+        if event_stream is None:
+            return None
+        try:
+            latest = event_stream.get_latest_event_id()
+        except Exception:
+            return None
+        return latest if isinstance(latest, int) and latest >= 0 else None
+
+    def _checkpoint_is_superseded_by_persisted_control_event(
+        self,
+        event_stream: EventStream | None,
+        record: Any,
+    ) -> bool:
+        if event_stream is None or record is None:
+            return False
+        anchor_event_id = getattr(record, "anchor_event_id", None)
+        if not isinstance(anchor_event_id, int) or anchor_event_id < 0:
+            return False
+        latest_critical_id = self._latest_persisted_critical_event_id(event_stream)
+        return latest_critical_id is not None and latest_critical_id > anchor_event_id
+
+    @staticmethod
+    def _latest_persisted_critical_event_id(
+        event_stream: EventStream,
+    ) -> int | None:
+        try:
+            for event in event_stream.search_events(reverse=True):
+                if not EventPersistence.is_critical_event(event):
+                    continue
+                event_id = getattr(event, "id", None)
+                if isinstance(event_id, int) and event_id >= 0:
+                    return event_id
+        except Exception as exc:
+            logger.debug(
+                "Failed to inspect persisted critical events for %s: %s",
+                getattr(event_stream, "sid", "<unknown>"),
+                exc,
+            )
+        return None
+
+    @staticmethod
+    def _checkpoint_session_key(event_stream: EventStream | None) -> str:
+        sid = getattr(event_stream, "sid", None)
+        return sid if isinstance(sid, str) and sid else "__global__"
+
+    @staticmethod
+    def _sanitize_checkpoint_key(session_key: str) -> str:
+        safe = Path(session_key).name.replace("..", "_")
+        return safe.replace("/", "_").replace("\\", "_")
 
     # ------------------------------------------------------------------ #
     # Streaming helpers (provider-agnostic post-hoc streaming)

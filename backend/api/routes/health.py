@@ -114,6 +114,41 @@ def _check_tmux() -> dict:
     }
 
 
+def _check_recovery() -> dict:
+    """Expose recent restore provenance and aggregate event persistence health."""
+    try:
+        from backend.api.app_state import get_app_state
+        from backend.events.stream_stats import get_aggregated_event_stream_stats
+
+        app_state = get_app_state()
+        stream_stats = get_aggregated_event_stream_stats()
+        status = "ok"
+        if stream_stats.get("persist_failures", 0) > 0 or stream_stats.get(
+            "durable_writer_errors", 0
+        ) > 0:
+            status = "degraded"
+        return {
+            "status": status,
+            "state_restores": app_state.get_state_restore_snapshot(limit=10),
+            "event_streams": stream_stats,
+        }
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}
+
+
+def _check_startup() -> dict:
+    """Expose the latest canonical startup snapshot for operators."""
+    try:
+        from backend.api.app_state import get_app_state
+
+        snapshot = get_app_state().get_startup_snapshot()
+        if not snapshot:
+            return {"status": "unknown"}
+        return {"status": "ok", "server": snapshot}
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}
+
+
 _start_time = time.monotonic()
 
 
@@ -156,6 +191,8 @@ def add_health_endpoints(app: FastAPI) -> None:
         redis_check = _check_redis()
         database_check = _check_database()
         tmux_check = _check_tmux()
+        recovery_check = _check_recovery()
+        startup_check = _check_startup()
 
         checks = {
             "config": config_check,
@@ -163,6 +200,8 @@ def add_health_endpoints(app: FastAPI) -> None:
             "redis": redis_check,
             "database": database_check,
             "tmux": tmux_check,
+            "recovery": recovery_check,
+            "startup": startup_check,
         }
 
         all_ok = all(

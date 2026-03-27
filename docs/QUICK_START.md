@@ -30,16 +30,37 @@ uv sync
 ### 2) Start the server
 
 ```powershell
-uv run forge serve
-```
-
-Same as `uv run forge all` / `uv run forge start` (aliases). Or run the backend only:
-
-```powershell
 uv run python start_server.py
 ```
 
+This is the canonical local server path. `uv run forge serve` now delegates to the same entrypoint.
+
+Equivalent aliases:
+
+```powershell
+uv run forge serve
+uv run forge all
+uv run forge start
+```
+
 Then open **http://localhost:3000** in a browser.
+
+Startup now prints a preflight summary showing the resolved app root, settings path,
+host, port, reload mode, and readiness URL.
+
+## Security profile
+
+Forge's default local runtime is not sandboxed. If you want a stricter local policy mode, set `security.execution_profile` to `hardened_local` in your configuration.
+
+`hardened_local` blocks or constrains:
+- commands that execute outside the workspace
+- background processes by default
+- network-capable commands unless explicitly allowed
+- package installation commands unless explicitly allowed
+- sensitive file access unless explicitly allowed
+- interactive terminal sessions that drift outside the workspace
+
+This is policy hardening, not host isolation.
 
 ## URLs
 
@@ -64,3 +85,14 @@ Ensure **Ollama** or **LM Studio** is running. Forge auto-discovers them on star
 ### Port already in use
 
 Change the backend port via environment variable `FORGE_PORT`.
+
+The canonical local server will also auto-select the next free port in a small range
+and print the resolved port in the startup preflight.
+
+### Health and startup status
+
+Use the readiness endpoint for the current startup snapshot and recovery diagnostics:
+
+```text
+http://localhost:3000/api/health/ready
+```

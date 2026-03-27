@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LLMRateGovernor` — per-session token-rate throttling to prevent runaway loops
 - Token-level and cost-acceleration loop detection in `StuckDetector`
 - Real auto-recovery in `ErrorRecoveryStrategy` (network retry, context truncation, runtime restart)
+- Canonical local server startup planner shared by `start_server.py`, `forge serve`, and embedded mode
+- Operator-facing startup and recovery snapshots in health and settings surfaces
+- `hardened_local` workspace-scoped allowlists for git, package, and network-capable commands
 
 ### Changed
 
@@ -38,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Trimmed base dependencies: moved `asyncpg`, `libtmux` to optional groups
 - Consolidated editor tools — `str_replace_editor` is the primary, others deprecated
 - Improved CLI entry point with `forge init` command
+- Hardened local execution policy: interactive terminals, command cwd, uploads, and file access now stay workspace-scoped under `security.execution_profile = "hardened_local"`
+- Crash recovery now fails closed more often, tracks restore provenance, and uses persisted control-event evidence to distinguish stale WAL from ambiguous recovery
+- Startup and status flows now use one canonical local server path, with the resolved startup plan visible in the UI and API
+- Security documentation now explicitly describes Forge as local policy hardening without sandbox or process isolation
 
 ### Deprecated
 

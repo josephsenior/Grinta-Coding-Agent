@@ -28,9 +28,231 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getSettings, saveSettings } from "@/api/settings";
-import type { MCPServerConfig, SettingsResponse } from "@/types/settings";
+import type {
+  MCPServerConfig,
+  RecoverySnapshot,
+  SettingsResponse,
+  StartupSnapshot,
+} from "@/types/settings";
 import { cn } from "@/lib/utils";
 import Monitoring from "./Monitoring";
+
+function renderBoolBadge(value: boolean | undefined, trueLabel = "Yes", falseLabel = "No") {
+  if (value === undefined) {
+    return (
+      <Badge variant="secondary" className="h-5 text-[10px]">
+        Unknown
+      </Badge>
+    );
+  }
+  return value ? (
+    <Badge className="h-5 border-green-500/50 bg-green-500/10 text-green-600 text-[10px]" variant="outline">
+      {trueLabel}
+    </Badge>
+  ) : (
+    <Badge variant="secondary" className="h-5 text-[10px]">
+      {falseLabel}
+    </Badge>
+  );
+}
+
+function formatRecordedAt(timestamp: number | undefined): string | null {
+  if (!timestamp || !Number.isFinite(timestamp)) return null;
+  const millis = timestamp > 1_000_000_000_000 ? timestamp : timestamp * 1000;
+  return new Date(millis).toLocaleString();
+}
+
+function StartupDetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-md border px-3 py-2">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <div className={cn("text-right text-xs", mono && "font-mono")}>{value}</div>
+    </div>
+  );
+}
+
+function StartupSection({ settings }: { settings: SettingsResponse }) {
+  const snapshot = settings.startup_snapshot as StartupSnapshot | null | undefined;
+  const recovery = settings.recovery_snapshot as RecoverySnapshot | null | undefined;
+  const recordedAt = formatRecordedAt(snapshot?.recorded_at);
+  const latestRestore = recovery?.state_restores?.recent?.[0];
+  const latestRestoreAt = formatRecordedAt(
+    typeof latestRestore?.recorded_at === "number" ? latestRestore.recorded_at : undefined,
+  );
+
+  const recoveryBadge = (() => {
+    switch (recovery?.status) {
+      case "ok":
+        return (
+          <Badge className="h-5 border-green-500/50 bg-green-500/10 text-green-600 text-[10px]" variant="outline">
+            Recovery healthy
+          </Badge>
+        );
+      case "degraded":
+        return (
+          <Badge className="h-5 border-amber-500/50 bg-amber-500/10 text-amber-700 text-[10px]" variant="outline">
+            Recovery degraded
+          </Badge>
+        );
+      case "error":
+        return (
+          <Badge className="h-5 border-destructive/50 bg-destructive/10 text-destructive text-[10px]" variant="outline">
+            Recovery error
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="secondary" className="h-5 text-[10px]">
+            Recovery unknown
+          </Badge>
+        );
+    }
+  })();
+
+  return (
+    <section>
+      <div className="mb-4 flex items-center gap-2">
+        <Activity className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-base font-semibold">Startup Status</h2>
+      </div>
+
+      {!snapshot ? (
+        <div className="rounded-lg border border-dashed px-4 py-6 text-sm text-muted-foreground">
+          Startup snapshot is not available yet. Start the backend through the canonical server path and reload settings.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-lg border px-4 py-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">Local server snapshot</span>
+              {snapshot.runtime ? (
+                <Badge variant="outline" className="h-5 px-1.5 font-mono text-[10px]">
+                  {snapshot.runtime}
+                </Badge>
+              ) : null}
+              {renderBoolBadge(snapshot.reload_enabled, "Reload on", "Reload off")}
+              {snapshot.port_auto_switched ? (
+                <Badge variant="secondary" className="h-5 text-[10px]">
+                  Port auto-switched
+                </Badge>
+              ) : null}
+              {recoveryBadge}
+            </div>
+            {recordedAt ? (
+              <p className="mt-2 text-xs text-muted-foreground">Captured {recordedAt}</p>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Shows the resolved startup plan currently recorded by the backend.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border px-4 py-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">Recovery provenance</span>
+              {latestRestore?.source ? (
+                <Badge variant="outline" className="h-5 px-1.5 font-mono text-[10px]">
+                  {latestRestore.source}
+                </Badge>
+              ) : null}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {latestRestore
+                ? `Latest restore ${latestRestoreAt ? `captured ${latestRestoreAt}` : "recorded recently"}.`
+                : "No recent restore fallback has been recorded."}
+            </p>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <StartupDetailRow
+                label="Latest Restore Source"
+                value={latestRestore?.source ?? "None recorded"}
+                mono
+              />
+              <StartupDetailRow
+                label="Restore Count"
+                value={recovery?.state_restores?.count ?? 0}
+                mono
+              />
+              <StartupDetailRow
+                label="Restore Path"
+                value={latestRestore?.path ?? "Not applicable"}
+                mono
+              />
+              <StartupDetailRow
+                label="Primary Restore Error"
+                value={latestRestore?.primary_error ?? "None"}
+              />
+              <StartupDetailRow
+                label="Persist Failures"
+                value={recovery?.event_streams?.persist_failures ?? 0}
+                mono
+              />
+              <StartupDetailRow
+                label="Durable Writer Errors"
+                value={recovery?.event_streams?.durable_writer_errors ?? 0}
+                mono
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-2">
+            <StartupDetailRow
+              label="Host / Port"
+              value={
+                snapshot.resolved_port !== undefined
+                  ? `${snapshot.host ?? "127.0.0.1"}:${snapshot.resolved_port}`
+                  : (snapshot.host ?? "Unknown")
+              }
+              mono
+            />
+            <StartupDetailRow
+              label="Requested Port"
+              value={snapshot.requested_port ?? "Unknown"}
+              mono
+            />
+            <StartupDetailRow
+              label=".env.local"
+              value={renderBoolBadge(snapshot.dotenv_local_loaded, "Loaded", "Not loaded")}
+            />
+            <StartupDetailRow
+              label="agent.yaml in cwd"
+              value={renderBoolBadge(snapshot.agent_config_present, "Present", "Missing")}
+            />
+            <StartupDetailRow
+              label="Project Root"
+              value={snapshot.project_root ?? "Unknown"}
+              mono
+            />
+            <StartupDetailRow
+              label="Settings Path"
+              value={snapshot.settings_path ?? "Unknown"}
+              mono
+            />
+            <StartupDetailRow label="UI URL" value={snapshot.ui_url ?? "Unknown"} mono />
+            <StartupDetailRow label="Health URL" value={snapshot.health_url ?? "Unknown"} mono />
+          </div>
+
+          <details className="rounded-lg border px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium">More startup details</summary>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <StartupDetailRow label="API URL" value={snapshot.api_url ?? "Unknown"} mono />
+              <StartupDetailRow label="Docs URL" value={snapshot.docs_url ?? "Unknown"} mono />
+              <StartupDetailRow label="Current Working Dir" value={snapshot.cwd ?? "Unknown"} mono />
+              <StartupDetailRow label="App Root" value={snapshot.app_root ?? "Unknown"} mono />
+            </div>
+          </details>
+        </div>
+      )}
+    </section>
+  );
+}
 
 // ─── Model Section ────────────────────────────────────────────────────────────
 
@@ -42,6 +264,7 @@ function ModelSection({
   onSave: (patch: Partial<SettingsResponse>) => Promise<void>;
 }) {
   const [model, setModel] = useState(settings.llm_model ?? "");
+  const [provider, setProvider] = useState(settings.llm_provider ?? "");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(settings.llm_base_url ?? "");
   const [showKey, setShowKey] = useState(false);
@@ -49,14 +272,16 @@ function ModelSection({
 
   const isDirty =
     model !== (settings.llm_model ?? "") ||
+    provider !== (settings.llm_provider ?? "") ||
     apiKey !== "" ||
     baseUrl !== (settings.llm_base_url ?? "");
 
-  const [errors, setErrors] = useState<{ model?: string; baseUrl?: string }>({});
+  const [errors, setErrors] = useState<{ model?: string; provider?: string; baseUrl?: string }>({});
 
   const validate = (): boolean => {
     const next: typeof errors = {};
     if (!model.trim()) next.model = "Model is required";
+    if (!provider.trim()) next.provider = "Provider is required";
     if (baseUrl.trim() && !/^https?:\/\/.+/.test(baseUrl.trim()))
       next.baseUrl = "Must be a valid URL starting with http:// or https://";
     setErrors(next);
@@ -69,6 +294,7 @@ function ModelSection({
     try {
       const body: Record<string, unknown> = {
         llm_model: model.trim(),
+        llm_provider: provider.trim().toLowerCase(),
         llm_base_url: baseUrl.trim() || null,
       };
       if (apiKey) body.llm_api_key = apiKey;
@@ -89,6 +315,20 @@ function ModelSection({
       <div className="space-y-4">
         {/* Model name */}
         <div className="space-y-1.5">
+          <label className="text-sm font-medium">Provider</label>
+          <Input
+            placeholder="e.g. openai, anthropic, google, groq, ollama"
+            value={provider}
+            onChange={(e) => { setProvider(e.target.value); setErrors((p) => ({ ...p, provider: undefined })); }}
+            className={cn("font-mono text-sm", errors.provider && "border-destructive")}
+          />
+          {errors.provider && <p className="text-xs text-destructive">{errors.provider}</p>}
+          <p className="text-xs text-muted-foreground">
+            Explicit provider id used for routing and API key selection.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
           <label className="text-sm font-medium">Model</label>
           <Input
             placeholder="e.g. claude-sonnet-4-20250514"
@@ -98,10 +338,10 @@ function ModelSection({
           />
           {errors.model && <p className="text-xs text-destructive">{errors.model}</p>}
           <p className="text-xs text-muted-foreground">
-            Provider-prefixed model identifier — e.g.{" "}
-            <code className="rounded bg-muted px-1">anthropic/claude-3-5-sonnet</code>,{" "}
+            Raw model id for the selected provider — e.g.{" "}
+            <code className="rounded bg-muted px-1">claude-3-5-sonnet</code>,{" "}
             <code className="rounded bg-muted px-1">gpt-4o</code>,{" "}
-            <code className="rounded bg-muted px-1">ollama/llama3.2</code>
+            <code className="rounded bg-muted px-1">meta-llama/llama-4-scout-17b-16e-instruct</code>
           </p>
         </div>
 
@@ -558,7 +798,7 @@ function MCPSection({
 
 // ─── Sidebar nav item ─────────────────────────────────────────────────────────
 
-type Section = "model" | "mcp" | "monitoring";
+type Section = "startup" | "model" | "mcp" | "monitoring";
 
 function SidebarItem({
   label,
@@ -592,7 +832,7 @@ function SidebarItem({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Settings() {
-  const [activeSection, setActiveSection] = useState<Section>("model");
+  const [activeSection, setActiveSection] = useState<Section>("startup");
   const queryClient = useQueryClient();
 
   const {
@@ -630,6 +870,12 @@ export default function Settings() {
         </div>
         <nav className="space-y-0.5">
           <SidebarItem
+            label="Startup"
+            icon={Activity}
+            active={activeSection === "startup"}
+            onClick={() => setActiveSection("startup")}
+          />
+          <SidebarItem
             label="Model"
             icon={Bot}
             active={activeSection === "model"}
@@ -643,7 +889,7 @@ export default function Settings() {
           />
           <SidebarItem
             label="Monitoring"
-            icon={Activity}
+            icon={Eye}
             active={activeSection === "monitoring"}
             onClick={() => setActiveSection("monitoring")}
           />
@@ -668,6 +914,7 @@ export default function Settings() {
                 </div>
               ) : settings ? (
                 <>
+                  {activeSection === "startup" && <StartupSection settings={settings} />}
                   {activeSection === "model" && (
                     <ModelSection settings={settings} onSave={handleSave} />
                   )}

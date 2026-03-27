@@ -364,6 +364,22 @@ def create_controller(
         initial_state = State.restore_from_session(
             event_stream.sid, event_stream.file_store
         )
+        provenance = getattr(initial_state, "restore_provenance", None)
+        if provenance is not None:
+            from backend.api.app_state import get_app_state
+
+            get_app_state().record_state_restore(
+                event_stream.sid,
+                source=provenance.source,
+                path=provenance.path,
+                primary_error=provenance.primary_error,
+            )
+            logger.info(
+                "Restored controller state for %s from %s (%s)",
+                event_stream.sid,
+                provenance.source,
+                provenance.path,
+            )
     except Exception as e:
         logger.debug("Cannot restore agent state: %s", e)
     from backend.controller.agent_controller import ControllerConfig

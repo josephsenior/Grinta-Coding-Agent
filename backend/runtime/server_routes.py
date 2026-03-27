@@ -49,16 +49,24 @@ def _ensure_path_in_workspace(path: str, workspace_root: str) -> str:
         raise HTTPException(status_code=400, detail=f"Invalid path: {e}") from e
 
 
+def _safe_extract_zip_archive(zip_path: str, destination_root: str) -> None:
+    """Extract a zip archive into the workspace while blocking zip-slip entries."""
+    destination = Path(destination_root).resolve()
+    with ZipFile(zip_path, "r") as archive:
+        for member in archive.infolist():
+            target_path = (destination / member.filename).resolve()
+            try:
+                target_path.relative_to(destination)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Path traversal detected in uploaded archive",
+                ) from None
+        archive.extractall(destination)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register all exception handlers on the FastAPI app."""
-
-    @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception):
-        logger.exception("Unhandled exception occurred:")
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "An unexpected error occurred. Please try again later."},
-        )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -76,6 +84,14 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "detail": "Invalid request parameters",
                 "errors": str(exc.errors()),
             },
+        )
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        logger.exception("Unhandled exception occurred:")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "An unexpected error occurred. Please try again later."},
         )
 
 
@@ -108,16 +124,32 @@ def register_routes(
         return response
 
     @app.post("/execute_action")
-    async def execute_action_route(action_request: Any):
+    async def execute_action_route(request: Request):
         client = get_client()
         assert client is not None
         try:
-            action = event_from_dict(action_request.event)
+            try:
+                payload = await request.json()
+            except json.JSONDecodeError as e:
+                raise HTTPException(status_code=400, detail="Invalid JSON body") from e
+            if not isinstance(payload, dict):
+                raise HTTPException(
+                    status_code=422, detail="Request body must be a JSON object"
+                )
+            # Accept either event_to_dict(action) or {"event": { ... }}.
+            event_data = payload["event"] if "event" in payload else payload
+            if not isinstance(event_data, dict):
+                raise HTTPException(
+                    status_code=422, detail="Event payload must be a JSON object"
+                )
+            action = event_from_dict(event_data)
             if not isinstance(action, Action):
                 raise HTTPException(status_code=400, detail="Invalid action type")
             client.last_execution_time = time.time()
             observation = await client.run_action(action)
             return event_to_dict(observation)
+        except HTTPException:
+            raise
         except Exception as e:
             logger.exception("Error while running /execute_action: %s", str(e))
             raise HTTPException(
@@ -175,6 +207,7 @@ def register_routes(
     ):
         client = get_client()
         assert client is not None
+        workspace_root = client.initial_cwd
         try:
             filename = file.filename
             if not filename:
@@ -185,7 +218,7 @@ def register_routes(
                 raise HTTPException(
                     status_code=400, detail="Destination must be an absolute path"
                 )
-            full_dest_path = destination
+            full_dest_path = _ensure_path_in_workspace(destination, workspace_root)
             if not os.path.exists(full_dest_path):
                 os.makedirs(full_dest_path, exist_ok=True)
             if recursive or (not recursive and filename.endswith(".zip")):
@@ -196,10 +229,12 @@ def register_routes(
                 zip_path = os.path.join(full_dest_path, filename)
                 with open(zip_path, "wb") as buffer:
                     shutil.copyfileobj(file.file, buffer)
-                shutil.unpack_archive(zip_path, full_dest_path)
+                _safe_extract_zip_archive(zip_path, full_dest_path)
                 os.remove(zip_path)
             else:
-                file_path = os.path.join(full_dest_path, filename)
+                file_path = _ensure_path_in_workspace(
+                    os.path.join(full_dest_path, filename), workspace_root
+                )
                 with open(file_path, "wb") as buffer:
                     shutil.copyfileobj(file.file, buffer)
             return JSONResponse(
@@ -210,6 +245,8 @@ def register_routes(
                 },
                 status_code=200,
             )
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -240,6 +277,8 @@ def register_routes(
                     filename=f"{os.path.basename(path)}.zip",
                     background=BackgroundTask(lambda: os.unlink(temp_zip.name)),
                 )
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 

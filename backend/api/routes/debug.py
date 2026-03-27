@@ -104,7 +104,7 @@ async def session_debug(session_id: str) -> JSONResponse:
         )
 
     try:
-        from backend.api.session.manager import session_manager  # type: ignore[import-untyped]
+        from backend.api.session.manager import session_manager
 
         session = session_manager.get_session(session_id)
         if session is None:
@@ -139,7 +139,7 @@ async def list_debug_sessions() -> JSONResponse:
         )
 
     try:
-        from backend.api.session.manager import session_manager  # type: ignore[import-not-found]
+        from backend.api.session.manager import session_manager
 
         sessions = session_manager.list_sessions()
         return JSONResponse({"sessions": sessions})

@@ -12,6 +12,7 @@ from backend.api.versioning import (
     MINIMUM_SUPPORTED_VERSION,
     SUNSET_DATES,
     _EXCLUDED_PATHS,
+    _reject_missing_version,
     add_version_headers,
     get_api_version_from_path,
     version_middleware,
@@ -87,6 +88,15 @@ class TestAddVersionHeaders:
 # ---------------------------------------------------------------------------
 # _EXCLUDED_PATHS
 # ---------------------------------------------------------------------------
+
+
+class TestRejectMissingVersion:
+    def test_returns_400_with_suggested_path(self) -> None:
+        resp = _reject_missing_version("/api/settings/list")
+        assert resp.status_code == 400
+        body = resp.body
+        assert b"missing_api_version" in body
+        assert CURRENT_VERSION.value.encode() in body
 
 
 class TestExcludedPaths:

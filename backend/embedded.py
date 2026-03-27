@@ -20,6 +20,16 @@ import sys
 import threading
 import time
 import webbrowser
+from pathlib import Path
+
+from backend.cli.server_startup import (
+    add_project_root_to_path,
+    build_server_startup_plan,
+    ensure_utf8_stdout,
+    print_server_startup_preflight,
+    record_startup_snapshot,
+    validate_storage_contract,
+)
 
 logger = logging.getLogger("forge.embedded")
 
@@ -78,6 +88,10 @@ def _browser_url(host: str, port: int) -> str:
 
 def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = False) -> None:
     """Start server in background thread, open the web UI, wait for Ctrl+C."""
+    project_root = Path(__file__).resolve().parents[1]
+    add_project_root_to_path(project_root)
+    ensure_utf8_stdout()
+
     level = logging.DEBUG if verbose else logging.WARNING
     logging.basicConfig(
         level=level,
@@ -85,13 +99,25 @@ def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = Fals
         force=True,
     )
 
-    print(f"🔧 Forge embedded mode — starting server on http://{host}:{port} …")
+    env = os.environ.copy()
+    env["FORGE_HOST"] = host
+    env["HOST"] = host
+    env["FORGE_PORT"] = str(port)
+    env["PORT"] = str(port)
+    env["FORGE_WATCH"] = "0"
+
+    plan = build_server_startup_plan(project_root, env)
+    validate_storage_contract(env)
+    record_startup_snapshot(plan)
+
+    print("Embedded mode delegates to the canonical local startup planner.")
+    print_server_startup_preflight(plan)
 
     # Start the server in a daemon thread so it dies automatically when the
     # main thread exits.
     server_thread = threading.Thread(
         target=_run_server,
-        args=(host, port),
+        args=(plan.host, plan.resolved_port),
         daemon=True,
         name="forge-server",
     )
@@ -99,7 +125,7 @@ def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = Fals
 
     # Wait for the server to become healthy
     print("   Waiting for server readiness…", end="", flush=True)
-    ready = _wait_for_server(host, port)
+    ready = _wait_for_server(plan.host, plan.resolved_port)
     if not ready:
         print(" FAILED")
         print(
@@ -111,7 +137,7 @@ def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = Fals
 
     print(" ready ✓")
 
-    ui_url = _browser_url(host, port)
+    ui_url = plan.ui_url
     print(f"   Opening web UI: {ui_url}")
     try:
         webbrowser.open(ui_url)

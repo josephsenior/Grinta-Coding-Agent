@@ -27,6 +27,8 @@ This document provides a high-level overview of Forge's architecture for contrib
 └───────────────────────────────────────────────────────┘
 ```
 
+Runtime note: Forge currently uses a local in-process runtime. The optional `hardened_local` profile adds stricter local execution policy, but it is not sandboxing or process isolation.
+
 ## Backend Architecture
 
 ### Controller (`backend/controller/`)

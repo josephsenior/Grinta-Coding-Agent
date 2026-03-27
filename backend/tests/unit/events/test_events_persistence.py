@@ -71,7 +71,7 @@ class TestPersistSyncPath:
         fs.delete.assert_called_once()
 
     def test_critical_event_always_sync(self):
-        p, fs = _make_persistence()
+        p, _ = _make_persistence()
         payload = {"id": 2, "action": "finish"}
         p.persist_event(payload, event_id=2, cache_payload=None)
         assert p.stats["critical_sync_persistence"] == 1
@@ -84,6 +84,27 @@ class TestPersistSyncPath:
 
         write_calls = [str(c) for c in fs.write.call_args_list]
         assert any("cache/0_3.json" in w for w in write_calls)
+
+    def test_health_snapshot_tracks_confirmed_critical_event(self):
+        p, _ = _make_persistence()
+
+        p.persist_event({"id": 7, "action": "finish"}, event_id=7, cache_payload=None)
+
+        health = p.get_health_snapshot()
+        assert health["persistence_health"] == "healthy"
+        assert health["last_confirmed_event_id"] == 7
+        assert health["last_confirmed_critical_event_id"] == 7
+        assert health["last_persistence_mode"] == "sync"
+
+    def test_health_snapshot_degrades_after_persist_failure(self):
+        p, fs = _make_persistence()
+        fs.write.side_effect = OSError("disk full")
+
+        p.persist_event({"id": 9, "action": "run"}, event_id=9, cache_payload=None)
+
+        health = p.get_health_snapshot()
+        assert health["persistence_health"] == "degraded"
+        assert health["last_confirmed_event_id"] is None
 
 
 # ── build_cache_payload ───────────────────────────────────────────────
@@ -100,7 +121,7 @@ class TestBuildCachePayloadPersist:
         page = [{"id": 0}, {"id": 1}, {"id": 2}]
         result = p.build_cache_payload(page)
         assert result is not None
-        filename, contents = result
+        filename, _contents = result
         assert "cache/" in filename
 
     def test_returns_none_for_empty(self):

@@ -15,6 +15,7 @@ import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from binaryornot.check import is_binary
@@ -59,16 +60,21 @@ from backend.runtime.file_operations import (
     read_pdf_file,
     read_text_file,
     read_video_file,
-    resolve_path,
     truncate_cmd_output,
     truncate_large_text,
     write_file_content,
 )
+from backend.runtime.utils.files import resolve_path as resolve_workspace_path
 from backend.runtime.browser_init import init_browser
 from backend.runtime.file_viewer_server import start_file_viewer_server
 from backend.runtime.mcp.proxy import MCPProxyManager
 from backend.runtime.plugin_loader import init_plugins
 from backend.runtime.plugins import ALL_PLUGINS, Plugin
+from backend.runtime.security_enforcement import (
+    evaluate_hardened_local_command_policy,
+    path_is_within_workspace,
+    tokenize_command,
+)
 from backend.runtime.server_routes import (
     register_exception_handlers,
     register_routes,
@@ -120,6 +126,7 @@ class ActionExecutor:
         enable_browser: bool,
         tool_registry: Any | None = None,  # ToolRegistry for cross-platform support
         mcp_config: Any | None = None,
+        security_config: Any | None = None,
     ) -> None:
         """Create runtime executor, initialize workspace, and prepare tooling integrations."""
         self.username = username
@@ -164,6 +171,7 @@ class ActionExecutor:
 
         # MCP clients are created lazily on first use.
         self._mcp_config = mcp_config
+        self.security_config = security_config
         self._mcp_clients: list[Any] | None = None
         # Same server list passed to create_mcps (after Windows stdio filter), for diagnostics.
         self._mcp_servers_resolved: list[Any] | None = None
@@ -406,6 +414,134 @@ class ActionExecutor:
         tail = " | ".join(lines[-3:])
         return tail[:300]
 
+    def _workspace_root(self) -> Path:
+        return Path(self._initial_cwd).resolve()
+
+    def _is_hardened_local(self) -> bool:
+        return (
+            getattr(self.security_config, "execution_profile", "standard")
+            == "hardened_local"
+        )
+
+    def _validate_interactive_session_scope(
+        self, session_id: str, session: Any
+    ) -> ErrorObservation | None:
+        if not self._is_hardened_local():
+            return None
+
+        current_cwd = Path(getattr(session, "cwd", self._initial_cwd)).resolve()
+        if path_is_within_workspace(current_cwd, self._workspace_root()):
+            return None
+
+        self.session_manager.close_session(session_id)
+        return ErrorObservation(
+            content=(
+                "Interactive terminal session closed by hardened_local policy: "
+                f"session cwd escaped the workspace. Session: {session_id} | cwd={current_cwd}"
+            )
+        )
+
+    def _predict_interactive_cwd_change(
+        self, command: str, current_cwd: Path
+    ) -> tuple[Path | None, str | None]:
+        tokens = tokenize_command(command)
+        if not tokens:
+            return (None, None)
+
+        op = tokens[0].strip().lower()
+        if op not in {"cd", "pushd", "set-location", "sl"}:
+            return (None, None)
+
+        if len(tokens) < 2 or tokens[1].strip() in {"", "~", "$HOME", "%USERPROFILE%", "-"}:
+            return (
+                None,
+                "Action blocked by hardened_local policy: interactive directory changes must target an explicit path inside the workspace.",
+            )
+
+        target = Path(self._rewrite_workspace_tokens(tokens[1]))
+        predicted = target.resolve() if target.is_absolute() else (current_cwd / target).resolve()
+        if not path_is_within_workspace(predicted, self._workspace_root()):
+            return (
+                None,
+                "Action blocked by hardened_local policy: interactive terminal sessions cannot change directory outside the workspace. "
+                f"Requested cwd: {predicted}",
+            )
+        return (predicted, None)
+
+    def _evaluate_interactive_terminal_command(
+        self, command: str, current_cwd: Path
+    ) -> tuple[Path | None, ErrorObservation | None]:
+        if not self._is_hardened_local():
+            return (None, None)
+
+        stripped = command.strip()
+        if not stripped:
+            return (None, None)
+
+        if any(separator in stripped for separator in ("\n", "&&", ";", "||")):
+            return (
+                None,
+                ErrorObservation(
+                    content=(
+                        "Action blocked by hardened_local policy: interactive terminal input cannot contain chained or multiline commands."
+                    )
+                ),
+            )
+
+        block_message = evaluate_hardened_local_command_policy(
+            command=stripped,
+            security_config=self.security_config,
+            workspace_root=self._workspace_root(),
+            requested_cwd=str(current_cwd),
+            base_cwd=str(current_cwd),
+            is_background=stripped.endswith("&"),
+        )
+        if block_message is not None:
+            return (None, ErrorObservation(content=block_message))
+
+        predicted_cwd, cwd_error = self._predict_interactive_cwd_change(stripped, current_cwd)
+        if cwd_error is not None:
+            return (None, ErrorObservation(content=cwd_error))
+
+        return (predicted_cwd, None)
+
+    def _resolve_effective_cwd(
+        self, requested_cwd: str | None, base_cwd: str | None = None
+    ) -> Path:
+        workspace_root = self._workspace_root()
+        base_path = Path(base_cwd).resolve() if base_cwd else workspace_root
+        if not requested_cwd:
+            return base_path
+        requested = Path(requested_cwd)
+        if requested.is_absolute():
+            return requested.resolve()
+        return (base_path / requested).resolve()
+
+    def _validate_workspace_scoped_cwd(
+        self,
+        command: str,
+        requested_cwd: str | None,
+        base_cwd: str | None = None,
+    ) -> ErrorObservation | None:
+        if not self._is_hardened_local():
+            return None
+
+        workspace_root = self._workspace_root()
+        effective_cwd = self._resolve_effective_cwd(requested_cwd, base_cwd)
+        try:
+            effective_cwd.relative_to(workspace_root)
+        except ValueError:
+            return ErrorObservation(
+                content=(
+                    "Action blocked by hardened_local policy: command execution must stay inside the workspace. "
+                    f"Command: {command} | cwd={effective_cwd}"
+                )
+            )
+        return None
+
+    def _resolve_workspace_file_path(self, path: str, working_dir: str) -> str:
+        return str(resolve_workspace_path(path, working_dir, self._initial_cwd))
+
     def _maybe_mark_repeated_cmd_failure(
         self, action: CmdRunAction, observation: CmdOutputObservation
     ) -> None:
@@ -529,6 +665,16 @@ class ActionExecutor:
                     r"\bpython3\b", "python", action.command
                 )
 
+            default_session = self.session_manager.get_session("default")
+            base_cwd = default_session.cwd if default_session else self._initial_cwd
+            cwd_error = self._validate_workspace_scoped_cwd(
+                action.command,
+                action.cwd,
+                base_cwd,
+            )
+            if cwd_error is not None:
+                return cwd_error
+
             if action.is_background:
                 return await self._run_background_cmd(action)
 
@@ -567,10 +713,11 @@ class ActionExecutor:
         """
         session_id = f"bg-{uuid.uuid4().hex[:8]}"
         default_session = self.session_manager.get_session("default")
-        cwd = (
-            action.cwd
-            or (default_session.cwd if default_session else None)
-            or self._initial_cwd
+        cwd = str(
+            self._resolve_effective_cwd(
+                action.cwd,
+                (default_session.cwd if default_session else None) or self._initial_cwd,
+            )
         )
         session = self.session_manager.create_session(session_id=session_id, cwd=cwd)
         logger.debug(
@@ -611,9 +758,14 @@ class ActionExecutor:
         session immediately. Used for isolated/one-off executions.
         """
         temp_id = f"static-{uuid.uuid4().hex[:8]}"
-        bash_session = self.session_manager.create_session(
-            session_id=temp_id, cwd=action.cwd
+        default_session = self.session_manager.get_session("default")
+        cwd = str(
+            self._resolve_effective_cwd(
+                action.cwd,
+                (default_session.cwd if default_session else None) or self._initial_cwd,
+            )
         )
+        bash_session = self.session_manager.create_session(session_id=temp_id, cwd=cwd)
         try:
             return cast(
                 CmdOutputObservation,
@@ -678,12 +830,30 @@ class ActionExecutor:
             if not cwd:
                 cwd = self._initial_cwd
 
+            cwd_error = self._validate_workspace_scoped_cwd(
+                action.command or "<interactive terminal>",
+                action.cwd,
+                cwd,
+            )
+            if cwd_error is not None:
+                return cwd_error
+
+            cwd = str(self._resolve_effective_cwd(action.cwd, cwd))
+
             # Create the new session via manager
             session = self.session_manager.create_session(
                 session_id=session_id, cwd=cwd
             )
 
             if action.command:
+                action.command = self._rewrite_workspace_tokens(action.command)
+                predicted_cwd, policy_error = self._evaluate_interactive_terminal_command(
+                    action.command,
+                    Path(cwd).resolve(),
+                )
+                if policy_error is not None:
+                    self.session_manager.close_session(session_id)
+                    return policy_error
                 # Send the initial command if provided
                 logger.debug(
                     "Running initial command in terminal %s: %s",
@@ -693,6 +863,8 @@ class ActionExecutor:
                 # Attempt to write input. If underlying session doesn't support input,
                 # it will log a warning but not crash.
                 session.write_input(action.command + "\n")
+                if predicted_cwd is not None and hasattr(session, "_cwd"):
+                    session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
 
             # Return initial output
             content = session.read_output()
@@ -708,14 +880,29 @@ class ActionExecutor:
         if not session:
             return ErrorObservation(f"Terminal session {action.session_id} not found.")
 
+        scope_error = self._validate_interactive_session_scope(action.session_id, session)
+        if scope_error is not None:
+            return scope_error
+
         try:
-            write_content = action.input
+            write_content = self._rewrite_workspace_tokens(action.input)
             # Add newline if not a control sequence, unless user explicitly handles it?
             # TerminalInputAction usually implies raw input.
             # If user types "ls", they usually mean "ls\n".
             # Control sequences are separate.
 
+            predicted_cwd: Path | None = None
+            if not action.is_control:
+                predicted_cwd, policy_error = self._evaluate_interactive_terminal_command(
+                    write_content,
+                    Path(getattr(session, "cwd", self._initial_cwd)).resolve(),
+                )
+                if policy_error is not None:
+                    return policy_error
+
             session.write_input(write_content, is_control=action.is_control)
+            if predicted_cwd is not None and hasattr(session, "_cwd"):
+                session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
             # Wait briefly for output to appear
             await asyncio.sleep(0.2)
             content = session.read_output()
@@ -732,6 +919,10 @@ class ActionExecutor:
                 f"Terminal session {action.session_id} not found or closed."
             )
 
+        scope_error = self._validate_interactive_session_scope(action.session_id, session)
+        if scope_error is not None:
+            return scope_error
+
         try:
             content = session.read_output()
             return TerminalObservation(session_id=action.session_id, content=content)
@@ -741,7 +932,7 @@ class ActionExecutor:
 
     def _resolve_path(self, path: str, working_dir: str) -> str:
         """Resolve a relative or absolute path to an absolute path with security validation."""
-        return resolve_path(path, working_dir)
+        return self._resolve_workspace_file_path(path, working_dir)
 
     def _handle_aci_file_read(self, action: FileReadAction) -> FileReadObservation:
         """Handle file reading using the FILE_EDITOR implementation."""
@@ -774,7 +965,12 @@ class ActionExecutor:
 
         # Resolve file path
         working_dir = bash_session.cwd
-        filepath = resolve_path(action.path, working_dir)
+        try:
+            filepath = self._resolve_workspace_file_path(action.path, working_dir)
+        except PermissionError:
+            return ErrorObservation(
+                f"You're not allowed to access this path: {action.path}. You can only access paths inside the workspace."
+            )
 
         try:
             # Handle different file types
@@ -798,7 +994,10 @@ class ActionExecutor:
         action.path = self._normalize_workspace_path(action.path)
 
         working_dir = bash_session.cwd
-        filepath = resolve_path(action.path, working_dir)
+        try:
+            filepath = self._resolve_workspace_file_path(action.path, working_dir)
+        except PermissionError as e:
+            return ErrorObservation(f"Permission error on {action.path}: {e}")
 
         try:
             ensure_directory_exists(filepath)
@@ -959,7 +1158,12 @@ class ActionExecutor:
         # Translate /workspace/ virtual paths to the actual workspace directory.
         action.path = self._normalize_workspace_path(action.path)
         working_dir = bash_session.cwd
-        filepath = resolve_path(action.path, working_dir)
+        try:
+            filepath = self._resolve_workspace_file_path(action.path, working_dir)
+        except PermissionError:
+            return ErrorObservation(
+                f"You're not allowed to access this path: {action.path}. You can only access paths inside the workspace."
+            )
 
         dir_view = self._edit_try_directory_view(filepath, action.path, action)
         if dir_view is not None:
@@ -1272,12 +1476,15 @@ if __name__ == "__main__":
         global client, mcp_proxy_manager, initialization_error
         try:
             logger.info("Initializing ActionExecutor...")
+            from backend.core.config.config_loader import load_forge_config
+
             client = ActionExecutor(
                 plugins_to_load,
                 work_dir=args.working_dir,
                 username=args.username,
                 user_id=args.user_id,
                 enable_browser=args.enable_browser,
+                security_config=load_forge_config().security,
             )
             logger.info(
                 "ActionExecutor instance created. Starting async initialization..."
@@ -1304,8 +1511,6 @@ if __name__ == "__main__":
                     api_key=None,
                     logger_level=logger.getEffectiveLevel(),
                 )
-                from backend.core.config.config_loader import load_forge_config
-
                 forge_config = load_forge_config()
                 mcp_proxy_manager.initialize(forge_config.mcp.servers)
                 allowed_origins = ["*"]

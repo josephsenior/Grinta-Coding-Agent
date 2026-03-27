@@ -78,7 +78,10 @@ class TestLLMResponse:
         tcs = [{"id": "tc1"}]
         resp = LLMResponse(content="", model="m", usage={}, tool_calls=tcs)
         d = resp.to_dict()
-        assert d["choices"][0]["message"]["tool_calls"] == tcs
+        tool_calls = d["choices"][0]["message"]["tool_calls"]
+        assert tool_calls is not None
+        assert tool_calls[0]["id"] == "tc1"
+        assert tool_calls[0]["type"] == "function"
 
     def test_getitem(self):
         resp = LLMResponse(content="x", model="m", usage={})
@@ -136,15 +139,9 @@ class TestGetDirectClient:
             client = get_direct_client("anthropic/claude-3", api_key="sk-test")
             assert isinstance(client, AnthropicClient)
 
-    def test_claude_model(self):
-        with (
-            patch("backend.llm.direct_clients.Anthropic"),
-            patch("backend.llm.direct_clients.AsyncAnthropic"),
-        ):
-            from backend.llm.direct_clients import AnthropicClient
-
-            client = get_direct_client("claude-3.5-sonnet", api_key="sk-test")
-            assert isinstance(client, AnthropicClient)
+    def test_claude_model_requires_explicit_provider(self):
+        with pytest.raises(ValueError, match="provider"):
+            get_direct_client("claude-3.5-sonnet", api_key="sk-test")
 
     def test_gemini_model(self):
         with patch("backend.llm.direct_clients.genai"):
@@ -254,6 +251,27 @@ class TestOpenAIClientHelpers:
 
         msg = MagicMock(tool_calls=[])
         assert extract_tool_calls(msg) is None
+
+    def test_sanitize_openai_metadata_values_to_strings(self):
+        from backend.llm.direct_clients import _sanitize_openai_compatible_kwargs
+
+        kwargs = {
+            "extra_body": {
+                "metadata": {
+                    "session_id": "abc",
+                    "trace_version": 1,
+                    "tags": ["model:gpt-4", "agent:orchestrator"],
+                    "extra": {"a": 1},
+                }
+            }
+        }
+
+        sanitized = _sanitize_openai_compatible_kwargs(kwargs)
+        metadata = sanitized["extra_body"]["metadata"]
+        assert metadata["session_id"] == "abc"
+        assert metadata["trace_version"] == "1"
+        assert metadata["tags"] == "model:gpt-4,agent:orchestrator"
+        assert metadata["extra"] == '{"a":1}'
 
 
 # ---------------------------------------------------------------------------

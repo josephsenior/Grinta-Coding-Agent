@@ -62,30 +62,20 @@ VERIFIED_GROQ_MODELS: Any = _LazyModelList("groq")
 
 # Provider extraction patterns
 PROVIDER_PREFIX_PATTERNS = {
-    "openai": ["openai/", "gpt-"],
-    "anthropic": ["anthropic/", "claude-"],
+    "openai": ["openai/"],
+    "anthropic": ["anthropic/"],
     "google": ["google/", "gemini/"],
-    "xai": ["xai/", "grok-"],
+    "xai": ["xai/"],
     "groq": ["groq/"],
     "openrouter": ["openrouter/"],
     "nvidia": ["nvidia/", "moonshotai/"],
 }
 
-PROVIDER_KEYWORD_PATTERNS = {
-    "google": ["gemini"],
-    "xai": ["grok"],
-    "groq": ["llama-3.1", "llama-3.3", "qwen3"],
-    "nvidia": ["kimi-k2.5", "moonshotai/kimi-k2-5"],
-}
+# Legacy heuristic tables intentionally left empty.
+# Provider selection now relies on explicit prefixes or exact catalog entries.
+PROVIDER_KEYWORD_PATTERNS: dict[str, list[str]] = {}
 
-PROVIDER_FALLBACK_PATTERNS = {
-    "openai": ["gpt"],
-    "anthropic": ["claude"],
-    "google": ["gemini"],
-    "xai": ["grok"],
-    "groq": ["llama", "qwen"],
-    "nvidia": ["kimi", "moonshotai"],
-}
+PROVIDER_FALLBACK_PATTERNS: dict[str, list[str]] = {}
 
 # Provider and API Key constants
 DEFAULT_API_KEY_MIN_LENGTH = 10

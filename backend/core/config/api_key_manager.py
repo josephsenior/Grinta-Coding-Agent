@@ -22,11 +22,11 @@ _INSTANCE_NAME = "forge_api_key_manager_instance"
 class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
     """Secure API key manager for multi-provider LLM support.
 
-    Handles API keys for 30+ LLM providers with automatic provider detection,
+    Handles API keys for 30+ LLM providers with explicit or catalog-backed provider detection,
     format validation, and secure storage using Pydantic SecretStr.
 
     Features:
-        - Auto-detection of provider from model string (e.g., 'openrouter/gpt-4' → 'openrouter')
+        - Provider extraction from explicit prefixes or exact catalog entries
         - API key format validation (prefix matching, length checks)
         - Environment variable fallbacks (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
         - Secure storage (never logs full keys, uses SecretStr)
@@ -112,13 +112,20 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if not model or not str(model).strip():
             return None
 
-        provider = self._extract_provider(model)
-
         # If a key is provided and it matches the provider, trust it.
         # If it does NOT match, prefer environment/stored provider keys first.
         # This avoids misrouting when a user switches models/providers but their
         # settings still contain an old provider key (e.g., OpenRouter -> Gemini).
         fallback_key: SecretStr | None = None
+
+        provider = self._extract_provider(model)
+        if provider == "unknown":
+            logger.error(
+                "Cannot determine API-key provider for model %s. Use an explicit provider prefix.",
+                model,
+            )
+            return None
+
         if provided_key:
             key_value = provided_key.get_secret_value()
             if self._is_correct_provider_key(provided_key, provider):
@@ -220,6 +227,12 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if not model or not str(model).strip():
             return
         provider = self._extract_provider(model)
+        if provider == "unknown":
+            logger.warning(
+                "Skipping API key storage for ambiguous model %s; provider must be explicit",
+                model,
+            )
+            return
         self.provider_api_keys[provider] = api_key
         logger.debug("Set API key for %s", provider)
 
@@ -244,6 +257,12 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             return
 
         provider = self._extract_provider(model)
+        if provider == "unknown":
+            logger.warning(
+                "Skipping environment export for ambiguous model %s; provider must be explicit",
+                model,
+            )
+            return
         logger.debug(
             "Setting environment variables for model: %s, provider: %s", model, provider
         )
@@ -329,12 +348,18 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             Provider name if matched, None otherwise
 
         """
-        # Define prefix and pattern mappings for each provider
+        # Explicit provider prefixes only.
         prefix_patterns = {
-            "openai": ["openai/", "gpt-"],
-            "anthropic": ["anthropic/", "claude-"],
+            "openai": ["openai/"],
+            "anthropic": ["anthropic/"],
             "google": ["google/", "gemini/"],
-            "xai": ["xai/", "grok-"],
+            "xai": ["xai/"],
+            "groq": ["groq/"],
+            "mistral": ["mistral/"],
+            "openrouter": ["openrouter/"],
+            "nvidia": ["nvidia/"],
+            "ollama": ["ollama/"],
+            "deepseek": ["deepseek/"],
         }
 
         for provider, prefixes in prefix_patterns.items():
@@ -344,53 +369,17 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         return None
 
     def _check_keyword_match(self, model_lower: str) -> str | None:
-        """Check for provider keyword matches in model name.
-
-        Args:
-            model_lower: Lowercase model string
-
-        Returns:
-            Provider name if matched, None otherwise
-
-        """
-        keyword_patterns = {
-            "google": ["gemini"],
-            "xai": ["grok"],
-        }
-
-        for provider, keywords in keyword_patterns.items():
-            if any(keyword in model_lower for keyword in keywords):
-                return provider
-
+        """Legacy no-op retained for compatibility with older tests/helpers."""
         return None
 
     def _check_fallback_patterns(self, model_lower: str) -> str:
-        """Check fallback patterns for common model families.
-
-        Args:
-            model_lower: Lowercase model string
-
-        Returns:
-            Provider name or 'unknown'
-
-        """
-        fallback_patterns = {
-            "openai": ["gpt"],
-            "anthropic": ["claude"],
-            "google": ["gemini"],
-            "xai": ["grok"],
-        }
-
-        for provider, patterns in fallback_patterns.items():
-            if any(pattern in model_lower for pattern in patterns):
-                return provider
-
+        """Legacy no-op retained for compatibility with older tests/helpers."""
         return "unknown"
 
     def _extract_provider(self, model: str) -> str:
         """Extract provider from model identifier using resolver.
 
-        Uses the catalog-based resolver for accurate provider detection.
+        Uses explicit provider prefixes or exact catalog entries.
 
         Args:
             model: Model identifier string
@@ -410,22 +399,12 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             logger.debug("Resolved model=%s to provider=%s", model, provider)
             return provider
         except Exception as e:
-            logger.warning("Failed to use resolver for provider detection: %s", e)
-            # Fallback to legacy logic
-            model_lower = model.lower()
-
-            # Check prefix matches first (most specific)
-            found = self._check_prefix_match(model, model_lower)
-            if found:
-                return found
-
-            # Check keyword matches (moderately specific)
-            found = self._check_keyword_match(model_lower)
-            if found:
-                return found
-
-            # Check fallback patterns (least specific)
-            return self._check_fallback_patterns(model_lower)
+            logger.warning(
+                "Failed to determine provider for model %s without heuristics: %s",
+                model,
+                e,
+            )
+            return "unknown"
 
     def _is_correct_provider_key(
         self, api_key: SecretStr, expected_provider: str
@@ -457,6 +436,8 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
 
     def _get_provider_key_from_env(self, provider: str) -> str | None:
         """Get API key for provider from environment variables using provider configuration."""
+        if not provider or provider == "unknown":
+            return None
         # Use provider configuration to get the correct environment variable
         env_var = provider_config_manager.get_environment_variable(provider)
         if env_var:

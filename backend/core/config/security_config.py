@@ -26,7 +26,7 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     """
 
-    confirmation_mode: bool = Field(default=True)
+    confirmation_mode: bool = Field(default=False)
     security_analyzer: str | None = Field(default=None)
     enforce_security: bool = Field(
         default=True,
@@ -43,6 +43,69 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "Conversation access validation strictness. "
             "'permissive' skips ownership checks (single-user default). "
             "'strict' enforces conversation ownership and rejects anonymous access."
+        ),
+    )
+    execution_profile: Literal["standard", "hardened_local"] = Field(
+        default="standard",
+        description=(
+            "Runtime execution profile. 'standard' preserves current local behavior. "
+            "'hardened_local' adds stricter local policy gates for commands and file access."
+        ),
+    )
+    allow_network_commands: bool = Field(
+        default=False,
+        description=(
+            "When execution_profile='hardened_local', allow network-capable shell commands "
+            "such as curl, wget, scp, rsync, and netcat."
+        ),
+    )
+    allow_package_installs: bool = Field(
+        default=False,
+        description=(
+            "When execution_profile='hardened_local', allow package installation commands "
+            "such as pip install, npm install, and Install-Module."
+        ),
+    )
+    allow_background_processes: bool = Field(
+        default=False,
+        description=(
+            "When execution_profile='hardened_local', allow starting background processes."
+        ),
+    )
+    allow_sensitive_path_access: bool = Field(
+        default=False,
+        description=(
+            "When execution_profile='hardened_local', allow read/write access to sensitive "
+            "workspace files such as .env, .ssh, and credential stores."
+        ),
+    )
+    hardened_local_git_allowlist: list[str] = Field(
+        default_factory=lambda: [
+            "status",
+            "diff",
+            "log",
+            "show",
+            "branch",
+            "rev-parse",
+            "ls-files",
+        ],
+        description=(
+            "When execution_profile='hardened_local', git subcommands allowed to run "
+            "inside the workspace without broad git write/network permission."
+        ),
+    )
+    hardened_local_package_allowlist: list[str] = Field(
+        default_factory=list,
+        description=(
+            "When execution_profile='hardened_local', package-management operations "
+            "allowed inside the workspace, e.g. ['npm_install', 'pnpm_add']."
+        ),
+    )
+    hardened_local_network_allowlist: list[str] = Field(
+        default_factory=list,
+        description=(
+            "When execution_profile='hardened_local', network-capable command families "
+            "allowed inside the workspace, e.g. ['curl', 'invoke-webrequest']."
         ),
     )
     model_config = ConfigDict(extra="ignore")

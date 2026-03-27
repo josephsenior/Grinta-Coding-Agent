@@ -95,6 +95,11 @@ class EventPersistence:
             "critical_sync_persistence": 0,
             "durable_enqueue_failures": 0,
         }
+        self._last_confirmed_event_id: int | None = None
+        self._last_confirmed_critical_event_id: int | None = None
+        self._last_persisted_at_monotonic: float | None = None
+        self._last_persist_failure_at_monotonic: float | None = None
+        self._last_persistence_mode: str | None = None
 
         # Optional SQLite accelerator
         self._sqlite_store: Any = None
@@ -198,6 +203,22 @@ class EventPersistence:
         contents = json.dumps(current_write_page)
         cache_filename = self._get_filename_for_cache(start, end)
         return cache_filename, contents
+
+    def get_health_snapshot(self) -> dict[str, Any]:
+        """Return lightweight persistence-health diagnostics for recovery and ops."""
+        last_success = self._last_persisted_at_monotonic
+        last_failure = self._last_persist_failure_at_monotonic
+        health = "healthy"
+        if last_failure is not None and (
+            last_success is None or last_failure >= last_success
+        ):
+            health = "degraded"
+        return {
+            "persistence_health": health,
+            "last_confirmed_event_id": self._last_confirmed_event_id,
+            "last_confirmed_critical_event_id": self._last_confirmed_critical_event_id,
+            "last_persistence_mode": self._last_persistence_mode,
+        }
 
     def _process_pending_file(
         self, pending_path: str, event_path: str, events_dir: str
@@ -373,8 +394,16 @@ class EventPersistence:
                     pending_file,
                     exc,
                 )
+            event_id = payload.get("id")
+            if isinstance(event_id, int):
+                self._record_persist_success(
+                    event_id,
+                    is_critical=self._is_critical_payload(payload),
+                    mode="sync",
+                )
         except Exception as exc:  # pragma: no cover
             self.stats["persist_failures"] += 1
+            self._last_persist_failure_at_monotonic = time.monotonic()
             if self._recent_persist_failures is not None:
                 self._recent_persist_failures.append(time.monotonic())
             logger.error(
@@ -403,6 +432,19 @@ class EventPersistence:
     def durable_writer(self) -> DurableEventWriter | None:
         """Expose durable writer for stats aggregation."""
         return self._durable_writer
+
+    def _record_persist_success(
+        self,
+        event_id: int,
+        *,
+        is_critical: bool,
+        mode: str,
+    ) -> None:
+        self._last_confirmed_event_id = event_id
+        if is_critical:
+            self._last_confirmed_critical_event_id = event_id
+        self._last_persisted_at_monotonic = time.monotonic()
+        self._last_persistence_mode = mode
 
 
 # ------------------------------------------------------------------

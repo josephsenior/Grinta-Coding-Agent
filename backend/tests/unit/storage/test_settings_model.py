@@ -31,13 +31,25 @@ class TestSettingsDefaults:
             agent="Orchestrator",
             max_iterations=50,
             llm_model="gpt-4",
+            llm_provider="openai",
             llm_api_key=SecretStr("sk-test"),
         )
         assert s.language == "en"
         assert s.agent == "Orchestrator"
-        assert s.llm_model == "gpt-4"
+        assert s.llm_model == "openai/gpt-4"
+        assert s.llm_provider == "openai"
         assert s.llm_api_key is not None
         assert s.llm_api_key.get_secret_value() == "sk-test"
+
+    def test_provider_inferred_from_prefixed_model(self):
+        s = Settings(llm_model="groq/meta-llama/llama-4-scout")
+        assert s.llm_provider == "groq"
+        assert s.llm_model == "groq/meta-llama/llama-4-scout"
+
+    def test_provider_normalized_and_reprefixes_model(self):
+        s = Settings(llm_model="openai/gpt-4o", llm_provider="groq")
+        assert s.llm_provider == "groq"
+        assert s.llm_model == "groq/gpt-4o"
 
     def test_agent_name_is_stripped_not_rewritten(self):
         s = Settings(agent="  Orchestrator  ")

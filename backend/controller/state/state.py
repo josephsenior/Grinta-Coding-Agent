@@ -7,7 +7,7 @@ import os
 import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, SupportsIndex
 
 import backend
 from backend.controller.state.control_flags import (
@@ -296,12 +296,78 @@ class ActivePlan:
         return None
 
 
+@dataclass(frozen=True)
+class RestoreProvenance:
+    """Describe how a persisted State object was restored."""
+
+    source: str
+    path: str
+    primary_error: str | None = None
+
+
 class TrafficControlState:
     """Track pause/resume state for agent loops and manage iteration counters."""
 
     NORMAL = "normal"
     THROTTLING = "throttling"
     PAUSED = "paused"
+
+
+class TrackedHistoryList(list):
+    """List wrapper that bumps State history version on in-place mutation."""
+
+    def __init__(self, owner: State | None = None, values: list[Any] | None = None):
+        super().__init__(values or [])
+        self.owner = owner
+
+    def attach_owner(self, owner: State) -> None:
+        self.owner = owner
+
+    def _mark(self) -> None:
+        owner = self.owner
+        if owner is not None:
+            owner.mark_history_mutated()
+
+    def append(self, item: Any) -> None:
+        super().append(item)
+        self._mark()
+
+    def extend(self, iterable) -> None:
+        super().extend(iterable)
+        self._mark()
+
+    def insert(self, index: SupportsIndex, item: Any) -> None:
+        super().insert(index, item)
+        self._mark()
+
+    def clear(self) -> None:
+        super().clear()
+        self._mark()
+
+    def pop(self, index: SupportsIndex = -1):
+        result = super().pop(index)
+        self._mark()
+        return result
+
+    def remove(self, value: Any) -> None:
+        super().remove(value)
+        self._mark()
+
+    def sort(self, *args: Any, **kwargs: Any) -> None:
+        super().sort(*args, **kwargs)
+        self._mark()
+
+    def reverse(self) -> None:
+        super().reverse()
+        self._mark()
+
+    def __setitem__(self, index, value) -> None:
+        super().__setitem__(index, value)
+        self._mark()
+
+    def __delitem__(self, index) -> None:
+        super().__delitem__(index)
+        self._mark()
 
 
 @dataclass
@@ -370,6 +436,46 @@ class State:
     delegates: dict[tuple[int, int], tuple[str, str]] | None = None
     metrics: Metrics = field(default_factory=Metrics)
     plan: ActivePlan | None = None
+    restore_provenance: RestoreProvenance | None = None
+
+    def __post_init__(self) -> None:
+        self._history_version = 0
+        self._view_history_version = -1
+        self._view = View.from_events([])
+        self.history = self.history
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "history":
+            wrapped = self._coerce_history(value)
+            super().__setattr__(name, wrapped)
+            self.mark_history_mutated()
+            return
+        super().__setattr__(name, value)
+
+    def _coerce_history(self, value: Any) -> TrackedHistoryList:
+        if isinstance(value, TrackedHistoryList):
+            value.attach_owner(self)
+            return value
+        return TrackedHistoryList(self, list(value or []))
+
+    def mark_history_mutated(self) -> None:
+        current = getattr(self, "_history_version", 0)
+        self._history_version = current + 1
+        self._cached_first_user_message = None
+
+    def set_restore_provenance(
+        self,
+        source: str,
+        path: str,
+        *,
+        primary_error: str | None = None,
+    ) -> None:
+        """Record where restored state came from for logging and diagnostics."""
+        self.restore_provenance = RestoreProvenance(
+            source=source,
+            path=path,
+            primary_error=primary_error,
+        )
 
     # ------------------------------------------------------------------ #
     # Centralized mutation methods
@@ -548,25 +654,37 @@ class State:
         """
         state: State | None = None
         primary_error: Exception | None = None
+        restore_path = get_conversation_agent_state_filename(sid, user_id)
 
         # --- Try the primary file first ---
         try:
             raw = file_store.read(
-                get_conversation_agent_state_filename(sid, user_id),
+                restore_path,
             )
         except FileNotFoundError as e:
             if not user_id:
                 # Before giving up, try checkpoints
-                state = State._restore_from_checkpoints(file_store, sid, user_id)
+                state = State._restore_from_checkpoints(
+                    file_store,
+                    sid,
+                    user_id,
+                    primary_error=e,
+                )
                 if state is not None:
                     return state
                 msg = f"Could not restore state from session file for sid: {sid}"
                 raise FileNotFoundError(msg) from e
             filename = get_conversation_agent_state_filename(sid)
+            restore_path = filename
             try:
                 raw = file_store.read(filename)
             except FileNotFoundError:
-                state = State._restore_from_checkpoints(file_store, sid, user_id)
+                state = State._restore_from_checkpoints(
+                    file_store,
+                    sid,
+                    user_id,
+                    primary_error=e,
+                )
                 if state is not None:
                     return state
                 raise
@@ -580,9 +698,20 @@ class State:
                 sid,
                 e,
             )
-            state = State._restore_from_checkpoints(file_store, sid, user_id)
+            state = State._restore_from_checkpoints(
+                file_store,
+                sid,
+                user_id,
+                primary_error=e,
+            )
             if state is None:
-                raise primary_error
+                raise primary_error from e
+
+        state.set_restore_provenance(
+            "primary",
+            restore_path,
+            primary_error=str(primary_error) if primary_error else None,
+        )
 
         if state.agent_state in RESUMABLE_STATES:
             state.resume_state = state.agent_state
@@ -596,6 +725,8 @@ class State:
         file_store: FileStore,
         sid: str,
         user_id: str | None,
+        *,
+        primary_error: Exception | None = None,
     ) -> State | None:
         """Try restoring from checkpoint files, newest first.
 
@@ -614,8 +745,14 @@ class State:
         )
         for ckpt_name in json_files[:MAX_STATE_CHECKPOINTS]:
             try:
-                raw = file_store.read(f"{ckpt_dir}{ckpt_name}")
+                ckpt_path = f"{ckpt_dir}{ckpt_name}"
+                raw = file_store.read(ckpt_path)
                 state = State._from_raw(raw)
+                state.set_restore_provenance(
+                    "checkpoint",
+                    ckpt_path,
+                    primary_error=str(primary_error) if primary_error else None,
+                )
                 logger.info(
                     "Restored state from checkpoint %s for sid %s",
                     ckpt_name,
@@ -673,7 +810,11 @@ class State:
         state = self.__dict__.copy()
         state["history"] = []
         state.pop("_history_checksum", None)
+        state.pop("_history_version", None)
+        state.pop("_view_history_version", None)
+        state.pop("_cached_first_user_message", None)
         state.pop("_view", None)
+        state.pop("restore_provenance", None)
         state.pop("iteration", None)
         state.pop("local_iteration", None)
         state.pop("max_iterations", None)
@@ -695,6 +836,10 @@ class State:
             )
         if not hasattr(self, "budget_flag"):
             self.budget_flag = None
+        self._history_version = 0
+        self._view_history_version = -1
+        self._view = View.from_events([])
+        self.history = self.history
 
     def _process_user_message_event(
         self,
@@ -778,16 +923,18 @@ class State:
             Dictionary with session, version, and tag metadata
 
         """
+        tags = [
+            f"model:{model_name}",
+            f"agent:{agent_name}",
+            f"web_host:{os.environ.get('WEB_HOST', 'unspecified')}",
+            f"FORGE_version:{backend.__version__}",
+        ]
         return {
             "session_id": self.session_id,
             "trace_version": backend.__version__,
             "trace_user_id": self.user_id,
-            "tags": [
-                f"model:{model_name}",
-                f"agent:{agent_name}",
-                f"web_host:{os.environ.get('WEB_HOST', 'unspecified')}",
-                f"FORGE_version:{backend.__version__}",
-            ],
+            # OpenAI-compatible metadata payloads require plain string values.
+            "tags": ",".join(tags),
         }
 
     def get_local_step(self):
@@ -820,9 +967,9 @@ class State:
             View object containing relevant events for agent context
 
         """
-        history_checksum = len(self.history)
-        old_history_checksum = getattr(self, "_history_checksum", -1)
-        if history_checksum != old_history_checksum:
-            self._history_checksum = history_checksum
+        history_version = getattr(self, "_history_version", 0)
+        old_history_version = getattr(self, "_view_history_version", -1)
+        if history_version != old_history_version:
+            self._view_history_version = history_version
             self._view = View.from_events(self.history)
         return self._view

@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import MagicMock
 
+import pytest
 
+from backend.core.errors import ModelProviderError
+from backend.engines.orchestrator.executor import OrchestratorExecutor
 from backend.engines.orchestrator.streaming_checkpoint import (
     CheckpointRecord,
     StreamingCheckpoint,
@@ -197,6 +201,129 @@ class TestRecover:
         ckpt._wal_path.write_text("{bad: json}", encoding="utf-8")
         ckpt.recover()
         assert not ckpt._wal_path.exists()
+
+
+class TestRecoveryInspection:
+    def test_inspect_recovery_clean_without_wal(self, tmp_path):
+        ckpt = StreamingCheckpoint(str(tmp_path))
+
+        inspection = ckpt.inspect_recovery()
+
+        assert inspection.status == "clean"
+        assert inspection.record is None
+
+    def test_inspect_recovery_blocks_recent_uncommitted_wal(self, tmp_path):
+        ckpt = StreamingCheckpoint(str(tmp_path))
+        token = ckpt.begin({"model": "gpt-4"}, attempt=2)
+
+        inspection = ckpt.inspect_recovery()
+
+        assert inspection.status == "blocked_uncommitted"
+        assert inspection.record is not None
+        assert inspection.record.token == token
+        assert "attempt=2" in inspection.reason
+
+    def test_inspect_recovery_discards_stale_wal(self, tmp_path):
+        ckpt = StreamingCheckpoint(str(tmp_path))
+        token = ckpt.begin({"model": "gpt-4"})
+        raw = json.loads(ckpt._wal_path.read_text(encoding="utf-8"))
+        raw["created_at"] = 0.0
+        ckpt._wal_path.write_text(json.dumps(raw), encoding="utf-8")
+
+        inspection = ckpt.inspect_recovery()
+
+        assert inspection.status == "stale_discarded"
+        assert inspection.record is not None
+        assert inspection.record.token == token
+        assert not ckpt._wal_path.exists()
+
+    def test_inspect_recovery_discards_corrupt_wal(self, tmp_path):
+        ckpt = StreamingCheckpoint(str(tmp_path))
+        ckpt._wal_path.write_text("{bad json", encoding="utf-8")
+
+        inspection = ckpt.inspect_recovery()
+
+        assert inspection.status == "corrupt_discarded"
+        assert inspection.record is None
+        assert not ckpt._wal_path.exists()
+
+
+class TestExecutorRecoveryBlock:
+    def test_executor_blocks_once_after_recent_uncommitted_checkpoint(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("FORGE_DATA_DIR", str(tmp_path))
+        ckpt_dir = tmp_path / "streaming_checkpoints"
+        ckpt = StreamingCheckpoint(str(ckpt_dir))
+        ckpt.begin(
+            {
+                "model": "gpt-4",
+                "messages": [{"role": "user", "content": "hi"}],
+            }
+        )
+
+        llm = MagicMock()
+        executor = OrchestratorExecutor(
+            llm=llm,
+            safety_manager=MagicMock(),
+            planner=MagicMock(),
+            mcp_tools_provider=lambda: {},
+        )
+
+        with pytest.raises(ModelProviderError, match="manual confirmation"):
+            executor.execute({}, event_stream=None)
+
+        llm.completion.assert_not_called()
+
+    def test_executor_blocks_only_the_session_with_uncommitted_checkpoint(
+        self, tmp_path, monkeypatch
+    ):
+        import backend.engines.orchestrator.function_calling as fc
+        import sys
+
+        from backend.engines.orchestrator import executor as executor_module
+
+        monkeypatch.setenv("FORGE_DATA_DIR", str(tmp_path))
+        sys.modules.setdefault("forge.engines.orchestrator.function_calling", fc)
+        monkeypatch.setattr(
+            executor_module.orchestrator_function_calling,
+            "response_to_actions",
+            lambda *args, **kwargs: [],
+        )
+        ckpt_dir = tmp_path / "streaming_checkpoints" / "session-a"
+        ckpt = StreamingCheckpoint(str(ckpt_dir))
+        ckpt.begin(
+            {
+                "model": "gpt-4",
+                "messages": [{"role": "user", "content": "hi"}],
+            }
+        )
+
+        llm = MagicMock()
+        llm.completion.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="ok"))],
+            id="resp-1",
+        )
+        safety = MagicMock()
+        safety.apply.return_value = (True, [])
+        executor = OrchestratorExecutor(
+            llm=llm,
+            safety_manager=safety,
+            planner=MagicMock(),
+            mcp_tools_provider=lambda: {},
+        )
+
+        session_a_stream = MagicMock()
+        session_a_stream.sid = "session-a"
+        session_b_stream = MagicMock()
+        session_b_stream.sid = "session-b"
+
+        with pytest.raises(ModelProviderError, match="manual confirmation"):
+            executor.execute({}, event_stream=session_a_stream)
+
+        executor.execute({}, event_stream=session_b_stream)
+
+        assert llm.completion.call_count == 1
 
 
 # ---------------------------------------------------------------------------

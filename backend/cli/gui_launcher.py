@@ -17,7 +17,7 @@ def ensure_config_dir_exists() -> Path:
 
 
 def launch_gui_server() -> None:
-    """Launch the Forge GUI server locally."""
+    """Launch the canonical local Forge server entrypoint."""
     print(f"🚀 Launching Forge v{__version__} GUI server...")
     print("")
 
@@ -31,39 +31,15 @@ def launch_gui_server() -> None:
 
     print("")
     print("✅ Starting local Forge server...")
-    print("   GUI: http://localhost:3000")
-    print("   API: http://localhost:3000/api")
-    print("")
-    print("Press Ctrl+C to stop the server.")
+    print("   Delegating to start_server.py (canonical local server entrypoint)")
     print("")
 
-    # Set environment variables for local execution
     env = os.environ.copy()
     env["FORGE_RUNTIME"] = "local"
+    start_server_path = Path(__file__).resolve().parents[2] / "start_server.py"
 
     try:
-        # Check if port 3000 is available (basic check)
-        import socket
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        result = sock.connect_ex(("127.0.0.1", 3000))
-        sock.close()
-        if result == 0:
-            print("⚠️  Warning: Port 3000 seems to be in use. Server start might fail.")
-
-        # Start the server using uvicorn
-        # We use the listen module which mounts the API and Socket.IO
-        cmd = [
-            sys.executable,
-            "-m",
-            "uvicorn",
-            "backend.api.socketio_asgi_app:app",
-            "--host",
-            "0.0.0.0",
-            "--port",
-            "3000",
-        ]
-
+        cmd = [sys.executable, str(start_server_path)]
         subprocess.run(cmd, env=env, check=True)
     except subprocess.CalledProcessError as e:
         print("")

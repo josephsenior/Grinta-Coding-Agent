@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from typing import Any
 
 from backend.core.config import ForgeConfig
@@ -132,6 +133,8 @@ class AppState:
         self._conversation_manager: Any = None
         self._conversation_store: ConversationStore | None = None
         self.monitoring_listener: MonitoringListener | None = None
+        self._state_restore_records: dict[str, dict[str, Any]] = {}
+        self._startup_snapshot: dict[str, Any] | None = None
 
     # ----- Event service adapter -----
 
@@ -230,6 +233,60 @@ class AppState:
             return None
 
     # ----- Teardown -----
+
+    def record_state_restore(
+        self,
+        sid: str,
+        *,
+        source: str,
+        path: str,
+        primary_error: str | None = None,
+    ) -> None:
+        """Record state restore provenance for operator-facing diagnostics."""
+        entry = {
+            "sid": sid,
+            "source": source,
+            "path": path,
+            "primary_error": primary_error,
+            "recorded_at": time.time(),
+        }
+        with self._lock:
+            self._state_restore_records[sid] = entry
+            if len(self._state_restore_records) > 50:
+                oldest_sid = min(
+                    self._state_restore_records,
+                    key=lambda key: self._state_restore_records[key].get(
+                        "recorded_at", 0.0
+                    ),
+                )
+                self._state_restore_records.pop(oldest_sid, None)
+
+    def get_state_restore_snapshot(self, limit: int = 10) -> dict[str, Any]:
+        """Return recent state-restore provenance for health/status endpoints."""
+        with self._lock:
+            records = sorted(
+                self._state_restore_records.values(),
+                key=lambda item: item.get("recorded_at", 0.0),
+                reverse=True,
+            )
+        trimmed = records[: max(limit, 0)]
+        return {
+            "count": len(records),
+            "recent": trimmed,
+        }
+
+    def record_startup_snapshot(self, snapshot: dict[str, Any]) -> None:
+        """Record the latest local-server startup plan for health/status endpoints."""
+        entry = dict(snapshot)
+        entry["recorded_at"] = time.time()
+        with self._lock:
+            self._startup_snapshot = entry
+
+    def get_startup_snapshot(self) -> dict[str, Any]:
+        """Return the latest recorded startup snapshot, if any."""
+        with self._lock:
+            snapshot = dict(self._startup_snapshot or {})
+        return snapshot
 
     def close(self) -> None:
         """Release resources held by this AppState instance.

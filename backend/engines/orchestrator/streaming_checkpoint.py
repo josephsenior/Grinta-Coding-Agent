@@ -36,6 +36,16 @@ class CheckpointRecord:
     created_at: float
     params_summary: dict[str, Any] = field(default_factory=dict)
     attempt: int = 1
+    anchor_event_id: int | None = None
+
+
+@dataclass
+class RecoveryInspection:
+    """Result of inspecting the streaming WAL on startup."""
+
+    status: str
+    record: CheckpointRecord | None = None
+    reason: str = ""
 
 
 class StreamingCheckpoint:
@@ -60,7 +70,13 @@ class StreamingCheckpoint:
     # Public API
     # ------------------------------------------------------------------ #
 
-    def begin(self, params: dict[str, Any], attempt: int = 1) -> str:
+    def begin(
+        self,
+        params: dict[str, Any],
+        attempt: int = 1,
+        *,
+        anchor_event_id: int | None = None,
+    ) -> str:
         """Create a write-ahead checkpoint before an LLM call.
 
         Returns a unique token used to commit or discard the checkpoint.
@@ -72,6 +88,7 @@ class StreamingCheckpoint:
             created_at=time.time(),
             params_summary=summary,
             attempt=attempt,
+            anchor_event_id=anchor_event_id,
         )
         self._write(record)
         self._active = record
@@ -101,16 +118,24 @@ class StreamingCheckpoint:
         Returns the record if one exists (indicating a crash mid-stream),
         or ``None`` if the last call completed cleanly.
         """
+        inspection = self.inspect_recovery()
+        if inspection.status == "blocked_uncommitted":
+            return inspection.record
+        return None
+
+    def inspect_recovery(self) -> RecoveryInspection:
+        """Inspect the WAL and classify recovery state without guessing.
+
+        Recent uncommitted checkpoints are treated as ambiguous and should
+        block the next automatic retry. Corrupt or stale WAL files are
+        discarded eagerly.
+        """
         if not self._wal_path.exists():
-            return None
+            return RecoveryInspection(status="clean")
         try:
-            raw = json.loads(self._wal_path.read_text(encoding="utf-8"))
-            record = CheckpointRecord(**raw)
+            record = self._read_record()
             age = time.time() - record.created_at
 
-            # Discard stale checkpoints — if the WAL is older than the
-            # max age it almost certainly belongs to a completed call
-            # whose commit() was missed, not to an in-flight request.
             if age > self._MAX_CHECKPOINT_AGE_SEC:
                 logger.warning(
                     "Discarding stale streaming checkpoint %s (age=%.1fs > %.0fs limit)",
@@ -119,19 +144,29 @@ class StreamingCheckpoint:
                     self._MAX_CHECKPOINT_AGE_SEC,
                 )
                 self._remove_wal()
-                return None
+                return RecoveryInspection(
+                    status="stale_discarded",
+                    record=record,
+                    reason="checkpoint exceeded max age",
+                )
 
-            logger.warning(
-                "Recovered uncommitted streaming checkpoint %s (age=%.1fs, attempt=%d)",
-                record.token,
-                age,
-                record.attempt,
+            reason = (
+                f"recent uncommitted checkpoint token={record.token} "
+                f"age={age:.1f}s attempt={record.attempt}"
             )
-            return record
+            logger.warning("Streaming checkpoint requires manual recovery: %s", reason)
+            return RecoveryInspection(
+                status="blocked_uncommitted",
+                record=record,
+                reason=reason,
+            )
         except Exception:
             logger.exception("Corrupt streaming WAL — discarding")
             self._remove_wal()
-            return None
+            return RecoveryInspection(
+                status="corrupt_discarded",
+                reason="checkpoint WAL could not be parsed",
+            )
 
     @property
     def active_token(self) -> str | None:
@@ -151,6 +186,10 @@ class StreamingCheckpoint:
         if "tools" in params:
             summary["tool_count"] = len(params["tools"])
         return summary
+
+    def _read_record(self) -> CheckpointRecord:
+        raw = json.loads(self._wal_path.read_text(encoding="utf-8"))
+        return CheckpointRecord(**raw)
 
     def _write(self, record: CheckpointRecord) -> None:
         try:
