@@ -299,7 +299,10 @@ class BashSession(BaseShellSession):
         """
         try:
             # Fast liveness probe: ask tmux for the pane pid
-            self.pane.cmd("display-message", "-p", "#{pane_pid}")
+            pane = self.pane
+            if pane is None:
+                return False
+            pane.cmd("display-message", "-p", "#{pane_pid}")
             return False
         except Exception:
             logger.warning("Tmux session died — attempting recovery")
@@ -309,8 +312,9 @@ class BashSession(BaseShellSession):
         try:
             self.initialize()
             # Restore previous working directory
-            if old_cwd and old_cwd != self.work_dir:
-                self.pane.send_keys(f"cd {old_cwd}")
+            new_pane = self.pane
+            if old_cwd and old_cwd != self.work_dir and new_pane is not None:
+                new_pane.send_keys(f"cd {old_cwd}")
                 time.sleep(0.2)
                 self._clear_screen()
             logger.info("Tmux session recovered (cwd=%s)", old_cwd)

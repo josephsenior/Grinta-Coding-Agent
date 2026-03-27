@@ -34,6 +34,7 @@ from backend.core.provider_types import (
 )
 from backend.mcp_client import add_mcp_tools_to_agent
 from backend.memory.agent_memory import Memory
+from backend.api.session.runtime_factory import RuntimeResult
 from backend.runtime import RuntimeAcquireResult, runtime_orchestrator
 from backend.api.app_accessors import get_event_service_adapter
 from backend.api.types import LLMAuthenticationError
@@ -415,7 +416,7 @@ class AgentSession:
 
         return result.success
 
-    def _apply_runtime_result(self, result: RuntimeAcquireResult) -> None:
+    def _apply_runtime_result(self, result: RuntimeResult) -> None:
         """Copy successful runtime acquisition result onto session fields."""
         if not result.success:
             return

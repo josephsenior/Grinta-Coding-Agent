@@ -72,9 +72,13 @@ class RuntimeOrchestrator:
         key = config.runtime
         pooled = self._pool.acquire(key)
         if pooled:
+            runtime = pooled.runtime
+            rebind = getattr(runtime, "rebind_event_stream", None)
+            if callable(rebind):
+                rebind(event_stream, sid=session_id)
             self._telemetry.record_acquire(key, reused=True)
             result = RuntimeAcquireResult(
-                runtime=pooled.runtime, repo_directory=pooled.repo_directory
+                runtime=runtime, repo_directory=pooled.repo_directory
             )
             runtime_watchdog.watch_runtime(
                 result.runtime,

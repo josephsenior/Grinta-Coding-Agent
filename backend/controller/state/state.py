@@ -160,7 +160,7 @@ def _normalize_plan_step_status(raw_status: Any) -> str:
     return status if status in VALID_PLAN_STEP_STATUSES else "pending"
 
 
-def normalize_plan_step_payload(step: dict[str, Any], idx: int | None = None) -> dict[str, Any]:
+def normalize_plan_step_payload(step: Any, idx: int | None = None) -> dict[str, Any]:
     """Normalize plan/task-tracker step payloads to the canonical schema."""
     if not isinstance(step, dict):
         msg = f"Plan step must be a dictionary, got {type(step)}"

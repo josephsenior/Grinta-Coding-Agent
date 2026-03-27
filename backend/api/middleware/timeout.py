@@ -50,11 +50,17 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
         # Endpoint-specific timeouts (in seconds)
         # Longer timeouts for operations that legitimately take time
         self.endpoint_timeouts: dict[str, int] = {
-            "/api/conversations": 60,  # Conversation operations can take longer
+            "/api/v1/conversations": 120,  # Conversation creation: MCP init can take 30-60s
+            "/api/conversations": 120,  # Legacy path alias
+            "/api/v1/llm/chat": 120,  # LLM calls can take 1-2 minutes
             "/api/llm/chat": 120,  # LLM calls can take 1-2 minutes
+            "/api/v1/llm/stream": 180,  # Streaming can take even longer
             "/api/llm/stream": 180,  # Streaming can take even longer
+            "/api/v1/database-connections/query": 60,  # Database queries
             "/api/database-connections/query": 60,  # Database queries
+            "/api/v1/files/upload-files": 60,  # File uploads
             "/api/files/upload-files": 60,  # File uploads
+            "/api/v1/memory": 45,  # Memory operations
             "/api/memory": 45,  # Memory operations
         }
 

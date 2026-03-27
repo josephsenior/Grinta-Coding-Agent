@@ -93,10 +93,12 @@ def _update_brace_depth(char: str, depth: int, start: int, i: int) -> tuple[int,
 def _repair_and_load(extracted: str, kwargs: dict) -> Any:
     """Attempt to repair malformed JSON and load."""
     try:
-        repaired = repair_json(extracted)
-        if isinstance(repaired, tuple):
-            repaired = repaired[0] if repaired else extracted
-        return json.loads(str(repaired), **kwargs)
+        repaired_raw: Any = repair_json(extracted)
+        if isinstance(repaired_raw, tuple):
+            repaired_val: Any = repaired_raw[0] if repaired_raw else extracted
+        else:
+            repaired_val = repaired_raw
+        return json.loads(str(repaired_val), **kwargs)
     except (json.JSONDecodeError, ValueError, TypeError) as e:
         raise LLMResponseError(
             "Invalid JSON in response. Please make sure the response is a valid JSON object."

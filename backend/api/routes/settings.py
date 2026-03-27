@@ -480,8 +480,6 @@ def _merge_forge_mcp_for_api(settings: Settings) -> Settings:
     except Exception as exc:
         logger.debug("Forge MCP merge skipped: %s", exc)
         return settings
-    if forge_mcp is None:
-        return settings
 
     # Shallow copy only: deep=True can raise "cannot pickle 'mappingproxy' object"
     # when copying frozen UserSecrets / nested immutables, which forces GET /settings
@@ -646,8 +644,12 @@ async def store_settings(
             if "user_consents_to_analytics" in Settings.model_fields:
                 current_consent = getattr(settings, "user_consents_to_analytics", None)
                 if current_consent is None:
-                    settings.user_consents_to_analytics = getattr(
-                        existing_settings, "user_consents_to_analytics", None
+                    setattr(
+                        settings,
+                        "user_consents_to_analytics",
+                        getattr(
+                            existing_settings, "user_consents_to_analytics", None
+                        ),
                     )
 
         _apply_runtime_and_git_overrides(settings)

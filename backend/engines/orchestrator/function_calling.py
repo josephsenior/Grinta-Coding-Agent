@@ -6,7 +6,7 @@ This is similar to the functionality of `OrchestratorResponseParser`.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.errors import (
     FunctionCallNotExistsError,
@@ -1085,7 +1085,10 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
             handler = editor_command_handlers[command]
             return handler(editor, path, normalized_args)
         elif command in simple_command_handlers:
-            simple_handler = simple_command_handlers[command]
+            simple_handler = cast(
+                Callable[[str, dict[str, Any]], Action],
+                simple_command_handlers[command],
+            )
             return simple_handler(path, normalized_args)
         else:
             all_cmds = list(editor_command_handlers) + list(simple_command_handlers)

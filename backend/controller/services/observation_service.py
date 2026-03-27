@@ -77,6 +77,7 @@ class ObservationService:
             return
 
         # Plugin hook: action_post
+        assert pending_action is not None  # _matches_pending_action requires this
         try:
             from backend.core.plugin import get_plugin_registry
 

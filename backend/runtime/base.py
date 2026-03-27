@@ -211,17 +211,9 @@ class Runtime(
             create_file_fn=self._create_file_fn_git_handler,
         )
         self.sid = sid
-        self.event_stream = event_stream
+        self.event_stream = None
         self.project_root = project_root
-        if event_stream:
-            # Unsubscribe first if already exists (handles reconnection cases)
-            try:
-                event_stream.unsubscribe(EventStreamSubscriber.RUNTIME, self.sid)
-            except Exception:
-                pass  # Ignore if not subscribed
-            event_stream.subscribe(
-                EventStreamSubscriber.RUNTIME, self.on_event, self.sid
-            )
+        self.rebind_event_stream(event_stream, sid=sid)
         self.plugins = copy.deepcopy(plugins) if plugins is not None and plugins else []
         self.status_callback = status_callback
         self.attach_to_existing = attach_to_existing
@@ -270,6 +262,40 @@ class Runtime(
                 analyzer_cls.__name__,
                 self.sid,
             )
+
+    def rebind_event_stream(self, event_stream: EventStream | None, sid: str | None = None) -> None:
+        """Rebind runtime event subscription when the runtime is reused.
+
+        Warm-pooled runtimes can outlive a conversation. When reattached to a new
+        session, they must unsubscribe from the old stream and subscribe to the new
+        one, otherwise actions are emitted but never executed by the runtime.
+        """
+        old_stream = getattr(self, "event_stream", None)
+        old_sid = getattr(self, "sid", None)
+
+        if old_stream is not None and old_sid is not None:
+            try:
+                old_stream.unsubscribe(EventStreamSubscriber.RUNTIME, old_sid)
+            except Exception:
+                pass
+
+        if sid is not None:
+            self.sid = sid
+
+        self.event_stream = event_stream
+        if self.event_stream is None:
+            return
+
+        try:
+            self.event_stream.unsubscribe(EventStreamSubscriber.RUNTIME, self.sid)
+        except Exception:
+            pass
+
+        self.event_stream.subscribe(
+            EventStreamSubscriber.RUNTIME,
+            self.on_event,
+            self.sid,
+        )
 
     @property
     def workspace_root(self) -> Path:

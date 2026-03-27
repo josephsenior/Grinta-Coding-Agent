@@ -85,8 +85,6 @@ class SecretsManager:
         return f"{self._FORMAT_V3}:{salt_b64}:{token_b64}"
 
     def _decode_v3_ciphertext(self, ciphertext: str) -> tuple[bytes, bytes] | None:
-        if not isinstance(ciphertext, str):
-            return None
         parts = ciphertext.split(":", 2)
         if len(parts) != 3 or parts[0] != self._FORMAT_V3:
             return None
@@ -100,8 +98,6 @@ class SecretsManager:
             return None
 
     def _decode_v2_ciphertext(self, ciphertext: str) -> tuple[bytes, bytes] | None:
-        if not isinstance(ciphertext, str):
-            return None
         parts = ciphertext.split(":", 2)
         if len(parts) != 3 or parts[0] != self._FORMAT_PREFIX:
             return None

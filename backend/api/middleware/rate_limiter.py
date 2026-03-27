@@ -227,12 +227,13 @@ class EndpointRateLimiter:
         return self.LIMITS["default"]
 
 
+_redis_asyncio: Any = None
 try:
-    import redis.asyncio as redis
+    import redis.asyncio as redis_ai
 
+    _redis_asyncio = redis_ai
     REDIS_AVAILABLE = True
 except ImportError:
-    redis = None
     REDIS_AVAILABLE = False
     logger.info("Redis not available, using in-memory rate limiting")
 
@@ -263,12 +264,12 @@ class RedisRateLimiter(RateLimiter):
 
     async def get_redis_client(self) -> Any | None:
         """Get or create Redis client."""
-        if not REDIS_AVAILABLE or redis is None:
+        if not REDIS_AVAILABLE or _redis_asyncio is None:
             return None
 
         if self._redis_client is None:
             try:
-                self._redis_client = redis.from_url(
+                self._redis_client = _redis_asyncio.from_url(
                     self.redis_url,
                     decode_responses=True,
                 )

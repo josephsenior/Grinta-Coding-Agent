@@ -175,13 +175,24 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
             if "llm_api_key" in data and data["llm_api_key"]:
                 llm_dict["api_key"] = data["llm_api_key"]
             if "llm_base_url" in data and data["llm_base_url"]:
-                llm_dict["base_url"] = data["llm_base_url"]
+                raw_url = str(data["llm_base_url"]).strip()
+                model_str = str(llm_dict.get("model") or "").lower()
+                # Google/Gemini routes through the SDK — a custom base_url breaks
+                # litellm and is always ignored in the API route; replicate that here.
+                _is_google = (
+                    model_str.startswith(("google/", "gemini/", "gemini-"))
+                    or "gemini" in model_str
+                )
+                if not _is_google:
+                    llm_dict["base_url"] = raw_url
 
             cfg.set_llm_config(LLMConfig.model_validate(llm_dict))
 
-        # Top-level ForgeConfig fields (mcp_host, etc.)
+        # Top-level ForgeConfig fields (mcp_host, project_root, etc.)
         if "mcp_host" in data and data["mcp_host"]:
             cfg.mcp_host = data["mcp_host"]
+        if "project_root" in data and data["project_root"]:
+            cfg.project_root = data["project_root"]
 
     finally:
         summary.emit()

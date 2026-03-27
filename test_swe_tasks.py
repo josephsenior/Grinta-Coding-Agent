@@ -15,8 +15,27 @@ from forge_client import ForgeClient
 BASE_URL = os.environ.get("FORGE_BASE_URL", "http://localhost:3000")
 WAIT_SECONDS = int(os.environ.get("FORGE_WAIT_SECONDS", "300"))
 
-# Workspace root = Forge repo dir (project_root is "" = cwd = Forge dir)
-WORKSPACE = os.path.abspath(os.path.dirname(__file__))
+# Match the project_root configured in settings.json.
+# Override with FORGE_WORKSPACE env var if needed.
+def _get_workspace() -> str:
+    env = os.environ.get("FORGE_WORKSPACE", "").strip()
+    if env:
+        return os.path.abspath(env)
+    # Try to read from settings.json next to this file
+    settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
+    try:
+        import json
+        with open(settings_path, encoding="utf-8") as f:
+            s = json.load(f)
+        pr = (s.get("project_root") or "").strip()
+        if pr:
+            return os.path.abspath(pr)
+    except Exception:
+        pass
+    # Fallback: Forge repo root (works when project_root is empty = cwd)
+    return os.path.abspath(os.path.dirname(__file__))
+
+WORKSPACE = _get_workspace()
 
 
 TASKS = [
@@ -25,26 +44,25 @@ TASKS = [
         "description": "Fix an off-by-one bug in a Python function",
         "setup_files": {
             "swe_task_bugfix.py": (
-                "def first_n_evens(n):\n"
-                "    \"\"\"Return the first n even numbers starting from 0.\"\"\"\n"
-                "    result = []\n"
-                "    for i in range(n + 1):  # BUG: should be range(n)\n"
-                "        if i % 2 == 0:\n"
-                "            result.append(i)\n"
-                "    return result\n"
+                "def sum_of_squares(n):\n"
+                "    \"\"\"Return 1^2 + 2^2 + ... + n^2.\"\"\"\n"
+                "    total = 0\n"
+                "    for i in range(1, n):  # BUG: off-by-one, should be range(1, n + 1)\n"
+                "        total += i * i\n"
+                "    return total\n"
             ),
         },
         "output_files": ["swe_task_bugfix.py"],
         "prompt": (
             "There is a bug in the file `swe_task_bugfix.py` in the current directory.\n"
-            "The function `first_n_evens(n)` should return exactly n even numbers starting from 0.\n"
-            "For example: first_n_evens(3) should return [0, 2, 4], but currently returns [0, 2, 4, 6].\n\n"
-            "Fix the bug in the file. The fix should be a one-character change (n+1 → n in the range call).\n"
-            "After fixing, verify the function works correctly by running it."
+            "The function `sum_of_squares(n)` should return 1^2 + 2^2 + ... + n^2.\n"
+            "For example: sum_of_squares(3) should return 14 (=1+4+9), but currently returns 5 (=1+4, misses 9).\n\n"
+            "The bug is an off-by-one error: it uses `range(1, n)` but should use `range(1, n + 1)`.\n"
+            "Fix the bug in the file and verify the function works correctly by running it."
         ),
         "verify": lambda files: (
-            "range(n)" in files.get("swe_task_bugfix.py", "")
-            and "range(n + 1)" not in files.get("swe_task_bugfix.py", "")
+            ("range(1, n + 1)" in files.get("swe_task_bugfix.py", "")
+             or "range(1, n+1)" in files.get("swe_task_bugfix.py", ""))
         ),
     },
     {
@@ -154,8 +172,11 @@ TASKS = [
 async def run_task(task: dict, client: ForgeClient) -> dict:
     name = task["name"]
     print(f"\n{'='*70}")
-    print(f"TASK: {name} — {task['description']}")
+    print(f"TASK: {name} - {task['description']}")
     print(f"{'='*70}")
+
+    # Recreate workspace if it was removed between runs.
+    os.makedirs(WORKSPACE, exist_ok=True)
 
     # Write setup files into workspace
     for fname, content in task.get("setup_files", {}).items():
@@ -183,7 +204,7 @@ async def run_task(task: dict, client: ForgeClient) -> dict:
 
     try:
         print("  Creating conversation...")
-        conv = await asyncio.wait_for(client.create_conversation(), timeout=30)
+        conv = await asyncio.wait_for(client.create_conversation(), timeout=120)
         conv_id = conv.get("id") or conv.get("conversation_id")
         if not conv_id:
             raise ValueError(f"No conv ID in: {conv}")
@@ -197,6 +218,7 @@ async def run_task(task: dict, client: ForgeClient) -> dict:
         last_state = [None]
         event_count = [0]
         tool_calls = [0]
+        awaiting_count = [0]
 
         async def on_event(event: dict) -> None:
             event_count[0] += 1
@@ -216,8 +238,13 @@ async def run_task(task: dict, client: ForgeClient) -> dict:
                 if action not in ("message", "recall", "add_memory"):
                     tool_calls[0] += 1
 
-            if state in {"AWAITING_USER_INPUT"} and event.get("id") is not None:
-                initialized.set()
+            if state in {"AWAITING_USER_INPUT"}:
+                awaiting_count[0] += 1
+                if awaiting_count[0] == 1 and event.get("id") is not None:
+                    initialized.set()
+                elif awaiting_count[0] >= 2:
+                    # Agent sent a question after receiving the task - it gave up
+                    terminal.set()
             if state in {"FINISHED", "STOPPED", "ERROR", "REJECTED"} or \
                action == "finish" or obs == "agent_finish":
                 terminal.set()
@@ -269,7 +296,7 @@ async def run_task(task: dict, client: ForgeClient) -> dict:
         elif task["verify"](file_contents):
             result["status"] = "PASS"
             result["exit_code"] = 0
-            print(f"  PASS: verification succeeded")
+            print("  PASS: verification succeeded")
         else:
             result["status"] = "FAIL"
             result["exit_code"] = 1
@@ -300,7 +327,7 @@ async def main() -> int:
     else:
         tasks = TASKS
 
-    print(f"\nForge SWE Task Test Runner")
+    print("\nForge SWE Task Test Runner")
     print(f"Server: {BASE_URL}")
     print(f"Timeout per task: {WAIT_SECONDS}s")
     print(f"Tasks: {[t['name'] for t in tasks]}\n")
@@ -326,7 +353,7 @@ async def main() -> int:
     print(f"{'='*70}")
     passed = 0
     for r in results:
-        status_sym = "✓" if r["status"] == "PASS" else "✗"
+        status_sym = "PASS" if r["status"] == "PASS" else "FAIL"
         print(
             f"  {status_sym}  {r['name']:<28}  {r['status']:<12}  "
             f"{r['elapsed']:5.1f}s  state={r['last_state']}"

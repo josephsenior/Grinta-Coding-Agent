@@ -154,7 +154,7 @@ class BasePlaybook(BaseModel):
         FILE_ATTRIBUTE_NORMAL = 0x00000080
         INVALID_HANDLE_VALUE = wintypes.HANDLE(-1).value
 
-        kernel32 = ctypes.windll.kernel32
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
         kernel32.SetLastError(0)
         handle = kernel32.CreateFileW(
             str(path),
@@ -173,7 +173,7 @@ class BasePlaybook(BaseModel):
         try:
             import msvcrt
 
-            fd = msvcrt.open_osfhandle(handle, os.O_RDONLY)
+            fd = msvcrt.open_osfhandle(handle, os.O_RDONLY)  # type: ignore[attr-defined]
         except Exception:
             kernel32.CloseHandle(handle)
             raise

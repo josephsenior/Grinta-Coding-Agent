@@ -403,7 +403,7 @@ class EventStream(EventStore):
             try:
                 result = callback(event)
                 if inspect.isawaitable(result):
-                    run_or_schedule(result)
+                    run_or_schedule(result)  # type: ignore[unreachable]
             except Exception as exc:  # pragma: no cover - defensive logging
                 logger.error(
                     "Error in inline event callback %s for subscriber %s: %s",

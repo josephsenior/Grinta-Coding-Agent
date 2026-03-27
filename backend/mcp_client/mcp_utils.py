@@ -322,6 +322,7 @@ async def fetch_mcp_tools_from_config(
             )
             return wrapper_tool_params([])
 
+        from backend.mcp_client.mcp_bootstrap_status import MCPBootstrapState
         from backend.mcp_client.mcp_tool_aliases import prepare_mcp_tool_exposed_names
 
         reserved = set(reserved_tool_names or ()) | set(
@@ -331,6 +332,7 @@ async def fetch_mcp_tools_from_config(
         mcp_tools = convert_mcps_to_tools(mcps)
         remote_tool_count = sum(len(getattr(c, "tools", ()) or ()) for c in mcps)
         conv_errs = list(_last_mcp_conversion_errors)
+        boot_state: MCPBootstrapState
         if remote_tool_count == 0:
             boot_state = "connected_no_remote_tools"
         elif conv_errs:
