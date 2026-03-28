@@ -1,7 +1,7 @@
-r"""Forge plugin system — lightweight hook-based extension API.
+﻿r"""Forge plugin system — lightweight hook-based extension API.
 
 There are **two** plugin surfaces in Forge — this module provides the
-*core hook API* while :mod:`backend.runtime.plugins` provides the
+*core hook API* while :mod:`backend.execution.plugins` provides the
 *runtime plugin API*.  They serve different purposes:
 
 +------------------------------+--------------------------------------------+
@@ -58,9 +58,9 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from backend.events.action import Action
-    from backend.events.event import Event
-    from backend.events.observation import Observation
+    from backend.ledger.action import Action
+    from backend.ledger.event import Event
+    from backend.ledger.observation import Observation
 
 logger = logging.getLogger(__name__)
 

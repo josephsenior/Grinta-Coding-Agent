@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING
 
 from backend.core.config import LLMConfig
 from backend.core.logger import forge_logger as logger
-from backend.events.event import EventSource
-from backend.events.event_store import EventStore
+from backend.ledger.event import EventSource
+from backend.ledger.event_store import EventStore
 
 if TYPE_CHECKING:
-    from backend.llm.llm_registry import LLMRegistry
-    from backend.storage.data_models.settings import Settings
-    from backend.storage.files import FileStore
+    from backend.inference.llm_registry import LLMRegistry
+    from backend.persistence.data_models.settings import Settings
+    from backend.persistence.files import FileStore
 
 
 async def generate_conversation_title(

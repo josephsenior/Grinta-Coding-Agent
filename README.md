@@ -24,6 +24,33 @@ Most AI coding tools stop at the file edit. Forge keeps going:
 - **Safety First:** Per-action risk assessment, rollback checkpoints (no git required), and multi-trip circuit breakers before any destructive action.
 - **Local-First:** Native Ollama and OpenAI-compatible support. Zero cloud required.
 
+## Forge Vocabulary
+
+Forge is standardizing on a distinct internal architecture language. The codebase
+still contains older implementation names, but the canonical set is locked in
+[docs/VOCABULARY.md](docs/VOCABULARY.md). The highest-signal mappings are:
+
+- session orchestrator: currently `AgentController` or bare controller terminology
+- operation: currently `Action`
+- outcome: currently `Observation`
+- record and ledger: currently `Event` and implemented by `EventStream`
+- run: current backend session object
+- run state: currently `State`
+- snapshot: currently `Checkpoint`
+- transcript: currently `Trajectory`
+- runtime executor: currently `ActionExecutor`
+- open operation: currently `PendingAction`
+- execution policy: currently autonomy mode
+- compactor: currently condenser
+- context memory: currently `ConversationMemory` and the generic memory layer
+- operation pipeline: currently `ToolInvocationPipeline`
+- governance: currently `Review`
+- runtime, playbook, tool, core, security, telemetry, validation, and utils stay as they are
+
+The goal is to make Forge read like what it already is: a local-first execution
+platform with durable run history, governed automation, and adaptive context
+management.
+
 ## Security Boundary
 
 Forge currently runs actions on the local host. The `hardened_local` execution profile adds stricter local policy gates for commands, file access, workspace scoping, and interactive terminals, but it is not a sandbox and it is not process isolation.
@@ -42,10 +69,10 @@ graph TB
         SM[Session Manager]
     end
 
-    subgraph Controller["Agent Controller"]
-        AC[AgentController]
+    subgraph Controller["Session Orchestrator"]
+        AC[SessionOrchestrator]
         Planner[Task Planner]
-        Critics[Critics: Finish · Budget · SuitePass]
+        Critics[Governance: Finish · Budget · SuitePass]
         Safety[Circuit Breaker / Stuck Detector]
     end
 
@@ -54,14 +81,14 @@ graph TB
         Tools["23 Tools (edit · test · browse · db)"]
     end
 
-    subgraph Memory["Memory"]
-        Condensers["12 Condensers"]
+    subgraph Memory["Context Memory"]
+        Condensers["12 Compactors"]
         GraphRAG[GraphRAG]
     end
 
     subgraph Persistence["Persistence"]
-        ES[EventStream / WAL]
-        Checkpoints[Rollback Checkpoints]
+        ES[Ledger / WAL]
+        Checkpoints[Snapshots / Rollback]
     end
 
     Server --> AC
@@ -75,7 +102,7 @@ graph TB
     ES --> Checkpoints
 ```
 
-See the [Architecture Deep Dive](docs/ARCHITECTURE.md) for a full walkthrough of the 21 services and 23 tools.
+See the [Architecture Deep Dive](docs/ARCHITECTURE.md) for a full walkthrough of the current implementation and the [Forge Vocabulary](docs/VOCABULARY.md) for the naming contract.
 
 ---
 
@@ -191,6 +218,7 @@ Forge detects if the agent is looping by analyzing action patterns, semantic int
 
 - [User Guide](docs/USER_GUIDE.md) — LLM setup, autonomy modes, playbooks, and web UI usage.
 - [Architecture](docs/ARCHITECTURE.md) — Deeper dive into the controller, events, and engine layers.
+- [Vocabulary](docs/VOCABULARY.md) — Canonical Forge terminology and package taxonomy.
 - [Developer Guide](docs/DEVELOPER.md) — For contributors: project layout, internals, and patterns.
 - [API Reference](openapi.json) — Full OpenAPI 3.1 spec for the backend.
 - [Contributing](CONTRIBUTING.md) — How to add new tools, condensers, or features.

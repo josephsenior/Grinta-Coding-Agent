@@ -355,6 +355,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             "google": ["google/", "gemini/"],
             "xai": ["xai/"],
             "groq": ["groq/"],
+            "openhands": ["openhands/"],
             "mistral": ["mistral/"],
             "openrouter": ["openrouter/"],
             "nvidia": ["nvidia/"],
@@ -392,7 +393,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             return "unknown"
 
         try:
-            from backend.llm.provider_resolver import get_resolver
+            from backend.inference.provider_resolver import get_resolver
 
             resolver = get_resolver()
             provider = resolver.resolve_provider(model)

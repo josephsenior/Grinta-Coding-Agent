@@ -18,7 +18,7 @@ from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.forge_config import ForgeConfig
-    from backend.storage.data_models.settings import Settings
+    from backend.persistence.data_models.settings import Settings
 
 try:
     import redis
@@ -175,7 +175,7 @@ class SmartConfigCache:
             cached = self.redis.get(user_key)
 
             if isinstance(cached, bytes):
-                from backend.storage.data_models.settings import (
+                from backend.persistence.data_models.settings import (
                     Settings as SettingsModel,
                 )
 

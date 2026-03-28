@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from backend.events.action.commands import CmdRunAction
-from backend.events.observation.commands import CmdOutputObservation
+from backend.ledger.action.commands import CmdRunAction
+from backend.ledger.observation.commands import CmdOutputObservation
 from backend.validation.command_classification import (
     classify_shell_intent,
     find_cmd_output_for_run,

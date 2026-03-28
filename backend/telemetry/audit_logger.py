@@ -11,11 +11,11 @@ from uuid import uuid4
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from backend.controller.safety_validator import ValidationResult
-    from backend.events.action import Action
+    from backend.orchestration.safety_validator import ValidationResult
+    from backend.ledger.action import Action
 
 from backend.core.logger import forge_logger as logger
-from backend.events.action import ActionSecurityRisk
+from backend.ledger.action import ActionSecurityRisk
 from backend.telemetry.models import AuditEntry
 
 
@@ -121,7 +121,7 @@ class AuditLogger:
             Action content string (truncated if too long)
 
         """
-        from backend.events.action import (
+        from backend.ledger.action import (
             CmdRunAction,
             FileEditAction,
         )

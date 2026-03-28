@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from backend.core.enums import ActionSecurityRisk
-from backend.events.action import Action, CmdRunAction, FileWriteAction
+from backend.ledger.action import Action, CmdRunAction, FileWriteAction
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 
 logger = logging.getLogger(__name__)

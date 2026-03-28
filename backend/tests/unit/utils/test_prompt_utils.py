@@ -106,7 +106,7 @@ class TestPromptManager:
         assert pm.user_template is not None
 
     @patch(
-        "backend.engines.orchestrator.tools.prompt.refine_prompt",
+        "backend.engine.tools.prompt.refine_prompt",
         side_effect=lambda x: x,
     )
     def test_get_system_message(self, mock_refine, tmp_path):
@@ -175,7 +175,7 @@ class TestPromptManager:
 
 class TestOrchestratorPromptManager:
     @patch(
-        "backend.engines.orchestrator.tools.prompt.refine_prompt",
+        "backend.engine.tools.prompt.refine_prompt",
         side_effect=lambda x: x,
     )
     def test_identity_prefix_added(self, mock_refine, tmp_path):
@@ -195,7 +195,7 @@ class TestOrchestratorPromptManager:
         assert result.startswith("You are Forge agent.")
 
     @patch(
-        "backend.engines.orchestrator.tools.prompt.refine_prompt",
+        "backend.engine.tools.prompt.refine_prompt",
         side_effect=lambda x: x,
     )
     def test_identity_prefix_not_duplicated(self, mock_refine, tmp_path):
@@ -217,7 +217,7 @@ class TestOrchestratorPromptManager:
         assert result.count("You are Forge agent.") == 1
 
     @patch(
-        "backend.engines.orchestrator.tools.prompt.refine_prompt",
+        "backend.engine.tools.prompt.refine_prompt",
         side_effect=lambda x: x,
     )
     def test_config_injected(self, mock_refine, tmp_path):
@@ -286,7 +286,7 @@ class TestOrchestratorPromptManager:
         assert isinstance(last_content, TextContent)
         assert "8 turns left" in last_content.text
 
-    @patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x)
+    @patch("backend.engine.tools.prompt.refine_prompt", side_effect=lambda x: x)
     def test_inject_lessons_learned(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
@@ -315,7 +315,7 @@ class TestOrchestratorPromptManager:
             assert "REPOSITORY_LESSONS_LEARNED" in result
             assert "Always test your code." in result
 
-    @patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x)
+    @patch("backend.engine.tools.prompt.refine_prompt", side_effect=lambda x: x)
     def test_inject_scratchpad(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
@@ -326,10 +326,10 @@ class TestOrchestratorPromptManager:
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
 
         with patch(
-            "backend.engines.orchestrator.tools.note.scratchpad_entries_for_prompt",
+            "backend.engine.tools.note.scratchpad_entries_for_prompt",
             return_value=[("key", "val")],
         ), patch(
-            "backend.engines.orchestrator.tools.working_memory.get_working_memory_prompt_block",
+            "backend.engine.tools.working_memory.get_working_memory_prompt_block",
             return_value="",
         ):
             result = opm.get_system_message()

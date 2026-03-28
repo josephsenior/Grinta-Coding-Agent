@@ -1,13 +1,13 @@
-"""Agent control loop helpers for running runtimes and handling status callbacks."""
+﻿"""Agent control loop helpers for running runtimes and handling status callbacks."""
 
 import asyncio
 from collections.abc import Callable
 
-from backend.controller import AgentController
+from backend.orchestration import SessionOrchestrator
 from backend.core.logger import forge_logger as logger
 from backend.core.schemas import AgentState
-from backend.memory.agent_memory import Memory
-from backend.runtime.base import Runtime
+from backend.context.agent_memory import Memory
+from backend.execution.base import Runtime
 from backend.core.enums import RuntimeStatus
 from backend.utils.async_utils import run_or_schedule
 
@@ -19,7 +19,7 @@ _MAX_CONSECUTIVE_ERRORS = 20  # Force ERROR state after this many step failures
 
 
 def _handle_error_status(
-    controller: AgentController, runtime_status: RuntimeStatus, msg: str
+    controller: SessionOrchestrator, runtime_status: RuntimeStatus, msg: str
 ) -> None:
     """Handle error status in the status callback."""
     if controller:
@@ -60,7 +60,7 @@ def _handle_error_status(
 
 
 def _create_status_callback(
-    controller: AgentController,
+    controller: SessionOrchestrator,
 ) -> Callable[[str, RuntimeStatus, str], None]:
     """Create the status callback function."""
 
@@ -82,7 +82,7 @@ def _create_status_callback(
     return status_callback
 
 
-def _validate_status_callbacks(runtime: Runtime, controller: AgentController) -> None:
+def _validate_status_callbacks(runtime: Runtime, controller: SessionOrchestrator) -> None:
     """Validate that status callbacks are not already set."""
     if getattr(runtime, "status_callback", None):
         logger.warning("Runtime status_callback already set; overriding in run loop")
@@ -92,7 +92,7 @@ def _validate_status_callbacks(runtime: Runtime, controller: AgentController) ->
 
 def _set_status_callbacks(
     runtime: Runtime,
-    controller: AgentController,
+    controller: SessionOrchestrator,
     memory: Memory,
     status_callback: Callable[[str, RuntimeStatus, str], None],
 ) -> None:
@@ -103,7 +103,7 @@ def _set_status_callbacks(
 
 
 async def run_agent_until_done(
-    controller: AgentController,
+    controller: SessionOrchestrator,
     runtime: Runtime,
     memory: Memory,
     end_states: list[AgentState],

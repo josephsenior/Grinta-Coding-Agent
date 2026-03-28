@@ -1,13 +1,13 @@
 import json
 import tempfile
 
-from backend.events import EventSource
-from backend.events.observation import NullObservation
-from backend.events.stream import EventStream
-from backend.api.routes.trajectory import get_trajectory
-from backend.api.session.conversation import ServerConversation
+from backend.ledger import EventSource
+from backend.ledger.observation import NullObservation
+from backend.ledger.stream import EventStream
+from backend.gateway.routes.trajectory import get_trajectory
+from backend.gateway.session.conversation import ServerConversation
 from backend.core.config import ForgeConfig
-from backend.storage.local_file_store import LocalFileStore
+from backend.persistence.local_file_store import LocalFileStore
 
 
 async def test_trajectory_replay_since_id_and_ordering() -> None:

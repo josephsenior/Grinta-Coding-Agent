@@ -22,7 +22,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-from backend.cli.server_startup import (
+from backend.gateway.cli.server_startup import (
     add_project_root_to_path,
     build_server_startup_plan,
     ensure_utf8_stdout,
@@ -46,7 +46,7 @@ def _run_server(host: str, port: int) -> None:
     import uvicorn  # imported here so the main thread can start fast
 
     uvicorn.run(
-        "backend.api.socketio_asgi_app:app",
+        "backend.gateway.socketio_asgi_app:app",
         host=host,
         port=port,
         log_level="error",   # suppress uvicorn's startup noise in embedded mode

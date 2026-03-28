@@ -61,16 +61,16 @@ high-water mark (HWM). When the queue is full, apply a configurable policy
 
 ---
 
-## ADR-004: 21-Service Controller Decomposition
+## ADR-004: 21-Service Orchestration Decomposition
 
 **Status:** Accepted  
 **Date:** 2025-01  
-**Context:** `AgentController` grew to 2000+ LOC with mixed responsibilities:
+**Context:** `SessionOrchestrator` grew to 2000+ LOC with mixed responsibilities:
 state management, error recovery, safety checks, budget enforcement, stuck
 detection, and more.
 
 **Decision:** Decompose into 21 focused services, each under 200 LOC, sharing
-state through a `ControllerContext` facade. The controller orchestrates service
+state through an `OrchestrationContext` facade. The session orchestrator coordinates service
 calls but delegates logic.
 
 **Consequences:**
@@ -78,7 +78,7 @@ calls but delegates logic.
 - ✅ Single responsibility per service
 - ✅ Controller LOC reduced from 2000+ to ~870
 - ⚠️ More files to navigate (mitigated by clear naming)
-- ⚠️ SharedContext coupling (mitigated by interface discipline)
+- ⚠️ OrchestrationContext coupling (mitigated by interface discipline)
 
 ---
 
@@ -313,3 +313,72 @@ as an alternative but the TUI is the recommended interface.
 - ✅ Keyboard-driven workflow
 - ⚠️ Limited to terminal capabilities (no rich media)
 - ⚠️ Textual framework learning curve
+
+---
+
+## ADR-016: Forge Vocabulary Contract
+
+**Status:** Accepted  
+**Date:** 2026-03  
+**Context:** Forge has evolved far beyond its original shell, but parts of its
+top-level language still undersell what the system actually is. The strongest
+Forge characteristics are durable run history, governed execution, adaptive
+context management, and local-first runtime control. Without a canonical
+vocabulary, future renames will drift, public docs will stay inconsistent, and
+the codebase will keep reading more inherited than it really is.
+
+**Decision:** Standardize on a Forge-first vocabulary contract and use it as
+the reference language for future documentation, public protocols, package
+decisions, and code symbol migration. This vocabulary lock should be set before
+any large implementation-planning pass or rename wave.
+
+`Outcome` is preferred over `Result` or `Effect` because it fits ledger
+semantics cleanly without implying that only world-state mutations matter.
+
+**Canonical terms:**
+
+- `Agent` stays `Agent`
+- `AgentController` and bare `Controller` become `SessionOrchestrator`
+- `Action` becomes `Operation`
+- `Observation` becomes `Outcome`
+- `Event` becomes `Record`
+- `EventStream` becomes `Ledger`
+- `EventStore` becomes `LedgerStore`
+- backend `Session` becomes `Run`
+- user-facing `Conversation` stays `Conversation`
+- `State` becomes `RunState`
+- `Checkpoint` becomes `Snapshot`
+- `Trajectory` becomes `Transcript`
+- `ActionExecutor` becomes `RuntimeExecutor`
+- `PendingAction` becomes `OpenOperation`
+- `Autonomy` becomes `ExecutionPolicy`
+- `Condenser` becomes `Compactor`
+- `ConversationMemory` / generic memory layer becomes `ContextMemory`
+- `ToolInvocationPipeline` becomes `OperationPipeline`
+- `Review` becomes `Governance`
+
+**Terms intentionally preserved:**
+
+- `Agent`
+- `Runtime`
+- `Playbook`
+- `Tool`
+- `Conversation` on user-facing surfaces
+- `Core`, `Security`, `Telemetry`, `Validation`, `Utils`
+
+**Naming principles:**
+
+- Use industrial, precise names; avoid cute or mystical metaphors.
+- Name concepts by semantic role, not implementation detail.
+- Keep the architecture model-agnostic and OS-agnostic; avoid provider-specific or platform-specific core nouns.
+- Lock the language before large implementation planning or rename waves.
+- Change the inherited conceptual shell first, not the strong mechanisms underneath it.
+
+**Consequences:**
+
+- ✅ Forge now has one explicit language contract for future renames
+- ✅ Implementation planning can evaluate changes against one stable vocabulary lock
+- ✅ Documentation can describe Forge in terms that match its actual strengths
+- ✅ Package and protocol changes can be evaluated against one stable reference
+- ⚠️ During transition, docs may reference both canonical names and current code names
+- ⚠️ A later implementation sweep must migrate symbols, packages, and persisted schemas carefully

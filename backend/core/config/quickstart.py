@@ -23,7 +23,7 @@ import json
 import os
 from pathlib import Path
 
-from backend.llm.provider_resolver import discover_all_local_models
+from backend.inference.provider_resolver import discover_all_local_models
 
 
 def generate_quickstart_config(

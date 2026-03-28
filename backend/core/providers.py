@@ -14,7 +14,7 @@ VERIFIED_PROVIDERS = ["anthropic", "openai", "mistral", "groq"]
 
 def _get_verified(provider: str) -> list[str]:
     """Lazily load verified models from the catalog."""
-    from backend.llm.catalog_loader import get_verified_models
+    from backend.inference.catalog_loader import get_verified_models
 
     return get_verified_models(provider)
 
@@ -67,6 +67,7 @@ PROVIDER_PREFIX_PATTERNS = {
     "google": ["google/", "gemini/"],
     "xai": ["xai/"],
     "groq": ["groq/"],
+    "openhands": ["openhands/"],
     "openrouter": ["openrouter/"],
     "nvidia": ["nvidia/", "moonshotai/"],
 }
@@ -183,6 +184,27 @@ PROVIDER_CONFIGURATIONS: dict[str, dict[str, Any]] = {
         "forbidden_params": {"custom_llm_provider"},
         "api_key_prefixes": ["gsk_"],
         "api_key_min_length": 20,
+        "handles_own_routing": False,
+        "requires_custom_llm_provider": False,
+    },
+    "openhands": {
+        "name": "openhands",
+        "env_var": "OPENHANDS_API_KEY",
+        "requires_protocol": True,
+        "supports_streaming": True,
+        "required_params": {"api_key", "model"},
+        "optional_params": {
+            "base_url",
+            "timeout",
+            "temperature",
+            "max_tokens",
+            "top_p",
+            "seed",
+            "drop_params",
+        },
+        "forbidden_params": {"custom_llm_provider"},
+        "api_key_prefixes": [],
+        "api_key_min_length": 10,
         "handles_own_routing": False,
         "requires_custom_llm_provider": False,
     },

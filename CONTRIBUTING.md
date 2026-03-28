@@ -1,10 +1,11 @@
-# Contributing to Forge
+﻿# Contributing to Forge
 
 Thank you for your interest in contributing to Forge! This guide will help you get started.
 
 ## Development Setup
 
 ### Prerequisites
+
 - Python 3.12+
 - Git
 - (Optional) PostgreSQL 14+ for database-backed storage
@@ -27,11 +28,13 @@ uv run forge serve
 ## How to Contribute
 
 ### Reporting Bugs
+
 - Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.md)
 - Include: steps to reproduce, expected vs actual behavior, environment details
 - Attach logs from `backend/` console output if applicable
 
 ### Suggesting Features
+
 - Use the [Feature Request template](.github/ISSUE_TEMPLATE/feature_request.md)
 - Describe the use case, not just the solution
 
@@ -47,6 +50,7 @@ uv run forge serve
 ### Code Standards
 
 **Backend (Python):**
+
 - Type hints on all function signatures
 - Docstrings on public functions (Google style)
 - `async def` for I/O-bound operations
@@ -54,12 +58,13 @@ uv run forge serve
 - Follow existing service decomposition patterns
 
 **Python API client (`forge_client`):**
+
 - Keep `ForgeClient` as the single place for httpx + Socket.IO to the backend
 - Prefer extending `ForgeClient` over ad hoc httpx/socketio in scripts or tests
 
 ### Commit Convention
 
-```
+```text
 type: short description
 
 types: feat, fix, refactor, docs, test, chore, perf
@@ -68,24 +73,24 @@ types: feat, fix, refactor, docs, test, chore, perf
 ## Architecture Quick Reference
 
 | Directory | Purpose |
-|---|---|
-| `backend/controller/` | Agent loop orchestration (22 decomposed services) |
-| `backend/controller/services/` | Service classes composing the controller |
-| `backend/events/` | Event sourcing, backpressure-aware stream, durable writer |
-| `backend/storage/` | File & DB storage implementations |
-| `backend/api/` | FastAPI app, routes, middleware, Socket.IO |
-| `backend/engines/` | Agent engines (orchestrator, echo, etc.) |
-| `backend/memory/` | Context condensers, RAG, vector store |
+| --- | --- |
+| `backend/orchestration/` | Session orchestration (22 decomposed services) |
+| `backend/orchestration/services/` | Service classes composing the orchestrator |
+| `backend/ledger/` | Event sourcing, backpressure-aware stream, durable writer |
+| `backend/persistence/` | File & DB storage implementations |
+| `backend/gateway/` | FastAPI app, routes, middleware, Socket.IO |
+| `backend/engine/` | Production agent engine package |
+| `backend/context/` | Context memory, compactors, RAG, vector store |
 | `backend/core/` | Config (Pydantic), exceptions, schemas, logging |
 | `backend/security/` | Security analyzer, input validation |
 | `forge_client/` | Python HTTP + Socket.IO client for tests and scripts |
 
-### Controller Service Map
+### Orchestration Service Map
 
-The `AgentController` (~770 LOC) delegates work to these services:
+The `SessionOrchestrator` (~770 LOC) delegates work to these services:
 
 | Service | Responsibility |
-|---|---|
+| --- | --- |
 | `LifecycleService` | Init, reset, config binding |
 | `ActionExecutionService` | Get & execute next agent action |
 | `ActionService` | Action intake, pending coordination |
@@ -106,7 +111,7 @@ The `AgentController` (~770 LOC) delegates work to these services:
 | `TelemetryService` | Tool pipeline & telemetry init |
 | `AutonomyService` | Autonomy controller init |
 | `IterationService` | Iteration counting |
-| `ControllerContext` | Shared facade for services |
+| `OrchestrationContext` | Shared facade for services |
 
 ### Key Patterns
 

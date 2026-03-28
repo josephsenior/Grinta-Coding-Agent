@@ -8,7 +8,7 @@ project_root = Path(__file__).parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from backend.cli.server_startup import (  # noqa: E402
+from backend.gateway.cli.server_startup import (  # noqa: E402
     build_server_startup_plan,
     ensure_utf8_stdout,
     print_server_startup_preflight,

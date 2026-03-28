@@ -14,7 +14,7 @@ from backend.utils.conversation_summary import (
     _try_llm_title_generation,
     _auto_generate_title_impl,
 )
-from backend.events.event import EventSource
+from backend.ledger.event import EventSource
 
 
 # ── _generate_truncated_title ────────────────────────────────────────

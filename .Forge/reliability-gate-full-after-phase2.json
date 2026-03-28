@@ -1,4 +1,4 @@
-{
+﻿{
   "phase": "full",
   "generated_at_epoch": 1774464472.5361679,
   "results": [
@@ -21,7 +21,7 @@
         "-m",
         "pytest",
         "-q",
-        "backend/tests/unit/knowledge_base"
+          "backend/tests/unit/knowledge"
       ],
       "return_code": 0,
       "duration_seconds": 3.494
@@ -33,7 +33,7 @@
         "-m",
         "pytest",
         "-q",
-        "backend/tests/unit/controller/services/test_step_guard_service.py"
+        "backend/tests/unit/orchestration/services/test_step_guard_service.py"
       ],
       "return_code": 0,
       "duration_seconds": 6.267
@@ -57,7 +57,7 @@
         "-m",
         "pytest",
         "-q",
-        "backend/tests/unit/runtime"
+        "backend/tests/unit/execution"
       ],
       "return_code": 0,
       "duration_seconds": 24.839

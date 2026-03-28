@@ -210,7 +210,7 @@ Or configure named agents with specific engines:
 
 ```toml
 [agent.CodeReviewAgent]
-classpath = "backend.engines.auditor.auditor.AuditorAgent"
+classpath = "backend.engine.auditor.auditor.AuditorAgent"
 llm_config = "fast"
 ```
 

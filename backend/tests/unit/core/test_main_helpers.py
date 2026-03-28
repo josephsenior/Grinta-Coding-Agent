@@ -26,8 +26,8 @@ from backend.core.bootstrap.main import (
     _setup_runtime_for_controller,
     _execute_controller_lifecycle,
 )
-from backend.events.action import MessageAction, NullAction
-from backend.events.observation import AgentStateChangedObservation
+from backend.ledger.action import MessageAction, NullAction
+from backend.ledger.observation import AgentStateChangedObservation
 from backend.core.enums import AgentState, RuntimeStatus
 
 

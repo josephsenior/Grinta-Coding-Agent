@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.events.event import Event
-    from backend.llm.metrics import Metrics, TokenUsage
+    from backend.ledger.event import Event
+    from backend.inference.metrics import Metrics, TokenUsage
 
 
 def _get_tool_response_id(event: Event) -> str | None:

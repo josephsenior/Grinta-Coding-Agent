@@ -1,4 +1,4 @@
-"""Verify all API routes are properly configured and healthy.
+﻿"""Verify all API routes are properly configured and healthy.
 
 This script checks:
 1. All route modules can be imported without errors
@@ -18,23 +18,23 @@ project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 EXPECTED_ROUTERS = {
-    "conversation_api_router": "backend.api.routes.conversation",
-    "manage_conversation_api_router": "backend.api.routes.conversation_collection",
-    "features_router": "backend.api.routes.features",
-    "feedback_api_router": "backend.api.routes.feedback",
-    "files_api_router": "backend.api.routes.files",
-    "global_export_router": "backend.api.routes.global_export",
-    "knowledge_base_router": "backend.api.routes.knowledge_base",
-    "memory_router": "backend.api.routes.memory",
-    "monitoring_router": "backend.api.routes.monitoring",
-    "notifications_router": "backend.api.routes.notifications",
-    "public_api_router": "backend.api.routes.public",
-    "search_router": "backend.api.routes.search",
-    "secrets_router": "backend.api.routes.secrets",
-    "settings_router": "backend.api.routes.settings",
-    "templates_router": "backend.api.routes.templates",
-    "trajectory_router": "backend.api.routes.trajectory",
-    "workspace_router": "backend.api.routes.workspace",
+    "conversation_api_router": "backend.gateway.routes.conversation",
+    "manage_conversation_api_router": "backend.gateway.routes.conversation_collection",
+    "features_router": "backend.gateway.routes.features",
+    "feedback_api_router": "backend.gateway.routes.feedback",
+    "files_api_router": "backend.gateway.routes.files",
+    "global_export_router": "backend.gateway.routes.global_export",
+    "knowledge_base_router": "backend.gateway.routes.knowledge_base",
+    "memory_router": "backend.gateway.routes.memory",
+    "monitoring_router": "backend.gateway.routes.monitoring",
+    "notifications_router": "backend.gateway.routes.notifications",
+    "public_api_router": "backend.gateway.routes.public",
+    "search_router": "backend.gateway.routes.search",
+    "secrets_router": "backend.gateway.routes.secrets",
+    "settings_router": "backend.gateway.routes.settings",
+    "templates_router": "backend.gateway.routes.templates",
+    "trajectory_router": "backend.gateway.routes.trajectory",
+    "workspace_router": "backend.gateway.routes.workspace",
 }
 
 ROUTES_DIR = project_root / "backend" / "api" / "routes"
@@ -259,7 +259,7 @@ def _run_final_import_check() -> bool:
     print("4. Final check: Importing FastAPI app...")
     print("-" * 80)
     try:
-        from backend.api.app import app
+        from backend.gateway.app import app
         route_count = len(app.routes)
         print("  OK   FastAPI app imported successfully")
         print(f"  OK   App has {route_count} registered routes")

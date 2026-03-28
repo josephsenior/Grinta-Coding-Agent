@@ -33,7 +33,7 @@ def main() -> int:
         print('  $env:NVIDIA_API_KEY = "nvapi-..."; python scripts/test_nvidia_kimi.py')
         return 1
 
-    from backend.llm.direct_clients import get_direct_client
+    from backend.inference.direct_clients import get_direct_client
 
     # API expects "moonshotai/kimi-k2.5" (dot) per NVIDIA docs
     model = "moonshotai/kimi-k2.5"

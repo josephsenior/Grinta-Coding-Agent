@@ -27,7 +27,7 @@ class TestGetVerified:
     def test_get_verified_loads_from_catalog(self):
         """Test that _get_verified calls catalog_loader."""
         with patch(
-            "backend.llm.catalog_loader.get_verified_models",
+            "backend.inference.catalog_loader.get_verified_models",
             return_value=["model-1", "model-2"],
         ) as mock_loader:
             result = _get_verified("test_provider")
@@ -115,6 +115,7 @@ class TestProviderConstants:
         assert "openai" in PROVIDER_CONFIGURATIONS
         assert "anthropic" in PROVIDER_CONFIGURATIONS
         assert "google" in PROVIDER_CONFIGURATIONS
+        assert "openhands" in PROVIDER_CONFIGURATIONS
         assert "xai" in PROVIDER_CONFIGURATIONS
 
     def test_each_config_has_required_keys(self):

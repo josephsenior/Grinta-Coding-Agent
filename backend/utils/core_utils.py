@@ -5,13 +5,13 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from backend.llm.llm_registry import LLMRegistry
-from backend.api.services.conversation_stats import ConversationStats
-from backend.storage import get_file_store
+from backend.inference.llm_registry import LLMRegistry
+from backend.gateway.services.conversation_stats import ConversationStats
+from backend.persistence import get_file_store
 
 if TYPE_CHECKING:
     from backend.core.config.forge_config import ForgeConfig
-    from backend.storage.data_models.settings import Settings
+    from backend.persistence.data_models.settings import Settings
 
 
 def setup_llm_config(config: ForgeConfig, settings: Settings) -> ForgeConfig:

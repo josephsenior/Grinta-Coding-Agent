@@ -16,31 +16,31 @@ import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.controller import AgentController
-from backend.controller.agent import Agent
-from backend.controller.state.state import State
+from backend.orchestration import SessionOrchestrator
+from backend.orchestration.agent import Agent
+from backend.orchestration.state.state import State
 from backend.core.constants import GENERAL_TIMEOUT
 from backend.core.errors import AgentNotRegisteredError
 from backend.core.logger import forge_logger as logger
-from backend.events import EventStream
-from backend.memory.agent_memory import Memory
-from backend.llm.llm_registry import LLMRegistry
-from backend.runtime.plugins import PluginRequirement
-from backend.storage import get_file_store
-from backend.storage.data_models.user_secrets import UserSecrets
+from backend.ledger import EventStream
+from backend.context.agent_memory import Memory
+from backend.inference.llm_registry import LLMRegistry
+from backend.execution.plugins import PluginRequirement
+from backend.persistence import get_file_store
+from backend.persistence.data_models.user_secrets import UserSecrets
 from backend.utils.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig, ForgeConfig
-    from backend.events.event import Event
-    from backend.playbook_engine.playbook import BasePlaybook
+    from backend.ledger.event import Event
+    from backend.playbooks.engine.playbook import BasePlaybook
     from backend.core.provider_types import (
         ProviderTokenType,
         ProviderToken,
         ProviderType,
     )
-    from backend.runtime.base import Runtime
-    from backend.api.services.conversation_stats import ConversationStats
+    from backend.execution.base import Runtime
+    from backend.gateway.services.conversation_stats import ConversationStats
 
 
 def _instantiate_runtime(runtime_cls: type[object], **kwargs: Any) -> Runtime:
@@ -91,7 +91,7 @@ def filter_plugins_by_config(
     """Filter plugins through two layers:
 
     1. **Environment allowlist** — delegates to
-       ``backend.runtime.plugins.filter_plugins_by_config`` which honours the
+       ``backend.execution.plugins.filter_plugins_by_config`` which honours the
        ``FORGE_PLUGINS`` env-var (comma-separated allowlist).  When the var is
        unset every plugin passes through.
     2. **Agent-config denylist** — if an ``AgentConfig`` is reachable (via
@@ -107,7 +107,7 @@ def filter_plugins_by_config(
     Returns:
         Filtered list of plugin requirements.
     """
-    from backend.runtime.plugins import (
+    from backend.execution.plugins import (
         filter_plugins_by_config as _env_filter,
     )
 
@@ -166,7 +166,7 @@ def create_runtime(
 
     from pathlib import Path
 
-    from backend.runtime.runtime_factory import get_runtime_cls
+    from backend.execution.runtime_factory import get_runtime_cls
 
     resolved_ws = project_root
     if resolved_ws is None:
@@ -288,7 +288,7 @@ def create_memory(
 def _ensure_agent_class_available(agent_name: str) -> None:
     """Ensure the requested agent class has been registered.
 
-    Attempts to import `forge.engines` (and its submodules) lazily so that the
+    Attempts to import `forge.engine` (and its submodules) lazily so that the
     built-in agents are registered even when the CLI is exercised in isolation,
     such as during unit tests.
     """
@@ -298,9 +298,9 @@ def _ensure_agent_class_available(agent_name: str) -> None:
     except AgentNotRegisteredError:
         pass
     try:
-        importlib.import_module("forge.engines")
+        importlib.import_module("forge.engine")
     except Exception as exc:  # pragma: no cover - defensive logging
-        logger.debug("Failed to auto-import backend.engines: %s", exc)
+        logger.debug("Failed to auto-import forge.engine: %s", exc)
     try:
         Agent.get_cls(agent_name)
     except AgentNotRegisteredError as exc:
@@ -335,7 +335,7 @@ def create_controller(
     conversation_stats: ConversationStats,
     headless_mode: bool = True,
     replay_events: list[Event] | None = None,
-) -> tuple[AgentController, State | None]:
+) -> tuple[SessionOrchestrator, State | None]:
     """Create agent controller with optional state restoration.
 
     Attempts to restore previous agent state from session if available.
@@ -366,7 +366,7 @@ def create_controller(
         )
         provenance = getattr(initial_state, "restore_provenance", None)
         if provenance is not None:
-            from backend.api.app_state import get_app_state
+            from backend.gateway.app_state import get_app_state
 
             get_app_state().record_state_restore(
                 event_stream.sid,
@@ -382,10 +382,10 @@ def create_controller(
             )
     except Exception as e:
         logger.debug("Cannot restore agent state: %s", e)
-    from backend.controller.agent_controller import ControllerConfig
+    from backend.orchestration.orchestration_config import OrchestrationConfig
 
-    controller = AgentController(
-        config=ControllerConfig(
+    controller = SessionOrchestrator(
+        config=OrchestrationConfig(
             agent=agent,
             conversation_stats=conversation_stats,
             iteration_delta=config.max_iterations,

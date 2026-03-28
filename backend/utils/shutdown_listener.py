@@ -1,11 +1,11 @@
-"""Process shutdown coordination for long-running loops.
+﻿"""Process shutdown coordination for long-running loops.
 
 Uvicorn (and other ASGI servers) install SIGINT/SIGTERM handlers and run FastAPI
 lifespan shutdown. This module does **not** register signal handlers — that
 avoided fighting the server and broken Ctrl+C on Windows.
 
 Callers that need to stop background work should use :func:`should_continue` /
-:func:`should_exit`. The API lifespan calls :func:`backend.api.graceful_shutdown`
+:func:`should_exit`. The API lifespan calls :func:`backend.gateway.graceful_shutdown`
 which invokes :func:`request_process_shutdown` so those loops unwind cleanly.
 """
 

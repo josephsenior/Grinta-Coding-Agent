@@ -10,10 +10,10 @@ For **contribution workflow**, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 1. [Project Layout](#project-layout)
 2. [Request Lifecycle](#request-lifecycle)
-3. [Controller Services](#controller-services)
-4. [Event System Internals](#event-system-internals)
+3. [Orchestration Services](#orchestration-services)
+4. [Ledger Internals](#ledger-internals)
 5. [LLM Layer](#llm-layer)
-6. [Memory & Condensers](#memory--condensers)
+6. [Context Memory & Compactors](#context-memory--compactors)
 7. [Safety Systems](#safety-systems)
 8. [Adding a New Feature](#adding-a-new-feature)
 9. [Testing Guide](#testing-guide)
@@ -21,64 +21,65 @@ For **contribution workflow**, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project Layout
 
-```
+```text
 forge_client/          # Python HTTP + Socket.IO client (ForgeClient) for tests/scripts
 backend/
-├── adapters/          # I/O and serialization adapters
-├── controller/        # Agent loop, 21 services, safety systems
-│   ├── services/      # Decomposed controller responsibilities
-│   ├── state/         # Agent state management
-│   ├── controller_config.py  # Extracted ControllerConfig + ControllerServices
+├── gateway/           # FastAPI app, routes, middleware, sessions, adapters
+│   ├── adapters/      # I/O and serialization adapters
+│   ├── cli/           # CLI entrypoints and helpers
+│   └── integrations/  # External gateway integrations (including MCP)
+├── orchestration/     # Session orchestrator, services, safety systems
+│   ├── services/      # Decomposed orchestration responsibilities
+│   ├── state/         # Run-state management
+│   ├── orchestration_config.py  # Extracted OrchestrationConfig + OrchestrationServices
 │   ├── stuck.py       # 6-strategy stuck detection
 │   └── agent_circuit_breaker.py  # Anomaly-based safety pause
-├── core/              # Config, logging, exceptions
-│   └── config/        # Layered TOML + env config loading
-├── engines/           # LLM prompt engines
-│   └── orchestrator/  # Main Orchestrator engine with 23 tools
-├── events/            # Event-sourced event system
+├── engine/            # Main Orchestrator engine with tool-facing helpers
+├── ledger/            # Record ledger with WAL + backpressure
 │   ├── action/        # Agent actions (commands, edits, messages)
 │   ├── observation/   # Action results (output, errors, diffs)
-│   ├── stream.py      # EventStream with WAL + backpressure
+│   ├── stream.py      # Ledger (`EventStream`) with WAL + backpressure
 │   ├── stream_stats.py # Extracted aggregated stream statistics
 │   └── durable_writer.py  # Batch-mode event persistence (16-event batches)
-├── knowledge_base/    # Knowledge base logic (RAG)
-├── llm/               # LLM abstraction (direct SDK clients)
-├── mcp/               # MCP tool integration
-├── memory/            # Conversation memory + condensers
+├── core/              # Config, logging, exceptions
+│   └── config/        # Layered TOML + env config loading
+├── context/           # Context memory + compactors
 │   ├── conversation_memory.py  # Event→LLM message conversion
 │   ├── message_formatting.py   # Type-check utils & message formatting
 │   ├── context_tracking.py     # Decision/anchor/vector memory tracking
-│   └── condenser/strategies/   # 13 condenser strategies incl. auto-selector
+│   └── condenser/strategies/   # 13 compactor strategies incl. auto-selector
+├── execution/         # Local command execution and runtime policy enforcement
+├── inference/         # LLM abstraction (direct SDK clients)
+├── knowledge/         # Knowledge base logic (RAG)
+├── persistence/       # Persistence layer (SQLite, file-based)
 ├── playbooks/         # Built-in task playbooks (.md files)
-├── runtime/           # Local command execution and runtime policy enforcement
 ├── security/          # Command analysis + safety config
-├── api/               # FastAPI app, routes, middleware, sessions
-├── storage/           # Persistence layer (SQLite, file-based)
+├── validation/        # Validation and code-quality checks
 └── tests/             # Test suites (unit, integration, e2e, stress)
 ```
 
 ## Request Lifecycle
 
-```
+```text
 User Input (Web UI / forge_client)
   → ForgeClient.send_message()
     → Socket.IO / HTTP POST /api/conversations/{id}/messages
       → SessionManager.get_or_create_session()
-        → AgentController.run_loop()
+        → SessionOrchestrator.run_loop()
           → Engine.generate_action()     # LLM call → Action
           → Runtime.execute(action)       # Local execution + policy enforcement → Observation
 
 Note: the current runtime is not sandboxed. `hardened_local` is a stricter policy profile for local execution, not isolation.
-          → EventStream.add_event()       # Persist to WAL
+          → Ledger.add_record()           # Persist to WAL (`EventStream.add_event()` in code)
           → StuckDetector.is_stuck()      # 6-strategy check
           → CircuitBreaker.check()        # Safety gate
         ← Stream observations back via Socket.IO
       ← HTTP response with conversation state
 ```
 
-## Controller Services
+## Orchestration Services
 
-The `AgentController` delegates to 21 specialized services via `ControllerContext`:
+The `SessionOrchestrator` delegates to 21 specialized services via `OrchestrationContext`:
 
 | Service | Responsibility |
 | --- | --- |
@@ -106,16 +107,16 @@ The `AgentController` delegates to 21 specialized services via `ControllerContex
 
 ### Adding a New Service
 
-1. Create `backend/controller/services/my_service.py`
-2. Accept `ControllerContext` in `__init__`
-3. Add to `ControllerContext` initialization
-4. Write tests in `backend/tests/unit/controller/test_my_service.py`
+1. Create `backend/orchestration/services/my_service.py`
+2. Accept `OrchestrationContext` in `__init__`
+3. Add to `OrchestrationContext` initialization
+4. Write tests in `backend/tests/unit/orchestration/test_my_service.py`
 
 ```python
-from backend.controller.services.controller_context import ControllerContext
+from backend.orchestration.services.orchestration_context import OrchestrationContext
 
 class MyService:
-    def __init__(self, context: ControllerContext) -> None:
+    def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
 
     @property
@@ -129,7 +130,7 @@ class MyService:
 
 ## Tool Invocation Pipeline
 
-The `AgentController` executes tools through a middleware pipeline (`backend/controller/tool_pipeline.py`). This allows intercepting tool calls for validation, safety, and telemetry.
+The `SessionOrchestrator` executes tools through a middleware pipeline (`backend/orchestration/tool_pipeline.py`). This allows intercepting tool calls for validation, safety, and telemetry.
 
 ### Middleware Chain
 
@@ -148,11 +149,11 @@ The pipeline runs in four stages: `plan` → `verify` → `execute` → `observe
 | `TelemetryMiddleware` | All | **Observability**: Emits telemetry events for each stage. |
 | `LoggingMiddleware` | All | **Debugging**: detailed logs. |
 
-## Event System Internals
+## Ledger Internals
 
-### EventStream
+### Ledger (`EventStream`)
 
-The event system is **event-sourced**: all state changes flow through `EventStream`.
+The record system is event-sourced: all state changes flow through the ledger (`EventStream`).
 
 - **WAL Recovery**: Events are written to a write-ahead log before processing.
   On crash recovery, the WAL is replayed to restore state.
@@ -163,7 +164,7 @@ The event system is **event-sourced**: all state changes flow through `EventStre
 
 ### Event Types
 
-```
+```text
 Event
 ├── Action (agent → runtime)
 │   ├── CmdRunAction        # Shell command execution
@@ -184,8 +185,8 @@ Event
 
 Forge uses **direct SDK clients** (not litellm) for stability:
 
-```
-LLM (backend/llm/llm.py)
+```text
+LLM (backend/inference/llm.py)
 ├── RetryMixin          # Exponential backoff with jitter
 ├── DebugMixin          # Request/response logging
 ├── Metrics             # Token/cost tracking
@@ -212,17 +213,17 @@ LLM (backend/llm/llm.py)
 3. Add routing condition to `get_direct_client()`
 4. Add model features to `model_features.py`
 
-## Memory & Condensers
+## Context Memory & Compactors
 
-### Condenser Pipeline
+### Compactor Pipeline
 
-When context exceeds limits, condensers compress history:
+When context exceeds limits, compactors compress history:
 
+```text
+Full History → Compactor → Compressed History → LLM
 ```
-Full History → Condenser → Compressed History → LLM
-```
 
-**13 available strategies:**
+**13 available compactor strategies:**
 
 | Type | Strategy | Cost | Quality |
 | --- | --- | --- | --- |
@@ -236,15 +237,15 @@ Full History → Condenser → Compressed History → LLM
 | `llm_attention` | LLM-scored relevance | $$ | Best quality |
 | `semantic` | Embedding similarity | $ | Context-aware |
 | `hybrid` | Multi-strategy | $$ | Most robust |
-| `pipeline` | Chained condensers | Varies | Composable |
+| `pipeline` | Chained compactors | Varies | Composable |
 | `block_compress` | Block-level compression | $ | Efficient |
 | `attention` | Attention scoring | $ | Focus-aware |
 
-### Adding a New Condenser
+### Adding a New Compactor
 
-1. Create class in `backend/memory/condenser/`
-2. Extend `Condenser` base class
-3. Register in condenser factory
+1. Create class in `backend/context/condenser/`
+2. Extend the `Condenser` base class
+3. Register in the condenser factory
 4. Add config schema in `backend/core/config/condenser_config.py`
 5. Add tests
 
@@ -252,7 +253,7 @@ Full History → Condenser → Compressed History → LLM
 
 ### Three Layers of Protection
 
-```
+```text
 Layer 1: Pre-execution (CommandAnalyzer)
   → Analyzes commands before execution
   → Blocks critical: rm -rf /, dd, format, mkfs
@@ -287,7 +288,7 @@ Layer 3: Detection (StuckDetector)
 
 1. **Config**: Add settings to `backend/core/config/` with defaults
 2. **Implementation**: Follow existing patterns in the relevant module
-3. **Events**: If state-changing, emit events through `EventStream`
+3. **Records**: If state-changing, emit them through the ledger (`EventStream`)
 4. **Safety**: If executing commands, integrate with `CommandAnalyzer`
 5. **Tests**: Unit tests + integration tests
 6. **Docs**: Update relevant README or guide
@@ -313,35 +314,34 @@ Forge maintains a high standard of code quality with a focus on comprehensive un
 
 ### Test Structure
 
-```
+```text
 backend/tests/
 ├── unit/              # Fast, isolated unit tests
-│   ├── controller/    # Controller service tests
+│   ├── orchestration/ # Session orchestrator and service tests
 │   ├── core/          # Core config, errors, utils tests
-│   ├── engines/       # Engine tests
-│   ├── events/        # Event system tests
+│   ├── engine/        # Engine tests
+│   ├── execution/     # Runtime execution tests
+│   ├── gateway/       # FastAPI, routes, middleware, and session tests
+│   ├── governance/    # Governance tests
+│   ├── inference/     # LLM client tests
+│   ├── ledger/        # Record ledger tests
 │   ├── knowledge/     # Knowledge base tests
-│   ├── code_quality/  # Code quality (linter) tests
-│   ├── llm/           # LLM client tests
-│   ├── mcp/           # MCP integration tests
-│   ├── memory/        # Memory & condenser tests
-│   ├── review/        # Code review tests
-│   ├── runtime/       # Runtime tests
+│   ├── context/       # Context memory and compactor tests
+│   ├── persistence/   # Storage and persistence tests
+│   ├── playbooks/     # Playbook tests
 │   ├── security/      # Security & command analysis tests
-│   ├── server/        # Server, middleware, routes tests
-│   ├── storage/       # Storage layer tests
 │   ├── telemetry/     # Telemetry tests
 │   ├── tools/         # Tool tests
 │   ├── forge_client/  # Tests for forge_client.ForgeClient
 │   ├── utils/         # Utility tests
-│   └── validation/    # Validation tests
+│   └── validation/    # Validation and code-quality tests
 ├── integration/       # Multi-component integration tests
 ├── e2e/               # End-to-end tests (require running server)
 └── stress/            # Load and pressure tests
 ```
 
 **Convention:** Every test file lives under its source module's subfolder
-(e.g., tests for `backend/memory/` go in `backend/tests/unit/memory/`),
+(e.g., tests for `backend/context/` go in `backend/tests/unit/context/`),
 not in the root `unit/` directory.
 
 ### Running Tests
@@ -402,9 +402,9 @@ class TestMyFeature:
 
 ### 1. Model Context Protocol (MCP)
 
-The `backend/mcp_integration/` directory contains Forge's internal MCP logic. Always import
-from `backend.mcp_integration` (not `mcp`) when using Forge's specific client or tool
-registry utilities. The bare `mcp` package refers to the official SDK.
+Forge's internal MCP logic lives under `backend/gateway/integrations/mcp/`. Always import
+from Forge's integration package (not the bare `mcp` SDK package) when using
+Forge-specific client or tool-registry utilities.
 
 ### 2. Event Loop Management
 
@@ -415,10 +415,10 @@ Async tests use `pytest-asyncio` in **STRICT mode** — every async test must be
 Circuit breaker state persists across iterations within a session. If testing
 breaker behavior, always call `breaker.reset()` in teardown.
 
-### 4. Condenser Side Effects
+### 4. Compactor Side Effects
 
-LLM-based condensers make real API calls unless mocked. Always mock the LLM
-client in unit tests for condensers that use `llm_config`.
+LLM-based compactors make real API calls unless mocked. Always mock the LLM
+client in unit tests for compactors that use the current `llm_config` condenser wiring.
 
 ### 5. Config Loading
 
@@ -441,7 +441,7 @@ rules below.**
 
 ### The Problem
 
-`EventStream` dispatches subscriber callbacks inside a `ThreadPoolExecutor`.
+The ledger (`EventStream`) dispatches subscriber callbacks inside a `ThreadPoolExecutor`.
 Those threads have **no running asyncio event loop**.  If a callback creates
 a coroutine and tries to schedule it, there are only two safe options:
 
@@ -461,14 +461,14 @@ All fire-and-forget coroutine scheduling goes through one function:
 ```python
 from backend.utils.async_utils import run_or_schedule
 
-# Inside an EventStream callback, runtime handler, memory listener, etc.:
+# Inside a ledger (`EventStream`) callback, runtime handler, context listener, etc.:
 run_or_schedule(self._on_event(event))
 ```
 
 `run_or_schedule` does the right thing automatically:
 
 | Situation | What happens |
-|---|---|
+| --- | --- |
 | Caller is in a running event loop | Creates a tracked task on that loop |
 | Caller is in a background thread, main loop registered | Uses `call_soon_threadsafe` to schedule on the main loop |
 | No loop anywhere (CLI fallback) | Creates a disposable loop + `run_until_complete` (blocking) |
@@ -476,7 +476,7 @@ run_or_schedule(self._on_event(event))
 The main loop is registered once at application startup:
 
 ```python
-# backend/api/app.py — inside _lifespan():
+# backend/gateway/app.py — inside _lifespan():
 from backend.utils.async_utils import set_main_event_loop
 set_main_event_loop()  # captures asyncio.get_running_loop()
 ```
@@ -498,7 +498,7 @@ set_main_event_loop()  # captures asyncio.get_running_loop()
    `call_sync_from_async()` or `loop.run_in_executor()`.
 
 5. **`step()` has its own scheduling path.**
-   `AgentController.step()` is called from `EventStream` dispatch threads.
+  `SessionOrchestrator.step()` is called from ledger (`EventStream`) dispatch threads.
    It uses `self._main_loop.call_soon_threadsafe(self._create_step_task)` to
    schedule the step task directly on the main loop.  This predates the
    generalized `run_or_schedule` fix and is kept for clarity.
@@ -510,14 +510,14 @@ set_main_event_loop()  # captures asyncio.get_running_loop()
 
 ### Diagram
 
-```
-EventStream._dispatch_event()
+```text
+EventStream._dispatch_event()  # current implementation name
         │
         ▼
   ThreadPoolExecutor thread (no event loop)
         │
         ▼
-  subscriber.on_event(event)          e.g. AgentController.on_event
+    subscriber.on_event(event)          e.g. SessionOrchestrator.on_event
         │
         ▼
   run_or_schedule(coro)               backend/utils/async_utils.py

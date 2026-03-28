@@ -10,18 +10,18 @@ This diagram provides an overview of the roles of each component and how they co
 The key classes in Forge are:
 
 - LLM: brokers all interactions with large language models. Works with any underlying completion model using direct SDK clients.
-- Agent: responsible for looking at the current State, and producing an Action that moves one step closer toward the end-goal.
-- AgentController: initializes the Agent, manages State, and drive the main loop that pushes the Agent forward, step by step
-- State: represents the current state of the Agent's task. Includes things like the current step, a history of recent events, the Agent's long-term plan, etc
-- EventStream: a central hub for Events, where any component can publish Events, or listen for Events published by other components
-  - Event: an Action or Observeration
-    - Action: represents a request to e.g. edit a file, run a command, or send a message
-    - Observation: represents information collected from the environment, e.g. file contents or command output
-- Runtime: responsible for performing Actions, and sending back Observations
+- Agent: responsible for looking at the current RunState and producing an Operation that moves one step closer toward the end-goal.
+- SessionOrchestrator: initializes the Agent, manages RunState, and drives the main loop that pushes the Agent forward, step by step.
+- RunState: represents the current state of the Agent's task. Includes things like the current step, a history of recent records, the Agent's long-term plan, etc.
+- Ledger: a central hub for Records, where any component can publish records, or listen for records published by other components. In the current codebase this role is implemented by `EventStream`.
+  - Record: an Operation or Outcome
+    - Operation: represents a request to e.g. edit a file, run a command, or send a message
+    - Outcome: represents information collected from the environment, e.g. file contents or command output
+- Runtime: responsible for performing Operations and sending back Outcomes
   - Runtime Environment: the part of the runtime responsible for running commands in a local workspace with optional policy hardening
-- Server: brokers Forge sessions over HTTP/WebSocket (web UI and API clients)
-  - Session: holds a single EventStream, a single AgentController, and a single Runtime. Generally represents a single task (but potentially including several user prompts)
-  - ConversationManager: keeps a list of active sessions, and ensures requests are routed to the correct Session
+- Server: brokers Forge runs over HTTP/WebSocket (web UI and API clients)
+  - Run: holds a single Ledger, a single SessionOrchestrator, and a single Runtime. In the current codebase this role is implemented by `Session`.
+  - ConversationManager: keeps a list of active runs and ensures requests are routed to the correct Run
 
 ## Control Flow
 
@@ -31,23 +31,23 @@ Here's the basic loop (in pseudocode) that drives agents.
 while True:
   prompt = agent.generate_prompt(state)
   response = llm.completion(prompt)
-  action = agent.parse_response(response)
-  observation = runtime.run(action)
-  state = state.update(action, observation)
+  operation = agent.parse_response(response)
+  outcome = runtime.run(operation)
+  state = state.update(operation, outcome)
 ```
 
-In reality, most of this is achieved through message passing, via the EventStream.
-The EventStream serves as the backbone for all communication in Forge.
+In reality, most of this is achieved through message passing via the ledger.
+The ledger (`EventStream` in the current implementation) serves as the backbone for all communication in Forge.
 
 ```mermaid
 flowchart LR
-  Agent--Actions-->AgentController
-  AgentController--State-->Agent
-  AgentController--Actions-->EventStream
-  EventStream--Observations-->AgentController
-  Runtime--Observations-->EventStream
-  EventStream--Actions-->Runtime
-  Clients--Actions-->EventStream
+  Agent--Operations-->SessionOrchestrator
+  SessionOrchestrator--RunState-->Agent
+  SessionOrchestrator--Operations-->Ledger
+  Ledger--Outcomes-->SessionOrchestrator
+  Runtime--Outcomes-->Ledger
+  Ledger--Operations-->Runtime
+  Clients--Operations-->Ledger
 ```
 
 ## Runtime

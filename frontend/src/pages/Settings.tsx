@@ -317,7 +317,7 @@ function ModelSection({
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Provider</label>
           <Input
-            placeholder="e.g. openai, anthropic, google, groq, ollama"
+            placeholder="e.g. openai, anthropic, google, groq, openhands, ollama"
             value={provider}
             onChange={(e) => { setProvider(e.target.value); setErrors((p) => ({ ...p, provider: undefined })); }}
             className={cn("font-mono text-sm", errors.provider && "border-destructive")}

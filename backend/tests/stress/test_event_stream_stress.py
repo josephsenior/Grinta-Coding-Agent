@@ -4,9 +4,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from backend.events import EventSource, EventStream
-from backend.events.observation import NullObservation
-from backend.storage import get_file_store
+from backend.ledger import EventSource, EventStream
+from backend.ledger.observation import NullObservation
+from backend.persistence import get_file_store
 
 pytestmark = pytest.mark.stress
 

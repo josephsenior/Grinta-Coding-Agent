@@ -9,9 +9,9 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 from backend.core.enums import FileReadSource
-from backend.events.action import CmdRunAction
-from backend.events.observation import CmdOutputObservation
-from backend.events.observation.files import FileReadObservation
+from backend.ledger.action import CmdRunAction
+from backend.ledger.observation import CmdOutputObservation
+from backend.ledger.observation.files import FileReadObservation
 from backend.validation.task_validator import (
     CompositeValidator,
     DiffValidator,

@@ -97,7 +97,7 @@ class ActionType(str, Enum):
 
 
 class LifecyclePhase(str, Enum):
-    """High-level lifecycle phases for the AgentController.
+    """High-level lifecycle phases for the SessionOrchestrator.
 
     Unlike :class:`AgentState` (which tracks the agent's *logical* state
     within a conversation), ``LifecyclePhase`` tracks the controller

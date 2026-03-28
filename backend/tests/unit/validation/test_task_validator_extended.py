@@ -15,9 +15,9 @@ from backend.validation.task_validator import (
     ValidationResult,
 )
 from backend.core.enums import FileReadSource
-from backend.events.action import CmdRunAction
-from backend.events.observation import CmdOutputObservation
-from backend.events.observation.files import FileReadObservation, FileWriteObservation
+from backend.ledger.action import CmdRunAction
+from backend.ledger.observation import CmdOutputObservation
+from backend.ledger.observation.files import FileReadObservation, FileWriteObservation
 
 
 # ---------------------------------------------------------------------------

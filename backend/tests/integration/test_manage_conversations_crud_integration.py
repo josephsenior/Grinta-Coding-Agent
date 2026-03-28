@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from starlette.requests import Request
 
-from backend.api.routes.conversation_collection import (
+from backend.gateway.routes.conversation_collection import (
     ConversationResponse,
     InitSessionRequest,
     UpdateConversationRequest,
@@ -20,8 +20,8 @@ from backend.api.routes.conversation_collection import (
     search_conversations_route,
     update_conversation,
 )
-from backend.storage.data_models.conversation_metadata import ConversationTrigger
-from backend.storage.data_models.conversation_status import ConversationStatus
+from backend.persistence.data_models.conversation_metadata import ConversationTrigger
+from backend.persistence.data_models.conversation_status import ConversationStatus
 
 
 def _request(path: str = "/api/conversations") -> Request:
@@ -50,7 +50,7 @@ async def test_create_conversation_handler_success() -> None:
             return_value=Path("/tmp"),
         ),
         patch(
-            "backend.api.routes.conversation_collection.extract_request_data",
+            "backend.gateway.routes.conversation_collection.extract_request_data",
             return_value=(
                 None,
                 None,
@@ -64,27 +64,27 @@ async def test_create_conversation_handler_success() -> None:
             ),
         ),
         patch(
-            "backend.api.routes.conversation_collection.determine_conversation_trigger",
+            "backend.gateway.routes.conversation_collection.determine_conversation_trigger",
             return_value=(ConversationTrigger.GUI, None, None),
         ),
         patch(
-            "backend.api.routes.conversation_collection.apply_conversation_overrides",
+            "backend.gateway.routes.conversation_collection.apply_conversation_overrides",
             return_value=(None, None, "hello"),
         ),
         patch(
-            "backend.api.routes.conversation_collection.validate_remote_api_request",
+            "backend.gateway.routes.conversation_collection.validate_remote_api_request",
             return_value=None,
         ),
         patch(
-            "backend.api.routes.conversation_collection.prepare_conversation_params",
+            "backend.gateway.routes.conversation_collection.prepare_conversation_params",
             return_value=("user-1", {}, None),
         ),
         patch(
-            "backend.api.routes.conversation_collection.resolve_conversation_id",
+            "backend.gateway.routes.conversation_collection.resolve_conversation_id",
             return_value="conv-1",
         ),
         patch(
-            "backend.api.routes.conversation_collection.handle_regular_conversation",
+            "backend.gateway.routes.conversation_collection.handle_regular_conversation",
             AsyncMock(return_value=SimpleNamespace(status=ConversationStatus.STARTING)),
         ),
     ):
@@ -110,15 +110,15 @@ async def test_search_conversations_handler_success() -> None:
 
     with (
         patch(
-            "backend.api.routes.conversation_collection.get_user_id",
+            "backend.gateway.routes.conversation_collection.get_user_id",
             MagicMock(return_value="user-1"),
         ),
         patch(
-            "backend.api.routes.conversation_collection.get_conversation_store",
+            "backend.gateway.routes.conversation_collection.get_conversation_store",
             AsyncMock(return_value=MagicMock()),
         ),
         patch(
-            "backend.api.routes.conversation_collection._search_conversations_impl",
+            "backend.gateway.routes.conversation_collection._search_conversations_impl",
             AsyncMock(return_value=expected),
         ) as search_impl,
     ):
@@ -143,19 +143,19 @@ async def test_get_update_delete_handlers() -> None:
 
     with (
         patch(
-            "backend.api.routes.conversation_collection.get_user_id",
+            "backend.gateway.routes.conversation_collection.get_user_id",
             MagicMock(return_value="user-1"),
         ),
         patch(
-            "backend.api.routes.conversation_collection.get_conversation_store",
+            "backend.gateway.routes.conversation_collection.get_conversation_store",
             AsyncMock(return_value=store),
         ),
         patch(
-            "backend.api.routes.conversation_collection.get_conversation_details",
+            "backend.gateway.routes.conversation_collection.get_conversation_details",
             AsyncMock(return_value={"conversation_id": "conv-1"}),
         ) as get_impl,
         patch(
-            "backend.api.routes.conversation_collection.delete_conversation_entry",
+            "backend.gateway.routes.conversation_collection.delete_conversation_entry",
             AsyncMock(return_value=True),
         ) as delete_impl,
     ):

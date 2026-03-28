@@ -1,4 +1,4 @@
-import importlib
+﻿import importlib
 import os
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
@@ -65,9 +65,9 @@ def build_client(env: dict, tracer_store: list[_TestSpan] | None = None):
 
     # Reload modules in-place so OTEL config reflects env set above,
     # without swapping module identities (which breaks later patching).
-    import backend.api.otel_config as otel_config  # type: ignore
-    import backend.api.route_registry as route_registry  # type: ignore
-    import backend.api.app as app_module  # type: ignore
+    import backend.gateway.otel_config as otel_config  # type: ignore
+    import backend.gateway.route_registry as route_registry  # type: ignore
+    import backend.gateway.app as app_module  # type: ignore
 
     importlib.reload(otel_config)
     importlib.reload(route_registry)

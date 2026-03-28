@@ -1,4 +1,4 @@
-"""Bootstrap entry point for the Forge agent framework.
+﻿"""Bootstrap entry point for the Forge agent framework.
 
 Classes:
     FakeUserResponseFunc
@@ -21,20 +21,20 @@ from typing import TYPE_CHECKING, Protocol
 from backend.utils.async_utils import run_or_schedule
 
 if TYPE_CHECKING:
-    from backend.controller.agent import Agent
-    from backend.controller.state.state import State
-    from backend.events.action.action import Action
-    from backend.events.event import Event
-    from backend.events.stream import EventStream
+    from backend.orchestration.agent import Agent
+    from backend.orchestration.state.state import State
+    from backend.ledger.action.action import Action
+    from backend.ledger.event import Event
+    from backend.ledger.stream import EventStream
     from backend.core.provider_types import ProviderTokenType
-    from backend.memory.agent_memory import Memory
-    from backend.llm.llm_registry import LLMRegistry
-    from backend.runtime.base import Runtime
-    from backend.api.services.conversation_stats import ConversationStats
+    from backend.context.agent_memory import Memory
+    from backend.inference.llm_registry import LLMRegistry
+    from backend.execution.base import Runtime
+    from backend.gateway.services.conversation_stats import ConversationStats
 
 
-from backend.adapters import read_input, read_task
-from backend.controller.replay import ReplayManager
+from backend.gateway.adapters import read_input, read_task
+from backend.orchestration.replay import ReplayManager
 from backend.core.config import (
     ForgeConfig,
     parse_arguments,
@@ -51,11 +51,11 @@ from backend.core.bootstrap.setup import (
     get_provider_tokens,
     initialize_repository_for_runtime,
 )
-from backend.events import EventSource, EventStreamSubscriber
-from backend.events.action import MessageAction, NullAction
-from backend.events.observation import AgentStateChangedObservation
-from backend.mcp_client import add_mcp_tools_to_agent
-from backend.runtime import (
+from backend.ledger import EventSource, EventStreamSubscriber
+from backend.ledger.action import MessageAction, NullAction
+from backend.ledger.observation import AgentStateChangedObservation
+from backend.gateway.integrations.mcp import add_mcp_tools_to_agent
+from backend.execution import (
     RuntimeAcquireResult,
     RuntimeOrchestrator,
     runtime_orchestrator,

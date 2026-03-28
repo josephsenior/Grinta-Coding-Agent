@@ -172,7 +172,7 @@ class TestAgentRegistration:
         with patch("backend.core.config.config_loader.get_impl") as mock_get_impl:
             mock_cls = MagicMock()
             mock_get_impl.return_value = mock_cls
-            from backend.controller.agent import Agent
+            from backend.orchestration.agent import Agent
 
             with patch.object(Agent, "register") as mock_register:
                 register_custom_agents(cfg)

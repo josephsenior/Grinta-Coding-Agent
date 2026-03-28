@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import MagicMock
 
-from backend.events.action.files import FileWriteAction
-from backend.events.observation.files import FileReadObservation
+from backend.ledger.action.files import FileWriteAction
+from backend.ledger.observation.files import FileReadObservation
 from backend.validation.task_validator import (
     CompositeValidator,
     DiffValidator,

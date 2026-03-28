@@ -14,9 +14,9 @@ from typing import cast
 
 import pytest
 
-from backend.llm.llm_registry import LLMRegistry
-from backend.api.services.conversation_stats import ConversationStats
-from backend.storage.data_models.settings import Settings
+from backend.inference.llm_registry import LLMRegistry
+from backend.gateway.services.conversation_stats import ConversationStats
+from backend.persistence.data_models.settings import Settings
 from backend.core.config.forge_config import ForgeConfig
 from backend.utils.core_utils import (
     create_registry_and_conversation_stats,

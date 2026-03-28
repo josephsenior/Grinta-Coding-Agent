@@ -7,13 +7,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.api.routes.conversation_collection import (
+from backend.gateway.routes.conversation_collection import (
     ConversationResponse,
     ProvidersSetModel,
     start_conversation,
     stop_conversation,
 )
-from backend.storage.data_models.conversation_status import ConversationStatus
+from backend.persistence.data_models.conversation_status import ConversationStatus
 
 
 @pytest.mark.asyncio
@@ -31,15 +31,15 @@ async def test_start_conversation_success() -> None:
 
     with (
         patch(
-            "backend.api.services.conversation_mutation_service.resolve_conversation_store",
+            "backend.gateway.services.conversation_mutation_service.resolve_conversation_store",
             AsyncMock(return_value=store),
         ),
         patch(
-            "backend.api.services.conversation_mutation_service.require_conversation_manager",
+            "backend.gateway.services.conversation_mutation_service.require_conversation_manager",
             return_value=manager,
         ),
         patch(
-            "backend.api.services.conversation_service.setup_init_conversation_settings",
+            "backend.gateway.services.conversation_service.setup_init_conversation_settings",
             AsyncMock(return_value=SimpleNamespace()),
         ),
     ):
@@ -70,7 +70,7 @@ async def test_stop_conversation_when_running_closes_session() -> None:
     manager.close_session = AsyncMock()
 
     with patch(
-        "backend.api.services.conversation_mutation_service.require_conversation_manager",
+        "backend.gateway.services.conversation_mutation_service.require_conversation_manager",
         return_value=manager,
     ):
         response = await stop_conversation(
@@ -96,7 +96,7 @@ async def test_stop_conversation_when_not_running_is_noop() -> None:
     manager.close_session = AsyncMock()
 
     with patch(
-        "backend.api.services.conversation_mutation_service.require_conversation_manager",
+        "backend.gateway.services.conversation_mutation_service.require_conversation_manager",
         return_value=manager,
     ):
         response = await stop_conversation(

@@ -14,14 +14,14 @@ from collections import deque
 from typing import Any
 from unittest.mock import MagicMock
 
-from backend.controller.agent_circuit_breaker import (
+from backend.orchestration.agent_circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
 )
-from backend.controller.health import collect_controller_health
-from backend.controller.memory_pressure import MemoryPressureMonitor
-from backend.controller.state.state import State
-from backend.events.action import ActionSecurityRisk
+from backend.orchestration.health import collect_orchestration_health
+from backend.orchestration.memory_pressure import MemoryPressureMonitor
+from backend.orchestration.state.state import State
+from backend.ledger.action import ActionSecurityRisk
 
 # ------------------------------------------------------------------ #
 # Helpers
@@ -217,7 +217,7 @@ class TestMemoryPressureCondenserWiring:
     """Test that memory_pressure flag in state.extra_data forces condensation."""
 
     def test_no_condenser_returns_full_history(self):
-        from backend.engines.orchestrator.memory_manager import (
+        from backend.engine.memory_manager import (
             ConversationMemoryManager,
         )
 
@@ -232,10 +232,10 @@ class TestMemoryPressureCondenserWiring:
         assert result.pending_action is None
 
     def test_condenser_returns_view_without_pressure(self):
-        from backend.engines.orchestrator.memory_manager import (
+        from backend.engine.memory_manager import (
             ConversationMemoryManager,
         )
-        from backend.memory.view import View
+        from backend.context.view import View
 
         config = MagicMock()
         mgr = ConversationMemoryManager(config, MagicMock())
@@ -254,11 +254,11 @@ class TestMemoryPressureCondenserWiring:
         """When memory_pressure is set and condenser returns a View (no condensation),
         force condensation via get_condensation on RollingCondenser.
         """
-        from backend.engines.orchestrator.memory_manager import (
+        from backend.engine.memory_manager import (
             ConversationMemoryManager,
         )
-        from backend.memory.condenser.condenser import Condensation, RollingCondenser
-        from backend.memory.view import View
+        from backend.context.condenser.condenser import Condensation, RollingCondenser
+        from backend.context.view import View
 
         config = MagicMock()
         mgr = ConversationMemoryManager(config, MagicMock())
@@ -289,11 +289,11 @@ class TestMemoryPressureCondenserWiring:
 
     def test_memory_pressure_cleared_even_on_failure(self):
         """Memory pressure flag is consumed even if forced condensation fails."""
-        from backend.engines.orchestrator.memory_manager import (
+        from backend.engine.memory_manager import (
             ConversationMemoryManager,
         )
-        from backend.memory.condenser.condenser import RollingCondenser
-        from backend.memory.view import View
+        from backend.context.condenser.condenser import RollingCondenser
+        from backend.context.view import View
 
         config = MagicMock()
         mgr = ConversationMemoryManager(config, MagicMock())
@@ -320,10 +320,10 @@ class TestMemoryPressureCondenserWiring:
         """If condenser is not a RollingCondenser, memory pressure is still cleared
         but no forced condensation is attempted.
         """
-        from backend.engines.orchestrator.memory_manager import (
+        from backend.engine.memory_manager import (
             ConversationMemoryManager,
         )
-        from backend.memory.view import View
+        from backend.context.view import View
 
         config = MagicMock()
         mgr = ConversationMemoryManager(config, MagicMock())
@@ -353,7 +353,7 @@ class TestMemoryPressureCondenserWiring:
 
 
 class TestHealthSnapshot:
-    """Test collect_controller_health assembles a complete snapshot."""
+    """Test collect_orchestration_health assembles a complete snapshot."""
 
     def _make_controller(self, **overrides):
         """Build a minimal mock controller for health collection."""
@@ -391,7 +391,7 @@ class TestHealthSnapshot:
 
     def test_snapshot_has_required_keys(self):
         ctrl = self._make_controller()
-        snap = collect_controller_health(ctrl)
+        snap = collect_orchestration_health(ctrl)
         assert "timestamp" in snap
         assert "controller_id" in snap
         assert "state" in snap
@@ -399,7 +399,7 @@ class TestHealthSnapshot:
 
     def test_severity_green_when_healthy(self):
         ctrl = self._make_controller()
-        snap = collect_controller_health(ctrl)
+        snap = collect_orchestration_health(ctrl)
         # Severity depends on the mock fidelity; verify it's a valid value
         assert snap["severity"] in ("green", "yellow", "red")
         assert isinstance(snap.get("warnings", []), list)
@@ -409,7 +409,7 @@ class TestHealthSnapshot:
         # Record enough errors to trigger circuit breaker concern
         for _ in range(5):
             ctrl.circuit_breaker_service.record_error(Exception("test"))
-        snap = collect_controller_health(ctrl)
+        snap = collect_orchestration_health(ctrl)
         # Should have warnings about consecutive errors
         warnings = snap.get("warnings", [])
         assert warnings or snap["severity"] in ("yellow", "red")
@@ -424,7 +424,7 @@ class TestStateExtraData:
     """Test that extra_data survives serialization round-trips."""
 
     def test_extra_data_preserved(self):
-        from backend.controller.state.state import State
+        from backend.orchestration.state.state import State
 
         s = State(session_id="test-1")
         s.extra_data["some_metadata"] = "FOO"
@@ -435,7 +435,7 @@ class TestStateExtraData:
 
     def test_extra_data_isolation(self):
         """Each State instance has its own extra_data dict."""
-        from backend.controller.state.state import State
+        from backend.orchestration.state.state import State
 
         s1 = State(session_id="s1")
         s2 = State(session_id="s2")

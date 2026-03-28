@@ -13,12 +13,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.controller.agent_circuit_breaker import (
+from backend.orchestration.agent_circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
 )
-from backend.controller.safety_validator import ExecutionContext, SafetyValidator
-from backend.events.action import ActionSecurityRisk, CmdRunAction
+from backend.orchestration.safety_validator import ExecutionContext, SafetyValidator
+from backend.ledger.action import ActionSecurityRisk, CmdRunAction
 from backend.security.command_analyzer import CommandAnalyzer
 from backend.security.safety_config import SafetyConfig
 from backend.validation.task_validator import (
@@ -267,7 +267,7 @@ class TestGracefulShutdown:
     @pytest.mark.asyncio
     async def test_graceful_shutdown_gives_final_turn(self):
         """Test that graceful shutdown gives agent one final turn."""
-        # This would require full AgentController setup
+        # This would require full SessionOrchestrator setup
         # Placeholder for integration test
 
 
@@ -276,7 +276,7 @@ class TestSemanticStuckDetection:
 
     def test_detects_low_diversity_high_failure(self):
         """Test detection of semantic loops."""
-        from backend.controller.stuck import StuckDetector
+        from backend.orchestration.stuck import StuckDetector
 
         # Create mock state with semantic loop
         state = MagicMock()

@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-03-28 09:06:59",
+  "events_condensed": 150,
+  "files_touched": {
+    "C:\\Users\\GIGABYTE\\Desktop\\New folder\\triage_notes.txt": {
+      "action": "create_file",
+      "type": "edit"
+    }
+  },
+  "recent_errors": [
+    "[exit_code=1] [ERROR STREAM]\nGet-ChildItem: Cannot find path 'C:\\B' because it does not exist."
+  ],
+  "decisions": [
+    "WARNING: Some MCP servers failed to connect. The following tools may be unavailable:\n  - fetch (stdio): Failed to connect to stdio server fetch: Client failed to connect: [WinError 4551] An Application Control policy has blocked this file\n  - fetch (stdio): Failed to connect to stdio server fetch: Client failed to connect: [WinError 4551] An Application Control policy has blocked this file\n  - fetch (stdio): Failed to connect to stdio server fetch: Client failed to connect: [WinError 4551] An Ap"
+  ],
+  "recent_commands": [
+    {
+      "command": "dir /B /S",
+      "output": "[ERROR STREAM]\nGet-ChildItem: Cannot find path 'C:\\B' because it does not exist."
+    },
+    {
+      "command": "Write-Output '=== GIT STATUS ==='; $g=git status --short 2>$null; if($LASTEXITCODE -ne 0){'(not a git repo)'}else{$g}; Write-Output ''; Write-Output '=== RECENT COMMITS ==='; $l=git log --oneline -5 2>$null; if($LASTEXITCODE -ne 0){'(no git history)'}else{$l}; Write-Output ''; Write-Output '=== DIRECTORY TREE (depth 2) ==='; Get-ChildItem -Recurse -Depth 1 -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch 'node_modules|__pycache__|venv|\\.git' } | Select-Object -First 80 | ForE",
+      "output": "=== GIT STATUS ===\n(not a git repo)\n\n... (truncated) ...\n14652 chrome\n14828 chrome\n15392 chrome"
+    }
+  ],
+  "attempted_approaches": [
+    {
+      "type": "command",
+      "detail": "dir /B /S",
+      "outcome": "FAILED (exit=1): Get-ChildItem: Cannot find path 'C:\\B' because it does not exist."
+    },
+    {
+      "type": "command",
+      "detail": "Write-Output '=== GIT STATUS ==='; $g=git status --short 2>$null; if($LASTEXITCODE -ne 0){'(not a git repo)'}else{$g}; Write-Output ''; Write-Output '",
+      "outcome": "SUCCESS"
+    }
+  ]
+}

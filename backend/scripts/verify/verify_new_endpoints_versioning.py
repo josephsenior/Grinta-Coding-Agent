@@ -1,4 +1,4 @@
-"""Quick script to verify new endpoints are registered with versioning tags."""
+﻿"""Quick script to verify new endpoints are registered with versioning tags."""
 
 import codecs
 import sys
@@ -32,7 +32,7 @@ def main():
     all_found = True
     for endpoint in NEW_ENDPOINTS:
         # Check if router is imported
-        import_pattern = f"from backend.api.routes.{endpoint} import"
+        import_pattern = f"from backend.gateway.routes.{endpoint} import"
         include_pattern = f"app.include_router({endpoint}_router"
         tags_pattern = f'tags=["v1", "{endpoint}"]'
 

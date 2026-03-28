@@ -34,7 +34,7 @@ class TestPromptManager:
             pm._load_template("nonexistent.j2")
 
     def test_get_system_message(self, prompt_dir):
-        with patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x):
+        with patch("backend.engine.tools.prompt.refine_prompt", side_effect=lambda x: x):
             pm = PromptManager(prompt_dir)
             msg = pm.get_system_message(name="Forge")
             assert msg == "System: Forge"
@@ -98,7 +98,7 @@ class TestOrchestratorPromptManager:
         )
 
     def test_get_system_message_injects_identity(self, prompt_dir):
-        with patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x):
+        with patch("backend.engine.tools.prompt.refine_prompt", side_effect=lambda x: x):
             opm = OrchestratorPromptManager(prompt_dir)
             # Should have "You are Forge agent." prefix
             msg = opm.get_system_message(name="Test")
@@ -168,7 +168,7 @@ class TestOrchestratorPromptManager:
 
     def test_set_prompt_tier(self, prompt_dir):
         # Line 244-245: self._prompt_tier = tier, and check if debug tier works
-        with patch("backend.engines.orchestrator.tools.prompt.refine_prompt", side_effect=lambda x: x):
+        with patch("backend.engine.tools.prompt.refine_prompt", side_effect=lambda x: x):
             opm = OrchestratorPromptManager(prompt_dir)
             opm.set_prompt_tier("debug")
             assert opm._prompt_tier == "debug"
@@ -181,7 +181,7 @@ class TestOrchestratorPromptManager:
         # Line 303-304: except Exception: return content
         opm = OrchestratorPromptManager(prompt_dir)
         with patch(
-            "backend.engines.orchestrator.tools.note.scratchpad_entries_for_prompt",
+            "backend.engine.tools.note.scratchpad_entries_for_prompt",
             side_effect=Exception("failed"),
         ):
             result = opm._inject_scratchpad("content")
@@ -190,10 +190,10 @@ class TestOrchestratorPromptManager:
     def test_inject_scratchpad_success(self, prompt_dir):
         opm = OrchestratorPromptManager(prompt_dir)
         with patch(
-            "backend.engines.orchestrator.tools.note.scratchpad_entries_for_prompt",
+            "backend.engine.tools.note.scratchpad_entries_for_prompt",
             return_value=[("key", "note value")],
         ), patch(
-            "backend.engines.orchestrator.tools.working_memory.get_working_memory_prompt_block",
+            "backend.engine.tools.working_memory.get_working_memory_prompt_block",
             return_value="",
         ):
             result = opm._inject_scratchpad("content")
@@ -203,10 +203,10 @@ class TestOrchestratorPromptManager:
     def test_inject_scratchpad_includes_working_memory_block(self, prompt_dir):
         opm = OrchestratorPromptManager(prompt_dir)
         with patch(
-            "backend.engines.orchestrator.tools.note.scratchpad_entries_for_prompt",
+            "backend.engine.tools.note.scratchpad_entries_for_prompt",
             return_value=[],
         ), patch(
-            "backend.engines.orchestrator.tools.working_memory.get_working_memory_prompt_block",
+            "backend.engine.tools.working_memory.get_working_memory_prompt_block",
             return_value="<WORKING_MEMORY>\n[PLAN] test\n</WORKING_MEMORY>",
         ):
             result = opm._inject_scratchpad("content")

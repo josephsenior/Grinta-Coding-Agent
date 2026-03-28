@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import MagicMock
-from backend.controller.agent_controller import AgentController
-from backend.controller.services.step_guard_service import StepGuardService
-from backend.controller.agent_circuit_breaker import CircuitBreakerResult
-from backend.events.action import SystemMessageAction
-from backend.events.observation import ErrorObservation
+from backend.orchestration.session_orchestrator import SessionOrchestrator
+from backend.orchestration.services.step_guard_service import StepGuardService
+from backend.orchestration.agent_circuit_breaker import CircuitBreakerResult
+from backend.ledger.action import SystemMessageAction
+from backend.ledger.observation import ErrorObservation
 
 class TestCircuitBreakerIntegration:
     @pytest.mark.asyncio
@@ -18,7 +18,7 @@ class TestCircuitBreakerIntegration:
         """
         # Setup Controller Context Mock
         mock_context = MagicMock()
-        mock_controller = MagicMock(spec=AgentController)
+        mock_controller = MagicMock(spec=SessionOrchestrator)
         mock_context.get_controller.return_value = mock_controller
 
         # Setup Event Stream
@@ -72,7 +72,7 @@ class TestCircuitBreakerIntegration:
         """
         # Setup
         mock_context = MagicMock()
-        mock_controller = MagicMock(spec=AgentController)
+        mock_controller = MagicMock(spec=SessionOrchestrator)
         mock_context.get_controller.return_value = mock_controller
         mock_controller.event_stream = MagicMock()
         mock_cb_service = MagicMock()

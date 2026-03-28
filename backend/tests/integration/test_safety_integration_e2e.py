@@ -5,8 +5,8 @@ These tests simulate real agent scenarios to verify the complete safety workflow
 
 import pytest
 
-from backend.controller.safety_validator import ExecutionContext, SafetyValidator
-from backend.events.action import ActionSecurityRisk, CmdRunAction
+from backend.orchestration.safety_validator import ExecutionContext, SafetyValidator
+from backend.ledger.action import ActionSecurityRisk, CmdRunAction
 from backend.security.command_analyzer import CommandAnalyzer
 from backend.security.safety_config import SafetyConfig
 

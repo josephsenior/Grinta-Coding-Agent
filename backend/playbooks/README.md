@@ -2,7 +2,7 @@
 
 **Purpose:** On-demand procedural and domain guidance. They inject only when a **recall/knowledge** query matches a trigger (see `Memory._find_playbook_knowledge`).
 
-**Not here:** General agent behaviour, tool frugality, security rules, memory-tool choice, or error-recovery for shell — that lives in the orchestrator **system prompt** (`backend/engines/orchestrator/prompts/`). Do not duplicate it in playbooks.
+**Not here:** General agent behaviour, tool frugality, security rules, memory-tool choice, or error-recovery for shell — that lives in the orchestrator **system prompt** (`backend/engine/prompts/`). Do not duplicate it in playbooks.
 
 ## Trigger policy (quality / focus)
 

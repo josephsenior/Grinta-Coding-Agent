@@ -1,4 +1,4 @@
-"""User-selected project folder (workspace) only.
+﻿"""User-selected project folder (workspace) only.
 
 The workspace path is whatever folder the user sets via **Open workspace** (and optional
 persisted ``~/.forge/app/active_workspace.json``). There is no fallback to ``cwd()`` or
@@ -121,7 +121,7 @@ def apply_workspace_to_config(config, root: Path) -> str:
 def get_effective_workspace_root() -> Path | None:
     """Return the open project folder, or ``None`` if the user has not chosen one."""
     try:
-        from backend.api.app_state import get_app_state
+        from backend.gateway.app_state import get_app_state
 
         wb = (get_app_state().config.project_root or "").strip()
         if wb:

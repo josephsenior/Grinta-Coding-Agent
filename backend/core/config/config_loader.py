@@ -40,14 +40,14 @@ from backend.core.config.forge_config import ForgeConfig
 from backend.core.config.llm_config import LLMConfig
 from backend.core.config.model_rebuild import rebuild_config_models
 from backend.core.constants import JWT_SECRET_FILE as JWT_SECRET
-from backend.storage import get_file_store
+from backend.persistence import get_file_store
 from backend.utils.import_utils import get_impl
 
 if TYPE_CHECKING:
     import argparse
 
     from backend.core.config.condenser_config import CondenserConfig
-    from backend.storage.files import FileStore
+    from backend.persistence.files import FileStore
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
         # it overrides LLM_MODEL from the environment even when both are set.
         llm_keys = ("llm_model", "llm_api_key", "llm_base_url", "llm_provider")
         if any(k in data for k in llm_keys):
-            from backend.llm.provider_resolver import canonicalize_model_selection
+            from backend.inference.provider_resolver import canonicalize_model_selection
 
             base = cfg.llms.get("llm")
             llm_dict = base.model_dump(exclude_none=True) if base else {}
@@ -418,7 +418,7 @@ def get_condenser_config_arg(
 
 def register_custom_agents(config: ForgeConfig) -> None:
     """Register custom agents from configuration."""
-    from backend.controller.agent import Agent
+    from backend.orchestration.agent import Agent
 
     for agent_name, agent_config in config.agents.items():
         classpath = getattr(agent_config, "classpath", None)

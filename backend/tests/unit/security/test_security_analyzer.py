@@ -6,8 +6,8 @@ from __future__ import annotations
 import pytest
 
 from backend.core.enums import ActionSecurityRisk
-from backend.events.action import CmdRunAction, FileWriteAction
-from backend.events.action.message import MessageAction
+from backend.ledger.action import CmdRunAction, FileWriteAction
+from backend.ledger.action.message import MessageAction
 from backend.security.analyzer import (
     SecurityAnalyzer,
     _CMD_RISK_MAP,

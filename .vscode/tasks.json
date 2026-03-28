@@ -1,4 +1,4 @@
-{
+﻿{
 	"version": "2.0.0",
 	"tasks": [
 		{
@@ -46,7 +46,7 @@
 		{
 			"label": "Run Uvicorn Task",
 			"type": "shell",
-			"command": "uv run uvicorn backend.api.socketio_asgi_app:app --port 3030",
+			"command": "uv run uvicorn backend.gateway.socketio_asgi_app:app --port 3030",
 			"isBackground": true
 		},
 		{

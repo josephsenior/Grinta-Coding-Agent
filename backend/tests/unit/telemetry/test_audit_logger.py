@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.events.action import ActionSecurityRisk
+from backend.ledger.action import ActionSecurityRisk
 from backend.telemetry.audit_logger import AuditLogger
 
 
@@ -34,7 +34,7 @@ def _make_validation_result(
 
 
 def _make_cmd_action(command: str = "echo hello") -> MagicMock:
-    from backend.events.action import CmdRunAction
+    from backend.ledger.action import CmdRunAction
 
     action = MagicMock(spec=CmdRunAction)
     action.command = command
@@ -43,7 +43,7 @@ def _make_cmd_action(command: str = "echo hello") -> MagicMock:
 
 
 def _make_file_edit_action(path: str = "file.py") -> MagicMock:
-    from backend.events.action import FileEditAction
+    from backend.ledger.action import FileEditAction
 
     action = MagicMock(spec=FileEditAction)
     action.path = path

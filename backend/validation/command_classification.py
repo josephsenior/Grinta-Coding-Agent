@@ -10,10 +10,10 @@ import shlex
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.events.action.commands import CmdRunAction
-    from backend.events.observation.commands import CmdOutputObservation
+    from backend.ledger.action.commands import CmdRunAction
+    from backend.ledger.observation.commands import CmdOutputObservation
 
-from backend.events.event import Event
+from backend.ledger.event import Event
 
 
 def argv_tokens(command: str) -> list[str]:
@@ -152,7 +152,7 @@ def find_cmd_output_for_run(
     Falls back to matching ``observation.command`` only when the run has no event id
     (e.g. deserialized or synthetic history).
     """
-    from backend.events.observation.commands import CmdOutputObservation
+    from backend.ledger.observation.commands import CmdOutputObservation
 
     rid = getattr(run, "id", None)
     aid = int(rid) if rid is not None and int(rid) != Event.INVALID_ID else None

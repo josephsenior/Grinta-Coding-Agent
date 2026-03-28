@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import tempfile
 
-from backend.events import EventSource
-from backend.events.observation.empty import NullObservation
-from backend.events.serialization.event import event_to_dict
-from backend.events.stream import EventStream
-from backend.storage.local_file_store import LocalFileStore
-from backend.storage.locations import get_conversation_events_dir
+from backend.ledger import EventSource
+from backend.ledger.observation.empty import NullObservation
+from backend.ledger.serialization.event import event_to_dict
+from backend.ledger.stream import EventStream
+from backend.persistence.local_file_store import LocalFileStore
+from backend.persistence.locations import get_conversation_events_dir
 
 
 def test_event_stream_replays_pending_event_on_startup() -> None:

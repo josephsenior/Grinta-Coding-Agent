@@ -17,9 +17,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backend.events.backpressure import BackpressureManager
-from backend.events.durable_writer import DurableEventWriter, PersistedEvent
-from backend.events.observation import NullObservation
+from backend.ledger.backpressure import BackpressureManager
+from backend.ledger.durable_writer import DurableEventWriter, PersistedEvent
+from backend.ledger.observation import NullObservation
 from backend.utils.circuit_breaker import CircuitBreaker, CircuitBreakerManager
 
 pytestmark = pytest.mark.stress

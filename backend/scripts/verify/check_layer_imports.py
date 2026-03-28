@@ -33,22 +33,22 @@ from pathlib import Path
 RULES: list[tuple[str, str, str]] = [
     (
         "backend/controller",
-        "backend.api",
+        "backend.gateway",
         "controller must not depend on server layer",
     ),
-    ("backend/llm", "backend.api", "llm must not depend on server layer"),
-    ("backend/engines", "backend.api", "engines must not depend on server layer"),
-    ("backend/memory", "backend.api", "memory must not depend on server layer"),
-    ("backend/events", "backend.api", "events must not depend on server layer"),
+    ("backend/llm", "backend.gateway", "llm must not depend on server layer"),
+    ("backend/engines", "backend.gateway", "engines must not depend on server layer"),
+    ("backend/memory", "backend.gateway", "memory must not depend on server layer"),
+    ("backend/events", "backend.gateway", "events must not depend on server layer"),
     (
         "backend/events",
-        "backend.controller",
+        "backend.orchestration",
         "events must not depend on controller layer",
     ),
-    ("backend/core", "backend.api", "core must not depend on server layer"),
-    ("backend/core", "backend.controller", "core must not depend on controller layer"),
-    ("backend/core", "backend.engines", "core must not depend on engines layer"),
-    ("backend/core", "backend.memory", "core must not depend on memory layer"),
+    ("backend/core", "backend.gateway", "core must not depend on server layer"),
+    ("backend/core", "backend.orchestration", "core must not depend on controller layer"),
+    ("backend/core", "backend.engine", "core must not depend on engines layer"),
+    ("backend/core", "backend.context", "core must not depend on memory layer"),
 ]
 
 # Known exemptions (module path → reason).  Keep this list SMALL.

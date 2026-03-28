@@ -1,4 +1,4 @@
-"""Run reliability validation gates for hard-cut migration phases.
+﻿"""Run reliability validation gates for hard-cut migration phases.
 
 This script provides one command to execute the release validation bundles used
 for migration signoff. It is intentionally cross-platform and model/provider
@@ -38,11 +38,11 @@ def _phase_commands(phase: str, include_integration: bool) -> list[tuple[str, li
         ),
         (
             "release1_knowledge_base_units",
-            py + ["backend/tests/unit/knowledge_base"],
+              py + ["backend/tests/unit/knowledge"],
         ),
         (
             "release1_step_guard_units",
-            py + ["backend/tests/unit/controller/services/test_step_guard_service.py"],
+                py + ["backend/tests/unit/orchestration/services/test_step_guard_service.py"],
         ),
         (
             "release1_error_recovery_memory_units",
@@ -53,7 +53,7 @@ def _phase_commands(phase: str, include_integration: bool) -> list[tuple[str, li
     ]
 
     release2 = [
-        ("release2_runtime_units", py + ["backend/tests/unit/runtime"]),
+        ("release2_runtime_units", py + ["backend/tests/unit/execution"]),
     ]
 
     integration = [

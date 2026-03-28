@@ -1,4 +1,4 @@
-name: End-to-End Tests
+﻿name: End-to-End Tests
 
 on:
   workflow_dispatch:
@@ -55,7 +55,7 @@ jobs:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
         run: |
-          uv run uvicorn backend.api.socketio_asgi_app:app \
+          uv run uvicorn backend.gateway.socketio_asgi_app:app \
             --host 127.0.0.1 --port 3000 &
           for i in $(seq 1 30); do
             curl -sf http://127.0.0.1:3000/api/health/live && break || sleep 1
@@ -72,7 +72,7 @@ jobs:
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
         run: |
           Start-Process -NoNewWindow -FilePath "uv" `
-            -ArgumentList "run","uvicorn","backend.api.socketio_asgi_app:app","--host","127.0.0.1","--port","3000"
+            -ArgumentList "run","uvicorn","backend.gateway.socketio_asgi_app:app","--host","127.0.0.1","--port","3000"
           for ($i = 0; $i -lt 30; $i++) {
             try {
               Invoke-WebRequest -Uri http://127.0.0.1:3000/api/health/live -UseBasicParsing -TimeoutSec 2 | Out-Null
@@ -89,7 +89,7 @@ jobs:
 
       - name: Cleanup (Linux)
         if: always() && runner.os != 'Windows'
-        run: pkill -f "uvicorn backend.api" || true
+        run: pkill -f "uvicorn backend.gateway" || true
 
       - name: Cleanup (Windows)
         if: always() && runner.os == 'Windows'

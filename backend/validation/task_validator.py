@@ -13,13 +13,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.controller.state.state import State
+    from backend.orchestration.state.state import State
 
 from backend.core.logger import forge_logger as logger
-from backend.events.action import CmdRunAction
-from backend.events.action.files import FileEditAction, FileWriteAction
-from backend.events.observation import CmdOutputObservation
-from backend.events.observation.files import FileEditObservation, FileReadObservation, FileWriteObservation
+from backend.ledger.action import CmdRunAction
+from backend.ledger.action.files import FileEditAction, FileWriteAction
+from backend.ledger.observation import CmdOutputObservation
+from backend.ledger.observation.files import FileEditObservation, FileReadObservation, FileWriteObservation
 from backend.validation.command_classification import (
     find_cmd_output_for_run,
     is_git_diff_command,

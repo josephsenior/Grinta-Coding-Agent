@@ -6,7 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from backend.events.action import ActionSecurityRisk
+from backend.ledger.action import ActionSecurityRisk
 
 
 class AuditEntry(BaseModel):

@@ -1,4 +1,4 @@
-"""Tests for backend.core.bootstrap.setup — framework initialization helpers."""
+﻿"""Tests for backend.core.bootstrap.setup — framework initialization helpers."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.runtime.plugins.requirement import PluginRequirement
+from backend.execution.plugins.requirement import PluginRequirement
 from backend.core.config.forge_config import ForgeConfig
 from backend.core.bootstrap.setup import (
     filter_plugins_by_config,
@@ -57,7 +57,7 @@ def test_filter_plugins_by_config():
     )
 
 
-@patch("backend.controller.agent.Agent.get_cls")
+@patch("backend.orchestration.agent.Agent.get_cls")
 def test_ensure_agent_class_available_success(mock_get_cls):
     from backend.core.bootstrap.setup import _ensure_agent_class_available
 
@@ -67,7 +67,7 @@ def test_ensure_agent_class_available_success(mock_get_cls):
 
 @patch("backend.core.bootstrap.setup.get_file_store")
 @patch("backend.core.bootstrap.setup.EventStream")
-@patch("backend.runtime.runtime_factory.get_runtime_cls")
+@patch("backend.execution.runtime_factory.get_runtime_cls")
 def test_create_runtime_sid_from_stream(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
 ):
@@ -83,7 +83,7 @@ def test_create_runtime_sid_from_stream(
     mock_runtime_cls.__name__ = "Mock"
     mock_get_runtime_cls.return_value = mock_runtime_cls
 
-    with patch("backend.controller.agent.Agent.get_cls") as mock_get_cls:
+    with patch("backend.orchestration.agent.Agent.get_cls") as mock_get_cls:
         mock_agent_cls = MagicMock()
         mock_agent_cls.runtime_plugins = []
         mock_agent_cls.__name__ = "Agent"  # Fix attributed error __name__
@@ -98,7 +98,7 @@ def test_create_runtime_sid_from_stream(
 
 @patch("backend.core.bootstrap.setup.get_file_store")
 @patch("backend.core.bootstrap.setup.EventStream")
-@patch("backend.runtime.runtime_factory.get_runtime_cls")
+@patch("backend.execution.runtime_factory.get_runtime_cls")
 def test_create_runtime(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
 ):
@@ -120,7 +120,7 @@ def test_create_runtime(
     type(mock_agent).runtime_plugins = []
 
     # We need to mock Agent.get_cls too if agent is None
-    with patch("backend.controller.agent.Agent.get_cls") as mock_get_agent_cls:
+    with patch("backend.orchestration.agent.Agent.get_cls") as mock_get_agent_cls:
         mock_agent_cls = MagicMock()
         mock_agent_cls.runtime_plugins = []
         mock_agent_cls.__name__ = "Agent"
@@ -133,7 +133,7 @@ def test_create_runtime(
 
 
 @patch("backend.core.bootstrap.setup.State.restore_from_session")
-@patch("backend.core.bootstrap.setup.AgentController")
+@patch("backend.core.bootstrap.setup.SessionOrchestrator")
 def test_create_controller(mock_controller_cls, mock_restore):
     mock_agent = MagicMock()
     mock_runtime = MagicMock()
@@ -177,7 +177,7 @@ def test_create_memory_extended():
 
 
 @patch("backend.core.bootstrap.setup.importlib.import_module")
-@patch("backend.controller.agent.Agent.get_cls")
+@patch("backend.orchestration.agent.Agent.get_cls")
 def test_create_agent_retry(mock_get_cls, mock_import):
     mock_config = MagicMock(spec=ForgeConfig)
     mock_config.default_agent = "my_agent"
@@ -199,10 +199,10 @@ def test_create_agent_retry(mock_get_cls, mock_import):
 
     llm_registry = MagicMock()
     create_agent(mock_config, llm_registry)
-    mock_import.assert_called_with("forge.engines")
+    mock_import.assert_called_with("forge.engine")
 
 
-@patch("backend.controller.agent.Agent.get_cls")
+@patch("backend.orchestration.agent.Agent.get_cls")
 def test_ensure_agent_class_available_fatal(mock_get_cls):
     from backend.core.bootstrap.setup import _ensure_agent_class_available
     from backend.core.errors import AgentNotRegisteredError

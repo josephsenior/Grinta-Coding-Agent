@@ -294,7 +294,7 @@ def run_or_schedule(coro: Coroutine[Any, Any, Any]) -> None:
     """Execute *coro* on an event loop, creating one if necessary.
 
     This centralises a pattern that was previously duplicated across
-    ``AgentController``, ``Runtime``, ``Session``, and ``Memory``:
+    ``SessionOrchestrator``, ``Runtime``, ``Session``, and ``Memory``:
 
     1. If a loop is already running in the current thread → schedule
        *coro* as a background task on that loop.

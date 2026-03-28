@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from backend.events.action.mcp import MCPAction
-from backend.mcp_client.mcp_utils import call_tool_mcp
+from backend.ledger.action.mcp import MCPAction
+from backend.gateway.integrations.mcp.mcp_utils import call_tool_mcp
 
 
 class FakeMcpError(Exception):
@@ -36,7 +36,7 @@ async def test_mcp_validation_error_envelope() -> None:
     client.exposed_to_protocol = {}
     client.call_tool = AsyncMock(side_effect=FakeMcpError("MCP error -32602: invalid_type"))
 
-    with patch("backend.mcp_client.mcp_utils.McpError", FakeMcpError):
+    with patch("backend.gateway.integrations.mcp.mcp_utils.McpError", FakeMcpError):
         obs = await call_tool_mcp([client], action)
 
     payload = json.loads(obs.content)

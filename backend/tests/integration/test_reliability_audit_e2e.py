@@ -9,13 +9,13 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 import pytest
 
-from backend.controller.agent_circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitBreakerResult
-from backend.controller.safety_validator import SafetyValidator, ExecutionContext
-from backend.controller.services.budget_guard_service import BudgetGuardService
-from backend.controller.rate_governor import LLMRateGovernor
-from backend.events.action import CmdRunAction, ActionSecurityRisk
-from backend.events.observation import ErrorObservation
-from backend.llm.metrics import TokenUsage
+from backend.orchestration.agent_circuit_breaker import CircuitBreaker, CircuitBreakerConfig, CircuitBreakerResult
+from backend.orchestration.safety_validator import SafetyValidator, ExecutionContext
+from backend.orchestration.services.budget_guard_service import BudgetGuardService
+from backend.orchestration.rate_governor import LLMRateGovernor
+from backend.ledger.action import CmdRunAction, ActionSecurityRisk
+from backend.ledger.observation import ErrorObservation
+from backend.inference.metrics import TokenUsage
 from backend.security.safety_config import SafetyConfig
 
 

@@ -130,7 +130,8 @@ retry_multiplier = 2.0
 
 **Symptom:** `context_length_exceeded` or `prompt is too long`
 
-**Fix:** Enable history truncation and/or use a condenser:
+**Fix:** Enable history truncation and/or use a compactor. The current config
+section name is still `[condenser]`:
 ```toml
 [agent]
 enable_history_truncation = true

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from backend.core.enums import ActionSecurityRisk
-from backend.events.action import CmdRunAction, FileWriteAction
+from backend.ledger.action import CmdRunAction, FileWriteAction
 from backend.security.analyzer import SecurityAnalyzer
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 

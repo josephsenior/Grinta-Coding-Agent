@@ -13,9 +13,9 @@ from jinja2 import Environment, FileSystemLoader, Template
 from backend.core.message import Message, TextContent
 
 if TYPE_CHECKING:
-    from backend.controller.state.state import State
-    from backend.events.observation.agent import PlaybookKnowledge
-    from backend.storage.data_models.knowledge_base import KnowledgeBaseSearchResult
+    from backend.orchestration.state.state import State
+    from backend.ledger.observation.agent import PlaybookKnowledge
+    from backend.persistence.data_models.knowledge_base import KnowledgeBaseSearchResult
 
 
 @dataclass
@@ -152,7 +152,7 @@ class PromptManager:
 
     def get_system_message(self, **context) -> str:
         """Render system prompt with optional context and apply refinement helpers."""
-        from backend.engines.orchestrator.tools.prompt import refine_prompt
+        from backend.engine.tools.prompt import refine_prompt
 
         # On Windows, set is_windows=False when bash is available so the
         # system prompt teaches bash (not PowerShell) — matching the shell
@@ -359,10 +359,10 @@ class OrchestratorPromptManager(PromptManager):
     def _inject_scratchpad(self, content: str) -> str:
         """Append persistent scratchpad and working memory so they survive condensation."""
         try:
-            from backend.engines.orchestrator.tools.note import (
+            from backend.engine.tools.note import (
                 scratchpad_entries_for_prompt,
             )
-            from backend.engines.orchestrator.tools.working_memory import (
+            from backend.engine.tools.working_memory import (
                 get_working_memory_prompt_block,
             )
 

@@ -19,8 +19,8 @@ from backend.core.logger import forge_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.forge_config import ForgeConfig
-    from backend.storage.data_models.settings import Settings
-    from backend.storage.settings.settings_store import SettingsStore
+    from backend.persistence.data_models.settings import Settings
+    from backend.persistence.settings.settings_store import SettingsStore
 
 try:
     import redis.asyncio as aioredis
@@ -223,7 +223,7 @@ class AsyncSmartCache:
             cached = await client.get(user_key)
 
             if cached:
-                from backend.storage.data_models.settings import (
+                from backend.persistence.data_models.settings import (
                     Settings as SettingsModel,
                 )
 

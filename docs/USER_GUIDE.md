@@ -10,7 +10,7 @@
 4. [Working with the Web UI](#working-with-the-web-ui)
 5. [Working with the API](#working-with-the-api)
 6. [LLM Providers](#llm-providers)
-7. [Memory & Condensers](#memory--condensers)
+7. [Context Memory & Compactors](#context-memory--compactors)
 8. [Safety & Budget Controls](#safety--budget-controls)
 9. [MCP Integration](#mcp-integration)
 10. [Playbooks](#playbooks)
@@ -24,7 +24,7 @@
 ### Prerequisites
 
 | Requirement | Version | Notes |
-|-------------|---------|-------|
+| --- | --- | --- |
 | Python | 3.12+ | [python.org](https://python.org) |
 | uv | 1.7+ | [docs.astral.sh/uv](https://docs.astral.sh/uv/) |
 | Git | 2.30+ | [git-scm.com](https://git-scm.com/downloads) |
@@ -61,7 +61,7 @@ Terminal 1 — Backend:
 python start_server.py
 ```
 
-Open the web UI at **http://localhost:3000** (or run `python forge.py` to start the server and open a browser tab automatically).
+Open the web UI at [http://localhost:3000](http://localhost:3000) (or run `python forge.py` to start the server and open a browser tab automatically).
 
 ---
 
@@ -109,7 +109,7 @@ This ensures MCP processes (like `browser-use` or `github`) securely inherit cre
 Any setting can be injected. For complex setups, rely on `.env`:
 
 | Config Path | Environment Variable |
-|-------------|---------------------|
+| --- | --- |
 | `llm.api_key` | `LLM_API_KEY` |
 | `llm.model` | `LLM_MODEL` |
 | `core.max_budget_per_task` | `CORE_MAX_BUDGET_PER_TASK` |
@@ -125,7 +125,7 @@ Any setting can be injected. For complex setups, rely on `.env`:
 python start_server.py
 ```
 
-Then open **http://localhost:3000** in a browser.
+Then open [http://localhost:3000](http://localhost:3000) in a browser.
 
 ### 2. Create a Conversation
 
@@ -135,7 +135,7 @@ From the web UI home screen, start a **new conversation** (or resume an existing
 
 Type a natural language instruction:
 
-```
+```text
 Create a Python function that reads a CSV file, calculates the average
 of a numeric column, and writes the result to a new file. Include error
 handling and type hints.
@@ -162,7 +162,7 @@ The agent shows each action as it executes. You can:
 ### Example Tasks
 
 | Task | Typical Cost | Iterations |
-|------|-------------|------------|
+| --- | --- | --- |
 | Fix a specific bug | $0.03–0.10 | 2–5 |
 | Implement a function | $0.05–0.20 | 3–8 |
 | Add tests for a module | $0.10–0.30 | 5–15 |
@@ -173,7 +173,7 @@ The agent shows each action as it executes. You can:
 
 ## Working with the Web UI
 
-The primary interface is the React app served with the backend (default **http://localhost:3000**).
+The primary interface is the React app served with the backend (default [http://localhost:3000](http://localhost:3000)).
 Use it to manage conversations, settings, confirmations, and workspace changes. The same REST and
 Socket.IO APIs power automation via the Python package `forge_client` (see tests under
 `backend/tests/unit/forge_client/` and `scripts/test_agent_via_sockets.py`).
@@ -228,7 +228,7 @@ the server is running.
 ### Supported Providers
 
 | Provider | Models | Config |
-|----------|--------|--------|
+| --- | --- | --- |
 | **Anthropic** | Claude Sonnet 4, Claude Haiku | `model = "claude-sonnet-4-20250514"` |
 | **OpenAI** | GPT-4o, GPT-4o-mini, o1 | `model = "gpt-4o"` |
 | **Google** | Gemini 2.5 Pro, Flash | `model = "gemini/gemini-2.5-pro"` |
@@ -290,20 +290,21 @@ model = "claude-haiku-4-5-20251001"            # Faster, cheaper
 
 [llm.condenser]
 api_key = "sk-..."
-model = "gpt-4o-mini"             # For memory condensation
+model = "gpt-4o-mini"             # Current config name for compaction workloads
 ```
 
 ---
 
-## Memory & Condensers
+## Context Memory & Compactors
 
-Condensers manage conversation history when it grows too large for the
-LLM's context window.
+Context memory is compacted when conversation history grows too large for the
+LLM's context window. The current implementation still uses `condenser` as the
+config section and class family name.
 
-### Available Condensers
+### Available Compactors
 
-| Condenser | Best For | Config |
-|-----------|----------|--------|
+| Compactor | Best For | Current Config |
+| --- | --- | --- |
 | **smart** (default) | General use — adapts automatically | `type = "smart"` |
 | **llm** | Long sessions needing high-quality summaries | `type = "llm"` |
 | **observation_masking** | Preserving structure, masking old outputs | `type = "observation_masking"` |
@@ -313,7 +314,7 @@ LLM's context window.
 | **llm_attention** | LLM-scored relevance prioritization | `type = "llm_attention"` |
 | **noop** | Debugging — no condensation | `type = "noop"` |
 
-### Configuration
+### Compactor Configuration
 
 ```toml
 [condenser]
@@ -321,7 +322,7 @@ type = "smart"    # Recommended default
 
 # Or for long sessions with high-quality summarization:
 # type = "llm"
-# llm_config = "condenser"   # References [llm.condenser] section
+# llm_config = "condenser"   # References the current [llm.condenser] section
 # max_size = 100
 # keep_first = 1
 ```
@@ -379,7 +380,7 @@ enable_graceful_shutdown = true   # Recommended
 Forge supports the [Model Context Protocol](https://modelcontextprotocol.io/)
 for connecting external tool servers.
 
-### Configuration
+### MCP Configuration
 
 ```toml
 [mcp]
@@ -413,7 +414,7 @@ their trigger phrases, injecting specialist guidance into the agent's context wi
 ### Context Playbooks (auto-triggered)
 
 | Playbook | Trigger phrases |
-|---|---|
+| --- | --- |
 | **Debug** | `bug fix`, `debug`, `traceback`, `exception`, `error fix` |
 | **Feature** | `implement feature`, `add feature`, `new feature`, `build feature` |
 | **Refactoring** | `refactor`, `clean up code`, `restructure`, `technical debt` |
@@ -431,7 +432,7 @@ their trigger phrases, injecting specialist guidance into the agent's context wi
 Task playbooks collect variables from you before running:
 
 | Command | What it does |
-|---|---|
+| --- | --- |
 | `/address_pr_comments` | Reads PR URL + branch and resolves all reviewer comments |
 | `/update_test` | Runs a test command on a branch and fixes failures |
 | `/update_pr_description` | Rewrites the PR description to reflect the current diff |
@@ -489,7 +490,7 @@ enable_summarize_context = false  # Agent-initiated condensation
 
 ### Reduce Cost
 
-1. **Use a cheaper model for condensation:**
+1. **Use a cheaper model for compaction:**
 
    ```toml
    [llm.condenser]
@@ -563,7 +564,7 @@ enable_summarize_context = false  # Agent-initiated condensation
    max_input_tokens = 128000
    ```
 
-3. **Use smart condenser:**
+3. **Use smart compactor:**
 
    ```toml
    [condenser]

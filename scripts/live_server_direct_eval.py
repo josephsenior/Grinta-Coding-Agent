@@ -21,6 +21,7 @@ from forge_client import ForgeClient
 BASE_URL = os.environ.get("FORGE_BASE_URL", "http://127.0.0.1:3000")
 FORGE_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = Path(r"C:\Users\GIGABYTE\Desktop\New folder")
+EVAL_WORKSPACE = WORKSPACE_ROOT / "agent_eval_workspace"
 RESULTS_PATH = FORGE_ROOT / "live_server_direct_eval_results.json"
 SERVER_LOG_PATH = FORGE_ROOT / "live_server_direct_eval_server.log"
 
@@ -110,13 +111,39 @@ def start_server_subprocess() -> subprocess.Popen[str]:
     return proc
 
 
+def _rmtree_retry(path: Path, retries: int = 8, delay: float = 0.25) -> None:
+    """Remove a directory tree with retries for Windows file-handle races."""
+    import stat as _stat
+
+    def _make_writable(p: Path) -> None:
+        for root, dirs, files in os.walk(str(p)):
+            for name in files + dirs:
+                try:
+                    os.chmod(os.path.join(root, name), _stat.S_IWRITE | _stat.S_IREAD)
+                except OSError:
+                    pass
+
+    last: Exception | None = None
+    for _ in range(retries):
+        try:
+            _make_writable(path)
+            shutil.rmtree(path)
+            return
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            last = exc
+            time.sleep(delay)
+    raise OSError(f"Failed to remove {path} after {retries} retries") from last
+
+
 def reset_workspace() -> None:
-    WORKSPACE_ROOT.mkdir(parents=True, exist_ok=True)
-    for child in WORKSPACE_ROOT.iterdir():
+    EVAL_WORKSPACE.mkdir(parents=True, exist_ok=True)
+    for child in EVAL_WORKSPACE.iterdir():
         if child.is_dir():
-            shutil.rmtree(child)
+            _rmtree_retry(child)
         else:
-            child.unlink()
+            child.unlink(missing_ok=True)
 
 
 def write_text(path: Path, content: str) -> None:
@@ -127,11 +154,11 @@ def write_text(path: Path, content: str) -> None:
 def prepare_complex_refactor() -> None:
     reset_workspace()
     write_text(
-        WORKSPACE_ROOT / "complex_refactor" / "reporting" / "__init__.py",
+        EVAL_WORKSPACE / "complex_refactor" / "reporting" / "__init__.py",
         "",
     )
     write_text(
-        WORKSPACE_ROOT / "complex_refactor" / "reporting" / "stats.py",
+        EVAL_WORKSPACE / "complex_refactor" / "reporting" / "stats.py",
         "def moving_average(values, window):\n"
         "    if window <= 0:\n"
         "        raise ValueError('window must be positive')\n"
@@ -150,12 +177,12 @@ def prepare_complex_refactor() -> None:
         "    return {'count': len(values), 'total': total, 'average': average}\n",
     )
     write_text(
-        WORKSPACE_ROOT / "complex_refactor" / "reporting" / "formatting.py",
+        EVAL_WORKSPACE / "complex_refactor" / "reporting" / "formatting.py",
         "def format_summary(summary):\n"
         "    return f\"count={summary['count']} total={summary['total']} average={summary['average']:.2f}\"\n",
     )
     write_text(
-        WORKSPACE_ROOT / "complex_refactor" / "test_reporting.py",
+        EVAL_WORKSPACE / "complex_refactor" / "test_reporting.py",
         "import unittest\n\n"
         "from reporting.formatting import format_summary\n"
         "from reporting.stats import moving_average, summarize\n\n\n"
@@ -174,6 +201,12 @@ def prepare_complex_refactor() -> None:
 
 
 def run_unittest(test_dir: str, pattern: str = "test*.py") -> tuple[bool, str]:
+    # top_level == start_dir so the directory itself is the import root.
+    # Tests inside a given scenario dir import from sibling packages, not from
+    # the EVAL_WORKSPACE parent — so the top-level must be the scenario dir.
+    start_dir = EVAL_WORKSPACE / test_dir
+    if not start_dir.is_dir():
+        return False, f"Test directory does not exist: {start_dir}"
     proc = subprocess.run(
         [
             sys.executable,
@@ -181,14 +214,17 @@ def run_unittest(test_dir: str, pattern: str = "test*.py") -> tuple[bool, str]:
             "unittest",
             "discover",
             "-s",
-            test_dir,
+            str(start_dir),
             "-p",
             pattern,
+            "-t",
+            str(start_dir),
         ],
-        cwd=str(WORKSPACE_ROOT),
+        cwd=str(start_dir),
         capture_output=True,
         text=True,
         timeout=60,
+        check=False,
     )
     combined = (proc.stdout or "") + (proc.stderr or "")
     return proc.returncode == 0, combined[-4000:]
@@ -244,6 +280,11 @@ async def run_prompt(prompt: str, *, disconnect_after_tool: bool = False, discon
         return trace, True
     except Exception as exc:
         trace.events.append({"error": str(exc)})
+        if trace.conversation_id:
+            try:
+                await client.stop_agent(trace.conversation_id)
+            except Exception:
+                pass
         return trace, False
     finally:
         await client.close()
@@ -252,8 +293,8 @@ async def run_prompt(prompt: str, *, disconnect_after_tool: bool = False, discon
 async def run_server_restart_scenario() -> dict[str, Any]:
     reset_workspace()
     prompt = (
-        "Create a new folder `resume_suite`. Inside it create a small standard-library Python package with "
-        "`resume_suite/core.py`, `resume_suite/__init__.py`, and `test_resume_suite.py`. "
+        "Create a new folder `agent_eval_workspace/resume_suite`. Inside it create a small standard-library Python package with "
+        "`agent_eval_workspace/resume_suite/core.py`, `agent_eval_workspace/resume_suite/__init__.py`, and `agent_eval_workspace/test_resume_suite.py`. "
         "Implement `slugify(text)` and `dedupe_keep_order(items)` with unittests, then run the tests."
     )
     trace = ScenarioTrace()
@@ -332,8 +373,8 @@ async def run_server_restart_scenario() -> dict[str, Any]:
         return {
             "conversation_id": conv_id,
             "killed_pids": killed,
-            "health_project_root": health.get("config", {}).get("project_root"),
-            "health_recovery": health.get("recovery"),
+                "health_project_root": health.get("checks", {}).get("config", {}).get("project_root"),
+                "health_recovery": health.get("checks", {}).get("recovery"),
             "settings_recovery": settings_snapshot.get("recovery_snapshot"),
             "conversation_state_after_restart": conv_state,
             "event_count": len(trace.events),
@@ -362,10 +403,10 @@ async def main() -> int:
     try:
         prepare_complex_refactor()
         trace1, ok1 = await run_prompt(
-            "In `complex_refactor`, make `python -m unittest complex_refactor.test_reporting` pass. Fix the root causes, keep the existing public functions, add concise module or function docstrings where they are missing, and run the tests.",
+            "In `agent_eval_workspace/complex_refactor`, make the tests pass. Fix the root causes, keep the existing public functions, add concise module or function docstrings where they are missing, and run the tests.",
         )
         tests_ok1, test_output1 = run_unittest("complex_refactor")
-        stats_path = WORKSPACE_ROOT / "complex_refactor" / "reporting" / "stats.py"
+        stats_path = EVAL_WORKSPACE / "complex_refactor" / "reporting" / "stats.py"
         results["complex_fix"] = {
             "conversation_id": trace1.conversation_id,
             "success": ok1,
@@ -380,12 +421,13 @@ async def main() -> int:
     except Exception as exc:
         results["complex_fix"] = {"error": str(exc)}
     save_results(results)
+    await asyncio.sleep(5.0)
 
     print_step("Scenario 2: websocket disconnect and reconnect")
     try:
         reset_workspace()
         trace2, ok2 = await run_prompt(
-            "Create a folder `resilience_app`. Inside it create a standard-library Python package with `resilience_app/__init__.py`, `resilience_app/tasks.py`, `resilience_app/cli.py`, and `test_tasks.py`. Implement `parse_tasks(text)` to parse `[x] done` and `[ ] pending` lines, plus `summarize_tasks(tasks)` returning total/completed/pending counts. Add unittests and run them.",
+            "Create a folder `agent_eval_workspace/resilience_app`. Inside it create a standard-library Python package with `agent_eval_workspace/resilience_app/__init__.py`, `agent_eval_workspace/resilience_app/tasks.py`, `agent_eval_workspace/resilience_app/cli.py`, and `agent_eval_workspace/test_tasks.py`. Implement `parse_tasks(text)` to parse `[x] done` and `[ ] pending` lines, plus `summarize_tasks(tasks)` returning total/completed/pending counts. Add unittests and run them.",
             disconnect_after_tool=True,
             disconnect_pause=10.0,
         )
@@ -404,6 +446,7 @@ async def main() -> int:
     except Exception as exc:
         results["disconnect_reconnect"] = {"error": str(exc)}
     save_results(results)
+    await asyncio.sleep(5.0)
 
     print_step("Scenario 3: server restart during active work")
     try:

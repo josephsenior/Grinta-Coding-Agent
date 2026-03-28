@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from backend.events.action import ActionSecurityRisk
+from backend.ledger.action import ActionSecurityRisk
 from backend.telemetry.models import AuditEntry
 
 

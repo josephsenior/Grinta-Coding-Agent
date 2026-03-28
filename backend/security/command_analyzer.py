@@ -52,7 +52,7 @@ class CommandAssessment:
     @property
     def risk_level(self) -> Any:
         """Return the corresponding ``ActionSecurityRisk`` enum member."""
-        from backend.events.action import ActionSecurityRisk
+        from backend.ledger.action import ActionSecurityRisk
 
         level_name = _RISK_TO_ACTION_LEVEL.get(self.risk_category.value, "LOW")
         return ActionSecurityRisk[level_name]
