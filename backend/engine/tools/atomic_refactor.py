@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 @dataclass

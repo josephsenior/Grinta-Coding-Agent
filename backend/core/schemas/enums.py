@@ -1,6 +1,6 @@
-"""Central location for Forge action/agent/observation enums.
+"""Central location for App action/agent/observation enums.
 
-These enums were historically defined in ``forge.core.schema``; they now live here
+These enums were historically defined in ``app.core.schema``; they now live here
 alongside the Pydantic schema models so there is a single source of truth.
 """
 

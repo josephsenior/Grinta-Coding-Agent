@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol
 
 from backend.core.constants import MAX_LINES_TO_EDIT
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
@@ -26,7 +26,7 @@ from backend.execution.utils.diff import get_diff
 from backend.utils.chunk_localizer import Chunk, get_top_k_chunk_matches
 
 if TYPE_CHECKING:
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.inference.llm import LLM
     from backend.inference.llm_registry import LLMRegistry
 
@@ -123,7 +123,7 @@ class FileEditRuntimeInterface(Protocol):
 class FileEditRuntimeMixin(ABC):
     """Mixin providing LLM-assisted edit flows for runtime implementations."""
 
-    config: ForgeConfig
+    config: AppConfig
     runtime: Any
     draft_editor_llm: LLM | None
     enable_llm_editor: bool

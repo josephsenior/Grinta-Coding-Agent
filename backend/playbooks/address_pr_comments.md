@@ -1,7 +1,7 @@
 ---
 name: address_pr_comments
 version: 1.0.0
-author: Forge
+author: App
 agent: Orchestrator
 triggers:
   - /address_pr_comments

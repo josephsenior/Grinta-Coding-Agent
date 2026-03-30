@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
+from contextlib import AbstractContextManager
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -11,7 +14,7 @@ import backend.gateway.graceful_shutdown as gs
 
 
 @pytest.fixture(autouse=True)
-def _reset_graceful_shutdown_state() -> None:
+def _reset_graceful_shutdown_state() -> Iterator[None]:
     gs._shutdown_handlers.clear()
     gs._shutdown_in_progress = False
     yield
@@ -23,7 +26,7 @@ def test_is_shutting_down_false_initially() -> None:
     assert gs.is_shutting_down() is False
 
 
-def _patch_request_shutdown() -> patch:
+def _patch_request_shutdown() -> AbstractContextManager[Any]:
     return patch("backend.utils.shutdown_listener.request_process_shutdown")
 
 

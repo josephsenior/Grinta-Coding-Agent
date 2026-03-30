@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.orchestration.session_orchestrator import SessionOrchestrator
@@ -22,7 +22,7 @@ class ContextWindowMiddleware(ToolInvocationMiddleware):
 
     Why this matters: without proactive warnings the LLM only learns the
     context window is full *after* the API returns an error — at which point
-    Forge must trigger emergency condensation.  This middleware gives the LLM
+    App must trigger emergency condensation.  This middleware gives the LLM
     a chance to call ``request_condensation()`` voluntarily before overflow.
     """
 

@@ -1,4 +1,4 @@
-"""Factory helpers and exports for Forge file storage backends."""
+"""Factory helpers and exports for App file storage backends."""
 
 from __future__ import annotations
 

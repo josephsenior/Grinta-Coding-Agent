@@ -29,7 +29,7 @@ class TestPortLockInit:
     def test_default_lock_dir(self):
         lock = PortLock(8080)
         assert lock.port == 8080
-        assert "FORGE_port_locks" in lock.lock_dir
+        assert "app_port_locks" in lock.lock_dir
         assert lock.lock_file_path.endswith("port_8080.lock")
         assert lock.is_locked is False
 
@@ -143,7 +143,7 @@ class TestCleanupStaleLocks:
             assert cleanup_stale_locks() == 0
 
     def test_cleans_old_files(self, tmp_path):
-        lock_dir = tmp_path / "FORGE_port_locks"
+        lock_dir = tmp_path / "app_port_locks"
         lock_dir.mkdir()
         # Create a stale lock file
         stale = lock_dir / "port_1234.lock"
@@ -158,7 +158,7 @@ class TestCleanupStaleLocks:
         assert not stale.exists()
 
     def test_preserves_fresh_files(self, tmp_path):
-        lock_dir = tmp_path / "FORGE_port_locks"
+        lock_dir = tmp_path / "app_port_locks"
         lock_dir.mkdir()
         fresh = lock_dir / "port_5678.lock"
         fresh.write_text("5678")

@@ -16,14 +16,14 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from forge_client import ForgeClient
+from client import AppClient
 
-BASE_URL = os.environ.get("FORGE_BASE_URL", "http://127.0.0.1:3000")
-FORGE_ROOT = Path(__file__).resolve().parents[1]
+BASE_URL = os.environ.get("APP_BASE_URL", "http://127.0.0.1:3000")
+APP_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = Path(r"C:\Users\GIGABYTE\Desktop\New folder")
 EVAL_WORKSPACE = WORKSPACE_ROOT / "agent_eval_workspace"
-RESULTS_PATH = FORGE_ROOT / "live_server_direct_eval_results.json"
-SERVER_LOG_PATH = FORGE_ROOT / "live_server_direct_eval_server.log"
+RESULTS_PATH = APP_ROOT / "live_server_direct_eval_results.json"
+SERVER_LOG_PATH = APP_ROOT / "live_server_direct_eval_server.log"
 
 
 def save_results(results: dict[str, Any]) -> None:
@@ -103,7 +103,7 @@ def start_server_subprocess() -> subprocess.Popen[str]:
     with SERVER_LOG_PATH.open("w", encoding="utf-8") as log_file:
         proc = subprocess.Popen(
             [sys.executable, "start_server.py"],
-            cwd=str(FORGE_ROOT),
+            cwd=str(APP_ROOT),
             stdout=log_file,
             stderr=log_file,
             text=True,
@@ -230,7 +230,7 @@ def run_unittest(test_dir: str, pattern: str = "test*.py") -> tuple[bool, str]:
     return proc.returncode == 0, combined[-4000:]
 
 
-async def create_conversation(client: ForgeClient) -> str:
+async def create_conversation(client: AppClient) -> str:
     conv = await asyncio.wait_for(client.create_conversation(), timeout=180)
     conv_id = str(conv.get("conversation_id") or conv.get("id") or "")
     if not conv_id:
@@ -246,7 +246,7 @@ async def run_prompt(prompt: str, *, disconnect_after_tool: bool = False, discon
     initialized = asyncio.Event()
     prompt_sent = False
 
-    client = ForgeClient(BASE_URL)
+    client = AppClient(BASE_URL)
 
     async def on_event(event: dict[str, Any]) -> None:
         nonlocal prompt_sent
@@ -302,7 +302,7 @@ async def run_server_restart_scenario() -> dict[str, Any]:
     progress = asyncio.Event()
     initialized = asyncio.Event()
     prompt_sent = False
-    client = ForgeClient(BASE_URL)
+    client = AppClient(BASE_URL)
 
     async def on_event(event: dict[str, Any]) -> None:
         nonlocal prompt_sent
@@ -345,7 +345,7 @@ async def run_server_restart_scenario() -> dict[str, Any]:
         health = wait_for_health(timeout=90)
         settings_snapshot = request_json("GET", "/api/v1/settings")
 
-        reconnect_client = ForgeClient(BASE_URL)
+        reconnect_client = AppClient(BASE_URL)
         try:
             async def on_reconnect(event: dict[str, Any]) -> None:
                 trace.record(event)

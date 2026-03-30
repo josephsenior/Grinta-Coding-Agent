@@ -24,32 +24,32 @@ class TestDefaultOutFile(unittest.TestCase):
 
     def test_windows_platform_returns_dll(self) -> None:
         out_base = Path("/path/to/my-langs")
-        with patch.dict("os.environ", {"FORGE_PLATFORM": "win32"}):
+        with patch.dict("os.environ", {"APP_PLATFORM": "win32"}):
             result = _default_out_file(out_base)
         self.assertTrue(result.endswith(".dll"))
 
     def test_windows_64_platform_returns_dll(self) -> None:
         out_base = Path("c:\\grammars\\build")
-        with patch.dict("os.environ", {"FORGE_PLATFORM": "win_amd64"}):
+        with patch.dict("os.environ", {"APP_PLATFORM": "win_amd64"}):
             result = _default_out_file(out_base)
         self.assertTrue(result.endswith(".dll"))
 
     def test_darwin_platform_returns_dylib(self) -> None:
         out_base = Path("/usr/local/grammars/lang")
-        with patch.dict("os.environ", {"FORGE_PLATFORM": "darwin"}):
+        with patch.dict("os.environ", {"APP_PLATFORM": "darwin"}):
             result = _default_out_file(out_base)
         self.assertTrue(result.endswith(".dylib"))
 
     def test_linux_platform_returns_so(self) -> None:
         out_base = Path("/opt/grammars/parser")
-        with patch.dict("os.environ", {"FORGE_PLATFORM": "linux"}):
+        with patch.dict("os.environ", {"APP_PLATFORM": "linux"}):
             result = _default_out_file(out_base)
         self.assertTrue(result.endswith(".so"))
 
     def test_fallback_to_sys_platform(self) -> None:
         out_base = Path("/tmp/build")
         env = dict(__import__("os").environ)
-        env.pop("FORGE_PLATFORM", None)
+        env.pop("APP_PLATFORM", None)
         with patch.dict("os.environ", env, clear=True):
             with patch("backend.tools.tools.build_tree_sitter_lang.sys") as mock_sys:
                 mock_sys.platform = "linux"
@@ -58,7 +58,7 @@ class TestDefaultOutFile(unittest.TestCase):
 
     def test_unknown_platform_defaults_to_so(self) -> None:
         out_base = Path("/opt/lib")
-        with patch.dict("os.environ", {"FORGE_PLATFORM": "freebsd"}):
+        with patch.dict("os.environ", {"APP_PLATFORM": "freebsd"}):
             result = _default_out_file(out_base)
         self.assertTrue(result.endswith(".so"))
 
@@ -109,7 +109,7 @@ class TestMainFunction(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "tree-sitter-python").mkdir()
             with patch.dict("sys.modules", {"tree_sitter": fake_ts}):
-                with patch.dict("os.environ", {"FORGE_PLATFORM": "linux"}):
+                with patch.dict("os.environ", {"APP_PLATFORM": "linux"}):
                     main(["--grammar-dir", tmpdir, "--lang", "tree-sitter-python"])
             call_args = fake_ts.Language.build_library.call_args
             output_path = call_args[0][0]
@@ -163,7 +163,7 @@ class TestMainFunction(unittest.TestCase):
             custom_out = Path(tmpdir) / "custom" / "location"
             custom_out.parent.mkdir(parents=True, exist_ok=True)
             with patch.dict("sys.modules", {"tree_sitter": fake_ts}):
-                with patch.dict("os.environ", {"FORGE_PLATFORM": "darwin"}):
+                with patch.dict("os.environ", {"APP_PLATFORM": "darwin"}):
                     main(
                         [
                             "--grammar-dir",

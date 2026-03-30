@@ -1,7 +1,7 @@
 ---
 name: update_test
 version: 1.0.0
-author: Forge
+author: App
 agent: Orchestrator
 triggers:
   - /update_test

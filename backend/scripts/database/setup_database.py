@@ -24,7 +24,7 @@ async def create_database():
     user = os.getenv("DB_USER", "postgres")
     password = os.getenv("DB_PASSWORD", "postgres")
 
-    db_name = os.getenv("DB_NAME", "forge")
+    db_name = os.getenv("DB_NAME", "app")
 
     dsn = f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
@@ -58,7 +58,7 @@ async def run_migrations():
     # Get database connection parameters
     host = os.getenv("DB_HOST", "localhost")
     port = int(os.getenv("DB_PORT", "5432"))
-    database = os.getenv("DB_NAME", "forge")
+    database = os.getenv("DB_NAME", "app")
     user = os.getenv("DB_USER", "postgres")
     password = os.getenv("DB_PASSWORD", "postgres")
 
@@ -76,7 +76,7 @@ async def run_migrations():
 
     # Get migration directory
     project_root = Path(__file__).parent.parent
-    migrations_dir = project_root / "forge" / "storage" / "user" / "migrations"
+    migrations_dir = project_root / "app" / "storage" / "user" / "migrations"
     migration_files = sorted(migrations_dir.glob("*.sql"))
 
     if not migration_files:
@@ -109,7 +109,7 @@ async def verify_setup():
     """Verify the setup by checking if users table exists."""
     host = os.getenv("DB_HOST", "localhost")
     port = int(os.getenv("DB_PORT", "5432"))
-    database = os.getenv("DB_NAME", "forge")
+    database = os.getenv("DB_NAME", "app")
     user = os.getenv("DB_USER", "postgres")
     password = os.getenv("DB_PASSWORD", "postgres")
 
@@ -135,14 +135,14 @@ async def verify_setup():
 async def main():
     """Main setup function."""
     print("=" * 60)
-    print("Forge Database Setup")
+    print("App Database Setup")
     print("=" * 60)
     print()
 
     # Check environment variables
     db_host = os.getenv("DB_HOST", "localhost")
     db_port = os.getenv("DB_PORT", "5432")
-    db_name = os.getenv("DB_NAME", "forge")
+    db_name = os.getenv("DB_NAME", "app")
     db_user = os.getenv("DB_USER", "postgres")
     db_password = os.getenv("DB_PASSWORD", "")
 

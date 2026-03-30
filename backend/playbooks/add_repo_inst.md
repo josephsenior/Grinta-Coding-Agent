@@ -1,7 +1,7 @@
 ---
 name: add_repo_inst
 version: 1.0.0
-author: Forge
+author: App
 agent: Orchestrator
 triggers:
   - /add_repo_inst
@@ -12,7 +12,7 @@ inputs:
 
 Please browse the current repository under /workspace/{{ REPO_FOLDER_NAME }}, look at the documentation and relevant code, and understand the purpose of this repository.
 
-Specifically, I want you to create a `.Forge/playbooks/repo.md` file. This file should contain succinct information that summarizes (1) the purpose of this repository, (2) the general setup of this repo, and (3) a brief description of the structure of this repo.
+Specifically, I want you to create a `.app/playbooks/repo.md` file. This file should contain succinct information that summarizes (1) the purpose of this repository, (2) the general setup of this repo, and (3) a brief description of the structure of this repo.
 
 Here's an example:
 
@@ -23,8 +23,8 @@ type: repo
 agent: Orchestrator
 ---
 
-This repository contains the code for Forge, an automated AI software engineer. It has a Python backend
-(in the `backend` directory) and a React web UI, plus a small `forge_client` package for HTTP/Socket.IO from Python.
+This repository contains the code for App, an automated AI software engineer. It has a Python backend
+(in the `backend` directory) and a React web UI, plus a small `client` package for HTTP/Socket.IO from Python.
 
 ## General Setup:
 
@@ -51,11 +51,11 @@ Backend:
 Web UI:
 
 - Served with the backend (default http://localhost:3000)
-- Launch server: `uv run forge serve` or `python start_server.py`
+- Launch server: `uv run app serve` or `python start_server.py`
 
 Python API client:
 
-- Package `forge_client` — use `ForgeClient` in tests and scripts
+- Package `client` — use `AppClient` in tests and scripts
 ```
 
 Now, please write a similar markdown for the current repository.

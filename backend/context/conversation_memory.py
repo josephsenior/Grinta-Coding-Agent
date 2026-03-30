@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, cast
 
 from backend.core.config.agent_config import AgentConfig
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.message import Message
 from backend.core.schemas import ActionType
 from backend.ledger.action import (
@@ -25,7 +25,7 @@ from backend.ledger.observation.reject import UserRejectObservation
 from backend.context.action_processors import convert_action_to_messages
 from backend.context.context_tracking import ContextTracker
 from backend.context.graph_store import GraphMemoryStore
-from backend.core.workspace_context import ensure_forge_dir
+from backend.core.workspace_context import ensure_project_state_dir
 from backend.context.memory_types import (
     ContextAnchor,
     Decision,
@@ -50,7 +50,7 @@ from backend.context.vector_store import EnhancedVectorStore
 from backend.utils.prompt import PromptManager
 
 
-def _forge_tool_ok_for_observation(obs: Observation) -> bool | None:
+def _tool_ok_for_observation(obs: Observation) -> bool | None:
     """Structured tool outcome for serialized role=tool messages.
 
     Prefer canonical ``tool_result`` metadata when present. ``None`` means the
@@ -77,7 +77,7 @@ class _ToolCallTracking:
     tool_call_messages: dict[str, Message] = field(default_factory=dict)
 
 
-class ConversationMemory:
+class ContextMemory:
     """Processes event history into a coherent conversation for the agent."""
 
     def __init__(self, config: AgentConfig, prompt_manager: PromptManager) -> None:
@@ -91,9 +91,9 @@ class ConversationMemory:
         if bool(getattr(config, "enable_vector_memory", False)):
             vector_store = self._initialize_vector_memory()
             try:
-                forge_dir = ensure_forge_dir()
+                project_state_dir = ensure_project_state_dir()
                 graph_store = GraphMemoryStore(
-                    persistence_path=str(forge_dir / "graph_memory.json")
+                    persistence_path=str(project_state_dir / "graph_memory.json")
                 )
             except Exception as e:
                 logger.warning("Failed to initialize graph memory store: %s", e)
@@ -172,7 +172,7 @@ class ConversationMemory:
                 enable_reranking=hybrid_enabled,
             )
             logger.info(
-                "✅ Vector memory initialized for ConversationMemory\n   Accuracy: 92%% | Hybrid retrieval: %s",
+                "✅ Vector memory initialized for ContextMemory\n   Accuracy: 92%% | Hybrid retrieval: %s",
                 "enabled" if hybrid_enabled else "disabled",
             )
             return store
@@ -200,11 +200,11 @@ class ConversationMemory:
                 False otherwise
 
         Example:
-            >>> ConversationMemory._is_valid_image_url("https://example.com/image.png")
+            >>> ContextMemory._is_valid_image_url("https://example.com/image.png")
             True
-            >>> ConversationMemory._is_valid_image_url(None)
+            >>> ContextMemory._is_valid_image_url(None)
             False
-            >>> ConversationMemory._is_valid_image_url("   ")
+            >>> ContextMemory._is_valid_image_url("   ")
             False
 
         """
@@ -303,7 +303,7 @@ class ConversationMemory:
             fallback_content = getattr(event, "message")
         if fallback_content is not None:
             logger.debug(
-                "[ConversationMemory] Handling generic event type %s via fallback.",
+                "[ContextMemory] Handling generic event type %s via fallback.",
                 type(event).__name__,
             )
             return [message_with_text("user", fallback_content)]
@@ -513,19 +513,19 @@ class ConversationMemory:
                     e,
                     exc_info=True,
                 )
-                if os.getenv("FORGE_ALLOW_EMERGENCY_SYSTEM_PROMPT", "").strip().lower() in (
+                if os.getenv("APP_ALLOW_EMERGENCY_SYSTEM_PROMPT", "").strip().lower() in (
                     "1",
                     "true",
                     "yes",
                 ):
                     logger.warning(
-                        "FORGE_ALLOW_EMERGENCY_SYSTEM_PROMPT set — using minimal emergency system text"
+                        "APP_ALLOW_EMERGENCY_SYSTEM_PROMPT set — using minimal emergency system text"
                     )
-                    system_prompt = "You are Forge agent."
+                    system_prompt = "You are App agent."
                 else:
                     raise RuntimeError(
                         "System prompt could not be loaded. Fix PromptManager configuration or set "
-                        "FORGE_ALLOW_EMERGENCY_SYSTEM_PROMPT=1 for an explicit degraded mode."
+                        "APP_ALLOW_EMERGENCY_SYSTEM_PROMPT=1 for an explicit degraded mode."
                     ) from e
             messages.insert(0, message_with_text("system", system_prompt))
         elif first_idx != 0:
@@ -649,7 +649,7 @@ class ConversationMemory:
                 content=message.content,
                 tool_call_id=tool_call_metadata.tool_call_id,
                 name=tool_call_metadata.function_name,
-                forge_tool_ok=_forge_tool_ok_for_observation(obs),
+                tool_ok=_tool_ok_for_observation(obs),
             )
             return []
 
@@ -710,10 +710,10 @@ class ConversationMemory:
                 
         if not has_system_message:
             logger.debug(
-                "[ConversationMemory] No SystemMessageAction found in events. Adding one.",
+                "[ContextMemory] No SystemMessageAction found in events. Adding one.",
             )
             events.insert(0, system_message)
-            logger.info("[ConversationMemory] Added SystemMessageAction")
+            logger.info("[ContextMemory] Added SystemMessageAction")
 
     def _ensure_initial_user_message(
         self, events: list[Event], initial_user_action: MessageAction
@@ -796,3 +796,4 @@ class ConversationMemory:
         if isinstance(source, EventSource):
             return source == EventSource.USER
         return source == "user"
+__all__ = ["ContextMemory"]

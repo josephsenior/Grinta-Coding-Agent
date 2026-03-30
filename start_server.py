@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the Forge backend server with the canonical local startup flow."""
+"""Start the backend server with the canonical local startup flow."""
 
 from pathlib import Path
 import sys

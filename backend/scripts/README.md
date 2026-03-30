@@ -1,6 +1,6 @@
 # Backend Scripts
 
-Organized collection of utility scripts for the Forge backend.
+Organized collection of utility scripts for the App backend.
 
 ## Directory Structure
 

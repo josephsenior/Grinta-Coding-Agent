@@ -18,12 +18,12 @@ def test_executor_emits_streaming_chunk_actions(monkeypatch):
     """Executor should emit StreamingChunkAction events even when provider streaming is unavailable."""
     from backend.engine.executor import OrchestratorExecutor
 
-    # The executor keeps a proxy to a module name under the `forge.*` namespace.
+    # The executor keeps a proxy to a module name under the `app.*` namespace.
     # In unit tests we import via `backend.*`, so we register an alias to keep
     # the proxy resolvable.
     import backend.engine.function_calling as fc
 
-    sys.modules.setdefault("forge.engine.function_calling", fc)
+    sys.modules.setdefault("app.engine.function_calling", fc)
 
     # Stub function calling to avoid depending on tool parsing details here.
     from backend.engine import executor as executor_module
@@ -102,7 +102,7 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
     from backend.engine.executor import OrchestratorExecutor
 
     import backend.engine.function_calling as fc
-    sys.modules.setdefault("forge.engine.function_calling", fc)
+    sys.modules.setdefault("app.engine.function_calling", fc)
 
     from backend.engine import executor as executor_module
     monkeypatch.setattr(
@@ -166,7 +166,7 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
     from backend.ledger.action import MessageAction
 
     import backend.engine.function_calling as fc
-    sys.modules.setdefault("forge.engine.function_calling", fc)
+    sys.modules.setdefault("app.engine.function_calling", fc)
 
     from backend.engine import executor as executor_module
     monkeypatch.setattr(
@@ -230,7 +230,7 @@ def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_pro
     from backend.engine.streaming_checkpoint import StreamingCheckpoint
     from backend.ledger.observation import AgentStateChangedObservation
 
-    monkeypatch.setenv("FORGE_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("APP_DATA_DIR", str(tmp_path))
 
     event_stream = MagicMock()
     event_stream.sid = "sid-1"
@@ -264,7 +264,7 @@ def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
     from backend.engine.executor import OrchestratorExecutor
     from backend.engine.streaming_checkpoint import StreamingCheckpoint
 
-    monkeypatch.setenv("FORGE_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("APP_DATA_DIR", str(tmp_path))
 
     event_stream = MagicMock()
     event_stream.sid = "sid-2"

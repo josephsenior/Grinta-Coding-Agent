@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ============================================
-# FORGE - Docker Quick Start
+# App - Docker Quick Start
 # ============================================
 
 set -e
 
-echo "🚀 Starting Forge in Docker..."
+echo "🚀 Starting app in Docker..."
 
 NO_DATABASE=0
 DETACHED=0
@@ -33,13 +33,13 @@ if [ ! -f "settings.json" ]; then
 fi
 
 # Run docker compose
-echo "🐳 Running Docker Compose (default: Redis + Postgres + Forge)..."
+echo "🐳 Running Docker Compose (default: Redis + Postgres + app)..."
 
 if [ "$NO_DATABASE" -eq 1 ]; then
-    export FORGE_KB_STORAGE_TYPE=file
-    echo "⚠ Emergency mode enabled: KB_STORAGE_TYPE=file"
+    export APP_KB_STORAGE_TYPE=file
+    echo "⚠ Emergency mode enabled: APP_KB_STORAGE_TYPE=file"
 else
-    export FORGE_KB_STORAGE_TYPE=database
+    export APP_KB_STORAGE_TYPE=database
 fi
 
 if [ "$DETACHED" -eq 1 ]; then

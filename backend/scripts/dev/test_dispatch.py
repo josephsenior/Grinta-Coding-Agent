@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from backend.core.config import ForgeConfig
+from backend.core.config import AppConfig
 from backend.inference.llm_registry import LLMRegistry
 from backend.gateway.services.conversation_stats import ConversationStats
 from backend.gateway.session.session import Session
@@ -16,7 +16,7 @@ class DummySIO:
 
 
 async def run_test():
-    config = ForgeConfig()
+    config = AppConfig()
     llm_registry = LLMRegistry(config)
     fs = LocalFileStore("logs")
     stats = ConversationStats(fs, "test-sid", "user1")

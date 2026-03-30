@@ -30,5 +30,5 @@ python backend/scripts/verify/check_fastmcp_import.py
 python backend/scripts/verify/reliability_gate.py --phase full
 
 # Include integration filter checks and emit machine-readable report
-python backend/scripts/verify/reliability_gate.py --phase full --include-integration --json-report .forge/reliability-gate-report.json
+python backend/scripts/verify/reliability_gate.py --phase full --include-integration --json-report .app/reliability-gate-report.json
 ```

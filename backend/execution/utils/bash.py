@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, cast
 import bashlex
 import libtmux
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
     CMD_OUTPUT_PS1_END,
@@ -230,7 +230,7 @@ class BashSession(BaseShellSession):
             _shell_command = f"su {self.username} -"
         window_command = _shell_command
         logger.debug("Initializing bash session with command: %s", window_command)
-        session_name = f"Forge-{self.username}-{uuid.uuid4()}"
+        session_name = f"App-{self.username}-{uuid.uuid4()}"
         session_obj = cast(Any, server).new_session(
             session_name=session_name,
             start_directory=self.work_dir,

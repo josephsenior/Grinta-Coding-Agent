@@ -9,10 +9,10 @@ and also can target repository example trajectories. It will:
 
 Usage:
     # Dry-run (report files that would be modified):
-    python -m forge.tools.sanitize_trajectories --dry-run --paths tests/runtime/trajs
+    python -m app.tools.sanitize_trajectories --dry-run --paths tests/runtime/trajs
 
     # Apply changes to sessions directory (use carefully):
-    python -m forge.tools.sanitize_trajectories --apply --paths sessions
+    python -m app.tools.sanitize_trajectories --apply --paths sessions
 
 By default it treats any file ending with `.json` or `.jsonl` under the provided
 paths as candidates.

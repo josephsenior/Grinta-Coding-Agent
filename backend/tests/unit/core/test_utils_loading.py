@@ -10,17 +10,17 @@ import pytest
 from pydantic import ValidationError
 
 from backend.core.config.agent_config import AgentConfig
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.config.config_loader import (
     ConfigLoadSummary,
     _to_posix_workspace_path,
     get_agent_config_arg,
-    get_condenser_config_arg,
+    get_compactor_config_arg,
     get_or_create_jwt_secret,
     load_from_json,
     register_custom_agents,
     finalize_config,
-    load_forge_config,
+    load_app_config,
     setup_config_from_args,
     parse_arguments,
 )
@@ -35,7 +35,7 @@ class TestConfigLoadSummary:
         summary.record("core", "invalid", "bad value")
         summary.record_missing("agent", "section missing")
 
-        with patch("backend.core.logger.forge_logger.warning") as mock_warn:
+        with patch("backend.core.logger.app_logger.warning") as mock_warn:
             summary.emit()
             mock_warn.assert_called_once()
             # args[0] is fmt, args[1] is file, args[2] is issues
@@ -59,7 +59,7 @@ class TestConfigLoadSummary:
 
     def test_emit_empty(self):
         summary = ConfigLoadSummary("test.toml")
-        with patch("backend.core.logger.forge_logger.warning") as mock_warn:
+        with patch("backend.core.logger.app_logger.warning") as mock_warn:
             summary.emit()
             mock_warn.assert_not_called()
 
@@ -101,7 +101,7 @@ class TestJwtSecret:
 
 class TestFinalization:
     def test_finalize_config(self, tmp_path):
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         cfg.cache_dir = str(tmp_path / "cache")
         cfg.llms = {"default": MagicMock()}
         cfg.llms["default"].log_completions_folder = "logs"
@@ -137,26 +137,26 @@ class TestNamedGroupLoaders:
         with patch("backend.core.config.config_loader._load_json_config", return_value={}):
             assert get_agent_config_arg("nonexistent") is None
 
-    def test_get_condenser_config_arg_success(self, tmp_path):
+    def test_get_compactor_config_arg_success(self, tmp_path):
         json_file = tmp_path / "settings.json"
         # Mocking to avoid complex dependencies
         with patch("backend.core.config.config_loader._load_json_config") as mock_load:
             mock_load.return_value = {
-                "condenser_type": "recent",
-                "condenser_max_events": 10,
+                "compactor_type": "recent",
+                "compactor_max_events": 10,
             }
             with patch(
-                "backend.core.config.condenser_config.create_condenser_config"
+                "backend.core.config.compactor_config.create_compactor_config"
             ) as mock_create:
                 mock_cfg = MagicMock()
                 mock_create.return_value = mock_cfg
-                result = get_condenser_config_arg("my_condenser", str(json_file))
+                result = get_compactor_config_arg("my_compactor", str(json_file))
                 assert result is mock_cfg
 
-    def test_get_condenser_config_arg_missing_type(self, tmp_path):
+    def test_get_compactor_config_arg_missing_type(self, tmp_path):
         with patch("backend.core.config.config_loader._load_json_config") as mock_load:
-            mock_load.return_value = {"condenser_type": None}
-            assert get_condenser_config_arg("bad") is None
+            mock_load.return_value = {"compactor_type": None}
+            assert get_compactor_config_arg("bad") is None
 
 
 # ── Agent Registration ────────────────────────────────────────────────
@@ -164,7 +164,7 @@ class TestNamedGroupLoaders:
 
 class TestAgentRegistration:
     def test_register_custom_agents(self):
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         mock_agent_cfg = MagicMock()
         mock_agent_cfg.classpath = "some.module.Class"
         cfg.agents = {"custom": mock_agent_cfg}
@@ -189,13 +189,13 @@ class TestMainEntryPoints:
     @patch("backend.core.config.config_loader.finalize_config")
     @patch("backend.core.config.config_loader.export_llm_api_keys")
     @patch("backend.core.config.config_loader.register_custom_agents")
-    def test_load_FORGE_config_calls(self, *mocks):
+    def test_load_app_config_calls(self, *mocks):
         # This test only verifies that the other functions are called
-        load_forge_config(set_logging_levels=True)
+        load_app_config(set_logging_levels=True)
         for m in mocks:
             assert m.called
 
-    def test_load_FORGE_config_execution(self, tmp_path):
+    def test_load_app_config_execution(self, tmp_path):
         # This test actually executes the function (with minimal mocking)
         with patch("backend.core.config.config_loader.rebuild_config_models"):
             with patch("backend.core.config.config_loader.load_from_json"):
@@ -205,13 +205,13 @@ class TestMainEntryPoints:
                             with patch(
                                 "backend.core.config.config_loader.register_custom_agents"
                             ):
-                                # This will execute the body of load_FORGE_config
-                                load_forge_config(set_logging_levels=True)
+                                # This will execute the body of load_app_config
+                                load_app_config(set_logging_levels=True)
 
     def test_setup_config_from_args_execution(self):
         args = MagicMock()
         args.config_file = "settings.json"
-        with patch("backend.core.config.config_loader.load_forge_config") as mock_load:
+        with patch("backend.core.config.config_loader.load_app_config") as mock_load:
             with patch("backend.core.config.config_loader.apply_llm_config_override"):
                 with patch("backend.core.config.config_loader.apply_additional_overrides"):
                     setup_config_from_args(args)
@@ -225,15 +225,15 @@ class TestLoadFromJson:
     def test_load_from_json_success(self, tmp_path):
         json_file = tmp_path / "settings.json"
         json_file.write_text('{"mcp_host": "custom-host:9999"}')
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         load_from_json(cfg, str(json_file))
         assert cfg.mcp_host == "custom-host:9999"
 
     def test_load_from_json_requires_provider_for_unprefixed_model(self, tmp_path):
         json_file = tmp_path / "settings.json"
         json_file.write_text('{"llm_model": "gpt-4o"}')
-        cfg = ForgeConfig()
-        with patch("backend.core.config.config_loader.logger.forge_logger.warning") as mock_warn:
+        cfg = AppConfig()
+        with patch("backend.core.config.config_loader.logger.app_logger.warning") as mock_warn:
             load_from_json(cfg, str(json_file))
         mock_warn.assert_called()
         assert cfg.get_llm_config().model is None
@@ -241,76 +241,76 @@ class TestLoadFromJson:
     def test_load_from_json_applies_explicit_provider(self, tmp_path):
         json_file = tmp_path / "settings.json"
         json_file.write_text('{"llm_model": "meta-llama/llama-4-scout", "llm_provider": "groq"}')
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         load_from_json(cfg, str(json_file))
         assert cfg.get_llm_config().model == "groq/meta-llama/llama-4-scout"
 
     def test_load_from_json_file_not_found(self):
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         # Should return silently
         load_from_json(cfg, "nonexistent.json")
 
     def test_load_from_json_decode_error(self, tmp_path):
         json_file = tmp_path / "bad.json"
         json_file.write_text("invalid } json { here")
-        cfg = ForgeConfig()
-        with patch("backend.core.logger.forge_logger.warning") as mock_warn:
+        cfg = AppConfig()
+        with patch("backend.core.logger.app_logger.warning") as mock_warn:
             load_from_json(cfg, str(json_file))
             mock_warn.assert_called()
 
     def test_load_from_json_strict_mode_fail(self, tmp_path):
         json_file = tmp_path / "bad.json"
         json_file.write_text("invalid } json { here")
-        with patch.dict(os.environ, {"FORGE_STRICT_CONFIG": "true"}):
+        with patch.dict(os.environ, {"APP_STRICT_CONFIG": "true"}):
             with pytest.raises(ValueError, match="Invalid JSON"):
-                load_from_json(ForgeConfig(), str(json_file))
+                load_from_json(AppConfig(), str(json_file))
 
     def test_load_from_json_strict_mode_fatal_issue(self, tmp_path):
         json_file = tmp_path / "settings.json"
         json_file.write_text('{"file_store": "memory"}')
-        ForgeConfig()
-        with patch.dict(os.environ, {"FORGE_STRICT_CONFIG": "true"}):
-            with patch("backend.core.config.config_loader.logger.forge_logger.warning"):
+        AppConfig()
+        with patch.dict(os.environ, {"APP_STRICT_CONFIG": "true"}):
+            with patch("backend.core.config.config_loader.logger.app_logger.warning"):
                 # Manually force summary fatal in new json logic if needed
                 pass
 
 
-# ── Condenser Loader Extra ───────────────────────────────────────────
+# ── Compactor Loader Extra ───────────────────────────────────────────
 
 
-class TestCondenserLoaderExtra:
-    def test_get_condenser_config_missing_section(self, tmp_path):
+class TestCompactorLoaderExtra:
+    def test_get_compactor_config_missing_section(self, tmp_path):
         with patch("backend.core.config.config_loader._load_json_config", return_value={}):
-            assert get_condenser_config_arg("my_condenser") is None
+            assert get_compactor_config_arg("my_compactor") is None
 
-    def test_get_condenser_config_arg_validation_error(self, tmp_path):
+    def test_get_compactor_config_arg_validation_error(self, tmp_path):
         with patch(
             "backend.core.config.config_loader._load_json_config",
-            return_value={"condenser_type": "recent"},
+            return_value={"compactor_type": "recent"},
         ):
             with patch(
-                "backend.core.config.condenser_config.create_condenser_config",
+                "backend.core.config.compactor_config.create_compactor_config",
                 side_effect=ValidationError.from_exception_data("test", []),
             ):
-                assert get_condenser_config_arg("my_condenser") is None
+                assert get_compactor_config_arg("my_compactor") is None
 
-    def test_process_llm_condenser_success(self):
-        from backend.core.config.config_loader import _process_llm_condenser
+    def test_process_llm_compactor_success(self):
+        from backend.core.config.config_loader import _process_llm_compactor
 
-        condenser_data = {"llm_config": "my_llm"}
+        compactor_data = {"llm_config": "my_llm"}
         with patch("backend.core.config.config_loader.get_llm_config_arg") as mock_get:
             mock_llm = MagicMock()
             mock_get.return_value = mock_llm
-            result = _process_llm_condenser(condenser_data, "arg", "file.toml")
+            result = _process_llm_compactor(compactor_data, "arg", "file.toml")
             assert result is not None
             assert result["llm_config"] is mock_llm
 
-    def test_process_llm_condenser_fail(self):
-        from backend.core.config.config_loader import _process_llm_condenser
+    def test_process_llm_compactor_fail(self):
+        from backend.core.config.config_loader import _process_llm_compactor
 
-        condenser_data = {"llm_config": "my_llm"}
+        compactor_data = {"llm_config": "my_llm"}
         with patch("backend.core.config.config_loader.get_llm_config_arg", return_value=None):
-            assert _process_llm_condenser(condenser_data, "arg", "file.toml") is None
+            assert _process_llm_compactor(compactor_data, "arg", "file.toml") is None
 
 
 # ── Agent Registration Extra ──────────────────────────────────────────
@@ -318,7 +318,7 @@ class TestCondenserLoaderExtra:
 
 class TestAgentRegistrationExtra:
     def test_register_custom_agents_failure_handled(self):
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         mock_agent_cfg = MagicMock()
         mock_agent_cfg.classpath = "bad.Path"
         cfg.agents = {"bad": mock_agent_cfg}
@@ -330,7 +330,7 @@ class TestAgentRegistrationExtra:
             register_custom_agents(cfg)
 
     def test_register_custom_agents_no_classpath(self):
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         cfg.agents = {"no_cp": MagicMock(spec=[])}  # No classpath attribute
         # Should just skip
         register_custom_agents(cfg)
@@ -353,36 +353,36 @@ class TestCoverageGapsV2:
         with patch(
             "backend.core.config.config_loader._load_json_config", return_value={"agent": {}}
         ):
-            with patch("backend.core.logger.forge_logger.debug") as mock_debug:
+            with patch("backend.core.logger.app_logger.debug") as mock_debug:
                 assert get_agent_config_arg("my_agent") is None
                 mock_debug.assert_any_call(
                     "Loading from toml failed for %s", "my_agent"
                 )
 
-    def test_get_condenser_config_arg_logs(self, tmp_path):
+    def test_get_compactor_config_arg_logs(self, tmp_path):
         # Test success log (roughly line 315)
         with patch(
             "backend.core.config.config_loader._load_json_config",
-            return_value={"condenser_type": "recent"},
+            return_value={"compactor_type": "recent"},
         ):
             with patch(
-                "backend.core.config.condenser_config.create_condenser_config"
+                "backend.core.config.compactor_config.create_compactor_config"
             ) as mock_create:
                 mock_cfg = MagicMock()
                 mock_create.return_value = mock_cfg
-                with patch("backend.core.logger.forge_logger.info") as mock_info:
-                    get_condenser_config_arg("c1")
+                with patch("backend.core.logger.app_logger.info") as mock_info:
+                    get_compactor_config_arg("c1")
                     mock_info.assert_called()
 
         # Test error log missing type (roughly line 330)
         with patch(
             "backend.core.config.config_loader._load_json_config",
-            return_value={"condenser_type": None},
+            return_value={"compactor_type": None},
         ):
-            with patch("backend.core.logger.forge_logger.error") as mock_error:
-                get_condenser_config_arg("c2")
+            with patch("backend.core.logger.app_logger.error") as mock_error:
+                get_compactor_config_arg("c2")
                 mock_error.assert_called_with(
-                    'Missing "type" field in [condenser.%s] section of %s',
+                    'Missing "type" field in [compactor.%s] section of %s',
                     "c2",
                     "settings.json",
                 )
@@ -390,15 +390,15 @@ class TestCoverageGapsV2:
         # Test error log for failed LLM load (roughly line 351/304)
         with patch(
             "backend.core.config.config_loader._load_json_config",
-            return_value={"condenser_type": "llm", "condenser_llm_config": "missing"},
+            return_value={"compactor_type": "llm", "compactor_llm_config": "missing"},
         ):
             with patch(
                 "backend.core.config.config_loader.get_llm_config_arg", return_value=None
             ):
-                with patch("backend.core.logger.forge_logger.error") as mock_error:
-                    get_condenser_config_arg("c3")
+                with patch("backend.core.logger.app_logger.error") as mock_error:
+                    get_compactor_config_arg("c3")
                     mock_error.assert_any_call(
-                        "Failed to load required LLM config '%s' for condenser '%s'.",
+                        "Failed to load required LLM config '%s' for compactor '%s'.",
                         "missing",
                         "c3",
                     )

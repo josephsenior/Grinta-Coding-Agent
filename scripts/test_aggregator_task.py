@@ -21,8 +21,8 @@ async def connect():
 async def disconnect():
     log("Disconnected from backend")
 
-@sio.on("forge_event")
-async def on_forge_event(data):
+@sio.on("app_event")
+async def on_app_event(data):
     log(f"Event JSON: {json.dumps(data)}")
     if data.get("state") == "awaiting_user_input":
         log("Agent finished thinking!")
@@ -72,8 +72,8 @@ Constraints & Complexity:
 Instructions:
 Do NOT start writing code immediately. Use your think and task tracking tools to break down this entire project into a comprehensive, multi-step plan. Define your proposed architecture, state management, and error handling strategy, then execute the steps sequentially."""
 
-    log(f"Sending forge_user_action: {msg[:100]}...")
-    await sio.emit("forge_user_action", {
+    log(f"Sending app_user_action: {msg[:100]}...")
+    await sio.emit("app_user_action", {
         "action": "message",
         "args": {
             "content": msg,

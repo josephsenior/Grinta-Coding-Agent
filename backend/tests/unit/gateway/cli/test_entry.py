@@ -183,7 +183,7 @@ class TestMainFunction:
 
         original = sys.argv
         try:
-            sys.argv = ["forge"]
+            sys.argv = ["app"]
             main()
         finally:
             sys.argv = original
@@ -201,7 +201,7 @@ class TestMainFunction:
 
         original = sys.argv
         try:
-            sys.argv = ["forge", "--help"]
+            sys.argv = ["app", "--help"]
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -220,7 +220,7 @@ class TestMainFunction:
 
         original = sys.argv
         try:
-            sys.argv = ["forge", "-h"]
+            sys.argv = ["app", "-h"]
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -246,7 +246,7 @@ class TestMainFunction:
 
         original = sys.argv
         try:
-            sys.argv = ["forge"]
+            sys.argv = ["app"]
             main()
         finally:
             sys.argv = original
@@ -267,7 +267,7 @@ class TestMainFunction:
 
         original = sys.argv
         try:
-            sys.argv = ["forge", "--version"]
+            sys.argv = ["app", "--version"]
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -292,7 +292,7 @@ class TestIntegration:
 
         original = sys.argv
         try:
-            sys.argv = ["forge", "serve"]
+            sys.argv = ["app", "serve"]
             main()
         finally:
             sys.argv = original
@@ -315,7 +315,7 @@ class TestIntegration:
 
         original = sys.argv
         try:
-            sys.argv = ["forge", "init", "myproject"]
+            sys.argv = ["app", "init", "myproject"]
             main()
         finally:
             sys.argv = original

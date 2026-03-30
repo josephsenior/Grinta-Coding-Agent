@@ -19,9 +19,9 @@ from backend.knowledge.knowledge_base_manager import KnowledgeBaseManager
 ERROR_RECOVERY_MEMORY_TOOL_NAME = "error_recovery_memory"
 
 _COLLECTION_NAME = "Error Recovery Memory"
-_MIGRATION_MARKER = ".forge/error_recovery_migration_done.json"
-_LEGACY_LOCAL_FILE = ".forge/query_error_solutions.json"
-_LEGACY_GLOBAL_FILE = Path.home() / ".forge" / "global_query_error_solutions.json"
+_MIGRATION_MARKER = ".app/error_recovery_migration_done.json"
+_LEGACY_LOCAL_FILE = ".app/query_error_solutions.json"
+_LEGACY_GLOBAL_FILE = Path.home() / ".app" / "global_query_error_solutions.json"
 
 
 def _workspace_root() -> Path:

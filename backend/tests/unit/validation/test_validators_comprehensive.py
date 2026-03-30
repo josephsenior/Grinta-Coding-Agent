@@ -30,7 +30,7 @@ def _make_state(history=None):
     return s
 
 
-def _cmd_action(cmd: str) -> MagicMock:
+def _cmd_action(cmd: str) -> CmdRunAction:
     a = CmdRunAction(command=cmd)
     a.id = 1
     return a

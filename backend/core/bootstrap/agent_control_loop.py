@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Callable
 
 from backend.orchestration import SessionOrchestrator
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.context.agent_memory import Memory
 from backend.execution.base import Runtime

@@ -24,7 +24,7 @@ from backend.orchestration.tool_pipeline import (
     ToolInvocationContext,
     ToolInvocationMiddleware,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.observation import Observation
@@ -244,5 +244,5 @@ class ToolResultValidator(ToolInvocationMiddleware):
             lines.append("blocked: true")
 
         block = "\n".join(lines)[:1500]
-        annotation = f"\n\n<FORGE_RESULT_VALIDATION>\n{block}\n</FORGE_RESULT_VALIDATION>"
+        annotation = f"\n\n<APP_RESULT_VALIDATION>\n{block}\n</APP_RESULT_VALIDATION>"
         setattr(observation, "content", content + annotation)

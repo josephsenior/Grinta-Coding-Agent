@@ -10,7 +10,7 @@ def email_service():
         smtp_port=587,
         smtp_user="test@example.com",
         smtp_password="password",
-        from_email="noreply@forge.ai"
+        from_email="noreply@app.ai"
     )
 
 def test_email_service_enabled_status():
@@ -61,7 +61,7 @@ def test_send_email_not_configured():
 def test_send_password_reset_email_url_construction(mock_send, email_service):
     mock_send.return_value = True
 
-    with patch.dict(os.environ, {"APP_BASE_URL": "https://forge.ai"}):
+    with patch.dict(os.environ, {"APP_BASE_URL": "https://app.ai"}):
         email_service.send_password_reset_email(
             to_email="user@test.com",
             reset_token="secret-token"
@@ -74,7 +74,7 @@ def test_send_password_reset_email_url_construction(mock_send, email_service):
         html_body = args[2]
 
         assert to_email == "user@test.com"
-        assert "https://forge.ai/auth/reset-password" in html_body
+        assert "https://app.ai/auth/reset-password" in html_body
         assert "token=secret-token" in html_body
         assert "user%40test.com" in html_body  # urlencoded email
 def test_get_email_service_singleton():

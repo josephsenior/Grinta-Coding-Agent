@@ -6,7 +6,7 @@ from typing import overload
 
 from pydantic import BaseModel
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction, CondensationRequestAction
 from backend.ledger.event import Event
 from backend.ledger.observation.agent import AgentCondensationObservation
@@ -15,7 +15,7 @@ from backend.ledger.observation.agent import AgentCondensationObservation
 class View(BaseModel):
     """Linearly ordered view of events.
 
-    Produced by a condenser to indicate the included events are ready to process as LLM input.
+    Produced by a compactor to indicate the included events are ready to process as LLM input.
     """
 
     events: list[Event]
@@ -49,7 +49,7 @@ class View(BaseModel):
         Notes:
             - Enables for event in view: syntax
             - Delegates to events list iterator
-            - Preserves event order from condenser
+            - Preserves event order from the compactor
 
         """
         return iter(self.events)
@@ -98,16 +98,16 @@ class View(BaseModel):
         raise TypeError(msg)
 
     @staticmethod
-    def _collect_forgotten_event_ids(events: list[Event]) -> set[int]:
-        """Collect IDs of events that should be forgotten."""
-        forgotten_event_ids: set[int] = set()
+    def _collect_pruned_event_ids(events: list[Event]) -> set[int]:
+        """Collect IDs of events that should be pruned."""
+        pruned_event_ids: set[int] = set()
         for event in events:
             if isinstance(event, CondensationAction):
-                forgotten_event_ids.update(event.forgotten)
-                forgotten_event_ids.add(event.id)
+                pruned_event_ids.update(event.pruned)
+                pruned_event_ids.add(event.id)
             if isinstance(event, CondensationRequestAction):
-                forgotten_event_ids.add(event.id)
-        return forgotten_event_ids
+                pruned_event_ids.add(event.id)
+        return pruned_event_ids
 
     @staticmethod
     def _find_summary_info(events: list[Event]) -> tuple[str | None, int | None]:
@@ -135,9 +135,9 @@ class View(BaseModel):
     @staticmethod
     def from_events(events: list[Event]) -> View:
         """Create a view from a list of events, respecting the semantics of any condensation events."""
-        # Collect forgotten events
-        forgotten_event_ids = View._collect_forgotten_event_ids(events)
-        kept_events = [event for event in events if event.id not in forgotten_event_ids]
+        # Collect pruned events.
+        pruned_event_ids = View._collect_pruned_event_ids(events)
+        kept_events = [event for event in events if event.id not in pruned_event_ids]
 
         # Find and insert summary if available
         summary, summary_offset = View._find_summary_info(events)

@@ -1,8 +1,8 @@
 """Trajectory regression harness.
 
-This harness validates recorded Forge trajectories to catch reliability drift
+This harness validates recorded App trajectories to catch reliability drift
 between releases. It is opt-in and runs only when
-`FORGE_TRAJECTORY_REGRESSION_DIR` points to a directory containing JSON
+`APP_TRAJECTORY_REGRESSION_DIR` points to a directory containing JSON
 trajectory files.
 """
 
@@ -17,7 +17,7 @@ import pytest
 
 
 def _get_regression_dir() -> Path | None:
-    raw = os.getenv("FORGE_TRAJECTORY_REGRESSION_DIR", "").strip()
+    raw = os.getenv("APP_TRAJECTORY_REGRESSION_DIR", "").strip()
     if raw:
         path = Path(raw)
         if path.exists() and path.is_dir():

@@ -1,4 +1,4 @@
-"""Startup-time capability matrix for Forge runtimes.
+"""Startup-time capability matrix for App runtimes.
 
 :class:`RuntimeCapabilities` is a frozen snapshot of what a runtime can
 (and cannot) do, populated once during ``connect()`` and queryable by
@@ -64,7 +64,7 @@ def _env_true(name: str) -> bool:
 
 def _is_container_runtime() -> bool:
     """Best-effort container detection with env override support."""
-    if _env_true("FORGE_RUNTIME_IS_CONTAINER"):
+    if _env_true("APP_RUNTIME_IS_CONTAINER"):
         return True
     if os.getenv("container", "").strip():
         return True

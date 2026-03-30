@@ -53,7 +53,7 @@ class TestStepDecisionService:
 
     def test_condensation_action_steps(self):
         svc = StepDecisionService(_make_ctrl())
-        action = CondensationAction(forgotten_event_ids=[1, 2])
+        action = CondensationAction(pruned_event_ids=[1, 2])
         assert svc.should_step(action) is True
 
     def test_condensation_request_steps(self):

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import CmdRunAction
 from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.observation import CmdOutputObservation

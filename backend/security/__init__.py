@@ -1,4 +1,4 @@
-"""Security analysis framework for Forge agent actions."""
+"""Security analysis framework for App agent actions."""
 
 from backend.security.analyzer import SecurityAnalyzer
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory

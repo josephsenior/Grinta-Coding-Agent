@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import inspect
 import time
 
 
-from backend.context.vector_store import QueryCache
+from backend.context.local_vector_store import ChromaDBBackend, SQLiteBM25Backend
+from backend.context.vector_store import EnhancedVectorStore, QueryCache
 
 
 class TestQueryCacheInit:
@@ -107,3 +109,17 @@ class TestQueryCacheHashQuery:
     def test_hash_is_16_chars(self):
         h = QueryCache._hash_query("anything")
         assert len(h) == 16
+
+
+class TestDefaultCollectionNames:
+    def test_chromadb_backend_default_collection_name(self):
+        signature = inspect.signature(ChromaDBBackend)
+        assert signature.parameters["collection_name"].default == "APP_memory"
+
+    def test_sqlite_bm25_backend_default_collection_name(self):
+        signature = inspect.signature(SQLiteBM25Backend)
+        assert signature.parameters["collection_name"].default == "APP_memory"
+
+    def test_enhanced_vector_store_default_collection_name(self):
+        signature = inspect.signature(EnhancedVectorStore)
+        assert signature.parameters["collection_name"].default == "APP_memory"

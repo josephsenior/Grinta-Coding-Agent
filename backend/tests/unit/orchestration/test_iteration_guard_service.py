@@ -48,13 +48,13 @@ class TestGracefulShutdownEnabled:
         svc, ctrl = _make_service()
         ctrl.agent_config = None
         with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("FORGE_GRACEFUL_SHUTDOWN", None)
+            os.environ.pop("APP_GRACEFUL_SHUTDOWN", None)
             assert svc._graceful_shutdown_enabled() is True
 
     def test_disabled_by_env(self):
         svc, ctrl = _make_service()
         ctrl.agent_config = None
-        with patch.dict(os.environ, {"FORGE_GRACEFUL_SHUTDOWN": "0"}):
+        with patch.dict(os.environ, {"APP_GRACEFUL_SHUTDOWN": "0"}):
             assert svc._graceful_shutdown_enabled() is False
 
     def test_disabled_by_config(self):

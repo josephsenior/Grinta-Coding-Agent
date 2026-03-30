@@ -59,6 +59,39 @@ class TestToolTelemetryInit:
         assert hasattr(tt, "_invocations")
         assert hasattr(tt, "_latency")
 
+    def test_setup_prometheus_uses_app_metric_names(self):
+        counter = MagicMock()
+        histogram = MagicMock()
+        fake_prometheus = MagicMock()
+        fake_prometheus.Counter = counter
+        fake_prometheus.Histogram = histogram
+        fake_prometheus.REGISTRY = MagicMock(_names_to_collectors={})
+
+        ToolTelemetry._shared_invocations = None
+        ToolTelemetry._shared_latency = None
+        try:
+            with patch(
+                "backend.orchestration.tool_telemetry.importlib.import_module",
+                return_value=fake_prometheus,
+            ):
+                ToolTelemetry()
+
+            counter.assert_called_once_with(
+                "app_tool_invocations_total",
+                "Number of tool invocations processed by the agent controller",
+                labelnames=("tool", "outcome"),
+            )
+            histogram.assert_called_once_with(
+                "app_tool_latency_seconds",
+                "Duration of tool invocations executed by the agent controller",
+                labelnames=("tool", "outcome"),
+                buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf")),
+            )
+        finally:
+            ToolTelemetry._shared_invocations = None
+            ToolTelemetry._shared_latency = None
+
+
 
 # ---------------------------------------------------------------------------
 # Lifecycle hooks — on_plan

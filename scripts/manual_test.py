@@ -7,7 +7,7 @@ import sys
 import httpx
 import socketio
 
-BASE = os.getenv("FORGE_BASE_URL", "http://127.0.0.1:3000")
+BASE = os.getenv("APP_BASE_URL", "http://127.0.0.1:3000")
 AGENT_TIMEOUT = 600
 _INIT_TIMEOUT = 120
 _IDLE_CUTOFF = 120
@@ -48,7 +48,7 @@ class EventCollector:
 
         @self.sio.on("*")
         def on_any(event_name: str, data: Any = None) -> None:
-            if event_name != "forge_event" or not isinstance(data, dict):
+            if event_name != "app_event" or not isinstance(data, dict):
                 return
             with self._lock:
                 self.events.append(data)
@@ -115,7 +115,7 @@ class EventCollector:
     def send_message(self, content: str) -> None:
         print(f"Sending message: {content}")
         self.sio.emit(
-            "forge_user_action",
+            "app_user_action",
             {
                 "action": "message",
                 "args": {"content": content, "image_urls": []},

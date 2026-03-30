@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from logging import LoggerAdapter
 
     from backend.orchestration.agent import Agent
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.inference.llm_registry import LLMRegistry
     from backend.execution.base import Runtime
 
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 async def create_runtime(
     *,
     runtime_name: str,
-    config: ForgeConfig,
+    config: AppConfig,
     agent: Agent,
     sid: str,
     user_id: str | None,
@@ -176,7 +176,7 @@ def _resolve_repo_tokens(
     return MappingProxyType(dict(vcs_provider_tokens or {}))
 
 
-def _can_use_shared_helper(config: ForgeConfig) -> bool:
+def _can_use_shared_helper(config: AppConfig) -> bool:
     return all(
         hasattr(config, attr) for attr in ("runtime", "runtime_config", "file_store")
     )
@@ -204,7 +204,7 @@ def _build_repo_initializer(
 async def _create_direct(
     *,
     runtime_cls: type,
-    config: ForgeConfig | SimpleNamespace,
+    config: AppConfig | SimpleNamespace,
     agent: Agent,
     sid: str,
     event_stream: EventStream,
@@ -281,7 +281,7 @@ async def _create_direct(
 
 def _create_with_helper(
     *,
-    config: ForgeConfig,
+    config: AppConfig,
     agent: Agent,
     sid: str,
     user_id: str | None,

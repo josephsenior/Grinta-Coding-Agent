@@ -13,7 +13,7 @@ from collections import deque
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from backend.gateway.adapters import json
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.durable_writer import DurableEventWriter, PersistedEvent
 from backend.persistence.locations import get_conversation_events_dir
 
@@ -103,7 +103,7 @@ class EventPersistence:
 
         # Optional SQLite accelerator
         self._sqlite_store: Any = None
-        if str(os.getenv("FORGE_SQLITE_EVENTS", "false")).lower() in (
+        if str(os.getenv("APP_SQLITE_EVENTS", "false")).lower() in (
             "1",
             "true",
             "yes",
@@ -459,7 +459,7 @@ def _truncate_payload(payload: dict[str, Any], max_bytes: int) -> None:
     values, and truncates them until the estimated JSON size falls below
     *max_bytes*.
     """
-    trunc_marker = "\n\n[… truncated by Forge — event exceeded size cap …]"
+    trunc_marker = "\n\n[… truncated by App — event exceeded size cap …]"
 
     def _string_fields(d: dict, prefix: str = "") -> list[tuple[str, dict, str]]:
         results: list[tuple[str, dict, str]] = []

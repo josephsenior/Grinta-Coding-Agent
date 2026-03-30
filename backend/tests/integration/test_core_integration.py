@@ -2,7 +2,7 @@
 
 Covers:
 - CircuitBreaker deque-based sliding windows
-- Memory pressure → condenser forced-condensation wiring
+- Memory pressure → compactor forced-compaction wiring
 - MemoryPressureMonitor level detection
 - Health snapshot assembly
 - State serialization round-trip
@@ -135,7 +135,7 @@ class TestCircuitBreakerDeque:
         cb.record_stuck_detection()
         result = cb.check(state)
         assert result.tripped is True
-        assert result.action == "switch_context"
+        assert result.action == "stop"
 
     def test_high_risk_actions_trip(self):
         config = CircuitBreakerConfig(max_high_risk_actions=3)
@@ -209,78 +209,78 @@ class TestMemoryPressureMonitor:
 
 
 # ================================================================== #
-#  Memory Pressure → Condenser Wiring
+#  Memory Pressure → Compactor Wiring
 # ================================================================== #
 
 
-class TestMemoryPressureCondenserWiring:
+class TestMemoryPressureCompactorWiring:
     """Test that memory_pressure flag in state.extra_data forces condensation."""
 
-    def test_no_condenser_returns_full_history(self):
+    def test_no_compactor_returns_full_history(self):
         from backend.engine.memory_manager import (
-            ConversationMemoryManager,
+            ContextMemoryManager,
         )
 
         config = MagicMock()
-        config.condenser_config = None
-        mgr = ConversationMemoryManager(config, MagicMock())
-        mgr.condenser = None
+        config.compactor_config = None
+        mgr = ContextMemoryManager(config, MagicMock())
+        mgr.compactor = None
 
         state = _mock_state(history=["e1", "e2", "e3"])
         result = mgr.condense_history(state)
         assert result.events == ["e1", "e2", "e3"]
         assert result.pending_action is None
 
-    def test_condenser_returns_view_without_pressure(self):
+    def test_compactor_returns_view_without_pressure(self):
         from backend.engine.memory_manager import (
-            ConversationMemoryManager,
+            ContextMemoryManager,
         )
         from backend.context.view import View
 
         config = MagicMock()
-        mgr = ConversationMemoryManager(config, MagicMock())
+        mgr = ContextMemoryManager(config, MagicMock())
 
         fake_view = MagicMock(spec=View)
         fake_view.events = ["condensed"]
-        fake_condenser = MagicMock()
-        fake_condenser.condensed_history.return_value = fake_view
-        mgr.condenser = fake_condenser
+        fake_compactor = MagicMock()
+        fake_compactor.compacted_history.return_value = fake_view
+        mgr.compactor = fake_compactor
 
         state = _mock_state()
         result = mgr.condense_history(state)
         assert result.events == ["condensed"]
 
     def test_memory_pressure_forces_condensation(self):
-        """When memory_pressure is set and condenser returns a View (no condensation),
-        force condensation via get_condensation on RollingCondenser.
+        """When memory_pressure is set and the compactor returns a View,
+        force compaction via get_compaction on RollingCompactor.
         """
         from backend.engine.memory_manager import (
-            ConversationMemoryManager,
+            ContextMemoryManager,
         )
-        from backend.context.condenser.condenser import Condensation, RollingCondenser
+        from backend.context.compactor.compactor import Compaction, RollingCompactor
         from backend.context.view import View
 
         config = MagicMock()
-        mgr = ConversationMemoryManager(config, MagicMock())
+        mgr = ContextMemoryManager(config, MagicMock())
 
-        # Create a fake RollingCondenser that returns a View (no condensation)
+        # Create a fake RollingCompactor that returns a View (no compaction)
         fake_view = MagicMock(spec=View)
         fake_view.events = ["event1", "event2", "event3"]
 
-        fake_condensation = MagicMock(spec=Condensation)
+        fake_condensation = MagicMock(spec=Compaction)
         fake_condensation.action = MagicMock()
 
-        fake_condenser = MagicMock(spec=RollingCondenser)
-        fake_condenser.condensed_history.return_value = fake_view
-        fake_condenser.get_condensation.return_value = fake_condensation
-        mgr.condenser = fake_condenser
+        fake_compactor = MagicMock(spec=RollingCompactor)
+        fake_compactor.compacted_history.return_value = fake_view
+        fake_compactor.get_compaction.return_value = fake_condensation
+        mgr.compactor = fake_compactor
 
         state = _mock_state()
         state.turn_signals.memory_pressure = "CRITICAL"
         result = mgr.condense_history(state)
 
-        # Should have called get_condensation to force condensation
-        fake_condenser.get_condensation.assert_called_once_with(fake_view)
+        # Should have called get_compaction to force compaction
+        fake_compactor.get_compaction.assert_called_once_with(fake_view)
         # Memory pressure flag should be consumed
         pressure1: str | None = state.turn_signals.memory_pressure
         assert pressure1 is None
@@ -290,21 +290,21 @@ class TestMemoryPressureCondenserWiring:
     def test_memory_pressure_cleared_even_on_failure(self):
         """Memory pressure flag is consumed even if forced condensation fails."""
         from backend.engine.memory_manager import (
-            ConversationMemoryManager,
+            ContextMemoryManager,
         )
-        from backend.context.condenser.condenser import RollingCondenser
+        from backend.context.compactor.compactor import RollingCompactor
         from backend.context.view import View
 
         config = MagicMock()
-        mgr = ConversationMemoryManager(config, MagicMock())
+        mgr = ContextMemoryManager(config, MagicMock())
 
         fake_view = MagicMock(spec=View)
         fake_view.events = ["e1"]
 
-        fake_condenser = MagicMock(spec=RollingCondenser)
-        fake_condenser.condensed_history.return_value = fake_view
-        fake_condenser.get_condensation.side_effect = RuntimeError("condenser failed")
-        mgr.condenser = fake_condenser
+        fake_compactor = MagicMock(spec=RollingCompactor)
+        fake_compactor.compacted_history.return_value = fake_view
+        fake_compactor.get_compaction.side_effect = RuntimeError("compactor failed")
+        mgr.compactor = fake_compactor
 
         state = _mock_state()
         state.turn_signals.memory_pressure = "WARNING"
@@ -316,25 +316,25 @@ class TestMemoryPressureCondenserWiring:
         # Falls back to returning the original view
         assert result.events == ["e1"]
 
-    def test_non_rolling_condenser_ignores_pressure(self):
-        """If condenser is not a RollingCondenser, memory pressure is still cleared
-        but no forced condensation is attempted.
+    def test_non_rolling_compactor_ignores_pressure(self):
+        """If compactor is not a RollingCompactor, memory pressure is still cleared
+        but no forced compaction is attempted.
         """
         from backend.engine.memory_manager import (
-            ConversationMemoryManager,
+            ContextMemoryManager,
         )
         from backend.context.view import View
 
         config = MagicMock()
-        mgr = ConversationMemoryManager(config, MagicMock())
+        mgr = ContextMemoryManager(config, MagicMock())
 
         fake_view = MagicMock(spec=View)
         fake_view.events = ["e1", "e2"]
 
-        # Plain condenser (not RollingCondenser)
-        fake_condenser = MagicMock()
-        fake_condenser.condensed_history.return_value = fake_view
-        mgr.condenser = fake_condenser
+        # Plain compactor (not RollingCompactor)
+        fake_compactor = MagicMock()
+        fake_compactor.compacted_history.return_value = fake_view
+        mgr.compactor = fake_compactor
 
         state = _mock_state()
         state.turn_signals.memory_pressure = "CRITICAL"

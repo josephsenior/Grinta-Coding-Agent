@@ -407,9 +407,9 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         m.assert_called_once()
 
     async def test_run_critics_skipped_when_disabled(self):
-        """When FORGE_ENABLE_CRITICS=false, critics must not run and no scores are stored."""
+        """When ENABLE_REVIEW_CRITICS=false, critics must not run and no scores are stored."""
         import os
-        with patch.dict(os.environ, {"FORGE_ENABLE_CRITICS": "false"}):
+        with patch.dict(os.environ, {"ENABLE_REVIEW_CRITICS": "false"}):
             with patch("backend.governance.AgentFinishedCritic.evaluate") as m_fin, \
                  patch("backend.governance.BudgetCritic.evaluate") as m_bud, \
                  patch("backend.governance.SuitePassCritic.evaluate") as m_suite:

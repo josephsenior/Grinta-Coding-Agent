@@ -18,7 +18,7 @@ from pydantic import (  # noqa: E402
 )
 
 from backend.core.config.mcp_config import MCPConfig  # noqa: E402
-from backend.core.config.config_loader import load_forge_config  # noqa: E402
+from backend.core.config.config_loader import load_app_config  # noqa: E402
 from backend.core.constants import (  # noqa: E402
     DEFAULT_KB_AUTO_SEARCH,
     DEFAULT_KB_ENABLED,
@@ -47,7 +47,7 @@ _SETTINGS_FROM_CONFIG_CACHE_TTL: float = 60.0  # seconds (OPTIMIZED)
 
 
 class Settings(BaseModel):
-    """Persisted settings for Forge sessions."""
+    """Persisted settings for App sessions."""
 
     language: str | None = None
     agent: str | None = None
@@ -181,7 +181,7 @@ class Settings(BaseModel):
         try:
             import os
 
-            env_key = os.environ.get("FORGE_API_KEY")
+            env_key = os.environ.get("APP_API_KEY")
             if (
                 env_key
                 and isinstance(explicit_api_key, SecretStr)
@@ -227,7 +227,7 @@ class Settings(BaseModel):
             _settings_from_config_cache_loader_id
         _settings_from_config_cache = None
         _settings_from_config_cache_time = current_time
-        _settings_from_config_cache_loader_id = id(load_forge_config)
+        _settings_from_config_cache_loader_id = id(load_app_config)
         return
 
     @staticmethod
@@ -242,9 +242,9 @@ class Settings(BaseModel):
         if cached is None:
             return None
 
-        cache_is_mocked = Mock is not None and isinstance(load_forge_config, Mock)
+        cache_is_mocked = Mock is not None and isinstance(load_app_config, Mock)
         cache_loader_matches = _settings_from_config_cache_loader_id == id(
-            load_forge_config
+            load_app_config
         )
         cache_fresh = (
             current_time - _settings_from_config_cache_time
@@ -302,7 +302,7 @@ class Settings(BaseModel):
             _settings_from_config_cache_loader_id
         _settings_from_config_cache = settings
         _settings_from_config_cache_time = current_time
-        _settings_from_config_cache_loader_id = id(load_forge_config)
+        _settings_from_config_cache_loader_id = id(load_app_config)
 
     @staticmethod
     def from_config() -> Settings | None:
@@ -324,7 +324,7 @@ class Settings(BaseModel):
         if cached_settings is not None:
             return cached_settings
 
-        app_config = load_forge_config()
+        app_config = load_app_config()
 
         # Check for explicit LLM config that should skip settings
         if Settings._check_explicit_llm_config(app_config):

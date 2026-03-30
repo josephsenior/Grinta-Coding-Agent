@@ -13,7 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger import EventSource
 from backend.ledger.action import CmdRunAction, FileReadAction, FileWriteAction
 from backend.ledger.observation import (
@@ -98,12 +98,12 @@ class GitSetupMixin:
         random_str = "".join(
             random.choices(string.ascii_lowercase + string.digits, k=8)
         )
-        FORGE_workspace_branch = f"Forge-workspace-{random_str}"
+        workspace_branch = f"app-workspace-{random_str}"
         clone_command = f"git clone {remote_repo_url} {dir_name}"
         checkout_command = (
             f"git checkout {selected_branch}"
             if selected_branch
-            else f"git checkout -b {FORGE_workspace_branch}"
+            else f"git checkout -b {workspace_branch}"
         )
         clone_action = CmdRunAction(command=clone_command)
         await call_sync_from_async(self.run_action, clone_action)
@@ -120,8 +120,8 @@ class GitSetupMixin:
     # ------------------------------------------------------------------
 
     def maybe_run_setup_script(self) -> None:
-        """Run .Forge/setup.sh if it exists in the workspace or repository."""
-        setup_script = ".Forge/setup.sh"
+        """Run .app/setup.sh if it exists in the workspace or repository."""
+        setup_script = ".app/setup.sh"
         read_obs = cast(Any, self.read(FileReadAction(path=setup_script)))
         if isinstance(read_obs, ErrorObservation):
             return
@@ -194,7 +194,7 @@ class GitSetupMixin:
         self, pre_commit_script: str, pre_commit_hook: str
     ) -> bool:
         """Install the pre-commit hook file."""
-        pre_commit_hook_content = f'#!/bin/bash\n# This hook was installed by Forge\n# It calls the pre-commit script in the .Forge directory\n\nif [ -x "{pre_commit_script}" ]; then\n    source "{pre_commit_script}"\n    exit $?\nelse\n    echo "Warning: {pre_commit_script} not found or not executable"\n    exit 0\nfi\n'
+        pre_commit_hook_content = f'#!/bin/bash\n# This hook was installed by APP\n# It calls the pre-commit script in the .app directory\n\nif [ -x "{pre_commit_script}" ]; then\n    source "{pre_commit_script}"\n    exit $?\nelse\n    echo "Warning: {pre_commit_script} not found or not executable"\n    exit 0\nfi\n'
 
         write_obs = cast(
             Any,
@@ -209,8 +209,8 @@ class GitSetupMixin:
         return bool(GitSetupMixin._make_script_executable(self, pre_commit_hook))
 
     def maybe_setup_git_hooks(self) -> None:
-        """Set up git hooks if .Forge/pre-commit.sh exists in the workspace or repository."""
-        pre_commit_script = ".Forge/pre-commit.sh"
+        """Set up git hooks if .app/pre-commit.sh exists in the workspace or repository."""
+        pre_commit_script = ".app/pre-commit.sh"
         pre_commit_hook = ".git/hooks/pre-commit"
 
         # Check if pre-commit script exists
@@ -237,7 +237,7 @@ class GitSetupMixin:
         read_obs = cast(Any, self.read(FileReadAction(path=pre_commit_hook)))
         if (
             not isinstance(read_obs, ErrorObservation)
-            and "This hook was installed by Forge" not in read_obs.content
+            and "This hook was installed by APP" not in read_obs.content
         ):
             self.log("info", "Preserving existing pre-commit hook")
             if not GitSetupMixin._preserve_existing_hook(self, pre_commit_hook):

@@ -10,7 +10,7 @@ import os
 import subprocess
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
     CmdOutputMetadata,

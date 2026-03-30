@@ -1,5 +1,5 @@
 """
-Headless SWE task tests against the local Forge server.
+Headless SWE task tests against the local App server.
 Each task creates a concrete coding problem and verifies the agent solves it.
 """
 import asyncio
@@ -10,15 +10,15 @@ import traceback
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from forge_client import ForgeClient
+from client import AppClient
 
-BASE_URL = os.environ.get("FORGE_BASE_URL", "http://localhost:3000")
-WAIT_SECONDS = int(os.environ.get("FORGE_WAIT_SECONDS", "300"))
+BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+WAIT_SECONDS = int(os.environ.get("APP_WAIT_SECONDS", "300"))
 
 # Match the project_root configured in settings.json.
-# Override with FORGE_WORKSPACE env var if needed.
+# Override with APP_WORKSPACE env var if needed.
 def _get_workspace() -> str:
-    env = os.environ.get("FORGE_WORKSPACE", "").strip()
+    env = os.environ.get("APP_WORKSPACE", "").strip()
     if env:
         return os.path.abspath(env)
     # Try to read from settings.json next to this file
@@ -32,7 +32,7 @@ def _get_workspace() -> str:
             return os.path.abspath(pr)
     except Exception:
         pass
-    # Fallback: Forge repo root (works when project_root is empty = cwd)
+    # Fallback: App repo root (works when project_root is empty = cwd)
     return os.path.abspath(os.path.dirname(__file__))
 
 WORKSPACE = _get_workspace()
@@ -169,7 +169,7 @@ TASKS = [
 ]
 
 
-async def run_task(task: dict, client: ForgeClient) -> dict:
+async def run_task(task: dict, client: AppClient) -> dict:
     name = task["name"]
     print(f"\n{'='*70}")
     print(f"TASK: {name} - {task['description']}")
@@ -215,10 +215,10 @@ async def run_task(task: dict, client: ForgeClient) -> dict:
 
         terminal = asyncio.Event()
         initialized = asyncio.Event()
-        last_state = [None]
-        event_count = [0]
-        tool_calls = [0]
-        awaiting_count = [0]
+        last_state: list[str | None] = [None]
+        event_count: list[int] = [0]
+        tool_calls: list[int] = [0]
+        awaiting_count: list[int] = [0]
 
         async def on_event(event: dict) -> None:
             event_count[0] += 1
@@ -320,14 +320,14 @@ async def run_task(task: dict, client: ForgeClient) -> dict:
 
 
 async def main() -> int:
-    task_indices_env = os.environ.get("FORGE_TASK_INDICES", "")
+    task_indices_env = os.environ.get("APP_TASK_INDICES", "")
     if task_indices_env:
         indices = [int(i) for i in task_indices_env.split(",") if i.strip()]
         tasks = [TASKS[i] for i in indices if i < len(TASKS)]
     else:
         tasks = TASKS
 
-    print("\nForge SWE Task Test Runner")
+    print("\nApp SWE Task Test Runner")
     print(f"Server: {BASE_URL}")
     print(f"Timeout per task: {WAIT_SECONDS}s")
     print(f"Tasks: {[t['name'] for t in tasks]}\n")
@@ -343,7 +343,7 @@ async def main() -> int:
 
     results = []
     for task in tasks:
-        client = ForgeClient(BASE_URL)
+        client = AppClient(BASE_URL)
         r = await run_task(task, client)
         results.append(r)
 

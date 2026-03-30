@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
 
 
 class FeatureUnavailableError(Exception):
@@ -21,8 +21,8 @@ class FeatureUnavailableError(Exception):
         self.feature_name = feature_name
         if message is None:
             message = (
-                f"Feature '{feature_name}' is not available in Forge Core. "
-                "This feature is part of the Forge Pro/Enterprise editions."
+                f"Feature '{feature_name}' is not available in App Core. "
+                "This feature is part of the App Pro/Enterprise editions."
             )
         super().__init__(message)
 
@@ -30,15 +30,15 @@ class FeatureUnavailableError(Exception):
 class FeatureFlags:
     """Centralized feature flag management.
 
-    Reads feature flags from ForgeConfig and provides easy access to feature
+    Reads feature flags from AppConfig and provides easy access to feature
     availability status.
     """
 
-    def __init__(self, config: ForgeConfig | None = None) -> None:
+    def __init__(self, config: AppConfig | None = None) -> None:
         """Initialize feature flags from config.
 
         Args:
-            config: ForgeConfig instance.
+            config: AppConfig instance.
         """
         self._config = config
 
@@ -46,7 +46,7 @@ class FeatureFlags:
     def risk_assessment_enabled(self) -> bool:
         """Check if security risk assessment is enabled.
 
-        Always False in Forge Core.
+        Always False in App Core.
         """
         return False
 
@@ -66,11 +66,11 @@ class FeatureFlags:
         }
 
 
-def get_feature_flags(config: ForgeConfig | None = None) -> FeatureFlags:
+def get_feature_flags(config: AppConfig | None = None) -> FeatureFlags:
     """Get feature flags instance.
 
     Args:
-        config: ForgeConfig instance.
+        config: AppConfig instance.
 
     Returns:
         FeatureFlags instance.

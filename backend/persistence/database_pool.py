@@ -1,6 +1,6 @@
 """Async database pool utilities.
 
-Database-backed stores in Forge (e.g., conversation and knowledge base stores)
+Database-backed stores in App (e.g., conversation and knowledge base stores)
 expect an async pool exposing an asyncpg-like API (`acquire()`, `transaction()`,
 `execute()`, etc.).
 
@@ -13,7 +13,7 @@ import asyncio
 import os
 from typing import Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 _pool: Any | None = None
 _pool_lock = asyncio.Lock()

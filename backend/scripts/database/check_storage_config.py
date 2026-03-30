@@ -12,7 +12,7 @@ print(f"\nUSER_STORAGE_TYPE: {storage_type}")
 
 if storage_type == "NOT SET":
     print("\n[WARNING] USER_STORAGE_TYPE is not set!")
-    print("  Defaulting to 'file' storage (users saved to .forge/users/users.json)")
+    print("  Defaulting to 'file' storage (users saved to .app/users/users.json)")
     print("  To use PostgreSQL, set: USER_STORAGE_TYPE=database")
 elif storage_type.lower() in ("database", "db"):
     print("\n[OK] Using database storage")

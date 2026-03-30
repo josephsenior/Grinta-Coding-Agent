@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import OrchestrationContext

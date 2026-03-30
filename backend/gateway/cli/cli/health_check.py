@@ -1,4 +1,4 @@
-"""Production health check subcommand — HTTP liveness probe against a running Forge server."""
+"""Production health check subcommand — HTTP liveness probe against a running server."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ import httpx
 
 def run_health_check(_args: Any) -> None:
     """GET ``/alive`` on the configured host/port; exit 0 only if response is healthy."""
-    port = int(os.environ.get("FORGE_PORT") or os.environ.get("PORT") or "3000")
-    host = (os.environ.get("FORGE_HOST") or os.environ.get("HOST") or "127.0.0.1").strip()
+    port = int(os.environ.get("APP_PORT") or os.environ.get("PORT") or "3000")
+    host = (os.environ.get("APP_HOST") or os.environ.get("HOST") or "127.0.0.1").strip()
     probe_host = (
         "127.0.0.1" if host in ("0.0.0.0", "::", "::0") else host or "127.0.0.1"
     )

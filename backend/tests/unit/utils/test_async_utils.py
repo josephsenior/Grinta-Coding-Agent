@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import patch
 
 import pytest
 
+from backend.utils import async_utils
 from backend.utils.async_utils import (
     AsyncException,
     call_async_from_sync,
@@ -168,6 +170,20 @@ class TestCallAsyncFromSync:
             call_async_from_sync(failing_async)
 
 
+class TestGetMaxWorkers:
+    def test_reads_app_thread_pool_env(self):
+        with patch.dict("os.environ", {"APP_THREAD_POOL_MAX_WORKERS": "7"}, clear=False):
+            assert async_utils._get_max_workers() == 7
+
+    def test_invalid_app_thread_pool_env_falls_back(self):
+        with patch.dict("os.environ", {"APP_THREAD_POOL_MAX_WORKERS": "abc"}, clear=False):
+            assert async_utils._get_max_workers() == 32
+
+    def test_non_positive_app_thread_pool_env_falls_back(self):
+        with patch.dict("os.environ", {"APP_THREAD_POOL_MAX_WORKERS": "0"}, clear=False):
+            assert async_utils._get_max_workers() == 32
+
+
 # ── call_coro_in_bg_thread ─────────────────────────────────────────────
 
 
@@ -183,7 +199,7 @@ class TestCallCoroInBgThread:
             return value + 100
 
         await call_coro_in_bg_thread(bg_coro, timeout=5.0, value=50)
-        # Fire-and-forget, no result expected
+        # Background task, no result expected.
 
     @pytest.mark.asyncio
     async def test_uses_delegate_pattern(self):
@@ -192,7 +208,7 @@ class TestCallCoroInBgThread:
         async def sample():
             return "delegated"
 
-        # Should not raise even though it's fire-and-forget
+        # Should not raise even though it runs in the background.
         await call_coro_in_bg_thread(sample, timeout=2.0)
 
 

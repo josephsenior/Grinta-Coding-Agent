@@ -1,4 +1,4 @@
-"""Forge logging utilities and formatters for console and structured outputs."""
+"""App logging utilities and formatters for console and structured outputs."""
 
 from __future__ import annotations
 
@@ -201,7 +201,7 @@ def get_file_handler(
 ) -> TimedRotatingFileHandler:
     """Returns a file handler for logging."""
     os.makedirs(log_dir, exist_ok=True)
-    file_name = "forge.log"
+    file_name = "app.log"
     file_handler = TimedRotatingFileHandler(
         os.path.join(log_dir, file_name),
         when=when,
@@ -266,29 +266,29 @@ sys.excepthook = log_uncaught_exceptions
 # Module-level flags that can be toggled at runtime by config loading
 DISABLE_COLOR_PRINTING: bool = False
 
-forge_logger = logging.getLogger("forge")
-access_logger = logging.getLogger("forge.access")
+app_logger = logging.getLogger("app")
+access_logger = logging.getLogger("app.access")
 current_log_level = logging.INFO
 if LOG_LEVEL in logging.getLevelNamesMapping():
     current_log_level = logging.getLevelNamesMapping()[LOG_LEVEL]
-forge_logger.setLevel(current_log_level)
+app_logger.setLevel(current_log_level)
 access_logger.setLevel(current_log_level)
 if DEBUG:
-    forge_logger.addFilter(StackInfoFilter())
+    app_logger.addFilter(StackInfoFilter())
 if current_log_level == logging.DEBUG:
-    forge_logger.debug("DEBUG mode enabled.")
+    app_logger.debug("DEBUG mode enabled.")
 if LOG_JSON:
-    forge_logger.addHandler(json_log_handler(current_log_level))
+    app_logger.addHandler(json_log_handler(current_log_level))
     access_logger.addHandler(json_log_handler(current_log_level))
 else:
-    forge_logger.addHandler(get_console_handler(current_log_level))
+    app_logger.addHandler(get_console_handler(current_log_level))
     access_logger.addHandler(get_console_handler(current_log_level))
-forge_logger.addFilter(SensitiveDataFilter(forge_logger.name))
-forge_logger.addFilter(TraceContextFilter())
+app_logger.addFilter(SensitiveDataFilter(app_logger.name))
+app_logger.addFilter(TraceContextFilter())
 # Optionally correlate logs with active OpenTelemetry spans
 if OTEL_LOG_CORRELATION:
-    forge_logger.addFilter(OpenTelemetryTraceFilter())
-forge_logger.propagate = False
+    app_logger.addFilter(OpenTelemetryTraceFilter())
+app_logger.propagate = False
 access_logger.addFilter(SensitiveDataFilter(access_logger.name))
 access_logger.addFilter(TraceContextFilter())
 # Apply OTEL correlation to access logs as well
@@ -308,20 +308,20 @@ if LOG_SHIPPING_ENABLED:
 
         log_shipper = get_log_shipper()
         if log_shipper:
-            forge_logger.addHandler(LogShippingHandler(log_shipper))
+            app_logger.addHandler(LogShippingHandler(log_shipper))
             access_logger.addHandler(LogShippingHandler(log_shipper))
-            forge_logger.debug("Log shipping handler added")
+            app_logger.debug("Log shipping handler added")
     except Exception as e:
-        forge_logger.warning("Failed to initialize log shipping: %s", e)
+        app_logger.warning("Failed to initialize log shipping: %s", e)
 
-forge_logger.debug("Logging initialized")
+app_logger.debug("Logging initialized")
 LOG_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs"
 )
 if LOG_TO_FILE:
-    forge_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
+    app_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
     access_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
-    forge_logger.debug("Logging to file in: %s", LOG_DIR)
+    app_logger.debug("Logging to file in: %s", LOG_DIR)
 LOQUACIOUS_LOGGERS = [
     "engineio",
     "engineio.server",
@@ -366,7 +366,7 @@ class LlmFileHandler(logging.FileHandler):
                 try:
                     os.unlink(file_path)
                 except Exception as e:
-                    forge_logger.exception(
+                    app_logger.exception(
                         "Failed to delete %s. Reason: %s", file_path, e
                     )
         filename = f"{self.filename}_{self.message_counter:03}.log"
@@ -385,7 +385,7 @@ class LlmFileHandler(logging.FileHandler):
         self.stream = self._open()
         super().emit(record)
         self.stream.close()
-        forge_logger.debug("Logging to %s", self.baseFilename)
+        app_logger.debug("Logging to %s", self.baseFilename)
         self.message_counter += 1
 
 
@@ -409,7 +409,7 @@ llm_prompt_logger = _setup_llm_logger("prompt", current_log_level)
 llm_response_logger = _setup_llm_logger("response", current_log_level)
 
 
-class ForgeLoggerAdapter(logging.LoggerAdapter):
+class AppLoggerAdapter(logging.LoggerAdapter):
     """Logger adapter with context binding support.
 
     Allows binding contextual information (trace IDs, session IDs, etc.)
@@ -419,18 +419,18 @@ class ForgeLoggerAdapter(logging.LoggerAdapter):
     extra: dict
 
     def __init__(
-        self, logger: logging.Logger = forge_logger, extra: dict | None = None
+        self, logger: logging.Logger = app_logger, extra: dict | None = None
     ) -> None:
         """Initialize the adapter with a logger and optional context."""
         super().__init__(logger, extra or {})
 
-    def bind(self, **context: Any) -> ForgeLoggerAdapter:
+    def bind(self, **context: Any) -> AppLoggerAdapter:
         """Return a new adapter with additional context merged into extra.
 
         Example: adapter.bind(trace_id='abc', goal_id='g1')
         """
         new_extra = {**self.extra, **context}
-        return ForgeLoggerAdapter(self.logger, new_extra)
+        return AppLoggerAdapter(self.logger, new_extra)
 
     def process(
         self, msg: str, kwargs: MutableMapping[str, Any]
@@ -447,13 +447,13 @@ class ForgeLoggerAdapter(logging.LoggerAdapter):
 
 
 def bind_context(
-    logger: logging.Logger | ForgeLoggerAdapter, **context: Any
-) -> ForgeLoggerAdapter:
+    logger: logging.Logger | AppLoggerAdapter, **context: Any
+) -> AppLoggerAdapter:
     """Utility to bind tracing/context information to a logger.
 
-    Returns an ForgeLoggerAdapter which will include the provided context in all
+    Returns an AppLoggerAdapter which will include the provided context in all
     emitted logs via the `extra` dict. Intended keys: trace_id, goal_id, step_id, event_source, msg_type.
     """
-    if isinstance(logger, ForgeLoggerAdapter):
+    if isinstance(logger, AppLoggerAdapter):
         return logger.bind(**context)
-    return ForgeLoggerAdapter(logger, context)
+    return AppLoggerAdapter(logger, context)

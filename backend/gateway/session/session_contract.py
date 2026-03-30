@@ -56,13 +56,13 @@ def normalize_replay_cursor(
 ) -> ReplayCursor:
     """Normalize query parameters into a stable replay cursor."""
     # Allow operators to tune safe defaults without code changes.
-    with_default = os.getenv("FORGE_TRAJECTORY_DEFAULT_LIMIT")
+    with_default = os.getenv("APP_TRAJECTORY_DEFAULT_LIMIT")
     if with_default:
         try:
             default_limit = int(with_default)
         except (ValueError, TypeError):
             logger.warning(
-                "Invalid FORGE_TRAJECTORY_DEFAULT_LIMIT=%r; using default %d",
+                "Invalid APP_TRAJECTORY_DEFAULT_LIMIT=%r; using default %d",
                 with_default,
                 default_limit,
             )

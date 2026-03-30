@@ -1,4 +1,4 @@
-﻿# Forge Server
+﻿# App Server
 
 This is a WebSocket server that executes tasks using an agent.
 
@@ -103,7 +103,7 @@ This list may grow over time.
 
 ## Server Components
 
-The following section describes the server-side components of the Forge project.
+The following section describes the server-side components of the App project.
 
 ### 1. session/session.py
 

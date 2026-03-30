@@ -14,7 +14,7 @@ from backend.core.constants import GENERAL_TIMEOUT
 
 _logger = logging.getLogger(__name__)
 
-# Module-level set to hold strong references to fire-and-forget tasks.
+# Module-level set to hold strong references to background tasks.
 # Without this, tasks created via ``asyncio.create_task()`` may be
 # garbage-collected before completion (CPython GC behaviour).
 _background_tasks: set[asyncio.Task[Any]] = set()
@@ -50,7 +50,26 @@ def create_tracked_task(
 
 
 # Bounded worker pool — defaults to min(32, CPU+4) but can be overridden via env.
-_MAX_WORKERS = int(os.getenv("FORGE_THREAD_POOL_MAX_WORKERS", "32"))
+def _get_max_workers() -> int:
+    raw = os.getenv("APP_THREAD_POOL_MAX_WORKERS", "32")
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError):
+        _logger.warning(
+            "Invalid APP_THREAD_POOL_MAX_WORKERS=%r; using default 32",
+            raw,
+        )
+        return 32
+    if parsed <= 0:
+        _logger.warning(
+            "Non-positive APP_THREAD_POOL_MAX_WORKERS=%r; using default 32",
+            raw,
+        )
+        return 32
+    return parsed
+
+
+_MAX_WORKERS = _get_max_workers()
 EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=_MAX_WORKERS)
 
 
@@ -304,7 +323,7 @@ def run_or_schedule(coro: Coroutine[Any, Any, Any]) -> None:
     3. Otherwise fall back to a synchronous ``run_until_complete`` on a
        fresh disposable loop.
 
-    The function is intentionally fire-and-forget; callers that need the
+    The function is intentionally background-only; callers that need the
     result should ``await`` the coroutine directly instead.
     """
     # 1. Currently inside a running loop → create a task directly.

@@ -13,7 +13,7 @@ from datetime import timedelta
 from typing import Any, cast
 
 from backend.core.cache._serializer import _json_fallback
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 # Optional Redis dependency (graceful degradation)
 try:
@@ -45,7 +45,7 @@ class DistributedCache:
 
     def __init__(
         self,
-        prefix: str = "forge",
+        prefix: str = "app",
         host: str | None = None,
         port: int = 6379,
         password: str | None = None,

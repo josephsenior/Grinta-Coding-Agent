@@ -16,7 +16,7 @@ from backend.core.constants import (
 class RuntimeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for the runtime.
 
-    Simplified for Forge Core (LocalRuntime only).
+    Simplified for App Core (LocalRuntime only).
     """
 
     timeout: int = Field(

@@ -13,7 +13,7 @@ import json
 
 from backend.core import logger
 from backend.core.app_paths import get_app_settings_root
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 
 if TYPE_CHECKING:
@@ -26,10 +26,10 @@ def _load_json_config(json_file: str) -> dict | None:
         with open(json_file, "r", encoding="utf-8") as json_contents:
             return json.load(json_contents)
     except FileNotFoundError as e:
-        logger.forge_logger.error("Config file not found: %s. Error: %s", json_file, e)
+        logger.app_logger.error("Config file not found: %s. Error: %s", json_file, e)
         return None
     except Exception as e:
-        logger.forge_logger.error(
+        logger.app_logger.error(
             "Cannot parse config file %s. Exception: %s", json_file, e
         )
         return None
@@ -59,11 +59,11 @@ def get_llm_config_arg(
 
 
 def _resolve_llm_config_from_cli(
-    llm_config_name: str, config: ForgeConfig, config_file: str
+    llm_config_name: str, config: AppConfig, config_file: str
 ) -> LLMConfig:
     """Resolve LLM config from CLI parameter."""
     if llm_config_name in config.llms:
-        logger.forge_logger.debug(
+        logger.app_logger.debug(
             "Using LLM config '%s' from loaded configuration", llm_config_name
         )
         return config.llms[llm_config_name]
@@ -87,7 +87,7 @@ def _try_user_config_llm(llm_config_name: str, config_file: str) -> LLMConfig | 
     if primary_abs == canonical_abs or not os.path.isfile(canonical_abs):
         return None
 
-    logger.forge_logger.debug(
+    logger.app_logger.debug(
         "Trying to load LLM config '%s' from canonical settings: %s",
         llm_config_name,
         canonical_abs,
@@ -95,18 +95,18 @@ def _try_user_config_llm(llm_config_name: str, config_file: str) -> LLMConfig | 
     return get_llm_config_arg(llm_config_name, canonical_abs)
 
 
-def apply_llm_config_override(config: ForgeConfig, args: argparse.Namespace) -> None:
+def apply_llm_config_override(config: AppConfig, args: argparse.Namespace) -> None:
     """Apply LLM config override from CLI arguments."""
     if not args.llm_config:
         return
 
-    logger.forge_logger.debug("CLI specified LLM config: %s", args.llm_config)
+    logger.app_logger.debug("CLI specified LLM config: %s", args.llm_config)
     llm_config = _resolve_llm_config_from_cli(args.llm_config, config, args.config_file)
     config.set_llm_config(llm_config)
-    logger.forge_logger.debug("Set LLM config from CLI parameter: %s", args.llm_config)
+    logger.app_logger.debug("Set LLM config from CLI parameter: %s", args.llm_config)
 
 
-def apply_additional_overrides(config: ForgeConfig, args: argparse.Namespace) -> None:
+def apply_additional_overrides(config: AppConfig, args: argparse.Namespace) -> None:
     """Apply additional config overrides from CLI arguments."""
     if hasattr(args, "agent_cls") and args.agent_cls:
         config.default_agent = args.agent_cls

@@ -7,7 +7,7 @@ from backend.orchestration.state.control_flags import (
     IterationControlFlag,
 )
 from backend.orchestration.state.state import State
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import ChangeAgentStateAction
 from backend.ledger.action.empty import NullAction
 from backend.ledger.event_filter import EventFilter
@@ -16,7 +16,7 @@ from backend.ledger.observation.empty import NullObservation
 from backend.ledger.serialization.event import event_to_trajectory
 
 # Maximum number of events retained in state.history at runtime.
-# The condenser / View system controls what the LLM actually sees;
+# The compactor / View system controls what the LLM actually sees;
 # this cap prevents user-facing context memory growth.
 MAX_HISTORY_EVENTS: int = 10_000
 
@@ -277,14 +277,14 @@ class StateTracker:
             total = (sample_total // sample_count) * len(history)
         return total
 
-    def get_trajectory(self, include_screenshots: bool = False) -> list[dict]:
-        """Convert state history to trajectory format for export.
+    def get_transcript(self, include_screenshots: bool = False) -> list[dict]:
+        """Convert state history to transcript format for export.
 
         Args:
             include_screenshots: Whether to include screenshot data
 
         Returns:
-            List of trajectory event dictionaries
+            List of transcript event dictionaries
 
         """
         trajectory: list[dict[str, Any]] = []
@@ -293,6 +293,10 @@ class StateTracker:
             if serialized is not None:
                 trajectory.append(serialized)
         return trajectory
+
+    def get_trajectory(self, include_screenshots: bool = False) -> list[dict]:
+        """Backward-compatible alias for transcript export."""
+        return self.get_transcript(include_screenshots)
 
     def maybe_increase_control_flags_limits(self, headless_mode: bool) -> None:
         """Conditionally increase iteration and budget limits.

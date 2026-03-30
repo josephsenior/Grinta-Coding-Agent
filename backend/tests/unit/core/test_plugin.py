@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from backend.core.plugin import (
-    ForgePlugin,
+    AppPlugin,
     HookType,
     PLUGIN_API_VERSION,
     PLUGIN_COMPAT_WINDOW,
@@ -20,11 +20,11 @@ from backend.core.plugin import (
 
 
 # ---------------------------------------------------------------------------
-# Concrete test plugin (ForgePlugin is abstract)
+# Concrete test plugin (AppPlugin is abstract)
 # ---------------------------------------------------------------------------
 
 
-class _TestPlugin(ForgePlugin):
+class _TestPlugin(AppPlugin):
     name = "test-plugin"
     version = "1.0.0"
     description = "A test plugin"
@@ -53,11 +53,11 @@ class TestHookType:
 
 
 # ---------------------------------------------------------------------------
-# ForgePlugin
+# AppPlugin
 # ---------------------------------------------------------------------------
 
 
-class TestForgePlugin:
+class TestAppPlugin:
     def test_repr(self):
         p = _TestPlugin()
         r = repr(p)
@@ -119,7 +119,7 @@ class TestForgePlugin:
         assert result is content
 
     async def test_abstract_hooks_raise(self):
-        class Raises(ForgePlugin):
+        class Raises(AppPlugin):
             async def on_event(self, event):
                 return await super().on_event(event)  # type: ignore[safe-super]
 
@@ -492,7 +492,7 @@ class TestDiscovery:
 
         class EPs:
             def select(self, group):
-                if group == "forge.plugins":
+                if group == "app.plugins":
                     return [DummyEP("ok", register_fn)]
                 return []
 

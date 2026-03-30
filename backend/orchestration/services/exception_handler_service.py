@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from backend.core.errors import LLMContextWindowExceedError
 from backend.core.errors import AgentRuntimeError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.inference.exceptions import (
     APIConnectionError,
     APIError,

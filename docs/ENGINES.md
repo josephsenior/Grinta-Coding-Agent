@@ -1,6 +1,6 @@
-# Forge Agent Engines
+# App Agent Engines
 
-Forge ships with five specialized AI engines, each optimized for different
+App ships with five specialized AI engines, each optimized for different
 task types. The **Orchestrator** is the default and handles most coding tasks.
 
 ---
@@ -72,24 +72,24 @@ enable_finish = true
 
 ### Prompt Templates
 
-Located in `backend/engines/orchestrator/prompts/`. Jinja2 templates define
+Located in `backend/engine/prompts/`. Jinja2 templates define
 the system prompt, including role definition, available tools, output format,
 best practices, and few-shot examples.
 
-**See:** [backend/engines/orchestrator/README.md](../backend/engines/orchestrator/README.md)
+**See:** [backend/engine/README.md](../backend/engine/README.md)
 
 ---
 
 ## 2. MCP Browser (Remote Browsing)
 
-Web browsing is decoupled from the core Forge engine via the Model Context
+Web browsing is decoupled from the core App engine via the Model Context
 Protocol. This allows for flexible browsing engines like `browser-use` or
 other MCP-compatible agents.
 
 ### How It Works
 
 ```
-Forge → MCP Request → MCP Browser Server → Web Interaction → Forge
+App → MCP Request → MCP Browser Server → Web Interaction → App
 ```
 
 ### Key Components
@@ -216,8 +216,8 @@ llm_config = "fast"
 
 ## Adding Custom Engines
 
-1. Create a new directory under `backend/engines/`
-2. Implement the agent interface (see `backend/engines/echo/` for minimal example)
+1. Create the implementation under `backend/engine/` or an adjacent package
+2. Implement the agent interface (see `backend/tests/support/echo/` for a minimal example)
 3. Register via `classpath` in agent config
 
 ```toml

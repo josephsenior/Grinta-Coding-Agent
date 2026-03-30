@@ -1,13 +1,13 @@
-# Forge Architecture
+# App Architecture
 
-This document provides a high-level overview of Forge's architecture for contributors and maintainers.
+This document provides a high-level overview of App's architecture for contributors and maintainers.
 
 ## Canonical Vocabulary
 
-Forge is standardizing its architecture language. Historical code names still
-appear in a few places, but the canonical Forge vocabulary going forward is:
+App is standardizing its architecture language. Historical code names still
+appear in a few places, but the canonical App vocabulary going forward is:
 
-| Current code term | Canonical Forge term |
+| Current code term | Canonical App term |
 | --- | --- |
 | `AgentController` / bare `Controller` | session orchestrator |
 | `Action` | operation |
@@ -39,7 +39,7 @@ paths still live under `backend/execution/`.
 ```text
 ┌─────────────────────────────────────────────────────┐
 │           Web UI (React) + API clients               │
-│  Browser SPA  ·  forge_client (httpx + Socket.IO)    │
+│  Browser SPA  ·  client (httpx + Socket.IO)          │
 └──────────────┬──────────────────┬────────────────────┘
                │ REST (FastAPI)   │ WebSocket (Socket.IO)
 ┌──────────────▼──────────────────▼────────────────────┐
@@ -59,7 +59,7 @@ paths still live under `backend/execution/`.
 └───────────────────────────────────────────────────────┘
 ```
 
-Runtime note: Forge currently uses a local in-process runtime. The optional `hardened_local` profile adds stricter local execution policy, but it is not sandboxing or process isolation.
+Runtime note: App currently uses a local in-process runtime. The optional `hardened_local` profile adds stricter local execution policy, but it is not sandboxing or process isolation.
 
 ## Backend Architecture
 
@@ -90,7 +90,7 @@ All records flow through the ledger (`EventStream` in the current codebase), whi
 
 ### Context Memory (`backend/context/`)
 
-Context memory is managed via the compactor system (`Condenser` in the current codebase):
+Context memory is managed via the compactor system. The codebase and persisted config both use `Compactor` terminology:
 
 - Configurable strategies (summarize, sliding window, hybrid)
 - Bounded metadata storage (max 50 batches, oldest evicted)
@@ -98,7 +98,7 @@ Context memory is managed via the compactor system (`Condenser` in the current c
 
 ### Runtime (`backend/execution/` in the current codebase)
 
-Forge currently uses a local in-process runtime layer that:
+App currently uses a local in-process runtime layer that:
 
 - Executes operations against the local workspace
 - Applies policy enforcement and confirmation gates
@@ -116,12 +116,12 @@ Forge currently uses a local in-process runtime layer that:
 Pydantic v2 Settings cascading dynamically from:
 
 1. Environment variables (`.env`, `.env.local`)
-2. **`settings.json`** in the Forge **app root** (directory from `FORGE_APP_ROOT`, or the process working directory when the server starts — not the per-folder workspace root)
+2. **`settings.json`** in the app root (directory from `APP_ROOT`, or the process working directory when the server starts — not the per-folder workspace root)
 3. Internal defaults
 
 Provides safe merging.
 
-- `ForgeConfig` — server-level: budget ($5 default), API keys
+- `AppConfig` — server-level: budget ($5 default), API keys
 - `AgentConfig` — per-agent: circuit breaker (ON), graceful shutdown (ON)
 - Startup warnings for insecure defaults (dev API key, unlimited budget)
 
@@ -137,7 +137,7 @@ Abstract `FileStore` interface with implementations:
 ## Clients
 
 The React web app and automation/tests share the same REST + Socket.IO protocol.
-The Python package `forge_client` provides :class:`~forge_client.ForgeClient`
+The Python package `client` provides :class:`~client.AppClient`
 (httpx + Socket.IO) for scripts and unit tests.
 
 ## API Surface
@@ -158,8 +158,8 @@ The Python package `forge_client` provides :class:`~forge_client.ForgeClient`
 
 ### WebSocket Events
 
-- `forge_event` — streamed records and outcomes delivered to clients
-- `forge_action` / `forge_user_action` — incoming client operations
+- `app_event` — streamed records and outcomes delivered to clients
+- `app_action` / `app_user_action` — incoming client operations
 - `connect` / `disconnect` / `reconnect` — Connection lifecycle
 
 ## Reliability Features
@@ -172,5 +172,5 @@ The Python package `forge_client` provides :class:`~forge_client.ForgeClient`
 | Graceful shutdown | Configurable, ON by default |
 | Run-state snapshots | Last 3 timestamped snapshots |
 | Event write-ahead | `.pending` marker files for crash safety |
-| Memory bounding | History: 10K events + 200MB, condenser: 50 batches |
+| Memory bounding | History: 10K events + 200MB, compactor metadata: 50 batches |
 | Event size cap | 5MB hard limit with field truncation |

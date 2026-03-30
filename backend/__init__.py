@@ -1,11 +1,11 @@
-"""Forge automation framework package."""
+"""App automation framework package."""
 
 import warnings
 from pathlib import Path
 from importlib.metadata import version, PackageNotFoundError
 
 __version__ = "0.55.0"
-__package_name__ = "forge-ai"
+__package_name__ = "app-ai"
 
 
 def get_version() -> str:
@@ -47,7 +47,7 @@ try:
     __version__ = get_version()
 except Exception as _exc:
     warnings.warn(
-        f"Forge: could not determine package version ({_exc!r}); "
+        f"App: could not determine package version ({_exc!r}); "
         "reporting '0.55.0'.",
         stacklevel=1,
     )

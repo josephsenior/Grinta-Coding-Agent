@@ -11,7 +11,7 @@ from pydantic import SecretStr
 
 from backend.core.config.api_key_manager import api_key_manager
 from backend.core.constants import SECRET_PLACEHOLDER, SETTINGS_CACHE_TTL
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 # Import these at runtime so FastAPI can resolve them in Annotated types
 from backend.core.provider_types import ProviderTokenType, ProviderType
@@ -117,7 +117,7 @@ def _rebuild_settings_with(settings: Settings, **updates: Any) -> Settings:
 def _provider_token_key_for(model: str | None) -> tuple[str | None, str | None]:
     if not model:
         return None, None
-    provider = api_key_manager._extract_provider(model)
+    provider = api_key_manager.extract_provider(model)
     return _PROVIDER_TOKEN_MAPPING.get(provider), provider
 
 
@@ -233,7 +233,7 @@ def _set_environment_variables(
         normalized_key = SecretStr(str(api_key))
     try:
         api_key_manager.set_environment_variables(model, normalized_key)
-        provider = api_key_manager._extract_provider(model)
+        provider = api_key_manager.extract_provider(model)
         if provider == "google":
             os.environ.get("GEMINI_API_KEY")
             logger.debug("GEMINI provider env key present")
@@ -332,7 +332,7 @@ def _process_llm_model_configuration(settings: Settings) -> None:
 
 
 def _apply_runtime_and_git_overrides(settings: Settings) -> None:
-    forge_config = get_app_state().config
+    app_config = get_app_state().config
     git_config_updated = False
 
     # Some deployments/versions use a leaner Settings model that doesn't include
@@ -341,16 +341,16 @@ def _apply_runtime_and_git_overrides(settings: Settings) -> None:
     vcs_user_email = getattr(settings, "vcs_user_email", None)
 
     if vcs_user_name is not None:
-        forge_config.vcs_user_name = vcs_user_name
+        app_config.vcs_user_name = vcs_user_name
         git_config_updated = True
     if vcs_user_email is not None:
-        forge_config.vcs_user_email = vcs_user_email
+        app_config.vcs_user_email = vcs_user_email
         git_config_updated = True
     if git_config_updated:
         logger.info(
             "Updated global git configuration: name=%s, email=%s",
-            getattr(forge_config, "vcs_user_name", None),
-            getattr(forge_config, "vcs_user_email", None),
+            getattr(app_config, "vcs_user_name", None),
+            getattr(app_config, "vcs_user_email", None),
         )
 
 
@@ -446,7 +446,7 @@ async def load_settings(
         user_secrets = settings.secrets_store
         provider_tokens_set = _build_provider_tokens_set(user_secrets, provider_tokens)
 
-        settings = _merge_forge_mcp_for_api(settings)
+        settings = _merge_app_mcp_for_api(settings)
         response = _build_settings_response(settings, provider_tokens_set)
 
         # 🚀 PERFORMANCE FIX: Cache the response with user_id key
@@ -489,19 +489,19 @@ def _build_provider_tokens_set(
     return provider_tokens_set
 
 
-def _merge_forge_mcp_for_api(settings: Settings) -> Settings:
-    """Merge ``ForgeConfig.mcp`` into settings for GET /settings responses.
+def _merge_app_mcp_for_api(settings: Settings) -> Settings:
+    """Merge ``AppConfig.mcp`` into settings for GET /settings responses.
 
     Persisted ``settings.json`` is intentionally lean and often omits ``mcp_config``
-    even when MCP servers are defined in forge config (or defaults). Without this,
-    the UI shows zero servers while the runtime uses forge MCP.
+    even when MCP servers are defined in app config (or defaults). Without this,
+    the UI shows zero servers while the runtime uses the app MCP defaults.
     """
     try:
-        from backend.core.config.config_loader import load_forge_config
+        from backend.core.config.config_loader import load_app_config
 
-        forge_mcp = load_forge_config().mcp
+        app_mcp = load_app_config().mcp
     except Exception as exc:
-        logger.debug("Forge MCP merge skipped: %s", exc)
+        logger.debug("App MCP merge skipped: %s", exc)
         return settings
 
     # Shallow copy only: deep=True can raise "cannot pickle 'mappingproxy' object"
@@ -509,9 +509,9 @@ def _merge_forge_mcp_for_api(settings: Settings) -> Settings:
     # into the exception path and the UI shows llm_api_key_set=False despite settings.json.
     mcp_config = getattr(settings, "mcp_config", None)
     if mcp_config is None:
-        merged_mcp = forge_mcp
+        merged_mcp = app_mcp
     else:
-        merged_mcp = forge_mcp.merge(mcp_config)
+        merged_mcp = app_mcp.merge(mcp_config)
     return settings.model_copy(update={"mcp_config": merged_mcp})
 
 
@@ -835,8 +835,8 @@ def _build_default_settings_response() -> GETSettingsModel:
         email="",
         email_verified=True,
         mcp_config=None,
-        vcs_user_name="forge",
-        vcs_user_email="Forge@forge.dev",
+        vcs_user_name="app",
+        vcs_user_email="App@app.dev",
         # Autonomy Configuration
         autonomy_level="balanced",
         enable_permissions=True,

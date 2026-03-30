@@ -1,4 +1,4 @@
-"""Graceful shutdown for the Forge API process.
+"""Graceful shutdown for the App API process.
 
 Registered handlers run from FastAPI lifespan teardown (after Uvicorn receives
 SIGINT/SIGTERM and begins shutdown). Signal handling is owned by the ASGI server.
@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 _shutdown_handlers: list[Callable] = []
 _shutdown_in_progress = False

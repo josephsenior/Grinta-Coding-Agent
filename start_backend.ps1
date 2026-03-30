@@ -1,5 +1,5 @@
-# Start Forge Backend Server
-# Sets PYTHONPATH correctly so forge module can be found
+# Start Backend Server
+# Sets PYTHONPATH correctly so app module can be found
 
 param(
     [int]$Port = 3000
@@ -16,7 +16,7 @@ function Get-ListeningPidsForPort {
     }
 }
 
-function Is-ForgePythonProcess {
+function Is-AppPythonProcess {
     param([int]$ProcessId)
     try {
         $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction Stop
@@ -56,7 +56,7 @@ function Find-AvailablePort {
     return $null
 }
 
-function Test-ForgeAlive {
+function Test-AppAlive {
     param(
         [int]$TargetPort,
         [int]$TimeoutSeconds = 2
@@ -72,7 +72,7 @@ function Test-ForgeAlive {
     }
 }
 
-Write-Host "🚀 Starting Forge Backend Server..." -ForegroundColor Cyan
+Write-Host "🚀 Starting Backend Server..." -ForegroundColor Cyan
 
 # Change to project directory
 Set-Location -Path $PSScriptRoot
@@ -81,8 +81,8 @@ Set-Location -Path $PSScriptRoot
 $env:PYTHONPATH = "$PSScriptRoot"
 
 # Force local-dev defaults for clean startup behavior
-$env:FORGE_ENV = "development"
-Remove-Item Env:FORGE_STRICT -ErrorAction SilentlyContinue
+$env:APP_ENV = "development"
+Remove-Item Env:APP_STRICT -ErrorAction SilentlyContinue
 
 Write-Host "`n📁 Project root: $PSScriptRoot" -ForegroundColor Gray
 Write-Host "📁 Backend path: $PSScriptRoot\backend" -ForegroundColor Gray
@@ -99,33 +99,33 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Resolve port conflicts safely:
-# - stop stale Forge Python listeners on the target port
-# - if a non-Forge process owns the port, choose next free port
+# - stop stale App Python listeners on the target port
+# - if a non-App process owns the port, choose next free port
 $resolvedPort = $Port
 
-if (Test-ForgeAlive -TargetPort $Port) {
-    Write-Host "`n✅ Forge backend already running at http://127.0.0.1:$Port" -ForegroundColor Green
+if (Test-AppAlive -TargetPort $Port) {
+    Write-Host "`n✅ Backend already running at http://127.0.0.1:$Port" -ForegroundColor Green
     Write-Host "No new backend started to avoid duplicate/conflicting instances." -ForegroundColor Yellow
     exit 0
 }
 
 $listeners = Get-ListeningPidsForPort -TargetPort $Port
 if ($listeners -and $listeners.Count -gt 0) {
-    $forgePids = @()
-    $nonForgePids = @()
+    $appPids = @()
+    $nonAppPids = @()
 
     foreach ($listenerPid in $listeners) {
-        if (Is-ForgePythonProcess -ProcessId $listenerPid) {
-            $forgePids += $listenerPid
+        if (Is-AppPythonProcess -ProcessId $listenerPid) {
+            $appPids += $listenerPid
         }
         else {
-            $nonForgePids += $listenerPid
+            $nonAppPids += $listenerPid
         }
     }
 
-    if ($forgePids.Count -gt 0) {
-        Write-Host "`n🧹 Found stale Forge listener(s) on port ${Port}: $($forgePids -join ', ')" -ForegroundColor Yellow
-        Stop-Process -Id $forgePids -Force -ErrorAction SilentlyContinue
+    if ($appPids.Count -gt 0) {
+        Write-Host "`n🧹 Found stale App listener(s) on port ${Port}: $($appPids -join ', ')" -ForegroundColor Yellow
+        Stop-Process -Id $appPids -Force -ErrorAction SilentlyContinue
         Start-Sleep -Milliseconds 400
     }
 
@@ -138,13 +138,13 @@ if ($listeners -and $listeners.Count -gt 0) {
         }
 
         $resolvedPort = $nextPort
-        Write-Host "`n⚠️  Port ${Port} is still occupied by non-Forge process(es): $($stillOccupied -join ', ')" -ForegroundColor Yellow
+        Write-Host "`n⚠️  Port ${Port} is still occupied by non-App process(es): $($stillOccupied -join ', ')" -ForegroundColor Yellow
         Write-Host "➡️  Using fallback port $resolvedPort" -ForegroundColor Yellow
     }
 }
 
-if (Test-ForgeAlive -TargetPort $resolvedPort) {
-    Write-Host "`n✅ Forge backend already running at http://127.0.0.1:$resolvedPort" -ForegroundColor Green
+if (Test-AppAlive -TargetPort $resolvedPort) {
+    Write-Host "`n✅ App backend already running at http://127.0.0.1:$resolvedPort" -ForegroundColor Green
     Write-Host "No new backend started to avoid duplicate/conflicting instances." -ForegroundColor Yellow
     exit 0
 }
@@ -155,7 +155,7 @@ Write-Host "Press Ctrl+C to stop`n" -ForegroundColor Yellow
 # Start server with PYTHONPATH set
 $env:PYTHONPATH = "$PSScriptRoot"
 $env:PORT = "$resolvedPort"
-$env:FORGE_ENABLE_WINDOWS_MCP = "1"
+$env:APP_ENABLE_WINDOWS_MCP = "1"
 $env:PYTHONUTF8 = "1"
 # Prefer the project venv so Ctrl+C goes to Python (not a uv wrapper); fallback to uv run.
 $venvPy = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"

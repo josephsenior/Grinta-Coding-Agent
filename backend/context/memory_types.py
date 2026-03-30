@@ -40,7 +40,7 @@ class Decision:
     alternatives_considered: list[str] = field(default_factory=list)
     confidence: float = 1.0  # 0-1
     tier: MemoryTier = MemoryTier.WORKING
-    anchor: bool = False  # Should this be anchored (never forgotten)?
+    anchor: bool = False  # Should this be anchored (never pruned)?
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -76,7 +76,7 @@ class Decision:
 
 @dataclass
 class ContextAnchor:
-    """Critical information that should never be forgotten."""
+    """Critical information that should never be pruned."""
 
     anchor_id: str
     content: str

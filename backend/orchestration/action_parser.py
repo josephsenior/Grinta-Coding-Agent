@@ -1,4 +1,4 @@
-"""Abstract interfaces for parsing LLM responses into Forge actions."""
+"""Abstract interfaces for parsing LLM responses into App actions."""
 
 from abc import ABC, abstractmethod
 from typing import Any
@@ -19,7 +19,7 @@ class ActionParseError(Exception):
 
 
 class ResponseParser(ABC):
-    """Common interface for converting LLM responses into Forge actions."""
+    """Common interface for converting LLM responses into App actions."""
 
     def __init__(self) -> None:
         """Initialize the parser with an empty list of action parsers."""

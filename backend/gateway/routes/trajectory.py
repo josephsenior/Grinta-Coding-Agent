@@ -1,13 +1,13 @@
-﻿"""Routes for exporting or inspecting conversation event trajectories."""
+﻿"""Routes for exporting or inspecting conversation transcripts."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, status
 from fastapi.responses import JSONResponse
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.gateway.route_dependencies import get_dependencies
-from backend.gateway.services.trajectory_service import export_trajectory
+from backend.gateway.services.trajectory_service import export_transcript
 from backend.gateway.session.conversation import ServerConversation
 from backend.gateway.session.session_contract import normalize_replay_cursor
 from backend.gateway.utils import get_conversation
@@ -33,7 +33,7 @@ async def get_trajectory(
     ] = None,
     conversation: ServerConversation = Depends(get_conversation),
 ) -> JSONResponse:
-    """Get trajectory history for a conversation.
+    """Get transcript history for a conversation.
 
     Supports optional pagination via ``since_id`` (for reconnection-based
     delta fetches) and ``limit`` (cap returned events).
@@ -44,16 +44,21 @@ async def get_trajectory(
     cursor = normalize_replay_cursor(since_id=since_id, limit=limit)
 
     logger.info(
-        "Returning trajectory for %s (start_id=%s, limit=%s)",
+        "Returning transcript for %s (start_id=%s, limit=%s)",
         conversation_id,
         cursor.start_id,
         cursor.limit,
     )
 
-    trajectory = export_trajectory(conversation=conversation, cursor=cursor)
+    transcript = export_transcript(conversation=conversation, cursor=cursor)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"trajectory": trajectory},
+        content={"transcript": transcript, "trajectory": transcript},
     )
+
+
+get_transcript = get_trajectory
+
+__all__ = ["router", "get_trajectory", "get_transcript"]
 

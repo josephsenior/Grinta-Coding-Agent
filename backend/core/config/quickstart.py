@@ -1,4 +1,4 @@
-"""Quick-start configuration generator for new Forge users.
+"""Quick-start configuration generator for new App users.
 
 Generates a minimal ``settings.json`` with only the settings that matter
 on day one.  Every other knob inherits sensible defaults.
@@ -56,7 +56,7 @@ def generate_quickstart_config(
 
 def _interactive_init(dest: Path) -> None:
     """Walk the user through creating a minimal config file."""
-    print("\n🚀 Forge Quick-Start Configuration")
+    print("\n🚀 App Quick-Start Configuration")
     print("=" * 60)
 
     # 1. Detect local models
@@ -108,7 +108,7 @@ def _interactive_init(dest: Path) -> None:
 
     print(f"\n✅ Configuration saved to {dest}")
     print(f"📁 Workspace initialized at {dest.parent}/workspace/")
-    print("\n👉 To start, run: uv run forge serve\n")
+    print("\n👉 To start, run: uv run app serve\n")
 
 
 # ------------------------------------------------------------------ #
@@ -119,7 +119,7 @@ def _interactive_init(dest: Path) -> None:
 def main() -> None:
     """CLI entry-point: ``python -m backend.core.config.quickstart``."""
     # Determine project root (where settings.json lives)
-    project_root = Path(os.environ.get("FORGE_PROJECT_ROOT", Path.cwd()))
+    project_root = Path(os.environ.get("APP_PROJECT_ROOT", Path.cwd()))
     dest = project_root / "settings.json"
     _interactive_init(dest)
 

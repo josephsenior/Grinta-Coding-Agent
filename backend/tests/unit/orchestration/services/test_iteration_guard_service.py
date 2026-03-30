@@ -95,7 +95,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(result)
 
-    @patch.dict("os.environ", {"FORGE_GRACEFUL_SHUTDOWN": "0"})
+    @patch.dict("os.environ", {"APP_GRACEFUL_SHUTDOWN": "0"})
     def test_graceful_shutdown_disabled_from_env(self):
         """Test _graceful_shutdown_enabled reads from env var."""
         self.mock_controller.agent_config = None
@@ -104,7 +104,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(result)
 
-    @patch.dict("os.environ", {"FORGE_GRACEFUL_SHUTDOWN": "1"})
+    @patch.dict("os.environ", {"APP_GRACEFUL_SHUTDOWN": "1"})
     def test_graceful_shutdown_enabled_from_env(self):
         """Test _graceful_shutdown_enabled defaults to enabled."""
         self.mock_controller.agent_config = None

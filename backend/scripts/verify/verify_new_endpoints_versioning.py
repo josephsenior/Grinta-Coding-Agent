@@ -24,7 +24,7 @@ NEW_ENDPOINTS = [
 
 
 def main():
-    app_py = project_root / "forge" / "server" / "app.py"
+    app_py = project_root / "app" / "server" / "app.py"
     content = app_py.read_text(encoding="utf-8")
 
     print("Verifying new endpoints are registered with versioning...\n")

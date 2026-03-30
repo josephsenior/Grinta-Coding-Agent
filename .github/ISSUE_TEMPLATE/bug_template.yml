@@ -1,5 +1,5 @@
 name: Bug
-description: Report a problem with Forge
+description: Report a problem with App
 title: '[Bug]: '
 labels: ['bug']
 body:
@@ -28,22 +28,22 @@ body:
   - type: dropdown
     id: installation
     attributes:
-      label: Forge Installation
-      description: How are you running Forge?
+      label: App Installation
+      description: How are you running App?
       options:
         - Docker command in README
         - GitHub resolver
         - Development workflow
         - CLI
-        - app.forge.dev
+        - app.app.dev
         - Other
       default: 0
 
   - type: input
-    id: Forge-version
+    id: App-version
     attributes:
-      label: Forge Version
-      description: What version of Forge are you using?
+      label: App Version
+      description: What version of App are you using?
       placeholder: ex. 0.9.8, main, etc.
 
   - type: input

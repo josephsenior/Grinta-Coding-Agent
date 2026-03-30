@@ -63,10 +63,10 @@ UNINITIALIZED_PROMPT_MANAGER = _UninitializedPromptManager()
 """Module-level sentinel instance — import this instead of duplicating the class."""
 
 
-def _content_has_forge_identity(content: str) -> bool:
-    """True when the rendered system prompt already identifies as Forge (skip duplicate prefix)."""
+def _content_has_app_identity(content: str) -> bool:
+    """True when the rendered system prompt already identifies as App (skip duplicate prefix)."""
     head = content.lstrip()[:80].lower()
-    return head.startswith("you are forge")
+    return head.startswith("you are app")
 
 
 class PromptManager:
@@ -256,7 +256,7 @@ class OrchestratorPromptManager(PromptManager):
     with a proper override, preserving type-safety and IDE navigability.
     """
 
-    _IDENTITY_PREFIX = "You are Forge agent.\n"
+    _IDENTITY_PREFIX = "You are App agent.\n"
 
     def __init__(
         self,
@@ -265,27 +265,27 @@ class OrchestratorPromptManager(PromptManager):
         *,
         config: object | None = None,
         resolved_llm_model_id: str | None = None,
-        forge_config: object | None = None,
+        app_config: object | None = None,
     ) -> None:
         super().__init__(prompt_dir, system_prompt_filename)
         self._config = config
-        # Runtime-resolved model id (ForgeConfig + user settings live on LLMRegistry; AgentConfig often only references "llm").
+        # Runtime-resolved model id (AppConfig + user settings live on LLMRegistry; AgentConfig often only references "llm").
         self._resolved_llm_model_id = (resolved_llm_model_id or "").strip()
-        self._forge_config = forge_config
+        self._app_config = app_config
         # Populated dynamically by the orchestrator after MCP tools connect
         self.mcp_tool_names: list[str] = []
         self.mcp_tool_descriptions: dict[str, str] = {}
-        # Per-server usage_hint lines from Forge MCP config (see MCPServerConfig.usage_hint)
+        # Per-server usage_hint lines from app MCP config (see MCPServerConfig.usage_hint)
         self.mcp_server_hints: list[dict[str, str]] = []
 
     def _active_llm_model_id(self) -> str:
         """Model id for self-identification in the system prompt."""
         if self._resolved_llm_model_id:
             return self._resolved_llm_model_id
-        if self._forge_config is not None and self._config is not None:
+        if self._app_config is not None and self._config is not None:
             try:
                 llm_cfg = getattr(
-                    self._forge_config,
+                    self._app_config,
                     "get_llm_config_from_agent_config",
                     None,
                 )
@@ -313,8 +313,8 @@ class OrchestratorPromptManager(PromptManager):
         context.setdefault("mcp_server_hints", self.mcp_server_hints)
         context.setdefault("active_llm_model", self._active_llm_model_id())
         content = super().get_system_message(**context)
-        # Avoid duplicating identity: system_prompt.j2 already opens with "You are Forge, ..."
-        if not _content_has_forge_identity(content):
+        # Avoid duplicating identity: system_prompt.j2 already opens with the app identity.
+        if not _content_has_app_identity(content):
             content = self._IDENTITY_PREFIX + content
         content = self._inject_scratchpad(content)
         tier = getattr(self, "_prompt_tier", "base")
@@ -323,14 +323,14 @@ class OrchestratorPromptManager(PromptManager):
         return content
 
     def _inject_lessons_learned(self, content: str) -> str:
-        """Inject lessons learned from .Forge/lessons.md into the system prompt."""
+        """Inject lessons learned from .app/lessons.md into the system prompt."""
         try:
             from backend.core.workspace_resolution import get_effective_workspace_root
 
             root = get_effective_workspace_root()
             if root is None:
                 return content
-            lessons_path = root / ".Forge" / "lessons.md"
+            lessons_path = root / ".app" / "lessons.md"
             if not lessons_path.is_file():
                 lessons_path = root / "memories" / "repo" / "lessons.md"
                 if not lessons_path.is_file():

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.async_event_store_wrapper import AsyncEventStoreWrapper
 from backend.ledger.event_filter import EventFilter
 from backend.ledger.serialization import event_to_dict

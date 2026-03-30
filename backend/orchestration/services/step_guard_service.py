@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 
@@ -18,6 +18,9 @@ if TYPE_CHECKING:
 
 def _pending_action_for_observation_cause(controller) -> object | None:
     """Current pending action (if any) for correlating guard observations."""
+    svc = getattr(controller, "open_operation_service", None)
+    if svc is not None:
+        return svc.get()
     svc = getattr(controller, "pending_action_service", None)
     if svc is not None:
         return svc.get()

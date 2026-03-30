@@ -8,7 +8,7 @@ import pytest
 
 from backend.engine.memory_manager import (
     CondensedHistory,
-    ConversationMemoryManager,
+    ContextMemoryManager,
 )
 from backend.ledger.event import Event
 
@@ -17,9 +17,9 @@ from backend.ledger.event import Event
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
 
-def _make_config(condenser_config=None) -> MagicMock:
+def _make_config(compactor_config=None) -> MagicMock:
     cfg = MagicMock()
-    cfg.condenser_config = condenser_config
+    cfg.compactor_config = compactor_config
     return cfg
 
 
@@ -27,9 +27,9 @@ def _make_llm_registry() -> MagicMock:
     return MagicMock()
 
 
-def _make_manager(condenser_config=None) -> ConversationMemoryManager:
-    return ConversationMemoryManager(
-        config=_make_config(condenser_config=condenser_config),
+def _make_manager(compactor_config=None) -> ContextMemoryManager:
+    return ContextMemoryManager(
+        config=_make_config(compactor_config=compactor_config),
         llm_registry=_make_llm_registry(),
     )
 
@@ -80,58 +80,58 @@ class TestCondensedHistory:
 
 
 # ---------------------------------------------------------------------------
-# ConversationMemoryManager.__init__
+# ContextMemoryManager.__init__
 # ---------------------------------------------------------------------------
 
-class TestConversationMemoryManagerInit:
+class TestContextMemoryManagerInit:
     def test_conversation_memory_none_initially(self):
         m = _make_manager()
         assert m.conversation_memory is None
 
-    def test_condenser_none_initially(self):
+    def test_compactor_none_initially(self):
         m = _make_manager()
-        assert m.condenser is None
+        assert m.compactor is None
 
     def test_config_and_registry_stored(self):
         cfg = _make_config()
         reg = _make_llm_registry()
-        m = ConversationMemoryManager(config=cfg, llm_registry=reg)
+        m = ContextMemoryManager(config=cfg, llm_registry=reg)
         assert m._config is cfg
         assert m._llm_registry is reg
 
 
 # ---------------------------------------------------------------------------
-# initialize and _init_condenser
+# initialize and _init_compactor
 # ---------------------------------------------------------------------------
 
 class TestInitialize:
     def test_initialize_creates_conversation_memory(self):
         m = _make_manager()
         pm = MagicMock()
-        with patch("backend.engine.memory_manager.ConversationMemory") as MockCM:
+        with patch("backend.engine.memory_manager.ContextMemory") as MockCM:
             MockCM.return_value = MagicMock(name="conv_mem")
             m.initialize(pm)
         assert m.conversation_memory is not None
 
-    def test_initialize_no_condenser_config_leaves_condenser_none(self):
-        m = _make_manager(condenser_config=None)
+    def test_initialize_no_compactor_config_leaves_compactor_none(self):
+        m = _make_manager(compactor_config=None)
         pm = MagicMock()
-        with patch("backend.engine.memory_manager.ConversationMemory"):
+        with patch("backend.engine.memory_manager.ContextMemory"):
             m.initialize(pm)
-        assert m.condenser is None
+        assert m.compactor is None
 
-    def test_initialize_with_condenser_config_creates_condenser(self):
-        condenser_config = MagicMock()
-        m = _make_manager(condenser_config=condenser_config)
+    def test_initialize_with_compactor_config_creates_compactor(self):
+        compactor_config = MagicMock()
+        m = _make_manager(compactor_config=compactor_config)
         pm = MagicMock()
-        fake_condenser = MagicMock()
+        fake_compactor = MagicMock()
         with (
-            patch("backend.engine.memory_manager.ConversationMemory"),
-            patch("backend.engine.memory_manager.Condenser") as MockCondenser,
+            patch("backend.engine.memory_manager.ContextMemory"),
+            patch("backend.engine.memory_manager.Compactor") as MockCompactor,
         ):
-            MockCondenser.from_config.return_value = fake_condenser
+            MockCompactor.from_config.return_value = fake_compactor
             m.initialize(pm)
-        assert m.condenser is fake_condenser
+        assert m.compactor is fake_compactor
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ class TestCondenseHistory:
         state.extra_data = {}
         return state
 
-    def test_no_condenser_returns_all_history(self):
+    def test_no_compactor_returns_all_history(self):
         m = _make_manager()
         events = [MagicMock(), MagicMock()]
         state = self._make_state_with_history(events)
@@ -154,31 +154,31 @@ class TestCondenseHistory:
         assert result.events == events
         assert result.pending_action is None
 
-    def test_condenser_view_result_returns_view_events(self):
+    def test_compactor_view_result_returns_view_events(self):
         m = _make_manager()
         from backend.context.view import View
 
-        mock_condenser = MagicMock()
+        mock_compactor = MagicMock()
         view = MagicMock(spec=View)
         view.events = cast(list[Event], [MagicMock(), MagicMock()])
-        mock_condenser.condensed_history.return_value = view
-        m.condenser = mock_condenser
+        mock_compactor.compacted_history.return_value = view
+        m.compactor = mock_compactor
 
         state = self._make_state_with_history()
         result = m.condense_history(state)
         assert result.events == view.events
         assert result.pending_action is None
 
-    def test_condenser_non_view_result_returns_action(self):
+    def test_compactor_non_view_result_returns_action(self):
         m = _make_manager()
 
-        mock_condenser = MagicMock()
+        mock_compactor = MagicMock()
         condensation = MagicMock()
         # Not a View instance → will reach the else branch
         cast(Any, condensation).__class__ = object  # NOT a View
         condensation.action = MagicMock(name="action")
-        mock_condenser.condensed_history.return_value = condensation
-        m.condenser = mock_condenser
+        mock_compactor.compacted_history.return_value = condensation
+        m.compactor = mock_compactor
 
         state = self._make_state_with_history()
         result = m.condense_history(state)
@@ -189,11 +189,11 @@ class TestCondenseHistory:
         m = _make_manager()
         from backend.context.view import View
 
-        mock_condenser = MagicMock()
+        mock_compactor = MagicMock()
         view = MagicMock(spec=View)
         view.events = []
-        mock_condenser.condensed_history.return_value = view
-        m.condenser = mock_condenser
+        mock_compactor.compacted_history.return_value = view
+        m.compactor = mock_compactor
 
         state = self._make_state_with_history()
         state.extra_data = {}  # no memory_pressure key

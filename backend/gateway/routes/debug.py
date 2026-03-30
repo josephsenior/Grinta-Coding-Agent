@@ -2,7 +2,7 @@
 
 Exposes internal session diagnostics: controller state, memory pressure,
 rate governor stats, circuit breaker status, replay state, and event
-stream metrics.  Only enabled when ``FORGE_DEBUG=true`` or in development.
+stream metrics.  Only enabled when ``APP_DEBUG=true`` or in development.
 
 Endpoint: ``GET /api/debug/session/{session_id}``
 """
@@ -16,11 +16,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 router = APIRouter(prefix="/api/v1/debug", tags=["debug"])
 
-_DEBUG_ENABLED = os.getenv("FORGE_DEBUG", "false").lower() in ("true", "1", "yes")
+_DEBUG_ENABLED = os.getenv("APP_DEBUG", "false").lower() in ("true", "1", "yes")
 
 
 def _collect_controller_snapshot(controller: Any) -> dict[str, Any]:
@@ -100,7 +100,7 @@ async def session_debug(session_id: str) -> JSONResponse:
     if not _DEBUG_ENABLED:
         raise HTTPException(
             status_code=403,
-            detail="Debug endpoint disabled. Set FORGE_DEBUG=true to enable.",
+            detail="Debug endpoint disabled. Set APP_DEBUG=true to enable.",
         )
 
     try:
@@ -135,7 +135,7 @@ async def list_debug_sessions() -> JSONResponse:
     if not _DEBUG_ENABLED:
         raise HTTPException(
             status_code=403,
-            detail="Debug endpoint disabled. Set FORGE_DEBUG=true to enable.",
+            detail="Debug endpoint disabled. Set APP_DEBUG=true to enable.",
         )
 
     try:

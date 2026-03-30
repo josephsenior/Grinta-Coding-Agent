@@ -1,4 +1,4 @@
-"""MCP Proxy Manager for forge.
+"""MCP Proxy Manager for app.
 
 This module provides a manager class for handling FastMCP proxy instances,
 including initialization, configuration, and mounting to FastAPI applications.

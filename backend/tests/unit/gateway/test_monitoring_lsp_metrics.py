@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from backend.gateway.routes.monitoring import router as monitoring_router
 from backend.gateway.routes.monitoring import monitoring_helpers
+from backend.gateway.routes.monitoring.metrics import _get_lsp_metrics_event_limit
 from backend.ledger.observation.error import ErrorObservation
 
 
@@ -123,3 +124,15 @@ def test_main_metrics_includes_nested_lsp_metrics(monkeypatch):
     assert lsp["failure_rate"] == 0.5
     assert lsp["latency_ms"]["min"] == 15.0
     assert lsp["latency_ms"]["max"] == 45.0
+
+
+def test_get_lsp_metrics_event_limit_reads_app_env(monkeypatch):
+    monkeypatch.setenv("APP_LSP_METRICS_EVENT_LIMIT", "120")
+
+    assert _get_lsp_metrics_event_limit() == 120
+
+
+def test_get_lsp_metrics_event_limit_enforces_minimum(monkeypatch):
+    monkeypatch.setenv("APP_LSP_METRICS_EVENT_LIMIT", "10")
+
+    assert _get_lsp_metrics_event_limit() == 50

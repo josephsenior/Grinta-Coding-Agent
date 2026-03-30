@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from backend.core.message import TextContent
 
 from backend.context.observation_processors import (
     _get_observation_content,
@@ -120,7 +121,9 @@ class TestConvertObservation:
 
         msg = convert_observation_to_message(obs, max_message_chars=None)
 
-        text = msg.content[0].text
+        content = msg.content[0]
+        assert isinstance(content, TextContent)
+        text = content.text
         assert "summary" in text
         assert "SCRATCHPAD" in text
         assert "WORKING_MEMORY" in text

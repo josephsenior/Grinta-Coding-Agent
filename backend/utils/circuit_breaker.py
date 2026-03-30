@@ -25,10 +25,10 @@ class CircuitBreaker:
         self.lock = asyncio.Lock()
         self.state = _BreakerState()
         # Config
-        self.failure_threshold = int(os.getenv("FORGE_CB_FAILURE_THRESHOLD", "3"))
-        self.base_open_seconds = float(os.getenv("FORGE_CB_BASE_OPEN_SECONDS", "2"))
-        self.max_open_seconds = float(os.getenv("FORGE_CB_MAX_OPEN_SECONDS", "60"))
-        self.half_open_probes = int(os.getenv("FORGE_CB_HALF_OPEN_PROBES", "1"))
+        self.failure_threshold = int(os.getenv("APP_CB_FAILURE_THRESHOLD", "3"))
+        self.base_open_seconds = float(os.getenv("APP_CB_BASE_OPEN_SECONDS", "2"))
+        self.max_open_seconds = float(os.getenv("APP_CB_MAX_OPEN_SECONDS", "60"))
+        self.half_open_probes = int(os.getenv("APP_CB_HALF_OPEN_PROBES", "1"))
 
     async def async_call(self, fn: Callable[[], Awaitable]):
         """Execute fn under breaker control."""

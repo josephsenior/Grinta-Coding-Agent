@@ -75,7 +75,7 @@ def test_sentry():
 
             # Send a test error
             try:
-                raise ValueError("This is a test error from Forge backup script")
+                raise ValueError("This is a test error from App backup script")
             except Exception as e:
                 capture_exception(e)
 

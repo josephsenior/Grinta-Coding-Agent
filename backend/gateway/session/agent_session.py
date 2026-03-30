@@ -15,14 +15,14 @@ from backend.orchestration import SessionOrchestrator
 from backend.orchestration.orchestration_config import OrchestrationConfig
 from backend.orchestration.replay import ReplayManager
 from backend.orchestration.state.state import State
-from backend.core.config import AgentConfig, ForgeConfig, LLMConfig
+from backend.core.config import AgentConfig, AppConfig, LLMConfig
 from backend.core.enums import ErrorCategory
 from backend.core.errors import (
     RuntimeConnectError,
     SessionAlreadyActiveError,
     SessionStartupError,
 )
-from backend.core.logger import ForgeLoggerAdapter
+from backend.core.logger import AppLoggerAdapter
 from backend.core.schemas import AgentState
 from backend.ledger.action import ChangeAgentStateAction, MessageAction
 from backend.ledger.event import Event, EventSource
@@ -177,7 +177,7 @@ class AgentSession:
         self.file_store = file_store
         self._status_callback = status_callback
         self.user_id = user_id
-        self.logger = ForgeLoggerAdapter(extra={"session_id": sid, "user_id": user_id})
+        self.logger = AppLoggerAdapter(extra={"session_id": sid, "user_id": user_id})
         self.llm_registry = llm_registry
         self.conversation_stats = conversation_stats
         self._runtime_acquire_result: RuntimeAcquireResult | None = None
@@ -193,7 +193,7 @@ class AgentSession:
     async def start(
         self,
         runtime_name: str,
-        config: ForgeConfig,
+        config: AppConfig,
         agent: Agent,
         max_iterations: int,
         vcs_provider_tokens: ProviderTokenType | None = None,
@@ -748,7 +748,7 @@ class AgentSession:
         initial_message: MessageAction | None,
         replay_json: str,
         agent: Agent,
-        config: ForgeConfig,
+        config: AppConfig,
         max_iterations: int,
         max_budget_per_task: float | None,
         agent_to_llm_config: dict[str, LLMConfig] | None,
@@ -835,7 +835,7 @@ class AgentSession:
         if self.runtime is None:
             msg = "Runtime must be initialized before the agent controller"
             raise SessionStartupError(msg)
-        msg = f"\n--------------------------------- Forge Configuration ---------------------------------\nLLM: {
+        msg = f"\n--------------------------------- App Configuration ---------------------------------\nLLM: {
             agent.llm.config.model
         }\nBase URL: {agent.llm.config.base_url}\nAgent: {agent.name}\nRuntime: {
             self.runtime.__class__.__name__

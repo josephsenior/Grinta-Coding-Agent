@@ -5,7 +5,11 @@ from __future__ import annotations
 import threading
 from unittest.mock import MagicMock, patch
 
-from backend.gateway.app_state import AppState, _close_and_clear
+from backend.gateway.app_state import (
+    AppState,
+    _close_and_clear,
+    _get_socketio_cors_origins,
+)
 
 
 def _bare_app_state() -> AppState:
@@ -87,3 +91,21 @@ def test_close_and_clear_swallows_close_errors() -> None:
             raise OSError("no")
 
     _close_and_clear(Bad(), "bad")  # errors logged at debug, must not raise
+
+
+def test_get_socketio_cors_origins_defaults_to_wildcard(monkeypatch) -> None:
+    monkeypatch.delenv("APP_CORS_ORIGINS", raising=False)
+
+    assert _get_socketio_cors_origins() == "*"
+
+
+def test_get_socketio_cors_origins_reads_app_env(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "APP_CORS_ORIGINS",
+        "https://example.com, https://app.example.com",
+    )
+
+    assert _get_socketio_cors_origins() == [
+        "https://example.com",
+        "https://app.example.com",
+    ]

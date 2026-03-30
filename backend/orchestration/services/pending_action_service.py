@@ -9,7 +9,7 @@ import time
 from typing import TYPE_CHECKING
 
 from backend.core.constants import MCP_PENDING_ACTION_TIMEOUT_FLOOR
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger import EventSource
 from backend.ledger.action import Action
 from backend.ledger.observation import ErrorObservation
@@ -26,7 +26,7 @@ class PendingActionService:
         self._context = context
         self._timeout = timeout
         self._pending: tuple[Action, float] | None = None
-        self._watchdog_handle: asyncio.TimerHandle | None = None
+        self._watchdog_handle: asyncio.TimerHandle | threading.Timer | None = None
         self._watchdog_delay_s: float = timeout + 2
 
     @staticmethod
@@ -196,3 +196,8 @@ class PendingActionService:
         if self._watchdog_handle is not None:
             self._watchdog_handle.cancel()
             self._watchdog_handle = None
+
+
+OpenOperationService = PendingActionService
+
+__all__ = ["PendingActionService", "OpenOperationService"]

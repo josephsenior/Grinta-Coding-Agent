@@ -1,4 +1,4 @@
-﻿"""Command-line entrypoint for launching the Forge server with Uvicorn."""
+﻿"""Command-line entrypoint for launching the App server with Uvicorn."""
 
 import os
 import warnings
@@ -7,7 +7,7 @@ import uvicorn
 
 
 def main() -> None:
-    """Start the Forge server with optimized configuration.
+    """Start the App server with optimized configuration.
 
     This function initializes and runs the uvicorn server with performance
     optimizations for development and production environments.

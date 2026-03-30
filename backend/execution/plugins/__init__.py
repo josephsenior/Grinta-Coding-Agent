@@ -1,11 +1,11 @@
 ﻿"""Runtime plugin registration and convenience exports.
 
-.. note:: **Two plugin systems exist in Forge:**
+.. note:: **Two plugin systems exist in App:**
 
    * :mod:`backend.core.plugin` — *core hooks* (host-side, lifecycle hooks,
-     entry-point group ``forge.plugins``).
+     entry-point group ``app.plugins``).
     * **This module** — *runtime plugins* (run inside the runtime process,
-     entry-point group ``forge.runtime_plugins``).
+     entry-point group ``app.runtime_plugins``).
 
    They are intentionally separate.  See :mod:`backend.core.plugin` module
    docstring for a comparison table.
@@ -16,15 +16,15 @@ Plugins are registered via two mechanisms:
 
 1. **Built-in registry** — ``ALL_PLUGINS`` dict below (hardcoded).
 2. **Entry-point discovery** — third-party packages can declare a
-   ``forge.runtime_plugins`` entry point group to be auto-discovered::
+   ``app.runtime_plugins`` entry point group to be auto-discovered::
 
-       [project.entry-points."forge.runtime_plugins"]
+       [project.entry-points."app.runtime_plugins"]
        my_plugin = "my_package.plugin:MyPlugin"
 
    The entry point value must be a callable that returns a ``Plugin``
    instance.
 
-Enable / disable plugins via the ``FORGE_PLUGINS`` env variable
+Enable / disable plugins via the ``APP_PLUGINS`` env variable
 (comma-separated allowlist) or programmatically via
 ``filter_plugins_by_config()``.
 """
@@ -35,7 +35,7 @@ import importlib.metadata
 import os
 from collections.abc import Callable
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.execution.plugins.agent_skills import (
     AgentSkillsPlugin,
     AgentSkillsRequirement,
@@ -69,14 +69,14 @@ ALL_PLUGINS: dict[str, Callable[[], Plugin]] = {
 # ------------------------------------------------------------------
 # Entry-point auto-discovery
 # ------------------------------------------------------------------
-_EP_GROUP = "forge.runtime_plugins"
+_EP_GROUP = "app.runtime_plugins"
 
 
 def discover_plugins() -> dict[str, Callable[[], Plugin]]:
     """Merge built-in and entry-point-discovered plugins.
 
     Third-party packages register via
-    ``[project.entry-points."forge.runtime_plugins"]``.
+    ``[project.entry-points."app.runtime_plugins"]``.
     Conflicts are logged and the built-in version wins.
     """
     merged: dict[str, Callable[[], Plugin]] = dict(ALL_PLUGINS)
@@ -115,13 +115,13 @@ def discover_plugins() -> dict[str, Callable[[], Plugin]]:
 def filter_plugins_by_config(
     plugins: list[PluginRequirement],
 ) -> list[PluginRequirement]:
-    """Filter plugins against the ``FORGE_PLUGINS`` env allowlist.
+    """Filter plugins against the ``APP_PLUGINS`` env allowlist.
 
     If the env var is unset or empty, all plugins pass through (opt-out model).
     Otherwise, only plugins whose ``name`` appears in the comma-separated
     allowlist are kept.
     """
-    raw = os.getenv("FORGE_PLUGINS", "").strip()
+    raw = os.getenv("APP_PLUGINS", "").strip()
     if not raw:
         return plugins  # no filter — all enabled
 
@@ -130,7 +130,7 @@ def filter_plugins_by_config(
     disabled = [p.name for p in plugins if p.name.lower() not in allowed]
     if disabled:
         logger.info(
-            "Plugins disabled by FORGE_PLUGINS allowlist: %s",
+            "Plugins disabled by APP_PLUGINS allowlist: %s",
             ", ".join(disabled),
         )
     return filtered

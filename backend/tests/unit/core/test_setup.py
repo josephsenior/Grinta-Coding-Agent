@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.execution.plugins.requirement import PluginRequirement
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.bootstrap.setup import (
     filter_plugins_by_config,
     generate_sid,
@@ -21,11 +21,11 @@ from backend.core.bootstrap.setup import (
 
 
 def test_generate_sid():
-    sid1 = generate_sid(ForgeConfig(), "session1")
+    sid1 = generate_sid(AppConfig(), "session1")
     assert len(sid1) <= 32
     assert "session1" in sid1
 
-    sid2 = generate_sid(ForgeConfig(), "a" * 50)
+    sid2 = generate_sid(AppConfig(), "a" * 50)
     assert len(sid2) == 32
     assert sid2.startswith("a" * 16)
 
@@ -42,12 +42,12 @@ def test_filter_plugins_by_config():
     mock_agent = MagicMock()
     mock_agent.config.disabled_plugins = ["plugin1"]
     # Patch the logger in the core module to ensure it's captured
-    with patch("backend.core.logger.forge_logger.info") as mock_info:
+    with patch("backend.core.logger.app_logger.info") as mock_info:
         assert filter_plugins_by_config(plugins, agent=mock_agent) == []
         mock_info.assert_called()
 
     # Config with agent class name
-    mock_config = MagicMock(spec=ForgeConfig)
+    mock_config = MagicMock(spec=AppConfig)
     mock_agent_config = MagicMock()
     mock_agent_config.disabled_plugins = ["plugin1"]
     mock_config.get_agent_config.return_value = mock_agent_config
@@ -55,6 +55,17 @@ def test_filter_plugins_by_config():
         filter_plugins_by_config(plugins, config=mock_config, agent_cls_name="MyAgent")
         == []
     )
+
+
+def test_filter_plugins_by_config_honors_app_plugins_env():
+    plugin1 = MagicMock(spec=PluginRequirement)
+    plugin1.name = "plugin1"
+    plugin2 = MagicMock(spec=PluginRequirement)
+    plugin2.name = "plugin2"
+    plugins: list[PluginRequirement] = [plugin1, plugin2]
+
+    with patch.dict("os.environ", {"APP_PLUGINS": "plugin1"}, clear=False):
+        assert filter_plugins_by_config(plugins) == [plugin1]
 
 
 @patch("backend.orchestration.agent.Agent.get_cls")
@@ -71,7 +82,7 @@ def test_ensure_agent_class_available_success(mock_get_cls):
 def test_create_runtime_sid_from_stream(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
 ):
-    mock_config = MagicMock(spec=ForgeConfig)
+    mock_config = MagicMock(spec=AppConfig)
     mock_config.runtime = "docker"
     mock_config.default_agent = "agent"
 
@@ -102,7 +113,7 @@ def test_create_runtime_sid_from_stream(
 def test_create_runtime(
     mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
 ):
-    mock_config = MagicMock(spec=ForgeConfig)
+    mock_config = MagicMock(spec=AppConfig)
     mock_config.file_store = "memory"
     mock_config.local_data_root = "/tmp"
     mock_config.runtime = "docker"
@@ -141,7 +152,7 @@ def test_create_controller(mock_controller_cls, mock_restore):
     mock_runtime.event_stream.file_store = MagicMock()
     mock_runtime.security_analyzer = MagicMock()
 
-    mock_config = MagicMock(spec=ForgeConfig)
+    mock_config = MagicMock(spec=AppConfig)
     mock_config.max_iterations = 10
     mock_config.max_budget_per_task = 100
     mock_config.pending_action_timeout = 60.0
@@ -179,7 +190,7 @@ def test_create_memory_extended():
 @patch("backend.core.bootstrap.setup.importlib.import_module")
 @patch("backend.orchestration.agent.Agent.get_cls")
 def test_create_agent_retry(mock_get_cls, mock_import):
-    mock_config = MagicMock(spec=ForgeConfig)
+    mock_config = MagicMock(spec=AppConfig)
     mock_config.default_agent = "my_agent"
     mock_config.get_agent_config.return_value = MagicMock()
 
@@ -199,7 +210,7 @@ def test_create_agent_retry(mock_get_cls, mock_import):
 
     llm_registry = MagicMock()
     create_agent(mock_config, llm_registry)
-    mock_import.assert_called_with("forge.engine")
+    mock_import.assert_called_with("app.engine")
 
 
 @patch("backend.orchestration.agent.Agent.get_cls")

@@ -1,4 +1,4 @@
-"""Utilities and models for loading and instantiating Forge playbooks."""
+"""Utilities and models for loading and instantiating App playbooks."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import frontmatter
 from pydantic import BaseModel, ValidationError
 
 from backend.core.errors import PlaybookValidationError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.playbooks.engine.types import InputMetadata, PlaybookMetadata, PlaybookType
 
 
@@ -332,7 +332,7 @@ class KnowledgePlaybook(BasePlaybook):
 class RepoPlaybook(BasePlaybook):
     """Playbook specialized for repository-specific knowledge and guidelines.
 
-    RepoPlaybooks are loaded from `.Forge/playbooks/repo.md` files within repositories
+    RepoPlaybooks are loaded from `.app/playbooks/repo.md` files within repositories
     and contain private, repository-specific instructions that are automatically loaded when
     working with that repository. They are ideal for:
         - Repository-specific guidelines
@@ -491,7 +491,7 @@ def load_playbooks_from_dir(
     """Load all playbooks from the given directory.
 
     Args:
-        playbook_dir: Path to the playbooks directory (e.g. .Forge/playbooks)
+        playbook_dir: Path to the playbooks directory (e.g. .app/playbooks)
 
     Returns:
         tuple[dict[str, RepoPlaybook], dict[str, KnowledgePlaybook]]: Tuple of (repo_agents, knowledge_agents) dictionaries

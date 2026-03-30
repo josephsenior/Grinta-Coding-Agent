@@ -72,7 +72,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         mock_pipeline = MagicMock()
         mock_pipeline.run_verify = AsyncMock()
         mock_pipeline.run_execute = AsyncMock()
-        self.mock_controller.tool_pipeline = mock_pipeline
+        self.mock_controller.operation_pipeline = mock_pipeline
         # Override default cost for this specific test
         self.mock_controller.conversation_stats.get_combined_metrics.return_value.accumulated_cost = 10.5
 
@@ -108,7 +108,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
 
         mock_pipeline = MagicMock()
         mock_pipeline.run_verify = AsyncMock(side_effect=set_blocked)
-        self.mock_controller.tool_pipeline = mock_pipeline
+        self.mock_controller.operation_pipeline = mock_pipeline
 
         await self.service.run(mock_action, mock_ctx)
 
@@ -128,7 +128,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         mock_pipeline = MagicMock()
         mock_pipeline.run_verify = AsyncMock()
         mock_pipeline.run_execute = AsyncMock()
-        self.mock_controller.tool_pipeline = mock_pipeline
+        self.mock_controller.operation_pipeline = mock_pipeline
         self.mock_controller.telemetry_service = MagicMock()
 
         # Set blocked after verify
@@ -169,7 +169,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
             mock_ctx.blocked = True
 
         mock_pipeline.run_execute = AsyncMock(side_effect=set_blocked)
-        self.mock_controller.tool_pipeline = mock_pipeline
+        self.mock_controller.operation_pipeline = mock_pipeline
         self.mock_controller.telemetry_service = MagicMock()
 
         await self.service.run(mock_action, mock_ctx)
@@ -183,7 +183,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         mock_action.runnable = True
         mock_action.source = None
 
-        self.mock_controller.tool_pipeline = None
+        self.mock_controller.operation_pipeline = None
         self.mock_controller.event_stream = MagicMock()
         self.mock_controller.conversation_stats = MagicMock()
         self.mock_controller.conversation_stats.get_combined_metrics.return_value = (

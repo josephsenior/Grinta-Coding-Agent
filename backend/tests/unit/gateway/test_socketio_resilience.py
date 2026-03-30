@@ -1,7 +1,7 @@
 ﻿"""Tests for Socket.IO resilience improvements.
 
 Covers:
-- ForgeClient: exponential backoff config, offline queue, heartbeat, auto-rejoin
+- AppClient: exponential backoff config, offline queue, heartbeat, auto-rejoin
 - SocketIOConnectionManager: heartbeat tracking, stale connection cleanup
 """
 
@@ -117,27 +117,27 @@ class TestConnectionManagerQueueDelivery:
     async def test_deliver_queued_messages_success(self):
         mgr = self._make_manager()
         mgr.register_connection("sid-1")
-        mgr.queue_message("sid-1", "forge_event", {"data": "hello"})
+        mgr.queue_message("sid-1", "app_event", {"data": "hello"})
 
         sio = AsyncMock()
         delivered = await mgr.deliver_queued_messages("sid-1", sio)
         assert delivered == 1
-        sio.emit.assert_called_once_with("forge_event", {"data": "hello"}, room="sid-1")
+        sio.emit.assert_called_once_with("app_event", {"data": "hello"}, room="sid-1")
 
 
 # ---------------------------------------------------------------------------
-# ForgeClient resilience tests
+# AppClient resilience tests
 # ---------------------------------------------------------------------------
 
 
-class TestForgeClientResilience:
+class TestAppClientResilience:
     """Test client-side resilience features without real network."""
 
     def _make_client(self):
-        """Create a ForgeClient with mocked transports."""
-        from forge_client import ForgeClient
+        """Create an AppClient with mocked transports."""
+        from client import AppClient
 
-        client = ForgeClient.__new__(ForgeClient)
+        client = AppClient.__new__(AppClient)
         client.base_url = "http://localhost:3000"
         client._http = AsyncMock()
         client._sio = MagicMock()
@@ -160,7 +160,7 @@ class TestForgeClientResilience:
         await client.send_message("hello offline")
         assert len(client._offline_queue) == 1
         event, payload = client._offline_queue[0]
-        assert event == "forge_user_action"
+        assert event == "app_user_action"
         assert payload["args"]["content"] == "hello offline"
 
     @pytest.mark.asyncio
@@ -184,8 +184,8 @@ class TestForgeClientResilience:
     async def test_flush_offline_queue(self):
         client = self._make_client()
         client._sio.connected = True
-        client._offline_queue.append(("forge_user_action", {"action": "msg"}))
-        client._offline_queue.append(("forge_user_action", {"action": "msg2"}))
+        client._offline_queue.append(("app_user_action", {"action": "msg"}))
+        client._offline_queue.append(("app_user_action", {"action": "msg2"}))
 
         await client._flush_offline_queue()
         assert not client._offline_queue
@@ -196,7 +196,7 @@ class TestForgeClientResilience:
         client = self._make_client()
         client._sio.connected = True
         client._sio.emit = AsyncMock(side_effect=Exception("network error"))
-        client._offline_queue.append(("forge_user_action", {"action": "msg"}))
+        client._offline_queue.append(("app_user_action", {"action": "msg"}))
 
         await client._flush_offline_queue()
         # Should be re-queued
@@ -217,14 +217,14 @@ class TestForgeClientResilience:
 
     def test_sio_configured_with_exponential_backoff(self):
         """Verify the AsyncClient is created with backoff settings."""
-        from forge_client.client import (
-            ForgeClient,
+        from client.client import (
+            AppClient,
             _RECONNECT_ATTEMPTS,
             _RECONNECT_DELAY_MAX,
             _RECONNECT_DELAY_MIN,
         )
 
-        client = ForgeClient(base_url="http://localhost:3000")
+        client = AppClient(base_url="http://localhost:3000")
         assert client._sio.reconnection is True
         assert client._sio.reconnection_delay == _RECONNECT_DELAY_MIN
         assert client._sio.reconnection_delay_max == _RECONNECT_DELAY_MAX

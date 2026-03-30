@@ -11,7 +11,7 @@ from backend.core.providers import (
     PROVIDER_CONFIGURATIONS,
     UNKNOWN_PROVIDER_CONFIG,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 class ParameterType(Enum):
@@ -94,7 +94,7 @@ class ProviderConfigurationManager:
         self._unknown_provider_config = self._create_unknown_provider_config()
 
     def _load_provider_configurations(self) -> dict[str, ProviderConfig]:
-        """Load provider-specific configurations for Forge agents."""
+        """Load provider-specific configurations for App agents."""
         configs: dict[str, ProviderConfig] = {}
 
         for provider_name, config_data in PROVIDER_CONFIGURATIONS.items():

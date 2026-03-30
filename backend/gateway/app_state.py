@@ -1,4 +1,4 @@
-"""Application state container for the Forge server.
+"""Application state container for the App server.
 
 Replaces hidden mutable globals in ``shared.py`` with an explicit,
 app-scoped container that encapsulates singleton lifecycle.  Module-level
@@ -15,7 +15,7 @@ import threading
 import time
 from typing import Any
 
-from backend.core.config import ForgeConfig
+from backend.core.config import AppConfig
 from backend.ledger.adapter import EventServiceAdapter
 from backend.gateway.config.server_config import ServerConfig, load_server_config
 from backend.gateway.monitoring import MonitoringListener
@@ -39,6 +39,14 @@ def _close_and_clear(obj: Any, name: str) -> None:
         logger.debug("Error closing %s", name, exc_info=True)
 
 
+def _get_socketio_cors_origins() -> list[str] | str:
+    """Return Socket.IO CORS allowlist from the APP_CORS_ORIGINS env var."""
+    raw = os.environ.get("APP_CORS_ORIGINS", "*")
+    if raw == "*":
+        return "*"
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
 class AppState:
     """Centralized, explicit application state.
 
@@ -56,15 +64,15 @@ class AppState:
         from pathlib import Path
 
         from backend.core.app_paths import get_app_settings_root
-        from backend.core.config.config_loader import load_forge_config
+        from backend.core.config.config_loader import load_app_config
         from backend.core.workspace_resolution import (
             apply_workspace_to_config,
-            is_reserved_user_forge_data_dir,
+            is_reserved_user_app_data_dir,
             load_persisted_workspace_path,
             resolve_existing_directory,
         )
 
-        self.config: ForgeConfig = load_forge_config()
+        self.config: AppConfig = load_app_config()
 
         persisted = load_persisted_workspace_path()
         if persisted:
@@ -82,7 +90,7 @@ class AppState:
             if fsp:
                 try:
                     cand = Path(fsp).expanduser().resolve()
-                    if is_reserved_user_forge_data_dir(cand):
+                    if is_reserved_user_app_data_dir(cand):
                         self.config.local_data_root = ""
                     else:
                         apply_workspace_to_config(self.config, cand)
@@ -117,12 +125,8 @@ class AppState:
         import socketio  # type: ignore[import-untyped]
 
         # Default: allow all origins for local development. In production override
-        # FORGE_CORS_ORIGINS with an explicit comma-separated list.
-        _default_cors = os.environ.get("FORGE_CORS_ORIGINS", "*")
-        if _default_cors == "*":
-            _allowed: list[str] | str = "*"
-        else:
-            _allowed = [o.strip() for o in _default_cors.split(",") if o.strip()]
+        # APP_CORS_ORIGINS with an explicit comma-separated list.
+        _allowed = _get_socketio_cors_origins()
         self.sio = socketio.AsyncServer(
             cors_allowed_origins=_allowed, async_mode="asgi"
         )
@@ -173,8 +177,8 @@ class AppState:
                 impl = self.get_conversation_manager_impl()
 
                 # Ensure config is fresh before initializing manager
-                from backend.core.config.config_loader import load_forge_config
-                self.config = load_forge_config()
+                from backend.core.config.config_loader import load_app_config
+                self.config = load_app_config()
 
                 self._conversation_manager = impl.get_instance(  # type: ignore[attr-defined]
                     self.sio,

@@ -17,7 +17,7 @@ import pytest
 from backend.inference.llm_registry import LLMRegistry
 from backend.gateway.services.conversation_stats import ConversationStats
 from backend.persistence.data_models.settings import Settings
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.utils.core_utils import (
     create_registry_and_conversation_stats,
     setup_llm_config,
@@ -25,9 +25,9 @@ from backend.utils.core_utils import (
 
 
 @pytest.fixture
-def base_config() -> ForgeConfig:
-    """Provide a base Forge configuration."""
-    config = Mock(spec=ForgeConfig)
+def base_config() -> AppConfig:
+    """Provide a base application configuration."""
+    config = Mock(spec=AppConfig)
 
     # Mock LLM config getter/setter
     mock_llm_config = Mock()
@@ -73,7 +73,7 @@ class TestSetupLlmConfig:
 
     @patch("backend.utils.core_utils.deepcopy")
     def test_setup_llm_config_applies_user_settings(
-        self, mock_deepcopy: Mock, base_config: ForgeConfig, user_settings: Settings
+        self, mock_deepcopy: Mock, base_config: AppConfig, user_settings: Settings
     ) -> None:
         """Test that user settings override base config."""
         mock_deepcopy.side_effect = lambda x: x
@@ -90,7 +90,7 @@ class TestSetupLlmConfig:
 
     @patch("backend.utils.core_utils.deepcopy")
     def test_setup_llm_config_with_partial_settings(
-        self, mock_deepcopy: Mock, base_config: ForgeConfig, minimal_settings: Settings
+        self, mock_deepcopy: Mock, base_config: AppConfig, minimal_settings: Settings
     ) -> None:
         """Test that partial user settings fill in base config."""
         mock_deepcopy.side_effect = lambda x: x
@@ -107,7 +107,7 @@ class TestSetupLlmConfig:
         assert updated_llm_config.base_url is None
 
     def test_setup_llm_config_returns_config(
-        self, base_config: ForgeConfig, user_settings: Settings
+        self, base_config: AppConfig, user_settings: Settings
     ) -> None:
         """Test that setup_llm_config returns a config object."""
         result = setup_llm_config(base_config, user_settings)
@@ -115,7 +115,7 @@ class TestSetupLlmConfig:
 
     @patch("backend.utils.core_utils.deepcopy")
     def test_setup_llm_config_get_llm_config_called(
-        self, mock_deepcopy: Mock, base_config: ForgeConfig, user_settings: Settings
+        self, mock_deepcopy: Mock, base_config: AppConfig, user_settings: Settings
     ) -> None:
         """Test that get_llm_config is called to retrieve current config."""
         mock_deepcopy.side_effect = lambda x: x
@@ -124,7 +124,7 @@ class TestSetupLlmConfig:
 
     @patch("backend.utils.core_utils.deepcopy")
     def test_setup_llm_config_set_llm_config_called(
-        self, mock_deepcopy: Mock, base_config: ForgeConfig, user_settings: Settings
+        self, mock_deepcopy: Mock, base_config: AppConfig, user_settings: Settings
     ) -> None:
         """Test that set_llm_config is called to update config."""
         mock_deepcopy.side_effect = lambda x: x
@@ -132,7 +132,7 @@ class TestSetupLlmConfig:
         cast(Mock, base_config.set_llm_config).assert_called_once()
 
     def test_setup_llm_config_does_not_modify_original(
-        self, base_config: ForgeConfig, user_settings: Settings
+        self, base_config: AppConfig, user_settings: Settings
     ) -> None:
         """Test that original config is not modified (deep copy)."""
         original_id = id(base_config)
@@ -144,7 +144,7 @@ class TestSetupLlmConfig:
 
     @patch("backend.utils.core_utils.deepcopy")
     def test_setup_llm_config_empty_model_string(
-        self, mock_deepcopy: Mock, base_config: ForgeConfig
+        self, mock_deepcopy: Mock, base_config: AppConfig
     ) -> None:
         """Test handling of empty model string in settings."""
         mock_deepcopy.side_effect = lambda x: x
@@ -161,7 +161,7 @@ class TestSetupLlmConfig:
 
     @patch("backend.utils.core_utils.deepcopy")
     def test_setup_llm_config_preserves_unspecified_settings(
-        self, mock_deepcopy: Mock, base_config: ForgeConfig, user_settings: Settings
+        self, mock_deepcopy: Mock, base_config: AppConfig, user_settings: Settings
     ) -> None:
         """Test that settings not modified in user config are preserved."""
         mock_deepcopy.side_effect = lambda x: x
@@ -188,7 +188,7 @@ class TestCreateRegistryAndStats:
         mock_stats_class: Mock,
         mock_registry_class: Mock,
         mock_get_file_store: Mock,
-        base_config: ForgeConfig,
+        base_config: AppConfig,
         user_settings: Settings,
     ) -> None:
         """Test creating registry and stats with user settings."""
@@ -222,7 +222,7 @@ class TestCreateRegistryAndStats:
         mock_stats_class: Mock,
         mock_registry_class: Mock,
         mock_get_file_store: Mock,
-        base_config: ForgeConfig,
+        base_config: AppConfig,
     ) -> None:
         """Test creating registry and stats without user settings."""
         # Setup mocks
@@ -252,7 +252,7 @@ class TestCreateRegistryAndStats:
         mock_stats_class: Mock,
         mock_registry_class: Mock,
         mock_get_file_store: Mock,
-        base_config: ForgeConfig,
+        base_config: AppConfig,
         user_settings: Settings,
     ) -> None:
         """Test that updated config is returned."""
@@ -278,7 +278,7 @@ class TestCreateRegistryAndStats:
         mock_stats_class: Mock,
         mock_registry_class: Mock,
         mock_get_file_store: Mock,
-        base_config: ForgeConfig,
+        base_config: AppConfig,
         user_settings: Settings,
     ) -> None:
         """Test that stats is subscribed to registry."""
@@ -304,7 +304,7 @@ class TestCreateRegistryAndStats:
         mock_stats_class: Mock,
         mock_registry_class: Mock,
         mock_get_file_store: Mock,
-        base_config: ForgeConfig,
+        base_config: AppConfig,
         user_settings: Settings,
     ) -> None:
         """Test that file store is created with correct config."""
@@ -336,7 +336,7 @@ class TestCreateRegistryAndStats:
         mock_stats_class: Mock,
         mock_registry_class: Mock,
         mock_get_file_store: Mock,
-        base_config: ForgeConfig,
+        base_config: AppConfig,
         user_settings: Settings,
     ) -> None:
         """Test creating registry with None user_id."""
@@ -362,7 +362,7 @@ class TestCreateRegistryAndStats:
         mock_stats_class: Mock,
         mock_registry_class: Mock,
         mock_get_file_store: Mock,
-        base_config: ForgeConfig,
+        base_config: AppConfig,
         user_settings: Settings,
     ) -> None:
         """Test that agent class from settings is passed to registry."""
@@ -389,7 +389,7 @@ class TestCreateRegistryAndStats:
         mock_stats_class: Mock,
         mock_registry_class: Mock,
         mock_get_file_store: Mock,
-        base_config: ForgeConfig,
+        base_config: AppConfig,
     ) -> None:
         """Test that agent class is None when no user settings."""
         mock_file_store = Mock()
@@ -417,7 +417,7 @@ class TestConfigComplexity:
         mock_stats_class: Mock,
         mock_registry_class: Mock,
         mock_get_file_store: Mock,
-        base_config: ForgeConfig,
+        base_config: AppConfig,
         user_settings: Settings,
     ) -> None:
         """Test that multiple calls don't interfere."""
@@ -446,7 +446,7 @@ class TestConfigComplexity:
 
     @patch("backend.utils.core_utils.deepcopy")
     def test_settings_with_special_characters(
-        self, mock_deepcopy: Mock, base_config: ForgeConfig
+        self, mock_deepcopy: Mock, base_config: AppConfig
     ) -> None:
         """Test settings with special characters in strings."""
         mock_deepcopy.side_effect = lambda x: x

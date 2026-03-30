@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from backend.security.safety_config import SafetyConfig
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import Action, ActionSecurityRisk
 from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 
@@ -353,7 +353,7 @@ class SafetyValidator:
             import aiohttp
 
             async with aiohttp.ClientSession() as session:
-                payload = {"text": message, "username": "Forge Security"}
+                payload = {"text": message, "username": "App Security"}
                 async with session.post(
                     url,
                     json=payload,

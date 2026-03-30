@@ -1,4 +1,4 @@
-"""Security headers middleware for forge."""
+"""Security headers middleware for app."""
 
 import os
 from collections.abc import Callable

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 import asyncpg
 from asyncpg import Pool
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.persistence.data_models.knowledge_base import (
     KnowledgeBaseCollection,
     KnowledgeBaseDocument,

@@ -1,4 +1,4 @@
-"""Shared helper functions for loading and working with Forge config files.
+"""Shared helper functions for loading and working with application config files.
 
 Major subsystems have been extracted into focused modules:
 - ``env_loader``    – environment variable loading and type casting
@@ -6,7 +6,7 @@ Major subsystems have been extracted into focused modules:
 - ``cli_config``    – CLI argument parsing and config overrides
 - ``config_sections`` – per-section TOML processors
 
-This module remains the primary entry point for ``load_FORGE_config()``
+This module remains the primary entry point for ``load_app_config()``
 and ``setup_config_from_args()``.
 """
 
@@ -35,8 +35,7 @@ from backend.core.config.env_loader import export_llm_api_keys
 from backend.core.config.env_loader import (
     load_from_env,
 )
-from backend.core.config.env_loader import restore_environment
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 from backend.core.config.model_rebuild import rebuild_config_models
 from backend.core.constants import JWT_SECRET_FILE as JWT_SECRET
@@ -46,7 +45,7 @@ from backend.utils.import_utils import get_impl
 if TYPE_CHECKING:
     import argparse
 
-    from backend.core.config.condenser_config import CondenserConfig
+    from backend.core.config.compactor_config import CompactorConfig
     from backend.persistence.files import FileStore
 
 
@@ -103,7 +102,7 @@ class ConfigLoadSummary:
                 for issue in grouped[section]
             )
             lines.append(f"[{section}] {reasons}")
-        logger.forge_logger.warning(
+        logger.app_logger.warning(
             "Configuration sections skipped or partially applied while loading %s:\n%s",
             self._toml_file,
             "\n".join(lines),
@@ -134,12 +133,9 @@ def _to_posix_workspace_path(path: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-from backend.core.config.extended_config import ExtendedConfig  # noqa: E402
-
-
-def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
+def load_from_json(cfg: AppConfig, json_file: str = "settings.json") -> None:
     """Load the config from the flat settings.json file."""
-    strict_config = os.getenv("FORGE_STRICT_CONFIG", "false").lower() in (
+    strict_config = os.getenv("APP_STRICT_CONFIG", "false").lower() in (
         "1",
         "true",
         "yes",
@@ -152,7 +148,7 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
         except FileNotFoundError:
             return
         except Exception as e:
-            logger.forge_logger.warning(
+            logger.app_logger.warning(
                 "Cannot parse config from json, json values have not been applied.\nError: %s",
                 e,
             )
@@ -201,13 +197,13 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
                 )
                 if strict_config:
                     raise ValueError(msg)
-                logger.forge_logger.warning(
+                logger.app_logger.warning(
                     "Skipping LLM config from %s: %s", json_file, msg
                 )
             else:
                 cfg.set_llm_config(LLMConfig.model_validate(llm_dict))
 
-        # Top-level ForgeConfig fields (mcp_host, project_root, etc.)
+        # Top-level app config fields (mcp_host, project_root, etc.)
         if "mcp_host" in data and data["mcp_host"]:
             cfg.mcp_host = data["mcp_host"]
         if "project_root" in data and data["project_root"]:
@@ -218,7 +214,7 @@ def load_from_json(cfg: ForgeConfig, json_file: str = "settings.json") -> None:
 
     if strict_config and summary.has_fatal_issues():
         raise ValueError(
-            f"Strict config mode enabled (FORGE_STRICT_CONFIG=true): config load issues in {json_file}: "
+            f"Strict config mode enabled (APP_STRICT_CONFIG=true): config load issues in {json_file}: "
             f"{summary.format_fatal_issues()}"
         )
 
@@ -242,31 +238,31 @@ def get_or_create_jwt_secret(file_store: FileStore) -> str:
 # ---------------------------------------------------------------------------
 
 
-def finalize_config(cfg: ForgeConfig) -> None:
+def finalize_config(cfg: AppConfig) -> None:
     """More tweaks to the config after it's been loaded."""
     from backend.core.config.mcp_config import (
-        ensure_default_forge_mcp_http_server,
+        ensure_default_mcp_http_server,
         extend_mcp_servers_with_bundled_defaults,
     )
 
     extend_mcp_servers_with_bundled_defaults(cfg.mcp.servers)
-    ensure_default_forge_mcp_http_server(cfg)
+    ensure_default_mcp_http_server(cfg)
     _configure_llm_logging(cfg)
     _ensure_cache_directory(cfg)
     _configure_jwt_secret(cfg)
 
 
-def _configure_llm_logging(cfg: ForgeConfig) -> None:
+def _configure_llm_logging(cfg: AppConfig) -> None:
     for llm in cfg.llms.values():
         llm.log_completions_folder = os.path.abspath(llm.log_completions_folder)
 
 
-def _ensure_cache_directory(cfg: ForgeConfig) -> None:
+def _ensure_cache_directory(cfg: AppConfig) -> None:
     if cfg.cache_dir:
         pathlib.Path(cfg.cache_dir).mkdir(parents=True, exist_ok=True)
 
 
-def _configure_jwt_secret(cfg: ForgeConfig) -> None:
+def _configure_jwt_secret(cfg: AppConfig) -> None:
     if not cfg.jwt_secret:
         cfg.jwt_secret = SecretStr(
             get_or_create_jwt_secret(
@@ -276,7 +272,7 @@ def _configure_jwt_secret(cfg: ForgeConfig) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Named config group loaders (agent, llm, condenser)
+# Named config group loaders (agent, llm, compactor)
 # ---------------------------------------------------------------------------
 
 
@@ -285,128 +281,128 @@ def get_agent_config_arg(
 ) -> AgentConfig | None:
     """Get a group of agent settings from the config file."""
     agent_config_arg = agent_config_arg.strip("[]").removeprefix("agent.")
-    logger.forge_logger.debug("Loading agent config from %s", agent_config_arg)
+    logger.app_logger.debug("Loading agent config from %s", agent_config_arg)
     json_config = _load_json_config(json_file)
     if json_config is None:
         return None
     if "agent" in json_config and agent_config_arg in json_config["agent"]:
         return AgentConfig(**json_config["agent"][agent_config_arg])
-    logger.forge_logger.debug("Loading from toml failed for %s", agent_config_arg)
+    logger.app_logger.debug("Loading from toml failed for %s", agent_config_arg)
     return None
 
 
 # ---------------------------------------------------------------------------
-# Condenser config group loader
+# Compactor config group loader
 # ---------------------------------------------------------------------------
 
 
-def _validate_condenser_section(
-    json_config: dict, condenser_config_arg: str, json_file: str
+def _validate_compactor_section(
+    json_config: dict, compactor_config_arg: str, json_file: str
 ) -> dict | None:
-    if "condenser_type" not in json_config:
-        logger.forge_logger.error(
-            "Condenser config section [condenser.%s] not found in %s",
-            condenser_config_arg,
+    if "compactor_type" not in json_config:
+        logger.app_logger.error(
+            "Compactor config section [compactor.%s] not found in %s",
+            compactor_config_arg,
             json_file,
         )
         return None
 
-    condenser_dict = {"type": json_config.get("condenser_type")}
-    if json_config.get("condenser_max_events") is not None:
-        condenser_dict["max_events"] = json_config.get("condenser_max_events")
-    if json_config.get("condenser_keep_first") is not None:
-        condenser_dict["keep_first"] = json_config.get("condenser_keep_first")
-    if json_config.get("condenser_llm_config") is not None:
-        condenser_dict["llm_config"] = json_config.get("condenser_llm_config")
+    compactor_dict = {"type": json_config.get("compactor_type")}
+    if json_config.get("compactor_max_events") is not None:
+        compactor_dict["max_events"] = json_config.get("compactor_max_events")
+    if json_config.get("compactor_keep_first") is not None:
+        compactor_dict["keep_first"] = json_config.get("compactor_keep_first")
+    if json_config.get("compactor_llm_config") is not None:
+        compactor_dict["llm_config"] = json_config.get("compactor_llm_config")
 
-    return condenser_dict
+    return compactor_dict
 
 
-def _process_llm_condenser(
-    condenser_data: dict, condenser_config_arg: str, json_file: str
+def _process_llm_compactor(
+    compactor_data: dict, compactor_config_arg: str, json_file: str
 ) -> dict | None:
-    llm_config_name = condenser_data.get("llm_config")
+    llm_config_name = compactor_data.get("llm_config")
     if not llm_config_name:
         return None
 
-    logger.forge_logger.debug(
-        "Condenser [%s] requires LLM config [%s]. Loading it...",
-        condenser_config_arg,
+    logger.app_logger.debug(
+        "Compactor [%s] requires LLM config [%s]. Loading it...",
+        compactor_config_arg,
         llm_config_name,
     )
     if referenced_llm_config := get_llm_config_arg(
         llm_config_name, json_file=json_file
     ):
-        condenser_data["llm_config"] = referenced_llm_config
-        return condenser_data
-    logger.forge_logger.error(
-        "Failed to load required LLM config '%s' for condenser '%s'.",
+        compactor_data["llm_config"] = referenced_llm_config
+        return compactor_data
+    logger.app_logger.error(
+        "Failed to load required LLM config '%s' for compactor '%s'.",
         llm_config_name,
-        condenser_config_arg,
+        compactor_config_arg,
     )
     return None
 
 
-def _process_condenser_data(
-    condenser_data: dict, condenser_config_arg: str, json_file: str
+def _process_compactor_data(
+    compactor_data: dict, compactor_config_arg: str, json_file: str
 ) -> dict | None:
-    condenser_type = condenser_data.get("type")
+    compactor_type = compactor_data.get("type")
     if (
-        condenser_type in ("llm", "llm_attention", "structured")
-        and "llm_config" in condenser_data
-        and isinstance(condenser_data["llm_config"], str)
+        compactor_type in ("llm", "llm_attention", "structured")
+        and "llm_config" in compactor_data
+        and isinstance(compactor_data["llm_config"], str)
     ):
-        return _process_llm_condenser(condenser_data, condenser_config_arg, json_file)
-    return condenser_data
+        return _process_llm_compactor(compactor_data, compactor_config_arg, json_file)
+    return compactor_data
 
 
-def get_condenser_config_arg(
-    condenser_config_arg: str, json_file: str = "settings.json"
-) -> CondenserConfig | None:
-    """Get a group of condenser settings from the config file by name."""
-    condenser_config_arg = condenser_config_arg.strip("[]").removeprefix("condenser.")
-    logger.forge_logger.debug(
-        "Loading condenser config [%s] from %s", condenser_config_arg, json_file
+def get_compactor_config_arg(
+    compactor_config_arg: str, json_file: str = "settings.json"
+) -> CompactorConfig | None:
+    """Get a group of compactor settings from the config file by name."""
+    compactor_config_arg = compactor_config_arg.strip("[]").removeprefix("compactor.")
+    logger.app_logger.debug(
+        "Loading compactor config [%s] from %s", compactor_config_arg, json_file
     )
 
     json_config = _load_json_config(json_file)
     if json_config is None:
         return None
 
-    condenser_data = _validate_condenser_section(
-        json_config, condenser_config_arg, json_file
+    compactor_data = _validate_compactor_section(
+        json_config, compactor_config_arg, json_file
     )
-    if condenser_data is None:
+    if compactor_data is None:
         return None
 
-    condenser_type = condenser_data.get("type")
-    if not condenser_type:
-        logger.forge_logger.error(
-            'Missing "type" field in [condenser.%s] section of %s',
-            condenser_config_arg,
+    compactor_type = compactor_data.get("type")
+    if not compactor_type:
+        logger.app_logger.error(
+            'Missing "type" field in [compactor.%s] section of %s',
+            compactor_config_arg,
             json_file,
         )
         return None
 
-    condenser_data = _process_condenser_data(
-        condenser_data, condenser_config_arg, json_file
+    compactor_data = _process_compactor_data(
+        compactor_data, compactor_config_arg, json_file
     )
-    if condenser_data is None:
+    if compactor_data is None:
         return None
 
     try:
-        from backend.core.config.condenser_config import create_condenser_config
+        from backend.core.config.compactor_config import create_compactor_config
 
-        config = create_condenser_config(condenser_type, condenser_data)
-        logger.forge_logger.info(
-            "Successfully loaded condenser config [%s] from %s",
-            condenser_config_arg,
+        config = create_compactor_config(compactor_type, compactor_data)
+        logger.app_logger.info(
+            "Successfully loaded compactor config [%s] from %s",
+            compactor_config_arg,
             json_file,
         )
         return config
     except (ValidationError, ValueError) as e:
-        logger.forge_logger.error(
-            "Invalid condenser configuration for [%s]: %s.", condenser_config_arg, e
+        logger.app_logger.error(
+            "Invalid compactor configuration for [%s]: %s.", compactor_config_arg, e
         )
         return None
 
@@ -416,7 +412,7 @@ def get_condenser_config_arg(
 # ---------------------------------------------------------------------------
 
 
-def register_custom_agents(config: ForgeConfig) -> None:
+def register_custom_agents(config: AppConfig) -> None:
     """Register custom agents from configuration."""
     from backend.orchestration.agent import Agent
 
@@ -426,11 +422,11 @@ def register_custom_agents(config: ForgeConfig) -> None:
             try:
                 agent_cls = get_impl(Agent, classpath)
                 Agent.register(agent_name, agent_cls)
-                logger.forge_logger.info(
+                logger.app_logger.info(
                     "Registered custom agent '%s' from %s", agent_name, classpath
                 )
             except Exception as e:
-                logger.forge_logger.error(
+                logger.app_logger.error(
                     "Failed to register agent '%s': %s", agent_name, e
                 )
 
@@ -456,9 +452,9 @@ def parse_arguments() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 
 
-def load_forge_config(
+def load_app_config(
     set_logging_levels: bool = True, config_file: str = "settings.json"
-) -> ForgeConfig:
+) -> AppConfig:
     """Load the configuration from environment variables and the specified config file.
 
     Precedence (highest to lowest):
@@ -468,7 +464,7 @@ def load_forge_config(
     """
     rebuild_config_models()
 
-    config = ForgeConfig()
+    config = AppConfig()
 
     from backend.core.config.api_key_manager import api_key_manager
 
@@ -490,7 +486,7 @@ def load_forge_config(
     # back to the APIKeyManager so that DirectLLMClient can find it.
     # Temporarily suppress env export to avoid double-setting during sync
     with api_key_manager.suppress_env_export_context():
-        for llm_name, llm_cfg in config.llms.items():
+        for llm_cfg in config.llms.values():
             if not llm_cfg.model or not str(llm_cfg.model).strip():
                 continue
             if llm_cfg.api_key:
@@ -498,10 +494,9 @@ def load_forge_config(
                 api_key_manager.set_environment_variables(llm_cfg.model, llm_cfg.api_key)
             else:
                 # If no key in config, try to load from environment
-                provider = api_key_manager._extract_provider(llm_cfg.model)
-                env_key = api_key_manager._get_provider_key_from_env(provider)
+                provider = api_key_manager.extract_provider(llm_cfg.model)
+                env_key = api_key_manager.get_provider_key_from_env(provider)
                 if env_key:
-                    from pydantic import SecretStr
                     llm_cfg.api_key = SecretStr(env_key)
                     api_key_manager.set_api_key(llm_cfg.model, llm_cfg.api_key)
                     api_key_manager.set_environment_variables(llm_cfg.model, llm_cfg.api_key)
@@ -516,7 +511,7 @@ def load_forge_config(
     return config
 
 
-def setup_config_from_args(args: argparse.Namespace) -> ForgeConfig:
+def setup_config_from_args(args: argparse.Namespace) -> AppConfig:
     """Load config from toml and override with command line arguments.
 
     Configuration precedence (from highest to lowest):
@@ -525,7 +520,7 @@ def setup_config_from_args(args: argparse.Namespace) -> ForgeConfig:
     3. Canonical ``<get_app_settings_root()>/settings.json`` if that path differs and
        contains LLM keys (see :func:`backend.core.app_paths.get_app_settings_root`)
     """
-    config = load_forge_config(config_file=args.config_file)
+    config = load_app_config(config_file=args.config_file)
     apply_llm_config_override(config, args)
     apply_additional_overrides(config, args)
     return config

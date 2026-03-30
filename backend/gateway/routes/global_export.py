@@ -15,6 +15,11 @@ router = APIRouter(prefix="/api/v1/global-export", tags=["export"])
 logger = logging.getLogger(__name__)
 
 
+def _build_export_filename(timestamp: datetime | None = None) -> str:
+    ts = timestamp or datetime.now()
+    return f"app_backup_{ts.strftime('%Y%m%d_%H%M%S')}.json"
+
+
 class GlobalExportData(BaseModel):
     """Container for all exportable data."""
 
@@ -149,7 +154,7 @@ async def export_all_data() -> JSONResponse:
 
     Examples:
         >>> curl -X GET http://localhost:3000/api/global-export/ \\
-        ...     -o forge_backup_20250106_143022.json
+        ...     -o app_backup_20250106_143022.json
 
     """
     try:
@@ -166,7 +171,7 @@ async def export_all_data() -> JSONResponse:
         return JSONResponse(
             content=json.loads(export_data.model_dump_json(indent=2)),
             headers={
-                "Content-Disposition": f'attachment; filename="FORGE_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json"',
+                "Content-Disposition": f'attachment; filename="{_build_export_filename()}"',
             },
         )
     except Exception as e:
@@ -200,7 +205,7 @@ async def import_all_data(data: GlobalExportData) -> dict[str, dict[str, int]]:
     Examples:
         >>> curl -X POST http://localhost:3000/api/global-export/ \\
         ...     -H "Content-Type: application/json" \\
-        ...     -d @forge_backup_20250106_143022.json
+        ...     -d @app_backup_20250106_143022.json
 
     """
     try:

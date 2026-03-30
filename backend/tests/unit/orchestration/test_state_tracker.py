@@ -31,7 +31,7 @@ class TestStateTrackerInitHistory:
     def test_init_history_invalid_range_clears_history(self):
         tracker = StateTracker(sid="sid-1", file_store=None, user_id="user-1")
         tracker.state = State(start_id=9, end_id=3)
-        tracker.state.history = ["stale"]
+        tracker.state.history = [MessageAction(content="stale")]
         event_stream = MagicMock()
 
         tracker._init_history(event_stream)

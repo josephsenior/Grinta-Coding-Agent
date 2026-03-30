@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Forge will be documented in this file.
+All notable changes to App will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -21,14 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LLMRateGovernor` — per-session token-rate throttling to prevent runaway loops
 - Token-level and cost-acceleration loop detection in `StuckDetector`
 - Real auto-recovery in `ErrorRecoveryStrategy` (network retry, context truncation, runtime restart)
-- Canonical local server startup planner shared by `start_server.py`, `forge serve`, and embedded mode
+- Canonical local server startup planner shared by `start_server.py`, `app serve`, and embedded mode
 - Operator-facing startup and recovery snapshots in health and settings surfaces
 - `hardened_local` workspace-scoped allowlists for git, package, and network-capable commands
 
 ### Changed
 
 - Removed the Textual TUI; the React web UI is the sole interactive interface. Extracted
-  `ForgeClient` into the top-level `forge_client` package for tests and scripts.
+  `AppClient` into the top-level `client` package for tests and scripts.
 - **BREAKING**: All API endpoints migrated from `/api/*` to `/api/v1/*` for versioning
   - Update client code to use `/api/v1/` base URL (e.g., `/api/conversations` → `/api/v1/conversations`)
 - Removed all cloud runtime dependencies (e2b, modal, runloop-api-client, daytona) for local-first architecture
@@ -40,11 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Broke up `config/utils.py` (43KB→4 focused modules)
 - Trimmed base dependencies: moved `asyncpg`, `libtmux` to optional groups
 - Consolidated editor tools — `str_replace_editor` is the primary, others deprecated
-- Improved CLI entry point with `forge init` command
+- Improved CLI entry point with `app init` command
 - Hardened local execution policy: interactive terminals, command cwd, uploads, and file access now stay workspace-scoped under `security.execution_profile = "hardened_local"`
 - Crash recovery now fails closed more often, tracks restore provenance, and uses persisted control-event evidence to distinguish stale WAL from ambiguous recovery
 - Startup and status flows now use one canonical local server path, with the resolved startup plan visible in the UI and API
-- Security documentation now explicitly describes Forge as local policy hardening without sandbox or process isolation
+- Security documentation now explicitly describes App as local policy hardening without sandbox or process isolation
 
 ### Deprecated
 
@@ -73,5 +73,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Textual TUI replacement for React frontend
 - Docker runtime environment with cross-platform shell abstraction
 
-[Unreleased]: https://github.com/josephsenior/Forge/compare/v0.55.0...HEAD
-[0.55.0]: https://github.com/josephsenior/Forge/releases/tag/v0.55.0
+[Unreleased]: https://github.com/josephsenior/App/compare/v0.55.0...HEAD
+[0.55.0]: https://github.com/josephsenior/App/releases/tag/v0.55.0

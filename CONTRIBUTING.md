@@ -1,6 +1,6 @@
-﻿# Contributing to Forge
+﻿# Contributing to App
 
-Thank you for your interest in contributing to Forge! This guide will help you get started.
+Thank you for your interest in contributing to App! This guide will help you get started.
 
 ## Development Setup
 
@@ -14,15 +14,15 @@ Thank you for your interest in contributing to Forge! This guide will help you g
 
 ```bash
 # Clone
-git clone https://github.com/josephsenior/Forge.git
-cd Forge
+git clone https://github.com/josephsenior/App.git
+cd App
 
 # Backend
 uv sync
 python start_server.py
 
 # Web UI: start the server, then open http://localhost:3000
-uv run forge serve
+uv run app serve
 ```
 
 ## How to Contribute
@@ -54,13 +54,13 @@ uv run forge serve
 - Type hints on all function signatures
 - Docstrings on public functions (Google style)
 - `async def` for I/O-bound operations
-- Use `forge_logger` for logging (not `print()`)
+- Use `app_logger` for logging (not `print()`)
 - Follow existing service decomposition patterns
 
-**Python API client (`forge_client`):**
+**Python API client (`client`):**
 
-- Keep `ForgeClient` as the single place for httpx + Socket.IO to the backend
-- Prefer extending `ForgeClient` over ad hoc httpx/socketio in scripts or tests
+- Keep `AppClient` as the single place for httpx + Socket.IO to the backend
+- Prefer extending `AppClient` over ad hoc httpx/socketio in scripts or tests
 
 ### Commit Convention
 
@@ -83,7 +83,7 @@ types: feat, fix, refactor, docs, test, chore, perf
 | `backend/context/` | Context memory, compactors, RAG, vector store |
 | `backend/core/` | Config (Pydantic), exceptions, schemas, logging |
 | `backend/security/` | Security analyzer, input validation |
-| `forge_client/` | Python HTTP + Socket.IO client for tests and scripts |
+| `client/` | Python HTTP + Socket.IO client for tests and scripts |
 
 ### Orchestration Service Map
 
@@ -117,11 +117,11 @@ The `SessionOrchestrator` (~770 LOC) delegates work to these services:
 
 - **Event sourcing**: All agent actions/observations go through `EventStream`
 - **Backpressure**: `EventStream` caps in-flight events and applies backpressure
-- **Condenser**: Memory management via `Condenser` with configurable strategies
+- **Compactor**: Memory management via `Compactor` with configurable strategies
 - **State checkpoints**: Timestamped state snapshots (last 3 kept for crash recovery)
 - **Circuit breaker**: Trips after consecutive errors/stuck detections
 - **Safe defaults**: Budget capped at $5, circuit breaker ON, graceful shutdown ON
 
 ## Questions?
 
-Open a [Discussion](https://github.com/josephsenior/Forge/discussions) or file an issue.
+Open a [Discussion](https://github.com/josephsenior/App/discussions) or file an issue.

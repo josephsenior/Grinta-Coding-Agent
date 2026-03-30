@@ -1,4 +1,4 @@
-"""Message models and serialization utilities for Forge.
+"""Message models and serialization utilities for App.
 
 Classes:
     - ContentType: Enum of supported content kinds (text, image_url)
@@ -128,7 +128,7 @@ class Message(BaseModel):
         tool_call_id: ID for tool response messages
         name: Optional name for the message sender
         force_string_serializer: Force string serialization format
-        forge_tool_ok: When role is tool, optional structured success/failure for
+        tool_ok: When role is tool, optional structured success/failure for
             learning and diagnostics (None = unknown / use legacy content heuristics).
 
     """
@@ -143,7 +143,7 @@ class Message(BaseModel):
 
     name: str | None = None
     force_string_serializer: bool = False
-    forge_tool_ok: bool | None = None
+    tool_ok: bool | None = None
 
     # Rebuild the model to ensure all dependencies are properly resolved
     def __init_subclass__(cls, **kwargs):
@@ -253,8 +253,8 @@ class Message(BaseModel):
             )
             message_dict["tool_call_id"] = self.tool_call_id
             message_dict["name"] = self.name
-            if self.role == "tool" and self.forge_tool_ok is not None:
-                message_dict["forge_tool_ok"] = self.forge_tool_ok
+            if self.role == "tool" and self.tool_ok is not None:
+                message_dict["tool_ok"] = self.tool_ok
         return message_dict
 
 

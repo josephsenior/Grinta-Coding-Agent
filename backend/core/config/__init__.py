@@ -1,4 +1,4 @@
-"""Configuration schemas and helpers for Forge deployments."""
+"""Configuration schemas and helpers for application deployments."""
 
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.arg_utils import (
@@ -6,16 +6,17 @@ from backend.core.config.arg_utils import (
     get_headless_parser,
 )
 from backend.core.config.config_utils import (
-    FORGE_DEFAULT_AGENT,
-    FORGE_MAX_ITERATIONS,
+    DEFAULT_AGENT_NAME,
+    DEFAULT_MAX_ITERATIONS,
     get_field_info,
 )
 from backend.core.config.extended_config import ExtendedConfig
-from backend.core.config.forge_config import (
+from backend.core.config.app_config import (
     EventStreamConfig,
     FileUploadsConfig,
-    ForgeConfig,
+    AppConfig,
     GitIdentityConfig,
+    TranscriptConfig,
     TrajectoryConfig,
 )
 from backend.core.config.llm_config import LLMConfig
@@ -26,7 +27,7 @@ from backend.core.config.config_loader import (
     finalize_config,
     get_agent_config_arg,
     get_llm_config_arg,
-    load_forge_config,
+    load_app_config,
     load_from_env,
     load_from_json,
     parse_arguments,
@@ -36,15 +37,16 @@ from backend.core.config.config_loader import (
 # Ensure attributes exist at class level for patching frameworks
 
 __all__ = [
-    "FORGE_DEFAULT_AGENT",
-    "FORGE_MAX_ITERATIONS",
+    "DEFAULT_AGENT_NAME",
+    "DEFAULT_MAX_ITERATIONS",
     "AgentConfig",
     "ExtendedConfig",
     "LLMConfig",
     "MCPConfig",
-    "ForgeConfig",
+    "AppConfig",
     "GitIdentityConfig",
     "FileUploadsConfig",
+    "TranscriptConfig",
     "TrajectoryConfig",
     "EventStreamConfig",
     "RuntimeConfig",
@@ -57,7 +59,7 @@ __all__ = [
     "get_llm_config_arg",
     "load_from_env",
     "load_from_json",
-    "load_forge_config",
+    "load_app_config",
     "parse_arguments",
     "setup_config_from_args",
 ]

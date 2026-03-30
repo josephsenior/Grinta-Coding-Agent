@@ -1,10 +1,10 @@
-"""Database helper library for Forge agent runtime.
+"""Database helper library for App agent runtime.
 
 This library provides database connection and query functions that execute
 in the user's runtime environment, ensuring credentials never leave their infrastructure.
 
 Usage:
-    from forge_database import connect_postgresql, query_postgresql
+    from app_database import connect_postgresql, query_postgresql
 
     conn = await connect_postgresql('PROD_DB')
     results = await query_postgresql(conn, 'SELECT * FROM users LIMIT 10')

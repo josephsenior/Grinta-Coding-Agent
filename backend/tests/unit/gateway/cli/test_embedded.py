@@ -38,9 +38,9 @@ def test_run_embedded_uses_canonical_startup_plan(
 
     mock_build_plan.assert_called_once()
     build_env = mock_build_plan.call_args[0][1]
-    assert build_env["FORGE_HOST"] == "127.0.0.1"
-    assert build_env["FORGE_PORT"] == "3000"
-    assert build_env["FORGE_WATCH"] == "0"
+    assert build_env["APP_HOST"] == "127.0.0.1"
+    assert build_env["APP_PORT"] == "3000"
+    assert build_env["APP_WATCH"] == "0"
     mock_validate_contract.assert_called_once_with(build_env)
     mock_record_snapshot.assert_called_once_with(plan)
     mock_print_preflight.assert_called_once_with(plan)

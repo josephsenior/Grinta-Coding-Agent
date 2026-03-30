@@ -1,4 +1,4 @@
-# Workflow that builds, tests and then pushes the Forge and runtime docker images to the ghcr.io repository
+# Workflow that builds, tests and then pushes the App and runtime docker images to the ghcr.io repository
 name: Docker
 
 # Always run on "main"
@@ -51,7 +51,7 @@ jobs:
           fi
           echo "base_image=$json" >> "$GITHUB_OUTPUT"
 
-  # Builds the Forge Docker images
+  # Builds the App Docker images
   ghcr_build_app:
     name: Build App Image
     runs-on: blacksmith-4vcpu-ubuntu-2204
@@ -83,7 +83,7 @@ jobs:
       - name: Build and push app image
         if: "!github.event.pull_request.head.repo.fork"
         run: |
-          ./containers/build.sh -i Forge -o ${{ env.REPO_OWNER }} --push
+          ./containers/build.sh -i App -o ${{ env.REPO_OWNER }} --push
 
   # Builds the runtime Docker images
   ghcr_build_runtime:
@@ -126,7 +126,7 @@ jobs:
       - name: Install Python dependencies
         run: uv sync
       - name: Create source distribution and Dockerfile
-        run: uv run python3 Forge/runtime/utils/runtime_build.py --base_image ${{ matrix.base_image.image }} --build_folder containers/runtime --force_rebuild
+        run: uv run python3 App/runtime/utils/runtime_build.py --base_image ${{ matrix.base_image.image }} --build_folder containers/runtime --force_rebuild
       - name: Lowercase Repository Owner
         run: |
           echo REPO_OWNER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]') >> $GITHUB_ENV
@@ -220,14 +220,14 @@ jobs:
           RUNTIME_USER_ID=$(id -u) \
           RUNTIME_CONTAINER_IMAGE=$image_name \
           TEST_IN_CI=true \
-          RUN_AS_Forge=false \
+          RUN_AS_APP=false \
           uv run pytest -n 0 -raRs --reruns 2 --reruns-delay 5 -s ./tests/runtime --durations=10
         env:
           DEBUG: "1"
 
-  # Run unit tests with the Docker runtime Docker images as Forge user
+  # Run unit tests with the Docker runtime Docker images as App user
   test_runtime_oh:
-    name: RT Unit Tests (Forge)
+    name: RT Unit Tests (App)
     runs-on: blacksmith-8vcpu-ubuntu-2204
     needs: [ghcr_build_runtime, define-matrix]
     strategy:
@@ -277,7 +277,7 @@ jobs:
           RUNTIME_USER_ID=$(id -u) \
           RUNTIME_CONTAINER_IMAGE=$image_name \
           TEST_IN_CI=true \
-          RUN_AS_Forge=true \
+          RUN_AS_APP=true \
           uv run pytest -n 0 -raRs --reruns 2 --reruns-delay 5 -s ./tests/runtime --durations=10
         env:
           DEBUG: "1"

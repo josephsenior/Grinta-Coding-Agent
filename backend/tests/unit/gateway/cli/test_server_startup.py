@@ -23,12 +23,12 @@ from backend.gateway.cli.server_startup import (
 
 def test_build_server_startup_plan_uses_local_defaults(monkeypatch, tmp_path: Path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("FORGE_HOST", raising=False)
+    monkeypatch.delenv("APP_HOST", raising=False)
     monkeypatch.delenv("HOST", raising=False)
-    monkeypatch.delenv("FORGE_PORT", raising=False)
+    monkeypatch.delenv("APP_PORT", raising=False)
     monkeypatch.delenv("PORT", raising=False)
-    monkeypatch.delenv("FORGE_RUNTIME", raising=False)
-    monkeypatch.setenv("FORGE_APP_ROOT", str(tmp_path / "app-root"))
+    monkeypatch.delenv("APP_RUNTIME", raising=False)
+    monkeypatch.setenv("APP_ROOT", str(tmp_path / "app-root"))
 
     plan = build_server_startup_plan(tmp_path)
 
@@ -39,11 +39,11 @@ def test_build_server_startup_plan_uses_local_defaults(monkeypatch, tmp_path: Pa
     assert plan.health_url.endswith("/api/health/ready")
 
 
-def test_build_server_startup_plan_prefers_forge_port(monkeypatch, tmp_path: Path):
+def test_build_server_startup_plan_prefers_app_port(monkeypatch, tmp_path: Path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("FORGE_PORT", "3131")
+    monkeypatch.setenv("APP_PORT", "3131")
     monkeypatch.setenv("PORT", "3000")
-    monkeypatch.setenv("FORGE_APP_ROOT", str(tmp_path / "app-root"))
+    monkeypatch.setenv("APP_ROOT", str(tmp_path / "app-root"))
 
     plan = build_server_startup_plan(tmp_path)
 
@@ -53,7 +53,7 @@ def test_build_server_startup_plan_prefers_forge_port(monkeypatch, tmp_path: Pat
 
 def test_build_server_startup_plan_detects_agent_yaml(monkeypatch, tmp_path: Path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("FORGE_APP_ROOT", str(tmp_path / "app-root"))
+    monkeypatch.setenv("APP_ROOT", str(tmp_path / "app-root"))
     (tmp_path / "agent.yaml").write_text("name: demo\n", encoding="utf-8")
 
     plan = build_server_startup_plan(tmp_path)
@@ -105,12 +105,12 @@ def test_load_dotenv_local_missing_returns_false(tmp_path: Path) -> None:
 
 
 def test_validate_storage_contract_noop_for_file_mode() -> None:
-    env = {"KB_STORAGE_TYPE": "file", "DATABASE_URL": ""}
+    env = {"APP_KB_STORAGE_TYPE": "file", "DATABASE_URL": ""}
     validate_storage_contract(env)
 
 
 def test_validate_storage_contract_exits_when_db_without_url() -> None:
-    env = {"KB_STORAGE_TYPE": "database", "DATABASE_URL": "  "}
+    env = {"APP_KB_STORAGE_TYPE": "database", "DATABASE_URL": "  "}
     with pytest.raises(SystemExit) as exc:
         validate_storage_contract(env)
     assert exc.value.code == 2
@@ -165,9 +165,12 @@ def test_print_server_startup_preflight_emits_urls() -> None:
         docs_url="http://127.0.0.1:3000/docs",
         health_url="http://127.0.0.1:3000/api/health/ready",
     )
-    print_server_startup_preflight(plan, emit=buf.write)
+    def emit(line: str) -> None:
+        buf.write(f"{line}\n")
+
+    print_server_startup_preflight(plan, emit=emit)
     out = buf.getvalue()
-    assert "Forge local server preflight" in out
+    assert "Local server preflight" in out
     assert "127.0.0.1:3000" in out or "health" in out
 
 
@@ -191,7 +194,10 @@ def test_print_server_startup_preflight_port_switch_line() -> None:
         docs_url="http://127.0.0.1:3005/docs",
         health_url="http://127.0.0.1:3005/api/health/ready",
     )
-    print_server_startup_preflight(plan, emit=buf.write)
+    def emit(line: str) -> None:
+        buf.write(f"{line}\n")
+
+    print_server_startup_preflight(plan, emit=emit)
     assert "3000 requested" in buf.getvalue()
     assert "3005 selected" in buf.getvalue()
 
@@ -201,8 +207,8 @@ def test_build_server_startup_plan_finds_next_port_when_busy(
     mock_socket_class, monkeypatch, tmp_path: Path
 ):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("FORGE_APP_ROOT", str(tmp_path / "app-root"))
-    monkeypatch.setenv("FORGE_PORT", "9999")
+    monkeypatch.setenv("APP_ROOT", str(tmp_path / "app-root"))
+    monkeypatch.setenv("APP_PORT", "9999")
 
     def bind_side_effect(addr):
         _host, port = addr

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.gateway.app_state import get_app_state
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.workspace_resolution import (
     apply_workspace_to_config,
     get_effective_workspace_root,

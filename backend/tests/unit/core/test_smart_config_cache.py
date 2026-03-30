@@ -32,7 +32,7 @@ class TestSmartConfigCacheInit:
 
 
 class TestGetGlobalConfigMemory:
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_dispatches_to_memory_not_redis(self, mock_load):
         fake_config = MagicMock()
         mock_load.return_value = fake_config
@@ -41,7 +41,7 @@ class TestGetGlobalConfigMemory:
         result = cache.get_global_config()
         assert result is fake_config  # Proves memory path was used
 
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_cache_miss_loads_config(self, mock_load):
         fake_config = MagicMock()
         mock_load.return_value = fake_config
@@ -51,7 +51,7 @@ class TestGetGlobalConfigMemory:
         assert cache._global_config_cache is fake_config
         assert cache._global_config_time > 0
 
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_cache_hit_returns_cached(self, mock_load):
         fake_config = MagicMock()
         mock_load.return_value = fake_config
@@ -63,7 +63,7 @@ class TestGetGlobalConfigMemory:
         assert result is fake_config
         mock_load.assert_not_called()
 
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_cache_expired_reloads(self, mock_load):
         new_config = MagicMock()
         mock_load.return_value = new_config
@@ -80,7 +80,7 @@ class TestGetGlobalConfigMemory:
 
 class TestGetUserSettingsMemory:
     @patch("backend.core.cache.smart_config_cache.merge_settings_with_cache")
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_cache_miss_loads_and_merges(self, mock_load_cfg, mock_merge):
         fake_settings = MagicMock()
         fake_settings.merge_with_config_settings.return_value = fake_settings
@@ -114,7 +114,7 @@ class TestGetUserSettingsMemory:
         settings_store.load.return_value = new_settings
 
         with patch(
-            "backend.core.config.config_loader.load_forge_config", return_value=MagicMock()
+            "backend.core.config.config_loader.load_app_config", return_value=MagicMock()
         ):
             with patch(
                 "backend.core.cache.smart_config_cache.merge_settings_with_cache",
@@ -225,7 +225,7 @@ class TestSmartConfigCacheRedis:
         "backend.core.cache.smart_config_cache.serialize_model",
         return_value=b"serialized",
     )
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_get_global_config_redis_hit(self, mock_load_config, mock_serialize):
         # Test cache hit scenario by avoiding deserialize on the happy path
         # Instead, we test that when redis has cached data, it attempts to deserialize
@@ -237,7 +237,7 @@ class TestSmartConfigCacheRedis:
         mock_cfg = MagicMock()
         mock_load_config.return_value = mock_cfg
 
-        # When redis.get returns None, it's a cache miss and load_forge_config is called
+        # When redis.get returns None, it's a cache miss and load_app_config is called
         cache.redis.get.return_value = None
         result = cache._get_global_config_redis()
 
@@ -250,7 +250,7 @@ class TestSmartConfigCacheRedis:
     @patch(
         "backend.core.cache.smart_config_cache.serialize_model", return_value=b"blob"
     )
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_get_global_config_redis_miss(self, mock_load, _mock_serialize):
         cache = SmartConfigCache()
         cache.redis_available = True
@@ -262,7 +262,7 @@ class TestSmartConfigCacheRedis:
         assert result is fake_config
         cache.redis.setex.assert_called_once()
 
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_get_global_config_redis_error(self, mock_load):
         cache = SmartConfigCache()
         cache.redis_available = True
@@ -341,7 +341,7 @@ class TestMemoryCache:
         assert cache._global_config_time == 0
         assert cache._user_settings_cache == {}
 
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_get_global_config_memory_miss(self, mock_load):
         """Test memory cache miss - loads from file."""
         cache = SmartConfigCache()
@@ -355,7 +355,7 @@ class TestMemoryCache:
         assert cache._global_config_cache is mock_config
         assert cache._global_config_time > 0
 
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_get_global_config_memory_hit(self, mock_load):
         """Test memory cache hit - returns cached value."""
         cache = SmartConfigCache()
@@ -366,10 +366,10 @@ class TestMemoryCache:
 
         result = cache._get_global_config_memory()
         assert result is mock_config
-        # load_forge_config should not be called on cache hit
+        # load_app_config should not be called on cache hit
         mock_load.assert_not_called()
 
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_get_global_config_memory_ttl_expires(self, mock_load):
         """Test memory cache expiration - reloads after TTL."""
         cache = SmartConfigCache()
@@ -391,7 +391,7 @@ class TestMemoryCache:
         assert result2 is new_config
         assert mock_load.call_count == 2
 
-    @patch("backend.core.config.config_loader.load_forge_config")
+    @patch("backend.core.config.config_loader.load_app_config")
     def test_get_user_settings_memory(self, mock_load_global):
         """Test memory cache for user settings."""
         cache = SmartConfigCache()
@@ -507,7 +507,7 @@ class TestEdgeCasesAndErrors:
         cache.redis.get.return_value = b"invalid_data"
         mock_deserialize.side_effect = Exception("deserialize error")
 
-        with patch("backend.core.config.config_loader.load_forge_config") as mock_load:
+        with patch("backend.core.config.config_loader.load_app_config") as mock_load:
             mock_config = MagicMock()
             mock_load.return_value = mock_config
             result = cache._get_global_config_redis()

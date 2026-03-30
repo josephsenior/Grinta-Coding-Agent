@@ -1,7 +1,7 @@
 """Safe JSON-based serialization for Redis cache values.
 
 Uses JSON to eliminate unsafe deserialization attack vectors (CWE-502).
-Both ForgeConfig and Settings are Pydantic BaseModel subclasses and
+Both AppConfig and Settings are Pydantic BaseModel subclasses and
 round-trip cleanly through ``model_dump`` → JSON → ``model_validate``.
 """
 

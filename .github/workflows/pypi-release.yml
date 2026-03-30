@@ -1,4 +1,4 @@
-# Publishes the Forge PyPi package
+# Publishes the App PyPi package
 name: Publish PyPi Package
 
 # Triggered manually

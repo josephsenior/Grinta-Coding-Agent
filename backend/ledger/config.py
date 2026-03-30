@@ -26,11 +26,11 @@ class EventRuntimeDefaults:
 
 @lru_cache(maxsize=1)
 def get_event_runtime_defaults() -> EventRuntimeDefaults:
-    """Resolve event runtime defaults from Forge config, then env fallback."""
+    """Resolve event runtime defaults from app config, then env fallback."""
     try:
-        from backend.core.config.config_loader import load_forge_config
+        from backend.core.config.config_loader import load_app_config
 
-        cfg = load_forge_config()
+        cfg = load_app_config()
         event_cfg = getattr(cfg, "event_stream", None)
         if event_cfg is not None:
             return EventRuntimeDefaults(
@@ -54,21 +54,21 @@ def get_event_runtime_defaults() -> EventRuntimeDefaults:
         pass
 
     return EventRuntimeDefaults(
-        max_queue_size=int(os.getenv("FORGE_EVENTSTREAM_MAX_QUEUE", "2000")),
-        drop_policy=os.getenv("FORGE_EVENTSTREAM_POLICY", "drop_oldest").lower(),
-        hwm_ratio=float(os.getenv("FORGE_EVENTSTREAM_HWM_RATIO", "0.8")),
-        block_timeout=float(os.getenv("FORGE_EVENTSTREAM_BLOCK_TIMEOUT", "0.1")),
+        max_queue_size=int(os.getenv("APP_EVENTSTREAM_MAX_QUEUE", "2000")),
+        drop_policy=os.getenv("APP_EVENTSTREAM_POLICY", "drop_oldest").lower(),
+        hwm_ratio=float(os.getenv("APP_EVENTSTREAM_HWM_RATIO", "0.8")),
+        block_timeout=float(os.getenv("APP_EVENTSTREAM_BLOCK_TIMEOUT", "0.1")),
         rate_window_seconds=int(
-            os.getenv("FORGE_EVENTSTREAM_RATE_WINDOW_SECONDS", "60")
+            os.getenv("APP_EVENTSTREAM_RATE_WINDOW_SECONDS", "60")
         ),
-        workers=max(1, int(os.getenv("FORGE_EVENTSTREAM_WORKERS", "1"))),
-        async_write=os.getenv("FORGE_EVENTSTREAM_ASYNC_WRITE", "false").lower()
+        workers=max(1, int(os.getenv("APP_EVENTSTREAM_WORKERS", "1"))),
+        async_write=os.getenv("APP_EVENTSTREAM_ASYNC_WRITE", "false").lower()
         in ("1", "true", "yes"),
-        coalesce=os.getenv("FORGE_EVENT_COALESCE", "false").lower()
+        coalesce=os.getenv("APP_EVENT_COALESCE", "false").lower()
         in ("1", "true", "yes"),
-        coalesce_window_ms=float(os.getenv("FORGE_EVENT_COALESCE_WINDOW_MS", "100")),
+        coalesce_window_ms=float(os.getenv("APP_EVENT_COALESCE_WINDOW_MS", "100")),
         coalesce_max_batch=max(
             1,
-            int(os.getenv("FORGE_EVENT_COALESCE_MAX_BATCH", "20")),
+            int(os.getenv("APP_EVENT_COALESCE_MAX_BATCH", "20")),
         ),
     )

@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.gateway.user_auth import get_user_id
 from backend.gateway.utils.pagination import PaginatedResponse, parse_pagination_params
 from backend.gateway.utils.responses import error, success
@@ -65,7 +65,7 @@ class NotificationStore:
             storage_path: Path to notification storage directory
         """
         if storage_path is None:
-            storage_path = os.path.join(os.getcwd(), ".forge", "notifications")
+            storage_path = os.path.join(os.getcwd(), ".app", "notifications")
         self.storage_path = PathLib(storage_path)
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self._notifications_cache: dict[str, list[Notification]] = {}

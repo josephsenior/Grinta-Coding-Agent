@@ -1,17 +1,17 @@
 """Production health check for verifying critical dependencies.
 
-Ensures all Forge competitive advantages are available at startup.
+Ensures all App competitive advantages are available at startup.
 """
 
 from typing import Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 def check_structure_editor_dependencies() -> tuple[bool, str]:
     """Verify Structure Editor (Tree-sitter) is available.
 
-    This is CRITICAL for production - Structure Editor is Forge's competitive moat!
+    This is CRITICAL for production - Structure Editor is App's competitive moat!
 
     Returns:
         (success, message): Success status and detailed message
@@ -44,8 +44,8 @@ def check_structure_editor_dependencies() -> tuple[bool, str]:
         error_msg = f"""
 🚨 CRITICAL: Ultimate Editor dependencies missing!
 
-This is Forge's competitive moat - structure-aware editing with Tree-sitter.
-Without it, Forge falls back to basic string matching (like competitors).
+This is App's competitive moat - structure-aware editing with Tree-sitter.
+Without it, App falls back to basic string matching (like competitors).
 
 Missing: {e}
 
@@ -98,7 +98,7 @@ def run_production_health_check(raise_on_failure: bool = True) -> dict[str, Any]
 
     """
     logger.info("=" * 60)
-    logger.info("🏥 FORGE PRODUCTION HEALTH CHECK")
+    logger.info("🏥 APP PRODUCTION HEALTH CHECK")
     logger.info("=" * 60)
 
     results: dict[str, Any] = {
@@ -144,13 +144,13 @@ def run_production_health_check(raise_on_failure: bool = True) -> dict[str, Any]
         if raise_on_failure:
             raise RuntimeError(
                 f"Production health check failed! Critical dependencies missing: {critical_failures}\n"
-                "Forge cannot operate without Ultimate Editor (Tree-sitter)."
+                "App cannot operate without Ultimate Editor (Tree-sitter)."
             )
     else:
         results["overall_status"] = "HEALTHY"
         logger.info("=" * 60)
         logger.info("✅ HEALTH CHECK PASSED")
-        logger.info("   Forge is production-ready!")
+        logger.info("   App is production-ready!")
         logger.info("=" * 60)
 
     return results

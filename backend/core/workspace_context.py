@@ -2,14 +2,14 @@
 
 Three responsibilities
 ----------------------
-1. **Project memory**: reads/writes ``.forge/context.md`` — a human-editable
+1. **Project memory**: reads/writes ``.app/context.md`` — a human-editable
    file the agent receives at the start of every session.
 2. **Workspace fingerprinting**: detects the project type by probing well-known
    sentinel files so the UI can display it and pre-populate the context template.
 3. **Agent changelog**: appends newline-delimited JSON entries to
-   ``.forge/changelog.jsonl`` for optional end-of-day / summary tooling.
+    ``.app/changelog.jsonl`` for optional end-of-day / summary tooling.
 
-The ``.forge/`` directory is created automatically on first write.
+The ``.app/`` directory is created automatically on first write.
 A ``.gitignore`` inside it excludes ``changelog.jsonl`` by default
 (the context file is intentionally committed so the whole team benefits).
 """
@@ -43,14 +43,14 @@ _FINGERPRINTS: list[tuple[str, str]] = [
     (".github", "GitHub project"),
 ]
 
-_FORGE_DIR = ".forge"
+_PROJECT_STATE_DIR = ".app"
 _CONTEXT_FILE = "context.md"
 _CHANGELOG_FILE = "changelog.jsonl"
 
 _CONTEXT_TEMPLATE = """\
 # Project Context
 
-<!-- Forge reads this file at the start of every session. -->
+<!-- App reads this file at the start of every session. -->
 <!-- Describe your project, code conventions, and working preferences. -->
 <!-- Changes here take effect immediately on the next session start.  -->
 
@@ -80,28 +80,28 @@ _CONTEXT_TEMPLATE = """\
 # ── Directory helpers ────────────────────────────────────────────────
 
 
-def get_forge_dir(cwd: Path | None = None) -> Path:
-    """Return the path to the ``.forge/`` directory for *cwd* (or CWD)."""
-    return (cwd or Path.cwd()) / _FORGE_DIR
+def get_project_state_dir(cwd: Path | None = None) -> Path:
+    """Return the path to the ``.app/`` directory for *cwd* (or CWD)."""
+    return (cwd or Path.cwd()) / _PROJECT_STATE_DIR
 
 
-def ensure_forge_dir(cwd: Path | None = None) -> Path:
-    """Create ``.forge/`` (and its ``.gitignore``) if they don't exist."""
-    forge_dir = get_forge_dir(cwd)
-    forge_dir.mkdir(exist_ok=True)
-    gitignore = forge_dir / ".gitignore"
+def ensure_project_state_dir(cwd: Path | None = None) -> Path:
+    """Create ``.app/`` (and its ``.gitignore``) if they don't exist."""
+    project_state_dir = get_project_state_dir(cwd)
+    project_state_dir.mkdir(exist_ok=True)
+    gitignore = project_state_dir / ".gitignore"
     if not gitignore.exists():
         # Only ignore the volatile changelog; context.md should be committed.
         gitignore.write_text("changelog.jsonl\n", encoding="utf-8")
-    return forge_dir
+    return project_state_dir
 
 
 # ── Project memory ───────────────────────────────────────────────────
 
 
 def read_project_memory(cwd: Path | None = None) -> str | None:
-    """Return the contents of ``.forge/context.md``, or *None* if absent/empty."""
-    path = get_forge_dir(cwd) / _CONTEXT_FILE
+    """Return the contents of ``.app/context.md``, or *None* if absent/empty."""
+    path = get_project_state_dir(cwd) / _CONTEXT_FILE
     if not path.exists():
         return None
     try:
@@ -112,12 +112,12 @@ def read_project_memory(cwd: Path | None = None) -> str | None:
 
 
 def write_context_template(cwd: Path | None = None) -> Path:
-    """Create ``.forge/context.md`` with a starter template if it doesn't exist.
+    """Create ``.app/context.md`` with a starter template if it doesn't exist.
 
     Returns the path to the file (created or pre-existing).
     """
-    forge_dir = ensure_forge_dir(cwd)
-    context_path = forge_dir / _CONTEXT_FILE
+    project_state_dir = ensure_project_state_dir(cwd)
+    context_path = project_state_dir / _CONTEXT_FILE
     if not context_path.exists():
         fingerprint = detect_project_type(cwd)
         context_path.write_text(
@@ -170,13 +170,13 @@ def append_changelog(
     conversation_id: str = "",
     cwd: Path | None = None,
 ) -> None:
-    """Append a structured entry to ``.forge/changelog.jsonl``.
+    """Append a structured entry to ``.app/changelog.jsonl``.
 
     Failures are silently swallowed — the changelog must never crash the app.
     """
     try:
-        forge_dir = ensure_forge_dir(cwd)
-        changelog_path = forge_dir / _CHANGELOG_FILE
+        project_state_dir = ensure_project_state_dir(cwd)
+        changelog_path = project_state_dir / _CHANGELOG_FILE
         now = datetime.now(UTC)
         entry: dict[str, Any] = {
             "ts": now.isoformat(),
@@ -228,7 +228,7 @@ def _read_changelog_filtered(
     predicate,
     cwd: Path | None = None,
 ) -> list[dict[str, Any]]:
-    changelog_path = get_forge_dir(cwd) / _CHANGELOG_FILE
+    changelog_path = get_project_state_dir(cwd) / _CHANGELOG_FILE
     if not changelog_path.exists():
         return []
     entries: list[dict[str, Any]] = []
@@ -318,11 +318,11 @@ _TAGS_FILE = "tags.json"
 
 
 def _load_tags_store(cwd: Path | None = None) -> dict[str, dict[str, Any]]:
-    """Load the tags store from ``.forge/tags.json``.
+    """Load the tags store from ``.app/tags.json``.
 
     Returns a dict mapping conversation_id → {"tags": [...], "project": str}.
     """
-    path = get_forge_dir(cwd) / _TAGS_FILE
+    path = get_project_state_dir(cwd) / _TAGS_FILE
     if not path.exists():
         return {}
     try:
@@ -332,10 +332,10 @@ def _load_tags_store(cwd: Path | None = None) -> dict[str, dict[str, Any]]:
 
 
 def _save_tags_store(store: dict[str, dict[str, Any]], cwd: Path | None = None) -> None:
-    """Persist the tags store to ``.forge/tags.json``."""
+    """Persist the tags store to ``.app/tags.json``."""
     try:
-        forge_dir = ensure_forge_dir(cwd)
-        path = forge_dir / _TAGS_FILE
+        project_state_dir = ensure_project_state_dir(cwd)
+        path = project_state_dir / _TAGS_FILE
         path.write_text(json.dumps(store, indent=2, default=str), encoding="utf-8")
     except Exception:
         pass

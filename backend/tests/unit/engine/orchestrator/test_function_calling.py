@@ -354,7 +354,7 @@ class TestHandleTaskTrackerTool:
         assert action.command == "update"
 
     def test_duplicate_update_returns_think_action(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("FORGE_WORKSPACE_DIR", str(tmp_path))
+        monkeypatch.setenv("APP_WORKSPACE_DIR", str(tmp_path))
         args = {
             "command": "update",
             "task_list": [

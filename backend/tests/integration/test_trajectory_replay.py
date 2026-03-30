@@ -4,9 +4,9 @@ import tempfile
 from backend.ledger import EventSource
 from backend.ledger.observation import NullObservation
 from backend.ledger.stream import EventStream
-from backend.gateway.routes.trajectory import get_trajectory
+from backend.gateway.routes.trajectory import get_transcript
 from backend.gateway.session.conversation import ServerConversation
-from backend.core.config import ForgeConfig
+from backend.core.config import AppConfig
 from backend.persistence.local_file_store import LocalFileStore
 
 
@@ -14,7 +14,7 @@ async def test_trajectory_replay_since_id_and_ordering() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         file_store = LocalFileStore(tmpdir)
         event_stream = EventStream("test-conversation", file_store)
-        config = ForgeConfig()
+        config = AppConfig()
         try:
             for content in ["e0", "e1", "e2", "e3", "e4"]:
                 event_stream.add_event(
@@ -29,24 +29,24 @@ async def test_trajectory_replay_since_id_and_ordering() -> None:
                 event_stream=event_stream,
             )
 
-            resp = await get_trajectory(
+            resp = await get_transcript(
                 conversation_id="test-conversation",
                 since_id=1,
                 limit=None,
                 conversation=conversation,
             )
             payload = json.loads(resp.body)
-            ids = [evt["id"] for evt in payload["trajectory"]]
+            ids = [evt["id"] for evt in payload["transcript"]]
             assert ids == [2, 3, 4]
 
-            resp_limited = await get_trajectory(
+            resp_limited = await get_transcript(
                 conversation_id="test-conversation",
                 since_id=1,
                 limit=2,
                 conversation=conversation,
             )
             payload_limited = json.loads(resp_limited.body)
-            ids_limited = [evt["id"] for evt in payload_limited["trajectory"]]
+            ids_limited = [evt["id"] for evt in payload_limited["transcript"]]
             assert ids_limited == [2, 3]
         finally:
             event_stream.close()

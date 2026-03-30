@@ -38,3 +38,8 @@ class Observation(Event, metaclass=CanonicalMeta):
     def exit_code(self, value: int | None) -> None:
         """Set generic exit code metadata."""
         self._exit_code = value
+
+
+Outcome = Observation
+
+__all__ = ["Observation", "Outcome"]

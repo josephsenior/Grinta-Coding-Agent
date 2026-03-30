@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plugin development server with hot-reload.
 
-Provides a lightweight environment for developing and testing Forge
+Provides a lightweight environment for developing and testing App
 plugins without running the full agent + runtime stack.
 
 Usage::
@@ -231,13 +231,13 @@ async def _call_if_exists(plugin: Any, method: str, *args: Any) -> Any:
 def _is_base_method(method: Any) -> bool:
     """Check if a method is the default ABC implementation (no-op)."""
     qualname = getattr(method, "__qualname__", "")
-    return "ForgePlugin." in qualname
+    return "AppPlugin." in qualname
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="plugin_dev",
-        description="Forge plugin development tools",
+        description="App plugin development tools",
     )
     sub = parser.add_subparsers(dest="command")
 

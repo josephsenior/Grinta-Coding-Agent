@@ -1,4 +1,4 @@
-﻿"""Health and diagnostics endpoints for the Forge server."""
+﻿"""Health and diagnostics endpoints for the App server."""
 
 import os
 import shutil
@@ -32,9 +32,9 @@ def _check_storage() -> dict:
 def _check_config() -> dict:
     """Validate that the core config is loadable."""
     try:
-        from backend.core.config import load_forge_config
+        from backend.core.config import load_app_config
 
-        cfg = load_forge_config()
+        cfg = load_app_config()
         return {
             "status": "ok",
             "project_root": str(getattr(cfg, "project_root", None) or ""),
@@ -75,7 +75,7 @@ def _check_redis() -> dict:
 
 
 def _check_database() -> dict:
-    storage_mode = os.environ.get('KB_STORAGE_TYPE', 'file').strip().lower()
+    storage_mode = os.environ.get('APP_KB_STORAGE_TYPE', 'file').strip().lower()
     if storage_mode not in {'database', 'db'}:
         return {"status": "not_configured", "mode": storage_mode or 'file'}
 

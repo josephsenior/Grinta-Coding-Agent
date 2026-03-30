@@ -1,4 +1,4 @@
-﻿"""Bootstrap entry point for the Forge agent framework.
+﻿"""Bootstrap entry point for the App agent framework.
 
 Classes:
     FakeUserResponseFunc
@@ -36,11 +36,11 @@ if TYPE_CHECKING:
 from backend.gateway.adapters import read_input, read_task
 from backend.orchestration.replay import ReplayManager
 from backend.core.config import (
-    ForgeConfig,
+    AppConfig,
     parse_arguments,
     setup_config_from_args,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.bootstrap.agent_control_loop import run_agent_until_done
 from backend.core.schemas import AgentState
 from backend.core.bootstrap.setup import (
@@ -84,7 +84,7 @@ class FakeUserResponseFunc(Protocol):
 
 
 def _setup_runtime_and_repo(
-    config_: ForgeConfig,
+    config_: AppConfig,
     session_id: str,
     llm_registry,
     agent,
@@ -133,7 +133,7 @@ def _setup_runtime_and_repo(
 
 
 async def _setup_memory_and_mcp(
-    config_: ForgeConfig,
+    config_: AppConfig,
     runtime: Runtime,
     session_id: str,
     repo_directory: str | None,
@@ -164,13 +164,13 @@ async def _setup_memory_and_mcp(
 
 
 def _setup_replay_events(
-    config_: ForgeConfig, initial_action: Action
+    config_: AppConfig, initial_action: Action
 ) -> tuple[list[Event] | None, Action]:
-    """Setup replay events if trajectory replay is enabled."""
-    if config_.replay_trajectory_path:
-        logger.info("Trajectory replay is enabled")
+    """Setup replay events if transcript replay is enabled."""
+    if config_.replay_transcript_path:
+        logger.info("Transcript replay is enabled")
         assert isinstance(initial_action, NullAction)
-        return load_replay_log(config_.replay_trajectory_path)
+        return load_replay_log(config_.replay_transcript_path)
     return None, initial_action
 
 
@@ -267,7 +267,7 @@ def _setup_initial_events(
 
 
 def _create_event_handler(
-    config_: ForgeConfig,
+    config_: AppConfig,
     exit_on_message: bool,
     fake_user_response_fn: FakeUserResponseFunc | None,
     controller,
@@ -298,23 +298,28 @@ def _create_event_handler(
     return on_event
 
 
-def _save_trajectory(config_: ForgeConfig, session_id: str, controller) -> None:
-    """Save trajectory to file if configured."""
-    if config_.save_trajectory_path is not None:
-        if os.path.isdir(config_.save_trajectory_path):
-            file_path = os.path.join(config_.save_trajectory_path, f"{session_id}.json")
+def _save_transcript(config_: AppConfig, session_id: str, controller) -> None:
+    """Save transcript to file if configured."""
+    if config_.save_transcript_path is not None:
+        if os.path.isdir(config_.save_transcript_path):
+            file_path = os.path.join(config_.save_transcript_path, f"{session_id}.json")
         else:
-            file_path = config_.save_trajectory_path
+            file_path = config_.save_transcript_path
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        histories = controller.get_trajectory(config_.save_screenshots_in_trajectory)
+        histories = controller.get_transcript(config_.save_screenshots_in_transcript)
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(histories, f, indent=4)
 
 
+def _save_trajectory(config_: AppConfig, session_id: str, controller) -> None:
+    """Backward-compatible wrapper for transcript saving."""
+    _save_transcript(config_, session_id, controller)
+
+
 def _initialize_session_components(
-    config_: ForgeConfig,
+    config_: AppConfig,
     session_id: str | None,
-) -> tuple[str, LLMRegistry, ConversationStats, ForgeConfig, Agent]:
+) -> tuple[str, LLMRegistry, ConversationStats, AppConfig, Agent]:
     """Initialize session and components."""
     session_id = session_id or generate_sid(config_)
     llm_registry, conversation_stats, config_ = create_registry_and_conversation_stats(
@@ -325,7 +330,7 @@ def _initialize_session_components(
 
 
 def _setup_runtime_for_controller(
-    config_: ForgeConfig,
+    config_: AppConfig,
     llm_registry: LLMRegistry,
     session_id: str,
     headless_mode: bool,
@@ -346,7 +351,7 @@ def _setup_runtime_for_controller(
 
 
 async def run_controller(
-    config_: ForgeConfig | None = None,
+    config_: AppConfig | None = None,
     initial_action: Action | None = None,
     *,
     session_id: str | None = None,
@@ -396,8 +401,8 @@ async def run_controller(
 
 
 def _validate_run_controller_inputs(
-    config_: ForgeConfig | None, initial_action: Action | None
-) -> tuple[ForgeConfig, Action]:
+    config_: AppConfig | None, initial_action: Action | None
+) -> tuple[AppConfig, Action]:
     if config_ is None:
         raise TypeError("run_controller() missing required argument 'config_'")
     if initial_action is None:
@@ -407,7 +412,7 @@ def _validate_run_controller_inputs(
 
 async def _execute_controller_lifecycle(
     *,
-    config_: ForgeConfig,
+    config_: AppConfig,
     runtime: Runtime,
     session_id: str,
     repo_directory: str | None,
@@ -470,7 +475,7 @@ def _attach_status_callback(memory: Memory, controller) -> None:
 
 
 def _subscribe_controller_events(
-    config_: ForgeConfig,
+    config_: AppConfig,
     event_stream: EventStream,
     exit_on_message: bool,
     fake_user_response_fn: FakeUserResponseFunc | None,
@@ -497,7 +502,7 @@ async def _run_agent_loop(controller, runtime: Runtime, memory: Memory) -> None:
 
 
 async def _persist_controller_state(
-    config_: ForgeConfig, controller, event_stream: EventStream
+    config_: AppConfig, controller, event_stream: EventStream
 ) -> None:
     if config_.file_store is None or config_.file_store == "memory":
         return
@@ -573,7 +578,7 @@ def load_replay_log(trajectory_path: str) -> tuple[list[Event] | None, Action]:
 
 if __name__ == "__main__":
     args = parse_arguments()
-    config_main: ForgeConfig = setup_config_from_args(args)
+    config_main: AppConfig = setup_config_from_args(args)
     task_str = read_task(args, config_main.cli_multiline_input)
     initial_action_main: Action = NullAction()
     if config_main.replay_trajectory_path:

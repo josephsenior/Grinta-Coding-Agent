@@ -12,7 +12,7 @@ from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.engine.tools import (
     create_apply_patch_tool,
     create_cmd_run_tool,

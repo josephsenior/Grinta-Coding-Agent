@@ -1,4 +1,4 @@
-"""OpenTelemetry instrumentation helpers for Forge."""
+"""OpenTelemetry instrumentation helpers for App."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def redis_span(span_name: str) -> Generator[Any, None, None]:
         yield None
         return
 
-    tracer = _otel_trace.get_tracer("forge.redis")
+    tracer = _otel_trace.get_tracer("app.redis")
     with tracer.start_as_current_span(span_name, kind=_SpanKind.CLIENT) as span:
         span.set_attribute("db.system", "redis")
 
@@ -34,7 +34,7 @@ def redis_span(span_name: str) -> Generator[Any, None, None]:
 
             ctx = get_trace_context()
             if ctx.get("trace_id"):
-                span.set_attribute("forge.trace_id", str(ctx["trace_id"]))
+                span.set_attribute("app.trace_id", str(ctx["trace_id"]))
         except ImportError:
             pass
 

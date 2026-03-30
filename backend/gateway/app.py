@@ -12,7 +12,7 @@ from fastapi.routing import Mount
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend import __version__
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.logger import get_trace_context
 from backend.core.tracing import initialize_tracing
 from backend.gateway.error_handlers import register_exception_handlers
@@ -41,7 +41,7 @@ from backend.gateway.middleware.security_headers import (
 from backend.gateway.middleware.audit_logger import AuditLoggerMiddleware
 from backend.gateway.route_registry import register_routes
 from backend.gateway.routes.mcp import mcp_server
-from backend.gateway.app_accessors import config as _forge_config
+from backend.gateway.app_accessors import config as _app_config
 from backend.gateway.app_accessors import (
     get_conversation_manager,
 )
@@ -52,6 +52,10 @@ from backend.gateway.otel_config import (
 )
 
 mcp_app = mcp_server.http_app(path="/mcp", stateless_http=True, json_response=True)
+
+
+def _get_optional_lifespan_timeout_sec() -> float:
+    return float(os.getenv("APP_OPTIONAL_LIFESPAN_TIMEOUT_SEC", "20"))
 
 
 def combine_lifespans(*lifespans):
@@ -69,9 +73,7 @@ def combine_lifespans(*lifespans):
     async def combined_lifespan(fastapi_app):
         """Execute each provided lifespan sequentially within a single ExitStack."""
         async with contextlib.AsyncExitStack() as stack:
-            optional_startup_timeout = float(
-                os.getenv("FORGE_OPTIONAL_LIFESPAN_TIMEOUT_SEC", "20")
-            )
+            optional_startup_timeout = _get_optional_lifespan_timeout_sec()
             for index, lifespan in enumerate(lifespans):
                 lifespan_name = getattr(lifespan, "__name__", str(lifespan))
                 # First lifespan is core app startup and should fail fast if broken.
@@ -109,12 +111,12 @@ def _validate_config() -> None:
     This runs once during the lifespan startup phase and logs warnings for
     common misconfigurations that silently degrade the experience.
 
-    Set ``FORGE_STRICT=1`` (or ``FORGE_ENV=production``) to promote warnings
+    Set ``APP_STRICT=1`` (or ``APP_ENV=production``) to promote warnings
     to hard errors that prevent startup.
     """
     strict = (
-        os.getenv("FORGE_STRICT", "").strip().lower() in ("1", "true", "yes")
-        or os.getenv("FORGE_ENV", "").strip().lower() == "production"
+        os.getenv("APP_STRICT", "").strip().lower() in ("1", "true", "yes")
+        or os.getenv("APP_ENV", "").strip().lower() == "production"
     )
 
     validation_warnings, errors = _collect_validation_issues(strict)
@@ -127,8 +129,8 @@ def _validate_config() -> None:
             logger.error("  %s", e)
         logger.error("=" * 60)
         raise SystemExit(
-            "Forge cannot start due to configuration errors. "
-            "Fix the issues above or unset FORGE_STRICT / FORGE_ENV=production."
+            "Application cannot start due to configuration errors. "
+            "Fix the issues above or unset APP_STRICT / APP_ENV=production."
         )
 
     if validation_warnings:
@@ -140,7 +142,7 @@ def _validate_config() -> None:
         logger.warning("=" * 60)
         if strict:
             raise SystemExit(
-                "Forge strict mode: resolve all warnings above or unset FORGE_STRICT."
+                "Strict mode: resolve all warnings above or unset APP_STRICT."
             )
     else:
         logger.info("Config validation passed.")
@@ -162,7 +164,7 @@ def _collect_validation_issues(strict: bool) -> tuple[list[str], list[str]]:
 
 def _check_budget_sanity(warnings: list[str]) -> None:
     """Warn on unlimited task budget."""
-    budget = getattr(_forge_config, "max_budget_per_task", None)
+    budget = getattr(_app_config, "max_budget_per_task", None)
     if budget is None or budget == 0 or budget == 0.0:
         warnings.append(
             "max_budget_per_task is unlimited (None / 0). Long sessions with "
@@ -173,13 +175,13 @@ def _check_budget_sanity(warnings: list[str]) -> None:
 
 def _check_database_availability(warnings: list[str]) -> None:
     """Check database storage dependencies."""
-    if os.getenv("KB_STORAGE_TYPE", "file").lower() in ("database", "db"):
+    if os.getenv("APP_KB_STORAGE_TYPE", "file").lower() in ("database", "db"):
         if importlib.util.find_spec("asyncpg") is None:
             warnings.append(
-                "KB_STORAGE_TYPE=database but 'asyncpg' is not installed. Install with: pip install asyncpg"
+                "APP_KB_STORAGE_TYPE=database but 'asyncpg' is not installed. Install with: pip install asyncpg"
             )
         if not os.getenv("DATABASE_URL"):
-            warnings.append("KB_STORAGE_TYPE=database but DATABASE_URL is not set.")
+            warnings.append("APP_KB_STORAGE_TYPE=database but DATABASE_URL is not set.")
 
 
 def _check_system_dependencies(warnings: list[str]) -> None:
@@ -200,12 +202,12 @@ def _check_config_file_existence(warnings: list[str]) -> None:
         )
 
 def _check_mcp_host_config(warnings: list[str]) -> None:
-    """Warn when mcp_host is empty or disabled (default is localhost:3000 in ForgeConfig)."""
-    raw = getattr(_forge_config, "mcp_host", None)
+    """Warn when mcp_host is empty or disabled (default is localhost:3000 in AppConfig)."""
+    raw = getattr(_app_config, "mcp_host", None)
     normalized = (raw or "").strip()
     if not normalized or normalized.lower() in {"none", "null"}:
         warnings.append(
-            "mcp_host is not set. The internal Forge MCP server will be disabled. "
+            "mcp_host is not set. The internal MCP server will be disabled. "
             "AI agents will not have access to built-in workspace tools like search and file reading. "
             "The default is localhost:3000; override in settings.json (e.g. \"mcp_host\": \"host:port\") "
             "if your MCP endpoint runs elsewhere."
@@ -224,13 +226,13 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
 
     # ── Config validation (fail fast on misconfiguration) ───────────────
     # Reload config to ensure it picks up any changes made to settings.json
-    from backend.core.config.config_loader import load_forge_config
-    fastapi_app.state.config = load_forge_config()
+    from backend.core.config.config_loader import load_app_config
+    fastapi_app.state.config = load_app_config()
 
     _validate_config()
 
     # Startup
-    logger.info("Starting Forge server...")
+    logger.info("Starting App server...")
 
     # Initialize Sentry error tracking (if configured)
     sentry_dsn = os.getenv("SENTRY_DSN")
@@ -260,7 +262,7 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
             logger.warning("Sentry initialization failed: %s", e)
 
     # Initialize database schemas if storage type is set to database
-    if os.getenv("KB_STORAGE_TYPE", "file").lower() in ("database", "db"):
+    if os.getenv("APP_KB_STORAGE_TYPE", "file").lower() in ("database", "db"):
         logger.info("Initializing database schemas...")
         try:
             from backend.persistence.conversation.database_conversation_store import (
@@ -319,25 +321,25 @@ async def _lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
 
     # Lazily initialize the conversation manager to avoid None during import time
     async with get_conversation_manager():
-        logger.info("Forge server started successfully")
+        logger.info("App server started successfully")
         yield
         # Shutdown
-        logger.info("Shutting down Forge server...")
+        logger.info("Shutting down App server...")
         from backend.gateway.graceful_shutdown import graceful_shutdown
 
         await graceful_shutdown()
 
 
 app = FastAPI(
-    title="Forge API",
+    title="App API",
     description=(
-        "Forge: Production-grade AI development platform\n\n"
+        "App: Production-grade AI development platform\n\n"
         "Features:\n"
         "- Structure-aware code editing\n"
         "- Real-time collaboration\n"
         "- Enterprise security & monitoring\n\n"
-        "Documentation: https://docs.forge.ai\n"
-        "Support: support@forge.ai"
+        "Documentation: https://docs.app.ai\n"
+        "Support: support@app.ai"
     ),
     version=__version__,
     lifespan=combine_lifespans(_lifespan, mcp_app.lifespan),
@@ -394,7 +396,7 @@ if _tracing_enabled:
         _tracing_sample_rate = 0.1
     initialize_tracing(
         service_name=os.getenv(
-            "TRACING_SERVICE_NAME", os.getenv("SERVICE_NAME", "forge-server")
+            "TRACING_SERVICE_NAME", os.getenv("SERVICE_NAME", "app-server")
         ),
         service_version=os.getenv("TRACING_SERVICE_VERSION", __version__),
         exporter=os.getenv("TRACING_EXPORTER", os.getenv("OTEL_EXPORTER", "console")),
@@ -408,7 +410,7 @@ if _otel_enabled:
         from opentelemetry import trace
         from opentelemetry.trace import SpanKind
 
-        tracer = trace.get_tracer("forge.server")
+        tracer = trace.get_tracer("app.server")
 
         async def otel_wrapper(request: Request, call_next):
             request_path = request.url.path
@@ -436,7 +438,7 @@ if _otel_enabled:
                 span.set_attribute("http.target", request_path)
                 span.set_attribute("http.url", str(request.url))
                 span.set_attribute(
-                    "forge.request_id",
+                    "app.request_id",
                     getattr(getattr(request, "state", object()), "request_id", ""),
                 )
                 # Bridge thread-local orchestrator trace_id for correlation
@@ -444,7 +446,7 @@ if _otel_enabled:
                     ctx = get_trace_context()
                     tid = ctx.get("trace_id") if isinstance(ctx, dict) else None
                     if tid:
-                        span.set_attribute("forge.trace_id", str(tid))
+                        span.set_attribute("app.trace_id", str(tid))
                 except Exception:
                     logger.debug("Failed to bridge OTEL trace context", exc_info=True)
                 try:
@@ -502,7 +504,7 @@ app.add_middleware(
 # CSP policy can be toggled via env: CSP_POLICY=permissive|strict
 # Default: strict in production-like environments, permissive otherwise
 env_hint = (
-    os.getenv("FORGE_ENV")
+    os.getenv("APP_ENV")
     or os.getenv("ENV")
     or os.getenv("PYTHON_ENV")
     or os.getenv("NODE_ENV")

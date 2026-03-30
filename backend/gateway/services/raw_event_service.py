@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import status
 from fastapi.responses import JSONResponse
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.event import EventSource
 from backend.ledger.serialization.event import event_from_dict
 from backend.gateway.services.service_dependencies import (

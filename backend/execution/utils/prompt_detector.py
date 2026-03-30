@@ -18,7 +18,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 class PromptType(Enum):

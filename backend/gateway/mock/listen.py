@@ -3,7 +3,7 @@
 import uvicorn
 from fastapi import FastAPI, WebSocket
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.utils.shutdown_listener import should_continue
 
 app = FastAPI()
@@ -85,11 +85,11 @@ def get_config() -> dict:
     """
     return {
         "APP_MODE": "saas",
-        "APP_SLUG": "Forge-pro",
+        "APP_SLUG": "App-pro",
         "GITHUB_CLIENT_ID": "mock_github_client_id",
         "POSTHOG_CLIENT_KEY": "mock_posthog_key",
         "PROVIDERS_CONFIGURED": ["openai", "anthropic"],
-        "AUTH_URL": "https://auth.Forge.pro",
+        "AUTH_URL": "https://auth.app.pro",
         "FEATURE_FLAGS": {
             "ENABLE_BILLING": True,
             "HIDE_LLM_SETTINGS": False,

@@ -7,8 +7,8 @@ interruptions are recoverable.
 There are 3 main server side event handlers:
 
 - `connect` - Invoked when a new connection to the server is established. (This may be via http or WebSocket)
-- `forge_user_action` - Invoked when a connected client sends an event (such as a prompt for the Agent) -
-  this is distinct from the `forge_event` sent from the server to the client.
+- `app_user_action` - Invoked when a connected client sends an event (such as a prompt for the Agent) -
+  this is distinct from the `app_event` sent from the server to the client.
 - `disconnect` - Invoked when a connected client disconnects from the server.
 
 ## Disconnect

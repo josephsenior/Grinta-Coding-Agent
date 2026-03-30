@@ -8,7 +8,7 @@ from backend.core.constants import (
     EVICTION_SPIKE_THRESHOLD,
     IDLE_RECLAIM_SPIKE_THRESHOLD,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.execution.runtime_pool import (
     PooledRuntime,
     RuntimePool,
@@ -20,7 +20,7 @@ from backend.execution.watchdog import runtime_watchdog
 
 if TYPE_CHECKING:
     from backend.orchestration.agent import Agent
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.ledger.stream import EventStream
     from backend.inference.llm_registry import LLMRegistry
     from backend.execution.base import Runtime
@@ -55,7 +55,7 @@ class RuntimeOrchestrator:
 
     def acquire(
         self,
-        config: ForgeConfig,
+        config: AppConfig,
         llm_registry: LLMRegistry,
         *,
         session_id: str | None = None,

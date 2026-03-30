@@ -2,7 +2,7 @@
 
 ## Overview
 
-Orchestrator is Forge's flagship autonomous coding agent, optimized for the beta launch. It uses a **ReAct (Reasoning + Acting)** approach to solve coding tasks through iterative observation and action cycles.
+Orchestrator is App's flagship autonomous coding agent, optimized for the beta launch. It uses a **ReAct (Reasoning + Acting)** approach to solve coding tasks through iterative observation and action cycles.
 
 ## Key Features
 
@@ -158,7 +158,7 @@ The Orchestrator agent uses a carefully crafted prompt:
 5. Examples (few-shot learning)
 ```
 
-**File:** `Forge/engines/orchestrator/prompts.py`
+**File:** `App/engines/orchestrator/prompts.py`
 
 ### Optimizations
 
@@ -176,7 +176,7 @@ The Orchestrator agent uses a carefully crafted prompt:
 - Same action repeated 5 times (stuck detection)
 - High-risk action without confirmation
 
-**File:** `Forge/controller/circuit_breaker.py`
+**File:** `App/controller/circuit_breaker.py`
 
 ### 2. Confirmation Mode
 
@@ -229,14 +229,14 @@ max_message_chars = 20000  # Less context = faster + cheaper
 ### Enable Debug Logging
 
 ```bash
-LOG_LEVEL=DEBUG uv run python -m Forge.server.listen
+LOG_LEVEL=DEBUG uv run python -m App.server.listen
 ```
 
 ### Trace Agent Steps
 
 ```bash
 # Watch agent decisions
-tail -f logs/Forge.log | grep "Orchestrator"
+tail -f logs/App.log | grep "Orchestrator"
 
 # Output shows:
 # [Step 1] Thought: I need to read the file
@@ -266,7 +266,7 @@ tail -f logs/Forge.log | grep "Orchestrator"
 ### Add Custom Tools
 
 ```python
-# Forge/engines/orchestrator/tools.py
+# App/engines/orchestrator/tools.py
 
 CUSTOM_TOOLS = [
     {
@@ -283,7 +283,7 @@ CUSTOM_TOOLS = [
 ### Custom Prompt
 
 ```python
-# Forge/engines/orchestrator/prompts.py
+# App/engines/orchestrator/prompts.py
 
 CUSTOM_SYSTEM_PROMPT = """
 You are a specialized agent for...

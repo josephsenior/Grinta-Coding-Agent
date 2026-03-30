@@ -10,6 +10,7 @@ from backend.core.constants import (
     CONVERSATION_BASE_DIR,
     CURRENT_API_VERSION,
     DEFAULT_AGENT_AUTONOMY_LEVEL,
+    DEFAULT_AGENT_NAME,
     DEFAULT_AGENT_MEMORY_MAX_THREADS,
     DEFAULT_AGENT_MIN_ITERATIONS,
     DEFAULT_CMD_EXIT_CODE,
@@ -21,13 +22,12 @@ from backend.core.constants import (
     DEFAULT_LLM_TEMPERATURE,
     DEFAULT_MAX_CONCURRENT_CONVERSATIONS,
     DEFAULT_MAX_FILE_UPLOAD_SIZE_MB,
+    DEFAULT_MAX_ITERATIONS,
     DEFAULT_RUNTIME,
     DEFAULT_RUNTIME_TIMEOUT,
     DEFAULT_LOCAL_DATA_ROOT,
     ENV_VAR_REGISTRY,
     FILES_TO_IGNORE,
-    FORGE_DEFAULT_AGENT,
-    FORGE_MAX_ITERATIONS,
     LOG_COLORS,
     MAX_CMD_OUTPUT_SIZE,
     MAX_FILENAME_LENGTH,
@@ -80,9 +80,9 @@ class TestParseBoolEnv:
 
 class TestCoreConstants:
     def test_identity_constants(self):
-        assert FORGE_DEFAULT_AGENT == "Orchestrator"
-        assert isinstance(FORGE_MAX_ITERATIONS, int)
-        assert FORGE_MAX_ITERATIONS > 0
+        assert DEFAULT_AGENT_NAME == "Orchestrator"
+        assert isinstance(DEFAULT_MAX_ITERATIONS, int)
+        assert DEFAULT_MAX_ITERATIONS > 0
 
     def test_path_constants(self):
         assert DEFAULT_CONFIG_FILE == "settings.json"
@@ -165,4 +165,4 @@ class TestEnvVarRegistry:
     def test_known_keys_present(self):
         assert "LOG_LEVEL" in ENV_VAR_REGISTRY
         assert "DEBUG" in ENV_VAR_REGISTRY
-        assert "FORGE_PERMISSIVE_API" in ENV_VAR_REGISTRY
+        assert "APP_PERMISSIVE_API" in ENV_VAR_REGISTRY

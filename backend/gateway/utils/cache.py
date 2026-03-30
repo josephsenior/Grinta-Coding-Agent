@@ -1,4 +1,4 @@
-"""Multi-layer caching strategy for Forge.
+"""Multi-layer caching strategy for App.
 
 Provides L1 (in-memory), L2 (Redis), and L3 (database) caching layers.
 """
@@ -12,7 +12,7 @@ from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     pass
@@ -53,12 +53,12 @@ class CacheKey:
     """Helper for building cache keys."""
 
     @staticmethod
-    def build(*parts: str, prefix: str = "forge") -> str:
+    def build(*parts: str, prefix: str = "app") -> str:
         """Build a cache key from parts.
 
         Args:
             *parts: Key parts to join
-            prefix: Key prefix (default: "forge")
+            prefix: Key prefix (default: "app")
 
         Returns:
             Cache key string

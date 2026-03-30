@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from uvicorn import Config, Server
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.execution.utils.file_viewer import generate_file_viewer_html
 
 

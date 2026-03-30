@@ -131,7 +131,7 @@ def main():
     """Main verification function."""
     print(f"{BLUE}Verifying API Versioning Support{RESET}\n")
 
-    routes_dir = project_root / "forge" / "server" / "routes"
+    routes_dir = project_root / "app" / "server" / "routes"
     if not routes_dir.exists():
         print(f"{RED}❌ Routes directory not found: {routes_dir}{RESET}")
         return 1

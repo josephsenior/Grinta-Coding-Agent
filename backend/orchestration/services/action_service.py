@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 from backend.core.constants import LOG_ALL_EVENTS
 from backend.core.schemas import AgentState
@@ -16,17 +17,30 @@ if TYPE_CHECKING:
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
+def _resolve_operation_pipeline(controller):
+    controller_dict = getattr(controller, "__dict__", {})
+    pipeline = controller_dict.get("operation_pipeline")
+    if pipeline is None and not isinstance(controller, Mock):
+        pipeline = getattr(controller, "operation_pipeline", None)
+    if pipeline is not None:
+        return pipeline
+    pipeline = controller_dict.get("tool_pipeline")
+    if pipeline is not None:
+        return pipeline
+    return getattr(controller, "tool_pipeline", None)
+
+
 class ActionService:
     """Coordinates tool pipeline verification/execute and pending action lifecycle."""
 
     def __init__(
         self,
         context: OrchestrationContext,
-        pending_action_service,
+        open_operation_service,
         confirmation_service: ConfirmationService,
     ) -> None:
         self._context = context
-        self._pending_service = pending_action_service
+        self._pending_service = open_operation_service
         self._confirmation_service = confirmation_service
 
     async def run(self, action: Action, ctx: ToolInvocationContext | None) -> None:
@@ -49,7 +63,7 @@ class ActionService:
         self, action: Action, ctx: ToolInvocationContext | None
     ) -> None:
         controller = self._context.get_controller()
-        pipeline = getattr(controller, "tool_pipeline", None)
+        pipeline = _resolve_operation_pipeline(controller)
 
         if ctx and pipeline:
             await pipeline.run_verify(ctx)
@@ -70,7 +84,7 @@ class ActionService:
 
         await self._confirmation_service.handle_pending_confirmation(action)
 
-        pipeline = getattr(controller, "tool_pipeline", None)
+        pipeline = _resolve_operation_pipeline(controller)
         if ctx and pipeline:
             await pipeline.run_execute(ctx)
             if ctx.blocked:

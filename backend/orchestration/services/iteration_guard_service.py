@@ -6,7 +6,7 @@ import asyncio
 import os
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import MessageAction, PlaybookFinishAction
@@ -57,7 +57,7 @@ class IterationGuardService:
             cfg_value = getattr(agent_config, "enable_graceful_shutdown", True)
             if not cfg_value:
                 return False
-        graceful_env = os.getenv("FORGE_GRACEFUL_SHUTDOWN", "1").strip().lower()
+        graceful_env = os.getenv("APP_GRACEFUL_SHUTDOWN", "1").strip().lower()
         return graceful_env not in ("0", "false", "no")
 
     def _schedule_graceful_shutdown(self, reason: str) -> None:

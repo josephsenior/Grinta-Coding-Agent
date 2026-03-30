@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 from . import monitoring_helpers
 
@@ -86,12 +86,16 @@ def _extract_lsp_sample(event: Any) -> tuple[int, bool] | None:
     return latency_ms, has_error
 
 
+def _get_lsp_metrics_event_limit() -> int:
+    return max(50, int(os.getenv("APP_LSP_METRICS_EVENT_LIMIT", "400")))
+
+
 def _collect_lsp_metrics(manager: Any) -> LspMetricsResponse:
     if not manager:
         return LspMetricsResponse()
 
     sessions = monitoring_helpers.get_conversation_sessions(manager)
-    per_session_limit = max(50, int(os.getenv("FORGE_LSP_METRICS_EVENT_LIMIT", "400")))
+    per_session_limit = _get_lsp_metrics_event_limit()
 
     latencies: list[int] = []
     failures = 0

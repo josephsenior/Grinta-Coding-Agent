@@ -3,7 +3,7 @@ REM Batch script to set up automated database backups on Windows
 REM This script will run the PowerShell setup script with Administrator privileges
 
 echo ========================================
-echo Forge Database Backup - Windows Setup
+echo App Database Backup - Windows Setup
 echo ========================================
 echo.
 

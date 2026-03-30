@@ -80,6 +80,7 @@ class TestRollbackManager:
     def test_init_creates_dirs(self, workspace):
         rm = RollbackManager(str(workspace))
         assert rm.checkpoints_dir.exists()
+        assert rm.checkpoints_dir == workspace / ".app" / "checkpoints"
         assert rm.max_checkpoints == 20
 
     def test_create_checkpoint(self, workspace):
@@ -582,11 +583,11 @@ class TestRollbackManager:
         assert (nested / "util.py").exists()
         assert (workspace / "main.py").read_text() == "import util"
 
-    def test_clear_workspace_preserves_forge_and_git(self, workspace):
-        """Test that clear_workspace preserves .Forge and .git dirs."""
+    def test_clear_workspace_preserves_app_and_git(self, workspace):
+        """Test that clear_workspace preserves .app and .git dirs."""
         # Create special directories
-        workspace.joinpath(".Forge").mkdir()
-        workspace.joinpath(".Forge", "important.txt").write_text("keep")
+        workspace.joinpath(".app").mkdir()
+        workspace.joinpath(".app", "important.txt").write_text("keep")
         workspace.joinpath(".git").mkdir()
         workspace.joinpath(".git", "HEAD").write_text("git data")
 
@@ -599,8 +600,8 @@ class TestRollbackManager:
         rm._clear_workspace()
 
         # Special dirs should exist
-        assert workspace.joinpath(".Forge").exists()
-        assert workspace.joinpath(".Forge", "important.txt").exists()
+        assert workspace.joinpath(".app").exists()
+        assert workspace.joinpath(".app", "important.txt").exists()
         assert workspace.joinpath(".git").exists()
         assert workspace.joinpath(".git", "HEAD").exists()
 

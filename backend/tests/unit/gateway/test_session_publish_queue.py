@@ -4,6 +4,7 @@ import asyncio
 import unittest
 from unittest.mock import MagicMock
 from types import SimpleNamespace
+from typing import Any, cast
 
 from backend.gateway.session.session import Session
 from backend.ledger import EventStreamSubscriber
@@ -11,7 +12,7 @@ from backend.ledger import EventStreamSubscriber
 
 class TestSessionPublishQueue(unittest.IsolatedAsyncioTestCase):
     def _make_session(self, maxsize: int = 2) -> Session:
-        session = Session.__new__(Session)
+        session = cast(Any, Session.__new__(Session))
         session._publish_queue = asyncio.Queue(maxsize=maxsize)
         session.logger = MagicMock()
         return session
@@ -89,11 +90,11 @@ class TestSessionPublishQueue(unittest.IsolatedAsyncioTestCase):
 
 class TestSessionDispatchSubscriptionHealing(unittest.IsolatedAsyncioTestCase):
     async def test_dispatch_restores_missing_core_subscriptions(self):
-        session = Session.__new__(Session)
+        session = cast(Any, Session.__new__(Session))
         session.sid = "sid-1"
         session.logger = MagicMock()
-        session._init_ready = asyncio.Event()
-        session._init_ready.set()
+        init_ready = asyncio.Event()
+        init_ready.set()
 
         subscribe_calls: list[tuple[object, str]] = []
         event_stream = SimpleNamespace(_subscribers={})
@@ -108,7 +109,7 @@ class TestSessionDispatchSubscriptionHealing(unittest.IsolatedAsyncioTestCase):
         controller = SimpleNamespace(id="controller-1", on_event=MagicMock())
         memory = SimpleNamespace(on_event=MagicMock())
         session.agent_session = SimpleNamespace(
-            _init_ready=session._init_ready,
+            _init_ready=init_ready,
             event_stream=event_stream,
             controller=controller,
             memory=memory,

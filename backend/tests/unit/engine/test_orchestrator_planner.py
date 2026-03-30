@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from backend.core.enums import ActionSecurityRisk
 from backend.engine.orchestrator import Orchestrator
-from backend.engine.planner import OrchestratorPlanner
+from backend.engine.planner import OrchestratorPlanner, _maybe_log_prompt_metrics
 from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.observation import ErrorObservation
 
@@ -15,6 +15,26 @@ from backend.ledger.observation import ErrorObservation
 def _make_planner():
     """Create a planner with None dependencies for testing pure methods."""
     return object.__new__(OrchestratorPlanner)
+
+
+class TestPromptMetricsLogging:
+    def test_logs_when_app_debug_prompt_metrics_enabled(self):
+        with patch.dict(
+            "os.environ",
+            {"APP_DEBUG_PROMPT_METRICS": "1"},
+            clear=False,
+        ), patch("backend.engine.planner.logger") as mock_logger:
+            _maybe_log_prompt_metrics([
+                {"role": "system", "content": "hello"},
+                {"role": "user", "content": "world"},
+            ])
+
+        mock_logger.info.assert_called_once_with(
+            "APP_DEBUG_PROMPT_METRICS: system_messages=%s chars_each=%s chars_total=%s",
+            1,
+            [5],
+            5,
+        )
 
 
 class TestGetLastUserMessage:

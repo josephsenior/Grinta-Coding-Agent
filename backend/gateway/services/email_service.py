@@ -9,7 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from urllib.parse import urlencode
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 class EmailService:
@@ -23,7 +23,7 @@ class EmailService:
         smtp_password: str | None = None,
         smtp_use_tls: bool = True,
         from_email: str | None = None,
-        from_name: str = "Forge",
+        from_name: str = "App",
     ):
         """Initialize email service.
 
@@ -125,7 +125,7 @@ class EmailService:
             params = urlencode({"token": reset_token, "email": to_email})
             reset_url = f"{base_url}/auth/reset-password?{params}"
 
-        subject = "Reset Your Forge Password"
+        subject = "Reset Your App Password"
 
         # HTML email body
         html_body = f"""
@@ -145,7 +145,7 @@ class EmailService:
                     Hello,
                 </p>
                 <p style="color: #333; font-size: 16px; margin-bottom: 20px;">
-                    We received a request to reset your password for your Forge account. Click the button below to reset your password:
+                    We received a request to reset your password for your App account. Click the button below to reset your password:
                 </p>
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="{reset_url}" style="display: inline-block; background: linear-gradient(to right, #8b5cf6, #7c3aed); color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: 600; font-size: 16px;">
@@ -166,7 +166,7 @@ class EmailService:
                 </p>
             </div>
             <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
-                <p>© {datetime.now().year} Forge. All rights reserved.</p>
+                <p>© {datetime.now().year} App. All rights reserved.</p>
             </div>
         </body>
         </html>
@@ -174,11 +174,11 @@ class EmailService:
 
         # Plain text email body
         text_body = f"""
-Reset Your Forge Password
+Reset Your App Password
 
 Hello,
 
-We received a request to reset your password for your Forge account. Click the link below to reset your password:
+We received a request to reset your password for your App account. Click the link below to reset your password:
 
 {reset_url}
 
@@ -186,7 +186,7 @@ This link will expire in 1 hour.
 
 If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.
 
-© {datetime.now().year} Forge. All rights reserved.
+© {datetime.now().year} App. All rights reserved.
         """
 
         return self.send_email(to_email, subject, html_body, text_body)

@@ -1,4 +1,4 @@
-"""Rate limiting middleware for Forge API."""
+"""Rate limiting middleware for App API."""
 
 from __future__ import annotations
 

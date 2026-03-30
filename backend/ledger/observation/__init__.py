@@ -22,6 +22,7 @@ from backend.ledger.observation.files import (
 )
 from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.observation.observation import Observation
+from backend.ledger.observation.observation import Outcome
 from backend.ledger.observation.reject import UserRejectObservation
 from backend.ledger.observation.status import StatusObservation
 from backend.ledger.observation.success import SuccessObservation
@@ -43,6 +44,7 @@ __all__ = [
     "MCPObservation",
     "NullObservation",
     "Observation",
+    "Outcome",
     "RecallObservation",
     "RecallType",
     "StatusObservation",

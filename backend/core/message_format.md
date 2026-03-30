@@ -1,12 +1,12 @@
-# Forge Message Format and LLM Provider Integration
+# App Message Format and LLM Provider Integration
 
 ## Overview
 
-Forge uses its own `Message` class (`Forge/core/message.py`) which provides rich content support while maintaining compatibility with major LLM provider SDKs (OpenAI, Anthropic, Google Gemini, and xAI Grok).
+App uses its own `Message` class (`App/core/message.py`) which provides rich content support while maintaining compatibility with major LLM provider SDKs (OpenAI, Anthropic, Google Gemini, and xAI Grok).
 
 ## Class Structure
 
-Our `Message` class (`Forge/core/message.py`):
+Our `Message` class (`App/core/message.py`):
 
 ```python
 class Message(BaseModel):

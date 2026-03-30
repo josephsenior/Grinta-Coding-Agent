@@ -5,12 +5,12 @@ requires = [
 ]
 
 [project]
-name = "forge-ai"
+name = "app-ai"
 version = "0.55.0"
-description = "Forge: Your AI-Powered Development Platform"
+description = "App: Your AI-Powered Development Platform"
 readme = "README.md"
 license = "MIT"
-authors = [ { name = "Forge Team" } ]
+authors = [ { name = "App Team" } ]
 requires-python = ">=3.12,<3.14"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
@@ -68,6 +68,8 @@ dependencies = [
   "memory-profiler (>=0.61.0,<0.62.0)",
   "tomli-w>=1.1.0,<2",
   "aiofiles>=25.1.0",
+  "rich>=14.0,<15",
+  "prompt_toolkit>=3.0.50,<4",
 ]
 
 optional-dependencies.all = [
@@ -87,14 +89,14 @@ optional-dependencies.telemetry = [
   "opentelemetry-exporter-otlp-proto-grpc>=1.33.1,<2",
   "protobuf>=5,<6",
 ]
-urls = { Repository = "https://github.com/Forge/Forge" }
-scripts.forge = "backend.cli.entry:main"
-scripts.Forge = "backend.cli.entry:main"
+urls = { Repository = "https://github.com/App/App" }
+scripts.app = "backend.cli.entry:main"
+scripts.grinta = "backend.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [
   "backend",
-  "forge_client",
+  "client",
 ]
 
 [tool.hatch.build.targets.wheel.force-include]
@@ -173,7 +175,7 @@ lint.pydocstyle.convention = "google"
 [tool.coverage.run]
 source = [
   "backend",
-  "forge_client",
+  "client",
 ]
 omit = [
   "*/tests/*",

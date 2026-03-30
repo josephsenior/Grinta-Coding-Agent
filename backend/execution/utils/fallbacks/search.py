@@ -11,7 +11,7 @@ import re
 from collections.abc import Iterator
 from pathlib import Path
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.utils.regex_limits import try_compile_user_regex
 
 

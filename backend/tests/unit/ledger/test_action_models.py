@@ -112,6 +112,7 @@ class TestSystemMessageAction(unittest.TestCase):
         s = SystemMessageAction(content="x", tools=[{"t": 1}], agent_class="TestAgent")
         assert s.tools is not None
         self.assertEqual(len(s.tools), 1)
+        self.assertIsNotNone(s.APP_version)
         self.assertEqual(s.agent_class, "TestAgent")
 
     def test_str_with_tools(self):
@@ -428,32 +429,32 @@ class TestCondensationAction(unittest.TestCase):
         self.assertEqual(CondensationAction.action, ActionType.CONDENSATION)
 
     def test_with_event_ids(self):
-        c = CondensationAction(forgotten_event_ids=[1, 2, 3])
-        self.assertEqual(c.forgotten, [1, 2, 3])
+        c = CondensationAction(pruned_event_ids=[1, 2, 3])
+        self.assertEqual(c.pruned, [1, 2, 3])
 
     def test_with_event_range(self):
-        c = CondensationAction(forgotten_events_start_id=5, forgotten_events_end_id=10)
-        self.assertEqual(c.forgotten, [5, 6, 7, 8, 9, 10])
+        c = CondensationAction(pruned_events_start_id=5, pruned_events_end_id=10)
+        self.assertEqual(c.pruned, [5, 6, 7, 8, 9, 10])
 
     def test_with_summary(self):
         c = CondensationAction(
-            forgotten_event_ids=[1],
+            pruned_event_ids=[1],
             summary="condensed",
             summary_offset=0,
         )
         self.assertIn("condensed", c.message)
 
     def test_message_without_summary(self):
-        c = CondensationAction(forgotten_event_ids=[1, 2])
+        c = CondensationAction(pruned_event_ids=[1, 2])
         self.assertIn("dropping", c.message)
 
     def test_invalid_config_raises(self):
         # Both event_ids and event_range → invalid
         with self.assertRaises(ValueError):
             CondensationAction(
-                forgotten_event_ids=[1],
-                forgotten_events_start_id=2,
-                forgotten_events_end_id=3,
+                pruned_event_ids=[1],
+                pruned_events_start_id=2,
+                pruned_events_end_id=3,
             )
 
     def test_no_ids_and_no_range_raises(self):
@@ -462,11 +463,11 @@ class TestCondensationAction(unittest.TestCase):
 
     def test_summary_without_offset_raises(self):
         with self.assertRaises(ValueError):
-            CondensationAction(forgotten_event_ids=[1], summary="s")
+            CondensationAction(pruned_event_ids=[1], summary="s")
 
     def test_offset_without_summary_raises(self):
         with self.assertRaises(ValueError):
-            CondensationAction(forgotten_event_ids=[1], summary_offset=0)
+            CondensationAction(pruned_event_ids=[1], summary_offset=0)
 
 
 # ---------------------------------------------------------------------------

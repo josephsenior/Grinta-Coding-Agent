@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 from . import monitoring_helpers
 from .metrics import get_metrics
@@ -42,29 +42,29 @@ def _build_prom_base_lines(req: dict[str, Any], active_sessions: int) -> list[st
     hist_buckets = req.get("hist_buckets", {}) or {}
 
     lines = [
-        "# HELP forge_build_info Build information",
-        "# TYPE forge_build_info gauge",
-        'forge_build_info{version="1.0.0"} 1',
-        "# HELP forge_request_total Total HTTP requests",
-        "# TYPE forge_request_total counter",
-        f"forge_request_total {request_total}",
-        "# HELP forge_request_exceptions_total Total HTTP request exceptions",
-        "# TYPE forge_request_exceptions_total counter",
-        f"forge_request_exceptions_total {request_exceptions_total}",
-        "# HELP forge_request_duration_ms_bucket HTTP request duration histogram",
-        "# TYPE forge_request_duration_ms_histogram",
+        "# HELP app_build_info Build information",
+        "# TYPE app_build_info gauge",
+        'app_build_info{version="1.0.0"} 1',
+        "# HELP app_request_total Total HTTP requests",
+        "# TYPE app_request_total counter",
+        f"app_request_total {request_total}",
+        "# HELP app_request_exceptions_total Total HTTP request exceptions",
+        "# TYPE app_request_exceptions_total counter",
+        f"app_request_exceptions_total {request_exceptions_total}",
+        "# HELP app_request_duration_ms_bucket HTTP request duration histogram",
+        "# TYPE app_request_duration_ms_histogram",
     ]
 
     lines.extend(_build_prom_histogram_lines(hist_buckets, hist_sum, hist_count))
 
     lines.extend(
         [
-            "# HELP forge_runtime_running_sessions_total Total running agent sessions",
-            "# TYPE forge_runtime_running_sessions_total gauge",
-            f"forge_runtime_running_sessions_total {active_sessions}",
-            "# HELP forge_runtime_warm_pool_total Total warm runtime containers",
-            "# TYPE forge_runtime_warm_pool_total gauge",
-            "forge_runtime_warm_pool_total 0",
+            "# HELP app_runtime_running_sessions_total Total running agent sessions",
+            "# TYPE app_runtime_running_sessions_total gauge",
+            f"app_runtime_running_sessions_total {active_sessions}",
+            "# HELP app_runtime_warm_pool_total Total warm runtime containers",
+            "# TYPE app_runtime_warm_pool_total gauge",
+            "app_runtime_warm_pool_total 0",
         ]
     )
     return lines
@@ -82,28 +82,28 @@ def _build_prom_histogram_lines(
                 with contextlib.suppress(Exception):
                     numeric.append((int(key.split("_", 1)[1]), int(value)))
         for bucket, value in sorted(numeric, key=lambda x: x[0]):
-            lines.append(f'forge_request_duration_ms_bucket{{le="{bucket}"}} {value}')
+            lines.append(f'app_request_duration_ms_bucket{{le="{bucket}"}} {value}')
         lines.append(
-            f'forge_request_duration_ms_bucket{{le="+Inf"}} {int(hist_buckets.get("le_inf", 0) or 0)}'
+            f'app_request_duration_ms_bucket{{le="+Inf"}} {int(hist_buckets.get("le_inf", 0) or 0)}'
         )
     except Exception:
-        lines.append('forge_request_duration_ms_bucket{le="+Inf"} 0')
+        lines.append('app_request_duration_ms_bucket{le="+Inf"} 0')
 
-    lines.append(f"forge_request_duration_ms_sum {hist_sum}")
-    lines.append(f"forge_request_duration_ms_count {hist_count}")
+    lines.append(f"app_request_duration_ms_sum {hist_sum}")
+    lines.append(f"app_request_duration_ms_count {hist_count}")
     return lines
 
 
 def _format_acquire_release(k: str, v: Any) -> list[str]:
     """Format acquire/release telemetry (single total)."""
     total = sum(v.values()) if isinstance(v, dict) else v
-    return [f"forge_runtime_{k}_total {total}"]
+    return [f"app_runtime_{k}_total {total}"]
 
 
 def _format_reuse(v: Any) -> list[str]:
     """Format reuse telemetry (per-kind labels)."""
     items = v.items() if isinstance(v, dict) else []
-    return [f'forge_runtime_reuse{{kind="{kind}"}} {count}' for kind, count in items]
+    return [f'app_runtime_reuse{{kind="{kind}"}} {count}' for kind, count in items]
 
 
 def _format_watchdog_lines(v: Any) -> list[str]:
@@ -116,9 +116,9 @@ def _format_watchdog_lines(v: Any) -> list[str]:
             if "|" in key:
                 kind, reason = key.split("|", 1)
                 lines.append(
-                    f'forge_runtime_watchdog_terminations{{kind="{kind}",reason="{reason}"}} {count}'
+                    f'app_runtime_watchdog_terminations{{kind="{kind}",reason="{reason}"}} {count}'
                 )
-        lines.append(f"forge_runtime_watchdog_terminations_total {total}")
+        lines.append(f"app_runtime_watchdog_terminations_total {total}")
     return lines
 
 
@@ -131,7 +131,7 @@ def _format_scaling_lines(v: Any) -> list[str]:
         if "|" in key:
             signal, kind = key.split("|", 1)
             lines.append(
-                f'forge_runtime_scaling_signals{{kind="{kind}",signal="{signal}"}} {count}'
+                f'app_runtime_scaling_signals{{kind="{kind}",signal="{signal}"}} {count}'
             )
     return lines
 
@@ -148,8 +148,8 @@ def _format_telemetry_key(k: str, v: Any) -> list[str]:
     if k in handlers:
         return handlers[k](v)
     if isinstance(v, dict):
-        return [f'forge_runtime_{k}{{type="{label}"}} {val}' for label, val in v.items()]
-    return [f"forge_runtime_{k} {v}"]
+        return [f'app_runtime_{k}{{type="{label}"}} {val}' for label, val in v.items()]
+    return [f"app_runtime_{k} {v}"]
 
 
 def _extract_telemetry_prom_lines(stats: dict[str, Any]) -> list[str]:
@@ -171,22 +171,22 @@ def _extract_pool_prom_lines() -> list[str]:
         total = 0
         for pool_type, count in pool_stats.items():
             total += count
-            lines.append(f'forge_runtime_pool_size{{kind="{pool_type}"}} {count}')
-        lines.append(f"forge_runtime_pool_size_total {total}")
+            lines.append(f'app_runtime_pool_size{{kind="{pool_type}"}} {count}')
+        lines.append(f"app_runtime_pool_size_total {total}")
 
     if hasattr(monitoring_helpers.runtime_orchestrator, "idle_reclaim_stats"):
         idle_stats = monitoring_helpers.runtime_orchestrator.idle_reclaim_stats()
         total = sum(idle_stats.values())
         for kind, count in idle_stats.items():
-            lines.append(f'forge_runtime_pool_idle_reclaim{{kind="{kind}"}} {count}')
-        lines.append(f"forge_runtime_pool_idle_reclaim_total {total}")
+            lines.append(f'app_runtime_pool_idle_reclaim{{kind="{kind}"}} {count}')
+        lines.append(f"app_runtime_pool_idle_reclaim_total {total}")
 
     if hasattr(monitoring_helpers.runtime_orchestrator, "eviction_stats"):
         eviction_stats = monitoring_helpers.runtime_orchestrator.eviction_stats()
         total = sum(eviction_stats.values())
         for kind, count in eviction_stats.items():
-            lines.append(f'forge_runtime_pool_eviction{{kind="{kind}"}} {count}')
-        lines.append(f"forge_runtime_pool_eviction_total {total}")
+            lines.append(f'app_runtime_pool_eviction{{kind="{kind}"}} {count}')
+        lines.append(f"app_runtime_pool_eviction_total {total}")
 
     return lines
 
@@ -198,8 +198,8 @@ def _extract_watchdog_prom_lines() -> list[str]:
         wd_stats = monitoring_helpers.runtime_watchdog.stats()
         total = sum(wd_stats.values())
         for kind, count in wd_stats.items():
-            lines.append(f'forge_runtime_watchdog_watched{{kind="{kind}"}} {count}')
-        lines.append(f"forge_runtime_watchdog_watched_total {total}")
+            lines.append(f'app_runtime_watchdog_watched{{kind="{kind}"}} {count}')
+        lines.append(f"app_runtime_watchdog_watched_total {total}")
     return lines
 
 
@@ -222,19 +222,19 @@ def _runtime_orchestrator_prom_lines() -> list[str]:
 
 
 def _format_schema_missing(v: Any) -> list[str]:
-    return [f"forge_agent_config_schema_missing_total {v}"]
+    return [f"app_agent_config_schema_missing_total {v}"]
 
 
 def _format_schema_mismatch(v: Any) -> list[str]:
     return [
-        f'forge_agent_config_schema_mismatch{{version="{ver}"}} {count}'
+        f'app_agent_config_schema_mismatch{{version="{ver}"}} {count}'
         for ver, count in (v.items() if isinstance(v, dict) else [])
     ]
 
 
 def _format_invalid_agents(v: Any) -> list[str]:
     return [
-        f'forge_agent_config_invalid_section{{agent="{agent}"}} {count}'
+        f'app_agent_config_invalid_section{{agent="{agent}"}} {count}'
         for agent, count in (v.items() if isinstance(v, dict) else [])
     ]
 
@@ -249,13 +249,13 @@ def _format_config_schema_key(k: str, v: Any) -> list[str]:
     if k in handlers:
         return handlers[k](v)
     if k == "invalid_base":
-        return [f"forge_agent_config_invalid_base_total {v}"]
+        return [f"app_agent_config_invalid_base_total {v}"]
     if isinstance(v, dict):
         return [
-            f'forge_agent_config_{k}_total{{version="{label}"}} {val}'
+            f'app_agent_config_{k}_total{{version="{label}"}} {val}'
             for label, val in v.items()
         ]
-    return [f"forge_agent_config_{k}_total {v}"]
+    return [f"app_agent_config_{k}_total {v}"]
 
 
 def _config_schema_prom_lines() -> list[str]:

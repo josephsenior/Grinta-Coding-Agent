@@ -13,7 +13,7 @@ import sys
 from dataclasses import dataclass
 from typing import Literal
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 @dataclass
@@ -43,7 +43,7 @@ class ToolRegistry:
         self._detect_all_tools()
 
     def _detect_container_runtime(self) -> bool:
-        if os.getenv("FORGE_RUNTIME_IS_CONTAINER", "").strip().lower() in {
+        if os.getenv("APP_RUNTIME_IS_CONTAINER", "").strip().lower() in {
             "1",
             "true",
             "yes",
@@ -55,7 +55,8 @@ class ToolRegistry:
         return os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
 
     def _detect_wsl_runtime(self) -> bool:
-        if not sys.platform.startswith("linux"):
+        platform_name = getattr(sys, "platform", "")
+        if not str(platform_name).startswith("linux"):
             return False
         if os.getenv("WSL_DISTRO_NAME") or os.getenv("WSL_INTEROP"):
             return True

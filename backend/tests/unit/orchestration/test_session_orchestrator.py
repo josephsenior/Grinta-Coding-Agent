@@ -109,6 +109,11 @@ class TestServiceAliasing(unittest.TestCase):
             self.ctrl.pending_action_service, self.ctrl.services.pending_action
         )
 
+    def test_open_operation_service_alias(self):
+        self.assertIs(
+            self.ctrl.open_operation_service, self.ctrl.services.open_operation
+        )
+
     def test_autonomy_service_alias(self):
         self.assertIs(self.ctrl.autonomy_service, self.ctrl.services.autonomy)
 
@@ -458,11 +463,11 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
     async def test_close_shuts_down_pending_action_service(self):
         self.ctrl.services.state.set_agent_state = AsyncMock()
         self.ctrl.services.retry.shutdown = AsyncMock()
-        self.ctrl.services.pending_action.shutdown = MagicMock()
+        self.ctrl.services.open_operation.shutdown = MagicMock()
 
         await self.ctrl.close()
 
-        self.ctrl.services.pending_action.shutdown.assert_called_once_with()
+        self.ctrl.services.open_operation.shutdown.assert_called_once_with()
 
     async def test_stop_sets_stopped_state(self):
         self.ctrl.services.state.set_agent_state = AsyncMock()
@@ -522,6 +527,12 @@ class TestGetTrajectory(unittest.TestCase):
         self.ctrl.state_tracker.get_trajectory.return_value = [{"event": "test"}]
         result = self.ctrl.get_trajectory()
         self.assertEqual(result, [{"event": "test"}])
+
+    def test_get_transcript_when_closed(self):
+        self.ctrl._lifecycle = LifecyclePhase.CLOSED
+        self.ctrl.state_tracker.get_transcript.return_value = [{"record": "test"}]
+        result = self.ctrl.get_transcript()
+        self.assertEqual(result, [{"record": "test"}])
 
     def test_get_trajectory_with_screenshots(self):
         self.ctrl._lifecycle = LifecyclePhase.CLOSED
@@ -1117,12 +1128,12 @@ class TestStepDispatch(unittest.TestCase):
     def test_pending_action_properties(self):
         """Line 534-551 coverage for getter/setter."""
         mock_action = MagicMock()
-        self.ctrl.services.pending_action.get = MagicMock(return_value=mock_action)
+        self.ctrl.services.open_operation.get = MagicMock(return_value=mock_action)
         self.assertEqual(self.ctrl._pending_action, mock_action)
 
-        self.ctrl.services.pending_action.set = MagicMock()
+        self.ctrl.services.open_operation.set = MagicMock()
         self.ctrl._pending_action = None
-        self.ctrl.services.pending_action.set.assert_called_with(None)
+        self.ctrl.services.open_operation.set.assert_called_with(None)
 
     async def test_handle_post_execution_latency(self):
         """Line 509 coverage (latency recording)."""
@@ -1216,7 +1227,7 @@ class TestStepDispatch(unittest.TestCase):
     def test_can_drain_pending_getattr_branch(self):
         """Line 495-496 coverage."""
         # Ensure property returns None
-        self.ctrl.services.pending_action.get = MagicMock(return_value=None)
+        self.ctrl.services.open_operation.get = MagicMock(return_value=None)
         self.ctrl.services.action.get_pending_action = MagicMock(return_value=None)
 
         self.ctrl.agent.pending_actions = [MagicMock()]
@@ -1228,7 +1239,8 @@ class TestStepDispatch(unittest.TestCase):
     def test_pending_action_no_service(self):
         """Line 538-541 and 549-551 fallback paths."""
         # We need to bypass the properties that look up services
-        with patch.object(self.ctrl, "pending_action_service", None), \
+        with patch.object(self.ctrl, "open_operation_service", None), \
+             patch.object(self.ctrl, "pending_action_service", None), \
              patch.object(self.ctrl, "action_service", None):
 
             # Setter

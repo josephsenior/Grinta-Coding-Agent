@@ -16,8 +16,30 @@ from backend.core.config.mcp_config import (
     MCPRemoteServerConfig,
     MCPStdioServerConfig,
 )
-from backend.gateway.integrations.mcp.client import MCPClient
+from backend.gateway.integrations.mcp.client import (
+    MCPClient,
+    _mcp_call_total_budget_sec,
+    _mcp_reconnect_session_timeout_sec,
+)
 from backend.gateway.integrations.mcp.tool import MCPClientTool
+
+
+class TestMCPBudgetHelpers(unittest.TestCase):
+    def test_call_budget_reads_app_env(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {"APP_MCP_CALL_TOTAL_BUDGET_SEC": "45"},
+            clear=False,
+        ):
+            self.assertEqual(_mcp_call_total_budget_sec(), 45.0)
+
+    def test_reconnect_budget_invalid_env_falls_back(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {"APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC": "bad"},
+            clear=False,
+        ):
+            self.assertEqual(_mcp_reconnect_session_timeout_sec(), 90.0)
 
 
 class TestMCPClientSessionManagement(unittest.IsolatedAsyncioTestCase):
@@ -201,8 +223,8 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         # Verify headers passed to transport
         call_kwargs = mock_sse_transport.call_args[1]
         headers = call_kwargs.get("headers", {})
-        self.assertIn("X-Forge-ServerConversation-ID", headers)
-        self.assertEqual(headers["X-Forge-ServerConversation-ID"], "conv_abc123")
+        self.assertIn("X-App-ServerConversation-ID", headers)
+        self.assertEqual(headers["X-App-ServerConversation-ID"], "conv_abc123")
 
     @patch("backend.gateway.integrations.mcp.client.Client")
     @patch("backend.gateway.integrations.mcp.client.SSETransport")

@@ -1,4 +1,4 @@
-﻿"""Centralised FastAPI exception handlers for the Forge server.
+﻿"""Centralised FastAPI exception handlers for the App server.
 
 Call ``register_exception_handlers(app)`` from the application factory to
 wire up all handlers.
@@ -23,7 +23,7 @@ from backend.core.errors import (
     LLMMalformedActionError,
     LLMNoResponseError,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.provider_types import AuthenticationError
 
 

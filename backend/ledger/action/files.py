@@ -1,4 +1,4 @@
-"""File manipulation action types used by Forge agents."""
+"""File manipulation action types used by App agents."""
 
 from __future__ import annotations
 

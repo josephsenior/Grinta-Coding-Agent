@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.execution.runtime_pool import call_async_disconnect
 from backend.execution.telemetry import RuntimeTelemetry, runtime_telemetry
 
@@ -48,12 +48,12 @@ class RuntimeWatchdog:
         self._max_active_seconds = (
             max_active_seconds
             if max_active_seconds is not None
-            else _env_float("FORGE_RUNTIME_MAX_ACTIVE_SECONDS", 3600.0)
+            else _env_float("APP_RUNTIME_MAX_ACTIVE_SECONDS", 3600.0)
         )
         self._poll_interval = (
             poll_interval
             if poll_interval is not None
-            else _env_float("FORGE_RUNTIME_WATCHDOG_INTERVAL", 30.0)
+            else _env_float("APP_RUNTIME_WATCHDOG_INTERVAL", 30.0)
         )
         self._telemetry = telemetry or runtime_telemetry
         self._watched: dict[str, WatchedRuntime] = {}

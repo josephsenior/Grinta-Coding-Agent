@@ -27,7 +27,7 @@ from backend.orchestration.state.state import State
 from backend.orchestration.tool_pipeline import ToolInvocationContext
 from backend.core.constants import DEFAULT_PENDING_ACTION_TIMEOUT
 from backend.core.enums import LifecyclePhase
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
 from backend.ledger.action import (
@@ -128,7 +128,9 @@ class SessionOrchestrator:
     _SERVICE_ALIASES: ClassVar[dict[str, str]] = {
         "action_service": "action",
         "pending_action_service": "pending_action",
+        "open_operation_service": "open_operation",
         "autonomy_service": "autonomy",
+        "execution_policy_service": "execution_policy",
         "iteration_service": "iteration",
         "lifecycle_service": "lifecycle",
         "state_service": "state",
@@ -251,7 +253,7 @@ class SessionOrchestrator:
             config.budget_per_task_delta,
         )
         self.services.autonomy.initialize(config.agent)
-        self.services.telemetry.initialize_tool_pipeline()
+        self.services.telemetry.initialize_operation_pipeline()
         self.services.retry.initialize()
 
     def _register_action_context(
@@ -332,7 +334,9 @@ class SessionOrchestrator:
             self._step_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._step_task
-        pending_service = getattr(self, "pending_action_service", None)
+        pending_service = getattr(self, "open_operation_service", None)
+        if pending_service is None:
+            pending_service = getattr(self, "pending_action_service", None)
         if pending_service is not None:
             pending_service.shutdown()
         if set_stop_state:
@@ -625,7 +629,7 @@ class SessionOrchestrator:
                     # (which add events to state.history) run before the next
                     # get_next_action() → astep() → condense_history() check.
                     # Without this, state.history may be stale (missing the just-
-                    # executed CondensationAction), causing the condenser to see
+                    # executed CondensationAction), causing the compactor to see
                     # the pre-condensation view and fire again — creating a loop.
                     await asyncio.sleep(0)
                     await self._handle_post_execution()
@@ -739,7 +743,9 @@ class SessionOrchestrator:
 
     @property
     def _pending_action(self) -> Action | None:
-        pending_service = getattr(self, "pending_action_service", None)
+        pending_service = getattr(self, "open_operation_service", None)
+        if pending_service is None:
+            pending_service = getattr(self, "pending_action_service", None)
         if pending_service:
             return pending_service.get()
         service = getattr(self, "action_service", None)
@@ -749,7 +755,9 @@ class SessionOrchestrator:
 
     @_pending_action.setter
     def _pending_action(self, action: Action | None) -> None:
-        pending_service = getattr(self, "pending_action_service", None)
+        pending_service = getattr(self, "open_operation_service", None)
+        if pending_service is None:
+            pending_service = getattr(self, "pending_action_service", None)
         if pending_service:
             pending_service.set(action)
             return
@@ -794,23 +802,37 @@ class SessionOrchestrator:
         )
         self.state_tracker._init_history(self.event_stream)  # type: ignore[attr-defined]  # bootstrap wiring
 
-    def get_trajectory(self, include_screenshots: bool = False) -> list[dict]:
-        """Get the complete trajectory of agent actions and observations.
+    def get_transcript(self, include_screenshots: bool = False) -> list[dict]:
+        """Get the complete transcript of agent operations and outcomes.
 
         Must be called after controller is closed.
 
         Args:
-            include_screenshots: Whether to include screenshot data in trajectory
+            include_screenshots: Whether to include screenshot data in transcript
 
         Returns:
-            List of trajectory events as dictionaries
+            List of transcript records as dictionaries
 
         """
         if self._lifecycle != LifecyclePhase.CLOSED:
             raise RuntimeError(
+                f"get_transcript() requires the controller to be closed. Current phase: {self._lifecycle.value}"
+            )
+        getter = getattr(self.state_tracker, "get_transcript", None)
+        if getter is None:
+            getter = self.state_tracker.get_trajectory
+        return getter(include_screenshots)
+
+    def get_trajectory(self, include_screenshots: bool = False) -> list[dict]:
+        """Backward-compatible alias for transcript export."""
+        if self._lifecycle != LifecyclePhase.CLOSED:
+            raise RuntimeError(
                 f"get_trajectory() requires the controller to be closed. Current phase: {self._lifecycle.value}"
             )
-        return self.state_tracker.get_trajectory(include_screenshots)
+        getter = getattr(self.state_tracker, "get_trajectory", None)
+        if getter is None:
+            getter = self.state_tracker.get_transcript
+        return getter(include_screenshots)
 
     def _is_stuck(self) -> bool:
         """Checks if the agent is stuck in a loop.

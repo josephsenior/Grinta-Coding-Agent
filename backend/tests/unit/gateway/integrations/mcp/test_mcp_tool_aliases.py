@@ -1,7 +1,6 @@
 """Tests for stable MCP tool alias generation."""
 
-from types import SimpleNamespace
-
+from backend.core.config.mcp_config import MCPServerConfig
 from backend.gateway.integrations.mcp.client import MCPClient
 from backend.gateway.integrations.mcp.mcp_tool_aliases import prepare_mcp_tool_exposed_names
 from backend.gateway.integrations.mcp.tool import MCPClientTool
@@ -11,13 +10,27 @@ def _tool(name: str) -> MCPClientTool:
     return MCPClientTool(name=name, description=f"{name} tool", inputSchema={})
 
 
+def _server_config(name: str) -> MCPServerConfig:
+    return MCPServerConfig.model_construct(
+        name=name,
+        type="stdio",
+        command="python",
+        args=[],
+        env={},
+        url=None,
+        api_key=None,
+        transport="sse",
+        usage_hint=None,
+    )
+
+
 class TestPrepareMcpToolExposedNames:
     def test_reserved_name_collision_gets_server_scoped_alias(self):
         client = MCPClient(
             tools=[_tool("search")],
             tool_map={"search": _tool("search")},
         )
-        client._server_config = SimpleNamespace(name="Docs Server")
+        client._server_config = _server_config("Docs Server")
 
         prepare_mcp_tool_exposed_names([client], {"search"})
 
@@ -30,12 +43,12 @@ class TestPrepareMcpToolExposedNames:
             tools=[_tool("lookup")],
             tool_map={"lookup": _tool("lookup")},
         )
-        client_a._server_config = SimpleNamespace(name="alpha")
+        client_a._server_config = _server_config("alpha")
         client_b = MCPClient(
             tools=[_tool("lookup")],
             tool_map={"lookup": _tool("lookup")},
         )
-        client_b._server_config = SimpleNamespace(name="beta")
+        client_b._server_config = _server_config("beta")
 
         prepare_mcp_tool_exposed_names([client_a, client_b], set())
 
@@ -50,7 +63,7 @@ class TestPrepareMcpToolExposedNames:
             tools=[_tool("a")],
             tool_map={"a": _tool("a")},
         )
-        client._server_config = SimpleNamespace(name="special")
+        client._server_config = _server_config("special")
         reserved = {"a", "mcp_special_a", "mcp_special_a_2"}
         prepare_mcp_tool_exposed_names([client], reserved)
         assert [tool.name for tool in client.tools] == ["mcp_special_a_3"]
@@ -72,6 +85,6 @@ class TestPrepareMcpToolExposedNames:
             tools=[_tool("x")],
             tool_map={"x": _tool("x")},
         )
-        client._server_config = SimpleNamespace(name="@@@")
+        client._server_config = _server_config("@@@")
         prepare_mcp_tool_exposed_names([client], {"x"})
         assert [tool.name for tool in client.tools] == ["mcp_mcp_x"]

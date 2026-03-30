@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import forge_logger as logger  # noqa: E402
+from backend.core.logger import app_logger as logger  # noqa: E402
 from backend.core.schemas import AgentState  # noqa: E402
 from backend.ledger import EventSource  # noqa: E402
 from backend.ledger.action.agent import PlaybookFinishAction  # noqa: E402
@@ -57,7 +57,7 @@ class TaskValidationService:
         # Path to project-level session memory
         file_store = self._context.get_controller().config.file_store
         project_root = file_store.root if file_store else "."
-        memories_path = os.path.join(project_root, ".Forge", "lessons.md")
+        memories_path = os.path.join(project_root, ".app", "lessons.md")
 
         try:
             os.makedirs(os.path.dirname(memories_path), exist_ok=True)

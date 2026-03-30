@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Self, cast
 import httpx
 
 from backend.core.errors import AgentRuntimeDisconnectedError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
 from backend.ledger.action import (
     Action,
@@ -69,7 +69,7 @@ from backend.utils.async_utils import (
 
 if TYPE_CHECKING:
     from pydantic import SecretStr
-    from backend.core.config import ForgeConfig, RuntimeConfig
+    from backend.core.config import AppConfig, RuntimeConfig
     from backend.core.config.mcp_config import MCPConfig
     from backend.ledger.event import Event
     from backend.playbooks.engine import BasePlaybook
@@ -155,7 +155,7 @@ class Runtime(
 ):
     """Abstract base class for agent runtime environments.
 
-    This is an extension point in Forge that allows applications to customize how
+    This is an extension point in App that allows applications to customize how
     agents interact with the external environment. The runtime provides an environment with:
     - Bash shell access
     - Browser interaction
@@ -179,7 +179,7 @@ class Runtime(
     """
 
     sid: str
-    config: ForgeConfig
+    config: AppConfig
     initial_env_vars: dict[str, str]
     attach_to_existing: bool
     status_callback: Callable[[str, RuntimeStatus, str], None] | None
@@ -192,7 +192,7 @@ class Runtime(
 
     def __init__(
         self,
-        config: ForgeConfig,
+        config: AppConfig,
         event_stream: EventStream | None,
         llm_registry: LLMRegistry,
         sid: str = "default",
@@ -942,9 +942,9 @@ class Runtime(
         return False
 
     @classmethod
-    def setup(cls, config: ForgeConfig, headless_mode: bool = False) -> None:
+    def setup(cls, config: AppConfig, headless_mode: bool = False) -> None:
         """Set up the environment for runtimes to be created."""
 
     @classmethod
-    def teardown(cls, config: ForgeConfig) -> None:
+    def teardown(cls, config: AppConfig) -> None:
         """Tear down the environment in which runtimes are created."""

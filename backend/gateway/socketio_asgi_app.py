@@ -3,7 +3,7 @@
 import importlib
 import socketio  # type: ignore[import-untyped]
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.gateway.app import app as base_app
 from backend.gateway.app_accessors import sio
 

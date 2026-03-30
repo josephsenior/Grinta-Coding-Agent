@@ -1,4 +1,4 @@
-"""TOML section processors for Forge configuration loading.
+"""TOML section processors for App configuration loading.
 
 Extracted from config/utils.py to reduce its size. Contains the per-section
 processing functions (_process_core_section, _process_agent_section, etc.)
@@ -14,19 +14,19 @@ from pydantic import SecretStr, ValidationError
 
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.extended_config import ExtendedConfig
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 from backend.core.config.mcp_config import MCPConfig
 from backend.core.config.runtime_config import RuntimeConfig
 from backend.core.config.security_config import SecurityConfig
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.config_loader import ConfigLoadSummary
 
 
 def process_core_section(
-    core_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+    core_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [core] section of the TOML config."""
     try:
@@ -48,7 +48,7 @@ def process_core_section(
 
 
 def process_agent_section(
-    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+    toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [agent] section of the TOML config."""
     if "agent" in toml_config:
@@ -66,7 +66,7 @@ def process_agent_section(
 
 
 def process_llm_section(
-    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+    toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [llm] section of the TOML config."""
     if "llm" in toml_config:
@@ -92,7 +92,7 @@ def process_llm_section(
 
 
 def process_security_section(
-    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+    toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [security] section of the TOML config."""
     if "security" in toml_config:
@@ -117,7 +117,7 @@ def process_security_section(
 
 
 def process_runtime_section(
-    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+    toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [runtime] section of the TOML config."""
     if "runtime" in toml_config:
@@ -140,7 +140,7 @@ def process_runtime_section(
 
 
 def process_mcp_section(
-    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+    toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [mcp] section of the TOML config."""
     if "mcp" in toml_config:
@@ -162,51 +162,51 @@ def process_mcp_section(
             raise ValueError(msg) from err
 
 
-def process_condenser_section(
-    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+def process_compactor_section(
+    toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
-    """Process the [condenser] section of the TOML config.
+    """Process the [compactor] section of the TOML config.
 
-    If a [condenser] section exists in the TOML, it is respected.
+    If a [compactor] section exists in the TOML, it is respected.
     Otherwise the system defaults to auto-selection which adapts to the
     session dynamically.
     """
-    if "condenser" in toml_config:
+    if "compactor" in toml_config:
         try:
-            from backend.core.config.condenser_config import (
-                condenser_config_from_toml_section,
+            from backend.core.config.compactor_config import (
+                compactor_config_from_toml_section,
             )
 
-            condenser_mapping = condenser_config_from_toml_section(
-                toml_config["condenser"], cfg.llms
+            compactor_mapping = compactor_config_from_toml_section(
+                toml_config["compactor"], cfg.llms
             )
-            if "condenser" in condenser_mapping:
+            if "compactor" in compactor_mapping:
                 default_agent_config = cfg.get_agent_config()
-                default_agent_config.condenser_config = condenser_mapping["condenser"]
+                default_agent_config.compactor_config = compactor_mapping["compactor"]
                 logger.debug(
-                    "Default condenser configuration loaded from config toml and assigned to default agent",
+                    "Default compactor configuration loaded from config toml and assigned to default agent",
                 )
         except (TypeError, KeyError, ValidationError) as e:
             logger.warning(
-                "Cannot parse [condenser] config from toml, values have not been applied.\nError: %s",
+                "Cannot parse [compactor] config from toml, values have not been applied.\nError: %s",
                 e,
             )
             if summary:
-                summary.record("condenser", "invalid", str(e))
+                summary.record("compactor", "invalid", str(e))
     else:
-        from backend.core.config.condenser_config import AutoCondenserConfig
+        from backend.core.config.compactor_config import AutoCompactorConfig
 
         default_agent_config = cfg.get_agent_config()
-        default_agent_config.condenser_config = AutoCondenserConfig(
+        default_agent_config.compactor_config = AutoCompactorConfig(
             llm_config=cfg.get_llm_config(),
         )
         logger.debug(
-            "Auto condenser assigned to default agent (adapts to session dynamically)",
+            "Auto compactor assigned to default agent (adapts to session dynamically)",
         )
 
 
 def process_extended_section(
-    toml_config: dict, cfg: ForgeConfig, summary: ConfigLoadSummary | None = None
+    toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [extended] section of the TOML config."""
     if "extended" in toml_config:
@@ -230,7 +230,7 @@ def check_unknown_sections(toml_config: dict, toml_file: str) -> None:
         "llm",
         "security",
         "runtime",
-        "condenser",
+        "compactor",
         "mcp",
         "api_keys",
     }

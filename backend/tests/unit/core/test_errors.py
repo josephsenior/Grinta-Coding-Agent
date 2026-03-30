@@ -7,7 +7,7 @@ from backend.core.errors import (
     ConfigurationError,
     ContextLimitError,
     EventStreamError,
-    ForgeError,
+    AppError,
     InvariantBrokenError,
     ModelProviderError,
     PersistenceError,
@@ -26,30 +26,30 @@ from backend.core.errors import (
 )
 
 
-class TestForgeErrorBaseClass:
-    """Tests for ForgeError base class."""
+class TestAppErrorBaseClass:
+    """Tests for AppError base class."""
 
-    def test_forge_error_is_runtime_error(self):
-        """Test ForgeError inherits from RuntimeError."""
-        assert issubclass(ForgeError, RuntimeError)
+    def test_app_error_is_runtime_error(self):
+        """Test AppError inherits from RuntimeError."""
+        assert issubclass(AppError, RuntimeError)
 
-    def test_create_forge_error(self):
-        """Test creating ForgeError instance."""
-        error = ForgeError("Test error")
+    def test_create_app_error(self):
+        """Test creating AppError instance."""
+        error = AppError("Test error")
         assert str(error) == "Test error"
 
-    def test_raise_forge_error(self):
-        """Test raising ForgeError."""
-        with pytest.raises(ForgeError, match="Test error"):
-            raise ForgeError("Test error")
+    def test_raise_app_error(self):
+        """Test raising AppError."""
+        with pytest.raises(AppError, match="Test error"):
+            raise AppError("Test error")
 
 
 class TestRetryableError:
     """Tests for RetryableError."""
 
-    def test_inherits_from_forge_error(self):
-        """Test RetryableError inherits from ForgeError."""
-        assert issubclass(RetryableError, ForgeError)
+    def test_inherits_from_app_error(self):
+        """Test RetryableError inherits from AppError."""
+        assert issubclass(RetryableError, AppError)
 
     def test_create_retryable_error(self):
         """Test creating RetryableError instance."""
@@ -65,9 +65,9 @@ class TestRetryableError:
 class TestUserActionRequiredError:
     """Tests for UserActionRequiredError."""
 
-    def test_inherits_from_forge_error(self):
-        """Test UserActionRequiredError inherits from ForgeError."""
-        assert issubclass(UserActionRequiredError, ForgeError)
+    def test_inherits_from_app_error(self):
+        """Test UserActionRequiredError inherits from AppError."""
+        assert issubclass(UserActionRequiredError, AppError)
 
     def test_create_user_action_required_error(self):
         """Test creating UserActionRequiredError instance."""
@@ -78,9 +78,9 @@ class TestUserActionRequiredError:
 class TestInvariantBrokenError:
     """Tests for InvariantBrokenError."""
 
-    def test_inherits_from_forge_error(self):
-        """Test InvariantBrokenError inherits from ForgeError."""
-        assert issubclass(InvariantBrokenError, ForgeError)
+    def test_inherits_from_app_error(self):
+        """Test InvariantBrokenError inherits from AppError."""
+        assert issubclass(InvariantBrokenError, AppError)
 
     def test_create_invariant_broken_error(self):
         """Test creating InvariantBrokenError instance."""
@@ -91,10 +91,10 @@ class TestInvariantBrokenError:
 class TestClassifyError:
     """Tests for classify_error function."""
 
-    def test_classify_forge_error(self):
-        """Test classifying ForgeError returns its type."""
-        error = ForgeError("test")
-        assert classify_error(error) == ForgeError
+    def test_classify_app_error(self):
+        """Test classifying AppError returns its type."""
+        error = AppError("test")
+        assert classify_error(error) == AppError
 
     def test_classify_retryable_error(self):
         """Test classifying RetryableError returns its type."""
@@ -142,17 +142,17 @@ class TestClassifyError:
         assert classify_error(error) == InvariantBrokenError
 
     def test_classify_generic_exception(self):
-        """Test generic Exception classified as ForgeError."""
+        """Test generic Exception classified as AppError."""
         error = Exception("generic error")
-        assert classify_error(error) == ForgeError
+        assert classify_error(error) == AppError
 
 
 class TestAgentRuntimeError:
     """Tests for AgentRuntimeError and context handling."""
 
-    def test_inherits_from_forge_error(self):
-        """Test AgentRuntimeError inherits from ForgeError."""
-        assert issubclass(AgentRuntimeError, ForgeError)
+    def test_inherits_from_app_error(self):
+        """Test AgentRuntimeError inherits from AppError."""
+        assert issubclass(AgentRuntimeError, AppError)
 
     def test_create_without_context(self):
         """Test creating AgentRuntimeError without context."""
@@ -250,9 +250,9 @@ class TestConfigurationError:
 class TestSessionError:
     """Tests for SessionError base class."""
 
-    def test_inherits_from_forge_error(self):
-        """Test SessionError inherits from ForgeError."""
-        assert issubclass(SessionError, ForgeError)
+    def test_inherits_from_app_error(self):
+        """Test SessionError inherits from AppError."""
+        assert issubclass(SessionError, AppError)
 
     def test_create_session_error(self):
         """Test creating SessionError instance."""
@@ -342,9 +342,9 @@ class TestReplayError:
 class TestSocketConnectionError:
     """Tests for SocketConnectionError."""
 
-    def test_inherits_from_forge_error(self):
-        """Test SocketConnectionError inherits from ForgeError."""
-        assert issubclass(SocketConnectionError, ForgeError)
+    def test_inherits_from_app_error(self):
+        """Test SocketConnectionError inherits from AppError."""
+        assert issubclass(SocketConnectionError, AppError)
 
     def test_create_socket_connection_error(self):
         """Test creating SocketConnectionError."""
@@ -355,9 +355,9 @@ class TestSocketConnectionError:
 class TestEventStreamError:
     """Tests for EventStreamError."""
 
-    def test_inherits_from_forge_error(self):
-        """Test EventStreamError inherits from ForgeError."""
-        assert issubclass(EventStreamError, ForgeError)
+    def test_inherits_from_app_error(self):
+        """Test EventStreamError inherits from AppError."""
+        assert issubclass(EventStreamError, AppError)
 
     def test_create_event_stream_error(self):
         """Test creating EventStreamError."""
@@ -379,7 +379,7 @@ class TestErrorHierarchy:
         ]
         for error_cls in errors:
             assert issubclass(error_cls, AgentRuntimeError)
-            assert issubclass(error_cls, ForgeError)
+            assert issubclass(error_cls, AppError)
 
     def test_all_session_errors_inherit_correctly(self):
         """Test all session errors inherit from SessionError."""
@@ -393,12 +393,12 @@ class TestErrorHierarchy:
         ]
         for error_cls in errors:
             assert issubclass(error_cls, SessionError)
-            assert issubclass(error_cls, ForgeError)
+            assert issubclass(error_cls, AppError)
 
     def test_all_errors_are_runtime_errors(self):
-        """Test all Forge errors ultimately inherit from RuntimeError."""
+        """Test all app errors ultimately inherit from RuntimeError."""
         errors = [
-            ForgeError,
+            AppError,
             RetryableError,
             UserActionRequiredError,
             InvariantBrokenError,
@@ -434,19 +434,19 @@ from backend.core.errors import (
     TaskInvalidStateError,
     UserCancelledError,
 )
-from backend.core.errors import ForgeError
+from backend.core.errors import AppError
 
 
 # ---------------------------------------------------------------------------
-# Test that all exceptions are subclasses of ForgeError or AgentError
+# Test that all exceptions are subclasses of AppError or AgentError
 # ---------------------------------------------------------------------------
 
 
 class TestExceptionHierarchy:
     """Tests for the exception class hierarchy."""
 
-    def test_agent_error_is_forge_error(self):
-        assert issubclass(AgentError, ForgeError)
+    def test_agent_error_is_app_error(self):
+        assert issubclass(AgentError, AppError)
 
     def test_agent_subclasses(self):
         for exc_cls in [
@@ -458,7 +458,7 @@ class TestExceptionHierarchy:
         ]:
             assert issubclass(exc_cls, AgentError)
 
-    def test_llm_errors_are_forge_errors(self):
+    def test_llm_errors_are_app_errors(self):
         for exc_cls in [
             LLMMalformedActionError,
             LLMNoActionError,
@@ -466,7 +466,7 @@ class TestExceptionHierarchy:
             LLMNoResponseError,
             LLMContextWindowExceedError,
         ]:
-            assert issubclass(exc_cls, ForgeError)
+            assert issubclass(exc_cls, AppError)
 
     def test_function_call_errors(self):
         for exc_cls in [
@@ -474,10 +474,10 @@ class TestExceptionHierarchy:
             FunctionCallValidationError,
             FunctionCallNotExistsError,
         ]:
-            assert issubclass(exc_cls, ForgeError)
+            assert issubclass(exc_cls, AppError)
 
     def test_playbook_errors(self):
-        assert issubclass(PlaybookError, ForgeError)
+        assert issubclass(PlaybookError, AppError)
         assert issubclass(PlaybookValidationError, PlaybookError)
 
 
@@ -605,8 +605,8 @@ class TestExceptionCreation:
 class TestExceptionRaiseAndCatch:
     """Tests that exceptions integrate with Python's try/except properly."""
 
-    def test_catch_forge_error(self):
-        with pytest.raises(ForgeError):
+    def test_catch_app_error(self):
+        with pytest.raises(AppError):
             raise AgentStuckInLoopError()
 
     def test_catch_agent_error(self):

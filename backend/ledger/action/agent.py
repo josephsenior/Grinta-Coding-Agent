@@ -1,4 +1,4 @@
-"""Agent-focused action types emitted in Forge event streams."""
+"""Agent-focused action types emitted in App event streams."""
 
 from __future__ import annotations
 
@@ -116,11 +116,11 @@ class RecallAction(Action):
 class CondensationAction(Action):
     """This action indicates a condensation of the conversation history is happening.
 
-    There are two ways to specify the events to be forgotten:
+    There are two ways to specify the events to be pruned:
     1. By providing a list of event IDs.
     2. By providing the start and end IDs of a range of events.
 
-    In the second case, we assume that event IDs are monotonically increasing, and that _all_ events between the start and end IDs are to be forgotten.
+    In the second case, we assume that event IDs are monotonically increasing, and that _all_ events between the start and end IDs are to be pruned.
 
     Raises:
         ValueError: If the optional fields are not instantiated in a valid configuration.
@@ -128,48 +128,48 @@ class CondensationAction(Action):
     """
 
     action: ClassVar[str] = ActionType.CONDENSATION
-    forgotten_event_ids: list[int] | None = None
-    "The IDs of the events that are being forgotten (removed from the `View` given to the LLM)."
-    forgotten_events_start_id: int | None = None
-    "The ID of the first event to be forgotten in a range of events."
-    forgotten_events_end_id: int | None = None
-    "The ID of the last event to be forgotten in a range of events."
+    pruned_event_ids: list[int] | None = None
+    "The IDs of the events that are being pruned (removed from the `View` given to the LLM)."
+    pruned_events_start_id: int | None = None
+    "The ID of the first event to be pruned in a range of events."
+    pruned_events_end_id: int | None = None
+    "The ID of the last event to be pruned in a range of events."
     summary: str | None = None
-    "An optional summary of the events being forgotten."
+    "An optional summary of the events being pruned."
     summary_offset: int | None = None
     "An optional offset to the start of the resulting view indicating where the summary should be inserted."
 
     def _validate_field_polymorphism(self) -> bool:
         """Check if the optional fields are instantiated in a valid configuration."""
-        using_event_ids = self.forgotten_event_ids is not None
+        using_event_ids = self.pruned_event_ids is not None
         using_event_range = (
-            self.forgotten_events_start_id is not None
-            and self.forgotten_events_end_id is not None
+            self.pruned_events_start_id is not None
+            and self.pruned_events_end_id is not None
         )
-        forgotten_event_configuration = using_event_ids ^ using_event_range
+        pruned_event_configuration = using_event_ids ^ using_event_range
         summary_configuration = (
             self.summary is None and self.summary_offset is None
         ) or (self.summary is not None and self.summary_offset is not None)
-        return forgotten_event_configuration and summary_configuration
+        return pruned_event_configuration and summary_configuration
 
     def __post_init__(self):
-        """Validate that the provided fields describe exactly one forgetting strategy."""
+        """Validate that the provided fields describe exactly one pruning strategy."""
         if not self._validate_field_polymorphism():
             msg = "Invalid configuration of the optional fields."
             raise ValueError(msg)
 
     @property
-    def forgotten(self) -> list[int]:
-        """The list of event IDs that should be forgotten."""
+    def pruned(self) -> list[int]:
+        """The list of event IDs that should be pruned."""
         if not self._validate_field_polymorphism():
             msg = "Invalid configuration of the optional fields."
             raise ValueError(msg)
-        if self.forgotten_event_ids is not None:
-            return self.forgotten_event_ids
-        assert self.forgotten_events_start_id is not None
-        assert self.forgotten_events_end_id is not None
+        if self.pruned_event_ids is not None:
+            return self.pruned_event_ids
+        assert self.pruned_events_start_id is not None
+        assert self.pruned_events_end_id is not None
         return list(
-            range(self.forgotten_events_start_id, self.forgotten_events_end_id + 1)
+            range(self.pruned_events_start_id, self.pruned_events_end_id + 1)
         )
 
     @property
@@ -177,7 +177,7 @@ class CondensationAction(Action):
         """Get condensation summary or event list message."""
         if self.summary:
             return f"Summary: {self.summary}"
-        return f"Condenser is dropping the events: {self.forgotten}."
+        return f"Compactor is dropping the events: {self.pruned}."
 
 
 @dataclass

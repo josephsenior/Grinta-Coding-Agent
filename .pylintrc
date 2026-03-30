@@ -35,7 +35,7 @@ max-line-length=120
 
 [BASIC]
 # Good variable names (allow single-letter variables in specific contexts)
-good-names=i,j,k,ex,Run,_,f,e,x,y,id,pk,db,ok,TREE_SITTER_AVAILABLE,GENERIC_READ,FILE_SHARE_READ,FILE_SHARE_WRITE,FILE_SHARE_DELETE,OPEN_EXISTING,EXCLUDE_PREFIXES,TARGET_PACKAGES,FORGE_version,_RuntimeLanguage,_RuntimeParser,_RuntimeNode,_RuntimeTree,FILE_ATTRIBUTE_NORMAL
+good-names=i,j,k,ex,Run,_,f,e,x,y,id,pk,db,ok,TREE_SITTER_AVAILABLE,GENERIC_READ,FILE_SHARE_READ,FILE_SHARE_WRITE,FILE_SHARE_DELETE,OPEN_EXISTING,EXCLUDE_PREFIXES,TARGET_PACKAGES,APP_version,_RuntimeLanguage,_RuntimeParser,_RuntimeNode,_RuntimeTree,FILE_ATTRIBUTE_NORMAL
 
 # Allow uppercase constants and class attributes
 const-rgx=(([A-Z_][A-Z0-9_]*)|(__.*__)|([a-z_][a-z0-9_]*))$

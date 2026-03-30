@@ -1,4 +1,4 @@
-"""Tests for ConversationMemory – pure helper methods and formatting logic."""
+"""Tests for ContextMemory - pure helper methods and formatting logic."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import cast
 
 from backend.core.message import ImageContent, Message, TextContent
 from backend.core.config import AgentConfig
-from backend.context.conversation_memory import ConversationMemory
+from backend.context.conversation_memory import ContextMemory
 from backend.context.memory_types import DecisionType
 from backend.context.message_formatting import (
     apply_user_message_formatting,
@@ -32,11 +32,11 @@ def _make_config(**overrides) -> SimpleNamespace:
     return SimpleNamespace(**defaults)
 
 
-def _make_memory(**config_kw) -> ConversationMemory:
+def _make_memory(**config_kw) -> ContextMemory:
     cfg = _make_config(**config_kw)
     pm = MagicMock()
     pm.get_system_message.return_value = "System prompt"
-    return ConversationMemory(cast(AgentConfig, cfg), pm)
+    return ContextMemory(cast(AgentConfig, cfg), pm)
 
 
 # ── _is_valid_image_url ─────────────────────────────────────────────
@@ -45,18 +45,18 @@ def _make_memory(**config_kw) -> ConversationMemory:
 class TestIsValidImageUrl:
     def test_valid_url(self):
         assert (
-            ConversationMemory._is_valid_image_url("https://example.com/img.png")
+            ContextMemory._is_valid_image_url("https://example.com/img.png")
             is True
         )
 
     def test_none(self):
-        assert ConversationMemory._is_valid_image_url(None) is False
+        assert ContextMemory._is_valid_image_url(None) is False
 
     def test_empty(self):
-        assert ConversationMemory._is_valid_image_url("") is False
+        assert ContextMemory._is_valid_image_url("") is False
 
     def test_whitespace(self):
-        assert ConversationMemory._is_valid_image_url("   ") is False
+        assert ContextMemory._is_valid_image_url("   ") is False
 
 
 # ── _message_with_text ───────────────────────────────────────────────

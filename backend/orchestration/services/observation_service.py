@@ -5,14 +5,14 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from backend.orchestration.state.state import AgentState
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation, Observation
 from backend.ledger.serialization.event import truncate_content
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import OrchestrationContext
-    from backend.orchestration.services.pending_action_service import PendingActionService
+    from backend.orchestration.services.pending_action_service import OpenOperationService
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
@@ -44,10 +44,10 @@ class ObservationService:
     def __init__(
         self,
         context: OrchestrationContext,
-        pending_action_service: PendingActionService,
+        open_operation_service: OpenOperationService,
     ) -> None:
         self._context = context
-        self._pending_service = pending_action_service
+        self._pending_service = open_operation_service
 
     async def handle_observation(self, observation: Observation) -> None:
         controller = self._context.get_controller()

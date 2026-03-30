@@ -22,7 +22,7 @@ from backend.gateway.app import (
 class TestCheckBudgetSanity:
     def test_no_budget_warns(self):
         warnings: list[str] = []
-        with patch("backend.gateway.app._forge_config") as mock_cfg:
+        with patch("backend.gateway.app._app_config") as mock_cfg:
             mock_cfg.max_budget_per_task = None
             _check_budget_sanity(warnings)
         assert len(warnings) == 1
@@ -30,14 +30,14 @@ class TestCheckBudgetSanity:
 
     def test_zero_budget_warns(self):
         warnings: list[str] = []
-        with patch("backend.gateway.app._forge_config") as mock_cfg:
+        with patch("backend.gateway.app._app_config") as mock_cfg:
             mock_cfg.max_budget_per_task = 0
             _check_budget_sanity(warnings)
         assert len(warnings) == 1
 
     def test_valid_budget_no_warnings(self):
         warnings: list[str] = []
-        with patch("backend.gateway.app._forge_config") as mock_cfg:
+        with patch("backend.gateway.app._app_config") as mock_cfg:
             mock_cfg.max_budget_per_task = 5.0
             _check_budget_sanity(warnings)
         assert not warnings
@@ -49,14 +49,14 @@ class TestCheckBudgetSanity:
 class TestCheckDatabaseAvailability:
     def test_file_storage_no_warnings(self):
         warnings: list[str] = []
-        with patch.dict(os.environ, {"KB_STORAGE_TYPE": "file"}, clear=False):
+        with patch.dict(os.environ, {"APP_KB_STORAGE_TYPE": "file"}, clear=False):
             _check_database_availability(warnings)
         assert not warnings
 
     def test_database_without_asyncpg_warns(self):
         warnings: list[str] = []
         with (
-            patch.dict(os.environ, {"KB_STORAGE_TYPE": "database"}, clear=False),
+            patch.dict(os.environ, {"APP_KB_STORAGE_TYPE": "database"}, clear=False),
             patch("importlib.util.find_spec", return_value=None),
         ):
             _check_database_availability(warnings)
@@ -64,7 +64,7 @@ class TestCheckDatabaseAvailability:
 
     def test_database_without_url_warns(self):
         warnings: list[str] = []
-        env = {"KB_STORAGE_TYPE": "database"}
+        env = {"APP_KB_STORAGE_TYPE": "database"}
         # Remove DATABASE_URL if present
         env_copy = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
         env_copy.update(env)

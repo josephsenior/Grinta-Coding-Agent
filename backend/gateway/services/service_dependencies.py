@@ -19,7 +19,7 @@ from backend.gateway.app_accessors import (
 )
 
 if TYPE_CHECKING:
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.gateway.config.server_config import ServerConfig
     from backend.persistence.files import FileStore
 
@@ -29,8 +29,8 @@ def get_file_store() -> "FileStore":
     return get_app_state().file_store
 
 
-def get_forge_config() -> "ForgeConfig":
-    """FastAPI dependency that returns the current ForgeConfig.
+def get_app_config() -> "AppConfig":
+    """FastAPI dependency that returns the current AppConfig.
 
     Reads directly from AppState on each call to avoid the stale-snapshot
     problem with the module-level ``config`` reference in ``app_accessors``.

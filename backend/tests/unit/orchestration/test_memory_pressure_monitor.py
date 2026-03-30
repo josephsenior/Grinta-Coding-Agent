@@ -26,9 +26,9 @@ class TestMemoryPressureMonitorInit:
         assert m._check_interval == 5.0
 
     def test_env_var_thresholds(self, monkeypatch):
-        monkeypatch.setenv("FORGE_MEM_WARN_MB", "256")
-        monkeypatch.setenv("FORGE_MEM_CRIT_MB", "512")
-        monkeypatch.setenv("FORGE_MEM_CHECK_INTERVAL", "2")
+        monkeypatch.setenv("APP_MEM_WARN_MB", "256")
+        monkeypatch.setenv("APP_MEM_CRIT_MB", "512")
+        monkeypatch.setenv("APP_MEM_CHECK_INTERVAL", "2")
         m = MemoryPressureMonitor()
         assert m._warn_mb == 256
         assert m._crit_mb == 512

@@ -13,12 +13,12 @@ DOCKER_RUN_COMMAND="docker run -it --rm \
   -p 3000:3000 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --add-host host.docker.internal:host-gateway \
-  -e RUNTIME_CONTAINER_IMAGE=docker.forge.dev/Forge/runtime:${SHORT_SHA}-nikolaik \
-  --name Forge-app-${SHORT_SHA} \
-  docker.forge.dev/Forge/Forge:${SHORT_SHA}"
+  -e RUNTIME_CONTAINER_IMAGE=docker.app.dev/App/runtime:${SHORT_SHA}-nikolaik \
+  --name App-app-${SHORT_SHA} \
+  docker.app.dev/App/App:${SHORT_SHA}"
 
 # Define the uvx command
-UVX_RUN_COMMAND="uvx --python 3.12 --from git+https://github.com/Forge/Forge@${BRANCH_NAME} Forge"
+UVX_RUN_COMMAND="uvx --python 3.12 --from git+https://github.com/App/App@${BRANCH_NAME} App"
 
 # Get the current PR body
 PR_BODY=$(gh pr view "$PR_NUMBER" --json body --jq .body)

@@ -24,7 +24,7 @@ def _make_persistence(**overrides) -> tuple[EventPersistence, MagicMock]:
         "cache_size": 3,
     }
     defaults.update(overrides)
-    with patch.dict("os.environ", {"FORGE_SQLITE_EVENTS": "false"}):
+    with patch.dict("os.environ", {"APP_SQLITE_EVENTS": "false"}):
         p = EventPersistence(**cast(Any, defaults))
     return p, file_store
 
@@ -212,7 +212,7 @@ class TestTruncatePayloadPersist:
         payload = {"content": big_value, "id": 1}
         _truncate_payload(payload, max_bytes=10_000)
         assert len(cast(str, payload["content"])) < 100_000
-        assert "truncated by Forge" in cast(str, payload["content"])
+        assert "truncated by App" in cast(str, payload["content"])
 
     def test_leaves_small_payloads_untouched(self):
         payload = {"content": "small", "id": 1}

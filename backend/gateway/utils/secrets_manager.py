@@ -17,13 +17,13 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 class SecretsManager:
     """Manages encryption and decryption of secrets."""
 
-    _LEGACY_SALT = b"forge_secrets_salt"
+    _LEGACY_SALT = b"app_secrets_salt"
     _FORMAT_PREFIX = "v2"
     _FORMAT_V3 = "v3"
 
@@ -69,7 +69,7 @@ class SecretsManager:
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
-            info=b"forge-secrets-v3",
+            info=b"app-secrets-v3",
         )
         key = base64.urlsafe_b64encode(hkdf.derive(master_key.encode()))
         return Fernet(key)

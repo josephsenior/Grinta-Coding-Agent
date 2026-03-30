@@ -7,7 +7,7 @@ import threading
 import httpx
 import tenacity
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.persistence.files import FileStore
 from backend.utils.async_utils import EXECUTOR
 from backend.utils.tenacity_metrics import (

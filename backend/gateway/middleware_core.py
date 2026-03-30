@@ -1,4 +1,4 @@
-"""Custom middleware components for the Forge FastAPI server."""
+"""Custom middleware components for the App FastAPI server."""
 
 import asyncio
 import os

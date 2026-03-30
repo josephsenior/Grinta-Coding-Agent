@@ -165,7 +165,7 @@ class EnhancedVectorStore:
 
     def __init__(
         self,
-        collection_name: str = "FORGE_memory",
+        collection_name: str = "APP_memory",
         backend_type: str | None = None,
         enable_cache: bool = True,
         enable_reranking: bool = True,

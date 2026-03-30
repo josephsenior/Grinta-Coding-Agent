@@ -1,4 +1,4 @@
-﻿"""Conversation manager implementation for single-node Forge deployments."""
+﻿"""Conversation manager implementation for single-node App deployments."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from backend.core.constants import WORKSPACE_SWITCH_SESSION_CLOSE_TIMEOUT
 from backend.core.errors import AgentRuntimeUnavailableError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger.stream import EventStreamSubscriber, session_exists
 from backend.execution import get_runtime_cls
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
     import socketio  # type: ignore[import-untyped]
 
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
     from backend.core.config.llm_config import LLMConfig
     from backend.ledger.action import MessageAction
     from backend.inference.llm_registry import LLMRegistry
@@ -63,7 +63,7 @@ class LocalConversationManager(ConversationManager):
     """
 
     sio: socketio.AsyncServer
-    config: ForgeConfig
+    config: AppConfig
     file_store: FileStore
     server_config: ServerConfig
     monitoring_listener: MonitoringListener = MonitoringListener()
@@ -493,7 +493,7 @@ class LocalConversationManager(ConversationManager):
         return self._agent_loop_info_from_session(session)
 
     @staticmethod
-    def _session_needs_restart(session: Session) -> bool:
+    def _session_needs_restart(session: Any) -> bool:
         """Return True when a cached session is too unhealthy to reuse."""
         if getattr(session, "_closed", False):
             return True
@@ -552,7 +552,7 @@ class LocalConversationManager(ConversationManager):
                 if self._loop is not None:
                     await run_in_loop(
                         self.sio.emit(
-                            "forge_event",
+                            "app_event",
                             status_update_dict,
                             to=ROOM_KEY.format(sid=oldest_conversation_id),
                         ),
@@ -560,7 +560,7 @@ class LocalConversationManager(ConversationManager):
                     )
                 else:
                     await self.sio.emit(
-                        "forge_event",
+                        "app_event",
                         status_update_dict,
                         to=ROOM_KEY.format(sid=oldest_conversation_id),
                     )
@@ -735,7 +735,7 @@ class LocalConversationManager(ConversationManager):
     def get_instance(
         cls,
         sio: socketio.AsyncServer,
-        config: ForgeConfig,
+        config: AppConfig,
         file_store: FileStore,
         server_config: ServerConfig,
         monitoring_listener: MonitoringListener | None,
@@ -744,7 +744,7 @@ class LocalConversationManager(ConversationManager):
 
         Args:
             sio: SocketIO server instance
-            config: Forge configuration
+            config: App configuration
             file_store: File storage backend
             server_config: Server configuration
             monitoring_listener: Optional monitoring listener

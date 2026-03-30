@@ -12,7 +12,7 @@ from backend.orchestration.agent import Agent
 if TYPE_CHECKING:
     pass
 from backend.core.errors import AgentNotRegisteredError, PlaybookValidationError
-from backend.core.logger import ForgeLoggerAdapter
+from backend.core.logger import AppLoggerAdapter
 from backend.core.schemas import AgentState
 from backend.ledger.action import MessageAction, NullAction
 from backend.ledger.event import Event, EventSource
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
     import socketio  # type: ignore[import-untyped]
 
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.inference.llm_registry import LLMRegistry
     from backend.gateway.services.conversation_stats import ConversationStats
     from backend.persistence.data_models.settings import Settings
@@ -52,7 +52,7 @@ class Session:
     is_alive: bool = True
     agent_session: AgentSession
     loop: asyncio.AbstractEventLoop
-    config: ForgeConfig
+    config: AppConfig
     llm_registry: LLMRegistry
     file_store: FileStore
     user_id: str | None
@@ -61,7 +61,7 @@ class Session:
     def __init__(
         self,
         sid: str,
-        config: ForgeConfig,
+        config: AppConfig,
         llm_registry: LLMRegistry,
         conversation_stats: ConversationStats,
         file_store: FileStore,
@@ -73,7 +73,7 @@ class Session:
         self.sio = sio
         self.last_active_ts = int(time.time())
         self.file_store = file_store
-        self.logger = ForgeLoggerAdapter(extra={"session_id": sid})
+        self.logger = AppLoggerAdapter(extra={"session_id": sid})
         self.llm_registry = llm_registry
         self.conversation_stats = conversation_stats
         self.agent_session = AgentSession(
@@ -108,7 +108,7 @@ class Session:
 
         if self.sio:
             await self.sio.emit(
-                "forge_event",
+                "app_event",
                 event_to_dict(
                     AgentStateChangedObservation("", AgentState.STOPPED.value)
                 ),
@@ -139,20 +139,22 @@ class Session:
             cfg.mcp = cfg.mcp.merge(mcp_config)
             self.logger.debug("Merged custom MCP Config: %s", mcp_config)
 
-        from backend.core.config.mcp_config import dedupe_forge_mcp_http_servers
+        from backend.core.config.mcp_config import dedupe_default_mcp_http_servers
 
-        dedupe_forge_mcp_http_servers(cfg.mcp)
+        dedupe_default_mcp_http_servers(cfg.mcp)
 
         self.logger.debug(
             "MCP configuration after setup - self.config.mcp: %s", cfg.mcp
         )
 
-    def _apply_condenser(self, settings: Settings, agent_config, llm_config) -> None:
-        """Configure agent condenser — always uses automatic selection."""
-        from backend.core.config.condenser_config import AutoCondenserConfig
+    def _apply_compactor(self, settings: Settings, agent_config, llm_config) -> None:
+        """Configure the agent compactor using automatic selection."""
+        from backend.core.config.compactor_config import AutoCompactorConfig
 
-        agent_config.condenser_config = AutoCondenserConfig(llm_config=llm_config)
-        self.logger.info("Condenser: auto-selection enabled (adapts to session length and patterns)")
+        agent_config.compactor_config = AutoCompactorConfig(llm_config=llm_config)
+        self.logger.info(
+            "Compactor: auto-selection enabled (adapts to session length and patterns)"
+        )
 
     def _extract_conversation_data(
         self,
@@ -280,8 +282,8 @@ class Session:
         agent_name = agent_cls if agent_cls is not None else "agent"
         llm_config = self.config.get_llm_config_from_agent(agent_name)
 
-        # Configure condenser if enabled
-        self._apply_condenser(settings, agent_config, llm_config)
+        # Configure compactor if enabled
+        self._apply_compactor(settings, agent_config, llm_config)
 
         # Create agent
         try:
@@ -300,7 +302,7 @@ class Session:
                 agent_config.disabled_playbooks = list(disabled_playbooks)
             agent_name = agent_cls if agent_cls is not None else "agent"
             llm_config = self.config.get_llm_config_from_agent(agent_name)
-            self._apply_condenser(settings, agent_config, llm_config)
+            self._apply_compactor(settings, agent_config, llm_config)
             agent_type = Agent.get_cls(agent_cls)
 
         agent = agent_type(agent_config, self.llm_registry)
@@ -751,7 +753,7 @@ class Session:
         if self.sio is None:
             self.logger.warning("Socket.IO server not available; dropping event.")
             return
-        await self.sio.emit("forge_event", data, to=ROOM_KEY.format(sid=self.sid))
+        await self.sio.emit("app_event", data, to=ROOM_KEY.format(sid=self.sid))
 
     async def send_error(self, message: str) -> None:
         """Sends an error message to the client."""

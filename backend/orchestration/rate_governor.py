@@ -7,7 +7,7 @@ import time
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.inference.metrics import TokenUsage

@@ -36,9 +36,9 @@ class TestMemoryPressureMonitor:
         with patch.dict(
             os.environ,
             {
-                "FORGE_MEM_WARN_MB": "1024",
-                "FORGE_MEM_CRIT_MB": "2048",
-                "FORGE_MEM_CHECK_INTERVAL": "15",
+                "APP_MEM_WARN_MB": "1024",
+                "APP_MEM_CRIT_MB": "2048",
+                "APP_MEM_CHECK_INTERVAL": "15",
             },
         ):
             monitor = MemoryPressureMonitor()
@@ -48,7 +48,7 @@ class TestMemoryPressureMonitor:
 
     def test_init_custom_overrides_env(self):
         """Test custom values override environment variables."""
-        with patch.dict(os.environ, {"FORGE_MEM_WARN_MB": "1024"}):
+        with patch.dict(os.environ, {"APP_MEM_WARN_MB": "1024"}):
             monitor = MemoryPressureMonitor(warn_mb=512)
             assert monitor._warn_mb == 512
 

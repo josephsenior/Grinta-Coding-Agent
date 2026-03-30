@@ -65,19 +65,19 @@ class TestViewBasics:
         assert v.unhandled_condensation_request is False
 
 
-class TestCollectForgottenEventIds:
+class TestCollectPrunedEventIds:
     def test_no_condensation_actions(self):
         events = [_make_event(1), _make_event(2)]
-        result = View._collect_forgotten_event_ids(events)
+        result = View._collect_pruned_event_ids(events)
         assert result == set()
 
     def test_with_condensation_action(self):
         from backend.ledger.action.agent import CondensationAction
 
-        ca = CondensationAction(forgotten_event_ids=[10, 20, 30])
+        ca = CondensationAction(pruned_event_ids=[10, 20, 30])
         ca._id = 99
         events = [_make_event(1), ca]
-        result = View._collect_forgotten_event_ids(events)
+        result = View._collect_pruned_event_ids(events)
         assert 10 in result
         assert 20 in result
         assert 30 in result
@@ -88,7 +88,7 @@ class TestCollectForgottenEventIds:
 
         cra = CondensationRequestAction()
         cra._id = 50
-        result = View._collect_forgotten_event_ids([_make_event(1), cra])
+        result = View._collect_pruned_event_ids([_make_event(1), cra])
         assert 50 in result
 
 
@@ -103,7 +103,7 @@ class TestFindSummaryInfo:
         from backend.ledger.action.agent import CondensationAction
 
         ca = CondensationAction(
-            forgotten_event_ids=[1],
+            pruned_event_ids=[1],
             summary="AI decided to use X",
             summary_offset=0,
         )
@@ -128,7 +128,7 @@ class TestCheckUnhandledCondensationRequest:
         )
 
         cra = CondensationRequestAction()
-        ca = CondensationAction(forgotten_event_ids=[1])
+        ca = CondensationAction(pruned_event_ids=[1])
         events: list[Any] = [cra, ca]
         assert View._check_unhandled_condensation_request(events) is False
 
@@ -146,16 +146,16 @@ class TestFromEvents:
         assert not v
         assert v.unhandled_condensation_request is False
 
-    def test_filters_forgotten(self):
+    def test_filters_pruned(self):
         from backend.ledger.action.agent import CondensationAction
 
         e1 = _make_event(1)
         e2 = _make_event(2)
-        ca = CondensationAction(forgotten_event_ids=[1])
+        ca = CondensationAction(pruned_event_ids=[1])
         ca._id = 99  # The action itself should also be removed
         events = [e1, e2, ca]
         v = View.from_events(events)
-        # e1 (id=1) is forgotten, ca (id=99) is forgotten
+        # e1 (id=1) is pruned, ca (id=99) is pruned.
         event_ids = [e.id for e in v.events]
         assert 1 not in event_ids
         assert 99 not in event_ids

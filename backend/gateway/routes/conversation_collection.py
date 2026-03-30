@@ -1,4 +1,4 @@
-"""Routes for creating, listing, and managing Forge conversations and sessions.
+"""Routes for creating, listing, and managing App conversations and sessions.
 
 Business logic is delegated to:
 - ``session_init_service``   – conversation creation / init orchestration
@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Imports needed for InitSessionRequest model_rebuild
 from backend.core.config.mcp_config import MCPConfig
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.provider_types import (
     ProviderTokenType,
     CreatePlaybook,

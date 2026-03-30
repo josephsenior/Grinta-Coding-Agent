@@ -1,5 +1,5 @@
 # ============================================
-# FORGE - Docker Quick Start
+# App - Docker Quick Start
 # ============================================
 
 param(
@@ -7,7 +7,7 @@ param(
     [switch]$Detached
 )
 
-Write-Host "🚀 Starting Forge in Docker..." -ForegroundColor Cyan
+Write-Host "🚀 Starting app in Docker..." -ForegroundColor Cyan
 
 # Ensure settings.json exists so it can be mounted
 if (-not (Test-Path "settings.json")) {
@@ -21,12 +21,12 @@ if (-not (Test-Path "settings.json")) {
 }
 
 # Run docker compose
-Write-Host "🐳 Running Docker Compose (default: Redis + Postgres + Forge)..." -ForegroundColor Green
+Write-Host "🐳 Running Docker Compose (default: Redis + Postgres + app)..." -ForegroundColor Green
 
-$env:FORGE_KB_STORAGE_TYPE = if ($NoDatabase) { "file" } else { "database" }
+$env:APP_KB_STORAGE_TYPE = if ($NoDatabase) { "file" } else { "database" }
 
 if ($NoDatabase) {
-    Write-Host "⚠ Emergency mode enabled: KB_STORAGE_TYPE=file" -ForegroundColor Yellow
+    Write-Host "⚠ Emergency mode enabled: APP_KB_STORAGE_TYPE=file" -ForegroundColor Yellow
 }
 
 if ($Detached) {

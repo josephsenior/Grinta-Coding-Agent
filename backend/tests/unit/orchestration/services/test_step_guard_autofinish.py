@@ -1,7 +1,7 @@
 """Tests for StepGuardService reliability-first behavior."""
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.orchestration.services.step_guard_service import StepGuardService
 from backend.ledger.action.files import FileEditAction, FileWriteAction
@@ -76,25 +76,27 @@ class TestEnsureCanStep(unittest.IsolatedAsyncioTestCase):
         controller = MagicMock()
         context.get_controller.return_value = controller
         service = StepGuardService(context)
-        service._check_circuit_breaker = AsyncMock(return_value=False)
-        service._handle_stuck_detection = AsyncMock(return_value=True)
-
-        allowed = await service.ensure_can_step()
+        with (
+            patch.object(service, "_check_circuit_breaker", new=AsyncMock(return_value=False)) as mock_check,
+            patch.object(service, "_handle_stuck_detection", new=AsyncMock(return_value=True)) as mock_handle,
+        ):
+            allowed = await service.ensure_can_step()
 
         self.assertFalse(allowed)
-        service._check_circuit_breaker.assert_awaited_once_with(controller)
-        service._handle_stuck_detection.assert_not_awaited()
+        mock_check.assert_awaited_once_with(controller)
+        mock_handle.assert_not_awaited()
 
     async def test_stuck_detection_runs_after_circuit_breaker_clear(self):
         context = MagicMock()
         controller = MagicMock()
         context.get_controller.return_value = controller
         service = StepGuardService(context)
-        service._check_circuit_breaker = AsyncMock(return_value=True)
-        service._handle_stuck_detection = AsyncMock(return_value=True)
-
-        allowed = await service.ensure_can_step()
+        with (
+            patch.object(service, "_check_circuit_breaker", new=AsyncMock(return_value=True)) as mock_check,
+            patch.object(service, "_handle_stuck_detection", new=AsyncMock(return_value=True)) as mock_handle,
+        ):
+            allowed = await service.ensure_can_step()
 
         self.assertTrue(allowed)
-        service._check_circuit_breaker.assert_awaited_once_with(controller)
-        service._handle_stuck_detection.assert_awaited_once_with(controller)
+        mock_check.assert_awaited_once_with(controller)
+        mock_handle.assert_awaited_once_with(controller)

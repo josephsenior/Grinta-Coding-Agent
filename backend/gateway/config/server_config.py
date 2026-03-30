@@ -2,7 +2,7 @@
 
 import os
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.gateway.types import AppMode, ServerConfigInterface
 from backend.utils.import_utils import get_impl
 
@@ -12,7 +12,7 @@ from backend.utils.import_utils import get_impl
 class ServerConfig(ServerConfigInterface):
     """Default OSS server configuration with environment-driven overrides."""
 
-    config_cls: str | None = os.environ.get("FORGE_CONFIG_CLS", None)
+    config_cls: str | None = os.environ.get("APP_SERVER_CONFIG_CLS", None)
     app_mode: AppMode = AppMode.OSS
     posthog_client_key: str = "phc_3ESMmY9SgqEAGBB6sMGK5ayYHkeUuknH2vP6FmWH9RA"
     github_client_id: str = os.environ.get("GITHUB_APP_CLIENT_ID", "")
@@ -22,8 +22,10 @@ class ServerConfig(ServerConfigInterface):
     enable_jira: bool = os.environ.get("ENABLE_JIRA", "true") == "true"
     enable_jira_dc: bool = os.environ.get("ENABLE_JIRA_DC", "true") == "true"
     enable_linear: bool = os.environ.get("ENABLE_LINEAR", "true") == "true"
-    enable_review_critics: bool = os.environ.get("FORGE_ENABLE_CRITICS", "true") == "true"
-    """Set FORGE_ENABLE_CRITICS=false to disable post-task critic scoring."""
+    enable_review_critics: bool = (
+        os.environ.get("ENABLE_REVIEW_CRITICS", "true") == "true"
+    )
+    """Set ENABLE_REVIEW_CRITICS=false to disable post-task critic scoring."""
     settings_store_class: str = (
         "backend.persistence.settings.file_settings_store.FileSettingsStore"
     )
@@ -61,7 +63,7 @@ class ServerConfig(ServerConfigInterface):
                 "ENABLE_JIRA": self.enable_jira,
                 "ENABLE_JIRA_DC": self.enable_jira_dc,
                 "ENABLE_LINEAR": self.enable_linear,
-                "FORGE_ENABLE_CRITICS": self.enable_review_critics,
+                "ENABLE_REVIEW_CRITICS": self.enable_review_critics,
             },
         }
 
@@ -69,14 +71,14 @@ class ServerConfig(ServerConfigInterface):
 def load_server_config() -> ServerConfig:
     """Load server configuration from environment.
 
-    Reads FORGE_CONFIG_CLS environment variable to determine config class,
+    Reads APP_SERVER_CONFIG_CLS environment variable to determine config class,
     instantiates it, and verifies the configuration.
 
     Returns:
         Loaded and verified ServerConfig instance
 
     """
-    config_cls = os.environ.get("FORGE_CONFIG_CLS", None)
+    config_cls = os.environ.get("APP_SERVER_CONFIG_CLS", None)
     logger.info("Using config class %s", config_cls)
     server_config_cls = get_impl(ServerConfig, config_cls)
     server_config: ServerConfig = server_config_cls()

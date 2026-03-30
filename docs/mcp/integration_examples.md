@@ -1,6 +1,6 @@
 # MCP Integration Examples
 
-Forge supports the Model Context Protocol (MCP) to connect agents with external tools and data sources.
+App supports the Model Context Protocol (MCP) to connect agents with external tools and data sources.
 
 ## 1. Configuring MCP Servers
 

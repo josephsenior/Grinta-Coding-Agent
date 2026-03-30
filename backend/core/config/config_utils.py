@@ -1,4 +1,4 @@
-"""Helpers for loading and normalising Forge configuration data."""
+"""Helpers for loading and normalizing application configuration data."""
 
 from types import NoneType, UnionType
 from typing import Any, get_args, get_origin
@@ -6,7 +6,7 @@ from typing import Any, get_args, get_origin
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
-from backend.core.constants import FORGE_DEFAULT_AGENT, FORGE_MAX_ITERATIONS
+from backend.core.constants import DEFAULT_AGENT_NAME, DEFAULT_MAX_ITERATIONS
 
 
 def get_field_info(field: FieldInfo) -> dict[str, Any]:
@@ -53,8 +53,8 @@ def model_defaults_to_dict(model: BaseModel) -> dict[str, Any]:
 
 
 __all__ = [
-    "FORGE_DEFAULT_AGENT",
-    "FORGE_MAX_ITERATIONS",
+    "DEFAULT_AGENT_NAME",
+    "DEFAULT_MAX_ITERATIONS",
     "get_field_info",
     "model_defaults_to_dict",
 ]

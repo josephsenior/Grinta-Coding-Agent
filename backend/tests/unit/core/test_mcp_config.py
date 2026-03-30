@@ -419,29 +419,30 @@ class TestMCPConfig:
         assert "json-server" in server_names
 
 
-# ── ForgeMCPConfig ────────────────────────────────────────────────────
+# ── AppMCPConfig ─────────────────────────────────────────────────────
 
 
-class TestForgeMCPConfig:
+class TestAppMCPConfig:
     def test_create_default_mcp_server_config(self):
-        from backend.core.config.forge_config import ForgeConfig
-        from backend.core.config.mcp_config import ForgeMCPConfig
+        from backend.core.config.app_config import AppConfig
+        from backend.core.config.mcp_config import AppMCPConfig
 
-        config = ForgeConfig()
-        shttp, stdio = ForgeMCPConfig.create_default_mcp_server_config(
+        config = AppConfig()
+        shttp, stdio = AppMCPConfig.create_default_mcp_server_config(
             "localhost:3000", config, "user123"
         )
         assert shttp is not None
+        assert shttp.name == "app-mcp"
         assert shttp.url == "http://localhost:3000/mcp/mcp"
         assert isinstance(stdio, list)
         assert not stdio
 
     def test_create_default_mcp_server_config_skips_invalid_host(self):
-        from backend.core.config.forge_config import ForgeConfig
-        from backend.core.config.mcp_config import ForgeMCPConfig
+        from backend.core.config.app_config import AppConfig
+        from backend.core.config.mcp_config import AppMCPConfig
 
-        config = ForgeConfig()
-        shttp, stdio = ForgeMCPConfig.create_default_mcp_server_config(
+        config = AppConfig()
+        shttp, stdio = AppMCPConfig.create_default_mcp_server_config(
             None, config, "user123"
         )
         assert shttp is None

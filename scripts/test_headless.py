@@ -5,9 +5,9 @@ import sys
 import time
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-from forge_client.client import ForgeClient
+from client import AppClient
 
-SERVER = os.environ.get("FORGE_BASE_URL", "http://localhost:3000")
+SERVER = os.environ.get("APP_BASE_URL", "http://localhost:3000")
 TIMEOUT = 600  # 10 min max per task
 
 
@@ -26,7 +26,7 @@ async def run_task(description: str, task: str) -> dict:
     print(f"TASK: {description}")
     print(f"{'='*60}")
 
-    client = ForgeClient(base_url=SERVER)
+    client = AppClient(base_url=SERVER)
     tool_calls = []
     final_status = None
     t0 = time.time()

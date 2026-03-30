@@ -1,12 +1,12 @@
 ﻿"""Protocol defining the executor interface for runtime drivers.
 
 This decouples runtime drivers (e.g. ``LocalRuntimeInProcess``) from the
-concrete ``ActionExecutor`` class.  Drivers should depend on
-:class:`ActionExecutorProtocol` and receive a concrete implementation
-via dependency injection or a factory callable.
+concrete ``RuntimeExecutor`` class. Drivers should depend on
+:class:`RuntimeExecutorProtocol` and receive a concrete implementation via
+dependency injection or a factory callable.
 
 The protocol mirrors the public surface of
-:class:`backend.execution.action_execution_server.ActionExecutor` that is
+:class:`backend.execution.action_execution_server.RuntimeExecutor` that is
 actually exercised by runtime drivers.
 """
 
@@ -24,8 +24,8 @@ from backend.ledger.observation import Observation
 
 
 @runtime_checkable
-class ActionExecutorProtocol(Protocol):
-    """Structural sub-typing interface for action executors.
+class RuntimeExecutorProtocol(Protocol):
+    """Structural sub-typing interface for runtime executors.
 
     Any object providing these methods can be used as the executor
     backing a runtime driver — whether it runs in-process, over HTTP,

@@ -2,22 +2,21 @@
 
 Run:  python scripts/headless_swe_tests.py
 Env:
-  FORGE_BASE_URL  (default: http://localhost:3000)
-  FORGE_TIMEOUT   (default: 600)  seconds to wait for agent
+    APP_BASE_URL  (default: http://localhost:3000)
+    APP_TIMEOUT   (default: 600)  seconds to wait for agent
 """
 
 import asyncio
-import json
 import os
 import sys
 import time
 from typing import Any
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from forge_client import ForgeClient
+from client import AppClient
 
-BASE_URL = os.environ.get("FORGE_BASE_URL", "http://localhost:3000")
-TIMEOUT = int(os.environ.get("FORGE_TIMEOUT", "600"))
+BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+TIMEOUT = int(os.environ.get("APP_TIMEOUT", "600"))
 
 # ---------------------------------------------------------------------------
 # Test scenarios: simple → complex
@@ -27,7 +26,7 @@ SCENARIOS: list[dict[str, Any]] = [
         "name": "simple_file_create",
         "prompt": (
             "Create a file called 'hello.txt' in the workspace with the content:\n"
-            "Hello from Forge!\n"
+            "Hello from App!\n"
             "Then confirm it was created by reading it back."
         ),
         "check": lambda events: any(
@@ -167,7 +166,7 @@ async def run_scenario(scenario: dict[str, Any]) -> TestResult:
         if action == "finish" or observation == "agent_finish":
             terminal.set()
 
-    client = ForgeClient(BASE_URL)
+    client = AppClient(BASE_URL)
     try:
         conv = await asyncio.wait_for(client.create_conversation(), timeout=30)
         conv_id = conv.get("id") or conv.get("conversation_id")
@@ -281,7 +280,7 @@ def _agent_state_from(event: dict) -> str:
 
 
 async def main() -> int:
-    print(f"Forge Headless SWE Tests")
+    print("App Headless SWE Tests")
     print(f"Server: {BASE_URL}  |  Timeout: {TIMEOUT}s per scenario")
     print("=" * 78)
 
@@ -297,7 +296,7 @@ async def main() -> int:
         return 1
 
     # Pick scenarios to run
-    scenario_filter = os.environ.get("FORGE_TEST_SCENARIO", "").strip()
+    scenario_filter = os.environ.get("APP_TEST_SCENARIO", "").strip()
     if scenario_filter:
         scenarios = [s for s in SCENARIOS if s["name"] == scenario_filter]
         if not scenarios:
@@ -313,7 +312,6 @@ async def main() -> int:
         print(f"\n{'─' * 78}")
         print(f"[{i}/{len(scenarios)}] {scenario['name']}: {scenario['description']}")
         print(f"{'─' * 78}")
-        t = time.time()
         result = await run_scenario(scenario)
         print(f"  → {result.status} ({result.duration:.1f}s, {len(result.tool_calls)} tool calls)")
         if result.error:
@@ -342,7 +340,7 @@ async def main() -> int:
         for issue in r.issues:
             all_issues.append(f"{r.name}: {issue}")
     if all_issues:
-        print(f"\nDETECTED ISSUES:")
+        print("\nDETECTED ISSUES:")
         for issue in all_issues:
             print(f"  - {issue}")
 

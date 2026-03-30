@@ -44,12 +44,12 @@ class TestBatchRequest:
             model="gpt-4",
             temperature=0.7,
             max_tokens=100,
-            metadata={"project": "forge"},
+            metadata={"project": "app"},
         )
         assert req.model == "gpt-4"
         assert req.temperature == 0.7
         assert req.max_tokens == 100
-        assert req.metadata == {"project": "forge"}
+        assert req.metadata == {"project": "app"}
 
 
 # ---------------------------------------------------------------------------

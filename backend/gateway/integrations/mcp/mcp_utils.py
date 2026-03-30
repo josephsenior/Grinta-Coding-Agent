@@ -1,4 +1,4 @@
-"""Utility helpers for configuring and invoking Model Context Protocol clients in Forge."""
+"""Utility helpers for configuring and invoking Model Context Protocol clients in App."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from backend.core.config.mcp_config import (
     MCPConfig,
     MCPServerConfig,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.ledger.observation.mcp import MCPObservation
 from backend.gateway.integrations.mcp.cache import get_cached, set_cache
@@ -45,9 +45,9 @@ def _get_mcp_connect_timeout_sec() -> float:
     """Return MCP server connect timeout in seconds.
 
     Default is generous for cold ``npx``/``uvx`` first installs; override with
-    ``FORGE_MCP_CONNECT_TIMEOUT_SEC``.
+    ``APP_MCP_CONNECT_TIMEOUT_SEC``.
     """
-    raw = os.getenv("FORGE_MCP_CONNECT_TIMEOUT_SEC", "60")
+    raw = os.getenv("APP_MCP_CONNECT_TIMEOUT_SEC", "60")
     try:
         timeout = float(raw)
         return timeout if timeout > 0 else 60.0
@@ -736,7 +736,7 @@ async def _execute_direct_tool(
                     f"MCP tool '{action.name}' timed out (server did not respond in time).\n"
                     "The tool may be waiting on a slow network call or the MCP server may be stuck.\n"
                     "Try: mcp_capabilities_status, a narrower query, or non-MCP tools.\n"
-                    "Tune limits: FORGE_MCP_CALL_TOTAL_BUDGET_SEC, FORGE_MCP_RECONNECT_SESSION_TIMEOUT_SEC."
+                    "Tune limits: APP_MCP_CALL_TOTAL_BUDGET_SEC, APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC."
                 ),
                 code="MCP_TOOL_TIMEOUT",
                 retryable=True,
@@ -777,7 +777,7 @@ async def call_tool_mcp(
     Args:
         mcps: The list of MCP clients to execute the action on
         action: The MCP action to execute
-        configured_servers: Servers Forge attempted to connect (for diagnostics tools)
+        configured_servers: Servers App attempted to connect (for diagnostics tools)
 
     Returns:
         The observation from the MCP server

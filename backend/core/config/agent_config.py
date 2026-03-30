@@ -15,10 +15,10 @@ from pydantic import (
 
 from backend._canonical import CanonicalModelMetaclass
 
-# Import CondenserConfig directly - needed for Pydantic validation
-from backend.core.config.condenser_config import (
-    CondenserConfig,
-    ConversationWindowCondenserConfig,
+# Import CompactorConfig directly - needed for Pydantic validation
+from backend.core.config.compactor_config import (
+    CompactorConfig,
+    ConversationWindowCompactorConfig,
 )
 from backend.core.config.config_telemetry import config_telemetry
 from backend.core.constants import (
@@ -65,9 +65,9 @@ from backend.core.constants import (
     DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME,
     DEFAULT_AGENT_THINK_ENABLED,
     DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
-    FORGE_DEFAULT_AGENT,
+    DEFAULT_AGENT_NAME,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.core.config.llm_config import LLMConfig
@@ -83,7 +83,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         llm_config: LLM configuration for the agent
         memory_max_threads: Maximum number of history items to include in context window
         memory_enabled: Whether to enable conversation memory
-        condenser_config: Configuration for conversation memory condenser
+        compactor_config: Configuration for conversation memory compactor
         enable_prompt_extensions: Whether to allow agent-specific prompt extensions (agent suffix)
         enable_browsing: Whether to enable browser environment
         enable_auto_lint: Whether to enable automatic linting after edits
@@ -95,7 +95,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(
-        default=FORGE_DEFAULT_AGENT,
+        default=DEFAULT_AGENT_NAME,
         min_length=1,
         description="Name of the agent to use",
     )
@@ -111,8 +111,8 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_MEMORY_ENABLED,
         description="Whether to enable conversation memory",
     )
-    condenser_config: CondenserConfig = Field(
-        default_factory=ConversationWindowCondenserConfig
+    compactor_config: CompactorConfig = Field(
+        default_factory=ConversationWindowCompactorConfig
     )
     enable_prompt_extensions: bool = Field(
         default=DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED
@@ -217,7 +217,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     max_iterations_override: int | None = Field(
         default=None,
-        description="Override max_iterations from ForgeConfig (None = use ForgeConfig value)",
+        description="Override max_iterations from AppConfig (None = use AppConfig value)",
     )
     complexity_iteration_multiplier: float = Field(
         default=DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
@@ -293,7 +293,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     merge_control_system_into_primary: bool = Field(
         default=DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY,
         description=(
-            "Append FORGE control/status text to the first system message instead of "
+            "Append APP control/status text to the first system message instead of "
             "inserting a second system message (some providers handle a single system "
             "message better)"
         ),
@@ -328,7 +328,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     @model_validator(mode="before")
     @classmethod
     def _drop_legacy_enable_prompt_caching(cls, data: Any) -> Any:
-        """Ignore removed agent-level flag (use LLMConfig.caching_prompt instead)."""
+        """Normalize legacy field names before model validation."""
         if isinstance(data, dict):
             data = dict(data)
             data.pop("enable_prompt_caching", None)
@@ -424,7 +424,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         for key, value in data.items():
             if isinstance(value, dict) and key not in [
                 "llm_config",
-                "condenser_config",
+                "compactor_config",
                 "llm_draft_config",
             ]:
                 # This is a custom agent section like [agent.Navigator]

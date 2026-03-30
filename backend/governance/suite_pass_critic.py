@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.execution.utils.test_output_summary import parse_pytest_pass_fail_counts
 from backend.governance.base import BaseCritic, CriticResult
 

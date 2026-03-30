@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.execution.base import Runtime
@@ -57,7 +57,7 @@ class FileTransaction:
     async def __aenter__(self) -> FileTransaction:
         """Enter transaction context."""
         # Create temporary backup directory
-        self.backup_dir = tempfile.mkdtemp(prefix="forge_txn_")
+        self.backup_dir = tempfile.mkdtemp(prefix="app_txn_")
         logger.info("Started file transaction with backup dir: %s", self.backup_dir)
         return self
 

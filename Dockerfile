@@ -1,10 +1,10 @@
 # ============================================================================
-# Forge — Docker build
+# App — Docker build
 # ============================================================================
 # Usage:
 #   docker compose up              # recommended (uses docker-compose.yml)
-#   docker build -t forge .        # standalone build
-#   docker run -p 3000:3000 forge  # standalone run
+#   docker build -t app .        # standalone build
+#   docker run -p 3000:3000 app  # standalone run
 # ============================================================================
 
 # --- Builder stage: install deps + build ---
@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN useradd --create-home --shell /bin/bash forge
+RUN useradd --create-home --shell /bin/bash app
 
 WORKDIR /app
 
@@ -47,14 +47,14 @@ COPY --from=builder /build/settings.template.json /build/start_server.py ./
 RUN cp settings.template.json settings.json && \
     mkdir -p /app/.tmux && \
     mkdir -p /app/workspace && \
-    chown -R forge:forge /app
+    chown -R app:app /app
 
 # Switch to non-root user
-USER forge
+USER app
 
 # Runtime environment
-ENV FORGE_HOST=0.0.0.0 \
-    FORGE_PORT=3000 \
+ENV APP_HOST=0.0.0.0 \
+    APP_PORT=3000 \
     PROJECT_ROOT=/app/workspace \
     TMUX_TMPDIR=/app/.tmux
 

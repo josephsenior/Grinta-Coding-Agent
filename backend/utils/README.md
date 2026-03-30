@@ -1,30 +1,30 @@
-# Forge Utilities
+# App Utilities
 
-This directory contains various utility functions and classes used throughout Forge.
+This directory contains various utility functions and classes used throughout App.
 
 ## Runtime Implementation Substitution
 
-Forge provides an extensibility mechanism through the `get_impl` and `import_from` functions in `import_utils.py`. This mechanism allows applications built on Forge to customize behavior by providing their own implementations of Forge base classes.
+App provides an extensibility mechanism through the `get_impl` and `import_from` functions in `import_utils.py`. This mechanism allows applications built on App to customize behavior by providing their own implementations of App base classes.
 
 ### How It Works
 
 1. Base classes define interfaces through abstract methods and properties
-2. Default implementations are provided by Forge
+2. Default implementations are provided by App
 3. Applications can provide custom implementations by:
    - Creating a class that inherits from the base class
    - Implementing all required methods
-   - Configuring Forge to use the custom implementation via configuration
+   - Configuring App to use the custom implementation via configuration
 
 ### Example
 
 ```python
-# In Forge base code:
+# In App base code:
 class ConversationManager:
     @abstractmethod
     async def attach_to_conversation(self, sid: str) -> Conversation:
         """Attach to an existing conversation."""
 
-# Default implementation in Forge:
+# Default implementation in App:
 class StandaloneConversationManager(ConversationManager):
     async def attach_to_conversation(self, sid: str) -> Conversation:
         # Single-server implementation
@@ -42,7 +42,7 @@ server_config.conversation_manager_class = 'myapp.ClusteredConversationManager'
 
 ### Common Extension Points
 
-Forge provides several components that can be extended:
+App provides several components that can be extended:
 
 1. Server Components:
    - `ConversationManager`: Manages conversation lifecycles
@@ -64,7 +64,7 @@ The mechanism is implemented through two key functions:
 1. `import_from(qual_name: str)`: Imports any Python value from its fully qualified name
 
    ```python
-   UserAuth = import_from('Forge.server.user_auth.UserAuth')
+   UserAuth = import_from('App.server.user_auth.UserAuth')
    ```
 
 2. `get_impl(cls: type[T], impl_name: str | None) -> type[T]`: Imports and validates a class implementation

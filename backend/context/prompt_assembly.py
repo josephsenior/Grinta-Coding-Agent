@@ -1,6 +1,6 @@
 """Prompt assembly helpers for workspace context and knowledge recall.
 
-Extracted from :class:`~backend.context.conversation_memory.ConversationMemory`
+Extracted from :class:`~backend.context.conversation_memory.ContextMemory`
 to reduce file size and improve cohesion.  These functions build
 ``Message`` objects from ``RecallObservation`` events and delegate to
 :class:`~backend.utils.prompt.PromptManager` for template rendering.
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.message import ImageContent, Message, TextContent
 from backend.core.enums import RecallType
 from backend.ledger.event import Event

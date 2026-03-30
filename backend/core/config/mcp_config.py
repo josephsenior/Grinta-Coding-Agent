@@ -20,16 +20,16 @@ from pydantic import (
 )
 
 from backend._canonical import CanonicalModelMetaclass
-from backend.core.constants import DEFAULT_FORGE_MCP_CONFIG_CLS
-from backend.core.logger import forge_logger as logger
+from backend.core.constants import DEFAULT_APP_MCP_CONFIG_CLS
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
 from backend.utils.import_utils import get_impl
 
 # When set (1/true/yes), ``load_bundled_mcp_server_configs`` returns []. Unit tests that
 # assert exact MCP server lists should set this env var; production leaves it unset.
-NO_BUNDLED_MCP_DEFAULTS_ENV = "FORGE_NO_BUNDLED_MCP_DEFAULTS"
+NO_BUNDLED_MCP_DEFAULTS_ENV = "APP_NO_BUNDLED_MCP_DEFAULTS"
 
 
 def _validate_mcp_url(url: str) -> str:
@@ -433,12 +433,12 @@ def extend_mcp_servers_with_bundled_defaults(servers: list[MCPServerConfig]) -> 
             logger.debug("Applied bundled MCP default server '%s'", srv.name)
 
 
-def dedupe_forge_mcp_http_servers(mcp: MCPConfig) -> None:
-    """Keep a single ``forge-mcp`` server row (first wins) after user merges."""
+def dedupe_default_mcp_http_servers(mcp: MCPConfig) -> None:
+    """Keep a single ``app-mcp`` server row (first wins) after user merges."""
     seen = False
     kept: list[MCPServerConfig] = []
     for s in mcp.servers:
-        if s.name == "forge-mcp":
+        if s.name == "app-mcp":
             if seen:
                 continue
             seen = True
@@ -446,17 +446,17 @@ def dedupe_forge_mcp_http_servers(mcp: MCPConfig) -> None:
     mcp.servers = kept
 
 
-def ensure_default_forge_mcp_http_server(cfg: Any) -> None:
-    """Ensure the default Forge SHTTP MCP server exists once (single source of truth)."""
-    dedupe_forge_mcp_http_servers(cfg.mcp)
-    default, stdio_extra = ForgeMCPConfigImpl.create_default_mcp_server_config(
+def ensure_default_mcp_http_server(cfg: Any) -> None:
+    """Ensure the default SHTTP MCP server exists once (single source of truth)."""
+    dedupe_default_mcp_http_servers(cfg.mcp)
+    default, stdio_extra = AppMCPConfigImpl.create_default_mcp_server_config(
         cfg.mcp_host,
         cfg,
         None,
     )
     if default is None:
         return
-    if any(s.name == "forge-mcp" for s in cfg.mcp.servers):
+    if any(s.name == "app-mcp" for s in cfg.mcp.servers):
         return
     if default.url and any(getattr(s, "url", None) == default.url for s in cfg.mcp.servers):
         return
@@ -470,20 +470,20 @@ def _filter_windows_stdio_servers(servers: list) -> list:
     return servers
 
 
-class ForgeMCPConfig:
-    """Utility class for creating default Forge MCP configurations."""
+class AppMCPConfig:
+    """Utility class for creating default application MCP configurations."""
 
     @staticmethod
     def create_default_mcp_server_config(
         host: str | None,
-        config: ForgeConfig,
+        config: AppConfig,
         user_id: str | None = None,
     ) -> tuple[MCPServerConfig | None, list[MCPServerConfig]]:
         """Create a default MCP server configuration.
 
         Args:
             host: Host string
-            config: ForgeConfig
+            config: AppConfig
             user_id: Optional user ID for the MCP server
         Returns:
             tuple[MCPServerConfig | None, list[MCPServerConfig]]:
@@ -496,12 +496,12 @@ class ForgeMCPConfig:
         normalized_host = (host or "").strip()
         if not normalized_host or normalized_host.lower() in {"none", "null"}:
             logger.warning(
-                "Skipping default Forge MCP server: invalid mcp_host=%r", host
+                "Skipping default MCP server: invalid mcp_host=%r", host
             )
             return (None, stdio_servers)
 
         shttp_servers = MCPServerConfig(
-            name="forge-mcp",
+            name="app-mcp",
             type="shttp",
             url=f"http://{normalized_host}/mcp/mcp",
             api_key=None,
@@ -510,21 +510,21 @@ class ForgeMCPConfig:
         return (shttp_servers, stdio_servers)
 
 
-FORGE_mcp_config_cls = os.environ.get(
-    "FORGE_MCP_CONFIG_CLS",
-    DEFAULT_FORGE_MCP_CONFIG_CLS,
+configured_mcp_config_cls = os.environ.get(
+    "APP_MCP_CONFIG_CLS",
+    DEFAULT_APP_MCP_CONFIG_CLS,
 )
-ForgeMCPConfigImpl = get_impl(ForgeMCPConfig, FORGE_mcp_config_cls)
+AppMCPConfigImpl = get_impl(AppMCPConfig, configured_mcp_config_cls)
 
 __all__ = [
     "MCPRemoteServerConfig",
     "MCPStdioServerConfig",
     "MCPConfig",
-    "ForgeMCPConfig",
-    "ForgeMCPConfigImpl",
+    "AppMCPConfig",
+    "AppMCPConfigImpl",
     "NO_BUNDLED_MCP_DEFAULTS_ENV",
-    "dedupe_forge_mcp_http_servers",
-    "ensure_default_forge_mcp_http_server",
+    "dedupe_default_mcp_http_servers",
+    "ensure_default_mcp_http_server",
     "extend_mcp_servers_with_bundled_defaults",
     "load_bundled_mcp_server_configs",
 ]

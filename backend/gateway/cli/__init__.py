@@ -1,1 +1,1 @@
-"""Forge CLI module."""
+"""App CLI module."""

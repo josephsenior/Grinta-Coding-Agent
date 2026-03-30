@@ -2,13 +2,13 @@
 
 ## Reporting Vulnerabilities
 
-If you discover a security vulnerability in Forge, please report it responsibly.
+If you discover a security vulnerability in App, please report it responsibly.
 
 **DO NOT** open a public issue for security vulnerabilities.
 
 ### How to Report
 
-1. Email: security@forge.ai (or open a private security advisory on GitHub)
+1. Email: security@app.ai (or open a private security advisory on GitHub)
 2. Include:
    - Description of the vulnerability
    - Steps to reproduce
@@ -32,7 +32,7 @@ If you discover a security vulnerability in Forge, please report it responsibly.
 
 ### Transport
 - CORS restricted to localhost by default
-- CSRF protection available (opt-in via `FORGE_CSRF_ENABLED`)
+- CSRF protection available (opt-in via `APP_CSRF_ENABLED`)
 - Security headers (CSP, X-Frame-Options, etc.) via middleware
 
 ### Runtime Safety
@@ -43,8 +43,8 @@ If you discover a security vulnerability in Forge, please report it responsibly.
 - Request size limits and timeouts
 
 ### Runtime Boundary
-- Forge does not currently provide sandbox or container isolation for local command execution.
-- The local runtime executes with the permissions of the user running Forge.
+- App does not currently provide sandbox or container isolation for local command execution.
+- The local runtime executes with the permissions of the user running App.
 - `hardened_local` improves local safety with workspace-scoped policy enforcement, but it is not equivalent to a sandbox.
 - Treat the current runtime as appropriate for trusted local development workflows, not hostile repositories.
 

@@ -1,4 +1,4 @@
-"""Safety configuration for Forge security controls."""
+"""Safety configuration for App security controls."""
 
 from __future__ import annotations
 

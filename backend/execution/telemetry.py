@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 runtime_telemetry: RuntimeTelemetry  # forward ref for type checking
 

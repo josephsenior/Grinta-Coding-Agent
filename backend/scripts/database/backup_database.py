@@ -1,6 +1,6 @@
 """Database backup script for PostgreSQL user storage.
 
-Creates automated backups of the Forge PostgreSQL database.
+Creates automated backups of the App PostgreSQL database.
 Supports full backups, incremental backups, and restore operations.
 
 Usage:
@@ -85,11 +85,16 @@ BACKUP_DIR = Path(os.getenv("BACKUP_DIR", "./backups"))
 BACKUP_RETENTION_DAYS = int(os.getenv("BACKUP_RETENTION_DAYS", "30"))
 
 
+def build_backup_filename(timestamp: datetime | None = None, suffix: str = ".sql") -> str:
+    ts = timestamp or datetime.now()
+    return f"app_backup_{ts.strftime('%Y%m%d_%H%M%S')}{suffix}"
+
+
 async def get_db_connection():
     """Get database connection from environment variables."""
     host = os.getenv("DB_HOST", "localhost")
     port = int(os.getenv("DB_PORT", "5432"))
-    database = os.getenv("DB_NAME", "forge")
+    database = os.getenv("DB_NAME", "app")
     user = os.getenv("DB_USER", "postgres")
     password = os.getenv("DB_PASSWORD", "")
 
@@ -111,13 +116,13 @@ async def create_backup():
 
     # Generate backup filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = BACKUP_DIR / f"forge_backup_{timestamp}.sql"
+    backup_file = BACKUP_DIR / f"app_backup_{timestamp}.dump"
 
     try:
         conn = await get_db_connection()
 
         # Get database name
-        db_name = os.getenv("DB_NAME", "forge")
+        db_name = os.getenv("DB_NAME", "app")
 
         # Use pg_dump via subprocess (more reliable than asyncpg for backups)
         import subprocess
@@ -173,7 +178,9 @@ async def create_backup():
             sys.exit(1)
 
         # Also create a plain SQL backup for easier inspection
-        sql_backup_file = BACKUP_DIR / f"forge_backup_{timestamp}.sql"
+        sql_backup_file = BACKUP_DIR / build_backup_filename(
+            datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+        )
         cmd_sql = [
             pg_dump_exe,
             "-h",
@@ -239,7 +246,7 @@ def _build_restore_cmd(
     host = os.getenv("DB_HOST", "localhost")
     port = os.getenv("DB_PORT", "5432")
     user = os.getenv("DB_USER", "postgres")
-    db_name = os.getenv("DB_NAME", "forge")
+    db_name = os.getenv("DB_NAME", "app")
     is_custom = backup_path.suffix == ".sql" and backup_path.stat().st_size < 1000
     if is_custom or backup_path.suffix == ".dump":
         assert pg_restore_exe is not None
@@ -299,8 +306,8 @@ def list_backups():
         print(f"No backup directory found: {BACKUP_DIR}")
         return
 
-    backups = sorted(BACKUP_DIR.glob("forge_backup_*.sql"), reverse=True)
-    backups.extend(sorted(BACKUP_DIR.glob("forge_backup_*.dump"), reverse=True))
+    backups = sorted(BACKUP_DIR.glob("app_backup_*.sql"), reverse=True)
+    backups.extend(sorted(BACKUP_DIR.glob("app_backup_*.dump"), reverse=True))
 
     if not backups:
         print("No backups found.")
@@ -328,7 +335,7 @@ def cleanup_old_backups(days: int = BACKUP_RETENTION_DAYS):
         return
 
     cutoff_date = datetime.now() - timedelta(days=days)
-    backups = list(BACKUP_DIR.glob("forge_backup_*.*"))
+    backups = list(BACKUP_DIR.glob("app_backup_*.*"))
 
     old_backups = [
         b for b in backups if datetime.fromtimestamp(b.stat().st_mtime) < cutoff_date
@@ -354,7 +361,7 @@ def cleanup_old_backups(days: int = BACKUP_RETENTION_DAYS):
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Forge Database Backup Tool")
+    parser = argparse.ArgumentParser(description="App Database Backup Tool")
     parser.add_argument("--backup", action="store_true", help="Create a new backup")
     parser.add_argument("--restore", type=str, help="Restore from backup file")
     parser.add_argument("--list", action="store_true", help="List all backups")

@@ -1,4 +1,4 @@
-"""Security-related configuration schemas for Forge deployments."""
+"""Security-related configuration schemas for App deployments."""
 
 from __future__ import annotations
 

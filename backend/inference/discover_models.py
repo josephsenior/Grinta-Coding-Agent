@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sys
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.inference.provider_resolver import (
     check_local_providers,
     discover_all_local_models,

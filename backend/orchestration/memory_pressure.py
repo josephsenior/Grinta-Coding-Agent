@@ -18,7 +18,7 @@ import os
 import time
 from typing import Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 # Optional psutil — degrade gracefully on platforms where it is unavailable.
 try:
@@ -33,9 +33,9 @@ class MemoryPressureMonitor:
     """Monitors process RSS and signals when condensation should happen.
 
     Thresholds are configurable via environment variables:
-    - ``FORGE_MEM_WARN_MB``  — warning threshold (default 768 MB)
-    - ``FORGE_MEM_CRIT_MB``  — critical threshold (default 1536 MB)
-    - ``FORGE_MEM_CHECK_INTERVAL`` — minimum seconds between checks (default 10)
+    - ``APP_MEM_WARN_MB``  — warning threshold (default 768 MB)
+    - ``APP_MEM_CRIT_MB``  — critical threshold (default 1536 MB)
+    - ``APP_MEM_CHECK_INTERVAL`` — minimum seconds between checks (default 10)
 
     The monitor exposes three levels:
 
@@ -50,10 +50,10 @@ class MemoryPressureMonitor:
         crit_mb: int | None = None,
         check_interval_s: float | None = None,
     ) -> None:
-        self._warn_mb = warn_mb or int(os.getenv("FORGE_MEM_WARN_MB", "768"))
-        self._crit_mb = crit_mb or int(os.getenv("FORGE_MEM_CRIT_MB", "1536"))
+        self._warn_mb = warn_mb or int(os.getenv("APP_MEM_WARN_MB", "768"))
+        self._crit_mb = crit_mb or int(os.getenv("APP_MEM_CRIT_MB", "1536"))
         self._check_interval = check_interval_s or float(
-            os.getenv("FORGE_MEM_CHECK_INTERVAL", "10")
+            os.getenv("APP_MEM_CHECK_INTERVAL", "10")
         )
         self._last_check: float = 0.0
         self._last_rss_mb: float = 0.0

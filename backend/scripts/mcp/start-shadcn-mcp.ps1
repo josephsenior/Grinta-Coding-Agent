@@ -48,4 +48,4 @@ Write-Host "[run] Executing: npx $($npxArgs -join ' ')" -ForegroundColor DarkGra
 # Direct invocation so we stream logs inline
 npx @npxArgs
 
-Write-Host "[hint] To connect Forge to this proxy, set: `$env:FORGE_SHADCN_MCP_URL='http://localhost:$Port/sse' before running 'Forge serve'" -ForegroundColor Yellow
+Write-Host "[hint] To connect the app to this proxy, set: `$env:APP_SHADCN_MCP_URL='http://localhost:$Port/sse' before running 'App serve'" -ForegroundColor Yellow

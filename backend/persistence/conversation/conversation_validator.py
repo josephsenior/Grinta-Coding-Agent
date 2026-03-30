@@ -6,8 +6,8 @@ import os
 from datetime import UTC, datetime
 from typing import Literal
 
-from backend.core.config.config_loader import load_forge_config
-from backend.core.logger import forge_logger as logger
+from backend.core.config.config_loader import load_app_config
+from backend.core.logger import app_logger as logger
 from backend.gateway.config.server_config import ServerConfig
 from backend.gateway.user_auth import get_current_user_id
 from backend.persistence.conversation.conversation_store import ConversationStore
@@ -24,14 +24,14 @@ class ConversationValidator:
     """Validates conversation access with configurable strictness.
 
     Modes (configured via ``security.validation_mode`` in config or the
-    ``FORGE_VALIDATION_MODE`` env-var override):
+    ``APP_VALIDATION_MODE`` env-var override):
 
     * **permissive** (default): No ownership check; anonymous access
       auto-creates metadata.  Ideal for single-user / local-first setups.
     * **strict**: Rejects anonymous (``None``) user_id and verifies the
       caller owns the conversation.
 
-    Extension point: set ``FORGE_CONVERSATION_VALIDATOR_CLS`` to a
+    Extension point: set ``APP_CONVERSATION_VALIDATOR_CLS`` to a
     fully-qualified class name to replace this implementation entirely.
     """
 
@@ -40,12 +40,12 @@ class ConversationValidator:
             self._mode = mode
         else:
             # Env-var override > config value > default
-            env_mode = os.environ.get("FORGE_VALIDATION_MODE")
+            env_mode = os.environ.get("APP_VALIDATION_MODE")
             if env_mode in ("permissive", "strict"):
                 self._mode = env_mode  # type: ignore[assignment]
             else:
                 try:
-                    config = load_forge_config()
+                    config = load_app_config()
                     self._mode = config.security.validation_mode
                 except Exception:
                     self._mode = "permissive"
@@ -104,7 +104,7 @@ class ConversationValidator:
                 "Anonymous access is not allowed in strict validation mode."
             )
 
-        config = load_forge_config()
+        config = load_app_config()
         server_config = ServerConfig()
         store_cls: type[ConversationStore] = get_impl(
             ConversationStore, server_config.conversation_store_class
@@ -138,7 +138,7 @@ class ConversationValidator:
     async def _ensure_metadata_exists(
         self, conversation_id: str, user_id: str | None
     ) -> ConversationMetadata:
-        config = load_forge_config()
+        config = load_app_config()
         server_config = ServerConfig()
         conversation_store_class: type[ConversationStore] = get_impl(
             ConversationStore,
@@ -184,7 +184,7 @@ def create_conversation_validator() -> ConversationValidator:
         ConversationValidator instance (default or custom implementation)
     """
     conversation_validator_cls = os.environ.get(
-        "FORGE_CONVERSATION_VALIDATOR_CLS",
+        "APP_CONVERSATION_VALIDATOR_CLS",
         "backend.persistence.conversation.conversation_validator.ConversationValidator",
     )
     ConversationValidatorImpl = get_impl(

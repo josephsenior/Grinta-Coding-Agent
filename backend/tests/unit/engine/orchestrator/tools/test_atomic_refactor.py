@@ -1,4 +1,4 @@
-"""Tests for backend/engines/orchestrator/tools/atomic_refactor.py."""
+"""Tests for backend/engine/tools/atomic_refactor.py."""
 
 import os
 import shutil

@@ -1,4 +1,4 @@
-"""Shared utility functions and local config helpers for the Forge CLI."""
+"""Shared utility functions and local config helpers for the App CLI."""
 
 from __future__ import annotations
 

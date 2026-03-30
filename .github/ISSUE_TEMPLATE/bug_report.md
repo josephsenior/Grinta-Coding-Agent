@@ -35,7 +35,7 @@ If applicable, add screenshots to help explain your problem.
 - **Python Version:** [e.g., 3.11.5]
 - **Node Version:** [e.g., 18.17.0]
 - **Docker Version:** [e.g., 24.0.5]
-- **Forge Version:** [e.g., 1.0.0-beta]
+- **App Version:** [e.g., 1.0.0-beta]
 
 ## Configuration
 
@@ -48,7 +48,7 @@ If applicable, add screenshots to help explain your problem.
 Please include relevant logs:
 
 ```
-Paste logs here (check logs/Forge.log)
+Paste logs here (check logs/App.log)
 Include request_id if available
 ```
 

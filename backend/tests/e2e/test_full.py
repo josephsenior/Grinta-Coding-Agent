@@ -57,8 +57,8 @@ async def _run_e2e_trace():
     async def disconnect(reason):
         print(f"[SOCKET] Disconnected: {reason}")
 
-    @sio.on("forge_event")
-    async def on_forge_event(data):
+    @sio.on("app_event")
+    async def on_app_event(data):
         event_type = (
             data.get("payload", {}).get("type") if isinstance(data, dict) else "?"
         )
@@ -105,7 +105,7 @@ async def _run_e2e_trace():
     # 3. Send a user message
     print("\n[INFO] Sending user message 'say hello'...")
     await sio.emit(
-        "forge_user_action",
+        "app_user_action",
         {
             "action": "message",
             "args": {"content": "say hello", "image_urls": []},

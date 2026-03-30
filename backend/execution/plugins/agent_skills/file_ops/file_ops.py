@@ -1,6 +1,6 @@
-"""File operations module for Forge agent.
+"""File operations module for App agent.
 
-This module provides a collection of file manipulation skills that enable the Forge
+This module provides a collection of file manipulation skills that enable the App
 agent to perform various file operations such as opening, searching, and navigating
 through files and directories.
 

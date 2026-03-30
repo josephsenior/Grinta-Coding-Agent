@@ -6,7 +6,7 @@ the repository guideline (~400 LOC).
 
 from __future__ import annotations
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.stream import EventStream
 
 

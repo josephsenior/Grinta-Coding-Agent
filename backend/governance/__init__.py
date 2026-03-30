@@ -1,4 +1,4 @@
-"""Convenience imports for Forge critic implementations."""
+"""Convenience imports for App critic implementations."""
 
 from .base import BaseCritic, CriticResult
 from .budget_critic import BudgetCritic

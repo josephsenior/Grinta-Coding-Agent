@@ -1,4 +1,4 @@
-"""Pydantic models and enums describing Forge playbooks metadata and responses."""
+"""Pydantic models and enums describing App playbooks metadata and responses."""
 
 from __future__ import annotations
 

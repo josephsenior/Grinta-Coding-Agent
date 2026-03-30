@@ -2,20 +2,20 @@
 
 from threading import Lock
 
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.ledger.event import Event
 
 
 class MonitoringListener:
     """Abstract base class for monitoring application activity.
 
-    This is an extension point in Forge that allows applications to customize how
+    This is an extension point in App that allows applications to customize how
     application activity is monitored. Applications can substitute their own implementation by:
     1. Creating a class that inherits from MonitoringListener
     2. Implementing desired methods (all methods have default no-op implementations)
     3. Setting server_config.monitoring_listener_class to the fully qualified name of the class
 
-    The class is instantiated via get_impl() in forge.server.shared.py.
+    The class is instantiated via get_impl() in app.server.shared.py.
 
     Implementations should be non-disruptive, do not raise or block to perform I/O.
     """
@@ -23,7 +23,7 @@ class MonitoringListener:
     _instance_lock: Lock = Lock()
     _instance: "MonitoringListener | None" = None
 
-    def __init__(self, config: ForgeConfig | None = None) -> None:
+    def __init__(self, config: AppConfig | None = None) -> None:
         """Create a monitoring listener bound to the provided server configuration."""
         self.config = config
 
@@ -45,7 +45,7 @@ class MonitoringListener:
         """
 
     @classmethod
-    def get_instance(cls, config: ForgeConfig) -> "MonitoringListener":
+    def get_instance(cls, config: AppConfig) -> "MonitoringListener":
         """Return singleton MonitoringListener instance configured for server."""
         with cls._instance_lock:
             if cls._instance is None:

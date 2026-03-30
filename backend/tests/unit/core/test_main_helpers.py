@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
 
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.bootstrap.main import (
     _validate_run_controller_inputs,
     _setup_replay_events,
@@ -32,7 +32,7 @@ from backend.core.enums import AgentState, RuntimeStatus
 
 
 def test_validate_run_controller_inputs():
-    config = MagicMock(spec=ForgeConfig)
+    config = MagicMock(spec=AppConfig)
     action = MessageAction(content="test")
 
     cfg, act = _validate_run_controller_inputs(config, action)
@@ -47,8 +47,8 @@ def test_validate_run_controller_inputs():
 
 
 def test_setup_replay_events_none():
-    config = MagicMock(spec=ForgeConfig)
-    config.replay_trajectory_path = None
+    config = MagicMock(spec=AppConfig)
+    config.replay_transcript_path = None
     action = MessageAction(content="test")
 
     events, act = _setup_replay_events(config, action)
@@ -58,8 +58,8 @@ def test_setup_replay_events_none():
 
 @patch("backend.core.bootstrap.main.load_replay_log")
 def test_setup_replay_events_enabled(mock_load):
-    config = MagicMock(spec=ForgeConfig)
-    config.replay_trajectory_path = "path.json"
+    config = MagicMock(spec=AppConfig)
+    config.replay_transcript_path = "path.json"
     action = NullAction()
 
     mock_load.return_value = ([], action)
@@ -121,7 +121,7 @@ def test_prepare_final_state():
 @patch("backend.core.bootstrap.main.create_registry_and_conversation_stats")
 @patch("backend.core.bootstrap.main.create_agent")
 def test_initialize_session_components(mock_create_agent, mock_registry):
-    config = ForgeConfig()
+    config = AppConfig()
     mock_registry.return_value = (MagicMock(), MagicMock(), config)
     mock_create_agent.return_value = MagicMock()
 
@@ -140,7 +140,7 @@ def test_auto_continue_response():
 @patch("backend.core.bootstrap.main.add_mcp_tools_to_agent")
 @pytest.mark.asyncio
 async def test_setup_memory_and_mcp_with_mcp(mock_add_mcp, mock_create_mem):
-    config = ForgeConfig()
+    config = AppConfig()
     config.mcp_host = "localhost"
     mock_runtime = MagicMock()
     mock_runtime.event_stream = MagicMock()
@@ -171,7 +171,7 @@ def test_create_early_status_callback():
 
 @patch("backend.core.bootstrap.main.read_input")
 def test_create_event_handler(mock_read_input):
-    config = ForgeConfig()
+    config = AppConfig()
     mock_event_stream = MagicMock()
     handler = _create_event_handler(config, False, None, MagicMock(), mock_event_stream)
 
@@ -190,10 +190,10 @@ def test_create_event_handler(mock_read_input):
 @patch("backend.core.bootstrap.main.open", create=True)
 @patch("backend.core.bootstrap.main.json.dump")
 def test_save_trajectory(mock_json, mock_open, mock_mkdir):
-    config = ForgeConfig()
-    config.save_trajectory_path = "/tmp/trajectories"
+    config = AppConfig()
+    config.save_transcript_path = "/tmp/trajectories"
     mock_controller = MagicMock()
-    mock_controller.get_trajectory.return_value = {"events": []}
+    mock_controller.get_transcript.return_value = {"events": []}
 
     _save_trajectory(config, "session1", mock_controller)
 
@@ -228,7 +228,7 @@ def test_load_replay_log(mock_open, mock_is_file, mock_exists, mock_get_events):
 @patch("backend.core.bootstrap.main._save_trajectory")
 @pytest.mark.asyncio
 async def test_run_controller_full(mock_save, mock_exec, mock_setup, mock_init):
-    config = ForgeConfig()
+    config = AppConfig()
     mock_init.return_value = ("sid", MagicMock(), MagicMock(), config, MagicMock())
     mock_setup.return_value = (MagicMock(), "/tmp", MagicMock())
     mock_exec.return_value = MagicMock()
@@ -254,7 +254,7 @@ async def test_run_agent_loop_basic(mock_until_done):
 
 @patch("backend.core.bootstrap.main._setup_runtime_and_repo")
 def test_setup_runtime_for_controller(mock_setup_repo):
-    config = ForgeConfig()
+    config = AppConfig()
     mock_runtime = MagicMock()
     mock_acquire = MagicMock()
     mock_acquire.runtime = mock_runtime
@@ -294,7 +294,7 @@ async def test_execute_controller_lifecycle(
     mock_replay,
     mock_sm,
 ):
-    config = ForgeConfig()
+    config = AppConfig()
     mock_runtime = MagicMock()
     mock_runtime.event_stream = MagicMock()
     mock_agent = MagicMock()

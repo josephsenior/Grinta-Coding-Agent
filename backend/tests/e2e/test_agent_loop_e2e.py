@@ -7,7 +7,7 @@ RUNNING state and delivers events — proving that ``step()`` actually
 executed on the main event loop.
 
 **Requirements:**
-    - A running Forge server on ``http://127.0.0.1:{PORT}`` (default 3000).
+    - A running App server on ``http://127.0.0.1:{PORT}`` (default 3000).
     - A valid LLM API key configured in settings.json / env.
     - ``httpx`` and ``python-socketio`` installed.
 
@@ -36,10 +36,10 @@ import httpx
 import pytest
 import socketio
 
-BASE = os.environ.get("FORGE_TEST_BASE_URL", "http://127.0.0.1:3000")
+BASE = os.environ.get("APP_TEST_BASE_URL", "http://127.0.0.1:3000")
 
 # Maximum seconds to wait for the agent to produce activity.
-AGENT_TIMEOUT = int(os.environ.get("FORGE_TEST_AGENT_TIMEOUT", "120"))
+AGENT_TIMEOUT = int(os.environ.get("APP_TEST_AGENT_TIMEOUT", "120"))
 
 # Maximum seconds to wait for the server to finish initializing the
 # conversation (LOADING → AWAITING_USER_INPUT).
@@ -65,7 +65,7 @@ def _create_conversation() -> str:
 
 
 class _EventCollector:
-    """Sync Socket.IO client that collects ``forge_event`` payloads.
+    """Sync Socket.IO client that collects ``app_event`` payloads.
 
     Uses a background thread for the socketio receive loop so it works
     reliably under pytest (no event-loop conflicts with pytest-asyncio).
@@ -90,7 +90,7 @@ class _EventCollector:
 
         @self.sio.on("*")
         def on_any(event_name: str, data: Any = None) -> None:
-            if event_name != "forge_event" or not isinstance(data, dict):
+            if event_name != "app_event" or not isinstance(data, dict):
                 return
             with self._lock:
                 self.events.append(data)
@@ -141,7 +141,7 @@ class _EventCollector:
 
     def send_message(self, content: str) -> None:
         self.sio.emit(
-            "forge_user_action",
+            "app_user_action",
             {
                 "action": "message",
                 "args": {"content": content, "image_urls": []},

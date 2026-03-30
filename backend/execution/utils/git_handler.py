@@ -7,11 +7,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.execution.utils import git_changes, git_diff
 
-GIT_CHANGES_CMD = "python3 /Forge/code/Forge/runtime/utils/git_changes.py"
-GIT_DIFF_CMD = 'python3 /Forge/code/Forge/runtime/utils/git_diff.py "{file_path}"'
+GIT_CHANGES_CMD = "python3 /App/code/App/runtime/utils/git_changes.py"
+GIT_DIFF_CMD = 'python3 /App/code/App/runtime/utils/git_diff.py "{file_path}"'
 GIT_BRANCH_CMD = "git branch --show-current"
 
 

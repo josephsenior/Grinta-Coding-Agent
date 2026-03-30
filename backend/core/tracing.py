@@ -21,7 +21,7 @@ _state = _TracingState()
 
 def initialize_tracing(
 
-    service_name: str = "forge",
+    service_name: str = "app",
     service_version: str = "1.0.0",
     exporter: str = "console",
     endpoint: str | None = None,
@@ -79,7 +79,7 @@ def _setup_tracer_provider(service_name: str, service_version: str):
         {
             "service.name": service_name,
             "service.version": service_version,
-            "service.instance.id": os.getenv("HOSTNAME", "forge"),
+            "service.instance.id": os.getenv("HOSTNAME", "app"),
         }
     )
     tracer_provider = TracerProvider(resource=resource)
@@ -236,7 +236,7 @@ def get_tracer(name: str | None = None) -> Any:
     if not _state.initialized:
         # Auto-initialize with defaults
         initialize_tracing(
-            service_name=os.getenv("TRACING_SERVICE_NAME", "forge"),
+            service_name=os.getenv("TRACING_SERVICE_NAME", "app"),
             service_version=os.getenv("TRACING_SERVICE_VERSION", "1.0.0"),
             exporter=os.getenv("TRACING_EXPORTER", "console"),
             endpoint=os.getenv("TRACING_ENDPOINT"),
@@ -248,7 +248,7 @@ def get_tracer(name: str | None = None) -> Any:
         try:
             from opentelemetry import trace
 
-            service_name = os.getenv("TRACING_SERVICE_NAME", "forge")
+            service_name = os.getenv("TRACING_SERVICE_NAME", "app")
             _state.tracer = trace.get_tracer(name or service_name)
         except ImportError:
             logger.warning("OpenTelemetry not available")
@@ -273,7 +273,7 @@ def shutdown_tracing() -> None:
 # Auto-initialize tracing on module import if enabled
 if os.getenv("TRACING_ENABLED", "true").lower() == "true":
     initialize_tracing(
-        service_name=os.getenv("TRACING_SERVICE_NAME", "forge"),
+        service_name=os.getenv("TRACING_SERVICE_NAME", "app"),
         service_version=os.getenv("TRACING_SERVICE_VERSION", "1.0.0"),
         exporter=os.getenv("TRACING_EXPORTER", "console"),
         endpoint=os.getenv("TRACING_ENDPOINT"),

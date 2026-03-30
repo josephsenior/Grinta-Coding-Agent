@@ -1,6 +1,6 @@
 @echo off
 REM start-with-shadcn.cmd
-REM Wrapper to launch SuperGateway + shadcn-ui MCP + Forge.
+REM Wrapper to launch SuperGateway + shadcn-ui MCP + App.
 REM Supports either positional token or -GitHubToken=TOKEN flag.
 REM If .env.local exists with GITHUB_PERSONAL_ACCESS_TOKEN, no argument needed.
 

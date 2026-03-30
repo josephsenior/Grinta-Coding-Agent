@@ -9,15 +9,23 @@ from __future__ import annotations
 import os
 import sys
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.action import CmdRunAction
     from backend.ledger.observation import Observation
     from backend.execution.utils.process_registry import TaskCancellationService
-    from backend.execution.utils.tool_registry import ToolRegistry
+
+
+class ShellToolRegistryLike(Protocol):
+    has_bash: bool
+    has_powershell: bool
+    has_tmux: bool
+    shell_type: str
+    is_container_runtime: bool
+    is_wsl_runtime: bool
 
 
 class UnifiedShellSession(ABC):
@@ -204,7 +212,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
 
 def create_shell_session(
     work_dir: str,
-    tools: ToolRegistry | None = None,
+    tools: ShellToolRegistryLike | None = None,
     username: str | None = None,
     no_change_timeout_seconds: int = 30,
     max_memory_mb: int | None = None,
@@ -225,7 +233,10 @@ def create_shell_session(
     if tools is None:
         from backend.execution.utils.tool_registry import ToolRegistry
 
-        tools = ToolRegistry()
+        tools = cast(ShellToolRegistryLike, ToolRegistry())
+
+    resolved_tools = tools
+    assert resolved_tools is not None
 
     if cancellation_service is None:
         from backend.execution.utils.process_registry import TaskCancellationService
@@ -233,12 +244,12 @@ def create_shell_session(
         cancellation_service = TaskCancellationService(label="runtime")
 
     logger.info("Creating shell session for platform: %s", sys.platform)
-    logger.info("Detected shell: %s", tools.shell_type)
-    logger.info("Has tmux: %s", tools.has_tmux)
+    logger.info("Detected shell: %s", resolved_tools.shell_type)
+    logger.info("Has tmux: %s", resolved_tools.has_tmux)
     logger.info(
         "Runtime context: container=%s wsl=%s",
-        getattr(tools, "is_container_runtime", False),
-        getattr(tools, "is_wsl_runtime", False),
+        getattr(resolved_tools, "is_container_runtime", False),
+        getattr(resolved_tools, "is_wsl_runtime", False),
     )
 
     # Common session arguments
@@ -254,7 +265,7 @@ def create_shell_session(
     # LLMs generate bash commands natively; running them in bash eliminates
     # the need for fragile PowerShell translation regexes.
     if os.name == "nt":
-        if tools.has_bash:
+        if resolved_tools.has_bash:
             from backend.execution.utils.simple_bash import SimpleBashSession
 
             logger.info(
@@ -271,18 +282,20 @@ def create_shell_session(
         )
         return WindowsPowershellSession(
             **session_kwargs,  # type: ignore[arg-type]
-            powershell_exe=tools.shell_type if tools.has_powershell else None,
+            powershell_exe=(
+                resolved_tools.shell_type if resolved_tools.has_powershell else None
+            ),
         )
 
     # Unix with tmux: Use full BashSession
-    if tools.has_tmux and tools.has_bash:
+    if resolved_tools.has_tmux and resolved_tools.has_bash:
         from backend.execution.utils.bash import BashSession
 
         logger.info("Using BashSession with tmux")
         return BashSession(**session_kwargs)
 
     # Unix without tmux: Use simple Bash session
-    if tools.has_bash:
+    if resolved_tools.has_bash:
         from backend.execution.utils.simple_bash import SimpleBashSession
 
         logger.info("Using SimpleBashSession (no tmux)")
@@ -290,5 +303,5 @@ def create_shell_session(
 
     # Fallback: Should not happen if tools are detected correctly
     raise RuntimeError(
-        f"No suitable shell found for platform {sys.platform}. Detected shell: {tools.shell_type}"
+        f"No suitable shell found for platform {sys.platform}. Detected shell: {resolved_tools.shell_type}"
     )

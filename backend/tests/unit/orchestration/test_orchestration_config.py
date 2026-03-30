@@ -156,20 +156,20 @@ class TestOrchestrationServices:
         assert services.exception_handler is not None
 
     def test_service_count_matches_documentation(self):
-        """Test creates exactly 25 services as documented."""
+        """Test creates exactly 25 unique services as documented."""
         mock_controller = MagicMock()
         mock_controller.PENDING_ACTION_TIMEOUT = 30
 
         services = OrchestrationServices(mock_controller)
 
-        # Count all service attributes (excluding __dict__ and other internals)
+        # Count unique service instances; canonical aliases should not inflate the total.
         service_attrs = [
-            attr
+            getattr(services, attr)
             for attr in dir(services)
             if not attr.startswith("_") and not callable(getattr(services, attr))
         ]
 
-        assert len(service_attrs) == 25
+        assert len({id(service) for service in service_attrs}) == 25
 
     def test_services_receive_controller_reference(self):
         """Test some services receive direct controller reference."""

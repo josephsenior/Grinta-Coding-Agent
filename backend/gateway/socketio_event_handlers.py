@@ -2,7 +2,7 @@
 
 Responsibilities:
 - Socket.IO lifecycle events (``connect``, ``disconnect``)
-- Event routing (``forge_user_action``, ``forge_action``)
+- Event routing (``app_user_action``, ``app_action``)
 
 Connection-parameter validation and event-stream replay logic have been
 extracted into :mod:`backend.gateway.socketio_connection_params` and
@@ -18,7 +18,7 @@ from socketio.exceptions import (
     ConnectionRefusedError as SocketIOConnectionRefusedError,  # type: ignore[import-untyped]
 )
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.provider_types import ProviderType
 from backend.ledger.event_store import EventStore
 from backend.gateway.middleware.socketio_connection_manager import get_connection_manager
@@ -225,8 +225,8 @@ async def connect(connection_id: str, environ: dict, *args) -> None:
         raise
 
 
-@sio.event
-async def forge_user_action(connection_id: str, data: dict[str, Any]) -> None:
+@sio.on("app_user_action")
+async def app_user_action(connection_id: str, data: dict[str, Any]) -> None:
     """Handle user action from Socket.IO client.
 
     Args:
@@ -236,7 +236,7 @@ async def forge_user_action(connection_id: str, data: dict[str, Any]) -> None:
     """
     # Debug logging
     logger.info(
-        "forge_user_action received: action=%s, data=%s", data.get("action"), data
+        "app_user_action received: action=%s, data=%s", data.get("action"), data
     )
 
     manager = _get_conversation_manager_instance()
@@ -244,8 +244,8 @@ async def forge_user_action(connection_id: str, data: dict[str, Any]) -> None:
         await manager.send_to_event_stream(connection_id, data)
 
 
-@sio.event
-async def forge_action(connection_id: str, data: dict[str, Any]) -> None:
+@sio.on("app_action")
+async def app_action(connection_id: str, data: dict[str, Any]) -> None:
     """Handle agent action from Socket.IO client.
 
     Args:

@@ -1,4 +1,4 @@
-﻿"""Runtime implementations for Forge.
+﻿"""Runtime implementations for App.
 
 This package exposes implementation classes lazily to avoid importing heavy
 runtime dependencies unless they are actually used.

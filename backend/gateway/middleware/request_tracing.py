@@ -19,7 +19,7 @@ from collections.abc import Callable
 from fastapi import Request, Response
 
 from backend.core.logger import access_logger
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 class RequestTracingMiddleware:

@@ -1,4 +1,4 @@
-"""Tests for backend.core.logger — RollingLogger, trace context, ForgeLoggerAdapter, etc."""
+"""Tests for backend.core.logger — RollingLogger, trace context, AppLoggerAdapter, etc."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 
 from backend.core.logger import (
-    ForgeLoggerAdapter,
+    AppLoggerAdapter,
     LlmFileHandler,
     RollingLogger,
     bind_context,
@@ -143,38 +143,38 @@ class TestTraceContext:
         clear_trace_context()
 
 
-# ── ForgeLoggerAdapter ────────────────────────────────────────────────
+# ── AppLoggerAdapter ──────────────────────────────────────────────────
 
 
-class TestForgeLoggerAdapter:
+class TestAppLoggerAdapter:
     def test_default_extra(self):
-        adapter = ForgeLoggerAdapter()
+        adapter = AppLoggerAdapter()
         assert adapter.extra == {}
 
     def test_bind_returns_new_adapter(self):
-        adapter = ForgeLoggerAdapter()
+        adapter = AppLoggerAdapter()
         bound = adapter.bind(trace_id="abc", step_id="s1")
-        assert isinstance(bound, ForgeLoggerAdapter)
+        assert isinstance(bound, AppLoggerAdapter)
         assert bound.extra == {"trace_id": "abc", "step_id": "s1"}
         assert adapter.extra == {}  # Original unchanged
 
     def test_bind_merges_context(self):
-        adapter = ForgeLoggerAdapter(extra={"trace_id": "a"})
+        adapter = AppLoggerAdapter(extra={"trace_id": "a"})
         bound = adapter.bind(step_id="s1")
         assert bound.extra == {"trace_id": "a", "step_id": "s1"}
 
     def test_bind_override_existing(self):
-        adapter = ForgeLoggerAdapter(extra={"trace_id": "old"})
+        adapter = AppLoggerAdapter(extra={"trace_id": "old"})
         bound = adapter.bind(trace_id="new")
         assert bound.extra["trace_id"] == "new"
 
     def test_process_merges_extra_in_kwargs(self):
-        adapter = ForgeLoggerAdapter(extra={"trace_id": "abc"})
+        adapter = AppLoggerAdapter(extra={"trace_id": "abc"})
         msg, kwargs = adapter.process("test", {"extra": {"step_id": "s1"}})
         assert kwargs["extra"] == {"trace_id": "abc", "step_id": "s1"}
 
     def test_process_sets_extra_when_missing(self):
-        adapter = ForgeLoggerAdapter(extra={"trace_id": "abc"})
+        adapter = AppLoggerAdapter(extra={"trace_id": "abc"})
         msg, kwargs = adapter.process("test", {})
         assert kwargs["extra"] == {"trace_id": "abc"}
 
@@ -186,11 +186,11 @@ class TestBindContext:
     def test_with_raw_logger(self):
         logger = logging.getLogger("test_bind")
         adapter = bind_context(logger, trace_id="t1")
-        assert isinstance(adapter, ForgeLoggerAdapter)
+        assert isinstance(adapter, AppLoggerAdapter)
         assert adapter.extra["trace_id"] == "t1"
 
     def test_with_adapter(self):
-        adapter = ForgeLoggerAdapter(extra={"trace_id": "old"})
+        adapter = AppLoggerAdapter(extra={"trace_id": "old"})
         new_adapter = bind_context(adapter, step_id="s2")
         assert new_adapter.extra == {"trace_id": "old", "step_id": "s2"}
 
@@ -364,7 +364,7 @@ class TestLoggerExtraCoverage:
             mock_logging.error.assert_called_with("%s: %s", ValueError, err)
 
     def test_bind_context_recursive(self):
-        adapter = ForgeLoggerAdapter(extra={"a": 1})
+        adapter = AppLoggerAdapter(extra={"a": 1})
         bound = bind_context(adapter, b=2)
         assert bound.extra == {"a": 1, "b": 2}
 

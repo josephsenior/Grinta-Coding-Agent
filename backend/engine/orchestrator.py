@@ -26,7 +26,7 @@ from backend.core.errors import (
     ModelProviderError,
     ToolExecutionError,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.inference.exceptions import LLMError
 from backend.ledger.action import AgentThinkAction, MessageAction, PlaybookFinishAction
 from backend.ledger.event import EventSource
@@ -44,7 +44,7 @@ from .contracts import (
     SafetyManagerProtocol,
 )
 from .executor import OrchestratorExecutor
-from .memory_manager import ConversationMemoryManager
+from .memory_manager import ContextMemoryManager
 from .planner import OrchestratorPlanner
 from . import message_serializer
 
@@ -83,7 +83,7 @@ class Orchestrator(Agent):
 
         # Prompt manager + memory subsystems
         self._prompt_manager: PromptManager = self._create_prompt_manager()
-        self._memory_manager_impl = ConversationMemoryManager(config, llm_registry)
+        self._memory_manager_impl = ContextMemoryManager(config, llm_registry)
         self._memory_manager_impl.initialize(self.prompt_manager)
         # Expose conversation_memory for direct test and utility access
         self.conversation_memory = self._memory_manager_impl.conversation_memory
@@ -159,7 +159,7 @@ class Orchestrator(Agent):
             system_prompt_filename=system_prompt,
             config=self.config,
             resolved_llm_model_id=resolved_model or None,
-            forge_config=self.llm_registry.config if self.llm_registry else None,
+            app_config=self.llm_registry.config if self.llm_registry else None,
         )
 
     def _run_production_health_check(self) -> None:
@@ -494,10 +494,10 @@ class Orchestrator(Agent):
         )
 
     def _mcp_server_prompt_hints(self) -> list[dict[str, str]]:
-        """Build ``[{"server": name, "hint": text}, ...]`` from Forge MCP ``usage_hint`` fields."""
+        """Build ``[{"server": name, "hint": text}, ...]`` from MCP ``usage_hint`` fields."""
         try:
-            forge_cfg = getattr(self.llm_registry, "config", None)
-            mcp = getattr(forge_cfg, "mcp", None) if forge_cfg is not None else None
+            app_cfg = getattr(self.llm_registry, "config", None)
+            mcp = getattr(app_cfg, "mcp", None) if app_cfg is not None else None
             servers = getattr(mcp, "servers", None) or []
             rows: list[dict[str, str]] = []
             for s in servers:

@@ -127,18 +127,18 @@ class TestRestoreEnvironment:
         import os
 
         original = dict(os.environ)
-        monkeypatch.setenv("FORGE_TEST_NEW_KEY", "val")
+        monkeypatch.setenv("APP_TEST_NEW_KEY", "val")
         restore_environment(original)
-        assert "FORGE_TEST_NEW_KEY" not in os.environ
+        assert "APP_TEST_NEW_KEY" not in os.environ
 
     def test_restores_changed_keys(self, monkeypatch):
         import os
 
         original = dict(os.environ)
-        original["FORGE_TEST_KEY"] = "original"
-        monkeypatch.setenv("FORGE_TEST_KEY", "changed")
+        original["APP_TEST_KEY"] = "original"
+        monkeypatch.setenv("APP_TEST_KEY", "changed")
         restore_environment(original)
-        assert os.environ.get("FORGE_TEST_KEY") == "original"
+        assert os.environ.get("APP_TEST_KEY") == "original"
 
 
 # ---------------------------------------------------------------------------
@@ -331,9 +331,9 @@ class TestSetAttrFromEnv:
 class TestLoadFromEnv:
     def test_load_with_empty_env(self):
         """Test loading with empty environment."""
-        from backend.core.config.forge_config import ForgeConfig
+        from backend.core.config.app_config import AppConfig
 
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         cfg.get_llm_config()
         load_from_env(cfg, {})
         # Should not crash and preserve config
@@ -341,18 +341,18 @@ class TestLoadFromEnv:
 
     def test_load_with_core_vars(self):
         """Test loading core configuration from env."""
-        from backend.core.config.forge_config import ForgeConfig
+        from backend.core.config.app_config import AppConfig
 
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         env_dict = {"DEBUG_LEVEL": "20"}  # Or any valid core var
         load_from_env(cfg, env_dict)
         # Should complete successfully
 
     def test_load_with_llm_api_key(self):
         """Test that LLM_API_KEY is properly handled."""
-        from backend.core.config.forge_config import ForgeConfig
+        from backend.core.config.app_config import AppConfig
 
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         env_dict = {"LLM_API_KEY": "sk-test123"}
 
         with patch("backend.core.config.llm_config.suppress_llm_env_export"):
@@ -370,27 +370,27 @@ class TestLoadFromEnv:
 class TestExportLLMApiKeys:
     def test_export_with_no_llm_configs(self):
         """Test export when no LLM configs exist."""
-        from backend.core.config.forge_config import ForgeConfig
+        from backend.core.config.app_config import AppConfig
 
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         with patch("backend.core.config.api_key_manager.api_key_manager"):
             export_llm_api_keys(cfg)
             # Should handle gracefully
 
     def test_export_with_api_keys(self):
         """Test that API keys are exported for each LLM."""
-        from backend.core.config.forge_config import ForgeConfig
+        from backend.core.config.app_config import AppConfig
 
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         with patch("backend.core.config.api_key_manager.api_key_manager"):
             export_llm_api_keys(cfg)
             # Should have attempted to set keys
 
     def test_export_error_handling(self):
         """Test that export errors are caught gracefully - covers lines 179-183."""
-        from backend.core.config.forge_config import ForgeConfig
+        from backend.core.config.app_config import AppConfig
 
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         with patch(
             "backend.core.config.api_key_manager.api_key_manager",
             side_effect=Exception("Manager error"),
@@ -400,10 +400,10 @@ class TestExportLLMApiKeys:
 
     def test_export_with_valid_llm_keys(self):
         """Test export with valid LLM keys set."""
-        from backend.core.config.forge_config import ForgeConfig
+        from backend.core.config.app_config import AppConfig
         from backend.core.config.llm_config import LLMConfig
 
-        cfg = ForgeConfig()
+        cfg = AppConfig()
         # Set up an LLM config with API key
         llm = LLMConfig(model="gpt-4", api_key=SecretStr("sk-test123"))
         cfg.set_llm_config(llm)

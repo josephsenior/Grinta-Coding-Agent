@@ -16,7 +16,7 @@ class TestFeatureUnavailableError:
         err = FeatureUnavailableError("turbo_mode")
         assert err.feature_name == "turbo_mode"
         assert "turbo_mode" in str(err)
-        assert "Forge Pro" in str(err) or "Enterprise" in str(err)
+        assert "App Pro" in str(err) or "Enterprise" in str(err)
 
     def test_custom_message(self):
         err = FeatureUnavailableError("x", message="nope")

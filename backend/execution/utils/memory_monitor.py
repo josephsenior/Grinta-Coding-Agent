@@ -4,7 +4,7 @@ import threading
 
 from memory_profiler import memory_usage
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 class LogStream:

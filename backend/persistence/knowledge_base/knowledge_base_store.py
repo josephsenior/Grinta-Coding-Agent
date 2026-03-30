@@ -33,7 +33,7 @@ class KnowledgeBaseStore:
         """Initialize the knowledge base store.
 
         Args:
-            storage_dir: Directory to persist data. If None, uses ~/.Forge/kb/
+            storage_dir: Directory to persist data. If None, uses ~/.app/kb/
 
         """
         self._lock = Lock()
@@ -45,7 +45,7 @@ class KnowledgeBaseStore:
 
         # Setup storage directory
         if storage_dir is None:
-            storage_dir = Path.home() / ".Forge" / "kb"
+            storage_dir = Path.home() / ".app" / "kb"
         self.storage_dir = storage_dir
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
@@ -287,14 +287,14 @@ _store: KnowledgeBaseStore | Any | None = None
 def get_knowledge_base_store() -> KnowledgeBaseStore | Any:
     """Get the global knowledge base store instance.
 
-    Storage backend is determined by KB_STORAGE_TYPE environment variable:
+    Storage backend is determined by APP_KB_STORAGE_TYPE environment variable:
     - "database" or "db": Use PostgreSQL database storage
     - "file" or unset: Use file-based storage (default)
     """
     global _store
     if _store is None:
         # Check if database storage is requested
-        storage_type = os.getenv("KB_STORAGE_TYPE", "file").lower()
+        storage_type = os.getenv("APP_KB_STORAGE_TYPE", "file").lower()
         if storage_type in ("database", "db"):
             # Use database-backed store
             from backend.persistence.knowledge_base.database_knowledge_base_store import (
@@ -308,7 +308,7 @@ def get_knowledge_base_store() -> KnowledgeBaseStore | Any:
             _store = DatabaseStoreAdapter(db_store)
         else:
             # File-based store (default)
-            storage_dir = os.getenv("KB_STORAGE_PATH")
+            storage_dir = os.getenv("APP_KB_STORAGE_PATH")
             if storage_dir:
                 _store = KnowledgeBaseStore(storage_dir=Path(storage_dir))
             else:

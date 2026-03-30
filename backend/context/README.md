@@ -1,7 +1,7 @@
 # Memory Component
 
 - Short Term History
-- Memory Condenser
+- Memory Compactor
 
 ## Short Term History
 
@@ -10,9 +10,9 @@
 - When the context window or the token limit set by the user is exceeded, history starts condensing: chunks of messages into summaries.
 - Each summary is then injected into the context, in the place of the respective chunk it summarizes
 
-## Memory Condenser
+## Memory Compactor
 
-- Memory condenser is responsible for summarizing the chunks of events
+- Memory compactor is responsible for summarizing the chunks of events
 - It summarizes the earlier events first
 - It starts with the earliest agent actions and observations between two user messages
 - Then it does the same for later chunks of events between user messages

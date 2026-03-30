@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.orchestration.session_orchestrator import SessionOrchestrator
@@ -148,3 +148,13 @@ def __getattr__(name: str) -> Any:
         from backend.orchestration import middleware as mw
         return getattr(mw, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+OperationPipeline = ToolInvocationPipeline
+
+__all__ = [
+    "ToolInvocationContext",
+    "ToolInvocationMiddleware",
+    "ToolInvocationPipeline",
+    "OperationPipeline",
+]

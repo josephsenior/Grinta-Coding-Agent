@@ -12,7 +12,7 @@ import random
 import time
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.logger import get_trace_context
 from backend.gateway.middleware.cost_quota import (
     CostQuotaMiddleware,
@@ -445,7 +445,7 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
         except Exception:
             return
 
-        tracer = _otel_trace.get_tracer("forge.redis")
+        tracer = _otel_trace.get_tracer("app.redis")
         with tracer.start_as_current_span("quota.check", kind=_SpanKind.CLIENT) as span:
             span.set_attribute("db.system", "redis")
             span.set_attribute("quota.key", key)
@@ -456,7 +456,7 @@ class RedisCostQuotaMiddleware(CostQuotaMiddleware):
             span.set_attribute("quota.allowed", bool(allowed))
             ctx = get_trace_context()
             if ctx.get("trace_id"):
-                span.set_attribute("forge.trace_id", str(ctx["trace_id"]))
+                span.set_attribute("app.trace_id", str(ctx["trace_id"]))
 
     async def _handle_redis_check_failure(
         self,

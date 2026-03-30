@@ -220,6 +220,14 @@ class TestFileTransaction:
         assert txn.committed is True
 
     @pytest.mark.asyncio
+    async def test_context_manager_uses_app_transaction_prefix(self, workspace):
+        txn = FileTransaction(runtime=None)  # type: ignore[arg-type]
+
+        async with txn:
+            assert txn.backup_dir is not None
+            assert os.path.basename(txn.backup_dir).startswith("app_txn_")
+
+    @pytest.mark.asyncio
     async def test_context_manager_rollback_on_exception(self, workspace):
         file_path = os.path.join(workspace, "ctx_rollback.txt")
 

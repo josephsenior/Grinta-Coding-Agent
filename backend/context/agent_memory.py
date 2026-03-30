@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 import backend
 from backend.core.constants import RECALL_PIPELINE_TIMEOUT_SECONDS
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import RecallAction
 from backend.core.enums import RecallType
 from backend.ledger.event import Event, EventSource
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from backend.persistence.data_models.knowledge_base import KnowledgeBaseSettings
 
 GLOBAL_PLAYBOOKS_DIR = os.path.join(os.path.dirname(backend.__file__), "playbooks")
-USER_PLAYBOOKS_DIR = Path.home() / ".Forge" / "playbooks"
+USER_PLAYBOOKS_DIR = Path.home() / ".app" / "playbooks"
 
 
 class Memory:
@@ -311,7 +311,7 @@ class Memory:
 
         # Present /workspace as the working directory so the LLM uses
         # virtual paths. The runtime normalizes /workspace → real temp path.
-        if working_dir and "FORGE_workspace" in working_dir:
+        if working_dir and "app_workspace" in working_dir:
             working_dir = "/workspace"
 
         return {
@@ -487,7 +487,7 @@ class Memory:
             self.repo_playbooks[name] = agent_repo
 
     def _load_user_playbooks(self) -> None:
-        """Loads playbooks from the user's home directory (~/.Forge/playbooks/).
+        """Loads playbooks from the user's home directory (~/.app/playbooks/).
 
         Creates the directory if it doesn't exist.
         """

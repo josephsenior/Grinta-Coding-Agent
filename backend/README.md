@@ -1,29 +1,33 @@
 # Backend
 
-This folder contains all backend-related code and resources for the Forge project.
+This folder contains all backend-related code and resources for the App project.
 
 ## Structure
 
 ```
 backend/
-├── adapters/       # I/O adapters (e.g., JSON)
-├── api/            # FastAPI application and routes
-├── cli/            # Command-line interface
-├── code_quality/   # Code quality checks
-├── controller/     # Agent controller and state management
-├── core/           # Core configurations, schemas, and utilities
-├── engines/        # AI engines (e.g., Orchestrator)
-├── events/         # Event system (Actions, Observations)
-├── runtime/        # Execution runtime and tools
-├── scripts/        # Backend utility scripts
-├── tests/          # Test suite
-├── tools/          # Development tools
-└── conftest.py     # Pytest configuration
+├── core/            # Shared config, schemas, logging, and bootstrap
+├── gateway/         # FastAPI app, routes, middleware, sessions
+├── orchestration/   # Session orchestration loop and services
+├── engine/          # LLM-facing agent engine
+├── ledger/          # Record stream, persistence, and serialization
+├── context/         # Context memory and compaction
+├── execution/       # Local runtime execution and policy enforcement
+├── inference/       # Model/provider abstraction layer
+├── knowledge/       # Knowledge base logic
+├── persistence/     # File and database persistence
+├── playbooks/       # Built-in playbook content and engine
+├── governance/      # Governance critics and review helpers
+├── security/        # Security analysis and policy checks
+├── validation/      # Validation and code-quality checks
+├── scripts/         # Backend utility scripts
+├── tests/           # Test suite
+└── conftest.py      # Pytest configuration
 ```
 
 ## Package Structure
 
-Most application code lives under `backend/`. The CLI entry point is `backend/cli/`. The Python API client used by tests and scripts is in `forge_client/`. The `forge` console script is configured in `pyproject.toml`.
+Most application code lives under `backend/`. The CLI entry point is `backend/cli/`. The Python API client used by tests and scripts is in `client/`. The `app` console script is configured in `pyproject.toml`.
 
 ## Running Tests
 
@@ -56,4 +60,4 @@ python backend/scripts/database/setup_database.py
 
 ## Development
 
-All Python imports should continue to use `from forge.` - the package structure is abstracted by uv's package configuration.
+Backend code imports from `backend.*`. The automation client imports from `client.*` or the package root `client`.

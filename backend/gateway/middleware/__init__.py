@@ -1,7 +1,7 @@
 ﻿"""Server middleware exports.
 
 This package re-exports middleware utilities and classes, including helpers
-defined in the sibling module ``forge.server.middleware`` (middleware.py).
+defined in the sibling module ``app.server.middleware`` (middleware.py).
 We import those helpers via an explicit relative import to avoid recursive
 package-import issues and circular initialization.
 """
@@ -29,7 +29,7 @@ from backend.gateway.middleware.security_headers import (
 from backend.gateway.middleware.timeout import RequestTimeoutMiddleware
 
 # Import helpers from the sibling module middleware.py deterministically to
-# avoid importing the package name "forge.server.middleware" recursively.
+# avoid importing the package name "app.server.middleware" recursively.
 from ..middleware_core import (
     CacheControlMiddleware,
     InMemoryRateLimiter,
@@ -37,7 +37,7 @@ from ..middleware_core import (
     RateLimitMiddleware,
 )
 
-logger = logging.getLogger("forge.middleware")
+logger = logging.getLogger("app.middleware")
 
 __all__ = [
     "CacheControlMiddleware",

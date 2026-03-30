@@ -1,6 +1,6 @@
 # MCP Proxy Manager
 
-This module provides a manager class for handling FastMCP proxy instances in Forge, including initialization, configuration, and mounting to FastAPI applications.
+This module provides a manager class for handling FastMCP proxy instances in App, including initialization, configuration, and mounting to FastAPI applications.
 
 ## Overview
 
@@ -17,7 +17,7 @@ The `MCPProxyManager` class encapsulates all the functionality related to creati
 ### Basic Usage
 
 ```python
-from forge.runtime.mcp.proxy import MCPProxyManager
+from app.runtime.mcp.proxy import MCPProxyManager
 from fastapi import FastAPI
 
 # Create a FastAPI app

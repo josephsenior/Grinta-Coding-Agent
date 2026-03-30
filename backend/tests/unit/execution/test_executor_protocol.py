@@ -1,4 +1,4 @@
-﻿"""Tests for backend.execution.executor_protocol — ActionExecutorProtocol structural typing."""
+﻿"""Tests for backend.execution.executor_protocol — RuntimeExecutorProtocol structural typing."""
 
 from __future__ import annotations
 
@@ -13,60 +13,60 @@ from backend.ledger.action import (
     FileWriteAction,
 )
 from backend.ledger.observation import CmdOutputObservation
-from backend.execution.executor_protocol import ActionExecutorProtocol
+from backend.execution.executor_protocol import RuntimeExecutorProtocol
 
 
-# ── ActionExecutorProtocol ─────────────────────────────────────────────
+# ── RuntimeExecutorProtocol ────────────────────────────────────────────
 
 
-class TestActionExecutorProtocol:
-    """Test ActionExecutorProtocol structural typing and runtime_checkable."""
+class TestRuntimeExecutorProtocol:
+    """Test RuntimeExecutorProtocol structural typing and runtime_checkable."""
 
     def test_is_runtime_checkable(self):
         """Test protocol is decorated with @runtime_checkable."""
         # Protocol should have runtime checking enabled
-        assert hasattr(ActionExecutorProtocol, "__class__")
+        assert hasattr(RuntimeExecutorProtocol, "__class__")
 
     def test_protocol_has_ainit_method(self):
         """Test protocol specifies ainit lifecycle method."""
         # Check method exists in protocol
-        assert hasattr(ActionExecutorProtocol, "ainit")
+        assert hasattr(RuntimeExecutorProtocol, "ainit")
 
     def test_protocol_has_hard_kill_method(self):
         """Test protocol specifies hard_kill lifecycle method."""
-        assert hasattr(ActionExecutorProtocol, "hard_kill")
+        assert hasattr(RuntimeExecutorProtocol, "hard_kill")
 
     def test_protocol_has_close_method(self):
         """Test protocol specifies close lifecycle method."""
-        assert hasattr(ActionExecutorProtocol, "close")
+        assert hasattr(RuntimeExecutorProtocol, "close")
 
     def test_protocol_has_initialized_method(self):
         """Test protocol specifies initialized method."""
-        assert hasattr(ActionExecutorProtocol, "initialized")
+        assert hasattr(RuntimeExecutorProtocol, "initialized")
 
     def test_protocol_has_initial_cwd_property(self):
         """Test protocol specifies initial_cwd property."""
-        assert hasattr(ActionExecutorProtocol, "initial_cwd")
+        assert hasattr(RuntimeExecutorProtocol, "initial_cwd")
 
     def test_protocol_has_run_action_method(self):
         """Test protocol specifies generic run_action method."""
-        assert hasattr(ActionExecutorProtocol, "run_action")
+        assert hasattr(RuntimeExecutorProtocol, "run_action")
 
     def test_protocol_has_run_method(self):
         """Test protocol specifies run method for CmdRunAction."""
-        assert hasattr(ActionExecutorProtocol, "run")
+        assert hasattr(RuntimeExecutorProtocol, "run")
 
     def test_protocol_has_read_method(self):
         """Test protocol specifies read method for FileReadAction."""
-        assert hasattr(ActionExecutorProtocol, "read")
+        assert hasattr(RuntimeExecutorProtocol, "read")
 
     def test_protocol_has_write_method(self):
         """Test protocol specifies write method for FileWriteAction."""
-        assert hasattr(ActionExecutorProtocol, "write")
+        assert hasattr(RuntimeExecutorProtocol, "write")
 
     def test_protocol_has_edit_method(self):
         """Test protocol specifies edit method for FileEditAction."""
-        assert hasattr(ActionExecutorProtocol, "edit")
+        assert hasattr(RuntimeExecutorProtocol, "edit")
 
 
 # ── Protocol Compliance ────────────────────────────────────────────────
@@ -77,7 +77,7 @@ class TestProtocolCompliance:
 
     def test_compliant_mock_is_recognized(self):
         """Test mock implementing all methods is recognized as protocol compliant."""
-        mock_executor = MagicMock(spec=ActionExecutorProtocol)
+        mock_executor = MagicMock(spec=RuntimeExecutorProtocol)
         mock_executor.ainit = AsyncMock()
         mock_executor.hard_kill = AsyncMock()
         mock_executor.close = MagicMock()
@@ -90,7 +90,7 @@ class TestProtocolCompliance:
         mock_executor.edit = AsyncMock()
 
         # isinstance check should work with runtime_checkable protocol
-        assert isinstance(mock_executor, ActionExecutorProtocol)
+        assert isinstance(mock_executor, RuntimeExecutorProtocol)
 
     def test_partial_implementation_not_recognized(self):
         """Test object missing methods is not recognized as compliant."""
@@ -100,12 +100,12 @@ class TestProtocolCompliance:
         # Missing other required methods
 
         # Should not be recognized as implementing the protocol
-        assert not isinstance(partial_executor, ActionExecutorProtocol)
+        assert not isinstance(partial_executor, RuntimeExecutorProtocol)
 
     @pytest.mark.asyncio
     async def test_can_call_lifecycle_methods(self):
         """Test lifecycle methods can be called on compliant object."""
-        executor = MagicMock(spec=ActionExecutorProtocol)
+        executor = MagicMock(spec=RuntimeExecutorProtocol)
         executor.ainit = AsyncMock()
         executor.hard_kill = AsyncMock()
         executor.close = MagicMock()
@@ -124,7 +124,7 @@ class TestProtocolCompliance:
     @pytest.mark.asyncio
     async def test_can_call_action_methods(self):
         """Test action dispatch methods can be called on compliant object."""
-        executor = MagicMock(spec=ActionExecutorProtocol)
+        executor = MagicMock(spec=RuntimeExecutorProtocol)
         executor.run_action = AsyncMock(
             return_value=CmdOutputObservation(content="ok", command="test", exit_code=0)
         )
@@ -156,11 +156,10 @@ class TestProtocolCompliance:
 
     def test_can_access_initial_cwd_property(self):
         """Test initial_cwd property can be accessed on compliant object."""
-        executor = MagicMock(spec=ActionExecutorProtocol)
+        executor = MagicMock(spec=RuntimeExecutorProtocol)
         executor.initial_cwd = "/test/workspace"
 
         assert executor.initial_cwd == "/test/workspace"
-
 
 # ── Protocol Documentation ─────────────────────────────────────────────
 
@@ -169,26 +168,26 @@ class TestProtocolDocumentation:
     """Test protocol has proper documentation."""
 
     def test_protocol_has_docstring(self):
-        """Test ActionExecutorProtocol has class docstring."""
-        doc = ActionExecutorProtocol.__doc__
+        """Test RuntimeExecutorProtocol has class docstring."""
+        doc = RuntimeExecutorProtocol.__doc__
         assert doc is not None and "Structural sub-typing interface" in doc
 
     def test_ainit_has_docstring(self):
         """Test ainit method has docstring."""
-        doc = ActionExecutorProtocol.ainit.__doc__
+        doc = RuntimeExecutorProtocol.ainit.__doc__
         assert doc is not None and "async initialisation" in doc
 
     def test_hard_kill_has_docstring(self):
         """Test hard_kill method has docstring."""
-        doc = ActionExecutorProtocol.hard_kill.__doc__
+        doc = RuntimeExecutorProtocol.hard_kill.__doc__
         assert doc is not None and "Emergency teardown" in doc
 
     def test_run_action_has_docstring(self):
         """Test run_action method has docstring."""
-        doc = ActionExecutorProtocol.run_action.__doc__
+        doc = RuntimeExecutorProtocol.run_action.__doc__
         assert doc is not None and "Generic dispatch" in doc
 
     def test_initial_cwd_has_docstring(self):
         """Test initial_cwd property has docstring."""
-        doc = ActionExecutorProtocol.initial_cwd.__doc__
+        doc = RuntimeExecutorProtocol.initial_cwd.__doc__
         assert doc is not None and "root working directory" in doc

@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.pydantic_compat import model_dump_with_options
 
 

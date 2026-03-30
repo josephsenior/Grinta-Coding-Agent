@@ -32,17 +32,17 @@ reliability-gate-integration: pretest
 
 .PHONY: docker-up
 docker-up:
-	@FORGE_KB_STORAGE_TYPE=database docker compose up --build
+	@APP_KB_STORAGE_TYPE=database docker compose up --build
 
 .PHONY: docker-up-detached
 docker-up-detached:
-	@FORGE_KB_STORAGE_TYPE=database docker compose up --build -d
+	@APP_KB_STORAGE_TYPE=database docker compose up --build -d
 
 .PHONY: docker-up-no-db
 docker-up-no-db:
-	@FORGE_KB_STORAGE_TYPE=file docker compose up --build
+	@APP_KB_STORAGE_TYPE=file docker compose up --build
 
-# Makefile for Forge project
+# Makefile for App project
 SHELL=/usr/bin/env bash
 
 # Variables
@@ -179,11 +179,11 @@ run:
 	@echo "$(YELLOW)Waiting for the backend to start...$(RESET)"
 	@until nc -z localhost $(BACKEND_PORT); do sleep 0.1; done
 	@echo "$(GREEN)Backend started successfully on $(BACKEND_HOST_PORT).$(RESET)"
-	@echo "$(GREEN)Launch TUI with: uv run forge-tui$(RESET)"
+	@echo "$(GREEN)Launch TUI with: uv run app-tui$(RESET)"
 
 # Setup settings.json
 setup-config:
-	@echo "$(YELLOW)Setting up Forge configuration...$(RESET)"
+	@echo "$(YELLOW)Setting up App configuration...$(RESET)"
 	@$(MAKE) setup-config-prompts
 	@mv $(CONFIG_FILE).tmp $(CONFIG_FILE)
 	@echo "$(GREEN)settings.json setup completed.$(RESET)"
@@ -217,10 +217,10 @@ help:
 	@echo "Targets:"
 	@echo "  $(GREEN)build$(RESET)               - Build project, including environment setup and dependencies."
 	@echo "  $(GREEN)lint$(RESET)                - Run linters on the project."
-	@echo "  $(GREEN)setup-config$(RESET)        - Setup the configuration for Forge by providing LLM API key,"
+	@echo "  $(GREEN)setup-config$(RESET)        - Setup the configuration for App by providing LLM API key,"
 	@echo "                        LLM Model name, and local data root directory."
-	@echo "  $(GREEN)start-backend$(RESET)       - Start the backend server for the Forge project."
-	@echo "  $(GREEN)run$(RESET)                 - Start the backend, then launch the TUI with: uv run forge-tui"
+	@echo "  $(GREEN)start-backend$(RESET)       - Start the backend server for the App project."
+	@echo "  $(GREEN)run$(RESET)                 - Start the backend, then launch the TUI with: uv run app-tui"
 	@echo "  $(GREEN)help$(RESET)                - Display this help message, providing information on available targets."
 
 # Phony targets

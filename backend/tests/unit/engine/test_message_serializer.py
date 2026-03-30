@@ -24,7 +24,7 @@ def test_serialize_messages_fail_closed(monkeypatch):
     msg = MagicMock()
     msg.role = "user"
     msg.serialize_model.side_effect = RuntimeError("boom")
-    monkeypatch.delenv("FORGE_DEGRADED_MESSAGE_SERIALIZATION", raising=False)
+    monkeypatch.delenv("APP_DEGRADED_MESSAGE_SERIALIZATION", raising=False)
     with pytest.raises(MessageSerializationError):
         serialize_messages([msg])
 
@@ -36,10 +36,10 @@ def test_serialize_messages_degraded_mode(monkeypatch):
     chunk = MagicMock()
     chunk.text = "fallback text"
     msg.content = [chunk]
-    monkeypatch.setenv("FORGE_DEGRADED_MESSAGE_SERIALIZATION", "1")
+    monkeypatch.setenv("APP_DEGRADED_MESSAGE_SERIALIZATION", "1")
     try:
         out = serialize_messages([msg])
     finally:
-        monkeypatch.delenv("FORGE_DEGRADED_MESSAGE_SERIALIZATION", raising=False)
+        monkeypatch.delenv("APP_DEGRADED_MESSAGE_SERIALIZATION", raising=False)
     assert out[0]["role"] == "user"
     assert out[0]["content"] == "fallback text"

@@ -1,6 +1,6 @@
 """Build a combined Tree-sitter language shared library.
 
-Forge primarily uses `tree-sitter-language-pack` (prebuilt grammars) and does
+App primarily uses `tree-sitter-language-pack` (prebuilt grammars) and does
 not require vendored grammar repos. This script exists for advanced scenarios
 where you want to build a custom combined library from Tree-sitter grammar
 sources.
@@ -18,7 +18,7 @@ from pathlib import Path
 
 
 def _default_out_file(out_base: Path) -> str:
-    platform = os.environ.get("FORGE_PLATFORM") or sys.platform
+    platform = os.environ.get("APP_PLATFORM") or sys.platform
 
     if platform.startswith("win"):
         return f"{str(out_base)}.dll"

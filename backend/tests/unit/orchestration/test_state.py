@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any, cast
 from unittest.mock import MagicMock
-
 import pytest
 
 from backend.orchestration.state.state import (
@@ -241,6 +240,7 @@ class TestStateViewHelpers:
         assert md["session_id"] == "s1"
         assert isinstance(md["tags"], str)
         assert "gpt-4" in md["tags"]
+        assert "APP_version:" in md["tags"]
 
     def test_get_local_step_no_parent(self):
         s = State()

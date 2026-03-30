@@ -1,4 +1,4 @@
-"""Base interfaces for scoring Forge agent runs."""
+"""Base interfaces for scoring App agent runs."""
 
 from __future__ import annotations
 

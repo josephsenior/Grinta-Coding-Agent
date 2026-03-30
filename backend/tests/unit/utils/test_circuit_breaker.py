@@ -53,10 +53,10 @@ class TestCircuitBreakerTransitions:
         with patch.dict(
             "os.environ",
             {
-                "FORGE_CB_FAILURE_THRESHOLD": str(threshold),
-                "FORGE_CB_BASE_OPEN_SECONDS": str(base_seconds),
-                "FORGE_CB_MAX_OPEN_SECONDS": "10",
-                "FORGE_CB_HALF_OPEN_PROBES": "1",
+                "APP_CB_FAILURE_THRESHOLD": str(threshold),
+                "APP_CB_BASE_OPEN_SECONDS": str(base_seconds),
+                "APP_CB_MAX_OPEN_SECONDS": "10",
+                "APP_CB_HALF_OPEN_PROBES": "1",
             },
         ):
             return CircuitBreaker("test")
@@ -232,7 +232,7 @@ class TestCircuitBreakerManager:
             raise ValueError("boom")
 
         br = mgr.get("will-open")
-        with patch.dict("os.environ", {"FORGE_CB_FAILURE_THRESHOLD": "1"}):
+        with patch.dict("os.environ", {"APP_CB_FAILURE_THRESHOLD": "1"}):
             br.failure_threshold = 1
         with pytest.raises(ValueError):
             await mgr.async_call("will-open", _fail)

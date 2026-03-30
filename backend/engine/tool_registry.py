@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 def _extract_tool_names(tools: Iterable[dict[str, Any]] | None) -> set[str]:
@@ -61,7 +61,7 @@ def validate_mcp_tool_name_collisions(
     """Detect collisions between internal tool names and MCP tool names.
 
     Collisions are ambiguous for the model: the same tool name may refer to an
-    internal handler or an MCP tool. Forge currently resolves collisions by
+    internal handler or an MCP tool. App currently resolves collisions by
     preferring the internal tool handler.
 
     Returns a sorted list of colliding names.

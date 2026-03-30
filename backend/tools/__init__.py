@@ -1,4 +1,4 @@
-"""Tools package for Forge utilities."""
+"""Tools package for App utilities."""
 
 from backend.tools.sanitize_trajectories import (
     find_candidate_files,

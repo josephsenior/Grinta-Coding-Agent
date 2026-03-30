@@ -13,7 +13,7 @@ triggers:
 
 **Rules:** Slash-first triggers; no duplication of orchestrator system prompt (security, tool discipline, memory tool matrix). Keep one workflow per file; &lt; ~100 lines; examples &gt; prose.
 
-**User / repo playbooks:** `~/.Forge/playbooks/*.md` or ship under `backend/playbooks/` with a PR.
+**User / repo playbooks:** `~/.app/playbooks/*.md` or ship under `backend/playbooks/` with a PR.
 
 ```markdown
 ---

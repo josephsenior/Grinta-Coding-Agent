@@ -1,4 +1,4 @@
-# Forge User Guide
+# App User Guide
 
 > End-to-end guide: from installation to your first autonomous coding session.
 
@@ -32,8 +32,8 @@
 ### Step 1: Clone and Install
 
 ```bash
-git clone https://github.com/josephsenior/Forge.git
-cd Forge
+git clone https://github.com/josephsenior/App.git
+cd App
 uv sync
 ```
 
@@ -61,27 +61,27 @@ Terminal 1 — Backend:
 python start_server.py
 ```
 
-Open the web UI at [http://localhost:3000](http://localhost:3000) (or run `python forge.py` to start the server and open a browser tab automatically).
+Open the web UI at [http://localhost:3000](http://localhost:3000) (or run `python app.py` to start the server and open a browser tab automatically).
 
 ---
 
 ## Configuration
 
-Forge uses a multi-layered configuration system based on JSON and Environment Variables to ensure flexibility across different environments and prevent UI syncing ambiguity.
+App uses a multi-layered configuration system based on JSON and Environment Variables to ensure flexibility across different environments and prevent UI syncing ambiguity.
 
 ### Configuration Hierarchy
 
 Configuration loads with this exact precedence (highest wins):
 
 1. **Environment Variables**: Native shell vars, `.env.local`, and `.env` (best for API keys)
-2. **`settings.json` at the Forge app root**: The single source of truth for persisted settings (same file the Web UI reads and writes). Resolved via `FORGE_APP_ROOT` if set, otherwise the directory the backend process was started from — **not** the “Open folder” workspace path.
+2. **`settings.json` at the app root**: The single source of truth for persisted settings (same file the Web UI reads and writes). Resolved via `APP_ROOT` if set, otherwise the directory the backend process was started from — **not** the “Open folder” workspace path.
 3. **Pydantic defaults**: Internal safe fallbacks.
 
-If the UI and CLI disagree, confirm the backend’s working directory (or set `FORGE_APP_ROOT` to your Forge checkout) so everyone targets the same `settings.json`.
+If the UI and CLI disagree, confirm the backend’s working directory (or set `APP_ROOT` to your checkout) so everyone targets the same `settings.json`.
 
 ### Getting Started
 
-For standard use, rely on the Web UI to edit the repo’s `settings.json` (under the app root above). Protect API keys in `.env` at the Forge project root (or via your shell environment):
+For standard use, rely on the Web UI to edit the repo’s `settings.json` (under the app root above). Protect API keys in `.env` at the App project root (or via your shell environment):
 
 ```bash
 LLM_API_KEY=sk-your-key
@@ -119,7 +119,7 @@ Any setting can be injected. For complex setups, rely on `.env`:
 
 ## Your First Session
 
-### 1. Start Forge
+### 1. Start App
 
 ```bash
 python start_server.py
@@ -175,14 +175,14 @@ The agent shows each action as it executes. You can:
 
 The primary interface is the React app served with the backend (default [http://localhost:3000](http://localhost:3000)).
 Use it to manage conversations, settings, confirmations, and workspace changes. The same REST and
-Socket.IO APIs power automation via the Python package `forge_client` (see tests under
-`backend/tests/unit/forge_client/` and `scripts/test_agent_via_sockets.py`).
+Socket.IO APIs power automation via the Python package `client` (see tests under
+`backend/tests/unit/client/` and `scripts/test_agent_via_sockets.py`).
 
 ---
 
 ## Working with the API
 
-Forge exposes a REST + Socket.IO API on port 3000.
+App exposes a REST + Socket.IO API on port 3000.
 
 ### REST Endpoints
 
@@ -288,7 +288,7 @@ model = "claude-sonnet-4-20250514"   # Primary (high quality)
 api_key = "sk-..."
 model = "claude-haiku-4-5-20251001"            # Faster, cheaper
 
-[llm.condenser]
+[llm.compactor]
 api_key = "sk-..."
 model = "gpt-4o-mini"             # Current config name for compaction workloads
 ```
@@ -298,8 +298,8 @@ model = "gpt-4o-mini"             # Current config name for compaction workloads
 ## Context Memory & Compactors
 
 Context memory is compacted when conversation history grows too large for the
-LLM's context window. The current implementation still uses `condenser` as the
-config section and class family name.
+LLM's context window. App now uses compactor as the canonical term in code,
+docs, and persisted config.
 
 ### Available Compactors
 
@@ -309,7 +309,7 @@ config section and class family name.
 | **llm** | Long sessions needing high-quality summaries | `type = "llm"` |
 | **observation_masking** | Preserving structure, masking old outputs | `type = "observation_masking"` |
 | **recent** | Simple keep-N-recent approach | `type = "recent"` |
-| **amortized** | Gradual forgetting of old context | `type = "amortized"` |
+| **amortized** | Gradual pruning of old context | `type = "amortized"` |
 | **semantic** | Embedding-based relevance filtering | `type = "semantic"` |
 | **llm_attention** | LLM-scored relevance prioritization | `type = "llm_attention"` |
 | **noop** | Debugging — no condensation | `type = "noop"` |
@@ -317,12 +317,12 @@ config section and class family name.
 ### Compactor Configuration
 
 ```toml
-[condenser]
+[compactor]
 type = "smart"    # Recommended default
 
 # Or for long sessions with high-quality summarization:
 # type = "llm"
-# llm_config = "condenser"   # References the current [llm.condenser] section
+# llm_config = "compactor"   # References the example [llm.compactor] section above
 # max_size = 100
 # keep_first = 1
 ```
@@ -377,7 +377,7 @@ enable_graceful_shutdown = true   # Recommended
 
 ## MCP Integration
 
-Forge supports the [Model Context Protocol](https://modelcontextprotocol.io/)
+App supports the [Model Context Protocol](https://modelcontextprotocol.io/)
 for connecting external tool servers.
 
 ### MCP Configuration
@@ -408,7 +408,7 @@ detailed examples.
 
 ## Playbooks
 
-Forge includes 16 built-in playbooks that activate automatically when your message matches
+App includes 16 built-in playbooks that activate automatically when your message matches
 their trigger phrases, injecting specialist guidance into the agent's context window.
 
 ### Context Playbooks (auto-triggered)
@@ -453,7 +453,7 @@ You can also pass them via the API when creating a conversation.
 
 ### Custom Playbooks
 
-Create your own playbooks in `~/.Forge/playbooks/` (user-level) or `.Forge/playbooks/`
+Create your own playbooks in `~/.app/playbooks/` (user-level) or `.app/playbooks/`
 (repo-level) using the same Markdown + frontmatter format. Type
 `add playbook` in chat for a guided template.
 
@@ -493,12 +493,12 @@ enable_summarize_context = false  # Agent-initiated condensation
 1. **Use a cheaper model for compaction:**
 
    ```toml
-   [llm.condenser]
+   [llm.compactor]
    model = "gpt-4o-mini"
    
-   [condenser]
+   [compactor]
    type = "llm"
-   llm_config = "condenser"
+   llm_config = "compactor"
    ```
 
 2. **Enable prompt caching** (35% cost reduction):
@@ -538,10 +538,10 @@ enable_summarize_context = false  # Agent-initiated condensation
    timeout = 300
    ```
 
-3. **Enable observation masking** (less data to process):
+3. **Enable outcome masking** (less data to process):
 
    ```toml
-   [condenser]
+   [compactor]
    type = "observation_masking"
    attention_window = 50
    ```
@@ -567,6 +567,6 @@ enable_summarize_context = false  # Agent-initiated condensation
 3. **Use smart compactor:**
 
    ```toml
-   [condenser]
+   [compactor]
    type = "smart"
    ```

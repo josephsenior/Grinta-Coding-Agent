@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import socketio  # type: ignore[import-untyped]
 
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.core.config.llm_config import LLMConfig
     from backend.ledger.action import MessageAction
     from backend.gateway.config.server_config import ServerConfig
@@ -22,13 +22,13 @@ if TYPE_CHECKING:
 
 
 class ConversationManager(ABC):
-    """Abstract base class for managing conversations in forge.
+    """Abstract base class for managing conversations in app.
 
     This class defines the interface for managing conversations, whether in standalone
     or clustered mode. It handles the lifecycle of conversations, including creation,
     attachment, detachment, and cleanup.
 
-    This is an extension point in Forge, that applications built on it can use to modify behavior via server configuration, without modifying its code.
+    This is an extension point in App, that applications built on it can use to modify behavior via server configuration, without modifying its code.
     Applications can provide their own
     implementation by:
     1. Creating a class that inherits from ConversationManager
@@ -44,11 +44,11 @@ class ConversationManager(ABC):
     - Integration with external conversation management systems
     - Enhanced monitoring or logging capabilities
 
-    The implementation class is instantiated via get_impl() in forge.server.shared.py.
+    The implementation class is instantiated via get_impl() in app.server.shared.py.
     """
 
     sio: socketio.AsyncServer
-    config: ForgeConfig
+    config: AppConfig
     file_store: FileStore
     conversation_store: ConversationStore
 
@@ -163,7 +163,7 @@ class ConversationManager(ABC):
     def get_instance(
         cls,
         sio: socketio.AsyncServer,
-        config: ForgeConfig,
+        config: AppConfig,
         file_store: FileStore,
         server_config: ServerConfig,
         monitoring_listener: MonitoringListener,

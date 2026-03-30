@@ -1,4 +1,4 @@
-﻿"""API Versioning Infrastructure for Forge.
+﻿"""API Versioning Infrastructure for App.
 
 Policy (as of aggressive cleanup milestone):
 - All routes live under ``/api/…`` **without** a version segment.

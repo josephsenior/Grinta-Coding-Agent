@@ -12,7 +12,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS,
     DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.orchestration.session_orchestrator import SessionOrchestrator

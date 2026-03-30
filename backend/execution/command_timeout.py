@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.action import Action

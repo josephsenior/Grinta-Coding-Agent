@@ -130,7 +130,7 @@ def _windows_stdio_mcp_note() -> str | None:
     if _is_windows_stdio_mcp_disabled():
         return (
             "On Windows, stdio MCP servers are skipped unless the environment variable "
-            "FORGE_ENABLE_WINDOWS_MCP is set (HTTP/SSE/SHTTP servers are still attempted)."
+            "APP_ENABLE_WINDOWS_MCP is set (HTTP/SSE/SHTTP servers are still attempted)."
         )
     return None
 
@@ -159,7 +159,7 @@ async def mcp_capabilities_status(
     *,
     configured_servers: list[Any] | None = None,
 ) -> dict:
-    """Report configured vs connected MCP state, remote tools, and Forge wrapper tools."""
+    """Report configured vs connected MCP state, remote tools, and App wrapper tools."""
     mcps_list = list(mcps or [])
     configured = configured_servers or []
     configured_summaries = [
@@ -184,7 +184,7 @@ async def mcp_capabilities_status(
     if mcps_list and not remote_names:
         notes.append(
             "Connected server(s) returned zero tools from list_tools(). "
-            "Forge may still register wrapper tools (see wrapper_tools_registered); "
+            "App may still register wrapper tools (see wrapper_tools_registered); "
             "the LLM tool list merges remote tools plus applicable wrappers."
         )
 
@@ -203,8 +203,8 @@ async def mcp_capabilities_status(
         "connected_clients_count": n_conn,
         "connected_clients": [_connected_client_summary(c) for c in mcps_list],
         "wrapper_tools_registered": sorted(WRAPPER_TOOL_REGISTRY.keys()),
-        # Last Forge MCP bootstrap outcome (disabled vs unavailable vs degraded vs healthy)
-        "forge_bootstrap": get_mcp_bootstrap_status(),
+        # Last internal MCP bootstrap outcome (disabled vs unavailable vs degraded vs healthy)
+        "app_bootstrap": get_mcp_bootstrap_status(),
     }
     if notes:
         payload["notes"] = notes
@@ -236,7 +236,7 @@ def wrapper_tool_params(available_server_tools: list[str]) -> list[dict]:
                 "name": "mcp_capabilities_status",
                 "description": (
                     "Report MCP diagnostics: configured servers vs connected clients, "
-                    "remote tools from list_tools(), and Forge wrapper tools. "
+                    "remote tools from list_tools(), and App wrapper tools. "
                     "Use when connected_tools is empty but you still see MCP tools in the agent."
                 ),
                 "parameters": {

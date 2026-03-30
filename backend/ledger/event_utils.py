@@ -1,6 +1,6 @@
 """Utility helpers for pairing actions and observations from event logs."""
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action.action import Action
 from backend.ledger.action.empty import NullAction
 from backend.ledger.event import Event

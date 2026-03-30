@@ -18,7 +18,7 @@ from backend.ledger.action import AgentThinkAction
 
 _NOTE_DESCRIPTION = (
     "Store a persistent note in your scratchpad. "
-    "Notes are written to .forge/agent_notes.json inside the workspace root "
+    "Notes are written to .app/agent_notes.json inside the workspace root "
     "and survive context condensation — use them to remember decisions, "
     "constraints, or interim findings across a long session.\n\n"
     "Examples: key='auth_decision', value='using JWT with 1-hour expiry'.\n"
@@ -30,8 +30,8 @@ _RECALL_DESCRIPTION = (
     "Pass a specific key to get one value, or key=\"all\" to dump the entire scratchpad."
 )
 
-_NOTES_RELPATH = os.path.join(".forge", "agent_notes.json")
-_SCRATCHPAD_META_KEY = "__forge_scratchpad_meta__"
+_NOTES_RELPATH = os.path.join(".app", "agent_notes.json")
+_SCRATCHPAD_META_KEY = "__app_scratchpad_meta__"
 
 
 def create_note_tool() -> ChatCompletionToolParam:

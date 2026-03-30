@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import asyncpg
 from asyncpg import Pool
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.provider_types import ProviderType
 from backend.persistence.conversation.conversation_store import ConversationStore
 from backend.persistence.data_models.conversation_metadata import (
@@ -24,7 +24,7 @@ from backend.persistence.data_models.conversation_metadata_result_set import (
 )
 
 if TYPE_CHECKING:
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
 
 # SQL Schema for self-initialization
 CONVERSATION_SCHEMA_SQL = """
@@ -193,7 +193,7 @@ class DatabaseConversationStore(ConversationStore):
 
     @classmethod
     async def get_instance(
-        cls, config: ForgeConfig, user_id: str | None
+        cls, config: AppConfig, user_id: str | None
     ) -> DatabaseConversationStore:
         """Get a store for the user represented by the token given."""
         from backend.persistence.database_pool import get_db_pool

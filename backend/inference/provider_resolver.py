@@ -1,6 +1,6 @@
 """Provider resolution and local endpoint discovery.
 
-Provider resolution is intentionally strict for configured models: Forge trusts
+Provider resolution is intentionally strict for configured models: App trusts
 an explicit provider prefix (``provider/model``) or an exact catalog entry, and
 does not infer providers from model-name patterns.
 """
@@ -12,7 +12,7 @@ import time
 
 import httpx
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.inference.catalog_loader import lookup
 
 _PROVIDER_DEFAULT_URLS: dict[str, str] = {

@@ -1,6 +1,6 @@
 import json, sys, os
 sys.path.insert(0, '.')
-os.environ['FORGE_SETTINGS_FILE'] = 'settings.json'
+os.environ['APP_SETTINGS_FILE'] = 'settings.json'
 
 from backend.engine.planner import OrchestratorPlanner
 from backend.gateway.settings import Settings

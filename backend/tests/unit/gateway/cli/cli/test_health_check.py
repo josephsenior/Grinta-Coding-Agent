@@ -1,4 +1,4 @@
-"""Unit tests for backend.gateway.cli.cli.health_check — ``forge health`` subcommand."""
+"""Unit tests for backend.gateway.cli.cli.health_check — ``app health`` subcommand."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from backend.gateway.cli.cli.health_check import run_health_check
 
 @patch("backend.gateway.cli.cli.health_check.httpx.get")
 def test_run_health_check_success(mock_get: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("FORGE_HOST", "127.0.0.1")
-    monkeypatch.setenv("FORGE_PORT", "3001")
+    monkeypatch.setenv("APP_HOST", "127.0.0.1")
+    monkeypatch.setenv("APP_PORT", "3001")
     response = MagicMock()
     response.status_code = 200
     response.json.return_value = {"status": "ok"}
@@ -28,9 +28,9 @@ def test_run_health_check_success(mock_get: MagicMock, monkeypatch: pytest.Monke
 def test_run_health_check_wildcard_host_maps_to_localhost(
     mock_get: MagicMock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("FORGE_HOST", "0.0.0.0")
+    monkeypatch.setenv("APP_HOST", "0.0.0.0")
     monkeypatch.setenv("PORT", "8080")
-    monkeypatch.delenv("FORGE_PORT", raising=False)
+    monkeypatch.delenv("APP_PORT", raising=False)
     response = MagicMock()
     response.status_code = 200
     response.json.return_value = {"status": "ok"}

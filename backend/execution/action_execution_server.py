@@ -1,6 +1,6 @@
-"""This is the main file for the runtime client.
+﻿"""This is the main file for the runtime client.
 
-It is responsible for executing actions received from forge backend and producing observations.
+It is responsible for executing actions received from app backend and producing observations.
 
 NOTE: this executes inside the local runtime environment.
 """
@@ -23,7 +23,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from uvicorn import run
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
@@ -111,10 +111,10 @@ class ActionRequest(BaseModel):
     event: dict[str, Any]
 
 
-class ActionExecutor:
-    """ActionExecutor runs inside the local runtime environment.
+class RuntimeExecutor:
+    """RuntimeExecutor runs inside the local runtime environment.
 
-    It is responsible for executing actions received from forge backend and producing observations.
+    It is responsible for executing actions received from app backend and producing observations.
     """
 
     def __init__(
@@ -148,7 +148,7 @@ class ActionExecutor:
 
         # Keep a separate cancellation service for non-session tasks if needed,
         # or just rely on session manager for shell tasks.
-        # But ActionExecutor might have other tasks? For now, let's keep it minimal.
+        # But RuntimeExecutor might have other tasks? For now, let's keep it minimal.
 
         self.lock = asyncio.Lock()
         self.plugins: dict[str, Plugin] = {}
@@ -258,7 +258,7 @@ class ActionExecutor:
             self._initialized = True
         except Exception as e:
             logger.error(
-                "ActionExecutor initialization failed at step: %s",
+                "RuntimeExecutor initialization failed at step: %s",
                 e,
                 exc_info=True,
             )
@@ -328,7 +328,7 @@ class ActionExecutor:
         """Translate /workspace/... virtual paths to the actual workspace directory.
 
         When running outside a container the real workspace is a temp directory
-        (e.g. /tmp/FORGE_workspace_<sid>_... on Linux/macOS or under %%TEMP%%
+        (e.g. /tmp/app_workspace_<sid>_... on Linux/macOS or under %%TEMP%%
         on Windows).  The LLM always uses the /workspace virtual prefix, so
         this method strips it and returns the corresponding absolute path
         inside the real workspace root.
@@ -355,7 +355,7 @@ class ActionExecutor:
         This keeps the LLM's perspective consistent: it always sees /workspace
         paths regardless of the underlying temp directory location.
         Without this, the LLM sees path mismatches (it sends /workspace/foo but
-        gets back the real FORGE_workspace temp path) and loops trying to
+        gets back the real app_workspace temp path) and loops trying to
         reconcile them.
 
         Also strips ANSI color codes so terminal output is clean for the LLM.
@@ -1179,20 +1179,20 @@ class ActionExecutor:
             return ErrorObservation(f"Failed to edit file {action.path}: {e}")
 
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
-        """Execute an MCP tool call using Forge's MCP client integration."""
+        """Execute an MCP tool call using App's MCP client integration."""
         try:
             from backend.gateway.integrations.mcp.mcp_utils import (
                 call_tool_mcp,
                 create_mcps,
             )
             from backend.core.config.mcp_config import _filter_windows_stdio_servers
-            from backend.core.config.config_loader import load_forge_config
+            from backend.core.config.config_loader import load_app_config
 
             if self._mcp_clients is None:
                 # Prefer injected config (e.g. in-process runtime), fallback to load.
                 cfg = self._mcp_config
                 if cfg is None:
-                    cfg = load_forge_config().mcp
+                    cfg = load_app_config().mcp
 
                 servers = getattr(cfg, "servers", []) or []
                 # Apply the same allowlist-based Windows filter used during
@@ -1313,7 +1313,7 @@ class ActionExecutor:
 
                 call_async_from_sync(_disconnect_mcp, GENERAL_TIMEOUT)
             except Exception as exc:
-                logger.debug("MCP disconnect during ActionExecutor.close: %s", exc)
+                logger.debug("MCP disconnect during RuntimeExecutor.close: %s", exc)
 
         try:
             self.session_manager.close_all()
@@ -1333,15 +1333,15 @@ class ActionExecutor:
 
 
 # Initialize global variables for client and proxies
-client: ActionExecutor | None = None
+client: RuntimeExecutor | None = None
 mcp_proxy_manager: MCPProxyManager | None = None
 
 
 # Initializers for routes
-def get_client() -> ActionExecutor:
+def get_client() -> RuntimeExecutor:
     if client is None:
-        logger.warning("Action executor not initialized")
-        raise ReferenceError("Action executor not initialized")
+        logger.warning("Runtime executor not initialized")
+        raise ReferenceError("Runtime executor not initialized")
     return client
 
 
@@ -1390,13 +1390,13 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
 
-    logger.info("Closing ActionExecutor...")
+    logger.info("Closing RuntimeExecutor...")
     if client:
         try:
             client.close()
-            logger.info("ActionExecutor closed successfully.")
+            logger.info("RuntimeExecutor closed successfully.")
         except Exception as e:
-            logger.error("Error closing ActionExecutor: %s", e, exc_info=True)
+            logger.error("Error closing RuntimeExecutor: %s", e, exc_info=True)
 
     logger.info("Shutdown complete.")
 
@@ -1441,7 +1441,7 @@ if __name__ == "__main__":
     parser.add_argument("port", type=int, help="Port to listen on")
     parser.add_argument("--working-dir", type=str, help="Working directory")
     parser.add_argument("--plugins", type=str, help="Plugins to initialize", nargs="+")
-    parser.add_argument("--username", type=str, help="User to run as", default="forge")
+    parser.add_argument("--username", type=str, help="User to run as", default="app")
     parser.add_argument("--user-id", type=int, help="User ID to run as", default=1000)
     parser.add_argument(
         "--enable-browser",
@@ -1466,36 +1466,36 @@ if __name__ == "__main__":
                 raise ValueError(msg)
             plugins_to_load.append(ALL_PLUGINS[plugin]())
 
-    client: ActionExecutor | None = None  # type: ignore[no-redef]
+    client: RuntimeExecutor | None = None  # type: ignore[no-redef]
     mcp_proxy_manager: MCPProxyManager | None = None  # type: ignore[no-redef]
     initialization_task: asyncio.Task | None = None
     initialization_error: Exception | None = None
 
     async def _initialize_background(app: FastAPI):
-        """Initialize ActionExecutor and MCP Proxy Manager in the background."""
+        """Initialize RuntimeExecutor and MCP Proxy Manager in the background."""
         global client, mcp_proxy_manager, initialization_error
         try:
-            logger.info("Initializing ActionExecutor...")
-            from backend.core.config.config_loader import load_forge_config
+            logger.info("Initializing RuntimeExecutor...")
+            from backend.core.config.config_loader import load_app_config
 
-            client = ActionExecutor(
+            client = RuntimeExecutor(
                 plugins_to_load,
                 work_dir=args.working_dir,
                 username=args.username,
                 user_id=args.user_id,
                 enable_browser=args.enable_browser,
-                security_config=load_forge_config().security,
+                security_config=load_app_config().security,
             )
             logger.info(
-                "ActionExecutor instance created. Starting async initialization..."
+                "RuntimeExecutor instance created. Starting async initialization..."
             )
 
             init_timeout = int(os.environ.get("ACTION_EXECUTOR_INIT_TIMEOUT", "300"))
             try:
                 await asyncio.wait_for(client.ainit(), timeout=init_timeout)
-                logger.info("ActionExecutor initialized successfully.")
+                logger.info("RuntimeExecutor initialized successfully.")
             except TimeoutError as exc:
-                error_msg = f"ActionExecutor initialization timed out after {init_timeout} seconds."
+                error_msg = f"RuntimeExecutor initialization timed out after {init_timeout} seconds."
                 logger.error(error_msg)
                 initialization_error = RuntimeError(error_msg)
                 raise initialization_error from exc
@@ -1511,8 +1511,8 @@ if __name__ == "__main__":
                     api_key=None,
                     logger_level=logger.getEffectiveLevel(),
                 )
-                forge_config = load_forge_config()
-                mcp_proxy_manager.initialize(forge_config.mcp.servers)
+                app_config = load_app_config()
+                mcp_proxy_manager.initialize(app_config.mcp.servers)
                 allowed_origins = ["*"]
                 try:
                     await mcp_proxy_manager.mount_to_app(app, allowed_origins)
@@ -1523,7 +1523,7 @@ if __name__ == "__main__":
 
         except Exception as e:
             logger.error(
-                "Failed to initialize ActionExecutor: %s",
+                "Failed to initialize RuntimeExecutor: %s",
                 e,
                 exc_info=True,
             )

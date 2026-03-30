@@ -1,6 +1,6 @@
 """checkpoint tool — save and restore progress markers.
 
-Persists to ``.forge/checkpoints.json``.  The agent can ``save`` a
+Persists to ``.app/checkpoints.json``.  The agent can ``save`` a
 checkpoint after completing a logical phase, and ``restore`` to see
 what was done.  This complements the task_tracker by providing a
 durable progress snapshot that survives condensation.
@@ -18,7 +18,7 @@ from backend.ledger.action.agent import AgentThinkAction
 
 CHECKPOINT_TOOL_NAME = "checkpoint"
 
-_CHECKPOINTS_FILE = ".forge/checkpoints.json"
+_CHECKPOINTS_FILE = ".app/checkpoints.json"
 
 
 def _checkpoints_path() -> Path:

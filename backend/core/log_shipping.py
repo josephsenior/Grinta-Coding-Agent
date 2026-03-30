@@ -80,12 +80,12 @@ class LogShipper(ExternalServiceBase):
 
     def _datadog_payload(self, logs: list[dict[str, Any]]) -> dict[str, Any]:
         env = os.getenv("ENV", "production")
-        hostname = os.getenv("HOSTNAME", "forge")
-        service = os.getenv("SERVICE_NAME", "forge")
+        hostname = os.getenv("HOSTNAME", "app")
+        service = os.getenv("SERVICE_NAME", "app")
         return {
             "logs": [
                 {
-                    "ddsource": "forge",
+                    "ddsource": "app",
                     "ddtags": f"env:{env}",
                     "hostname": hostname,
                     "service": service,

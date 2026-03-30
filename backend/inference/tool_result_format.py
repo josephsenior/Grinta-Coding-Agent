@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import json
 
-TOOL_RESULT_BLOCK_PREFIX = "<forge_tool_result_json>"
-TOOL_RESULT_BLOCK_SUFFIX = "</forge_tool_result_json>"
+TOOL_RESULT_BLOCK_PREFIX = "<app_tool_result_json>"
+TOOL_RESULT_BLOCK_SUFFIX = "</app_tool_result_json>"
 
 
 def encode_tool_result_payload(tool_name: str, content: object) -> str:

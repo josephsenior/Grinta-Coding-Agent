@@ -1,7 +1,7 @@
 import os
 from typing import Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.message import Message
 
 
@@ -39,14 +39,14 @@ def _serialize_message_with_fallback(msg: Message) -> dict:
             e,
             exc_info=True,
         )
-        degraded = os.getenv("FORGE_DEGRADED_MESSAGE_SERIALIZATION", "").strip().lower() in (
+        degraded = os.getenv("APP_DEGRADED_MESSAGE_SERIALIZATION", "").strip().lower() in (
             "1",
             "true",
             "yes",
         )
         if degraded:
             logger.warning(
-                "FORGE_DEGRADED_MESSAGE_SERIALIZATION is enabled — emitting flattened text-only message"
+                "APP_DEGRADED_MESSAGE_SERIALIZATION is enabled — emitting flattened text-only message"
             )
             fallback_lines = _extract_text_chunks(msg)
             return {
@@ -54,7 +54,7 @@ def _serialize_message_with_fallback(msg: Message) -> dict:
                 "content": "\n".join(fallback_lines),
             }
         raise MessageSerializationError(
-            "Message serialization failed; enable FORGE_DEGRADED_MESSAGE_SERIALIZATION=1 "
+            "Message serialization failed; enable APP_DEGRADED_MESSAGE_SERIALIZATION=1 "
             "to allow a logged text-only fallback."
         ) from e
 

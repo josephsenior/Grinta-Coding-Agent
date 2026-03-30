@@ -14,7 +14,7 @@ from backend.core.config.cli_config import (
     apply_llm_config_override,
     get_llm_config_arg,
 )
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 
 
@@ -75,7 +75,7 @@ class TestGetLlmConfigArg:
 
 class TestApplyAdditionalOverrides:
     def test_agent_cls_override(self):
-        config = ForgeConfig()
+        config = AppConfig()
         args = Namespace(
             agent_cls="CustomAgent", max_iterations=None, max_budget_per_task=None
         )
@@ -83,7 +83,7 @@ class TestApplyAdditionalOverrides:
         assert config.default_agent == "CustomAgent"
 
     def test_max_iterations_override(self):
-        config = ForgeConfig()
+        config = AppConfig()
         args = Namespace(
             agent_cls=None, max_iterations=50, max_budget_per_task=None
         )
@@ -91,7 +91,7 @@ class TestApplyAdditionalOverrides:
         assert config.max_iterations == 50
 
     def test_max_budget_override(self):
-        config = ForgeConfig()
+        config = AppConfig()
         args = Namespace(
             agent_cls=None, max_iterations=None, max_budget_per_task=10.0
         )
@@ -99,7 +99,7 @@ class TestApplyAdditionalOverrides:
         assert config.max_budget_per_task == 10.0
 
     def test_no_overrides(self):
-        config = ForgeConfig()
+        config = AppConfig()
         original_agent = config.default_agent
         original_iter = config.max_iterations
         args = Namespace()
@@ -108,7 +108,7 @@ class TestApplyAdditionalOverrides:
         assert config.max_iterations == original_iter
 
     def test_none_values_not_applied(self):
-        config = ForgeConfig()
+        config = AppConfig()
         original_iter = config.max_iterations
         args = Namespace(
             agent_cls=None, max_iterations=None, max_budget_per_task=None
@@ -122,13 +122,13 @@ class TestApplyAdditionalOverrides:
 
 class TestApplyLlmConfigOverride:
     def test_no_config_no_change(self):
-        config = ForgeConfig()
+        config = AppConfig()
         args = Namespace(llm_config=None, config_file="settings.json")
         apply_llm_config_override(config, args)
         # No changes should occur
 
     def test_config_from_loaded(self):
-        config = ForgeConfig()
+        config = AppConfig()
         llm = LLMConfig(model="gpt-4")
         config.llms["custom"] = llm
         args = Namespace(llm_config="custom", config_file="settings.json")
@@ -136,7 +136,7 @@ class TestApplyLlmConfigOverride:
         assert config.get_llm_config().model == "gpt-4"
 
     def test_missing_config_raises(self, tmp_path):
-        config = ForgeConfig()
+        config = AppConfig()
         args = Namespace(
             llm_config="nonexistent", config_file=str(tmp_path / "nonexistent.json")
         )
@@ -159,7 +159,7 @@ class TestApplyLlmConfigOverride:
             "backend.core.config.cli_config.get_app_settings_root",
             return_value=str(tmp_path),
         ):
-            config = ForgeConfig()
+            config = AppConfig()
             args = Namespace(llm_config="custom", config_file=str(main_config))
             apply_llm_config_override(config, args)
             assert config.get_llm_config().model == "gpt-4-user"

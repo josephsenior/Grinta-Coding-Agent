@@ -18,7 +18,7 @@ from typing import (
 )
 
 from backend.core.errors import LLMNoResponseError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.message import Message
 from backend.inference.debug_mixin import DebugMixin
 from backend.inference.direct_clients import get_direct_client

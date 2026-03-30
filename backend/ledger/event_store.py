@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 import time
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.event_store_abc import EventStoreABC
 from backend.ledger.serialization.event import event_from_dict
 from backend.persistence.locations import (
@@ -296,3 +296,8 @@ class EventStore(EventStoreABC):
         except ValueError:
             logger.warning("get id from filename (%s) failed.", filename)
             return -1
+
+
+LedgerStore = EventStore
+
+__all__ = ["EventStore", "LedgerStore"]

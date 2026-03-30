@@ -1,7 +1,7 @@
 ﻿"""Cost-based quota system for LLM API usage.
 
 Tracks actual $ spent instead of just request counts.
-Forge is a local-first, single-user application so the only plan is
+App is a local-first, single-user application so the only plan is
 UNLIMITED (infinite limits).  Cost tracking is still useful for budget
 awareness and telemetry.
 
@@ -26,7 +26,7 @@ from backend.core.constants import (
     QUOTA_EXEMPT_PATH_PREFIXES,
     QUOTA_EXEMPT_PATHS,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from fastapi import Request, Response
@@ -69,7 +69,7 @@ _cost_store: dict[str, dict[str, float]] = defaultdict(
     }
 )
 
-# Single unlimited config — Forge is local-first / single-user
+# Single unlimited config — App is local-first / single-user
 DEFAULT_QUOTA_CONFIG = QuotaConfig(
     daily_limit=float("inf"),
     monthly_limit=float("inf"),
@@ -85,7 +85,7 @@ DEFAULT_QUOTA_CONFIG = QuotaConfig(
 class CostQuotaMiddleware:
     """Middleware for tracking LLM costs.
 
-    Tracks actual $ spent on LLM API calls.  Forge is a local-first
+    Tracks actual $ spent on LLM API calls.  App is a local-first
     single-user application so the default quota is UNLIMITED.
     Cost tracking is still useful for budget awareness and telemetry.
     """

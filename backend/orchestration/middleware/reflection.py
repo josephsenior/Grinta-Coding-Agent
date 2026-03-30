@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.orchestration.session_orchestrator import SessionOrchestrator

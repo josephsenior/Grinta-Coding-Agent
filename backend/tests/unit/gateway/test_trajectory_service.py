@@ -14,7 +14,7 @@ from backend.gateway.services import trajectory_service
 from backend.gateway.session.session_contract import ReplayCursor
 
 
-class TestExportTrajectory:
+class TestExportTranscript:
     def test_export_success(self):
         # Mock conversation with event_stream
         mock_conversation = MagicMock()
@@ -29,7 +29,7 @@ class TestExportTrajectory:
                 mock_to_dict.return_value = {"foo": "bar"}
 
                 cursor = ReplayCursor(since_id=None, start_id=0, limit=10)
-                result = trajectory_service.export_trajectory(
+                result = trajectory_service.export_transcript(
                     conversation=mock_conversation,
                     cursor=cursor
                 )
@@ -49,7 +49,7 @@ class TestExportTrajectory:
                 mock_to_dict.return_value = {"data": "test"}
 
                 cursor = ReplayCursor(since_id=None, start_id=5, limit=20)
-                result = trajectory_service.export_trajectory(
+                result = trajectory_service.export_transcript(
                     conversation=mock_conversation,
                     cursor=cursor,
                     exclude_hidden=False
@@ -67,8 +67,11 @@ class TestExportTrajectory:
 
             cursor = ReplayCursor(since_id=None, start_id=0, limit=10)
 
-            with pytest.raises(ReplayError, match="Failed to export trajectory"):
-                trajectory_service.export_trajectory(
+            with pytest.raises(ReplayError, match="Failed to export transcript"):
+                trajectory_service.export_transcript(
                     conversation=mock_conversation,
                     cursor=cursor
                 )
+
+    def test_legacy_export_trajectory_alias(self):
+        assert trajectory_service.export_trajectory is trajectory_service.export_transcript

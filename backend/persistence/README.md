@@ -1,6 +1,6 @@
-# Forge Storage Module
+# App Storage Module
 
-The storage module provides different storage options for file operations in Forge, used for storing events, settings and other metadata. This module implements a common interface (`FileStore`) that allows for interchangeable storage backends.
+The storage module provides different storage options for file operations in App, used for storing events, settings and other metadata. This module implements a common interface (`FileStore`) that allows for interchangeable storage backends.
 
 **Usage:**
 
@@ -24,7 +24,7 @@ Local file storage saves files to the local filesystem.
 **Environment Variables:**
 
 - None specific to this storage option
-- Files are stored under `local_data_root` in `ForgeConfig`
+- Files are stored under `local_data_root` in `AppConfig`
 
 ### 2. In-Memory Storage (`memory`)
 
@@ -105,7 +105,7 @@ The `BatchedWebHookFileStore` extends the webhook functionality by batching mult
 
 ## Configuration
 
-To configure the storage module in Forge, use the following configuration options:
+To configure the storage module in App, use the following configuration options:
 
 ```toml
 [core]

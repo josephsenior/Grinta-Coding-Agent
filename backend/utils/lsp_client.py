@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 # ── Try importing pylsp; soft-dependency only ──────────────────────────────
 _PYLSP_AVAILABLE: bool | None = None  # None = not yet detected

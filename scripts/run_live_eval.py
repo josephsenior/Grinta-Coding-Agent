@@ -11,7 +11,7 @@ import psutil
 for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
     try:
         cmdline = " ".join(proc.info['cmdline'] or []).lower()
-        if "uvicorn" in cmdline or "start_server.py" in cmdline or "forge.py" in cmdline:
+        if "uvicorn" in cmdline or "start_server.py" in cmdline or "app.py" in cmdline:
             if sys.executable.lower() in cmdline or 'python' in cmdline:
                 print(f"Killing old server process {proc.pid}")
                 proc.kill()
@@ -64,8 +64,8 @@ async def run_scenario():
 
     events_seen = []
     
-    @sio.on("forge_event")
-    async def on_forge_event(data):
+    @sio.on("app_event")
+    async def on_app_event(data):
         events_seen.append(data)
         if "action" in data and data["action"] == "working_memory":
             print("\n----- MEMORY SCRATCHPAD UPDATE -----")
@@ -86,7 +86,7 @@ async def run_scenario():
     
     msg = "Create a Python script in a folder named `real_world_task` containing a script `app.py` that starts a tiny FastAPI server on port 8080 returning {'message': 'Hello World'}. Also write a `requirements.txt` for it in that folder. Use tool calls to write the files."
     print("Sending prompt...")
-    await sio.emit("forge_user_action", {
+    await sio.emit("app_user_action", {
         "action": "message",
         "args": {"content": msg, "image_urls": [], "file_urls": []}
     })

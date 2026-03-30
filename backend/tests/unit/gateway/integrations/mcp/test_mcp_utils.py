@@ -14,6 +14,7 @@ from backend.ledger.action.mcp import MCPAction
 from backend.gateway.integrations.mcp.mcp_bootstrap_status import reset_mcp_bootstrap_status
 from backend.gateway.integrations.mcp.mcp_utils import (
     _find_matching_mcp,
+    _get_mcp_connect_timeout_sec,
     _is_windows_stdio_mcp_disabled,
     _log_successful_connection,
     _serialize_result_to_json,
@@ -29,6 +30,19 @@ class TestIsWindowsMcpDisabled:
     def test_always_returns_false(self):
         """_is_windows_stdio_mcp_disabled always returns False for OS agnosticism."""
         assert _is_windows_stdio_mcp_disabled() is False
+
+
+class TestGetMcpConnectTimeoutSec:
+    def test_reads_app_env_override(self, monkeypatch):
+        monkeypatch.setenv("APP_MCP_CONNECT_TIMEOUT_SEC", "12.5")
+        monkeypatch.delenv("APP_MCP_CONNECT_TIMEOUT_SEC", raising=False)
+
+        assert _get_mcp_connect_timeout_sec() == 12.5
+
+    def test_invalid_env_falls_back_to_default(self, monkeypatch):
+        monkeypatch.setenv("APP_MCP_CONNECT_TIMEOUT_SEC", "invalid")
+
+        assert _get_mcp_connect_timeout_sec() == 60.0
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +175,7 @@ class TestAsyncHelpers:
             assert data["result"] == "ok"
             assert data["ok"] is True
             assert data["isError"] is False
+            assert obs.tool_result is not None
             assert obs.tool_result["ok"] is True
 
     @pytest.mark.asyncio
@@ -180,6 +195,7 @@ class TestAsyncHelpers:
             data = json.loads(obs.content)
             assert data["isError"] is True
             assert data["ok"] is False
+            assert obs.tool_result is not None
             assert obs.tool_result["ok"] is False
 
     @pytest.mark.asyncio
@@ -209,6 +225,8 @@ class TestAsyncHelpers:
         assert expected_keys.issubset(wrapper_data)
         assert expected_keys.issubset(direct_data)
         assert wrapper_data["ok"] is False and direct_data["ok"] is False
+        assert wrapper_obs.tool_result is not None
+        assert direct_obs.tool_result is not None
         assert wrapper_obs.tool_result["ok"] is False
         assert direct_obs.tool_result["ok"] is False
         assert wrapper_obs.tool_result["observation"] == wrapper_obs.observation
@@ -248,6 +266,7 @@ class TestAsyncHelpers:
             data = json.loads(obs.content)
             assert data["result"] == "data"
             assert data["ok"] is True
+            assert obs.tool_result is not None
             assert obs.tool_result["ok"] is True
 
     @pytest.mark.asyncio
@@ -347,6 +366,7 @@ class TestAsyncHelpers:
         data = json.loads(obs.content)
         assert data["ok"] is False
         assert data["error_code"] == "MCP_NO_CLIENTS"
+        assert obs.tool_result is not None
         assert obs.tool_result["ok"] is False
 
     @pytest.mark.asyncio
@@ -511,5 +531,5 @@ class TestAsyncHelpers:
         assert "mcp_capabilities_status" in inner["wrapper_tools_registered"]
         assert "notes" in inner
         assert any("not connected" in n for n in inner["notes"])
-        assert "forge_bootstrap" in inner
-        assert inner["forge_bootstrap"].get("state") is not None
+        assert "app_bootstrap" in inner
+        assert inner["app_bootstrap"].get("state") is not None

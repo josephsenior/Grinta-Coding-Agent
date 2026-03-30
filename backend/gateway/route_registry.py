@@ -1,4 +1,4 @@
-﻿"""Centralised route registration for the Forge FastAPI application.
+﻿"""Centralised route registration for the App FastAPI application.
 
 Call ``register_routes(app)`` from the application factory to attach
 all API routers.
@@ -57,7 +57,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(workspace_router, tags=["v1", "workspace"])
     add_health_endpoints(app)
 
-    # Debug endpoint — gated behind FORGE_DEBUG env var
+    # Debug endpoint — gated behind APP_DEBUG env var
     try:
         from backend.gateway.routes.debug import router as debug_router
 

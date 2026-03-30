@@ -1,7 +1,7 @@
 """Run database migrations for knowledge base storage.
 
 Usage:
-    python -m forge.storage.knowledge_base.migrations.run_migrations
+    python -m app.storage.knowledge_base.migrations.run_migrations
 """
 
 import asyncio
@@ -24,9 +24,9 @@ async def run_migrations():
     # Get database connection parameters
     host = os.getenv("DB_HOST", "localhost")
     port = int(os.getenv("DB_PORT", "5432"))
-    database = os.getenv("DB_NAME", "forge")
-    user = os.getenv("DB_USER", "forge")
-    password = os.getenv("DB_PASSWORD", "forge")
+    database = os.getenv("DB_NAME", "app")
+    user = os.getenv("DB_USER", "app")
+    password = os.getenv("DB_PASSWORD", "app")
 
     # Build connection string
     dsn = f"postgresql://{user}:{password}@{host}:{port}/{database}"

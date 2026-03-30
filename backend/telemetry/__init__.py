@@ -1,4 +1,4 @@
-"""Audit logging system for Forge autonomous agents."""
+"""Audit logging system for App autonomous agents."""
 
 from backend.telemetry.audit_logger import AuditLogger
 from backend.telemetry.cost_recording import record_llm_cost, register_cost_recorder

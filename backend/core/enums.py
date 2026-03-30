@@ -1,4 +1,4 @@
-"""Core enumeration types for Forge.
+"""Core enumeration types for App.
 
 Extracted from constants.py to keep single-responsibility modules.
 """
@@ -9,7 +9,7 @@ from enum import Enum
 class QuotaPlan(str, Enum):
     """User quota plan.
 
-    Forge is a local-first, single-user application so only UNLIMITED
+    App is a local-first, single-user application so only UNLIMITED
     is supported.  The enum is kept for backward compatibility with the
     cost-tracking infrastructure.
     """
@@ -190,7 +190,7 @@ class ActionSecurityRisk(int, Enum):
 
 
 class AppMode(str, Enum):
-    """Enumerate supported deployment modes for the Forge server."""
+    """Enumerate supported deployment modes for the App server."""
 
     OSS = "oss"
     SAAS = "saas"

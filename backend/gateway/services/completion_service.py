@@ -18,7 +18,7 @@ from backend.orchestration.agent_circuit_breaker import (
 )
 from backend.core.cache.async_smart_cache import AsyncSmartCache
 from backend.core.constants import COMPLETION_TIMEOUT
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
 from backend.inference.cost_tracker import record_llm_cost_from_response
 

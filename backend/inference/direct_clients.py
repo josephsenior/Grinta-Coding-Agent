@@ -17,7 +17,7 @@ import httpx
 from anthropic import Anthropic, AsyncAnthropic
 from openai import AsyncOpenAI, OpenAI
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 # ---------------------------------------------------------------------------
 # Shared httpx connection pool
@@ -247,73 +247,6 @@ def _sanitize_openai_compatible_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]
     sanitized["extra_body"] = sanitized_extra_body
     return sanitized
 
-    @staticmethod
-    def _normalize_finish_reason(reason: str | None) -> str:
-        if not reason:
-            return "stop"
-        reason = str(reason).strip().lower()
-        mapping = {
-            "end_turn": "stop",
-            "max_tokens": "length",
-            "tool_use": "tool_calls",
-        }
-        return mapping.get(reason, reason)
-
-    @staticmethod
-    def _normalize_tool_calls(tool_calls: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
-        if not tool_calls:
-            return None
-        import json
-        normalized = []
-        for i, tc in enumerate(tool_calls):
-            # Ensure function arguments are JSON strings
-            func = tc.get("function", {})
-            args = func.get("arguments", "{}")
-            if isinstance(args, dict):
-                args_str = json.dumps(args)
-            elif isinstance(args, str):
-                try:
-                    # just to validate
-                    json.loads(args)
-                    args_str = args
-                except json.JSONDecodeError:
-                    args_str = "{}" if not args.strip() else args
-            elif args is None:
-                args_str = "{}"
-            else:
-                try:
-                    args_str = str(args)
-                    json.loads(args_str)
-                except Exception:
-                    args_str = "{}"
-            
-            normalized_tc = {
-                "id": tc.get("id", f"call_{i}"),
-                "type": tc.get("type", "function"),
-                "function": {
-                    "name": str(func.get("name", "")),
-                    "arguments": args_str,
-                }
-            }
-            normalized.append(normalized_tc)
-        return normalized
-
-    def to_dict(self) -> dict[str, Any]:
-        message: dict[str, Any] = {"content": self.content, "role": "assistant"}
-        if self.tool_calls:
-            message["tool_calls"] = self.tool_calls  # type: ignore[assignment]
-
-        return {
-            "choices": [{"message": message, "finish_reason": self.finish_reason}],
-            "usage": self.usage,
-            "id": self.id,
-            "model": self.model,
-        }
-
-    def __getitem__(self, key):
-        """Allow dict-like access to the underlying dict representation."""
-        return self.to_dict()[key]
-
 
 class DirectLLMClient(ABC):
     """Abstract base class for direct LLM clients."""
@@ -389,7 +322,7 @@ class OpenAIClient(DirectLLMClient):
         return extract_tool_calls(message)
 
     def _map_openai_error(self, exc: Exception) -> Exception:
-        """Map openai SDK exceptions to Forge LLM exceptions."""
+        """Map openai SDK exceptions to App LLM exceptions."""
         import openai
         from backend.inference.exceptions import (
             RateLimitError,
@@ -400,7 +333,7 @@ class OpenAIClient(DirectLLMClient):
             APIConnectionError,
             InternalServerError,
             Timeout,
-            APIError as ForgeAPIError,
+            APIError as ProviderAPIError,
             is_context_window_error,
         )
 
@@ -459,7 +392,7 @@ class OpenAIClient(DirectLLMClient):
         if isinstance(exc, openai.InternalServerError):
             return InternalServerError(str(exc), llm_provider="openai", model=self.model_name)
         if isinstance(exc, openai.APIStatusError):
-            return ForgeAPIError(
+            return ProviderAPIError(
                 str(exc),
                 llm_provider="openai",
                 model=self.model_name,
@@ -485,8 +418,8 @@ class OpenAIClient(DirectLLMClient):
             return messages
         cleaned = []
         for msg in messages:
-            if isinstance(msg, dict) and "forge_tool_ok" in msg:
-                msg = {k: v for k, v in msg.items() if k != "forge_tool_ok"}
+            if isinstance(msg, dict) and "tool_ok" in msg:
+                msg = {k: v for k, v in msg.items() if k != "tool_ok"}
             cleaned.append(msg)
         return cleaned
 
@@ -647,7 +580,7 @@ class AnthropicClient(DirectLLMClient):
         return prepare_kwargs(messages, kwargs, self.model_name)
 
     def _map_anthropic_error(self, exc: Exception) -> Exception:
-        """Map anthropic SDK exceptions to Forge LLM exceptions."""
+        """Map anthropic SDK exceptions to App LLM exceptions."""
         import anthropic
         from backend.inference.exceptions import (
             RateLimitError,
@@ -658,7 +591,7 @@ class AnthropicClient(DirectLLMClient):
             APIConnectionError,
             InternalServerError,
             Timeout,
-            APIError as ForgeAPIError,
+            APIError as ProviderAPIError,
             is_context_window_error,
         )
 
@@ -680,7 +613,7 @@ class AnthropicClient(DirectLLMClient):
         if isinstance(exc, anthropic.InternalServerError):
             return InternalServerError(str(exc), llm_provider="anthropic", model=self.model_name)
         if isinstance(exc, anthropic.APIStatusError):
-            return ForgeAPIError(
+            return ProviderAPIError(
                 str(exc),
                 llm_provider="anthropic",
                 model=self.model_name,
@@ -927,7 +860,7 @@ class GeminiClient(DirectLLMClient):
         )
 
     def _map_gemini_error(self, exc: Exception) -> Exception:
-        """Map google.genai exceptions to Forge LLM exceptions."""
+        """Map google.genai exceptions to App LLM exceptions."""
         from google.genai.errors import APIError
         from backend.inference.exceptions import (
             RateLimitError,
@@ -939,7 +872,7 @@ class GeminiClient(DirectLLMClient):
             ServiceUnavailableError,
             Timeout,
             APIConnectionError,
-            APIError as ForgeAPIError,
+            APIError as ProviderAPIError,
             is_context_window_error,
         )
         import asyncio
@@ -989,7 +922,7 @@ class GeminiClient(DirectLLMClient):
                 return BadRequestError(str(exc), llm_provider="google", model=self.model_name)
             if exc.code and exc.code >= 500:
                 return InternalServerError(str(exc), llm_provider="google", model=self.model_name)
-            return ForgeAPIError(str(exc), llm_provider="google", model=self.model_name)
+            return ProviderAPIError(str(exc), llm_provider="google", model=self.model_name)
         return exc
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
@@ -1131,7 +1064,6 @@ class GeminiClient(DirectLLMClient):
                 fcs = getattr(chunk, "function_calls", None)
                 if fcs:
                     for fc in fcs:
-                        import json
                         try:
                             _args = getattr(fc, "args", {})
                             if hasattr(type(fc), "to_dict") and _args:

@@ -1,4 +1,4 @@
-﻿"""In-process LocalRuntime - runs ActionExecutor directly without subprocess/HTTP.
+﻿"""In-process LocalRuntime - runs RuntimeExecutor directly without subprocess/HTTP.
 
 This is a simplified version that eliminates the complexity of subprocess management
 and HTTP communication for desktop applications that only need local runtime.
@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from backend.core.config.security_config import SecurityConfig
 from backend.core.errors import AgentRuntimeDisconnectedError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import (
     Action,
     CmdRunAction,
@@ -25,19 +25,19 @@ from backend.ledger.action import (
     MCPAction,
 )
 from backend.ledger.observation import Observation
-from backend.execution.action_execution_server import ActionExecutor
+from backend.execution.action_execution_server import RuntimeExecutor
 from backend.execution.capabilities import detect_capabilities
 from backend.execution.drivers.action_execution.action_execution_client import (
     ActionExecutionClient,
 )
-from backend.execution.executor_protocol import ActionExecutorProtocol
+from backend.execution.executor_protocol import RuntimeExecutorProtocol
 from backend.execution.plugins import ALL_PLUGINS, Plugin
 from backend.core.enums import RuntimeStatus
 from backend.security.analyzer import SecurityAnalyzer
 from backend.utils.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.ledger import EventStream
     from backend.core.provider_types import ProviderTokenType
     from backend.inference.llm_registry import LLMRegistry
@@ -54,15 +54,15 @@ def get_user_info() -> tuple[int, str | None]:
 
 
 class LocalRuntimeInProcess(ActionExecutionClient):
-    """In-process local runtime that runs ActionExecutor directly.
+    """In-process local runtime that runs RuntimeExecutor directly.
 
-    This eliminates subprocess and HTTP overhead by running ActionExecutor
+    This eliminates subprocess and HTTP overhead by running RuntimeExecutor
     directly in the same process. Ideal for desktop applications.
     """
 
     def __init__(
         self,
-        config: ForgeConfig,
+        config: AppConfig,
         event_stream: EventStream,
         llm_registry: LLMRegistry,
         sid: str = "default",
@@ -100,10 +100,10 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         self._temp_workspace: str | None = project_root
         self.status_callback = status_callback
 
-        # ActionExecutor instance (created in connect()).  Typed against the
+        # RuntimeExecutor instance (created in connect()). Typed against the
         # protocol so this driver does not depend on the concrete class at
         # runtime — any executor satisfying the protocol works.
-        self._executor: ActionExecutorProtocol | None = None
+        self._executor: RuntimeExecutorProtocol | None = None
 
         # Apply startup env vars
         if self.config.runtime_config.runtime_startup_env_vars:
@@ -128,7 +128,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         )
 
     async def connect(self) -> None:
-        """Initialize ActionExecutor in-process."""
+        """Initialize RuntimeExecutor in-process."""
         import time
 
         start_time = time.time()
@@ -146,8 +146,8 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             else:
                 logger.warning("Plugin %s not found, skipping", plugin_req.name)
 
-        # Create ActionExecutor directly (no subprocess!)
-        logger.info("Creating ActionExecutor in-process...")
+        # Create RuntimeExecutor directly (no subprocess!)
+        logger.info("Creating RuntimeExecutor in-process...")
         if self._temp_workspace is None:
             self._setup_workspace_directory()
         if self._temp_workspace is None:
@@ -155,10 +155,10 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         work_dir = self._temp_workspace
         os.makedirs(work_dir, exist_ok=True)
 
-        self._executor = ActionExecutor(
+        self._executor = RuntimeExecutor(
             plugins_to_load=plugins_to_load,
             work_dir=work_dir,
-            username=self._username or "forge",
+            username=self._username or "app",
             user_id=self._user_id,
             enable_browser=self.config.enable_browser,
             tool_registry=self._tool_registry,  # Pass ToolRegistry for cross-platform support
@@ -166,8 +166,8 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             security_config=self.config.security,
         )
 
-        # Initialize ActionExecutor (this sets up bash, plugins, etc.)
-        logger.info("Initializing ActionExecutor...")
+        # Initialize RuntimeExecutor (this sets up bash, plugins, etc.)
+        logger.info("Initializing RuntimeExecutor...")
         await self._executor.ainit()
 
         self.set_runtime_status(RuntimeStatus.READY)
@@ -197,7 +197,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                 os.makedirs(base, exist_ok=True)
             else:
                 self._temp_workspace = tempfile.mkdtemp(
-                    prefix=f"FORGE_workspace_{self.sid}_"
+                    prefix=f"app_workspace_{self.sid}_"
                 )
             self.config.workspace_mount_path_in_runtime = self._temp_workspace
             logger.info("Using workspace: %s", self._temp_workspace)
@@ -212,7 +212,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         self.config.workspace_mount_path_in_runtime = self._temp_workspace
 
     async def execute_action(self, action: Any) -> Observation:
-        """Execute action directly via ActionExecutor."""
+        """Execute action directly via RuntimeExecutor."""
         if not self._runtime_initialized or self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
 
@@ -259,7 +259,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             # lines when the whitespace-stripped join contains the path.
             # Paths may span 3+ lines in narrow terminals, so we greedily
             # extend the join window until the full path is found.
-            if "FORGE_workspace" in val:
+            if "app_workspace" in val:
                 lines = val.split("\n")
                 i = 0
                 while i < len(lines) - 1:
@@ -282,13 +282,13 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             # Replace both slash variants of the temp path.
             val = val.replace(ws_back, "/workspace")
             val = val.replace(ws_fwd, "/workspace")
-            # Last resort: catch paths containing FORGE_workspace that
+            # Last resort: catch paths containing app_workspace that
             # weren't matched above (e.g. truncated/wrapped by terminal).
-            # Matches both Windows (C:\...\FORGE_workspace...) and
-            # Unix (/tmp/FORGE_workspace...) paths.
-            if "FORGE_workspace" in val:
+            # Matches both Windows (C:\...\app_workspace...) and
+            # Unix (/tmp/app_workspace...) paths.
+            if "app_workspace" in val:
                 val = re.sub(
-                    r"(?:[A-Za-z]:[/\\]|/)\S*FORGE_workspace\S*",
+                    r"(?:[A-Za-z]:[/\\]|/)\S*app_workspace\S*",
                     "/workspace",
                     val,
                 )
@@ -327,7 +327,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             logger.debug("LocalRuntimeInProcess hard_kill failed", exc_info=True)
 
     def run(self, action: CmdRunAction) -> Observation:
-        """Execute command via ActionExecutor."""
+        """Execute command via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
         # Use the action's own timeout (set by _set_action_timeout) plus a
@@ -337,19 +337,19 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         return call_async_from_sync(self._executor.run, timeout, action)
 
     def read(self, action: FileReadAction) -> Observation:
-        """Read file via ActionExecutor."""
+        """Read file via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
         return call_async_from_sync(self._executor.read, 15.0, action)
 
     def write(self, action: FileWriteAction) -> Observation:
-        """Write file via ActionExecutor."""
+        """Write file via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
         return call_async_from_sync(self._executor.write, 15.0, action)
 
     def edit(self, action: FileEditAction) -> Observation:
-        """Edit file via ActionExecutor."""
+        """Edit file via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
         return call_async_from_sync(self._executor.edit, 15.0, action)
@@ -466,20 +466,20 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """Get MCP configuration."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
-        # MCP is handled by ActionExecutor if available
+        # MCP is handled by RuntimeExecutor if available
         return self.config.mcp if hasattr(self.config, "mcp") else None
 
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
-        """Call MCP tool via ActionExecutor."""
+        """Call MCP tool via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
-        # ActionExecutor handles MCP through run_action
+        # RuntimeExecutor handles MCP through run_action
         return await self._executor.run_action(action)
 
     def close(self) -> None:
         """Clean up runtime resources."""
         if self._executor:
-            # ActionExecutor cleanup (this is synchronous)
+            # RuntimeExecutor cleanup (this is synchronous)
             if hasattr(self._executor, "close"):
                 self._executor.close()
             self._executor = None

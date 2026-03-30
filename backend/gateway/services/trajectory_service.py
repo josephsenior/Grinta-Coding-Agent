@@ -1,7 +1,7 @@
-﻿"""Trajectory service.
+﻿"""Transcript service.
 
-Centralizes trajectory export/replay logic so routes remain thin and semantics
-are consistent across HTTP and reconnect flows.
+Centralizes transcript export and replay logic so routes remain thin and
+semantics stay consistent across HTTP and reconnect flows.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from backend.ledger.serialization import event_to_dict
 from backend.gateway.session.session_contract import ReplayCursor
 
 
-def export_trajectory(
+def export_transcript(
     *,
     conversation: Any,
     cursor: ReplayCursor,
@@ -33,6 +33,11 @@ def export_trajectory(
         ):
             trajectory.append(event_to_dict(event))
     except Exception as exc:  # pragma: no cover - defensive boundary
-        raise ReplayError(f"Failed to export trajectory: {exc}") from exc
+        raise ReplayError(f"Failed to export transcript: {exc}") from exc
 
     return trajectory
+
+
+export_trajectory = export_transcript
+
+__all__ = ["export_transcript", "export_trajectory"]

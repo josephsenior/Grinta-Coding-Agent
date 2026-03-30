@@ -252,7 +252,7 @@ class TestExecutorRecoveryBlock:
     def test_executor_blocks_once_after_recent_uncommitted_checkpoint(
         self, tmp_path, monkeypatch
     ):
-        monkeypatch.setenv("FORGE_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv("APP_DATA_DIR", str(tmp_path))
         ckpt_dir = tmp_path / "streaming_checkpoints"
         ckpt = StreamingCheckpoint(str(ckpt_dir))
         ckpt.begin(
@@ -283,8 +283,8 @@ class TestExecutorRecoveryBlock:
 
         from backend.engine import executor as executor_module
 
-        monkeypatch.setenv("FORGE_DATA_DIR", str(tmp_path))
-        sys.modules.setdefault("forge.engine.function_calling", fc)
+        monkeypatch.setenv("APP_DATA_DIR", str(tmp_path))
+        sys.modules.setdefault("app.engine.function_calling", fc)
         monkeypatch.setattr(
             executor_module.orchestrator_function_calling,
             "response_to_actions",

@@ -13,7 +13,7 @@ triggers:
 
 ## `lessons.md` (project lessons)
 
-**Paths:** `.Forge/lessons.md` or `memories/repo/lessons.md`  
+**Paths:** `.app/lessons.md` or `memories/repo/lessons.md`  
 **Use for:** Durable repo facts — build/test commands, conventions, verified “we fixed X by Y”, architecture notes.  
 **Do not use for:** Secrets, one-off tickets, user prefs, temporary hacks.
 

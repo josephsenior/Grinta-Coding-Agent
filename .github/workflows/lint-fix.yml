@@ -41,8 +41,8 @@ jobs:
       - name: Commit and push if there are changes
         if: steps.git-check.outputs.changes == 'true'
         run: |
-          git config --local user.email "Forge@forge.dev"
-          git config --local user.name "Forge Bot"
+          git config --local user.email "App@app.dev"
+          git config --local user.name "App Bot"
           git add -A
           git commit -m "🤖 Auto-fix Python linting issues" --no-verify
           git push

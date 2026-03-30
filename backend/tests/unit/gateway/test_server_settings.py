@@ -103,4 +103,5 @@ class TestGETCustomSecrets:
         )
         assert model.custom_secrets is not None
         assert len(model.custom_secrets) == 2
+        assert model.custom_secrets is not None
         assert model.custom_secrets[0].name == "KEY1"

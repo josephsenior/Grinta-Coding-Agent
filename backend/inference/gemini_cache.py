@@ -1,4 +1,4 @@
-"""Gemini Context Caching manager for Forge."""
+"""Gemini context caching manager for the app."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from google import genai
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 class GeminiCacheManager:
@@ -56,7 +56,7 @@ class GeminiCacheManager:
             The name/ID of the cache, or None if creation failed or model doesn't support it.
         """
         # Context caching is typically for > 32k tokens.
-        # For Forge, we only use it if specifically requested via 'cache_prompt'
+        # We only use it if specifically requested via 'cache_prompt'
         # logic handled in the calling client.
 
         content_hash = self._get_hash(system_instruction, messages)
@@ -88,7 +88,7 @@ class GeminiCacheManager:
             cache = cast(Any, client.caches.create)(
                 model=model,
                 config={
-                    "display_name": f"forge_cache_{int(time.time())}",
+                    "display_name": f"app_cache_{int(time.time())}",
                     "system_instruction": system_instruction,
                     "ttl": f"{ttl_minutes * 60}s",
                 },

@@ -13,14 +13,12 @@ def test_lazy_memory_import() -> None:
     assert mem.Memory is RealMemory
 
 
-def test_lazy_conversation_memory_import() -> None:
+def test_lazy_context_memory_import() -> None:
     import backend.context as mem
 
-    from backend.context.conversation_memory import ConversationMemory as RealCM
+    from backend.context.conversation_memory import ContextMemory as RealCM
 
-    assert mem.ConversationMemory is RealCM
-
-
+    assert mem.ContextMemory is RealCM
 def test_unknown_attribute_raises() -> None:
     import backend.context as mem
 

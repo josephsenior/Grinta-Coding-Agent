@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
+from pathlib import Path
+import sys
 import time
 from unittest.mock import patch
-
 
 from backend.gateway.integrations.mcp.cache import (
     CacheEntry,
@@ -17,6 +20,34 @@ from backend.gateway.integrations.mcp.cache import (
     is_cacheable,
     set_cache,
 )
+
+
+class TestCacheConfig:
+    def test_max_cache_entry_bytes_reads_app_env(self, monkeypatch):
+        monkeypatch.setenv("APP_MCP_CACHE_MAX_ENTRY_BYTES", "1234")
+        monkeypatch.delenv("APP_MCP_CACHE_MAX_ENTRY_BYTES", raising=False)
+
+        module_path = (
+            Path(__file__).resolve().parents[5]
+            / "gateway"
+            / "integrations"
+            / "mcp"
+            / "cache.py"
+        )
+        spec = importlib.util.spec_from_file_location(
+            "_isolated_mcp_cache_config_test",
+            module_path,
+        )
+        assert spec is not None
+        assert spec.loader is not None
+        isolated_module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = isolated_module
+        try:
+            spec.loader.exec_module(isolated_module)
+        finally:
+            sys.modules.pop(spec.name, None)
+
+        assert isolated_module.MAX_CACHE_ENTRY_BYTES == 1234
 
 
 # ── CacheEntry dataclass ───────────────────────────────────────────────

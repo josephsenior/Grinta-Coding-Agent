@@ -6,10 +6,10 @@ import sys
 import time
 from typing import Any
 
-# Ensure backend and forge_client are importable from repo root
+# Ensure backend and client are importable from repo root
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from forge_client import ForgeClient
+from client import AppClient
 
 
 def _build_scenarios() -> list[dict[str, Any]]:
@@ -100,12 +100,12 @@ def _build_scenarios() -> list[dict[str, Any]]:
 def _choose_scenario() -> dict[str, Any]:
     """Pick a scenario by index or pseudo-random seed."""
     scenarios = _build_scenarios()
-    forced_index = os.environ.get("FORGE_SCENARIO_INDEX")
+    forced_index = os.environ.get("APP_SCENARIO_INDEX")
     if forced_index is not None and forced_index.strip():
         idx = int(forced_index) % len(scenarios)
         return scenarios[idx]
 
-    seed_value = os.environ.get("FORGE_SCENARIO_SEED")
+    seed_value = os.environ.get("APP_SCENARIO_SEED")
     rng = random.Random(seed_value) if seed_value else random.Random()
     return rng.choice(scenarios)
 
@@ -113,12 +113,12 @@ def _choose_scenario() -> dict[str, Any]:
 def _run_batch_mode() -> int:
     """Run multiple scenarios by re-invoking this script per scenario.
 
-    Env:
-      FORGE_BATCH_SCENARIOS=all|N   (default: all)
-      FORGE_BATCH_SEED=<seed>       (optional shuffle seed)
+        Env:
+            APP_BATCH_SCENARIOS=all|N   (default: all)
+            APP_BATCH_SEED=<seed>       (optional shuffle seed)
     """
     scenarios = _build_scenarios()
-    raw = (os.environ.get("FORGE_BATCH_SCENARIOS", "all") or "all").strip().lower()
+    raw = (os.environ.get("APP_BATCH_SCENARIOS", "all") or "all").strip().lower()
 
     if raw == "all":
         run_count = len(scenarios)
@@ -126,11 +126,11 @@ def _run_batch_mode() -> int:
         try:
             run_count = max(1, min(int(raw), len(scenarios)))
         except ValueError:
-            print(f"Invalid FORGE_BATCH_SCENARIOS={raw!r}; expected 'all' or integer.")
+            print(f"Invalid APP_BATCH_SCENARIOS={raw!r}; expected 'all' or integer.")
             return 9
 
     indices = list(range(len(scenarios)))
-    batch_seed = os.environ.get("FORGE_BATCH_SEED")
+    batch_seed = os.environ.get("APP_BATCH_SEED")
     if batch_seed:
         random.Random(batch_seed).shuffle(indices)
 
@@ -148,8 +148,8 @@ def _run_batch_mode() -> int:
         print("=" * 72)
 
         env = dict(os.environ)
-        env["FORGE_SCENARIO_INDEX"] = str(idx)
-        env["FORGE_BATCH_SCENARIOS"] = "0"  # prevent recursion
+        env["APP_SCENARIO_INDEX"] = str(idx)
+        env["APP_BATCH_SCENARIOS"] = "0"  # prevent recursion
 
         started = time.time()
         completed = subprocess.run([sys.executable, __file__], env=env, check=False)
@@ -171,10 +171,10 @@ def _run_batch_mode() -> int:
 
 
 async def main() -> int:
-    base_url = os.environ.get("FORGE_BASE_URL", "http://localhost:3000")
-    print(f"Connecting to local Forge server at {base_url}...")
+    base_url = os.environ.get("APP_BASE_URL", "http://localhost:3000")
+    print(f"Connecting to local App server at {base_url}...")
 
-    client = ForgeClient(base_url)
+    client = AppClient(base_url)
 
     scenario = _choose_scenario()
     test_file_name = str(scenario["primary_file"])
@@ -191,10 +191,10 @@ async def main() -> int:
 
     try:
         # Create or reuse a conversation
-        # NOTE: Using FORGE_CONVERSATION_ID in a shared shell can be "sticky" across runs.
+        # NOTE: Using APP_CONVERSATION_ID in a shared shell can be "sticky" across runs.
         # To avoid accidentally reusing a conversation that still has an active agent loop,
-        # reuse is opt-in via FORGE_REUSE_CONVERSATION_ID.
-        conv_id = os.environ.get("FORGE_REUSE_CONVERSATION_ID")
+        # reuse is opt-in via APP_REUSE_CONVERSATION_ID.
+        conv_id = os.environ.get("APP_REUSE_CONVERSATION_ID")
         if conv_id:
             print(f"Reusing conversation: {conv_id}")
         else:
@@ -207,21 +207,21 @@ async def main() -> int:
                 raise ValueError(f"Could not find conversation ID in: {conv}")
             print(f"Created conversation: {conv_id}")
 
-        skip_start = os.environ.get("FORGE_SKIP_START_AGENT", "").strip().lower() in {
+        skip_start = os.environ.get("APP_SKIP_START_AGENT", "").strip().lower() in {
             "1",
             "true",
             "yes",
             "on",
         }
         if skip_start:
-            print("Skipping start_agent (FORGE_SKIP_START_AGENT=1)")
+            print("Skipping start_agent (APP_SKIP_START_AGENT=1)")
         else:
             print("Starting agent...")
             await asyncio.wait_for(client.start_agent(str(conv_id)), timeout=60)
 
         initialized = asyncio.Event()
         terminal = asyncio.Event()
-        verbose = os.environ.get("FORGE_VERBOSE_EVENTS", "").strip().lower() in {
+        verbose = os.environ.get("APP_VERBOSE_EVENTS", "").strip().lower() in {
             "1",
             "true",
             "yes",
@@ -276,7 +276,8 @@ async def main() -> int:
             state = _agent_state(event)
             if event.get("action") == "streaming_chunk":
                 print("GOT STREAMING CHUNK")
-            if event.get('action') == 'streaming_chunk': print('CHUNK', repr(event)[:50])
+            if event.get('action') == 'streaming_chunk':
+                print('CHUNK', repr(event)[:50])
             if state:
                 last_agent_state = state
 
@@ -321,7 +322,7 @@ async def main() -> int:
 
         # Wait for the server to finish initializing the conversation.
         # This avoids a race where AWAITING_USER_INPUT overrides RUNNING.
-        init_timeout = int(os.environ.get("FORGE_INIT_TIMEOUT", "60"))
+        init_timeout = int(os.environ.get("APP_INIT_TIMEOUT", "60"))
         try:
             await asyncio.wait_for(initialized.wait(), timeout=init_timeout)
         except TimeoutError:
@@ -338,7 +339,7 @@ async def main() -> int:
         await asyncio.sleep(0.1)
         print(f"Socket.IO connected (post-send): {client.is_ws_connected}")
 
-        wait_seconds = int(os.environ.get("FORGE_WAIT_SECONDS", "300"))
+        wait_seconds = int(os.environ.get("APP_WAIT_SECONDS", "300"))
         print(f"Waiting for agent to process ({wait_seconds}s or until terminal state)...")
         try:
             await asyncio.wait_for(terminal.wait(), timeout=wait_seconds)
@@ -440,7 +441,7 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
-    batch_requested = os.environ.get("FORGE_BATCH_SCENARIOS")
+    batch_requested = os.environ.get("APP_BATCH_SCENARIOS")
     if batch_requested and batch_requested.strip() not in {"", "0", "false", "False"}:
         sys.exit(_run_batch_mode())
     sys.exit(asyncio.run(main()))

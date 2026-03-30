@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.inference.metrics import Metrics
 from backend.persistence.locations import get_conversation_stats_filename
 

@@ -1,4 +1,4 @@
-"""Pydantic schemas for all Forge action types."""
+"""Pydantic schemas for all App action types."""
 
 from __future__ import annotations
 
@@ -436,27 +436,27 @@ class CondensationActionSchema(ActionSchemaV1):
     """Schema for CondensationAction.
 
     This action indicates a condensation of the conversation history is happening.
-    There are two ways to specify the events to be forgotten:
+    There are two ways to specify the events to be pruned:
     1. By providing a list of event IDs.
     2. By providing the start and end IDs of a range of events.
-    In the second case, we assume that event IDs are monotonically increasing, and that _all_ events between the start and end IDs are to be forgotten.
+    In the second case, we assume that event IDs are monotonically increasing, and that _all_ events between the start and end IDs are to be pruned.
     """
 
     action_type: Literal["condensation"] = Field(
         ActionType.CONDENSATION.value, frozen=True
     )
     runnable: bool = Field(False, frozen=True)
-    forgotten_event_ids: list[int] | None = Field(
-        default=None, description="List of event IDs to forget"
+    pruned_event_ids: list[int] | None = Field(
+        default=None, description="List of event IDs to prune"
     )
-    forgotten_events_start_id: int | None = Field(
-        default=None, description="Start ID of range to forget"
+    pruned_events_start_id: int | None = Field(
+        default=None, description="Start ID of range to prune"
     )
-    forgotten_events_end_id: int | None = Field(
-        default=None, description="End ID of range to forget"
+    pruned_events_end_id: int | None = Field(
+        default=None, description="End ID of range to prune"
     )
     summary: str | None = Field(
-        default=None, description="Summary of forgotten events"
+        default=None, description="Summary of pruned events"
     )
     summary_offset: int | None = Field(
         default=None, description="Offset for summary insertion"

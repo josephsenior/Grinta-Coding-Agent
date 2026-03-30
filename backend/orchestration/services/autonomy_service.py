@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.orchestration.agent import Agent
@@ -79,3 +79,8 @@ class AutonomyService:
             logger.debug("TaskValidator enabled for completion checking")
 
         controller._add_system_message()
+
+
+ExecutionPolicyService = AutonomyService
+
+__all__ = ["AutonomyService", "ExecutionPolicyService"]

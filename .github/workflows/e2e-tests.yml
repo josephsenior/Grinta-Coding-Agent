@@ -25,7 +25,7 @@ jobs:
         python-version: ['3.12']
 
     env:
-      FORGE_TEST_AGENT_TIMEOUT: '120'
+      APP_TEST_AGENT_TIMEOUT: '120'
       PYTHONPATH: '.'
 
     steps:
@@ -50,7 +50,7 @@ jobs:
       - name: Start backend (Linux)
         if: runner.os != 'Windows'
         env:
-          FORGE_HOST: '127.0.0.1'
+          APP_HOST: '127.0.0.1'
           PORT: '3000'
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
@@ -66,7 +66,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         env:
-          FORGE_HOST: '127.0.0.1'
+          APP_HOST: '127.0.0.1'
           PORT: '3000'
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}

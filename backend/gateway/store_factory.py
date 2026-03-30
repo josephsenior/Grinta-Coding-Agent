@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.persistence.conversation.conversation_store import ConversationStore
     from backend.persistence.secrets.secrets_store import SecretsStore
     from backend.persistence.settings.settings_store import SettingsStore
@@ -17,14 +17,14 @@ if TYPE_CHECKING:
 
 async def get_conversation_store_instance(
     impl_class: type[ConversationStore],
-    config: ForgeConfig,
+    config: AppConfig,
     user_id: str | None,
 ) -> ConversationStore:
     """Get a conversation store instance using the implementation class.
 
     Args:
         impl_class: The conversation store implementation class
-        config: Forge configuration
+        config: App configuration
         user_id: User identifier
 
     Returns:
@@ -35,14 +35,14 @@ async def get_conversation_store_instance(
 
 async def get_settings_store_instance(
     impl_class: type[SettingsStore],
-    config: ForgeConfig,
+    config: AppConfig,
     user_id: str | None,
 ) -> SettingsStore:
     """Get a settings store instance using the implementation class.
 
     Args:
         impl_class: The settings store implementation class
-        config: Forge configuration
+        config: App configuration
         user_id: User identifier
 
     Returns:
@@ -53,14 +53,14 @@ async def get_settings_store_instance(
 
 async def get_secrets_store_instance(
     impl_class: type[SecretsStore],
-    config: ForgeConfig,
+    config: AppConfig,
     user_id: str | None,
 ) -> SecretsStore:
     """Get a secrets store instance using the implementation class.
 
     Args:
         impl_class: The secrets store implementation class
-        config: Forge configuration
+        config: App configuration
         user_id: User identifier
 
     Returns:

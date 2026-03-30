@@ -1,4 +1,4 @@
-﻿"""Model Context Protocol (MCP) routes and helpers for Forge server tooling."""
+﻿"""Model Context Protocol (MCP) routes and helpers for App server tooling."""
 
 # Note: NOT using "from __future__ import annotations" to avoid Field resolution issues in fastmcp
 # from __future__ import annotations
@@ -17,7 +17,7 @@ from fastmcp.server.dependencies import get_http_request
 # Import SecretStr from pydantic
 from pydantic import SecretStr
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.logger import get_trace_context
 from backend.core.provider_types import ProviderToken, ProviderType
 from backend.gateway.user_auth import (
@@ -36,7 +36,7 @@ def get_server_config():
 
 
 def get_config():
-    """Return Forge configuration without importing at module import time."""
+    """Return application configuration without importing at module import time."""
     from backend.gateway.app_accessors import config
 
     return config
@@ -59,7 +59,7 @@ try:
         from opentelemetry import trace as _otel_trace  # type: ignore
         from opentelemetry.trace import SpanKind  # type: ignore
 
-        _mcp_tracer = _otel_trace.get_tracer("forge.mcp")
+        _mcp_tracer = _otel_trace.get_tracer("app.mcp")
         _SPAN_KIND = SpanKind
 except Exception:  # pragma: no cover - optional dependency
     _mcp_tracer = None
@@ -79,7 +79,7 @@ class _McpRequestContext:
 async def _request_context() -> _McpRequestContext:
     request = get_http_request()
     headers = request.headers
-    conversation_id = headers.get("X-Forge-ServerConversation-ID", None)
+    conversation_id = headers.get("X-App-ServerConversation-ID", None)
     provider_tokens_raw = get_provider_tokens()
     provider_tokens = (
         dict(provider_tokens_raw) if provider_tokens_raw is not None else None
@@ -141,7 +141,7 @@ def _set_span_attributes(
         ctx = get_trace_context()
         trace_id = ctx.get("trace_id")
         if trace_id:
-            span.set_attribute("forge.trace_id", str(trace_id))
+            span.set_attribute("app.trace_id", str(trace_id))
     except Exception as e:
         logger.debug("Failed to set trace attributes: %s", e)
 

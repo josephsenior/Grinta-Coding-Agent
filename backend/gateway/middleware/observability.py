@@ -18,7 +18,7 @@ from backend.core.alerting import (
     get_alert_client,
     get_slo_tracker,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 PromCounter = Any
 PromHistogram = Any
@@ -60,13 +60,13 @@ class RequestObservabilityMiddleware(BaseHTTPMiddleware):
         assert _prometheus_client is not None
 
         self._request_counter = _prometheus_client.Counter(
-            "forge_http_requests_total",
-            "Total HTTP requests handled by Forge",
+            "app_http_requests_total",
+            "Total HTTP requests handled by the application",
             labelnames=("method", "path", "status"),
         )
         self._latency_histogram = _prometheus_client.Histogram(
-            "forge_http_request_latency_seconds",
-            "Latency of HTTP requests handled by Forge",
+            "app_http_request_latency_seconds",
+            "Latency of HTTP requests handled by the application",
             labelnames=("method", "path", "status"),
             buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf")),
         )

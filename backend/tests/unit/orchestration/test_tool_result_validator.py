@@ -243,7 +243,7 @@ class TestObserve:
 
         await validator.observe(ctx, obs)
 
-        assert "<FORGE_RESULT_VALIDATION>" in obs.content
+        assert "<APP_RESULT_VALIDATION>" in obs.content
 
     @pytest.mark.asyncio
     async def test_observe_runs_global_rules(self):

@@ -1,8 +1,8 @@
 """Pre-condensation snapshot — auto-extracts critical context before condensation.
 
 When condensation fires, the LLM loses all tool outputs and file contents.
-This module extracts the most important context from the about-to-be-forgotten
-events and persists it to ``.forge/pre_condensation_snapshot.json``.
+This module extracts the most important context from the about-to-be-pruned
+events and persists it to ``.app/pre_condensation_snapshot.json``.
 
 The snapshot is then injected into the post-condensation recovery sequence,
 giving the LLM a structured summary of what was lost — without requiring
@@ -23,13 +23,13 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.event import Event
 
-_WORKSPACE_ROOT = os.environ.get("FORGE_WORKSPACE_DIR", ".")
-_SNAPSHOT_FILE = ".forge/pre_condensation_snapshot.json"
+_WORKSPACE_ROOT = os.environ.get("APP_WORKSPACE_DIR", ".")
+_SNAPSHOT_FILE = ".app/pre_condensation_snapshot.json"
 
 # Limits to prevent the snapshot from becoming too large
 _MAX_ERRORS = 10
@@ -64,7 +64,7 @@ def extract_snapshot(events: list[Event]) -> dict[str, Any]:
     """Extract critical context from events that are about to be condensed.
 
     Args:
-        events: The events that will be forgotten during condensation.
+        events: The events that will be pruned during condensation.
 
     Returns:
         A structured dict containing the extracted context.

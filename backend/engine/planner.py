@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 def _maybe_log_prompt_metrics(messages: list) -> None:
-    """Log system-message character counts when FORGE_DEBUG_PROMPT_METRICS is set."""
-    flag = os.environ.get("FORGE_DEBUG_PROMPT_METRICS", "").strip().lower()
+    """Log system-message character counts when APP_DEBUG_PROMPT_METRICS is set."""
+    flag = os.environ.get("APP_DEBUG_PROMPT_METRICS", "").strip().lower()
     if flag not in ("1", "true", "yes", "on"):
         return
     sizes: list[int] = []
@@ -49,10 +49,10 @@ def _maybe_log_prompt_metrics(messages: list) -> None:
         else:
             sizes.append(len(str(c)))
     if not sizes:
-        logger.info("FORGE_DEBUG_PROMPT_METRICS: no system messages")
+        logger.info("APP_DEBUG_PROMPT_METRICS: no system messages")
         return
     logger.info(
-        "FORGE_DEBUG_PROMPT_METRICS: system_messages=%s chars_each=%s chars_total=%s",
+        "APP_DEBUG_PROMPT_METRICS: system_messages=%s chars_each=%s chars_total=%s",
         len(sizes),
         sizes,
         sum(sizes),
@@ -374,13 +374,13 @@ class OrchestratorPlanner:
         )
         parts = self._append_signal_parts(parts, memory_pressure, rep_score)
 
-        status = "<FORGE_CONTEXT_STATUS " + " | ".join(parts) + " />"
+        status = "<APP_CONTEXT_STATUS " + " | ".join(parts) + " />"
         status += self._build_context_pressure_warning(parts, memory_pressure)
         status += self._build_repetition_warning(rep_score)
         status += self._build_first_turn_orientation(state)
         status += self._build_active_plan_section(state)
         if planning_directive:
-            status += f"\n<FORGE_DIRECTIVE>\n{planning_directive}\n</FORGE_DIRECTIVE>"
+            status += f"\n<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>"
 
         return self._apply_control_message(messages, status)
 

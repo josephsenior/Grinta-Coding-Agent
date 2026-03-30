@@ -1,6 +1,6 @@
 """Helpers for adapting tool prompts to the current platform.
 
-The unit tests patch `forge.engine.tools.prompt.sys.platform`.
+The unit tests patch `app.engine.tools.prompt.sys.platform`.
 Importing `sys` here exposes the module attribute so that patching succeeds
 without raising `AttributeError`.
 """

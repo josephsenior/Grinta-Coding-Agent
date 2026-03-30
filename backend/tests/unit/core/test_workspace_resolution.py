@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from backend.core.workspace_resolution import (
     WORKSPACE_NOT_OPEN_ERROR_ID,
     WORKSPACE_NOT_OPEN_MESSAGE,
+    is_reserved_user_app_data_dir,
     is_workspace_not_open_error,
     normalize_user_workspace_path,
     resolve_existing_directory,
@@ -39,3 +42,7 @@ def test_resolve_existing_directory_after_normalization(tmp_path) -> None:
     d.mkdir()
     quoted = f'"{d}"'
     assert resolve_existing_directory(quoted) == d.resolve()
+
+
+def test_reserved_user_app_data_dir_matches_dot_app() -> None:
+    assert is_reserved_user_app_data_dir(Path.home() / ".app") is True

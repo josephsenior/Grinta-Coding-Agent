@@ -15,7 +15,7 @@ from typing import (
 )
 
 from backend.core.errors import ModelProviderError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.engine import function_calling as _function_calling_module  # noqa: F401
 from backend.engine.streaming_checkpoint import StreamingCheckpoint
 from backend.ledger.persistence import EventPersistence
@@ -101,7 +101,7 @@ class OrchestratorExecutor:
         # Write-ahead checkpoint root for crash recovery. Session-specific
         # checkpoint files are created lazily from the active event stream.
         self._checkpoint_root = os.path.join(
-            os.environ.get("FORGE_DATA_DIR", os.path.expanduser("~/.forge")),
+            os.environ.get("APP_DATA_DIR", os.path.expanduser("~/.app")),
             "streaming_checkpoints",
         )
         self._checkpoint_cache: dict[str, StreamingCheckpoint] = {}
@@ -123,7 +123,7 @@ class OrchestratorExecutor:
 
         # Write-ahead checkpoint before invoking the model.
         #
-        # NOTE: Forge's DirectLLMClient implementations intentionally expose
+        # NOTE: App's DirectLLMClient implementations intentionally expose
         # deterministic *non-streaming* completion for all providers. Native
         # streaming support varies widely across SDKs and tends to be the
         # source of flakiness. To keep UX responsive without relying on
@@ -219,7 +219,7 @@ class OrchestratorExecutor:
 
             first_chunk_timeout: float | None = 25.0
             first_chunk_timeout_raw = os.getenv(
-                "FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS", "25"
+                "APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS", "25"
             ).strip()
             try:
                 parsed_first_chunk_timeout = float(first_chunk_timeout_raw)
@@ -335,7 +335,7 @@ class OrchestratorExecutor:
                         
                         fallback_timeout = 120.0
                         try:
-                            _fb_raw = os.getenv("FORGE_LLM_FALLBACK_TIMEOUT_SECONDS", "120")
+                            _fb_raw = os.getenv("APP_LLM_FALLBACK_TIMEOUT_SECONDS", "120")
                             _fb_parsed = float(_fb_raw)
                             fallback_timeout = _fb_parsed if _fb_parsed > 0 else 120.0
                         except (TypeError, ValueError):

@@ -1,4 +1,4 @@
-"""Environment variable loading for Forge configuration.
+"""Environment variable loading for application configuration.
 
 Extracted from ``config/utils.py`` to keep the main config orchestrator lean.
 Contains the recursive env-var application logic and type casting.
@@ -14,7 +14,7 @@ from typing import Any, get_args, get_origin
 from pydantic import BaseModel, SecretStr
 
 from backend.core import logger
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 
 if __name__ != "__main__":
@@ -108,9 +108,9 @@ def _process_field_value(
                         sub_config.model, cast_value
                     )
             except Exception:
-                logger.forge_logger.debug("Failed to sync API key manager")
+                logger.app_logger.debug("Failed to sync API key manager")
     except (ValueError, TypeError):
-        logger.forge_logger.error(
+        logger.app_logger.error(
             "Error setting env var %s=<redacted>: check that the value is of the right type",
             env_var_name,
         )
@@ -136,7 +136,7 @@ def _set_attr_from_env(
 
 
 def load_from_env(
-    cfg: ForgeConfig, env_or_toml_dict: dict | MutableMapping[str, str]
+    cfg: AppConfig, env_or_toml_dict: dict | MutableMapping[str, str]
 ) -> None:
     """Set config attributes from environment variables or TOML dictionary."""
     env_dict = dict(env_or_toml_dict)
@@ -173,7 +173,7 @@ def restore_environment(original_env: dict[str, str]) -> None:
         os.environ[key] = original_env[key]
 
 
-def export_llm_api_keys(cfg: ForgeConfig) -> None:
+def export_llm_api_keys(cfg: AppConfig) -> None:
     """Export LLM API keys to environment after all overrides are applied."""
     try:
         from backend.core.config.api_key_manager import api_key_manager
@@ -183,6 +183,6 @@ def export_llm_api_keys(cfg: ForgeConfig) -> None:
                 api_key_manager.set_api_key(llm.model, llm.api_key)
                 api_key_manager.set_environment_variables(llm.model, llm.api_key)
     except Exception:
-        logger.forge_logger.debug(
+        logger.app_logger.debug(
             "Failed to export LLM API keys after configuration load"
         )

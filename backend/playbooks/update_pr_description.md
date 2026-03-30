@@ -1,7 +1,7 @@
 ---
 name: update_pr_description
 version: 1.0.0
-author: Forge
+author: App
 agent: Orchestrator
 triggers:
   - /update_pr_description

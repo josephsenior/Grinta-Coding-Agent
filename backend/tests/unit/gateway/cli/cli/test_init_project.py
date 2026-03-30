@@ -79,7 +79,7 @@ class TestInitProject(TestCase):
             content = f.read()
 
         self.assertIn('name: "test-project"', content)
-        self.assertIn('description: "A Forge agent."', content)
+        self.assertIn('description: "A App agent."', content)
         self.assertIn('version: "0.1.0"', content)
         self.assertIn('name: "Orchestrator"', content)
         self.assertIn("max_steps: 30", content)
@@ -113,9 +113,9 @@ class TestInitProject(TestCase):
             content = f.read()
 
         self.assertIn("# test-project", content)
-        self.assertIn("This is a Forge agent project.", content)
+        self.assertIn("This is a App agent project.", content)
         self.assertIn("## Getting Started", content)
-        self.assertIn("forge start", content)
+        self.assertIn("app start", content)
 
     @patch("backend.gateway.cli.cli.init_project.Path.cwd")
     @patch("backend.gateway.cli.cli.init_project.logger")
@@ -320,7 +320,7 @@ class TestInitProject(TestCase):
     def test_init_project_directory_name_fallback(self, mock_logger, mock_cwd):
         """Test that directory name is used when no name provided."""
         # Create temp directory with specific name
-        temp_dir = Path(tempfile.mkdtemp(suffix="_forge_test"))
+        temp_dir = Path(tempfile.mkdtemp(suffix="_app_test"))
         mock_cwd.return_value = temp_dir
 
         try:

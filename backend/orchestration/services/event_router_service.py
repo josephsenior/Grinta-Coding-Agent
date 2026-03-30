@@ -146,12 +146,14 @@ class EventRouterService:
 
         Scores are stored in ``state.extra_data["critic_scores"]`` and logged.
         Critics are informational — a failure here must never prevent task completion.
-        Disabled when the environment variable ``FORGE_ENABLE_CRITICS`` is set to
+        Disabled when the environment variable ``ENABLE_REVIEW_CRITICS`` is set to
         any value other than ``"true"`` (case-insensitive).
         """
         # User defaults: Critics are ON by default as an opinionated choice
-        if os.environ.get("FORGE_ENABLE_CRITICS", "true").lower() != "true":
-            self._ctrl.log("debug", "Review critics skipped (FORGE_ENABLE_CRITICS=false)")
+        if os.environ.get("ENABLE_REVIEW_CRITICS", "true").lower() != "true":
+            self._ctrl.log(
+                "debug", "Review critics skipped (ENABLE_REVIEW_CRITICS=false)"
+            )
             return
 
         from backend.governance import AgentFinishedCritic, BudgetCritic, SuitePassCritic

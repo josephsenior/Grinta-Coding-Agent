@@ -1,33 +1,33 @@
 # ============================================================================
-# Forge — Docker Compose
+# App — Docker Compose
 # ============================================================================
 # Quick start:   docker compose up
 # With rebuild:  docker compose up --build
 # Background:    docker compose up -d
-# Emergency file-storage mode: FORGE_KB_STORAGE_TYPE=file docker compose up
+# Emergency file-storage mode: APP_KB_STORAGE_TYPE=file docker compose up
 # ============================================================================
 
 services:
-  forge:
+  app:
     build: .
     ports:
-      - "${FORGE_PORT:-3000}:3000"
+      - "${APP_PORT:-3000}:3000"
     volumes:
       - ./workspace:/app/workspace          # Persist agent workspace
       - ./settings.json:/app/settings.json  # Mount your host config
-      - forge_data:/home/forge/.Forge       # Persist KB and Memory
+      - app_data:/home/app/.app       # Persist KB and Memory
       - tmux_socket:/app/.tmux              # Persist tmux sockets for session continuity
     environment:
-      - FORGE_HOST=0.0.0.0
-      - FORGE_PORT=3000
-      - KB_STORAGE_TYPE=${FORGE_KB_STORAGE_TYPE:-database}
-      - DATABASE_URL=postgresql://forge:${POSTGRES_PASSWORD:-forge_dev}@postgres:5432/forge
+      - APP_HOST=0.0.0.0
+      - APP_PORT=3000
+      - APP_KB_STORAGE_TYPE=${APP_KB_STORAGE_TYPE:-database}
+      - DATABASE_URL=postgresql://app:${POSTGRES_PASSWORD:-app_dev}@postgres:5432/app
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_URL=redis://redis:6379/0
       - TMUX_TMPDIR=/app/.tmux
-      - FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS=60
-      - FORGE_LLM_FALLBACK_TIMEOUT_SECONDS=180
+      - APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS=60
+      - APP_LLM_FALLBACK_TIMEOUT_SECONDS=180
     depends_on:
       redis:
         condition: service_healthy
@@ -49,14 +49,14 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      POSTGRES_DB: forge
-      POSTGRES_USER: forge
+      POSTGRES_DB: app
+      POSTGRES_USER: app
       # WARNING: Change this password in production!
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forge_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app_dev}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U forge"]
+      test: ["CMD-SHELL", "pg_isready -U app"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -80,5 +80,5 @@ services:
 
 volumes:
   pgdata:
-  forge_data:
+  app_data:
   tmux_socket:

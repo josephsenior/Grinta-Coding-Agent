@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADRs)
 
-This document records the key architectural decisions made in the Forge project,
+This document records the key architectural decisions made in the App project,
 their context, and rationale.
 
 ---
@@ -123,7 +123,7 @@ stuck patterns like semantic loops or oscillating action-observation pairs.
 
 ---
 
-## ADR-007: Multiple Condenser Strategies
+## ADR-007: Multiple Compactor Strategies
 
 **Status:** Accepted  
 **Date:** 2025-02  
@@ -132,17 +132,18 @@ session types need different compression strategies — code-heavy sessions
 benefit from observation masking, while research sessions need semantic
 filtering.
 
-**Decision:** Implement 12 condenser strategies behind a common interface,
+**Decision:** Implement 12 compactor strategies behind a common interface,
 with a `smart` default that adapts automatically. Users can select and
-configure condensers per agent.
+configure compactors per agent. The current code/config surface may still use
+`condenser` during the migration window.
 
-**Condensers:** smart, llm, observation_masking, recent, amortized,
+**Compactors:** smart, llm, observation_masking, recent, amortized,
 llm_attention, semantic, structured_summary, browser_output,
 conversation_window, no_op, pipeline.
 
 **Consequences:**
 - ✅ Optimal strategy for each use case
-- ✅ Pipeline condenser allows chaining
+- ✅ Pipeline compactor allows chaining
 - ✅ Smart default requires no configuration
 - ⚠️ 12 implementations to maintain
 
@@ -259,7 +260,7 @@ and API request/response models.
 **Status:** Accepted  
 **Date:** 2025-06  
 **Context:** The agent ecosystem is moving toward the Model Context Protocol
-(MCP) as a standard for tool integration. Supporting MCP allows Forge to
+(MCP) as a standard for tool integration. Supporting MCP allows App to
 leverage a growing ecosystem of tool servers.
 
 **Decision:** Implement MCP client support with cached wrapper tools.
@@ -296,8 +297,8 @@ well with Socket.IO and provides automatic API documentation.
 ## ADR-015: Textual TUI over Web Frontend
 
 **Status:** Superseded — the Textual TUI was removed; the **React web UI** is the
-primary interface. The Python package **`forge_client`** retains
-`ForgeClient` for tests and automation.
+primary interface. The Python package **`client`** retains
+`AppClient` for tests and automation.
 
 **Date:** 2025-01 (superseded 2026-03)  
 **Context:** Developers using a coding agent likely prefer a terminal-native
@@ -316,18 +317,18 @@ as an alternative but the TUI is the recommended interface.
 
 ---
 
-## ADR-016: Forge Vocabulary Contract
+## ADR-016: App Vocabulary Contract
 
 **Status:** Accepted  
 **Date:** 2026-03  
-**Context:** Forge has evolved far beyond its original shell, but parts of its
+**Context:** App has evolved far beyond its original shell, but parts of its
 top-level language still undersell what the system actually is. The strongest
-Forge characteristics are durable run history, governed execution, adaptive
+App characteristics are durable run history, governed execution, adaptive
 context management, and local-first runtime control. Without a canonical
 vocabulary, future renames will drift, public docs will stay inconsistent, and
 the codebase will keep reading more inherited than it really is.
 
-**Decision:** Standardize on a Forge-first vocabulary contract and use it as
+**Decision:** Standardize on a App-first vocabulary contract and use it as
 the reference language for future documentation, public protocols, package
 decisions, and code symbol migration. This vocabulary lock should be set before
 any large implementation-planning pass or rename wave.
@@ -376,9 +377,9 @@ semantics cleanly without implying that only world-state mutations matter.
 
 **Consequences:**
 
-- ✅ Forge now has one explicit language contract for future renames
+- ✅ App now has one explicit language contract for future renames
 - ✅ Implementation planning can evaluate changes against one stable vocabulary lock
-- ✅ Documentation can describe Forge in terms that match its actual strengths
+- ✅ Documentation can describe App in terms that match its actual strengths
 - ✅ Package and protocol changes can be evaluated against one stable reference
 - ⚠️ During transition, docs may reference both canonical names and current code names
 - ⚠️ A later implementation sweep must migrate symbols, packages, and persisted schemas carefully

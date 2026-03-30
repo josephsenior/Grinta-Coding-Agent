@@ -1,9 +1,9 @@
-"""Action event definitions emitted by Forge agents."""
+"""Action event definitions emitted by App agents."""
 
 from __future__ import annotations
 
 from backend.core.enums import ActionConfirmationStatus, ActionSecurityRisk
-from backend.ledger.action.action import Action
+from backend.ledger.action.action import Action, Operation
 from backend.ledger.action.agent import (
     AgentRejectAction,
     AgentThinkAction,
@@ -42,6 +42,7 @@ from backend.ledger.action.message import (
 
 __all__ = [
     "Action",
+    "Operation",
     "ActionConfirmationStatus",
     "ActionSecurityRisk",
     "PlaybookFinishAction",

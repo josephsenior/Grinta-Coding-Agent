@@ -18,7 +18,7 @@ from backend.gateway.utils.cache import CacheKey
 class TestCacheKey:
     def test_default_prefix(self):
         key = CacheKey.build("user", "123")
-        assert key == "forge:user:123"
+        assert key == "app:user:123"
 
     def test_custom_prefix(self):
         key = CacheKey.build("a", "b", prefix="app")
@@ -26,7 +26,7 @@ class TestCacheKey:
 
     def test_single_part(self):
         key = CacheKey.build("only")
-        assert key == "forge:only"
+        assert key == "app:only"
 
 
 # ---------------------------------------------------------------------------

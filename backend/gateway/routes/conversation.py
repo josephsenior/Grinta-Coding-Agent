@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.config.llm_config import LLMConfig
 from backend.core.errors import SessionInvariantError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.pydantic_compat import model_to_dict
 from backend.ledger.action.files import FileWriteAction
 from backend.ledger.event_filter import EventFilter
@@ -361,7 +361,7 @@ class UpdatePlaybookRequest(BaseModel):
     content: str
     name: str | None = Field(
         default=None,
-        description="If set, renames the playbook (only under .Forge/playbooks).",
+        description="If set, renames the playbook (only under the repository playbooks directory).",
     )
 
 
@@ -388,20 +388,20 @@ def _validate_playbook_name_key(raw: str) -> str:
     return "/".join(parts)
 
 
-def _forge_playbooks_root(workspace_root: str) -> str:
-    return os.path.normpath(os.path.join(workspace_root, ".Forge", "playbooks"))
+def _repo_playbooks_root(workspace_root: str) -> str:
+    return os.path.normpath(os.path.join(workspace_root, ".app", "playbooks"))
 
 
-def _is_under_forge_playbooks(workspace_root: str, file_path: str) -> bool:
-    root_pb = _forge_playbooks_root(workspace_root)
+def _is_under_repo_playbooks(workspace_root: str, file_path: str) -> bool:
+    root_pb = _repo_playbooks_root(workspace_root)
     fp_n = os.path.normpath(file_path)
     return fp_n == root_pb or fp_n.startswith(root_pb + os.sep)
 
 
 def _playbook_load_parent_dir(workspace_root: str, file_path: str) -> Path:
     """Directory to pass as playbook_dir when reloading a file from disk."""
-    if _is_under_forge_playbooks(workspace_root, file_path):
-        return Path(_forge_playbooks_root(workspace_root))
+    if _is_under_repo_playbooks(workspace_root, file_path):
+        return Path(_repo_playbooks_root(workspace_root))
     return Path(os.path.dirname(os.path.normpath(file_path)))
 
 
@@ -505,14 +505,14 @@ async def update_playbook(
 
         raw_new = (body.name or "").strip()
         new_key = _validate_playbook_name_key(raw_new) if raw_new else name
-        if new_key != name and not _is_under_forge_playbooks(root, old_fp):
+        if new_key != name and not _is_under_repo_playbooks(root, old_fp):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Renaming is only supported for playbooks under .Forge/playbooks",
+                detail="Renaming is only supported for playbooks under the repository playbooks directory",
             )
 
         if new_key != name:
-            pb_root = _forge_playbooks_root(root)
+            pb_root = _repo_playbooks_root(root)
             parts = tuple(PurePosixPath(new_key).parts)
             filename = f"{parts[-1]}.md"
             new_fp = os.path.normpath(os.path.join(pb_root, *parts[:-1], filename))

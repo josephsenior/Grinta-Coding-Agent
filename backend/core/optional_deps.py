@@ -28,5 +28,5 @@ def require_optional(module: str, *, extra: str) -> object:
     except ModuleNotFoundError as exc:
         raise OptionalDependencyError(
             f"Optional dependency '{module}' is required for this feature. "
-            f"Install with: pip install 'forge-ai[{extra}]'"
+            f"Install with: pip install 'app-ai[{extra}]'"
         ) from exc

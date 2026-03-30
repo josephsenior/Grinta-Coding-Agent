@@ -1,6 +1,6 @@
-# Forge Developer Guide
+# App Developer Guide
 
-Internal reference for contributors working on Forge internals.
+Internal reference for contributors working on App internals.
 
 For **user-facing** documentation, see [USER_GUIDE.md](USER_GUIDE.md).
 For **architecture overview**, see [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -22,7 +22,7 @@ For **contribution workflow**, see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Project Layout
 
 ```text
-forge_client/          # Python HTTP + Socket.IO client (ForgeClient) for tests/scripts
+client/                # Python HTTP + Socket.IO client (AppClient) for tests/scripts
 backend/
 ├── gateway/           # FastAPI app, routes, middleware, sessions, adapters
 │   ├── adapters/      # I/O and serialization adapters
@@ -47,7 +47,7 @@ backend/
 │   ├── conversation_memory.py  # Event→LLM message conversion
 │   ├── message_formatting.py   # Type-check utils & message formatting
 │   ├── context_tracking.py     # Decision/anchor/vector memory tracking
-│   └── condenser/strategies/   # 13 compactor strategies incl. auto-selector
+│   └── compactor/strategies/   # 13 compactor strategies incl. auto-selector
 ├── execution/         # Local command execution and runtime policy enforcement
 ├── inference/         # LLM abstraction (direct SDK clients)
 ├── knowledge/         # Knowledge base logic (RAG)
@@ -61,8 +61,8 @@ backend/
 ## Request Lifecycle
 
 ```text
-User Input (Web UI / forge_client)
-  → ForgeClient.send_message()
+User Input (Web UI / client)
+  → AppClient.send_message()
     → Socket.IO / HTTP POST /api/conversations/{id}/messages
       → SessionManager.get_or_create_session()
         → SessionOrchestrator.run_loop()
@@ -88,7 +88,7 @@ The `SessionOrchestrator` delegates to 21 specialized services via `Orchestratio
 | `BudgetService` | Token/cost budget enforcement |
 | `CircuitBreakerService` | Safety pause on anomalies |
 | `CommandService` | Command execution in runtime |
-| `CondenserService` | Memory condensation triggers |
+| `CondenserService` | Context compaction triggers |
 | `DelegationService` | Multi-agent task splitting |
 | `ErrorRecoveryService` | Classify + recover from errors |
 | `GracefulShutdownService` | Final turn on limit/budget hit |
@@ -97,7 +97,7 @@ The `SessionOrchestrator` delegates to 21 specialized services via `Orchestratio
 | `IterationService` | Main loop iteration logic |
 | `ObservationService` | Process execution results |
 | `ProgressService` | Track task progress |
-| `ReplayService` | Trajectory replay |
+| `ReplayService` | Transcript replay |
 | `RollbackService` | Undo failed actions |
 | `SafetyService` | Pre-execution safety checks |
 | `SecurityService` | Command risk analysis |
@@ -128,9 +128,9 @@ class MyService:
         pass
 ```
 
-## Tool Invocation Pipeline
+## Operation Pipeline
 
-The `SessionOrchestrator` executes tools through a middleware pipeline (`backend/orchestration/tool_pipeline.py`). This allows intercepting tool calls for validation, safety, and telemetry.
+The `SessionOrchestrator` executes tools through an operation pipeline (`backend/orchestration/tool_pipeline.py`, `ToolInvocationPipeline` in the current codebase). This allows intercepting tool calls for validation, safety, and telemetry.
 
 ### Middleware Chain
 
@@ -183,7 +183,7 @@ Event
 
 ### Direct Client Architecture
 
-Forge uses **direct SDK clients** (not litellm) for stability:
+App uses **direct SDK clients** (not litellm) for stability:
 
 ```text
 LLM (backend/inference/llm.py)
@@ -233,7 +233,7 @@ Full History → Compactor → Compressed History → LLM
 | `llm` | LLM summarization | $ | Good summaries |
 | `smart` | Auto-select best | Varies | Adaptive |
 | `auto` | Task-signal-based selection | Varies | Context-aware |
-| `amortized` | Gradual forgetting | Free | Balanced |
+| `amortized` | Gradual pruning | Free | Balanced |
 | `llm_attention` | LLM-scored relevance | $$ | Best quality |
 | `semantic` | Embedding similarity | $ | Context-aware |
 | `hybrid` | Multi-strategy | $$ | Most robust |
@@ -243,10 +243,10 @@ Full History → Compactor → Compressed History → LLM
 
 ### Adding a New Compactor
 
-1. Create class in `backend/context/condenser/`
-2. Extend the `Condenser` base class
-3. Register in the condenser factory
-4. Add config schema in `backend/core/config/condenser_config.py`
+1. Create class in `backend/context/compactor/`
+2. Extend the `Compactor` base class
+3. Register in the compactor factory
+4. Add config schema in `backend/core/config/compactor_config.py`
 5. Add tests
 
 ## Safety Systems
@@ -304,7 +304,7 @@ Layer 3: Detection (StuckDetector)
 
 ## Testing Guide
 
-Forge maintains a high standard of code quality with a focus on comprehensive unit test coverage for core modules. Recent efforts have achieved **95%+ coverage** across the `backend/core` infrastructure:
+App maintains a high standard of code quality with a focus on comprehensive unit test coverage for core modules. Recent efforts have achieved **95%+ coverage** across the `backend/core` infrastructure:
 
 - `backend/core/loop.py`: **100%**
 - `backend/core/logger.py`: **~95%**
@@ -332,7 +332,7 @@ backend/tests/
 │   ├── security/      # Security & command analysis tests
 │   ├── telemetry/     # Telemetry tests
 │   ├── tools/         # Tool tests
-│   ├── forge_client/  # Tests for forge_client.ForgeClient
+│   ├── client/        # Tests for client.AppClient
 │   ├── utils/         # Utility tests
 │   └── validation/    # Validation and code-quality tests
 ├── integration/       # Multi-component integration tests
@@ -402,9 +402,9 @@ class TestMyFeature:
 
 ### 1. Model Context Protocol (MCP)
 
-Forge's internal MCP logic lives under `backend/gateway/integrations/mcp/`. Always import
-from Forge's integration package (not the bare `mcp` SDK package) when using
-Forge-specific client or tool-registry utilities.
+App's internal MCP logic lives under `backend/gateway/integrations/mcp/`. Always import
+from App's integration package (not the bare `mcp` SDK package) when using
+App-specific client or tool-registry utilities.
 
 ### 2. Event Loop Management
 
@@ -418,7 +418,7 @@ breaker behavior, always call `breaker.reset()` in teardown.
 ### 4. Compactor Side Effects
 
 LLM-based compactors make real API calls unless mocked. Always mock the LLM
-client in unit tests for compactors that use the current `llm_config` condenser wiring.
+client in unit tests for compactors that use the current `llm_config` compactor wiring.
 
 ### 5. Config Loading
 
@@ -434,7 +434,7 @@ use `tmp_path` fixture to avoid polluting the repo.
 
 ## Async Scheduling Rules
 
-Forge mixes synchronous callbacks, async coroutines, and background-thread
+App mixes synchronous callbacks, async coroutines, and background-thread
 dispatch.  Getting the threading/loop boundary wrong is the single most
 common source of "agent stuck" bugs.  **Every contributor must follow the
 rules below.**
@@ -450,13 +450,13 @@ a coroutine and tries to schedule it, there are only two safe options:
    be sent to a loop that **is** running somewhere else.
 
 Creating a throw-away loop with `asyncio.new_event_loop()` +
-`run_until_complete()` is **never safe** for fire-and-forget coroutines.  The
+`run_until_complete()` is **never safe** for background coroutines.  The
 disposable loop is destroyed the moment `run_until_complete` returns; any
 `await` that yields control inside the coroutine will never resume.
 
 ### The Solution: `run_or_schedule` and the Main Loop Registry
 
-All fire-and-forget coroutine scheduling goes through one function:
+All background coroutine scheduling goes through one function:
 
 ```python
 from backend.utils.async_utils import run_or_schedule
@@ -483,7 +483,7 @@ set_main_event_loop()  # captures asyncio.get_running_loop()
 
 ### Rules
 
-1. **Never call `asyncio.new_event_loop()` to run a fire-and-forget coroutine.**
+1. **Never call `asyncio.new_event_loop()` to run a background coroutine.**
    Use `run_or_schedule()` instead.
 
 2. **Never call `asyncio.create_task()` from a background thread.**
@@ -535,14 +535,14 @@ EventStream._dispatch_event()  # current implementation name
 
 ## Windows Platform Notes
 
-Forge runs on Windows with `ProactorEventLoop` (Python 3.12 default).
+App runs on Windows with `ProactorEventLoop` (Python 3.12 default).
 Several areas need special attention:
 
 ### MCP stdio Servers
 
 Stdio-based MCP servers are **disabled by default** on Windows due to
 `ProactorEventLoop` limitations with subprocess pipes.  Set the environment
-variable `FORGE_ENABLE_WINDOWS_MCP=1` to override.  When servers are
+variable `APP_ENABLE_WINDOWS_MCP=1` to override.  When servers are
 skipped, a warning is logged with their names.
 
 ### PowerShell Path Escaping

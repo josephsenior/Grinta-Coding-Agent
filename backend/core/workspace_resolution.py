@@ -1,8 +1,8 @@
 ﻿"""User-selected project folder (workspace) only.
 
 The workspace path is whatever folder the user sets via **Open workspace** (and optional
-persisted ``~/.forge/app/active_workspace.json``). There is no fallback to ``cwd()`` or
-``~/.Forge`` as a project root.
+persisted ``~/.app/active_workspace.json``). There is no fallback to ``cwd()`` or
+``~/.app`` as a project root.
 
 Machine-local session files use :func:`backend.core.app_paths.get_app_settings_root` when
 no workspace is open (see ``AppState``).
@@ -24,7 +24,7 @@ WORKSPACE_NOT_OPEN_MESSAGE = (
 )
 WORKSPACE_NOT_OPEN_ERROR_ID = "WORKSPACE$NOT_OPEN"
 
-_PERSIST_REL = Path(".forge") / "app" / "active_workspace.json"
+_PERSIST_REL = Path(".app") / "active_workspace.json"
 
 
 def is_workspace_not_open_error(exc: BaseException) -> bool:
@@ -36,12 +36,12 @@ def _persist_file() -> Path:
     return Path.home() / _PERSIST_REL
 
 
-def is_reserved_user_forge_data_dir(path: Path) -> bool:
-    """True if *path* is ``~/.Forge`` or ``~/.forge`` (app data dirs, not a code workspace)."""
+def is_reserved_user_app_data_dir(path: Path) -> bool:
+    """True if *path* is ``~/.app`` (app data dir, not a code workspace)."""
     try:
         resolved = path.resolve()
         home = Path.home().resolve()
-        for name in (".Forge", ".forge"):
+        for name in (".app",):
             if resolved == (home / name).resolve():
                 return True
     except (OSError, ValueError):
@@ -60,7 +60,7 @@ def load_persisted_workspace_path() -> str | None:
         if not isinstance(path, str) or not path.strip():
             return None
         try:
-            if is_reserved_user_forge_data_dir(Path(path).expanduser().resolve()):
+            if is_reserved_user_app_data_dir(Path(path).expanduser().resolve()):
                 return None
         except OSError:
             return None
@@ -73,8 +73,8 @@ def load_persisted_workspace_path() -> str | None:
 def save_persisted_workspace_path(path: str) -> None:
     """Write workspace path for next backend start."""
     resolved = str(Path(path).resolve())
-    if is_reserved_user_forge_data_dir(Path(resolved)):
-        msg = f"Refusing to persist reserved Forge user data path as workspace: {resolved}"
+    if is_reserved_user_app_data_dir(Path(resolved)):
+        msg = f"Refusing to persist reserved app user data path as workspace: {resolved}"
         raise ValueError(msg)
     p = _persist_file()
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -107,9 +107,9 @@ def resolve_existing_directory(path_str: str) -> Path:
 
 def apply_workspace_to_config(config, root: Path) -> str:
     """Set project workspace on config; same path is used for conversation file store."""
-    if is_reserved_user_forge_data_dir(root):
+    if is_reserved_user_app_data_dir(root):
         msg = (
-            "That folder is reserved for Forge app data. Choose a project directory instead."
+            "That folder is reserved for app data. Choose a project directory instead."
         )
         raise ValueError(msg)
     s = str(root)
@@ -129,9 +129,9 @@ def get_effective_workspace_root() -> Path | None:
     except Exception:
         pass
 
-    from backend.core.config.config_loader import load_forge_config
+    from backend.core.config.config_loader import load_app_config
 
-    wb = (load_forge_config(set_logging_levels=False).project_root or "").strip()
+    wb = (load_app_config(set_logging_levels=False).project_root or "").strip()
     if wb:
         return Path(wb).expanduser().resolve()
     return None

@@ -1,4 +1,4 @@
-"""Tests for backend.core.plugin module — PluginRegistry, ForgePlugin, hooks dispatch."""
+"""Tests for backend.core.plugin module — PluginRegistry, AppPlugin, hooks dispatch."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 from backend.core.plugin import (
-    ForgePlugin,
+    AppPlugin,
     HookType,
     PluginRegistry,
 )
 
 
-class _SimplePlugin(ForgePlugin):
+class _SimplePlugin(AppPlugin):
     """Concrete plugin for testing."""
 
     name = "test-plugin"
@@ -30,7 +30,7 @@ class _SimplePlugin(ForgePlugin):
         pass
 
 
-class _ActionPlugin(ForgePlugin):
+class _ActionPlugin(AppPlugin):
     """Plugin that modifies actions."""
 
     name = "action-plugin"
@@ -62,14 +62,14 @@ class TestHookType(unittest.TestCase):
         self.assertEqual(HookType.TOOL_INVOKE, "tool_invoke")
 
 
-class TestForgePluginBase(unittest.TestCase):
+class TestAppPluginBase(unittest.TestCase):
     def test_repr(self):
         p = _SimplePlugin()
         self.assertIn("test-plugin", repr(p))
         self.assertIn("1.0.0", repr(p))
 
     def test_validate_default_name(self):
-        class Unnamed(ForgePlugin):
+        class Unnamed(AppPlugin):
             async def on_event(self, event):
                 pass
 
@@ -84,7 +84,7 @@ class TestForgePluginBase(unittest.TestCase):
         self.assertTrue(any("unnamed-plugin" in w for w in warnings))
 
     def test_validate_default_version(self):
-        class NoVer(ForgePlugin):
+        class NoVer(AppPlugin):
             name = "good-name"
 
             async def on_event(self, event):
@@ -100,7 +100,7 @@ class TestForgePluginBase(unittest.TestCase):
         self.assertTrue(any("0.0.0" in w for w in warnings))
 
     def test_validate_no_description(self):
-        class NoDesc(ForgePlugin):
+        class NoDesc(AppPlugin):
             name = "good"
             version = "1.0"
 
@@ -148,7 +148,7 @@ class TestPluginRegistry(unittest.TestCase):
         reg.unregister("nonexistent")  # Should not raise
 
     def test_incompatible_version_rejected(self):
-        class FuturePlugin(ForgePlugin):
+        class FuturePlugin(AppPlugin):
             name = "future"
             version = "1.0"
             min_api_version = (99, 99)
@@ -170,7 +170,7 @@ class TestPluginRegistry(unittest.TestCase):
         reg = PluginRegistry()
         reg.register(_SimplePlugin())
 
-        class Bad(ForgePlugin):
+        class Bad(AppPlugin):
             name = "bad"
             version = "1.0"
             description = "test"

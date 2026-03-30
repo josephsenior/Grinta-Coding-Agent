@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.gateway.user_auth import get_user_id
 from backend.gateway.utils import get_conversation_store
 from backend.gateway.utils.responses import error, success

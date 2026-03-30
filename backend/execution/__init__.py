@@ -1,4 +1,4 @@
-﻿"""Runtime and supporting infrastructure for Forge agents.
+﻿"""Runtime and supporting infrastructure for App agents.
 
 This module provides the Runtime interface and its implementations.
 In this version, only LocalRuntimeInProcess is supported.
@@ -40,6 +40,7 @@ def _lazy_import(module_path: str, attr: str) -> Any:
 __all__ = [
     "PooledRuntime",
     "LocalRuntimeInProcess",
+    "RuntimeExecutor",
     "RuntimePool",
     "Runtime",
     "RuntimeOrchestrator",
@@ -59,6 +60,11 @@ def __getattr__(name: str) -> Any:  # Lazy access to runtime classes
         return _lazy_import(
             "backend.execution.drivers.local.local_runtime_inprocess",
             "LocalRuntimeInProcess",
+        )
+    if name == "RuntimeExecutor":
+        return _lazy_import(
+            "backend.execution.action_execution_server",
+            "RuntimeExecutor",
         )
     raise AttributeError(name)
 

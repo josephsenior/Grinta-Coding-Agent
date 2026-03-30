@@ -1,6 +1,6 @@
 """Event store integrity helpers.
 
-Forge stores each event as an individual JSON file. A crash or partial write can
+App stores each event as an individual JSON file. A crash or partial write can
 leave a file unreadable. These helpers provide best-effort iteration that stops
 cleanly at the last valid event.
 """
@@ -11,7 +11,7 @@ import json
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:  # pragma: no cover
     from backend.ledger.event import Event

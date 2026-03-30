@@ -43,10 +43,10 @@ class TestRepositoryInfo:
         from backend.utils.prompt import RepositoryInfo
 
         ri = RepositoryInfo(
-            repo_name="forge", repo_directory="/repos/forge", branch_name="main"
+            repo_name="app", repo_directory="/repos/app", branch_name="main"
         )
-        assert ri.repo_name == "forge"
-        assert ri.repo_directory == "/repos/forge"
+        assert ri.repo_name == "app"
+        assert ri.repo_directory == "/repos/app"
         assert ri.branch_name == "main"
 
 
@@ -192,7 +192,7 @@ class TestOrchestratorPromptManager:
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
         result = opm.get_system_message()
-        assert result.startswith("You are Forge agent.")
+        assert result.startswith("You are App agent.")
 
     @patch(
         "backend.engine.tools.prompt.refine_prompt",
@@ -209,12 +209,12 @@ class TestOrchestratorPromptManager:
             "knowledge_base_info.j2",
         ]:
             (tmp_path / name).write_text(
-                "You are Forge agent.\nMore content", encoding="utf-8"
+                "You are App agent.\nMore content", encoding="utf-8"
             )
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
         result = opm.get_system_message()
-        assert result.count("You are Forge agent.") == 1
+        assert result.count("You are App agent.") == 1
 
     @patch(
         "backend.engine.tools.prompt.refine_prompt",
@@ -306,7 +306,7 @@ class TestOrchestratorPromptManager:
             assert "REPOSITORY_LESSONS_LEARNED" not in result
 
             # Test existing lessons file
-            lessons_dir = tmp_path / ".Forge"
+            lessons_dir = tmp_path / ".app"
             lessons_dir.mkdir(exist_ok=True)
             lessons_file = lessons_dir / "lessons.md"
             lessons_file.write_text("Always test your code.", encoding="utf-8")

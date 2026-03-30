@@ -12,7 +12,7 @@ from backend.engine.tools import note as m
 
 @pytest.fixture
 def scratchpad_root(tmp_path, monkeypatch):
-    """Isolate scratchpad under tmp_path/.forge/agent_notes.json."""
+    """Isolate scratchpad under tmp_path/.app/agent_notes.json."""
     monkeypatch.setattr(
         "backend.core.workspace_resolution.get_effective_workspace_root",
         lambda: tmp_path,
@@ -21,7 +21,7 @@ def scratchpad_root(tmp_path, monkeypatch):
 
 
 def test_legacy_flat_file_no_meta_sorts_alphabetically(scratchpad_root):
-    d = scratchpad_root / ".forge"
+    d = scratchpad_root / ".app"
     d.mkdir(parents=True)
     (d / "agent_notes.json").write_text(
         json.dumps({"zebra": "z", "alpha": "a"}),
@@ -32,7 +32,7 @@ def test_legacy_flat_file_no_meta_sorts_alphabetically(scratchpad_root):
 
 
 def test_timestamps_newest_first(scratchpad_root):
-    d = scratchpad_root / ".forge"
+    d = scratchpad_root / ".app"
     d.mkdir(parents=True)
     blob = {
         "first": "1",
@@ -45,7 +45,7 @@ def test_timestamps_newest_first(scratchpad_root):
 
 
 def test_casefold_dedupe_keeps_newer_timestamp(scratchpad_root):
-    d = scratchpad_root / ".forge"
+    d = scratchpad_root / ".app"
     d.mkdir(parents=True)
     blob = {
         "Auth": "old",

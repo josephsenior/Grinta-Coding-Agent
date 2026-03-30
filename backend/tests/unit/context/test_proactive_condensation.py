@@ -11,8 +11,8 @@ from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.action.message import MessageAction, SystemMessageAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import Observation
-from backend.context.condenser.strategies.conversation_window_condenser import (
-    ConversationWindowCondenser,
+from backend.context.compactor.strategies.conversation_window_compactor import (
+    ConversationWindowCompactor,
 )
 from backend.context.view import View
 
@@ -39,40 +39,40 @@ def _make_view(events, unhandled=False):
 # Proactive condensation threshold
 # ---------------------------------------------------------------------------
 class TestProactiveCondensation(unittest.TestCase):
-    """Verify should_condense triggers proactively based on event count."""
+    """Verify should_compact triggers proactively based on event count."""
 
     def test_below_threshold_no_condense(self):
-        condenser = ConversationWindowCondenser(max_events=100)
+        condenser = ConversationWindowCompactor(max_events=100)
         events = [_make_event(i) for i in range(50)]
         view = _make_view(events, unhandled=False)
-        self.assertFalse(condenser.should_condense(view))
+        self.assertFalse(condenser.should_compact(view))
 
     def test_at_threshold_no_condense(self):
-        condenser = ConversationWindowCondenser(max_events=100)
+        condenser = ConversationWindowCompactor(max_events=100)
         events = [_make_event(i) for i in range(100)]
         view = _make_view(events, unhandled=False)
-        self.assertFalse(condenser.should_condense(view))
+        self.assertFalse(condenser.should_compact(view))
 
     def test_above_threshold_condenses(self):
-        condenser = ConversationWindowCondenser(max_events=100)
+        condenser = ConversationWindowCompactor(max_events=100)
         events = [_make_event(i) for i in range(101)]
         view = _make_view(events, unhandled=False)
-        self.assertTrue(condenser.should_condense(view))
+        self.assertTrue(condenser.should_compact(view))
 
     def test_unhandled_request_always_condenses(self):
-        condenser = ConversationWindowCondenser(max_events=100)
+        condenser = ConversationWindowCompactor(max_events=100)
         events = [_make_event(i) for i in range(10)]
         view = _make_view(events, unhandled=True)
-        self.assertTrue(condenser.should_condense(view))
+        self.assertTrue(condenser.should_compact(view))
 
     def test_custom_threshold(self):
-        condenser = ConversationWindowCondenser(max_events=50)
+        condenser = ConversationWindowCompactor(max_events=50)
         events = [_make_event(i) for i in range(51)]
         view = _make_view(events, unhandled=False)
-        self.assertTrue(condenser.should_condense(view))
+        self.assertTrue(condenser.should_compact(view))
 
     def test_default_max_events_is_100(self):
-        condenser = ConversationWindowCondenser()
+        condenser = ConversationWindowCompactor()
         self.assertEqual(condenser._max_events, 100)
 
 
@@ -119,32 +119,32 @@ class TestFileEventsPreserved(unittest.TestCase):
 
         return events
 
-    def test_file_events_not_forgotten(self):
+    def test_file_events_not_pruned(self):
         """File action events are kept, so no manifest needed."""
         file_actions = {3: "src/app/page.tsx", 5: "src/app/layout.tsx"}
         events = self._build_real_events(20, file_actions)
 
-        condenser = ConversationWindowCondenser(max_events=10)
+        condenser = ConversationWindowCompactor(max_events=10)
         view = _make_view(events, unhandled=True)
-        condensation = condenser.get_condensation(view)
+        condensation = condenser.get_compaction(view)
         action = condensation.action
 
-        forgotten = set(action.forgotten_event_ids or [])
-        if action.forgotten_events_start_id is not None and action.forgotten_events_end_id is not None:
-            forgotten = set(range(
-                action.forgotten_events_start_id,
-                action.forgotten_events_end_id + 1,
+        pruned = set(action.pruned_event_ids or [])
+        if action.pruned_events_start_id is not None and action.pruned_events_end_id is not None:
+            pruned = set(range(
+                action.pruned_events_start_id,
+                action.pruned_events_end_id + 1,
             ))
-        self.assertNotIn(3, forgotten)
-        self.assertNotIn(5, forgotten)
+        self.assertNotIn(3, pruned)
+        self.assertNotIn(5, pruned)
 
     def test_no_summary_generated(self):
         """Summary/manifest is no longer generated (events preserved directly)."""
         file_actions = {3: "b.tsx", 4: "a.tsx"}
         events = self._build_real_events(20, file_actions)
-        condenser = ConversationWindowCondenser(max_events=10)
+        condenser = ConversationWindowCompactor(max_events=10)
         view = _make_view(events, unhandled=True)
-        condensation = condenser.get_condensation(view)
+        condensation = condenser.get_compaction(view)
         action = condensation.action
         self.assertIsNone(action.summary)
         self.assertIsNone(action.summary_offset)
@@ -157,25 +157,25 @@ class TestCreateCondensationAction(unittest.TestCase):
     """Verify _create_condensation_action builds correct actions."""
 
     def test_contiguous_range(self):
-        condenser = ConversationWindowCondenser()
+        condenser = ConversationWindowCompactor()
         action = condenser._create_condensation_action([2, 3, 4, 5])
-        self.assertEqual(action.forgotten_events_start_id, 2)
-        self.assertEqual(action.forgotten_events_end_id, 5)
+        self.assertEqual(action.pruned_events_start_id, 2)
+        self.assertEqual(action.pruned_events_end_id, 5)
 
     def test_non_contiguous_ids(self):
-        condenser = ConversationWindowCondenser()
+        condenser = ConversationWindowCompactor()
         action = condenser._create_condensation_action([2, 5, 8])
-        self.assertEqual(action.forgotten_event_ids, [2, 5, 8])
+        self.assertEqual(action.pruned_event_ids, [2, 5, 8])
 
     def test_no_summary(self):
-        condenser = ConversationWindowCondenser()
+        condenser = ConversationWindowCompactor()
         action = condenser._create_condensation_action([2, 3, 4])
         self.assertIsNone(action.summary)
 
-    def test_empty_forgotten_ids(self):
-        condenser = ConversationWindowCondenser()
+    def test_empty_pruned_ids(self):
+        condenser = ConversationWindowCompactor()
         action = condenser._create_condensation_action([])
-        self.assertEqual(action.forgotten_event_ids, [])
+        self.assertEqual(action.pruned_event_ids, [])
 
 
 # ---------------------------------------------------------------------------
@@ -188,14 +188,14 @@ class TestFromConfig(unittest.TestCase):
         config = MagicMock()
         config.max_events = 200
         registry = MagicMock()
-        condenser = ConversationWindowCondenser.from_config(config, registry)
+        condenser = ConversationWindowCompactor.from_config(config, registry)
         self.assertEqual(condenser._max_events, 200)
 
     def test_from_config_default_fallback(self):
         """If config doesn't have max_events, default to 100."""
         config = MagicMock(spec=[])  # spec=[] means no attributes
         registry = MagicMock()
-        condenser = ConversationWindowCondenser.from_config(config, registry)
+        condenser = ConversationWindowCompactor.from_config(config, registry)
         self.assertEqual(condenser._max_events, 100)
 
 

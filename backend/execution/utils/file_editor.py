@@ -675,6 +675,6 @@ class FileEditor:
                     self._write_file(file_path, original_content)
             except Exception as e:
                 # Log but continue rollback for other files
-                from backend.core.logger import forge_logger as logger
+                from backend.core.logger import app_logger as logger
 
                 logger.warning("Failed to rollback %s: %s", file_path, e)

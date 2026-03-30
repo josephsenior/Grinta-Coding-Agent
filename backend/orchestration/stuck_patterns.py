@@ -7,7 +7,7 @@ and use eq_no_pid for comparison.
 
 from __future__ import annotations
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action.action import Action
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.message import MessageAction

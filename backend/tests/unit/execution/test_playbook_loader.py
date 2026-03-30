@@ -85,9 +85,9 @@ class TestExtractOrgName:
 
 
 class TestGetOrgConfigRepoPath:
-    def test_returns_org_forge_path(self, rt: _FakeRuntime):
+    def test_returns_org_app_path(self, rt: _FakeRuntime):
         result = rt._get_org_config_repo_path("github.com/acme/repo", "acme")
-        assert result == "acme/.Forge"
+        assert result == "acme/.app"
 
 
 # -----------------------------------------------------------
@@ -154,12 +154,12 @@ class TestLogCloneFailure:
         obs = CmdOutputObservation(
             content="error output", command_id=0, command="git clone", exit_code=128
         )
-        rt._log_clone_failure(obs, "acme/.Forge")
+        rt._log_clone_failure(obs, "acme/.app")
         assert any("128" in msg for _, msg in rt._logs)
 
     def test_with_non_cmd_obs(self, rt: _FakeRuntime):
         obs = MagicMock(spec=[])  # no content or exit_code
-        rt._log_clone_failure(obs, "acme/.Forge")
+        rt._log_clone_failure(obs, "acme/.app")
         assert any("N/A" in msg for _, msg in rt._logs)
 
 
@@ -177,7 +177,7 @@ class TestGetPlaybooksFromOrgOrUser:
         mock_clone.return_value = [MagicMock(spec=BasePlaybook)]
         result = rt.get_playbooks_from_org_or_user("github.com/acme/repo")
         assert len(result) == 1
-        mock_clone.assert_called_once_with("acme", "acme/.Forge")
+        mock_clone.assert_called_once_with("acme", "acme/.app")
 
 
 # -----------------------------------------------------------
@@ -194,7 +194,7 @@ class TestCloneAndLoadOrgPlaybooks:
             "backend.execution.playbook_loader.call_async_from_sync",
             side_effect=AuthenticationError("nope"),
         ):
-            result = rt._clone_and_load_org_playbooks("acme", "acme/.Forge")
+            result = rt._clone_and_load_org_playbooks("acme", "acme/.app")
         assert result == []
 
     def test_generic_error_returns_empty(self, rt: _FakeRuntime):
@@ -202,17 +202,17 @@ class TestCloneAndLoadOrgPlaybooks:
             "backend.execution.playbook_loader.call_async_from_sync",
             side_effect=RuntimeError("unexpected"),
         ):
-            result = rt._clone_and_load_org_playbooks("acme", "acme/.Forge")
+            result = rt._clone_and_load_org_playbooks("acme", "acme/.app")
         assert result == []
 
     @patch.object(PlaybookLoaderMixin, "_execute_clone_and_load")
     def test_successful_auth_delegates(self, mock_exec, rt: _FakeRuntime):
         with patch(
             "backend.execution.playbook_loader.call_async_from_sync",
-            return_value="https://token@github.com/acme/.Forge",
+            return_value="https://token@github.com/acme/.app",
         ):
             mock_exec.return_value = []
-            rt._clone_and_load_org_playbooks("acme", "acme/.Forge")
+            rt._clone_and_load_org_playbooks("acme", "acme/.app")
         mock_exec.assert_called_once()
 
 
@@ -229,7 +229,7 @@ class TestExecuteCloneAndLoad:
             )
         )
         result = rt._execute_clone_and_load(
-            rt.workspace_root / "org", "https://x", "acme/.Forge"
+            rt.workspace_root / "org", "https://x", "acme/.app"
         )
         assert result == []
 
@@ -242,7 +242,7 @@ class TestExecuteCloneAndLoad:
         )
         mock_load.return_value = [MagicMock(spec=BasePlaybook)]
         result = rt._execute_clone_and_load(
-            rt.workspace_root / "org", "https://x", "acme/.Forge"
+            rt.workspace_root / "org", "https://x", "acme/.app"
         )
         assert len(result) == 1
 
@@ -254,10 +254,18 @@ class TestExecuteCloneAndLoad:
 
 class TestGetPlaybooksFromSelectedRepo:
     def test_no_selected_repo_loads_workspace(self, rt: _FakeRuntime):
-        # read returns ErrorObservation, no FORGE_instructions
+        # read returns ErrorObservation, no APP_instructions
         result = rt.get_playbooks_from_selected_repo(None)
         # Should still call _load_playbooks_from_directory
         assert isinstance(result, list)
+
+    @patch.object(PlaybookLoaderMixin, "_load_playbooks_from_directory")
+    def test_workspace_repo_playbooks_dir_uses_app_path(self, mock_load, rt: _FakeRuntime):
+        mock_load.return_value = []
+
+        rt.get_playbooks_from_selected_repo(None)
+
+        mock_load.assert_called_once_with(rt.workspace_root / ".app" / "playbooks", "repository")
 
     @patch.object(PlaybookLoaderMixin, "get_playbooks_from_org_or_user")
     def test_with_selected_repo_loads_org_and_repo(self, mock_org, rt: _FakeRuntime):
@@ -266,15 +274,28 @@ class TestGetPlaybooksFromSelectedRepo:
         mock_org.assert_called_once_with("github.com/acme/repo")
         assert isinstance(result, list)
 
+    @patch.object(PlaybookLoaderMixin, "_load_playbooks_from_directory")
     @patch.object(PlaybookLoaderMixin, "get_playbooks_from_org_or_user")
-    def test_loads_forge_instructions_file(self, mock_org, rt: _FakeRuntime):
+    def test_selected_repo_playbooks_dir_uses_app_path(self, mock_org, mock_load, rt: _FakeRuntime):
         mock_org.return_value = []
-        # Make read return a FileReadObservation for .FORGE_instructions
+        mock_load.return_value = []
+
+        rt.get_playbooks_from_selected_repo("github.com/acme/repo")
+
+        mock_load.assert_called_once_with(
+            rt.workspace_root / "repo" / ".app" / "playbooks",
+            "repository",
+        )
+
+    @patch.object(PlaybookLoaderMixin, "get_playbooks_from_org_or_user")
+    def test_loads_app_instructions_file(self, mock_org, rt: _FakeRuntime):
+        mock_org.return_value = []
+        # Make read return a FileReadObservation for .APP_instructions
         cast(Any, rt).read = MagicMock(
             return_value=FileReadObservation(
-                content="# Forge instructions content", path=".FORGE_instructions"
+                content="# App instructions content", path=".APP_instructions"
             )
         )
         cast(Any, rt).list_files = MagicMock(return_value=[])
         rt.get_playbooks_from_selected_repo("github.com/acme/repo")
-        assert any("FORGE_instructions" in msg for _, msg in rt._logs)
+        assert any("APP_instructions" in msg for _, msg in rt._logs)

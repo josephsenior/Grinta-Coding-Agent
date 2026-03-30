@@ -19,7 +19,7 @@ def convert_messages(
     for m in messages:
         content = m.get("content", "")
 
-        # Handle list-style content (from Forge's message serialization)
+        # Handle list-style content (from App's message serialization)
         text_parts = []
         if isinstance(content, list):
             for item in content:

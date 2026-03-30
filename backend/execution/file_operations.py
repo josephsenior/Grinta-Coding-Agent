@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import re
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import FileReadAction, FileWriteAction
 from backend.core.enums import FileEditSource
 from backend.ledger.observation import (
@@ -135,7 +135,7 @@ def truncate_large_text(value: str, max_chars: int, *, label: str) -> str:
         len(value),
         max_chars,
     )
-    return value[:half] + "\n[... Truncated by Forge due to size ...]\n" + value[-half:]
+    return value[:half] + "\n[... Truncated by app due to size ...]\n" + value[-half:]
 
 
 # Default max chars for bash command output (configurable via env var).
@@ -145,7 +145,7 @@ def _get_max_cmd_output_chars(max_chars: int | None) -> int:
     """Resolve max_chars from arg or env."""
     if max_chars is not None:
         return max_chars
-    raw = os.environ.get("FORGE_MAX_CMD_OUTPUT_CHARS", "")
+    raw = os.environ.get("APP_MAX_CMD_OUTPUT_CHARS", "")
     try:
         return int(raw) if raw else _DEFAULT_MAX_CMD_OUTPUT_CHARS
     except (ValueError, TypeError):
@@ -254,7 +254,7 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
     Args:
         output: Raw command output string.
         max_chars: Maximum number of characters to keep. Reads
-            ``FORGE_MAX_CMD_OUTPUT_CHARS`` env var if not set, defaulting to
+            ``APP_MAX_CMD_OUTPUT_CHARS`` env var if not set, defaulting to
             40 000 characters (~80-120 lines for typical terminal output).
 
     Returns:
@@ -288,7 +288,7 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
 
     skipped = total_lines - len(head_lines) - len(tail_lines)
     notice = (
-        f"\n[FORGE: Output truncated — {skipped} lines hidden. "
+        f"\n[APP: Output truncated — {skipped} lines hidden. "
         f"Showing first {len(head_lines)} and last {len(tail_lines)} lines]"
     )
     notice += "\n"
@@ -320,18 +320,18 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
 
 def get_max_edit_observation_chars() -> int:
     """Read and validate max edit observation payload size from environment."""
-    raw_value = os.environ.get("FORGE_MAX_EDIT_OBS_CHARS", "200000")
+    raw_value = os.environ.get("APP_MAX_EDIT_OBS_CHARS", "200000")
     try:
         parsed = int(raw_value)
     except (TypeError, ValueError):
         logger.warning(
-            "Invalid FORGE_MAX_EDIT_OBS_CHARS=%r; using default 200000",
+            "Invalid APP_MAX_EDIT_OBS_CHARS=%r; using default 200000",
             raw_value,
         )
         return 200000
     if parsed <= 0:
         logger.warning(
-            "Non-positive FORGE_MAX_EDIT_OBS_CHARS=%s; using default 200000",
+            "Non-positive APP_MAX_EDIT_OBS_CHARS=%s; using default 200000",
             parsed,
         )
         return 200000

@@ -10,7 +10,7 @@ directly from ``AppState``, ensuring a single source of truth.
 .. deprecated::
     Route files should inject ``config``, ``file_store``, and ``server_config``
     via FastAPI ``Depends()`` providers defined in
-    ``backend.gateway.services.service_dependencies`` (``get_forge_config``,
+    ``backend.gateway.services.service_dependencies`` (``get_app_config``,
     ``get_file_store``, ``get_server_config``).  Direct imports from this
     module remain supported for non-route code (CLI, tests, utilities) that
     cannot use the DI system.
@@ -32,7 +32,7 @@ _state = get_app_state()
 server_config = _state.server_config
 sio = _state.sio
 def get_config():
-    """Get the current ForgeConfig reference."""
+    """Get the current AppConfig reference."""
     return _state.config
 
 # Note: 'config' is a legacy reference that might be stale if AppState.config is reloaded.

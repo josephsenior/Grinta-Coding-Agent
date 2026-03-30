@@ -22,12 +22,12 @@ from backend.core.constants import (
     MAX_MCP_CACHE_ENTRY_BYTES,
     MCP_CACHEABLE_TOOLS,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 DEFAULT_TTL_SECONDS = DEFAULT_MCP_CACHE_TTL_SECONDS
 try:
     MAX_CACHE_ENTRY_BYTES = int(
-        os.getenv("FORGE_MCP_CACHE_MAX_ENTRY_BYTES", str(MAX_MCP_CACHE_ENTRY_BYTES))
+        os.getenv("APP_MCP_CACHE_MAX_ENTRY_BYTES", str(MAX_MCP_CACHE_ENTRY_BYTES))
     )
 except ValueError:
     MAX_CACHE_ENTRY_BYTES = MAX_MCP_CACHE_ENTRY_BYTES

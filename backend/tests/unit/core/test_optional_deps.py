@@ -62,7 +62,7 @@ class TestRequireOptional:
         mock_import.side_effect = ModuleNotFoundError()
 
         with pytest.raises(
-            OptionalDependencyError, match="pip install 'forge-ai\\[test_extra\\]'"
+            OptionalDependencyError, match="pip install 'app-ai\\[test_extra\\]'"
         ):
             require_optional("test_module", extra="test_extra")
 

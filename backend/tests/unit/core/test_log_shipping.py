@@ -66,7 +66,7 @@ class TestLogShipper:
         payload = shipper._datadog_payload(logs)
         assert "logs" in payload
         assert len(payload["logs"]) == 1
-        assert payload["logs"][0]["ddsource"] == "forge"
+        assert payload["logs"][0]["ddsource"] == "app"
 
     async def test_flush_disabled(self):
         shipper = LogShipper(enabled=False)
@@ -91,7 +91,7 @@ class TestLogShipper:
         parsed = urlparse("https://http-intake.logs.datadoghq.com/api/v2/logs")
         payload = shipper._build_payload(parsed, logs)
         assert "logs" in payload
-        assert payload["logs"][0]["ddsource"] == "forge"
+        assert payload["logs"][0]["ddsource"] == "app"
 
     def test_build_payload_default(self):
         shipper = LogShipper()

@@ -27,7 +27,7 @@ class TaskTracker:
             from backend.core.workspace_resolution import require_effective_workspace_root
 
             workspace_root = require_effective_workspace_root()
-        self.path = Path(workspace_root) / ".forge" / "active_plan.json"
+        self.path = Path(workspace_root) / ".app" / "active_plan.json"
 
     def load_from_file(self) -> List[dict[str, Any]]:
         """Load the task list from disk."""

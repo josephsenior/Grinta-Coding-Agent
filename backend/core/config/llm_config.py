@@ -1,4 +1,4 @@
-"""LLM configuration schemas and helpers for Forge agents."""
+"""LLM configuration schemas and helpers for App agents."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from backend.core.constants import (
     DEFAULT_LLM_TOP_P,
 )
 from backend.core.logger import LOG_DIR
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 @contextmanager
@@ -353,8 +353,8 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                         logger.debug("Set correct API key for model: %s", self.model)
                     else:
                         # Try to set from environment as fallback
-                        provider = api_key_manager._extract_provider(self.model)
-                        env_key = api_key_manager._get_provider_key_from_env(provider)
+                        provider = api_key_manager.extract_provider(self.model)
+                        env_key = api_key_manager.get_provider_key_from_env(provider)
                         if env_key:
                             self.api_key = SecretStr(env_key)
                             logger.debug(
@@ -380,7 +380,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         """Clean base_url and other parameters using provider-aware validation."""
         if not self.model:
             return
-        provider = api_key_manager._extract_provider(self.model)
+        provider = api_key_manager.extract_provider(self.model)
         provider_config = provider_config_manager.get_provider_config(provider)
 
         # Use provider configuration to validate and clean base_url

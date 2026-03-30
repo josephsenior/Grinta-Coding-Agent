@@ -5,7 +5,7 @@ import time
 import importlib
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.schemas import (
     ActionSchemaUnion,
     ObservationSchemaUnion,
@@ -64,8 +64,8 @@ class ToolTelemetry:
 
         registry = getattr(prometheus_client, "REGISTRY", None)
         names_to_collectors = getattr(registry, "_names_to_collectors", {}) if registry is not None else {}
-        existing_invocations = names_to_collectors.get("forge_tool_invocations_total")
-        existing_latency = names_to_collectors.get("forge_tool_latency_seconds")
+        existing_invocations = names_to_collectors.get("app_tool_invocations_total")
+        existing_latency = names_to_collectors.get("app_tool_latency_seconds")
         if existing_invocations is not None and existing_latency is not None:
             type(self)._shared_invocations = existing_invocations
             type(self)._shared_latency = existing_latency
@@ -75,12 +75,12 @@ class ToolTelemetry:
 
         try:
             invocations = runtime_counter(
-                "forge_tool_invocations_total",
+                "app_tool_invocations_total",
                 "Number of tool invocations processed by the agent controller",
                 labelnames=("tool", "outcome"),
             )
             latency = runtime_histogram(
-                "forge_tool_latency_seconds",
+                "app_tool_latency_seconds",
                 "Duration of tool invocations executed by the agent controller",
                 labelnames=("tool", "outcome"),
                 buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf")),
@@ -88,8 +88,8 @@ class ToolTelemetry:
         except ValueError:
             # If metrics were already registered (e.g. tests resetting the singleton),
             # prefer reusing the existing collectors instead of failing import-time.
-            existing_invocations = names_to_collectors.get("forge_tool_invocations_total")
-            existing_latency = names_to_collectors.get("forge_tool_latency_seconds")
+            existing_invocations = names_to_collectors.get("app_tool_invocations_total")
+            existing_latency = names_to_collectors.get("app_tool_latency_seconds")
             if existing_invocations is None or existing_latency is None:
                 self._invocations = None
                 self._latency = None

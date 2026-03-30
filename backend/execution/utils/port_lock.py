@@ -10,7 +10,7 @@ import tempfile
 import time
 from typing import Any, Self, cast
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 try:
     import fcntl  # type: ignore[import-not-found, unused-ignore]
@@ -28,7 +28,7 @@ class PortLock:
         """Prepare filesystem lock state for the given port under the optional directory."""
         self.port = port
         self.lock_dir = lock_dir or os.path.join(
-            tempfile.gettempdir(), "FORGE_port_locks"
+            tempfile.gettempdir(), "app_port_locks"
         )
         self.lock_file_path = os.path.join(self.lock_dir, f"port_{port}.lock")
         self.lock_fd: int | None = None
@@ -259,7 +259,7 @@ def cleanup_stale_locks(max_age_seconds: int = 300) -> int:
         Number of lock files cleaned up
 
     """
-    lock_dir = os.path.join(tempfile.gettempdir(), "FORGE_port_locks")
+    lock_dir = os.path.join(tempfile.gettempdir(), "app_port_locks")
     if not os.path.exists(lock_dir):
         return 0
     cleaned = 0

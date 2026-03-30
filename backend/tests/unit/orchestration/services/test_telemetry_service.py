@@ -26,7 +26,7 @@ class TestTelemetryService(unittest.TestCase):
     @patch("backend.orchestration.tool_pipeline.LoggingMiddleware")
     @patch("backend.orchestration.tool_pipeline.TelemetryMiddleware")
     @patch("backend.orchestration.tool_result_validator.ToolResultValidator")
-    def test_initialize_tool_pipeline_default(
+    def test_initialize_operation_pipeline_default(
         self,
         mock_validator,
         mock_telemetry,
@@ -37,11 +37,11 @@ class TestTelemetryService(unittest.TestCase):
         mock_circuit,
         mock_safety,
     ):
-        """Test initialize_tool_pipeline creates default middleware stack."""
+        """Test initialize_operation_pipeline creates default middleware stack."""
         self.mock_context.agent_config.enable_planning_middleware = False
         self.mock_context.agent_config.enable_reflection_middleware = False
 
-        self.service.initialize_tool_pipeline()
+        self.service.initialize_operation_pipeline()
 
         # Check all default middlewares were created
         mock_safety.assert_called_once_with(self.mock_controller)
@@ -54,7 +54,7 @@ class TestTelemetryService(unittest.TestCase):
         mock_validator.assert_called_once()
 
         # Check pipeline was initialized
-        self.mock_context.initialize_tool_pipeline.assert_called_once()
+        self.mock_context.initialize_operation_pipeline.assert_called_once()
 
     @patch("backend.orchestration.tool_pipeline.ReflectionMiddleware")
     @patch("backend.orchestration.tool_pipeline.SafetyValidatorMiddleware")
@@ -65,7 +65,7 @@ class TestTelemetryService(unittest.TestCase):
     @patch("backend.orchestration.tool_pipeline.LoggingMiddleware")
     @patch("backend.orchestration.tool_pipeline.TelemetryMiddleware")
     @patch("backend.orchestration.tool_result_validator.ToolResultValidator")
-    def test_initialize_tool_pipeline_with_reflection(
+    def test_initialize_operation_pipeline_with_reflection(
         self,
         mock_validator,
         mock_telemetry,
@@ -77,11 +77,11 @@ class TestTelemetryService(unittest.TestCase):
         mock_safety,
         mock_reflection,
     ):
-        """Test initialize_tool_pipeline includes reflection middleware when enabled."""
+        """Test initialize_operation_pipeline includes reflection middleware when enabled."""
         self.mock_context.agent_config.enable_planning_middleware = False
         self.mock_context.agent_config.enable_reflection_middleware = True
 
-        self.service.initialize_tool_pipeline()
+        self.service.initialize_operation_pipeline()
 
         # Check reflection middleware was created
         mock_reflection.assert_called_once_with(self.mock_controller)
@@ -94,7 +94,7 @@ class TestTelemetryService(unittest.TestCase):
     @patch("backend.orchestration.tool_pipeline.LoggingMiddleware")
     @patch("backend.orchestration.tool_pipeline.TelemetryMiddleware")
     @patch("backend.orchestration.tool_result_validator.ToolResultValidator")
-    def test_initialize_tool_pipeline_none_config(
+    def test_initialize_operation_pipeline_none_config(
         self,
         mock_validator,
         mock_telemetry,
@@ -105,14 +105,20 @@ class TestTelemetryService(unittest.TestCase):
         mock_circuit,
         mock_safety,
     ):
-        """Test initialize_tool_pipeline handles None config."""
+        """Test initialize_operation_pipeline handles None config."""
         self.mock_context.agent_config = None
 
         # Should not raise exception
-        self.service.initialize_tool_pipeline()
+        self.service.initialize_operation_pipeline()
 
         # Should still initialize pipeline
-        self.mock_context.initialize_tool_pipeline.assert_called_once()
+        self.mock_context.initialize_operation_pipeline.assert_called_once()
+
+    def test_initialize_tool_pipeline_alias(self):
+        with patch.object(self.service, "initialize_operation_pipeline") as mock_initialize:
+            self.service.initialize_tool_pipeline()
+
+        mock_initialize.assert_called_once_with()
 
     @patch("backend.orchestration.tool_telemetry.ToolTelemetry")
     @patch("backend.ledger.observation.ErrorObservation")

@@ -20,12 +20,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.inference.llm import LLM
 
 if TYPE_CHECKING:
     from backend.core.config.agent_config import AgentConfig
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
     from backend.core.config.llm_config import LLMConfig
 
 
@@ -49,7 +49,7 @@ class LLMRegistry:
 
     def __init__(
         self,
-        config: ForgeConfig,
+        config: AppConfig,
         agent_cls: str | None = None,
         retry_listener: Callable[[int, int], None] | None = None,
         require_llm: bool = True,
@@ -57,7 +57,7 @@ class LLMRegistry:
         """Initialize LLM registry with configuration.
 
         Args:
-            config: Forge configuration with LLM settings
+            config: App configuration with LLM settings
             agent_cls: Optional agent class name to determine default LLM
             retry_listener: Optional callback for retry events (attempt, max_attempts)
 

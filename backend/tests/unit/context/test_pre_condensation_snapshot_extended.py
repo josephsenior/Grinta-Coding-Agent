@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 import unittest
+from pathlib import Path
+
+from backend.context import pre_condensation_snapshot as snapshot_module
 from backend.context.pre_condensation_snapshot import extract_snapshot
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.files import FileEditAction
@@ -10,6 +13,17 @@ from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.files import FileEditObservation
 
 class TestPreCondensationSnapshot(unittest.TestCase):
+    def test_snapshot_path_uses_app_dir(self):
+        original = snapshot_module._WORKSPACE_ROOT
+        try:
+            snapshot_module._WORKSPACE_ROOT = "C:/tmp/workspace"
+            self.assertEqual(
+                snapshot_module._snapshot_path(),
+                Path("C:/tmp/workspace") / ".app" / "pre_condensation_snapshot.json",
+            )
+        finally:
+            snapshot_module._WORKSPACE_ROOT = original
+
     def test_extract_snapshot_attempted_approaches(self):
         # Setup events
         events = [

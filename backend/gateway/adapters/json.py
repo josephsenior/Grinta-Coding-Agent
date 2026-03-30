@@ -1,4 +1,4 @@
-"""JSON serialization/deserialization helpers with Forge-specific encoding."""
+"""JSON serialization/deserialization helpers with application-specific encoding."""
 
 import json
 from datetime import datetime
@@ -15,12 +15,12 @@ from backend.ledger.serialization import event_to_dict
 from backend.inference.metrics import Metrics
 
 
-class ForgeJSONEncoder(json.JSONEncoder):
+class AppJSONEncoder(json.JSONEncoder):
     """Custom JSON encoder that handles datetime and event objects."""
 
     def default(self, obj: Any) -> Any:
-        """Serialize Forge-specific objects when dumping JSON."""
-        result = _try_serialize_forge_object(obj)
+        """Serialize app-specific objects when dumping JSON."""
+        result = _try_serialize_app_object(obj)
         if result is not _NOT_SERIALIZED:
             return result
         return super().default(obj)
@@ -29,8 +29,8 @@ class ForgeJSONEncoder(json.JSONEncoder):
 _NOT_SERIALIZED = object()
 
 
-def _try_serialize_forge_object(obj: Any) -> Any:
-    """Serialize Forge-specific types; return _NOT_SERIALIZED if not handled."""
+def _try_serialize_app_object(obj: Any) -> Any:
+    """Serialize app-specific types; return _NOT_SERIALIZED if not handled."""
     handlers = (
         (datetime, lambda o: o.isoformat()),
         (Event, event_to_dict),
@@ -45,7 +45,7 @@ def _try_serialize_forge_object(obj: Any) -> Any:
     return _NOT_SERIALIZED
 
 
-_json_encoder = ForgeJSONEncoder()
+_json_encoder = AppJSONEncoder()
 
 
 def dumps(obj: Any, **kwargs: Any) -> str:
@@ -54,7 +54,7 @@ def dumps(obj: Any, **kwargs: Any) -> str:
         return _json_encoder.encode(obj)
     encoder_kwargs = kwargs.copy()
     if "cls" not in encoder_kwargs:
-        encoder_kwargs["cls"] = ForgeJSONEncoder
+        encoder_kwargs["cls"] = AppJSONEncoder
     return json.dumps(obj, **encoder_kwargs)
 
 
@@ -105,4 +105,4 @@ def _repair_and_load(extracted: str, kwargs: dict) -> Any:
         ) from e
 
 
-__all__ = ["ForgeJSONEncoder", "dumps", "loads"]
+__all__ = ["AppJSONEncoder", "dumps", "loads"]

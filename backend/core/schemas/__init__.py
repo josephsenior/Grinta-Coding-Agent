@@ -1,4 +1,4 @@
-"""Formal Pydantic schemas for Forge events, actions, and observations.
+"""Formal Pydantic schemas for App events, actions, and observations.
 
 This module provides versioned, type-safe schemas for all event types,
 enabling explicit contracts, versioning, testing, and multi-agent expansion.

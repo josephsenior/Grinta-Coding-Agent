@@ -33,13 +33,13 @@ def test_check_redis_not_configured(monkeypatch):
 
 
 def test_check_database_not_configured_file_mode(monkeypatch):
-    monkeypatch.setenv("KB_STORAGE_TYPE", "file")
+    monkeypatch.setenv("APP_KB_STORAGE_TYPE", "file")
     result = _check_database()
     assert result["status"] == "not_configured"
 
 
 def test_check_database_missing_url(monkeypatch):
-    monkeypatch.setenv("KB_STORAGE_TYPE", "database")
+    monkeypatch.setenv("APP_KB_STORAGE_TYPE", "database")
     monkeypatch.delenv("DATABASE_URL", raising=False)
     result = _check_database()
     assert result["status"] == "error"
@@ -186,7 +186,7 @@ def test_check_config_ok(monkeypatch):
     cfg.project_root = "/proj"
     cfg.local_data_root = "/data"
 
-    monkeypatch.setattr("backend.core.config.load_forge_config", lambda: cfg)
+    monkeypatch.setattr("backend.core.config.load_app_config", lambda: cfg)
     result = _check_config()
     assert result["status"] == "ok"
     assert result["project_root"] == "/proj"
@@ -195,7 +195,7 @@ def test_check_config_ok(monkeypatch):
 
 def test_check_config_error(monkeypatch):
     monkeypatch.setattr(
-        "backend.core.config.load_forge_config",
+        "backend.core.config.load_app_config",
         MagicMock(side_effect=OSError("broken")),
     )
     result = _check_config()
@@ -257,7 +257,7 @@ def test_check_redis_invalid_port_defaults(monkeypatch):
 
 
 def test_check_database_db_alias_and_reachable(monkeypatch):
-    monkeypatch.setenv("KB_STORAGE_TYPE", "db")
+    monkeypatch.setenv("APP_KB_STORAGE_TYPE", "db")
     monkeypatch.setenv("DATABASE_URL", "postgresql://x")
     monkeypatch.setenv("POSTGRES_HOST", "127.0.0.1")
     monkeypatch.setenv("POSTGRES_PORT", "5432")
@@ -273,7 +273,7 @@ def test_check_database_db_alias_and_reachable(monkeypatch):
 
 
 def test_check_database_invalid_postgres_port(monkeypatch):
-    monkeypatch.setenv("KB_STORAGE_TYPE", "database")
+    monkeypatch.setenv("APP_KB_STORAGE_TYPE", "database")
     monkeypatch.setenv("DATABASE_URL", "postgresql://x")
     monkeypatch.setenv("POSTGRES_PORT", "oops")
 

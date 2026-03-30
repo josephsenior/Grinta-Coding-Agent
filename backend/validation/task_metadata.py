@@ -5,7 +5,7 @@ avoid guessing from prose.
 
 Format (first line only)::
 
-    FORGE_TASK_JSON:{"expected_output_files":["out.txt","report.md"]}
+    APP_TASK_JSON:{"expected_output_files":["out.txt","report.md"]}
 
 Everything after the first newline is the human-readable ``Task.description``.
 If the prefix is missing or JSON is invalid, the full string is treated as
@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-FORGE_TASK_JSON_PREFIX = "FORGE_TASK_JSON:"
+APP_TASK_JSON_PREFIX = "APP_TASK_JSON:"
 
 
 def parse_task_from_user_message(content: str) -> tuple[str, dict[str, Any]]:
@@ -30,10 +30,10 @@ def parse_task_from_user_message(content: str) -> tuple[str, dict[str, Any]]:
         return "", {}
 
     stripped = content.lstrip("\ufeff")
-    if not stripped.startswith(FORGE_TASK_JSON_PREFIX):
+    if not stripped.startswith(APP_TASK_JSON_PREFIX):
         return content, {}
 
-    rest = stripped[len(FORGE_TASK_JSON_PREFIX) :]
+    rest = stripped[len(APP_TASK_JSON_PREFIX) :]
     newline = rest.find("\n")
     if newline == -1:
         json_line, body = rest, ""

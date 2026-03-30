@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
@@ -11,21 +11,23 @@ from backend.core.provider_types import CustomSecret, ProviderToken, ProviderTyp
 from backend.persistence.data_models.settings import Settings
 
 
-def _import_mcp_config_class():
-    from backend.core.config.mcp_config import MCPConfig as _MCPConfig
+def _import_mcp_config_class() -> type[Any]:
+    from backend.core.config.mcp_config import MCPConfig as RuntimeMCPConfig
 
-    return _MCPConfig
+    return RuntimeMCPConfig
 
 
-def _mcp_config_type_with_fallback():
+def _mcp_config_type_with_fallback() -> type[Any] | Any:
     try:
         return _import_mcp_config_class()
     except Exception as e:
         logging.getLogger(__name__).warning("Failed to import MCPConfig: %s", e)
-        return Any  # type: ignore[return-value]
+        return Any
 
-
-MCPConfig = _mcp_config_type_with_fallback()
+if TYPE_CHECKING:
+    from backend.core.config.mcp_config import MCPConfig
+else:
+    MCPConfig = _mcp_config_type_with_fallback()
 
 
 class POSTProviderModel(BaseModel):

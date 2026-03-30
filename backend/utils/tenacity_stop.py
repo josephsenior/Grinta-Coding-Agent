@@ -1,4 +1,4 @@
-"""Tenacity stop condition integrating Forge shutdown listener."""
+"""Tenacity stop condition integrating App shutdown listener."""
 
 from typing import TYPE_CHECKING
 

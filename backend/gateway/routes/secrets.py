@@ -8,7 +8,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, FastAPI, Path, status
 from fastapi.responses import JSONResponse
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.provider_types import (
     ProviderTokenType,
     CustomSecret,

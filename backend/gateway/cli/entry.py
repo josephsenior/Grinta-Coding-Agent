@@ -1,4 +1,4 @@
-"""Main entry point for Forge CLI with subcommand support."""
+"""Main entry point for App CLI with subcommand support."""
 
 import sys
 

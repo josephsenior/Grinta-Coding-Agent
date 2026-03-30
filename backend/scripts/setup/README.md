@@ -8,9 +8,9 @@ Scripts for installation, configuration, and environment setup.
 - **`setup_windows_backup_task.bat`** - Setup Windows backup task (batch)
 - **`setup_windows_backup_task.ps1`** - Setup Windows backup task (PowerShell)
 - **`find_postgresql.ps1`** - Find PostgreSQL installation on Windows
-- **`set_forge_api_key.ps1`** - Set Forge API key in environment
-- **`start-with-shadcn.cmd`** - Start Forge with shadcn-ui MCP proxy (CMD)
-- **`start-with-shadcn.ps1`** - Start Forge with shadcn-ui MCP proxy (PowerShell)
+- **`set_app_api_key.ps1`** - Set app API key in environment
+- **`start-with-shadcn.cmd`** - Start App with shadcn-ui MCP proxy (CMD)
+- **`start-with-shadcn.ps1`** - Start App with shadcn-ui MCP proxy (PowerShell)
 
 ## Usage
 

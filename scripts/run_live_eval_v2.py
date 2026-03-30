@@ -18,7 +18,7 @@ with open("live_eval_log.txt", "w", encoding="utf-8") as clog:
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
             try:
                 cmdline = " ".join(proc.info['cmdline'] or []).lower()
-                if "uvicorn" in cmdline or "start_server.py" in cmdline or "forge.py" in cmdline:
+                if "uvicorn" in cmdline or "start_server.py" in cmdline or "app.py" in cmdline:
                     if sys.executable.lower() in cmdline or 'python' in cmdline:
                         log_print(f"Killing old server process {proc.pid}")
                         proc.kill()
@@ -69,8 +69,8 @@ with open("live_eval_log.txt", "w", encoding="utf-8") as clog:
             async def disconnect():
                 log_print("WS Disconnected!")
         
-            @sio.on("forge_event")
-            async def on_forge_event(data):
+            @sio.on("app_event")
+            async def on_app_event(data):
                 if "action" in data and data["action"] == "working_memory":
                     log_print("\n----- MEMORY SCRATCHPAD UPDATE -----")
                     log_print(json.dumps(data.get("args", {}), indent=2))
@@ -91,7 +91,7 @@ with open("live_eval_log.txt", "w", encoding="utf-8") as clog:
             
             msg = "Create a Python script in a folder named `real_world_task` containing a script `app.py` that starts a tiny FastAPI server on port 8080 returning {'message': 'Hello World'}. Also write a `requirements.txt` for it in that folder. Use tool calls to write the files."
             log_print(f"Sending prompt... {msg}")
-            await sio.emit("forge_user_action", {
+            await sio.emit("app_user_action", {
                 "action": "message",
                 "args": {"content": msg, "image_urls": [], "file_urls": []}
             })

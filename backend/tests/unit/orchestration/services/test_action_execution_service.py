@@ -37,6 +37,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.mock_context.state = MagicMock()
         self.mock_context.event_stream = MagicMock()
         self.mock_context.confirmation_service = None
+        self.mock_context.operation_pipeline = None
         self.mock_context.tool_pipeline = None
         self.mock_context.iteration_service = MagicMock()
         self.mock_context.iteration_service.apply_dynamic_iterations = AsyncMock()
@@ -177,7 +178,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         mock_pipeline = MagicMock()
         mock_pipeline.create_context = MagicMock(return_value=mock_ctx)
         mock_pipeline.run_plan = AsyncMock()
-        self.mock_context.tool_pipeline = mock_pipeline
+        self.mock_context.operation_pipeline = mock_pipeline
 
         with patch("backend.core.plugin.get_plugin_registry"):
             await self.service.execute_action(mock_action)
@@ -210,7 +211,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         mock_pipeline = MagicMock()
         mock_pipeline.create_context = MagicMock(return_value=mock_ctx)
         mock_pipeline.run_plan = AsyncMock()
-        self.mock_context.tool_pipeline = mock_pipeline
+        self.mock_context.operation_pipeline = mock_pipeline
 
         with patch("backend.core.plugin.get_plugin_registry"):
             await self.service.execute_action(mock_action)
@@ -239,7 +240,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         mock_action = MagicMock(spec=Action)
         mock_action.runnable = True
 
-        self.mock_context.tool_pipeline = None
+        self.mock_context.operation_pipeline = None
 
         with patch("backend.core.plugin.get_plugin_registry"):
             await self.service.execute_action(mock_action)

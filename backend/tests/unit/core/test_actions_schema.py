@@ -22,12 +22,12 @@ from backend.core.schemas.actions import (
 def test_condensation_action_schema():
     data = {
         "action_type": "condensation",
-        "forgotten_event_ids": [1, 2, 3],
+        "pruned_event_ids": [1, 2, 3],
         "summary": "Forgot 1, 2, 3"
     }
     action = CondensationActionSchema(**data)
     assert action.action_type == "condensation"
-    assert action.forgotten_event_ids == [1, 2, 3]
+    assert action.pruned_event_ids == [1, 2, 3]
     assert action.summary == "Forgot 1, 2, 3"
 
 def test_condensation_request_action_schema():

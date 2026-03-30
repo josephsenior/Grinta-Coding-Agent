@@ -1,4 +1,4 @@
-"""GUI launcher for Forge CLI."""
+"""GUI launcher for the application CLI."""
 
 import os
 import subprocess
@@ -10,15 +10,15 @@ from backend.core.app_paths import get_app_settings_root
 
 
 def ensure_config_dir_exists() -> Path:
-    """Ensure the directory for canonical ``settings.json`` exists (app root, not ``~/.Forge``)."""
+    """Ensure the directory for canonical ``settings.json`` exists (app root, not ``~/.app``)."""
     root = Path(get_app_settings_root())
     root.mkdir(parents=True, exist_ok=True)
     return root
 
 
 def launch_gui_server() -> None:
-    """Launch the canonical local Forge server entrypoint."""
-    print(f"🚀 Launching Forge v{__version__} GUI server...")
+    """Launch the canonical local server entrypoint."""
+    print(f"🚀 Launching v{__version__} GUI server...")
     print("")
 
     ensure_config_dir_exists()
@@ -30,12 +30,12 @@ def launch_gui_server() -> None:
         print("   The agent will be available in the 'Local' workspace.")
 
     print("")
-    print("✅ Starting local Forge server...")
+    print("✅ Starting local server...")
     print("   Delegating to start_server.py (canonical local server entrypoint)")
     print("")
 
     env = os.environ.copy()
-    env["FORGE_RUNTIME"] = "local"
+    env["APP_RUNTIME"] = "local"
     start_server_path = Path(__file__).resolve().parents[2] / "start_server.py"
 
     try:
@@ -43,12 +43,12 @@ def launch_gui_server() -> None:
         subprocess.run(cmd, env=env, check=True)
     except subprocess.CalledProcessError as e:
         print("")
-        print("❌ Failed to start Forge GUI server.")
+        print("❌ Failed to start GUI server.")
         print(f"Error: {e}")
         sys.exit(1)
     except KeyboardInterrupt:
         print("")
-        print("✓ Forge GUI server stopped successfully.")
+        print("✓ GUI server stopped successfully.")
         sys.exit(0)
     except Exception as e:
         print("")

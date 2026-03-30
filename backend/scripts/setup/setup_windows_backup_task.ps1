@@ -8,7 +8,7 @@ param(
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Forge Database Backup - Windows Setup" -ForegroundColor Cyan
+Write-Host "App Database Backup - Windows Setup" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -39,7 +39,7 @@ if (-not (Test-Path $LogDir)) {
 }
 
 # Task name
-$TaskName = "Forge-Database-Backup"
+$TaskName = "App-Database-Backup"
 
 # Check if task already exists
 $existingTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
@@ -88,7 +88,7 @@ try {
         -Trigger $Trigger `
         -Settings $Settings `
         -Principal $Principal `
-        -Description "Automated daily backup of Forge PostgreSQL database" | Out-Null
+        -Description "Automated daily backup of App PostgreSQL database" | Out-Null
 
     Write-Host ""
     Write-Host "✓ Scheduled task created successfully!" -ForegroundColor Green

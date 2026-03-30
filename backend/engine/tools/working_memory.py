@@ -8,7 +8,7 @@ structured sections that map to how an LLM agent actually thinks:
 - file_context: key files and their roles
 - decisions: architectural/implementation choices made
 
-All sections persist to ``.forge/working_memory.json`` and are automatically
+All sections persist to ``.app/working_memory.json`` and are automatically
 injected into post-condensation recovery context, ensuring the agent never
 loses its cognitive workspace even after history compression.
 """
@@ -78,7 +78,7 @@ def create_working_memory_tool() -> ChatCompletionToolParam:
 def _memory_path() -> Path:
     from backend.core.workspace_resolution import require_effective_workspace_root
 
-    return require_effective_workspace_root() / ".forge" / "working_memory.json"
+    return require_effective_workspace_root() / ".app" / "working_memory.json"
 
 
 def _load_memory() -> dict[str, str]:

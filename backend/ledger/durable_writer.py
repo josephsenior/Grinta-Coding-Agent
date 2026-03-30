@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 # Retry parameters for transient flush failures
 _MAX_FLUSH_RETRIES = 3
@@ -59,7 +59,7 @@ class DurableEventWriter:
             return
         self._stop_flag.clear()
         self._thread = threading.Thread(
-            target=self._run, name="forge-event-writer", daemon=True
+            target=self._run, name="app-event-writer", daemon=True
         )
         self._thread.start()
 

@@ -306,7 +306,7 @@ class AlertManager(ExternalServiceBase):
             "payload": {
                 "summary": summary,
                 "severity": "error",
-                "source": "forge",
+                "source": "app",
                 "custom_details": {
                     "policy": policy_name,
                     "metric": metric,

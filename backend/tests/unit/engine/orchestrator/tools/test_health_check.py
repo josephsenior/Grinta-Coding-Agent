@@ -1,4 +1,4 @@
-"""Tests for backend/engines/orchestrator/tools/health_check.py."""
+"""Tests for backend/engine/tools/health_check.py."""
 
 import pytest
 from unittest.mock import patch

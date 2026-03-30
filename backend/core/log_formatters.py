@@ -1,4 +1,4 @@
-"""Log formatters and filters for Forge.
+"""Log formatters and filters for App.
 
 Extracted from logger.py to keep single-responsibility modules.
 Classes are re-exported from logger.py as the canonical import surface.

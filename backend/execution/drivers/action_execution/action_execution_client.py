@@ -11,7 +11,7 @@ from backend.execution.utils.request import send_request
 from backend.execution.utils.system_stats import update_last_execution_time
 
 if TYPE_CHECKING:
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.ledger import EventStream
     from backend.inference.llm_registry import LLMRegistry
 
@@ -68,7 +68,7 @@ class ActionExecutionClient(Runtime):
 
     def __init__(
         self,
-        config: ForgeConfig,
+        config: AppConfig,
         event_stream: EventStream | None,
         llm_registry: LLMRegistry,
         sid: str = "default",
@@ -214,8 +214,8 @@ class ActionExecutionClient(Runtime):
             return ErrorObservation(
                 content=(
                     "MCP tools are not supported on Windows. "
-                    "To use MCP, run Forge on Linux or macOS, or "
-                    "use Forge in a Linux/macOS environment."
+                    "To use MCP, run App on Linux or macOS, or "
+                    "use App in a Linux/macOS environment."
                 )
             )
 

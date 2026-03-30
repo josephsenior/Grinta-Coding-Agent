@@ -1,12 +1,12 @@
-"""Initialize a new Forge agent project."""
+"""Initialize a new App agent project."""
 
 from pathlib import Path
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 TEMPLATE_BASIC_AGENT_YAML = """
 name: "{name}"
-description: "A Forge agent."
+description: "A App agent."
 version: "0.1.0"
 
 agent:
@@ -26,17 +26,17 @@ OPENAI_API_KEY=sk-...
 TEMPLATE_README = """
 # {name}
 
-This is a Forge agent project.
+This is a App agent project.
 
 ## Getting Started
 
 1. Copy `.env.example` to `.env` and fill in your API keys.
-2. Run `forge start` to launch the agent.
+2. Run `app start` to launch the agent.
 """
 
 
 def init_project(name: str | None = None, template: str = "basic") -> None:
-    """Initialize a new Forge project in the current directory.
+    """Initialize a new App project in the current directory.
 
     Args:
         name: Name of the project (defaults to current directory name)
@@ -45,7 +45,7 @@ def init_project(name: str | None = None, template: str = "basic") -> None:
     cwd = Path.cwd()
     project_name = name or cwd.name
 
-    logger.info("Initializing Forge project '%s' in %s...", project_name, cwd)
+    logger.info("Initializing App project '%s' in %s...", project_name, cwd)
 
     # Create agent.yaml
     agent_yaml_path = cwd / "agent.yaml"
@@ -79,4 +79,4 @@ def init_project(name: str | None = None, template: str = "basic") -> None:
     logger.info("Project '%s' initialized successfully!", project_name)
     logger.info("Next steps:")
     logger.info("  1. cp .env.example .env")
-    logger.info("  2. forge serve")
+    logger.info("  2. app serve")

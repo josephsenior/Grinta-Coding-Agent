@@ -36,8 +36,8 @@ class TestPromptManager:
     def test_get_system_message(self, prompt_dir):
         with patch("backend.engine.tools.prompt.refine_prompt", side_effect=lambda x: x):
             pm = PromptManager(prompt_dir)
-            msg = pm.get_system_message(name="Forge")
-            assert msg == "System: Forge"
+            msg = pm.get_system_message(name="App")
+            assert msg == "System: App"
 
     def test_get_example_user_message(self, prompt_dir):
         pm = PromptManager(prompt_dir)
@@ -77,11 +77,11 @@ class TestOrchestratorPromptManager:
         )
         assert opm._active_llm_model_id() == "openai/gpt-4o"
 
-    def test_active_llm_model_id_fallback_from_forge_config(self, prompt_dir):
+    def test_active_llm_model_id_fallback_from_app_config(self, prompt_dir):
         mock_llm_cfg = MagicMock()
         mock_llm_cfg.model = "anthropic/claude-3-5-sonnet"
-        mock_forge_config = MagicMock()
-        mock_forge_config.get_llm_config_from_agent_config.return_value = (
+        mock_app_config = MagicMock()
+        mock_app_config.get_llm_config_from_agent_config.return_value = (
             mock_llm_cfg
         )
         mock_agent_config = MagicMock()
@@ -90,19 +90,19 @@ class TestOrchestratorPromptManager:
             prompt_dir,
             config=mock_agent_config,
             resolved_llm_model_id="",
-            forge_config=mock_forge_config,
+            app_config=mock_app_config,
         )
         assert opm._active_llm_model_id() == "anthropic/claude-3-5-sonnet"
-        mock_forge_config.get_llm_config_from_agent_config.assert_called_once_with(
+        mock_app_config.get_llm_config_from_agent_config.assert_called_once_with(
             mock_agent_config
         )
 
     def test_get_system_message_injects_identity(self, prompt_dir):
         with patch("backend.engine.tools.prompt.refine_prompt", side_effect=lambda x: x):
             opm = OrchestratorPromptManager(prompt_dir)
-            # Should have "You are Forge agent." prefix
+            # Should have "You are App agent." prefix
             msg = opm.get_system_message(name="Test")
-            assert msg.startswith("You are Forge agent.\nSystem: Test")
+            assert msg.startswith("You are App agent.\nSystem: Test")
 
     def test_inject_lessons_learned_missing_file(self, prompt_dir, tmp_path):
         # Line 255: return content if file doesn't exist
@@ -119,7 +119,7 @@ class TestOrchestratorPromptManager:
         # Line 260-288 coverage
         opm = OrchestratorPromptManager(prompt_dir)
         content = "base-prompt"
-        lessons = tmp_path / ".Forge" / "lessons.md"
+        lessons = tmp_path / ".app" / "lessons.md"
         lessons.parent.mkdir(parents=True)
         lessons.write_text("lesson 1", encoding="utf-8")
         with patch(
@@ -133,7 +133,7 @@ class TestOrchestratorPromptManager:
     def test_inject_lessons_learned_truncation(self, prompt_dir, tmp_path):
         opm = OrchestratorPromptManager(prompt_dir)
         long_lessons = "X" * 4000
-        lessons = tmp_path / ".Forge" / "lessons.md"
+        lessons = tmp_path / ".app" / "lessons.md"
         lessons.parent.mkdir(parents=True)
         lessons.write_text(long_lessons, encoding="utf-8")
         with patch(
@@ -146,7 +146,7 @@ class TestOrchestratorPromptManager:
 
     def test_inject_lessons_learned_empty_file(self, prompt_dir, tmp_path):
         opm = OrchestratorPromptManager(prompt_dir)
-        lessons = tmp_path / ".Forge" / "lessons.md"
+        lessons = tmp_path / ".app" / "lessons.md"
         lessons.parent.mkdir(parents=True)
         lessons.write_text("  ", encoding="utf-8")
         with patch(

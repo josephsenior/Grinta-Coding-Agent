@@ -4,7 +4,7 @@ import json
 from typing import TYPE_CHECKING, Any
 from collections.abc import Callable
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import Action
 from backend.inference.tool_types import make_function_chunk, make_tool_param
 

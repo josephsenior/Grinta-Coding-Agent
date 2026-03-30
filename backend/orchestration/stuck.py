@@ -13,7 +13,7 @@ from backend.orchestration.stuck_patterns import (
     is_stuck_repeating_action_error,
     is_stuck_repeating_action_observation,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.validation.command_classification import classify_shell_intent
 from backend.ledger.action.action import Action
 from backend.ledger.action.agent import AgentThinkAction

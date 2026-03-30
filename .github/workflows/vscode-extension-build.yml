@@ -12,7 +12,7 @@ on:
       - 'ext-v*'
   pull_request:
     paths:
-      - 'forge/integrations/vscode/**'
+      - 'app/integrations/vscode/**'
       - 'build_vscode.py'
       - '.github/workflows/vscode-extension-build.yml'
 
@@ -42,7 +42,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install VSCode extension dependencies
-        working-directory: ./forge/integrations/vscode
+        working-directory: ./app/integrations/vscode
         run: npm ci
 
       - name: Build VSCode extension via build_vscode.py
@@ -54,14 +54,14 @@ jobs:
       - name: Validate .vsix file
         run: |
           # Verify the .vsix was created and is valid
-          if [ -f "forge/integrations/vscode/Forge-vscode-0.0.1.vsix" ]; then
+          if [ -f "app/integrations/vscode/App-vscode-0.0.1.vsix" ]; then
             echo "✅ VSCode extension built successfully"
-            ls -la forge/integrations/vscode/Forge-vscode-0.0.1.vsix
+            ls -la app/integrations/vscode/App-vscode-0.0.1.vsix
 
             # Basic validation that the .vsix is a valid zip file
             echo "🔍 Validating .vsix structure..."
-            file forge/integrations/vscode/Forge-vscode-0.0.1.vsix
-            unzip -t forge/integrations/vscode/Forge-vscode-0.0.1.vsix
+            file app/integrations/vscode/App-vscode-0.0.1.vsix
+            unzip -t app/integrations/vscode/App-vscode-0.0.1.vsix
 
             echo "✅ VSCode extension validation passed"
           else
@@ -73,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vscode-extension
-          path: forge/integrations/vscode/Forge-vscode-0.0.1.vsix
+          path: app/integrations/vscode/App-vscode-0.0.1.vsix
           retention-days: 7
 
       - name: Comment on PR with artifact link
@@ -85,7 +85,7 @@ jobs:
             const path = require('path');
 
             // Get file size for display
-            const vsixPath = 'forge/integrations/vscode/Forge-vscode-0.0.1.vsix';
+            const vsixPath = 'app/integrations/vscode/App-vscode-0.0.1.vsix';
             const stats = fs.statSync(vsixPath);
             const fileSizeKB = Math.round(stats.size / 1024);
 
@@ -93,7 +93,7 @@ jobs:
 
             The VSCode extension has been built and is ready for testing.
 
-            **📦 Download**: [Forge-vscode-0.0.1.vsix](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) (${fileSizeKB} KB)
+            **📦 Download**: [App-vscode-0.0.1.vsix](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) (${fileSizeKB} KB)
 
             **🚀 To install**:
             1. Download the artifact from the workflow run above

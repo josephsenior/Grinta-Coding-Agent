@@ -14,7 +14,7 @@ from backend.core.app_paths import get_app_settings_root
 
 @dataclass(slots=True)
 class ServerStartupPlan:
-    """Resolved startup configuration for the local Forge server."""
+    """Resolved startup configuration for the local application server."""
 
     host: str
     requested_port: int
@@ -103,15 +103,15 @@ def load_dotenv_local(
 def validate_storage_contract(environ: MutableMapping[str, str] | None = None) -> None:
     """Fail fast when database-backed storage is requested without a database URL."""
     env = environ if environ is not None else os.environ
-    storage_mode = env.get("KB_STORAGE_TYPE", "file").strip().lower()
+    storage_mode = env.get("APP_KB_STORAGE_TYPE", "file").strip().lower()
     if storage_mode not in {"database", "db"}:
         return
     db_url = env.get("DATABASE_URL", "").strip()
     if db_url:
         return
 
-    print("ERROR: KB_STORAGE_TYPE is set to database but DATABASE_URL is empty.")
-    print("Set DATABASE_URL or switch KB_STORAGE_TYPE=file for emergency local fallback.")
+    print("ERROR: APP_KB_STORAGE_TYPE is set to database but DATABASE_URL is empty.")
+    print("Set DATABASE_URL or switch APP_KB_STORAGE_TYPE=file for emergency local fallback.")
     raise SystemExit(2)
 
 
@@ -130,19 +130,19 @@ def build_server_startup_plan(
     env = environ if environ is not None else os.environ
     dotenv_loaded = load_dotenv_local(project_root, env)
 
-    env.setdefault("FORGE_RUNTIME", "local")
-    env.setdefault("FORGE_LLM_STEP_TIMEOUT_SECONDS", "180")
-    env.setdefault("FORGE_LLM_FIRST_CHUNK_TIMEOUT_SECONDS", "25")
+    env.setdefault("APP_RUNTIME", "local")
+    env.setdefault("APP_LLM_STEP_TIMEOUT_SECONDS", "180")
+    env.setdefault("APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS", "25")
 
-    host = env.get("FORGE_HOST", env.get("HOST", "127.0.0.1")).strip() or "127.0.0.1"
-    requested_port = _parse_port(env.get("FORGE_PORT") or env.get("PORT"), default=3000)
+    host = env.get("APP_HOST", env.get("HOST", "127.0.0.1")).strip() or "127.0.0.1"
+    requested_port = _parse_port(env.get("APP_PORT") or env.get("PORT"), default=3000)
     resolved_port = _find_available_port(host, requested_port)
 
-    env["FORGE_PORT"] = str(resolved_port)
+    env["APP_PORT"] = str(resolved_port)
     env["PORT"] = str(resolved_port)
 
-    dev_mode = env.get("FORGE_ENV", "development") != "production"
-    watch_enabled = env.get("FORGE_WATCH", "1").strip().lower() not in (
+    dev_mode = env.get("APP_ENV", "development") != "production"
+    watch_enabled = env.get("APP_WATCH", "1").strip().lower() not in (
         "0",
         "false",
         "no",
@@ -161,7 +161,7 @@ def build_server_startup_plan(
         resolved_port=resolved_port,
         port_auto_switched=resolved_port != requested_port,
         reload_enabled=reload_enabled,
-        runtime=env.get("FORGE_RUNTIME", "local"),
+        runtime=env.get("APP_RUNTIME", "local"),
         project_root=str(project_root.resolve()),
         cwd=str(cwd),
         app_root=str(app_root),
@@ -187,7 +187,7 @@ def print_server_startup_preflight(
     emit: Callable[[str], None] = print,
 ) -> None:
     """Print a concise startup preflight summary for operators."""
-    emit("Forge local server preflight")
+    emit("Local server preflight")
     emit(f"  app root: {plan.app_root}")
     emit(f"  settings: {plan.settings_path}")
     emit(f"  cwd: {plan.cwd}")
@@ -204,7 +204,7 @@ def print_server_startup_preflight(
     emit(f"  agent.yaml in cwd: {'yes' if plan.agent_config_present else 'no'}")
     emit(f"  health: {plan.health_url}")
     emit("")
-    emit(f"Starting Forge server on {plan.ui_url}")
+    emit(f"Starting server on {plan.ui_url}")
     emit("Press Ctrl+C to stop the server.")
     emit("")
 

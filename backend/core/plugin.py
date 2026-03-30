@@ -1,42 +1,42 @@
-﻿r"""Forge plugin system — lightweight hook-based extension API.
+﻿r"""App plugin system — lightweight hook-based extension API.
 
-There are **two** plugin surfaces in Forge — this module provides the
+There are **two** plugin surfaces in App — this module provides the
 *core hook API* while :mod:`backend.execution.plugins` provides the
 *runtime plugin API*.  They serve different purposes:
 
 +------------------------------+--------------------------------------------+
 | This module (core hooks)     | runtime.plugins (runtime extensions)       |
 +==============================+============================================+
-| ``ForgePlugin`` — lifecycle   | ``Plugin`` — initialise / run inside runtime|
+| ``AppPlugin`` — lifecycle   | ``Plugin`` — initialise / run inside runtime|
 | hooks (action, event, LLM,   |                                            |
 | session).                    |                                            |
 +------------------------------+--------------------------------------------+
 | Registered via entry-point   | Declared via ``PluginRequirement`` +       |
-| ``forge.plugins`` →          | ``ALL_PLUGINS`` or entry-point discovery.  |
+| ``app.plugins`` →          | ``ALL_PLUGINS`` or entry-point discovery.  |
 | ``register(registry)``       |                                            |
 +------------------------------+--------------------------------------------+
-| Runs **in the Forge process**| Runs **inside the runtime environment**.   |
+| Runs **in the App process**| Runs **inside the runtime environment**.   |
 +------------------------------+--------------------------------------------+
 
 If a third-party package needs both, it should register *two* objects —
-one ``ForgePlugin`` for host-side hooks, and one ``Plugin`` subclass for
+one ``AppPlugin`` for host-side hooks, and one ``Plugin`` subclass for
 runtime behaviour.
 
-Plugins are Python packages that expose a ``forge_plugin`` entry point
-(group: ``forge.plugins``).  Each entry point must resolve to a callable
+Plugins are Python packages that expose a ``app_plugin`` entry point
+(group: ``app.plugins``).  Each entry point must resolve to a callable
 that accepts a :class:`PluginRegistry` and calls ``registry.register(...)``
-to install one or more :class:`ForgePlugin` instances.
+to install one or more :class:`AppPlugin` instances.
 
 Example ``pyproject.toml`` entry for a plugin::
 
-    [project.entry-points.\"forge.plugins\"]
+    [project.entry-points.\"app.plugins\"]
     my_plugin = \"my_plugin:register\"
 
 Example plugin implementation::
 
-    from backend.core.plugin import ForgePlugin, PluginRegistry, HookType
+    from backend.core.plugin import AppPlugin, PluginRegistry, HookType
 
-    class MyPlugin(ForgePlugin):
+    class MyPlugin(AppPlugin):
         name = \"my-plugin\"
         version = \"0.1.0\"
 
@@ -79,7 +79,7 @@ PLUGIN_API_VERSION: tuple[int, int] = (1, 0)
 PLUGIN_COMPAT_WINDOW: int = 2
 
 # Contract stability marker — when True the hook signatures in
-# ``ForgePlugin`` are considered stable and will follow semver.
+# ``AppPlugin`` are considered stable and will follow semver.
 # Third-party plugins may rely on this guarantee.
 __plugin_contract_frozen__: bool = True
 
@@ -128,8 +128,8 @@ class HookType(str, Enum):
 # ------------------------------------------------------------------
 
 
-class ForgePlugin(ABC):
-    """Base class for Forge plugins.
+class AppPlugin(ABC):
+    """Base class for App plugins.
 
     Subclasses should set ``name`` and ``version`` and override any
     ``on_*`` methods they want to hook into.  All hooks are optional —
@@ -207,7 +207,7 @@ class ForgePlugin(ABC):
 
         ``original_events`` is the pre-condensation event list.
         ``condensed_events`` is the result.  ``metadata`` may include
-        ``condenser_type``, ``reduction_ratio`` etc.
+        ``compactor_type``, ``reduction_ratio`` etc.
 
         Return the (possibly modified) condensed event list.
         """
@@ -279,9 +279,9 @@ class PluginRegistry:
     The registry is a singleton-like object — typically one per process.
     """
 
-    _plugins: dict[str, ForgePlugin] = field(default_factory=dict)
+    _plugins: dict[str, AppPlugin] = field(default_factory=dict)
 
-    def register(self, plugin: ForgePlugin) -> None:
+    def register(self, plugin: AppPlugin) -> None:
         """Register a plugin. Duplicate names and incompatible versions are rejected.
 
         Version compatibility rules:
@@ -333,11 +333,11 @@ class PluginRegistry:
             logger.info("Plugin unregistered: %s", name)
 
     @property
-    def plugins(self) -> list[ForgePlugin]:
+    def plugins(self) -> list[AppPlugin]:
         """Return a list of all registered plugins."""
         return list(self._plugins.values())
 
-    def get_plugin(self, name: str) -> ForgePlugin | None:
+    def get_plugin(self, name: str) -> AppPlugin | None:
         """Get a plugin by name."""
         return self._plugins.get(name)
 
@@ -473,7 +473,7 @@ class PluginRegistry:
 
 
 def discover_plugins(registry: PluginRegistry | None = None) -> PluginRegistry:
-    """Discover and load plugins from ``forge.plugins`` entry points.
+    """Discover and load plugins from ``app.plugins`` entry points.
 
     Args:
         registry: Existing registry to populate. Creates a new one if ``None``.
@@ -491,9 +491,9 @@ def discover_plugins(registry: PluginRegistry | None = None) -> PluginRegistry:
 
     eps = entry_points()
     try:
-        group = eps.select(group="forge.plugins")
+        group = eps.select(group="app.plugins")
     except AttributeError:
-        group = entry_points(group="forge.plugins")
+        group = entry_points(group="app.plugins")
 
     for ep in group:
         try:
@@ -523,7 +523,7 @@ def get_plugin_registry() -> PluginRegistry:
 
 
 __all__ = [
-    "ForgePlugin",
+    "AppPlugin",
     "HookType",
     "PLUGIN_API_VERSION",
     "PLUGIN_COMPAT_WINDOW",

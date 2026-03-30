@@ -1,4 +1,4 @@
-"""Retry utilities shared by Forge LLM clients for resilient completions."""
+"""Retry utilities shared by App LLM clients for resilient completions."""
 
 import contextlib
 from collections.abc import Callable
@@ -12,7 +12,7 @@ from tenacity import (
 )
 
 from backend.core.errors import LLMNoResponseError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.utils.tenacity_metrics import (
     tenacity_after_factory,
     tenacity_before_sleep_factory,

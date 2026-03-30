@@ -1,7 +1,7 @@
 """Blast radius calculation utilities."""
 
 import re
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.utils.treesitter_editor import TreeSitterEditor
 from backend.utils.lsp_client import get_lsp_client
 

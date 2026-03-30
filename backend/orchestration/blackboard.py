@@ -16,13 +16,13 @@ class Blackboard:
     """Thread- and async-safe key-value store for sub-agent coordination."""
 
     def _save(self) -> None:
-        path = ".forge/blackboard.json"
+        path = ".app/blackboard.json"
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self._data, f)
 
     def _load(self) -> None:
-        path = ".forge/blackboard.json"
+        path = ".app/blackboard.json"
         if os.path.exists(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:

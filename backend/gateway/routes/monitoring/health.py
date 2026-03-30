@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 from backend.orchestration import (
     collect_orchestration_health as _collect_orchestration_health,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.stream import get_aggregated_event_stream_stats
 from backend.execution.utils.process_manager import (
     get_process_manager_health_snapshot as _get_process_manager_health_snapshot,
@@ -23,14 +23,14 @@ router = APIRouter()
 def _event_stream_thresholds() -> dict[str, int]:
     return {
         "drops_per_minute_yellow": max(
-            1, monitoring_helpers.int_env("FORGE_EVENTSTREAM_DROPS_YELLOW", 5)
+            1, monitoring_helpers.int_env("APP_EVENTSTREAM_DROPS_YELLOW", 5)
         ),
-        "drops_per_minute_red": max(1, monitoring_helpers.int_env("FORGE_EVENTSTREAM_DROPS_RED", 20)),
+        "drops_per_minute_red": max(1, monitoring_helpers.int_env("APP_EVENTSTREAM_DROPS_RED", 20)),
         "queue_utilization_yellow": max(
-            1, min(100, monitoring_helpers.int_env("FORGE_EVENTSTREAM_QUEUE_UTIL_YELLOW", 80))
+            1, min(100, monitoring_helpers.int_env("APP_EVENTSTREAM_QUEUE_UTIL_YELLOW", 80))
         ),
         "queue_utilization_red": max(
-            1, min(100, monitoring_helpers.int_env("FORGE_EVENTSTREAM_QUEUE_UTIL_RED", 95))
+            1, min(100, monitoring_helpers.int_env("APP_EVENTSTREAM_QUEUE_UTIL_RED", 95))
         ),
     }
 

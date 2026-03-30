@@ -1,9 +1,9 @@
 # ============================================
-# FORGE - Quick Start Script
+# APP - Quick Start Script
 # ============================================
-# Run this script in PowerShell to start Forge
+# Run this script in PowerShell to start App
 
-Write-Host "🚀 Starting Forge..." -ForegroundColor Cyan
+Write-Host "🚀 Starting App..." -ForegroundColor Cyan
 Write-Host ""
 
 # Change to project directory
@@ -53,13 +53,13 @@ Write-Host "✅ Model aliases updated in settings.json" -ForegroundColor Green
 Write-Host "✅ Dependencies synced!" -ForegroundColor Green
 Write-Host ""
 
-# Step 2: Launch Forge (web UI)
-Write-Host "🚀 Step 2: Starting Forge server..." -ForegroundColor Yellow
+# Step 2: Launch App (web UI)
+Write-Host "🚀 Step 2: Starting App server..." -ForegroundColor Yellow
 Write-Host "   Open http://localhost:3000 in your browser when uvicorn is ready." -ForegroundColor Cyan
 Write-Host ""
 
-uv run forge serve
+uv run app serve
 
 Write-Host ""
-Write-Host "✅ Forge session ended." -ForegroundColor Green
+Write-Host "✅ App session ended." -ForegroundColor Green
 pause

@@ -1,11 +1,11 @@
 <#!
 .SYNOPSIS
-  Starts the shadcn-ui MCP proxy (SuperGateway) and then launches Forge serve.
+  Starts the shadcn-ui MCP proxy (SuperGateway) and then launches App serve.
 .DESCRIPTION
   1. Ensures shadcn-ui MCP server dependencies are installed & built.
   2. Starts SuperGateway exposing http://localhost:8090/sse.
   3. Waits for the SSE endpoint to respond.
-  4. Launches Forge (uvx Forge serve) in the foreground after proxy is up.
+  4. Launches App (uvx App serve) in the foreground after proxy is up.
 .PARAMETER Port
   Port for SuperGateway (default 8090).
 .PARAMETER Framework
@@ -15,7 +15,7 @@
 .PARAMETER SkipBuild
   Skip rebuilding the MCP server even if build output missing.
 .PARAMETER NoServe
-  Start proxy only (do not start Forge serve).
+  Start proxy only (do not start App serve).
 #>
 param(
   [int]$Port = 8090,
@@ -136,19 +136,19 @@ if (-not $readyPort) {
 }
 # --- End non-stream readiness probe ---
 
-# Auto-register with Forge: set env var so Python picks it up in _setup_memory_and_mcp
-$env:FORGE_SHADCN_MCP_URL = "http://localhost:$Port/sse"
-Write-Host "[env] FORGE_SHADCN_MCP_URL=http://localhost:$Port/sse (auto-registered with Forge)" -ForegroundColor Green
+# Auto-register with the app: set env var so Python picks it up in _setup_memory_and_mcp
+$env:APP_SHADCN_MCP_URL = "http://localhost:$Port/sse"
+Write-Host "[env] APP_SHADCN_MCP_URL=http://localhost:$Port/sse (auto-registered with the app)" -ForegroundColor Green
 
 if ($NoServe) { Write-Host '[done] Proxy running only. Use Get-Job/Receive-Job to monitor.' -ForegroundColor Yellow; exit 0 }
 
-Write-Host "[4/5] Launching Forge server..." -ForegroundColor Cyan
-# Attempt to use uvx if available; fallback to 'Forge serve'
-$serveCmd = 'uvx --python 3.12 --from Forge-ai Forge serve'
-try { & uvx --version | Out-Null } catch { $serveCmd = 'Forge serve' }
+Write-Host "[4/5] Launching App server..." -ForegroundColor Cyan
+# Attempt to use uvx if available; fallback to 'App serve'
+$serveCmd = 'uvx --python 3.12 --from App-ai App serve'
+try { & uvx --version | Out-Null } catch { $serveCmd = 'App serve' }
 Write-Host "[cmd] $serveCmd" -ForegroundColor DarkGray
 
-# Run Forge in foreground
+# Run App in foreground
 try {
   Invoke-Expression $serveCmd
 } finally {

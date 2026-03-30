@@ -14,10 +14,10 @@ from backend.core.cache.cache_utils import (
     get_redis_connection_params,
     merge_settings_with_cache,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
     from backend.persistence.data_models.settings import Settings
 
 try:
@@ -81,37 +81,37 @@ class SmartConfigCache:
 
         if not self.redis_available:
             # Fallback to in-memory cache
-            self._global_config_cache: ForgeConfig | None = None
+            self._global_config_cache: AppConfig | None = None
             self._global_config_time: float = 0
             self._user_settings_cache: dict[str, tuple[Settings, float]] = {}
             logger.info("🚀 SmartConfigCache: Using in-memory cache fallback")
 
-    def get_global_config(self) -> ForgeConfig | None:
+    def get_global_config(self) -> AppConfig | None:
         """Get global app config with intelligent caching.
 
         Returns:
-            Global ForgeConfig or None if not available
+            Global AppConfig or None if not available
 
         """
         if self.redis_available:
             return self._get_global_config_redis()
         return self._get_global_config_memory()
 
-    def _get_global_config_redis(self) -> ForgeConfig | None:
+    def _get_global_config_redis(self) -> AppConfig | None:
         """Get global config from Redis cache."""
         try:
             cached = self.redis.get("smart_cache:global_config")
             if isinstance(cached, bytes):
-                from backend.core.config.forge_config import ForgeConfig
+                from backend.core.config.app_config import AppConfig
 
-                config = deserialize_model(cached, ForgeConfig)
+                config = deserialize_model(cached, AppConfig)
                 logger.debug("🚀 Global config cache HIT")
                 return config
 
             # Cache miss - load from file
-            from backend.core.config.config_loader import load_forge_config
+            from backend.core.config.config_loader import load_app_config
 
-            config = load_forge_config()
+            config = load_app_config()
 
             # Cache for 5 minutes (global config rarely changes)
             self.redis.setex("smart_cache:global_config", 300, serialize_model(config))
@@ -121,11 +121,11 @@ class SmartConfigCache:
         except Exception as e:
             logger.error("Redis global config error: %s", e)
             # Fallback to direct loading
-            from backend.core.config.config_loader import load_forge_config
+            from backend.core.config.config_loader import load_app_config
 
-            return load_forge_config()
+            return load_app_config()
 
-    def _get_global_config_memory(self) -> ForgeConfig | None:
+    def _get_global_config_memory(self) -> AppConfig | None:
         """Get global config from memory cache."""
         current_time = time.time()
 
@@ -138,9 +138,9 @@ class SmartConfigCache:
             return self._global_config_cache
 
         # Cache miss - load from file
-        from backend.core.config.config_loader import load_forge_config
+        from backend.core.config.config_loader import load_app_config
 
-        config = load_forge_config()
+        config = load_app_config()
 
         # Cache in memory
         self._global_config_cache = config

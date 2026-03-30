@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.gateway.schemas.conversation_info_result_set import (
     ConversationInfoResultSet,
 )
@@ -110,7 +110,7 @@ async def update_conversation_title(
         if sio is not None:
             try:
                 await sio.emit(
-                    "forge_event",
+                    "app_event",
                     {
                         "status_update": True,
                         "type": "info",

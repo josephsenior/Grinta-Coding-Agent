@@ -1,7 +1,7 @@
 {
   "AutoRunSuggestedCommands": true,
   "AllowedCommandOrigins": ["assistant"],
-  "AllowedCategories": ["error-fix", "forge_client", "backend", "tests", "docs"],
+  "AllowedCategories": ["error-fix", "client", "backend", "tests", "docs"],
   "DisallowedPatterns": [
     "pip install -U pip",
     "pip uninstall",

@@ -13,7 +13,7 @@ from backend.persistence.secrets.secrets_store import SecretsStore
 from backend.utils.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
     from backend.persistence.files import FileStore
 
 
@@ -28,7 +28,7 @@ class FileSecretsStore(SecretsStore):
         path: str | None = None,
         *,
         user_id: str | None = None,
-        config: ForgeConfig | None = None,
+        config: AppConfig | None = None,
     ) -> None:
         """Store dependencies and resolve the target secrets file path."""
         self.file_store = file_store
@@ -79,14 +79,14 @@ class FileSecretsStore(SecretsStore):
 
     @classmethod
     async def get_instance(
-        cls, config: ForgeConfig, user_id: str | None
+        cls, config: AppConfig, user_id: str | None
     ) -> FileSecretsStore:
         """Get FileSecretsStore singleton instance.
 
         Same root as ``settings.json`` — see :func:`backend.core.app_paths.get_app_settings_root`.
 
         Args:
-            config: Forge configuration
+            config: App configuration
             user_id: Optional user ID
 
         Returns:

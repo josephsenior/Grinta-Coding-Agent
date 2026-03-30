@@ -21,8 +21,8 @@ async def connect():
 async def disconnect():
     log("Disconnected from backend")
 
-@sio.on("forge_event")
-async def on_forge_event(data):
+@sio.on("app_event")
+async def on_app_event(data):
     log(f"Event JSON: {json.dumps(data)}")
     action_type = data.get('type')
     action = data.get('action')
@@ -60,8 +60,8 @@ async def main():
     await asyncio.sleep(2)
     
     msg = "Create a python script in a folder named `real_world_task` containing a script `app.py` that starts a tiny FastAPI server on port 8080 returning {'message': 'Hello World'}. Also write a `requirements.txt` for it in that folder. Use tool calls to write the files."
-    log(f"Sending forge_user_action: {msg}")
-    await sio.emit("forge_user_action", {
+    log(f"Sending app_user_action: {msg}")
+    await sio.emit("app_user_action", {
         "action": "message", 
         "args": {
             "content": msg,

@@ -8,7 +8,7 @@ from socketio.exceptions import (
     ConnectionRefusedError as SocketIOConnectionRefusedError,  # type: ignore[import-untyped]
 )
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.provider_types import ProviderType
 
 

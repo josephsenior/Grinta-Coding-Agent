@@ -1,6 +1,6 @@
-# Forge Vocabulary
+# App Vocabulary
 
-This document defines the canonical Forge architecture language.
+This document defines the canonical App architecture language.
 
 The codebase still contains older implementation names. This document is the
 reference contract for future renames across docs, protocols, package
@@ -20,7 +20,7 @@ planning. If it changes, update this document and ADR-016 first.
 
 ## Canonical Terms
 
-| Current code term | Canonical Forge term | Notes |
+| Current code term | Canonical App term | Notes |
 | --- | --- | --- |
 | `Agent` | `Agent` | Keep |
 | `AgentController` / bare `Controller` | `SessionOrchestrator` | Central control-plane component |
@@ -93,7 +93,7 @@ contract. The current implementation package state is:
 
 Until the migration lands:
 
-- Docs should use the canonical Forge term first.
+- Docs should use the canonical App term first.
 - Current code names can appear in backticks for orientation.
 - When prose and package paths differ, use the canonical term in prose and the actual package path in backticks.
 - New symbols, docs, and public contracts should prefer the canonical term unless a migration constraint blocks it.

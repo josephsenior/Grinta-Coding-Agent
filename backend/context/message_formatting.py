@@ -1,4 +1,4 @@
-"""Message formatting and type-check utilities for ConversationMemory.
+"""Message formatting and type-check utilities for ContextMemory.
 
 Extracted from :mod:`backend.context.conversation_memory` to keep module
 sizes within the repository guideline (~400 LOC).

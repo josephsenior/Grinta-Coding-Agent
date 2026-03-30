@@ -90,7 +90,7 @@ class TestCheckTools:
         assert result is tools
 
 
-class TestCleanToolsForGemini:
+class TestGeminiToolCleaning:
     """Tests for _clean_tools_for_gemini function."""
 
     def test_removes_default_values(self):

@@ -1,4 +1,4 @@
-"""Agent-scoped observation types emitted by Forge event stream."""
+"""Agent-scoped observation types emitted by App event stream."""
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar

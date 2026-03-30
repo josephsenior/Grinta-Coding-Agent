@@ -17,7 +17,7 @@ This script handles everything:
 - Checks for `uv` and Python versions
 - Syncs dependencies
 - Discover local models (Ollama/LM Studio)
-- Starts the Forge server (web UI at http://localhost:3000)
+- Starts the App server (web UI at http://localhost:3000)
 
 ## Option 2: Manual start
 
@@ -33,14 +33,14 @@ uv sync
 uv run python start_server.py
 ```
 
-This is the canonical local server path. `uv run forge serve` now delegates to the same entrypoint.
+This is the canonical local server path. `uv run app serve` now delegates to the same entrypoint.
 
 Equivalent aliases:
 
 ```powershell
-uv run forge serve
-uv run forge all
-uv run forge start
+uv run app serve
+uv run app all
+uv run app start
 ```
 
 Then open **http://localhost:3000** in a browser.
@@ -50,7 +50,7 @@ host, port, reload mode, and readiness URL.
 
 ## Security profile
 
-Forge's default local runtime is not sandboxed. If you want a stricter local policy mode, set `security.execution_profile` to `hardened_local` in your configuration.
+App's default local runtime is not sandboxed. If you want a stricter local policy mode, set `security.execution_profile` to `hardened_local` in your configuration.
 
 `hardened_local` blocks or constrains:
 - commands that execute outside the workspace
@@ -80,11 +80,11 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 ### Locally hosted models
 
-Ensure **Ollama** or **LM Studio** is running. Forge auto-discovers them on startup.
+Ensure **Ollama** or **LM Studio** is running. App auto-discovers them on startup.
 
 ### Port already in use
 
-Change the backend port via environment variable `FORGE_PORT`.
+Change the backend port via environment variable `APP_PORT`.
 
 The canonical local server will also auto-select the next free port in a small range
 and print the resolved port in the startup preflight.

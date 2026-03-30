@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 @dataclass
@@ -83,7 +83,7 @@ class RollbackManager:
 
         Args:
             workspace_path: Path to the workspace
-            checkpoints_dir: Directory to store checkpoints (default: workspace_path/.Forge/checkpoints)
+            checkpoints_dir: Directory to store checkpoints (default: workspace_path/.app/checkpoints)
             max_checkpoints: Maximum number of checkpoints to keep
             auto_cleanup: Whether to automatically clean up old checkpoints
 
@@ -92,7 +92,7 @@ class RollbackManager:
         self.checkpoints_dir = (
             Path(checkpoints_dir)
             if checkpoints_dir
-            else self.workspace_path / ".Forge" / "checkpoints"
+            else self.workspace_path / ".app" / "checkpoints"
         )
         self.max_checkpoints = max_checkpoints
         self.auto_cleanup = auto_cleanup
@@ -188,7 +188,7 @@ class RollbackManager:
                     "git",
                     "commit",
                     "-m",
-                    "[Forge Checkpoint] Auto-snapshot",
+                    "[App Checkpoint] Auto-snapshot",
                     "--allow-empty",
                 ],
                 check=False,
@@ -233,8 +233,8 @@ class RollbackManager:
             # Copy workspace files to checkpoint directory
             for file_path in self.workspace_path.rglob("*"):
                 if file_path.is_file():
-                    # Skip .Forge directory and .git
-                    if ".Forge" in file_path.parts or ".git" in file_path.parts:
+                    # Skip .app directory and .git
+                    if ".app" in file_path.parts or ".git" in file_path.parts:
                         continue
 
                     rel_path = file_path.relative_to(self.workspace_path)
@@ -408,9 +408,9 @@ class RollbackManager:
         return True
 
     def _clear_workspace(self) -> None:
-        """Clear workspace directory (except .Forge and .git)."""
+        """Clear workspace directory (except .app and .git)."""
         for item in self.workspace_path.iterdir():
-            if item.name not in [".Forge", ".git"]:
+            if item.name not in [".app", ".git"]:
                 if item.is_dir():
                     shutil.rmtree(item)
                 else:

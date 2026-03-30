@@ -37,3 +37,8 @@ class Action(Event, metaclass=CanonicalMeta):
         # Ensure confirmation_state always has a value (idempotent with field default)
         if not hasattr(self, "confirmation_state"):
             self.confirmation_state = ActionConfirmationStatus.CONFIRMED
+
+
+Operation = Action
+
+__all__ = ["Action", "Operation", "ActionConfirmationStatus"]

@@ -16,7 +16,7 @@ import time
 from collections.abc import Callable
 from uuid import UUID, uuid4
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 # True once graceful shutdown has been requested for this process.
 _should_exit: bool = False

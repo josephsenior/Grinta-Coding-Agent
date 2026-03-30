@@ -6,13 +6,13 @@ import pytest
 from pydantic import ValidationError
 
 from backend.core.config.agent_config import AgentConfig
-from backend.core.constants import FORGE_DEFAULT_AGENT
+from backend.core.constants import DEFAULT_AGENT_NAME
 
 
 class TestAgentConfigDefaults:
     def test_default_name(self):
         cfg = AgentConfig()
-        assert cfg.name == FORGE_DEFAULT_AGENT
+        assert cfg.name == DEFAULT_AGENT_NAME
 
     def test_default_memory_enabled(self):
         cfg = AgentConfig()
@@ -30,9 +30,9 @@ class TestAgentConfigDefaults:
         cfg = AgentConfig()
         assert isinstance(cfg.enable_cmd, bool)
 
-    def test_default_condenser_config(self):
+    def test_default_compactor_config(self):
         cfg = AgentConfig()
-        assert cfg.condenser_config is not None
+        assert cfg.compactor_config is not None
 
     def test_default_autonomy_level(self):
         cfg = AgentConfig()
@@ -68,13 +68,17 @@ class TestAgentConfigValidation:
         with pytest.raises(ValidationError):
             AgentConfig(**{"nonexistent_field": "value"})
 
-    def test_legacy_enable_prompt_caching_kwarg_dropped(self):
-        cfg = AgentConfig(enable_prompt_caching=False)
+    def test_legacy_enable_prompt_caching_input_dropped(self):
+        cfg = AgentConfig.model_validate({"enable_prompt_caching": False})
         assert not hasattr(cfg, "enable_prompt_caching")
 
     def test_legacy_enable_prompt_caching_in_model_validate_dropped(self):
         cfg = AgentConfig.model_validate({"enable_prompt_caching": True})
         assert not hasattr(cfg, "enable_prompt_caching")
+
+    def test_legacy_condenser_config_kwarg_rejected(self):
+        with pytest.raises(ValidationError):
+            AgentConfig.model_validate({"condenser_config": {"type": "noop"}})
 
 
 class TestAgentConfigCustom:
@@ -168,7 +172,7 @@ class TestCreateBaseConfig:
 
     def test_empty_gives_defaults(self):
         cfg = AgentConfig._create_base_config({})
-        assert cfg.name == FORGE_DEFAULT_AGENT
+        assert cfg.name == DEFAULT_AGENT_NAME
 
     def test_invalid_field_value_recovery(self):
         """Test that invalid field values trigger recovery logic."""
@@ -192,7 +196,7 @@ class TestCreateBaseConfig:
             }
         )
         # Should use defaults for invalid fields
-        assert cfg.name == FORGE_DEFAULT_AGENT
+        assert cfg.name == DEFAULT_AGENT_NAME
         assert cfg.memory_max_threads >= 1
 
 

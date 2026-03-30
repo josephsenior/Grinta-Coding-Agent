@@ -39,6 +39,7 @@ def test_get_settings_model_minimal() -> None:
     )
     assert m.llm_api_key_set is False
     assert m.llm_model_supports_vision is True
+    assert m.startup_snapshot is not None
     assert m.startup_snapshot["resolved_port"] == 3000
 
 

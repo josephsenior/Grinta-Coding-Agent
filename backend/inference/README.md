@@ -2,7 +2,7 @@
 
 ## Overview
 
-Forge's LLM system provides a robust, provider-agnostic abstraction layer using direct SDK clients for major providers (OpenAI, Anthropic, Google Gemini, and xAI Grok). This approach ensures maximum stability, performance, and access to the latest provider-specific features.
+App's LLM system provides a robust, provider-agnostic abstraction layer using direct SDK clients for major providers (OpenAI, Anthropic, Google Gemini, and xAI Grok). This approach ensures maximum stability, performance, and access to the latest provider-specific features.
 
 ## Key Features
 
@@ -18,7 +18,7 @@ Forge's LLM system provides a robust, provider-agnostic abstraction layer using 
 
 ### Provider Auto-Resolver Pattern
 
-Forge uses an intelligent routing system that automatically detects providers and discovers local endpoints:
+App uses an intelligent routing system that automatically detects providers and discovers local endpoints:
 
 ```
 User specifies model: "ollama/qwen2.5-coder" (canonical id)
@@ -54,8 +54,8 @@ Response + cost tracking + metrics
 Main interface for LLM calls:
 
 ```python
-from forge.models import LLM
-from forge.core.config import LLMConfig
+from app.models import LLM
+from app.core.config import LLMConfig
 
 # Create LLM instance
 config = LLMConfig(
@@ -125,7 +125,7 @@ python -m backend.inference.discover_models status
 Secure multi-provider API key management:
 
 ```python
-from forge.core.config.api_key_manager import api_key_manager
+from app.core.config.api_key_manager import api_key_manager
 
 # Get correct API key for model
 key = api_key_manager.get_api_key_for_model(
@@ -151,7 +151,7 @@ api_key_manager.set_environment_variables(
 Pre-configured settings for 30+ providers:
 
 ```python
-from forge.core.config.provider_config import provider_config_manager
+from app.core.config.provider_config import provider_config_manager
 
 # Get provider config
 config = provider_config_manager.get_provider_config("anthropic")
@@ -178,7 +178,7 @@ cleaned = provider_config_manager.validate_and_clean_params(
 Automatic feature detection:
 
 ```python
-from forge.models.model_features import get_features
+from app.models.model_features import get_features
 
 features = get_features("claude-haiku-4-5-20251001")
 
@@ -227,12 +227,12 @@ if features.supports_reasoning_effort:
 | LM Studio | 1234 | ✓ | GUI-based local models |
 | vLLM | 8000 | ✓ | Production local deployment |
 
-**No configuration needed** - Forge automatically discovers running local providers:
+**No configuration needed** - App automatically discovers running local providers:
 
 ```python
 # Just specify the model
 llm = LLM(model="ollama/llama3.2")
-# Forge automatically:
+# App automatically:
 # 1. Detects provider is "ollama"
 # 2. Probes localhost:11434
 # 3. Verifies it's a valid LLM endpoint
@@ -255,7 +255,7 @@ export VLLM_BASE_URL="http://localhost:8000/v1"
 
 ### Base URL Resolution Priority
 
-When determining where to send API requests, Forge uses this priority order:
+When determining where to send API requests, App uses this priority order:
 
 1. **Explicit** - Passed directly in code: `LLM(base_url="http://custom:9000")`
 2. **Environment** - Provider-specific env vars (e.g., `OLLAMA_HOST`)
@@ -271,7 +271,7 @@ os.environ["OLLAMA_HOST"] = "http://192.168.1.100:11434"
 llm = LLM(model="ollama/llama3.2")
 
 # Priority 3: Auto-discovery
-# (Forge automatically probes localhost:11434)
+# (App automatically probes localhost:11434)
 llm = LLM(model="ollama/llama3.2")
 
 # Priority 4: Default (for cloud providers)
@@ -330,7 +330,7 @@ LLM_API_VERSION=2024-12-01
 
 ### Step 1: Add Provider Config
 
-Edit `Forge/core/config/provider_config.py`:
+Edit `App/core/config/provider_config.py`:
 
 ```python
 configs['newprovider'] = ProviderConfig(
@@ -348,7 +348,7 @@ configs['newprovider'] = ProviderConfig(
 
 ### Step 2: Add Feature Patterns (if needed)
 
-Edit `Forge/llm/model_features.py`:
+Edit `App/llm/model_features.py`:
 
 ```python
 FUNCTION_CALLING_PATTERNS: list[str] = [
@@ -360,8 +360,8 @@ FUNCTION_CALLING_PATTERNS: list[str] = [
 ### Step 3: Test
 
 ```python
-from forge.models import LLM
-from forge.core.config import LLMConfig
+from app.models import LLM
+from app.core.config import LLMConfig
 
 config = LLMConfig(
     model="newprovider/model-name",
@@ -472,7 +472,7 @@ if response.choices[0].message.tool_calls:
 **Supported models:** GPT-4o, Claude 3.5+, Gemini 2.0+
 
 ```python
-from forge.core.message import Message
+from app.core.message import Message
 
 # Image message
 message = Message(
@@ -506,7 +506,7 @@ for chunk in response:
 ### LLM Metrics Class
 
 ```python
-from forge.models.metrics import Metrics
+from app.models.metrics import Metrics
 
 metrics = Metrics(model_name="claude-4")
 
@@ -588,7 +588,7 @@ LLM_MODEL=gpt-4o-mini
 
 ```python
 # Check if model supports function calling
-from forge.models.model_features import get_features
+from app.models.model_features import get_features
 
 features = get_features(your_model)
 print(f"Function calling: {features.supports_function_calling}")
@@ -647,7 +647,7 @@ caching_prompt = true  # 35-50% cost savings
 
 ```bash
 # Check accumulated costs
-tail -f logs/Forge.log | grep "Accumulated Cost"
+tail -f logs/App.log | grep "Accumulated Cost"
 
 # Or via Grafana
 open http://localhost:3001/grafana
@@ -720,7 +720,7 @@ ollama serve
 # Pull model
 ollama pull llama3.3:70b
 
-# Configure Forge
+# Configure App
 LLM_MODEL=ollama/llama3.3:70b
 OLLAMA_BASE_URL=http://localhost:11434
 ```

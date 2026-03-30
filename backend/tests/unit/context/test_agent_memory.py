@@ -9,7 +9,9 @@ import pytest
 from backend.core.enums import RecallType
 from backend.ledger.action.agent import RecallAction
 from backend.ledger.observation.agent import PlaybookKnowledge, RecallObservation
-from backend.context.agent_memory import Memory
+from pathlib import Path
+
+from backend.context.agent_memory import Memory, USER_PLAYBOOKS_DIR
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -52,6 +54,9 @@ class TestMemoryInit:
         ):
             Memory(mock_event_stream, sid="sub-test")
         mock_event_stream.subscribe.assert_called_once()
+
+    def test_user_playbooks_dir_uses_app_path(self):
+        assert USER_PLAYBOOKS_DIR == Path.home() / ".app" / "playbooks"
 
 
 # ── set_repository_info ──────────────────────────────────────────────
@@ -102,6 +107,16 @@ class TestSetRuntimeInfo:
         memory.set_runtime_info(runtime, {}, "/w")
         assert memory.runtime_info is not None
         assert memory.runtime_info.date  # should have today's date
+
+    def test_runtime_info_fields_virtualize_app_workspace_dir(self, memory):
+        runtime = MagicMock()
+        runtime.web_hosts = {}
+        runtime.additional_agent_instructions = None
+        memory.set_runtime_info(runtime, {}, "/tmp/app_workspace_test_sid_123")
+
+        fields = memory._get_runtime_info_fields()
+
+        assert fields["working_dir"] == "/workspace"
 
 
 # ── _is_transient_error ──────────────────────────────────────────────

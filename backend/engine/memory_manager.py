@@ -4,12 +4,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.message import Message, TextContent
 from backend.ledger.action import MessageAction
 from backend.inference.prompt_caching import model_supports_prompt_cache_hints
-from backend.context.condenser import Condenser
-from backend.context.conversation_memory import ConversationMemory
+from backend.context import ContextMemory
+from backend.context.compactor import Compactor
 from backend.context.pre_condensation_snapshot import (
     extract_snapshot,
     format_snapshot_for_injection,
@@ -33,8 +33,8 @@ class CondensedHistory:
     pending_action: Action | None
 
 
-class ConversationMemoryManager:
-    """Owns conversation memory and condensation."""
+class ContextMemoryManager:
+    """Owns context memory and condensation."""
 
     def __init__(
         self,
@@ -43,75 +43,75 @@ class ConversationMemoryManager:
     ) -> None:
         self._config = config
         self._llm_registry = llm_registry
-        self.conversation_memory: ConversationMemory | None = None
-        self.condenser: Condenser | None = None
+        self.conversation_memory: ContextMemory | None = None
+        self.compactor: Compactor | None = None
 
     def initialize(self, prompt_manager: PromptManager) -> None:
-        """Initialize conversation memory with prompt manager."""
-        self.conversation_memory = ConversationMemory(self._config, prompt_manager)
-        # Initialize condenser from config if available
-        condenser_config = getattr(self._config, "condenser_config", None)
-        self._init_condenser(condenser_config)
+        """Initialize context memory with prompt manager."""
+        self.conversation_memory = ContextMemory(self._config, prompt_manager)
+        # Initialize compactor from config if available
+        compactor_config = getattr(self._config, "compactor_config", None)
+        self._init_compactor(compactor_config)
 
-    def _init_condenser(self, condenser_config) -> None:
-        """Initialize the condenser from config."""
-        if condenser_config is None:
-            self.condenser = None
+    def _init_compactor(self, compactor_config) -> None:
+        """Initialize the compactor from config."""
+        if compactor_config is None:
+            self.compactor = None
             return
 
         try:
-            self.condenser = Condenser.from_config(
-                condenser_config,
+            self.compactor = Compactor.from_config(
+                compactor_config,
                 self._llm_registry,
             )
-            logger.debug("Using condenser: %s", type(self.condenser))
+            logger.debug("Using compactor: %s", type(self.compactor))
         except Exception as exc:  # pragma: no cover - condensation optional
-            logger.warning("Failed to initialize condenser: %s", exc)
-            self.condenser = None
+            logger.warning("Failed to initialize compactor: %s", exc)
+            self.compactor = None
 
     # --------------------------------------------------------------------- #
     # History utilities
     # --------------------------------------------------------------------- #
     def condense_history(self, state: State) -> CondensedHistory:
         history = getattr(state, "history", [])
-        if not self.condenser:
+        if not self.compactor:
             return CondensedHistory(list(history), None)
 
-        # Auto-extract critical context before condensation may discard events
+        # Auto-extract critical context before compaction may discard events
         self._extract_pre_condensation_snapshot(list(history))
 
-        condensation_result = self.condenser.condensed_history(state)
+        condensation_result = self.compactor.compacted_history(state)
 
-        # If memory pressure is active and the condenser chose NOT to
-        # condense (returned a plain View), force condensation so the
+        # If memory pressure is active and the compactor chose NOT to
+        # compact (returned a plain View), force compaction so the
         # agent loop can recover from high-memory situations.
         memory_pressure = state.turn_signals.memory_pressure
         if memory_pressure and isinstance(condensation_result, View):
-            from backend.context.condenser.condenser import RollingCondenser
+            from backend.context.compactor.compactor import RollingCompactor
 
-            if isinstance(self.condenser, RollingCondenser):
+            if isinstance(self.compactor, RollingCompactor):
                 logger.info(
-                    "Memory pressure %s: forcing condensation",
+                    "Memory pressure %s: forcing compaction",
                     memory_pressure,
                 )
                 try:
-                    forced = self.condenser.get_condensation(condensation_result)
+                    forced = self.compactor.get_compaction(condensation_result)
                     condensation_result = forced
                 except Exception as exc:
-                    logger.warning("Forced condensation failed: %s", exc)
+                    logger.warning("Forced compaction failed: %s", exc)
             # Clear the flag after consuming it
-            state.ack_memory_pressure(source="ConversationMemoryManager")
+            state.ack_memory_pressure(source="ContextMemoryManager")
 
         if isinstance(condensation_result, View):
             return CondensedHistory(condensation_result.events, None)
 
-        # Condensation occurred — attach the snapshot for post-recovery injection
+        # Compaction occurred — attach the snapshot for post-recovery injection
         return CondensedHistory([], condensation_result.action)
 
     def _extract_pre_condensation_snapshot(self, history: list[Event]) -> None:
         """Extract and persist a snapshot of critical context from current history.
 
-        This runs *before* the condenser, so the full event stream is still
+        This runs *before* the compactor, so the full event stream is still
         available.  The snapshot is read back during post-condensation recovery.
         """
         try:
@@ -204,3 +204,7 @@ class ConversationMemoryManager:
                     break
 
         return messages
+__all__ = [
+    "CondensedHistory",
+    "ContextMemoryManager",
+]

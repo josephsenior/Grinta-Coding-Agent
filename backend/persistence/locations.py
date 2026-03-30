@@ -141,9 +141,9 @@ def get_local_data_root() -> str:
     import os
 
     from backend.core.app_paths import get_app_settings_root
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
 
-    cfg = ForgeConfig()
+    cfg = AppConfig()
     raw = (cfg.local_data_root or "").strip()
     if not raw:
         return get_app_settings_root()

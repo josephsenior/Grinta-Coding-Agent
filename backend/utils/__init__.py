@@ -1,4 +1,4 @@
-"""Forge common utilities."""
+"""App common utilities."""
 
 from .retry import RetryError, retry
 

@@ -1,7 +1,7 @@
 """File state tracking middleware for the tool pipeline.
 
 Maintains a manifest of files read, modified, and created during a session.
-The manifest survives condensation by persisting to .forge/file_manifest.json
+The manifest survives condensation by persisting to .app/file_manifest.json
 alongside the scratchpad, and is injected into context via the planner.
 """
 
@@ -13,14 +13,14 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.orchestration.tool_pipeline import ToolInvocationContext
     from backend.ledger.observation import Observation
 
 
-_MANIFEST_PATH = os.path.join(".forge", "file_manifest.json")
+_MANIFEST_PATH = os.path.join(".app", "file_manifest.json")
 _MAX_TRACKED_FILES = 50
 
 

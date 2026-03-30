@@ -1,4 +1,4 @@
-"""Type safety and defensive programming utilities for Forge.
+"""Type safety and defensive programming utilities for App.
 
 Provides:
 - Sentinel objects for explicit None handling

@@ -1,4 +1,4 @@
-"""Monitoring and diagnostics routes for the Forge server."""
+"""Monitoring and diagnostics routes for the App server."""
 
 from .router import router
 

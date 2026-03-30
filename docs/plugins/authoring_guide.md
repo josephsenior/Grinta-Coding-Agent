@@ -1,17 +1,17 @@
-# Forge Plugin Authoring Guide
+# App Plugin Authoring Guide
 
-Forge supports a lightweight, hook-based plugin system that allows you to extend the agent's behavior, inspect events, and modify actions.
+App supports a lightweight, hook-based plugin system that allows you to extend the agent's behavior, inspect events, and modify actions.
 
 ## 1. Plugin Structure
 
-A Forge plugin is a Python package that exposes a `forge.plugins` entry point.
+A App plugin is a Python package that exposes a `app.plugins` entry point.
 
 ### Minimal Example
 
 ```python
-from backend.core.plugin import ForgePlugin, PluginRegistry
+from backend.core.plugin import AppPlugin, PluginRegistry
 
-class MyPlugin(ForgePlugin):
+class MyPlugin(AppPlugin):
     name = "my-plugin"
     version = "0.1.0"
     
@@ -26,13 +26,13 @@ def register(registry: PluginRegistry):
 ### pyproject.toml
 
 ```toml
-[project.entry-points."forge.plugins"]
+[project.entry-points."app.plugins"]
 my_plugin = "my_package:register"
 ```
 
 ## 2. Available Hooks
 
-Inherit from `ForgePlugin` and override these methods:
+Inherit from `AppPlugin` and override these methods:
 
 ### Action Hooks
 

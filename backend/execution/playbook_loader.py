@@ -104,7 +104,7 @@ class PlaybookLoaderMixin:
         """Load playbooks from the organization or user level repository.
 
         For example, if the repository is github.com/acme-co/api, this will check if
-        github.com/acme-co/.Forge exists. If it does, it will clone it and load
+        github.com/acme-co/.app exists. If it does, it will clone it and load
         the playbooks from the ./playbooks/ folder.
 
         Args:
@@ -122,10 +122,10 @@ class PlaybookLoaderMixin:
         if not org_name:
             return []
 
-        org_FORGE_repo = self._get_org_config_repo_path(selected_repository, org_name)
-        self.log("info", f"Checking for org-level playbooks at {org_FORGE_repo}")
+        org_config_repo = self._get_org_config_repo_path(selected_repository, org_name)
+        self.log("info", f"Checking for org-level playbooks at {org_config_repo}")
 
-        return self._clone_and_load_org_playbooks(org_name, org_FORGE_repo)
+        return self._clone_and_load_org_playbooks(org_name, org_config_repo)
 
     def get_playbooks_from_selected_repo(
         self, selected_repository: str | None
@@ -137,16 +137,16 @@ class PlaybookLoaderMixin:
 
         This method also checks for user/org level playbooks stored in a repository.
         For example, if the repository is github.com/acme-co/api, it will also check for
-        github.com/acme-co/.Forge and load playbooks from there if it exists.
+        github.com/acme-co/.app and load playbooks from there if it exists.
         """
-        playbooks_dir = self.workspace_root / ".Forge" / "playbooks"
+        playbooks_dir = self.workspace_root / ".app" / "playbooks"
         repo_root = None
         loaded_playbooks: list[BasePlaybook] = []
         if selected_repository:
             org_playbooks = self.get_playbooks_from_org_or_user(selected_repository)
             loaded_playbooks.extend(org_playbooks)
             repo_root = self.workspace_root / selected_repository.split("/")[-1]
-            playbooks_dir = repo_root / ".Forge" / "playbooks"
+            playbooks_dir = repo_root / ".app" / "playbooks"
         self.log(
             "info",
             f"Selected repo: {selected_repository}, loading playbooks from {playbooks_dir} (inside runtime)",
@@ -156,7 +156,7 @@ class PlaybookLoaderMixin:
             obs = cast(
                 Any,
                 self.read(
-                    FileReadAction(path=str(self.workspace_root / ".FORGE_instructions"))
+                    FileReadAction(path=str(self.workspace_root / ".APP_instructions"))
                 ),
             )
         except OSError:
@@ -164,20 +164,20 @@ class PlaybookLoaderMixin:
         if (isinstance(obs, ErrorObservation) or (isinstance(obs, FileReadObservation) and not obs.content)) and repo_root is not None:
             self.log(
                 "debug",
-                f".FORGE_instructions not present, trying to load from repository playbooks_dir={playbooks_dir!r}",
+                f".APP_instructions not present, trying to load from repository playbooks_dir={playbooks_dir!r}",
             )
             try:
                 obs = cast(
                     Any,
-                    self.read(FileReadAction(path=str(repo_root / ".FORGE_instructions"))),
+                    self.read(FileReadAction(path=str(repo_root / ".APP_instructions"))),
                 )
             except OSError:
                 obs = ErrorObservation("File not found")
         if isinstance(obs, FileReadObservation) and obs.content:
-            self.log("info", "FORGE_instructions playbook loaded.")
+            self.log("info", "APP_instructions playbook loaded.")
             loaded_playbooks.append(
                 BasePlaybook.load(
-                    path=".FORGE_instructions",
+                    path=".APP_instructions",
                     playbook_dir=None,
                     file_content=obs.content,
                 ),
@@ -208,20 +208,20 @@ class PlaybookLoaderMixin:
 
     def _get_org_config_repo_path(self, selected_repository: str, org_name: str) -> str:
         """Get org-level config repository path."""
-        return f"{org_name}/.Forge"
+        return f"{org_name}/.app"
 
     def _clone_and_load_org_playbooks(
-        self, org_name: str, org_FORGE_repo: str
+        self, org_name: str, org_config_repo: str
     ) -> list[BasePlaybook]:
         """Clone org config repo and load playbooks."""
-        org_repo_dir = self.workspace_root / f"org_FORGE_{org_name}"
+        org_repo_dir = self.workspace_root / f"org_app_{org_name}"
         self.log("debug", f"Creating temporary directory for org repo: {org_repo_dir}")
 
         try:
             remote_url = call_async_from_sync(
                 self.provider_handler.get_authenticated_git_url,
                 GENERAL_TIMEOUT,
-                org_FORGE_repo,
+                org_config_repo,
             )
         except Exception as e:
             from backend.core.provider_types import AuthenticationError
@@ -229,14 +229,14 @@ class PlaybookLoaderMixin:
             if isinstance(e, AuthenticationError):
                 self.log(
                     "debug",
-                    f"org-level playbook directory {org_FORGE_repo} not found: {e!s}",
+                    f"org-level playbook directory {org_config_repo} not found: {e!s}",
                 )
             return []
 
-        return self._execute_clone_and_load(org_repo_dir, remote_url, org_FORGE_repo)
+        return self._execute_clone_and_load(org_repo_dir, remote_url, org_config_repo)
 
     def _execute_clone_and_load(
-        self, org_repo_dir, remote_url: str, org_FORGE_repo: str
+        self, org_repo_dir, remote_url: str, org_config_repo: str
     ) -> list[BasePlaybook]:
         """Execute git clone and load playbooks."""
         clone_cmd = (
@@ -248,16 +248,16 @@ class PlaybookLoaderMixin:
         obs = cast(Any, self.run_action(action))
 
         if isinstance(obs, CmdOutputObservation) and obs.exit_code == 0:
-            return self._load_and_cleanup_org_playbooks(org_repo_dir, org_FORGE_repo)
-        self._log_clone_failure(obs, org_FORGE_repo)
+            return self._load_and_cleanup_org_playbooks(org_repo_dir, org_config_repo)
+        self._log_clone_failure(obs, org_config_repo)
         return []
 
     def _load_and_cleanup_org_playbooks(
-        self, org_repo_dir, org_FORGE_repo: str
+        self, org_repo_dir, org_config_repo: str
     ) -> list[BasePlaybook]:
         """Load playbooks and cleanup cloned repo."""
         self.log(
-            "info", f"Successfully cloned org-level playbooks from {org_FORGE_repo}"
+            "info", f"Successfully cloned org-level playbooks from {org_config_repo}"
         )
         org_playbooks_dir = org_repo_dir / "playbooks"
         self.log("info", f"Looking for playbooks in directory: {org_playbooks_dir}")
@@ -267,7 +267,7 @@ class PlaybookLoaderMixin:
         )
         self.log(
             "info",
-            f"Loaded {len(loaded_playbooks)} playbooks from org-level repository {org_FORGE_repo}",
+            f"Loaded {len(loaded_playbooks)} playbooks from org-level repository {org_config_repo}",
         )
 
         # Cleanup
@@ -276,7 +276,7 @@ class PlaybookLoaderMixin:
 
         return loaded_playbooks
 
-    def _log_clone_failure(self, obs, org_FORGE_repo: str) -> None:
+    def _log_clone_failure(self, obs, org_config_repo: str) -> None:
         """Log clone failure details."""
         clone_error_msg = (
             obs.content if isinstance(obs, CmdOutputObservation) else "Unknown error"
@@ -284,6 +284,6 @@ class PlaybookLoaderMixin:
         exit_code = obs.exit_code if isinstance(obs, CmdOutputObservation) else "N/A"
         self.log(
             "info",
-            f"No org-level playbooks found at {org_FORGE_repo} (exit_code: {exit_code})",
+            f"No org-level playbooks found at {org_config_repo} (exit_code: {exit_code})",
         )
         self.log("debug", f"Clone command output: {clone_error_msg}")

@@ -8,10 +8,10 @@ from backend.core.constants import (
     DEFAULT_MAIN_MODULE,
     DEFAULT_PYTHON_PREFIX,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.execution.plugins import PluginRequirement
 
 
@@ -31,19 +31,19 @@ def _build_plugin_args(plugins: list[PluginRequirement] | None) -> list[str]:
 
 
 def _validate_and_get_username(
-    override_username: str | None, run_as_forge: bool
+    override_username: str | None, run_as_runtime_user: bool
 ) -> str:
     """Validate and get username with security checks.
 
     Args:
         override_username: Override username if provided
-        run_as_forge: Whether to run as forge user
+        run_as_runtime_user: Whether to run as the configured non-root runtime user
 
     Returns:
         Validated username
 
     """
-    default_username = "forge" if run_as_forge else "root"
+    default_username = "app" if run_as_runtime_user else "root"
     username = override_username or default_username
 
     # Validate username to prevent command injection
@@ -107,7 +107,7 @@ def _validate_env_part(part: object) -> bool:
 def get_action_execution_server_startup_command(
     server_port: int,
     plugins: list[PluginRequirement],
-    app_config: ForgeConfig,
+    app_config: AppConfig,
     python_prefix: list[str] | None = None,
     override_user_id: int | None = None,
     override_username: str | None = None,
@@ -119,7 +119,7 @@ def get_action_execution_server_startup_command(
     Args:
         server_port: The port number for the server.
         plugins: List of plugin requirements.
-        app_config: Forge configuration object.
+        app_config: Application configuration object.
         python_prefix: Python command prefix (default: micromamba with uv).
         override_user_id: Override user ID for the server process.
         override_username: Override username for the server process.
@@ -137,8 +137,10 @@ def get_action_execution_server_startup_command(
 
     # Build command components
     plugin_args = _build_plugin_args(plugins)
-    username = _validate_and_get_username(override_username, app_config.run_as_Forge)
-    user_id = override_user_id or (1000 if app_config.run_as_Forge else 0)
+    username = _validate_and_get_username(
+        override_username, app_config.run_as_runtime_user
+    )
+    user_id = override_user_id or (1000 if app_config.run_as_runtime_user else 0)
 
     # Build base command
     effective_prefix = (

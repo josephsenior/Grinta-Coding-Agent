@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action.message import MessageAction
 from backend.core.provider_types import (
     CustomSecretsWithTypeSchema,

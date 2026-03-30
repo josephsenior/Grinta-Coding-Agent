@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.context.graph_store import GraphMemoryStore
 from backend.context.graph_rag import GraphRAG
 from backend.context.vector_store import EnhancedVectorStore

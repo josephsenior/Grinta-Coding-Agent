@@ -1,4 +1,4 @@
-"""Filtering utilities for querying Forge event streams."""
+"""Filtering utilities for querying App event streams."""
 
 from __future__ import annotations
 

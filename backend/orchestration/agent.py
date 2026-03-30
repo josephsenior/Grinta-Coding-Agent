@@ -29,7 +29,7 @@ from backend.core.errors import (
     AgentAlreadyRegisteredError,
     AgentNotRegisteredError,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.event import EventSource
 
 

@@ -2,7 +2,7 @@ import ast
 from pathlib import Path
 
 p = Path(
-    'C:/Users/youse/Bureau/Joseph/Forge/evaluation/benchmarks/versicode/metric/compute_migration_cdc_score.py'
+    'C:/Users/youse/Bureau/Joseph/App/evaluation/benchmarks/versicode/metric/compute_migration_cdc_score.py'
 )
 s = p.read_text(encoding='utf-8')
 mod = ast.parse(s)

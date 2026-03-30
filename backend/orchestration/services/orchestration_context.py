@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.orchestration.state.state_tracker import StateTracker
     from backend.orchestration.tool_pipeline import (
+        OperationPipeline,
         ToolInvocationContext,
         ToolInvocationPipeline,
     )
@@ -78,6 +79,9 @@ class OrchestrationContext:
         pending_service = getattr(self._controller, "pending_action_service", None)
         if pending_service:
             return pending_service.get()
+        pending_service = getattr(self._controller, "open_operation_service", None)
+        if pending_service:
+            return pending_service.get()
         action_service = getattr(self._controller, "action_service", None)
         if action_service:
             return action_service.get_pending_action()
@@ -92,18 +96,37 @@ class OrchestrationContext:
 
     def initialize_tool_pipeline(
         self, middlewares: Sequence[Any]
-    ) -> ToolInvocationPipeline:
+    ) -> OperationPipeline:
         """Attach a tool invocation pipeline to the controller.
 
         Resets bookkeeping caches to avoid stale context leakage.
         """
-        from backend.orchestration.tool_pipeline import ToolInvocationPipeline
+        from backend.orchestration.tool_pipeline import OperationPipeline
 
-        pipeline = ToolInvocationPipeline(self._controller, list(middlewares))
-        self._controller.tool_pipeline = pipeline
-        self._controller._action_contexts_by_object = {}
-        self._controller._action_contexts_by_event_id = {}
+        pipeline = OperationPipeline(self._controller, list(middlewares))
+        setattr(self._controller, "tool_pipeline", pipeline)
+        setattr(self._controller, "operation_pipeline", pipeline)
+        setattr(self._controller, "_action_contexts_by_object", {})
+        setattr(self._controller, "_action_contexts_by_event_id", {})
         return pipeline
+
+    def initialize_operation_pipeline(
+        self, middlewares: Sequence[Any]
+    ) -> OperationPipeline:
+        """Canonical alias for pipeline initialization."""
+        return self.initialize_tool_pipeline(middlewares)
+
+    @property
+    def open_operation(self):
+        """Canonical alias for the current pending action."""
+        pending_service = getattr(self._controller, "open_operation_service", None)
+        if pending_service:
+            return pending_service.get()
+        return self.pending_action
+
+    def set_open_operation(self, action: Action | None) -> None:
+        """Canonical alias for setting the current pending action."""
+        self.set_pending_action(action)
 
     def cleanup_action_context(
         self,
@@ -178,6 +201,19 @@ class OrchestrationContext:
 
     @property
     def tool_pipeline(self):
+        return getattr(self._controller, "tool_pipeline", None)
+
+    @property
+    def operation_pipeline(self):
+        controller_dict = getattr(self._controller, "__dict__", {})
+        pipeline = controller_dict.get("operation_pipeline")
+        if pipeline is None:
+            pipeline = getattr(self._controller, "operation_pipeline", None)
+        if pipeline is not None:
+            return pipeline
+        pipeline = controller_dict.get("tool_pipeline")
+        if pipeline is not None:
+            return pipeline
         return getattr(self._controller, "tool_pipeline", None)
 
     @property

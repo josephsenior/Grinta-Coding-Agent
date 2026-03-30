@@ -1,4 +1,4 @@
-"""Helper utilities for building Forge CLI argument parsers."""
+"""Helper utilities for building App CLI argument parsers."""
 
 from __future__ import annotations
 
@@ -115,15 +115,15 @@ def add_headless_specific_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def get_cli_parser() -> argparse.ArgumentParser:
-    """Create argument parser for Forge."""
+    """Create argument parser for App."""
     description = (
-        "Welcome to Forge: Code Less, Make More\n\n"
-        "Forge is now a GUI-only application. Use 'forge serve' to launch "
+        "Welcome to App: Code Less, Make More\n\n"
+        "App is now a GUI-only application. Use 'app serve' to launch "
         "the web interface."
     )
     parser = argparse.ArgumentParser(
         description=description,
-        prog="forge",
+        prog="app",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(
@@ -131,7 +131,7 @@ def get_cli_parser() -> argparse.ArgumentParser:
         title="commands",
         metavar="COMMAND",
     )
-    subparsers.add_parser("serve", help="Launch the Forge GUI server (web interface)")
+    subparsers.add_parser("serve", help="Launch the App GUI server (web interface)")
     subparsers.add_parser(
         "all", help="Alias for 'serve' (launch the web GUI server)"
     )
@@ -143,7 +143,7 @@ def get_cli_parser() -> argparse.ArgumentParser:
         "health", help="Run production health checks for critical dependencies"
     )
 
-    init_parser = subparsers.add_parser("init", help="Initialize a new Forge project")
+    init_parser = subparsers.add_parser("init", help="Initialize a new App project")
     init_parser.add_argument(
         "project_name",
         nargs="?",

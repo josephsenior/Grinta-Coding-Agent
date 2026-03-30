@@ -10,19 +10,19 @@ from backend.gateway.services.conversation_stats import ConversationStats
 from backend.persistence import get_file_store
 
 if TYPE_CHECKING:
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
     from backend.persistence.data_models.settings import Settings
 
 
-def setup_llm_config(config: ForgeConfig, settings: Settings) -> ForgeConfig:
+def setup_llm_config(config: AppConfig, settings: Settings) -> AppConfig:
     """Setup LLM configuration from user settings.
 
     Args:
-        config: The base Forge configuration.
+        config: The base application configuration.
         settings: User settings containing LLM preferences.
 
     Returns:
-        ForgeConfig: Updated configuration with user LLM settings.
+        AppConfig: Updated configuration with user LLM settings.
 
     """
     config = deepcopy(config)
@@ -35,21 +35,21 @@ def setup_llm_config(config: ForgeConfig, settings: Settings) -> ForgeConfig:
 
 
 def create_registry_and_conversation_stats(
-    config: ForgeConfig,
+    config: AppConfig,
     sid: str,
     user_id: str | None,
     user_settings: Settings | None = None,
-) -> tuple[LLMRegistry, ConversationStats, ForgeConfig]:
+) -> tuple[LLMRegistry, ConversationStats, AppConfig]:
     """Create LLM registry and conversation stats for a session.
 
     Args:
-        config: The base Forge configuration.
+        config: The base application configuration.
         sid: Session/conversation ID.
         user_id: User ID for the session.
         user_settings: Optional user-specific settings.
 
     Returns:
-        tuple[LLMRegistry, ConversationStats, ForgeConfig]: Registry, stats, and updated config.
+        tuple[LLMRegistry, ConversationStats, AppConfig]: Registry, stats, and updated config.
 
     """
     user_config = config

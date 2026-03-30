@@ -1,4 +1,4 @@
-﻿"""Tests for backend.gateway.adapters.json — ForgeJSONEncoder, dumps, loads."""
+﻿"""Tests for backend.gateway.adapters.json — AppJSONEncoder, dumps, loads."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import datetime
 import pytest
 from pydantic import BaseModel
 
-from backend.gateway.adapters.json import ForgeJSONEncoder, dumps, loads
+from backend.gateway.adapters.json import AppJSONEncoder, dumps, loads
 from backend.core.errors import LLMResponseError
 
 
@@ -23,20 +23,20 @@ class _SamplePydantic(BaseModel):
 
 
 # ===================================================================
-# ForgeJSONEncoder
+# AppJSONEncoder
 # ===================================================================
 
 
-class TestForgeJSONEncoder:
+class TestAppJSONEncoder:
     def test_datetime_encoding(self):
         dt = datetime(2025, 6, 15, 12, 30, 0)
-        result = json.dumps({"ts": dt}, cls=ForgeJSONEncoder)
+        result = json.dumps({"ts": dt}, cls=AppJSONEncoder)
         parsed = json.loads(result)
         assert parsed["ts"] == "2025-06-15T12:30:00"
 
     def test_pydantic_model_encoding(self):
         m = _SamplePydantic(name="hello", value=99)
-        result = json.dumps({"model": m}, cls=ForgeJSONEncoder)
+        result = json.dumps({"model": m}, cls=AppJSONEncoder)
         parsed = json.loads(result)
         assert parsed["model"]["name"] == "hello"
 
@@ -47,13 +47,13 @@ class TestForgeJSONEncoder:
             def model_dump(self):
                 return {"key": "dumped"}
 
-        result = json.dumps({"obj": FakeDumpable()}, cls=ForgeJSONEncoder)
+        result = json.dumps({"obj": FakeDumpable()}, cls=AppJSONEncoder)
         parsed = json.loads(result)
         assert parsed["obj"]["key"] == "dumped"
 
     def test_raises_for_unsupported_type(self):
         with pytest.raises(TypeError):
-            json.dumps({"bad": object()}, cls=ForgeJSONEncoder)
+            json.dumps({"bad": object()}, cls=AppJSONEncoder)
 
 
 # ===================================================================

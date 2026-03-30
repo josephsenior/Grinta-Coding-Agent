@@ -229,7 +229,7 @@ class TestOrchestratorPromptManager:
             side_effect=lambda x: x,
         ):
             result = pm.get_system_message(msg="hello")
-            assert "You are Forge agent." in result
+            assert "You are App agent." in result
             assert "System: hello" in result
 
     def test_get_system_message_with_config(self, pm):
@@ -242,7 +242,7 @@ class TestOrchestratorPromptManager:
             side_effect=lambda x: x,
         ):
             result = pm.get_system_message(msg="hi")
-            assert "You are Forge agent." in result
+            assert "You are App agent." in result
 
     def test_inject_scratchpad_success(self, pm):
         """Test scratchpad injection when notes exist."""

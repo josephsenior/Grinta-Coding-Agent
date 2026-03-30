@@ -58,7 +58,7 @@ class SystemMessageAction(Action):
 
     content: str = ""
     tools: list[Any] | None = None
-    FORGE_version: str | None = backend.__version__
+    APP_version: str | None = backend.__version__
     agent_class: str | None = None
     action: ClassVar[str] = ActionType.SYSTEM
 

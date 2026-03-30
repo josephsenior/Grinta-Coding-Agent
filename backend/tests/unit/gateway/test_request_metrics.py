@@ -66,20 +66,20 @@ def test_prometheus_metrics_expose_request_stats():
     body = prom.text
 
     # Check presence of build info metric
-    assert any(line.startswith("forge_build_info{") for line in body.splitlines())
+    assert any(line.startswith("app_build_info{") for line in body.splitlines())
 
     # Verify request counters exist and have numeric values
-    total = _get_metric_value(body, "forge_request_total")
+    total = _get_metric_value(body, "app_request_total")
     assert total is not None and total >= 2
 
-    exc_total = _get_metric_value(body, "forge_request_exceptions_total")
+    exc_total = _get_metric_value(body, "app_request_exceptions_total")
     assert exc_total is not None and exc_total >= 0
 
     # Histogram lines must be present with +Inf bucket, sum and count
     assert any(
-        line.startswith("forge_request_duration_ms_bucket{le=")
+        line.startswith("app_request_duration_ms_bucket{le=")
         for line in body.splitlines()
     )
-    sum_v = _get_metric_value(body, "forge_request_duration_ms_sum")
-    cnt_v = _get_metric_value(body, "forge_request_duration_ms_count")
+    sum_v = _get_metric_value(body, "app_request_duration_ms_sum")
+    cnt_v = _get_metric_value(body, "app_request_duration_ms_count")
     assert sum_v is not None and cnt_v is not None

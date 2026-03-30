@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from collections.abc import Awaitable
 from typing import Any, cast
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 try:  # pragma: no cover - optional dependency
     import redis.asyncio as redis

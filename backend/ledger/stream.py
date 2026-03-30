@@ -18,7 +18,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.backpressure import BackpressureManager
 from backend.ledger.coalescing import EventCoalescer
 from backend.ledger.config import get_event_runtime_defaults
@@ -37,6 +37,7 @@ class EventStreamSubscriber(str, Enum):
     """Lightweight wrapper attaching callbacks to event stream broadcast queue."""
 
     AGENT_CONTROLLER = "agent_controller"
+    CLI = "cli"
     SERVER = "server"
     RUNTIME = "runtime"
     MEMORY = "memory"
@@ -679,7 +680,11 @@ def get_aggregated_event_stream_stats() -> dict[str, int]:
     return _impl()
 
 
+Ledger = EventStream
+
+
 __all__ = [
+    "Ledger",
     "EventStream",
     "EventStreamSubscriber",
     "get_aggregated_event_stream_stats",

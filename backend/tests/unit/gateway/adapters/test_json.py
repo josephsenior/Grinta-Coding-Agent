@@ -1,4 +1,4 @@
-﻿"""Tests for backend.gateway.adapters.json — JSON serialization with Forge-specific encoding."""
+﻿"""Tests for backend.gateway.adapters.json custom JSON serialization."""
 
 import json
 from datetime import datetime
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import BaseModel
 
-from backend.gateway.adapters.json import ForgeJSONEncoder, dumps, loads
+from backend.gateway.adapters.json import AppJSONEncoder, dumps, loads
 from backend.core.errors import LLMResponseError
 
 
@@ -18,13 +18,13 @@ class SampleModel(BaseModel):
     value: int
 
 
-class TestForgeJSONEncoder:
-    """Tests for ForgeJSONEncoder custom encoder."""
+class TestAppJSONEncoder:
+    """Tests for AppJSONEncoder custom encoder."""
 
     def test_encode_datetime(self):
         """Test datetime serialization."""
         dt = datetime(2024, 1, 15, 10, 30, 45)
-        encoder = ForgeJSONEncoder()
+        encoder = AppJSONEncoder()
         result = encoder.encode({"timestamp": dt})
         assert "2024-01-15T10:30:45" in result
 
@@ -35,7 +35,7 @@ class TestForgeJSONEncoder:
         # Create real event instance
         event = NullAction()
 
-        encoder = ForgeJSONEncoder()
+        encoder = AppJSONEncoder()
         # Should use event_to_dict which internally calls appropriate serialization
         result = encoder.default(event)
         assert isinstance(result, dict)
@@ -48,14 +48,14 @@ class TestForgeJSONEncoder:
         metrics = MagicMock(spec=Metrics)
         metrics.get.return_value = {"tokens": 100, "cost": 0.01}
 
-        encoder = ForgeJSONEncoder()
+        encoder = AppJSONEncoder()
         result = encoder.default(metrics)
         assert result == {"tokens": 100, "cost": 0.01}
 
     def test_encode_base_model(self):
         """Test Pydantic BaseModel serialization."""
         model = SampleModel(name="test", value=42)
-        encoder = ForgeJSONEncoder()
+        encoder = AppJSONEncoder()
         result = encoder.default(model)
         assert result == {"name": "test", "value": 42}
 
@@ -64,7 +64,7 @@ class TestForgeJSONEncoder:
         from backend.ledger.observation import CmdOutputMetadata
 
         metadata = CmdOutputMetadata(exit_code=0, pid=123)
-        encoder = ForgeJSONEncoder()
+        encoder = AppJSONEncoder()
         result = encoder.default(metadata)
         assert isinstance(result, dict)
         assert result["exit_code"] == 0
@@ -75,13 +75,13 @@ class TestForgeJSONEncoder:
         obj = MagicMock()
         obj.model_dump.return_value = {"field": "value"}
 
-        encoder = ForgeJSONEncoder()
+        encoder = AppJSONEncoder()
         result = encoder.default(obj)
         assert result == {"field": "value"}
 
     def test_encode_unsupported_type(self):
         """Test encoding unsupported type raises TypeError."""
-        encoder = ForgeJSONEncoder()
+        encoder = AppJSONEncoder()
 
         class CustomClass:
             pass
@@ -93,7 +93,7 @@ class TestForgeJSONEncoder:
         """Test nested datetime in dict."""
         dt = datetime(2024, 6, 1, 12, 0, 0)
         data = {"info": {"created": dt}}
-        encoder = ForgeJSONEncoder()
+        encoder = AppJSONEncoder()
         result = encoder.encode(data)
         assert "2024-06-01T12:00:00" in result
 
@@ -101,7 +101,7 @@ class TestForgeJSONEncoder:
         """Test list containing datetimes."""
         dt1 = datetime(2024, 1, 1)
         dt2 = datetime(2024, 12, 31)
-        encoder = ForgeJSONEncoder()
+        encoder = AppJSONEncoder()
         result = encoder.encode([dt1, dt2])
         assert "2024-01-01" in result
         assert "2024-12-31" in result
@@ -116,7 +116,7 @@ class TestDumps:
         assert json.loads(result) == {"key": "value", "num": 42}
 
     def test_dumps_with_datetime(self):
-        """Test dumping datetime uses ForgeJSONEncoder."""
+        """Test dumping datetime uses AppJSONEncoder."""
         dt = datetime(2024, 3, 15)
         result = dumps({"date": dt})
         assert "2024-03-15" in result
@@ -153,8 +153,8 @@ class TestDumps:
         data = json.loads(result)
         assert set(data["items"]) == {1, 2, 3}
 
-    def test_dumps_preserves_forge_encoder_when_no_cls(self):
-        """Test dumps uses ForgeJSONEncoder when no cls specified."""
+    def test_dumps_preserves_app_encoder_when_no_cls(self):
+        """Test dumps uses AppJSONEncoder when no cls specified."""
         dt = datetime(2024, 7, 4)
         result = dumps({"date": dt}, indent=2)
         assert "2024-07-04" in result

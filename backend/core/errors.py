@@ -9,29 +9,29 @@ from __future__ import annotations
 from typing import Any
 
 
-class ForgeError(RuntimeError):
-    """Base class for normalized Forge errors."""
+class AppError(RuntimeError):
+    """Base class for normalized app errors."""
 
 
-class RetryableError(ForgeError):
+class RetryableError(AppError):
     """Operation may succeed if retried."""
 
 
-class UserActionRequiredError(ForgeError):
+class UserActionRequiredError(AppError):
     """User must change config/inputs before retrying."""
 
 
-class InvariantBrokenError(ForgeError):
+class InvariantBrokenError(AppError):
     """A system invariant was violated; continuing may be unsafe."""
 
 
-def classify_error(exc: Exception) -> type[ForgeError]:
+def classify_error(exc: Exception) -> type[AppError]:
     """Best-effort classification helper.
 
-    Maps arbitrary exceptions to the closest canonical ``ForgeError`` subclass.
+    Maps arbitrary exceptions to the closest canonical ``AppError`` subclass.
     Useful for boundary normalization in catch-all handlers.
     """
-    if isinstance(exc, ForgeError):
+    if isinstance(exc, AppError):
         return type(exc)
     if isinstance(exc, ValueError | TypeError | KeyError):
         return UserActionRequiredError
@@ -39,7 +39,7 @@ def classify_error(exc: Exception) -> type[ForgeError]:
         return RetryableError
     if isinstance(exc, AssertionError | RuntimeError):
         return InvariantBrokenError
-    return ForgeError
+    return AppError
 
 
 # ============================================================================
@@ -47,7 +47,7 @@ def classify_error(exc: Exception) -> type[ForgeError]:
 # ============================================================================
 
 
-class AgentRuntimeError(ForgeError):
+class AgentRuntimeError(AppError):
     """Base class for all agent runtime errors with context."""
 
     def __init__(self, message: str, context: dict[str, Any] | None = None):
@@ -80,7 +80,7 @@ class ConfigurationError(AgentRuntimeError):
 # ============================================================================
 
 
-class SessionError(ForgeError):
+class SessionError(AppError):
     """Base class for session lifecycle errors."""
 
 
@@ -108,16 +108,16 @@ class ReplayError(SessionError):
     """Raised when trajectory replay/export fails."""
 
 
-class SocketConnectionError(ForgeError):
+class SocketConnectionError(AppError):
     """Raised when Socket.IO connection validation fails."""
 
 
-class EventStreamError(ForgeError):
+class EventStreamError(AppError):
     """Raised when event-stream operations fail."""
 
 
 __all__ = [
-    "ForgeError",
+    "AppError",
     "RetryableError",
     "UserActionRequiredError",
     "InvariantBrokenError",
@@ -139,7 +139,7 @@ __all__ = [
     "EventStreamError",
 ]
 
-class AgentError(ForgeError):
+class AgentError(AppError):
     """Base class for all agent exceptions."""
 
 
@@ -216,7 +216,7 @@ class AgentStuckInLoopError(AgentError):
         super().__init__(message)
 
 
-class TaskInvalidStateError(ForgeError):
+class TaskInvalidStateError(AppError):
     """Raised when a task enters an invalid or unexpected state.
 
     Args:
@@ -230,7 +230,7 @@ class TaskInvalidStateError(ForgeError):
         super().__init__(message)
 
 
-class LLMMalformedActionError(ForgeError):
+class LLMMalformedActionError(AppError):
     """Raised when LLM returns a malformed action response.
 
     Args:
@@ -248,7 +248,7 @@ class LLMMalformedActionError(ForgeError):
         return self.message
 
 
-class LLMNoActionError(ForgeError):
+class LLMNoActionError(AppError):
     """Raised when LLM fails to return an action when one is required.
 
     Args:
@@ -261,7 +261,7 @@ class LLMNoActionError(ForgeError):
         super().__init__(message)
 
 
-class LLMResponseError(ForgeError):
+class LLMResponseError(AppError):
     """Raised when unable to extract an action from LLM response.
 
     Args:
@@ -276,7 +276,7 @@ class LLMResponseError(ForgeError):
         super().__init__(message)
 
 
-class LLMNoResponseError(ForgeError):
+class LLMNoResponseError(AppError):
     """Raised when LLM returns no response at all.
 
     This is particularly seen with Gemini models in certain conditions.
@@ -294,7 +294,7 @@ class LLMNoResponseError(ForgeError):
         super().__init__(message)
 
 
-class UserCancelledError(ForgeError):
+class UserCancelledError(AppError):
     """Raised when a user explicitly cancels an operation.
 
     Args:
@@ -307,7 +307,7 @@ class UserCancelledError(ForgeError):
         super().__init__(message)
 
 
-class OperationCancelled(ForgeError):
+class OperationCancelled(AppError):
     """Exception raised when an operation is cancelled (e.g. by a keyboard interrupt)."""
 
     def __init__(self, message: str = "Operation was cancelled") -> None:
@@ -315,7 +315,7 @@ class OperationCancelled(ForgeError):
         super().__init__(message)
 
 
-class LLMContextWindowExceedError(ForgeError):
+class LLMContextWindowExceedError(AppError):
     """Raised when conversation history exceeds LLM context window limit.
 
     Args:
@@ -334,7 +334,7 @@ class LLMContextWindowExceedError(ForgeError):
         super().__init__(message)
 
 
-class FunctionCallConversionError(ForgeError):
+class FunctionCallConversionError(AppError):
     """Exception raised when FunctionCallingConverter failed to convert a non-function call message
     to a function call message.
 
@@ -347,7 +347,7 @@ class FunctionCallConversionError(ForgeError):
         super().__init__(message)
 
 
-class FunctionCallValidationError(ForgeError):
+class FunctionCallValidationError(AppError):
     """Exception raised when FunctionCallingConverter failed to validate a function call message.
 
     This typically happens when the LLM outputs unrecognized function call / parameter names / values.
@@ -358,7 +358,7 @@ class FunctionCallValidationError(ForgeError):
         super().__init__(message)
 
 
-class FunctionCallNotExistsError(ForgeError):
+class FunctionCallNotExistsError(AppError):
     """Exception raised when an LLM call a tool that is not registered."""
 
     def __init__(self, message: str) -> None:
@@ -369,7 +369,7 @@ class FunctionCallNotExistsError(ForgeError):
 # Canonical runtime error class is defined in backend.core.errors.
 
 
-class ResourceLimitExceededError(ForgeError):
+class ResourceLimitExceededError(AppError):
     """Raised when a resource limit is exceeded (memory, CPU, disk, etc.).
 
     This exception is raised when:
@@ -388,7 +388,7 @@ class ResourceLimitExceededError(ForgeError):
         super().__init__(message)
 
 
-class PathValidationError(ForgeError):
+class PathValidationError(AppError):
     """Raised when path validation fails due to security concerns.
 
     This exception is raised when:
@@ -434,7 +434,7 @@ class AgentRuntimeNotFoundError(AgentRuntimeUnavailableError):
     """Exception raised when an agent runtime is not found."""
 
 
-class BrowserInitException(ForgeError):
+class BrowserInitException(AppError):
     """Raised when browser environment initialization fails.
 
     Args:
@@ -449,7 +449,7 @@ class BrowserInitException(ForgeError):
         super().__init__(message)
 
 
-class BrowserUnavailableException(ForgeError):
+class BrowserUnavailableException(AppError):
     """Raised when browser environment is not available or not initialized.
 
     Args:
@@ -465,7 +465,7 @@ class BrowserUnavailableException(ForgeError):
         super().__init__(message)
 
 
-class PlaybookError(ForgeError):
+class PlaybookError(AppError):
     """Base exception for all playbook errors."""
 
 

@@ -117,7 +117,7 @@ export LLM_API_KEY="sk-your-key-here"
 
 **Symptom:** `Rate limit exceeded` or `429 Too Many Requests`
 
-**Fix:** Forge has built-in retry with exponential backoff. If it persists:
+**Fix:** App has built-in retry with exponential backoff. If it persists:
 ```toml
 [llm]
 num_retries = 10
@@ -130,13 +130,13 @@ retry_multiplier = 2.0
 
 **Symptom:** `context_length_exceeded` or `prompt is too long`
 
-**Fix:** Enable history truncation and/or use a compactor. The current config
-section name is still `[condenser]`:
+**Fix:** Enable history truncation and/or use a compactor. The persisted config
+section name is `[compactor]`:
 ```toml
 [agent]
 enable_history_truncation = true
 
-[condenser]
+[compactor]
 type = "smart"
 ```
 
@@ -181,7 +181,7 @@ curl http://localhost:11434/v1/models
 
 **Symptom:** Agent repeats the same action or oscillates between actions
 
-**Cause:** The agent is in a stuck pattern. Forge has 6 detection strategies
+**Cause:** The agent is in a stuck pattern. App has 6 detection strategies
 for this.
 
 **Fix:**
@@ -279,7 +279,7 @@ python start_server.py --workspace /path/to/your/project
 **Symptom:** `Connection refused` or blank page at `http://localhost:3000`
 
 **Fix:**
-1. Ensure the backend is running: `python start_server.py` or `uv run forge serve`
+1. Ensure the backend is running: `python start_server.py` or `uv run app serve`
 2. Use the same host/port printed in the server logs (default **3000**)
 3. Verify no firewall is blocking localhost
 
@@ -335,7 +335,7 @@ enable_browser = false   # Disable if not needed
 
 **Symptom:** File paths with backslashes cause errors
 
-**Fix:** Forge normalizes paths internally. If you see path issues:
+**Fix:** App normalizes paths internally. If you see path issues:
 1. Use forward slashes in config: `workspace = "C:/Users/me/project"`
 2. Report the issue — path normalization should handle this
 
@@ -354,7 +354,7 @@ New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
 
 **Symptom:** `PermissionError` when closing a session
 
-**Cause:** Windows file handle locking. Forge retries cleanup automatically.
+**Cause:** Windows file handle locking. App retries cleanup automatically.
 
 **Fix:** Close any editors or file explorers accessing the workspace directory.
 
@@ -362,7 +362,7 @@ New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
 
 **Symptom:** Commands fail with shell-related errors
 
-**Fix:** Forge auto-detects the shell. Verify PowerShell is available:
+**Fix:** App auto-detects the shell. Verify PowerShell is available:
 ```powershell
 $PSVersionTable.PSVersion   # Should be 5.1+
 ```
@@ -426,11 +426,11 @@ uv sync
 
 If none of the above resolves your issue:
 
-1. **Search** [GitHub Issues](https://github.com/josephsenior/Forge/issues)
+1. **Search** [GitHub Issues](https://github.com/josephsenior/App/issues)
 2. **Open** a new issue with:
    - Steps to reproduce
    - Expected vs actual behavior
    - Output of `python --version` and `uv --version`
    - Relevant log output
    - Operating system and version
-3. **Ask** in [GitHub Discussions](https://github.com/josephsenior/Forge/discussions)
+3. **Ask** in [GitHub Discussions](https://github.com/josephsenior/App/discussions)

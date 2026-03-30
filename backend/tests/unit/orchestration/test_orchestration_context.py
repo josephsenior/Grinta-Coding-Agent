@@ -82,6 +82,12 @@ class TestOrchestrationContextProperties:
 
 
 class TestPendingAction:
+    def test_from_open_operation_service(self):
+        svc = MagicMock()
+        svc.get.return_value = "action_obj"
+        ctx = _make_ctx(open_operation_service=svc)
+        assert ctx.open_operation == "action_obj"
+
     def test_from_pending_action_service(self):
         svc = MagicMock()
         svc.get.return_value = "action_obj"
@@ -95,6 +101,27 @@ class TestPendingAction:
         controller.action_service = action_svc
         ctx = OrchestrationContext(_controller=controller)
         assert ctx.pending_action == "action_obj"
+
+
+class TestOperationPipeline:
+    def test_prefers_canonical_operation_pipeline(self):
+        pipeline = MagicMock()
+        ctx = _make_ctx(operation_pipeline=pipeline)
+        assert ctx.operation_pipeline is pipeline
+
+    def test_falls_back_to_tool_pipeline(self):
+        pipeline = MagicMock()
+        controller = MagicMock(spec=["tool_pipeline"])
+        controller.tool_pipeline = pipeline
+        ctx = OrchestrationContext(_controller=controller)
+        assert ctx.operation_pipeline is pipeline
+
+    def test_initialize_operation_pipeline_alias(self):
+        controller = MagicMock()
+        ctx = OrchestrationContext(_controller=controller)
+        pipeline = ctx.initialize_operation_pipeline([])
+        assert pipeline is controller.operation_pipeline
+        assert controller.tool_pipeline is pipeline
 
 
 # ── set_pending_action / clear ───────────────────────────────────────

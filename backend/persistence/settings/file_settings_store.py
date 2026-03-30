@@ -18,7 +18,7 @@ from backend.persistence.settings.settings_store import SettingsStore
 from backend.utils.async_utils import call_sync_from_async
 
 if TYPE_CHECKING:
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
     from backend.persistence.files import FileStore
 
 # 🚀 PERFORMANCE FIX: Global cache and lock for concurrent file access
@@ -81,7 +81,7 @@ class FileSettingsStore(SettingsStore):
 
     async def store(self, settings: Settings) -> None:
         """Store settings and invalidate cache."""
-        # Persist LLM connectivity plus MCP overrides. Forge still supplies defaults;
+        # Persist LLM connectivity plus MCP overrides. App still supplies defaults;
         # merged MCP from GET is optional to save, but when the user edits MCP in the
         # UI we must not drop it on the next LLM-only save (merge happens before store).
         minimal = model_dump_with_options(
@@ -114,7 +114,7 @@ class FileSettingsStore(SettingsStore):
 
     @classmethod
     async def get_instance(
-        cls, config: ForgeConfig, user_id: str | None
+        cls, config: AppConfig, user_id: str | None
     ) -> FileSettingsStore:
         """Get FileSettingsStore singleton instance.
 
@@ -123,7 +123,7 @@ class FileSettingsStore(SettingsStore):
         second settings file.
 
         Args:
-            config: Forge configuration (used for store *type* and webhooks only)
+            config: Application configuration (used for store *type* and webhooks only)
             user_id: Optional user ID
 
         Returns:

@@ -22,7 +22,7 @@ from backend.orchestration.agent import Agent
 from backend.orchestration.services import (
     ActionExecutionService,
     ActionService,
-    AutonomyService,
+    ExecutionPolicyService,
     BudgetGuardService,
     CircuitBreakerService,
     ConfirmationService,
@@ -34,7 +34,7 @@ from backend.orchestration.services import (
     LifecycleService,
     MetricsService,
     ObservationService,
-    PendingActionService,
+    OpenOperationService,
     RecoveryService,
     RetryService,
     SafetyService,
@@ -81,7 +81,8 @@ class OrchestrationServices:
 
     def __init__(self, controller: SessionOrchestrator):
         self.lifecycle = LifecycleService(controller)
-        self.autonomy = AutonomyService(controller)
+        self.execution_policy = ExecutionPolicyService(controller)
+        self.autonomy = self.execution_policy
         self.context = OrchestrationContext(controller)
         self.iteration = IterationService(self.context)
         self.iteration_guard = IterationGuardService(self.context)
@@ -89,14 +90,15 @@ class OrchestrationServices:
         self.step_prerequisites = StepPrerequisiteService(self.context)
         self.budget_guard = BudgetGuardService(self.context)
         self.safety = SafetyService(self.context)
-        self.pending_action = PendingActionService(
+        self.open_operation = OpenOperationService(
             self.context, controller.PENDING_ACTION_TIMEOUT
         )
-        self.observation = ObservationService(self.context, self.pending_action)
+        self.pending_action = self.open_operation
+        self.observation = ObservationService(self.context, self.open_operation)
         self.confirmation = ConfirmationService(self.context, self.safety)
         self.action = ActionService(
             self.context,
-            self.pending_action,
+            self.open_operation,
             self.confirmation,
         )
         self.action_execution = ActionExecutionService(self.context)

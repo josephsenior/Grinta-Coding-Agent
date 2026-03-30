@@ -12,7 +12,7 @@ from pydantic import SecretStr, ValidationError
 from backend.core.config.config_sections import (
     check_unknown_sections,
     process_agent_section,
-    process_condenser_section,
+    process_compactor_section,
     process_core_section,
     process_extended_section,
     process_llm_section,
@@ -20,7 +20,7 @@ from backend.core.config.config_sections import (
     process_runtime_section,
     process_security_section,
 )
-from backend.core.config.forge_config import ForgeConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.config.config_loader import ConfigLoadSummary
 
 
@@ -33,7 +33,7 @@ class TestCheckUnknownSections:
             "llm": {},
             "security": {},
             "runtime": {},
-            "condenser": {},
+            "compactor": {},
             "mcp": {},
             "extended": {},
         }
@@ -366,40 +366,40 @@ class TestProcessMcpSection:
         assert summary.records
 
 
-class TestProcessCondenserSection:
-    def test_auto_condenser_assigned_when_missing(self):
-        """When no [condenser] section exists, auto condenser is used."""
-        cfg = ForgeConfig()
+class TestProcessCompactorSection:
+    def test_auto_compactor_assigned_when_missing(self):
+        """When no [compactor] section exists, auto compactor is used."""
+        cfg = AppConfig()
         summary = DummySummary()
 
-        process_condenser_section({}, cfg, summary)
+        process_compactor_section({}, cfg, summary)
 
-        condenser_cfg = cfg.get_agent_config().condenser_config
-        assert condenser_cfg is not None
-        assert condenser_cfg.type == "auto"
+        compactor_cfg = cfg.get_agent_config().compactor_config
+        assert compactor_cfg is not None
+        assert compactor_cfg.type == "auto"
 
-    def test_condenser_mapping_applied(self):
-        cfg = ForgeConfig()
+    def test_compactor_mapping_applied(self):
+        cfg = AppConfig()
         summary = DummySummary()
-        dummy_condenser = MagicMock()
+        dummy_compactor = MagicMock()
 
         with patch(
-            "backend.core.config.condenser_config.condenser_config_from_toml_section",
-            return_value={"condenser": dummy_condenser},
+            "backend.core.config.compactor_config.compactor_config_from_toml_section",
+            return_value={"compactor": dummy_compactor},
         ):
-            process_condenser_section({"condenser": {"type": "noop"}}, cfg, summary)
+            process_compactor_section({"compactor": {"type": "noop"}}, cfg, summary)
 
-        assert cfg.get_agent_config().condenser_config is dummy_condenser
+        assert cfg.get_agent_config().compactor_config is dummy_compactor
 
-    def test_condenser_validation_error_records_summary(self):
-        """Test ValidationError in condenser section."""
-        cfg = ForgeConfig()
+    def test_compactor_validation_error_records_summary(self):
+        """Test ValidationError in compactor section."""
+        cfg = AppConfig()
         summary = DummySummary()
         with patch(
-            "backend.core.config.condenser_config.condenser_config_from_toml_section",
-            side_effect=ValidationError.from_exception_data("CondenserConfig", []),
+            "backend.core.config.compactor_config.compactor_config_from_toml_section",
+            side_effect=ValidationError.from_exception_data("CompactorConfig", []),
         ):
-            process_condenser_section({"condenser": {"bad": True}}, cfg, summary)
+            process_compactor_section({"compactor": {"bad": True}}, cfg, summary)
         assert summary.records
 
 

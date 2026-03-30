@@ -1,7 +1,7 @@
 ﻿"""User-friendly error formatting system.
 
 This module converts internal exceptions into structured, actionable responses
-for the Forge user interface, including severity, suggested actions, and
+for the App user interface, including severity, suggested actions, and
 fallback behaviour.
 """
 
@@ -37,7 +37,7 @@ from backend.gateway.utils.error_patterns import (
     check_permission_pattern,
     check_rate_limit_pattern,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 
 class ErrorAction:
@@ -177,14 +177,14 @@ def format_llm_no_response_error(error: LLMNoResponseError) -> UserFriendlyError
             ErrorAction("Try Again", "retry", highlight=True),
             ErrorAction("Simplify Request", "simplify"),
             ErrorAction(
-                "Get Help", "help", url="https://docs.forge.ai/errors/ai-timeout"
+                "Get Help", "help", url="https://docs.app.ai/errors/ai-timeout"
             ),
         ],
         technical_details=str(error),
         error_code="LLM_NO_RESPONSE",
         can_retry=True,
         retry_delay=60,
-        help_url="https://docs.forge.ai/errors/ai-timeout",
+        help_url="https://docs.app.ai/errors/ai-timeout",
     )
 
 
@@ -214,7 +214,7 @@ def format_context_window_error(
         technical_details=str(error),
         error_code="CONTEXT_WINDOW_EXCEEDED",
         can_retry=False,
-        help_url="https://docs.forge.ai/faq/context-limit",
+        help_url="https://docs.app.ai/faq/context-limit",
         reassurance="Don't worry - all your work is saved!",
     )
 
@@ -240,12 +240,12 @@ def format_agent_stuck_error(error: AgentStuckInLoopError) -> UserFriendlyError:
         suggestion="Break task into smaller steps",
         actions=[
             ErrorAction("Start Over", "new_conversation", highlight=True),
-            ErrorAction("Get Examples", "help", url="https://docs.forge.ai/examples"),
+            ErrorAction("Get Examples", "help", url="https://docs.app.ai/examples"),
         ],
         technical_details=str(error),
         error_code="AGENT_STUCK_IN_LOOP",
         can_retry=True,
-        help_url="https://docs.forge.ai/troubleshooting/stuck-agent",
+        help_url="https://docs.app.ai/troubleshooting/stuck-agent",
     )
 
 
@@ -278,7 +278,7 @@ def format_runtime_unavailable_error(
         error_code="RUNTIME_UNAVAILABLE",
         can_retry=True,
         retry_delay=30,
-        help_url="https://docs.forge.ai/troubleshooting/runtime-issues",
+        help_url="https://docs.app.ai/troubleshooting/runtime-issues",
         reassurance="Your work is safe! Just give it a moment.",
     )
 
@@ -289,7 +289,7 @@ def format_session_invariant_error(
     return UserFriendlyError(
         title="Invalid session request",
         message=(
-            "Forge rejected this request because it violates a session invariant.\n\n"
+            "App rejected this request because it violates a session invariant.\n\n"
             "This usually means a parameter is out of range or a cursor is invalid."
         ),
         severity=ErrorSeverity.WARNING,
@@ -306,7 +306,7 @@ def format_persistence_error(error: PersistenceError) -> UserFriendlyError:
     return UserFriendlyError(
         title="Storage problem",
         message=(
-            "Forge had trouble writing session data to storage.\n\n"
+            "App had trouble writing session data to storage.\n\n"
             "Your workspace may be temporarily unavailable or out of space."
         ),
         severity=ErrorSeverity.ERROR,
@@ -324,7 +324,7 @@ def format_replay_error(error: ReplayError) -> UserFriendlyError:
     return UserFriendlyError(
         title="Couldn't load conversation history",
         message=(
-            "Forge couldn't read some conversation events while replaying history.\n\n"
+            "App couldn't read some conversation events while replaying history.\n\n"
             "This can happen after an interrupted write or a corrupted event file."
         ),
         severity=ErrorSeverity.WARNING,
@@ -365,7 +365,7 @@ def format_function_call_error(
         technical_details=str(error),
         error_code="FUNCTION_CALL_ERROR",
         can_retry=True,
-        help_url="https://docs.forge.ai/troubleshooting/tool-errors",
+        help_url="https://docs.app.ai/troubleshooting/tool-errors",
     )
 
 
@@ -394,7 +394,7 @@ def format_malformed_action_error(error: LLMMalformedActionError) -> UserFriendl
         technical_details=str(error),
         error_code="MALFORMED_ACTION",
         can_retry=True,
-        help_url="https://docs.forge.ai/troubleshooting/ai-errors",
+        help_url="https://docs.app.ai/troubleshooting/ai-errors",
     )
 
 
@@ -469,16 +469,16 @@ def format_llm_authentication_error(
                 "Open Settings", "open_settings", url="/settings", highlight=True
             ),
             ErrorAction(
-                "Get API Key", "get_api_key", url="https://docs.forge.ai/setup/api-keys"
+                "Get API Key", "get_api_key", url="https://docs.app.ai/setup/api-keys"
             ),
             ErrorAction(
-                "Learn More", "help", url="https://docs.forge.ai/getting-started"
+                "Learn More", "help", url="https://docs.app.ai/getting-started"
             ),
         ],
         technical_details=str(error),
         error_code="LLM_AUTHENTICATION_ERROR",
         can_retry=False,
-        help_url="https://docs.forge.ai/setup/api-keys",
+        help_url="https://docs.app.ai/setup/api-keys",
         reassurance="This is normal! Just add your API key to get started.",
         metadata=context or {},
     )
@@ -628,7 +628,7 @@ def format_rate_limit_error(
         error_code="RATE_LIMIT_EXCEEDED",
         can_retry=True,
         retry_delay=300,  # 5 minutes
-        help_url="https://docs.forge.ai/billing/rate-limits",
+        help_url="https://docs.app.ai/billing/rate-limits",
     )
 
 
@@ -656,7 +656,7 @@ def format_authentication_error(
         technical_details=str(error),
         error_code="AUTHENTICATION_REQUIRED",
         can_retry=False,
-        help_url="https://docs.forge.ai/auth/sessions",
+        help_url="https://docs.app.ai/auth/sessions",
         reassurance="Your work is safe and saved",
     )
 
@@ -680,13 +680,13 @@ def format_network_error(
         suggestion="Check your connection and retry",
         actions=[
             ErrorAction("Retry", "retry", highlight=True),
-            ErrorAction("Check Status", "status", url="https://status.forge.ai"),
+            ErrorAction("Check Status", "status", url="https://status.app.ai"),
         ],
         technical_details=str(error),
         error_code="NETWORK_ERROR",
         can_retry=True,
         retry_delay=5,
-        help_url="https://docs.forge.ai/troubleshooting/connection",
+        help_url="https://docs.app.ai/troubleshooting/connection",
     )
 
 
@@ -749,7 +749,7 @@ def format_permission_error(
         suggestion="Check file permissions",
         actions=[
             ErrorAction("Try Different File", "retry", highlight=True),
-            ErrorAction("Learn More", "help", url="https://docs.forge.ai/permissions"),
+            ErrorAction("Learn More", "help", url="https://docs.app.ai/permissions"),
         ],
         technical_details=str(error),
         error_code="PERMISSION_DENIED",
@@ -788,12 +788,12 @@ def format_generic_error(
         actions=[
             ErrorAction("Refresh Page", "refresh", highlight=True),
             ErrorAction("New Session", "new_conversation"),
-            ErrorAction("Contact Support", "support", url="mailto:support@forge.ai"),
+            ErrorAction("Contact Support", "support", url="mailto:support@app.ai"),
         ],
         technical_details=f"{error_type}: {str(error)}\n\nStack Trace:\n{stack_trace}",
         error_code=error_type.upper(),
         can_retry=True,
-        help_url="https://docs.forge.ai/troubleshooting",
+        help_url="https://docs.app.ai/troubleshooting",
     )
 
 
@@ -854,13 +854,13 @@ def format_quota_exceeded_error(
         actions=[
             ErrorAction("Upgrade Plan", "upgrade", url="/billing", highlight=True),
             ErrorAction("See Pricing", "pricing", url="/pricing"),
-            ErrorAction("Contact Support", "support", url="mailto:support@forge.ai"),
+            ErrorAction("Contact Support", "support", url="mailto:support@app.ai"),
         ],
         technical_details=f"Quota exceeded: {spent_display} > {limit_display} ({limit_type}, plan: {plan})",
         error_code="COST_QUOTA_EXCEEDED",
         can_retry=True,
         retry_delay=int((reset_at - time.time()) if reset_at else 3600),
-        help_url="https://docs.forge.ai/billing/quotas",
+        help_url="https://docs.app.ai/billing/quotas",
         reassurance="Your work is saved! Just upgrade or wait for the reset.",
         metadata=quota_info,
     )
@@ -891,12 +891,12 @@ def format_budget_exceeded_error(
         actions=[
             ErrorAction("Upgrade Plan", "upgrade", url="/billing", highlight=True),
             ErrorAction("See Pricing", "pricing", url="/pricing"),
-            ErrorAction("Contact Sales", "sales", url="mailto:sales@forge.ai"),
+            ErrorAction("Contact Sales", "sales", url="mailto:sales@app.ai"),
         ],
         technical_details=f"Budget exceeded: {spend} > {budget}",
         error_code="BUDGET_EXCEEDED",
         can_retry=False,
-        help_url="https://docs.forge.ai/billing/budgets",
+        help_url="https://docs.app.ai/billing/budgets",
         reassurance="Your work is saved - just upgrade to continue!",
     )
 
@@ -935,7 +935,7 @@ def safe_format_error(
                 {
                     "label": "Support",
                     "type": "support",
-                    "url": "mailto:support@forge.ai",
+                    "url": "mailto:support@app.ai",
                 },
             ],
             "technical_details": f"{type(error).__name__}: {str(error)}",

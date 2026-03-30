@@ -1,4 +1,4 @@
-﻿"""File reader skills for the Forge agent.
+﻿"""File reader skills for the App agent.
 
 This module provides various functions to parse and extract content from different file types,
 including PDF, DOCX, LaTeX, audio, image, video, and PowerPoint files. It utilizes different

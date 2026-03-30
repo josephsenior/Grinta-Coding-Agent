@@ -36,7 +36,7 @@ class ServerConfigInterface(ABC):
 class MissingSettingsError(UserActionRequiredError, ValueError):
     """Raised when settings are missing or not found.
 
-    Dual-inherits ``UserActionRequiredError`` (from the canonical ``ForgeError``
+    Dual-inherits ``UserActionRequiredError`` (from the canonical ``AppError``
     tree) **and** ``ValueError`` for broad compatibility with caller error
     handling expectations.
     """

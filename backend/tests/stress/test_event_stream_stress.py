@@ -17,7 +17,7 @@ def temp_stream(tmp_path, monkeypatch):
     # Suppress LLM initialization to avoid API key timeout delays
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
-    monkeypatch.setenv("FORGE_EVENTSTREAM_ASYNC_WRITE", "true")
+    monkeypatch.setenv("APP_EVENTSTREAM_ASYNC_WRITE", "true")
     file_store = get_file_store("local", str(tmp_path))
     stream = EventStream("stress-session", file_store)
     try:

@@ -5,17 +5,17 @@ from backend.ledger.action import CmdRunAction
 from backend.ledger.action import FileReadAction
 from backend.ledger.action.terminal import TerminalInputAction, TerminalReadAction
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation, FileReadObservation
-from backend.execution.action_execution_server import ActionExecutor
+from backend.execution.action_execution_server import RuntimeExecutor
 from backend.utils.regex_limits import MAX_USER_REGEX_PATTERN_CHARS
 
 @pytest.fixture
 def mock_executor():
-    """Create a minimal mocked ActionExecutor to avoid full initialization."""
+    """Create a minimal mocked RuntimeExecutor to avoid full initialization."""
     with patch("os.makedirs"), \
          patch("backend.execution.action_execution_server.SessionManager"), \
-         patch("backend.execution.action_execution_server.ActionExecutor._init_browser_async"):
+         patch("backend.execution.action_execution_server.RuntimeExecutor._init_browser_async"):
 
-        executor = ActionExecutor(
+        executor = RuntimeExecutor(
             plugins_to_load=[],
             work_dir="/tmp/test",
             username="testuser",

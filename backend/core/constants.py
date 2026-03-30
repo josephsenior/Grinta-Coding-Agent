@@ -1,4 +1,4 @@
-"""Central location for Forge core constants.
+"""Central location for application core constants.
 
 Organisation
 ~~~~~~~~~~~~
@@ -25,8 +25,8 @@ def _parse_bool_env(var: str, default: str = "false") -> bool:
 
 
 # ── Core Identity & Limits ──────────────────────────────────────────
-FORGE_DEFAULT_AGENT = "Orchestrator"
-FORGE_MAX_ITERATIONS = (
+DEFAULT_AGENT_NAME = "Orchestrator"
+DEFAULT_MAX_ITERATIONS = (
     10000  # effectively unlimited flexibility
 )
 
@@ -38,9 +38,9 @@ DEFAULT_LOCAL_DATA_ROOT = "storage"
 DEFAULT_CONFIG_FILE = "settings.json"
 
 # ── URLs ────────────────────────────────────────────────────────────
-GUIDE_URL = "https://docs.forge.dev/guide"
-TROUBLESHOOTING_URL = "https://docs.forge.dev/usage/troubleshooting"
-# Host:port for the Forge MCP HTTP endpoint (same process as default dev API :3000)
+GUIDE_URL = "https://docs.app.dev/guide"
+TROUBLESHOOTING_URL = "https://docs.app.dev/usage/troubleshooting"
+# Host:port for the internal MCP HTTP endpoint (same process as default dev API :3000)
 DEFAULT_MCP_HOST = "localhost:3000"
 
 # ── Security ────────────────────────────────────────────────────────
@@ -70,16 +70,16 @@ IDLE_RECLAIM_SPIKE_THRESHOLD = 3
 EVICTION_SPIKE_THRESHOLD = 1
 
 # ── Runtime Bootstrap ───────────────────────────────────────────────
-MICROMAMBA_ENV_NAME = "Forge"
+MICROMAMBA_ENV_NAME = "App"
 DEFAULT_PYTHON_PREFIX = [
-    "/Forge/micromamba/bin/micromamba",
+    "/App/micromamba/bin/micromamba",
     "run",
     "-n",
     MICROMAMBA_ENV_NAME,
     "uv",
     "run",
 ]
-DEFAULT_MAIN_MODULE = "forge.runtime.action_execution_server"
+DEFAULT_MAIN_MODULE = "app.runtime.action_execution_server"
 
 # ── Storage ─────────────────────────────────────────────────────────
 CONVERSATION_BASE_DIR = "sessions"
@@ -90,11 +90,12 @@ DEFAULT_FILE_STORE = "local"
 DEFAULT_CACHE_DIR = "/tmp/cache"
 DEFAULT_CONVERSATION_MAX_AGE_SECONDS = 864000
 DEFAULT_MAX_CONCURRENT_CONVERSATIONS = 3
-DEFAULT_VCS_USER_NAME = "forge"
-DEFAULT_VCS_USER_EMAIL = "Forge@forge.dev"
+DEFAULT_VCS_USER_NAME = "app"
+DEFAULT_VCS_USER_EMAIL = "App@app.dev"
 DEFAULT_LOG_FORMAT = "text"
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_ENABLE_BROWSER = True
+DEFAULT_MAX_BUDGET_PER_TASK = 5.0
 
 # ── Runtime Defaults ────────────────────────────────────────────────
 DEFAULT_RUNTIME_TIMEOUT = 900
@@ -166,7 +167,7 @@ DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME = "system_prompt.j2"
 DEFAULT_AGENT_CLI_MODE = False
 DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT = True
 DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY = False
-DEFAULT_FORGE_MCP_CONFIG_CLS = "backend.core.config.mcp_config.ForgeMCPConfig"
+DEFAULT_APP_MCP_CONFIG_CLS = "backend.core.config.mcp_config.AppMCPConfig"
 DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS = 5
 DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS = 10
 DEFAULT_AGENT_MAX_STUCK_DETECTIONS = 15
@@ -200,9 +201,9 @@ CURRENT_API_VERSION = API_VERSION_V1
 
 # API versioning is strict by default: unversioned /api/ requests are
 # rejected with a 400 suggesting the correct path.  Existing deployments
-# that rely on unversioned routes can set FORGE_PERMISSIVE_API=1 to
+# that rely on unversioned routes can set APP_PERMISSIVE_API=1 to
 # restore the old permissive behavior during migration.
-ENFORCE_API_VERSIONING = os.getenv("FORGE_PERMISSIVE_API", "").strip().lower() not in (
+ENFORCE_API_VERSIONING = os.getenv("APP_PERMISSIVE_API", "").strip().lower() not in (
     "1",
     "true",
     "yes",
@@ -220,7 +221,7 @@ QUOTA_EXEMPT_PATHS = {"/", "/api/monitoring/health"}
 QUOTA_EXEMPT_PATH_PREFIXES = ["/assets"]
 
 
-# Quota limits (Forge is local-first / single-user — unlimited by default)
+# Quota limits (App is local-first / single-user — unlimited by default)
 
 # ── Circuit Breaker ─────────────────────────────────────────────────
 # CircuitState enum lives in backend.core.enums
@@ -301,17 +302,17 @@ BASH_TIMEOUT_MESSAGE_TEMPLATE = (
     "for future commands."
 )
 
-# ── Condenser Defaults ──────────────────────────────────────────────
-DEFAULT_CONDENSER_ATTENTION_WINDOW = 100
-DEFAULT_BROWSER_CONDENSER_ATTENTION_WINDOW = 1
-DEFAULT_CONDENSER_KEEP_FIRST = 1
-DEFAULT_CONDENSER_MAX_EVENTS = 100
-DEFAULT_CONDENSER_MAX_SIZE = 100
-DEFAULT_CONDENSER_MAX_EVENT_LENGTH = 10000
-DEFAULT_SMART_CONDENSER_MAX_SIZE = 200
-DEFAULT_SMART_CONDENSER_KEEP_FIRST = 5
-DEFAULT_SMART_CONDENSER_IMPORTANCE_THRESHOLD = 0.6
-DEFAULT_SMART_CONDENSER_RECENCY_BONUS_WINDOW = 20
+# ── Compactor Defaults ──────────────────────────────────────────────
+DEFAULT_COMPACTOR_ATTENTION_WINDOW = 100
+DEFAULT_BROWSER_COMPACTOR_ATTENTION_WINDOW = 1
+DEFAULT_COMPACTOR_KEEP_FIRST = 1
+DEFAULT_COMPACTOR_MAX_EVENTS = 100
+DEFAULT_COMPACTOR_MAX_SIZE = 100
+DEFAULT_COMPACTOR_MAX_EVENT_LENGTH = 10000
+DEFAULT_SMART_COMPACTOR_MAX_SIZE = 200
+DEFAULT_SMART_COMPACTOR_KEEP_FIRST = 5
+DEFAULT_SMART_COMPACTOR_IMPORTANCE_THRESHOLD = 0.6
+DEFAULT_SMART_COMPACTOR_RECENCY_BONUS_WINDOW = 20
 
 # ── Permissions & Safety Defaults ───────────────────────────────────
 DEFAULT_FILE_OPERATIONS_MAX_SIZE_MB = 50
@@ -426,7 +427,7 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     "LOG_ALL_EVENTS": ("True", "Log every event processed by the event stream"),
     "DEBUG_RUNTIME": ("false", "Extra runtime container debug output"),
     # API versioning
-    "FORGE_PERMISSIVE_API": (
+    "APP_PERMISSIVE_API": (
         "",
         "Set to '1' to allow unversioned /api/ routes (deprecated)",
     ),

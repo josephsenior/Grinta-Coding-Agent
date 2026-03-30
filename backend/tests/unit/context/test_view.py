@@ -74,35 +74,35 @@ class TestViewContainer:
 
 
 # ===================================================================
-# _collect_forgotten_event_ids
+# _collect_pruned_event_ids
 # ===================================================================
 
 
-class TestCollectForgottenIds:
+class TestCollectPrunedIds:
     def test_no_condensation_actions(self):
         evts = [_event(1), _event(2)]
-        assert View._collect_forgotten_event_ids(evts) == set()
+        assert View._collect_pruned_event_ids(evts) == set()
 
     def test_with_condensation_action(self):
         ca = CondensationAction(
-            forgotten_events_start_id=2,
-            forgotten_events_end_id=5,
+            pruned_events_start_id=2,
+            pruned_events_end_id=5,
         )
         ca._id = 10
         evts = [_event(1), ca, _event(6)]
-        forgotten = View._collect_forgotten_event_ids(evts)
+        pruned = View._collect_pruned_event_ids(evts)
         # Should include the condensation action itself and the range
-        assert 10 in forgotten
-        # The forgotten range from CondensationAction.forgotten property
-        for eid in ca.forgotten:
-            assert eid in forgotten
+        assert 10 in pruned
+        # The pruned range from CondensationAction.pruned property.
+        for eid in ca.pruned:
+            assert eid in pruned
 
     def test_with_condensation_request_action(self):
         cra = CondensationRequestAction()
         cra._id = 50
         evts = [_event(1), cra]
-        forgotten = View._collect_forgotten_event_ids(evts)
-        assert 50 in forgotten
+        pruned = View._collect_pruned_event_ids(evts)
+        assert 50 in pruned
 
 
 # ===================================================================
@@ -119,8 +119,8 @@ class TestFindSummaryInfo:
 
     def test_finds_summary_from_condensation(self):
         ca = CondensationAction(
-            forgotten_events_start_id=1,
-            forgotten_events_end_id=3,
+            pruned_events_start_id=1,
+            pruned_events_end_id=3,
             summary="Summary text",
             summary_offset=1,
         )
@@ -131,14 +131,14 @@ class TestFindSummaryInfo:
 
     def test_returns_last_condensation_summary(self):
         ca1 = CondensationAction(
-            forgotten_events_start_id=1,
-            forgotten_events_end_id=2,
+            pruned_events_start_id=1,
+            pruned_events_end_id=2,
             summary="Old",
             summary_offset=0,
         )
         ca2 = CondensationAction(
-            forgotten_events_start_id=3,
-            forgotten_events_end_id=4,
+            pruned_events_start_id=3,
+            pruned_events_end_id=4,
             summary="New",
             summary_offset=1,
         )
@@ -159,7 +159,7 @@ class TestCheckUnhandledRequest:
 
     def test_handled_request_returns_false(self):
         cra = CondensationRequestAction()
-        ca = CondensationAction(forgotten_events_start_id=1, forgotten_events_end_id=2)
+        ca = CondensationAction(pruned_events_start_id=1, pruned_events_end_id=2)
         evts: list[Any] = [cra, ca]
         assert View._check_unhandled_condensation_request(evts) is False
 
@@ -181,18 +181,18 @@ class TestFromEvents:
         assert len(view) == 2
         assert view.unhandled_condensation_request is False
 
-    def test_filters_forgotten_events(self):
+    def test_filters_pruned_events(self):
         e1 = _event(1)
         e2 = _event(2)
         e3 = _event(3)
         ca = CondensationAction(
-            forgotten_events_start_id=2,
-            forgotten_events_end_id=2,
+            pruned_events_start_id=2,
+            pruned_events_end_id=2,
         )
         ca._id = 10
         evts = [e1, e2, e3, ca]
         view = View.from_events(evts)
-        # e2 is forgotten, ca itself should be forgotten too
+        # e2 is pruned, and the condensation action is pruned too.
         ids = [e.id for e in view.events]
         assert 2 not in ids
         assert 10 not in ids

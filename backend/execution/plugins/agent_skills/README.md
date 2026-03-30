@@ -1,11 +1,11 @@
-# Forge Skill Sets
+# App Skill Sets
 
-This folder implements a skill/tool set `agentskills` for Forge.
+This folder implements a skill/tool set `agentskills` for App.
 
 It is intended to be used by the agent **inside runtime**.
 The skill set will be exposed as a `pip` package that can be installed as a plugin inside the runtime.
 
-The skill set can contain a bunch of wrapped tools for agent ([many examples here](https://github.com/Forge/Forge/pull/1914)), for example:
+The skill set can contain a bunch of wrapped tools for agent ([many examples here](https://github.com/App/App/pull/1914)), for example:
 
 - Audio/Video to text (these are a temporary solution, and we should switch to multimodal models when they are sufficiently cheap
 - PDF to text

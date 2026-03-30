@@ -19,7 +19,7 @@ from backend.core.config.mcp_config import (
     MCPRemoteServerConfig,
     MCPStdioServerConfig,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.gateway.integrations.mcp.error_collector import mcp_error_collector
 from backend.gateway.integrations.mcp.tool import MCPClientTool
 
@@ -33,9 +33,9 @@ _BASE_BACKOFF_S = 0.5
 def _mcp_call_total_budget_sec() -> float:
     """Max wall-clock time for one ``call_tool`` (attempt + reconnect + retry).
 
-    Override with ``FORGE_MCP_CALL_TOTAL_BUDGET_SEC``.
+    Override with ``APP_MCP_CALL_TOTAL_BUDGET_SEC``.
     """
-    raw = os.getenv("FORGE_MCP_CALL_TOTAL_BUDGET_SEC", "180")
+    raw = os.getenv("APP_MCP_CALL_TOTAL_BUDGET_SEC", "180")
     try:
         v = float(raw)
         return v if v > 0 else 180.0
@@ -46,9 +46,9 @@ def _mcp_call_total_budget_sec() -> float:
 def _mcp_reconnect_session_timeout_sec() -> float:
     """Per-attempt cap for ``_open_session`` + ``_populate_tools`` during reconnect.
 
-    Override with ``FORGE_MCP_RECONNECT_SESSION_TIMEOUT_SEC``.
+    Override with ``APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC``.
     """
-    raw = os.getenv("FORGE_MCP_RECONNECT_SESSION_TIMEOUT_SEC", "90")
+    raw = os.getenv("APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC", "90")
     try:
         v = float(raw)
         return v if v > 0 else 90.0
@@ -247,7 +247,7 @@ class MCPClient(BaseModel):
                 },
             )
         if conversation_id:
-            headers["X-Forge-ServerConversation-ID"] = conversation_id
+            headers["X-App-ServerConversation-ID"] = conversation_id
         return headers
 
     def _create_http_transport(self, server: MCPRemoteServerConfig, server_url: str, headers: dict):
@@ -315,9 +315,9 @@ class MCPClient(BaseModel):
         """Call a tool on the MCP server, reconnecting if the session dropped.
 
         Each attempt uses ``asyncio.wait_for`` with ``CALL_TIMEOUT`` seconds.
-        Reconnect steps are also bounded (see ``FORGE_MCP_RECONNECT_SESSION_TIMEOUT_SEC``).
+        Reconnect steps are also bounded (see ``APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC``).
         The entire invoke+reconnect+retry sequence is capped by
-        ``FORGE_MCP_CALL_TOTAL_BUDGET_SEC`` so a dead server cannot stall the agent.
+        ``APP_MCP_CALL_TOTAL_BUDGET_SEC`` so a dead server cannot stall the agent.
         """
         if tool_name not in self.tool_map:
             msg = f"Tool {tool_name} not found."

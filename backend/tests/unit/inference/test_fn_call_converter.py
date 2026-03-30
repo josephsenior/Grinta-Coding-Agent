@@ -586,8 +586,8 @@ class TestParseTelemetryCounters:
             {
                 "role": "user",
                 "content": (
-                    "<forge_tool_result_json>{\"tool_name\":\"my_fn\","
-                    "\"content\":</forge_tool_result_json>"
+                    "<app_tool_result_json>{\"tool_name\":\"my_fn\","
+                    "\"content\":</app_tool_result_json>"
                 ),
             }
         ]
@@ -699,13 +699,13 @@ class TestConvertMultipleToSingle:
 
 class TestRegexPatterns:
     def test_tool_result_decode(self):
-        text = "<forge_tool_result_json>{\"tool_name\":\"my_tool\",\"content\":\"some output\"}</forge_tool_result_json>"
+        text = "<app_tool_result_json>{\"tool_name\":\"my_tool\",\"content\":\"some output\"}</app_tool_result_json>"
         decoded = decode_tool_result_payload(text)
         assert decoded is not None
         assert decoded[0] == "my_tool"
 
     def test_tool_result_decode_tolerates_spacing_variants(self):
-        text = "<forge_tool_result_json> {\"tool_name\":\"my_tool\",\"content\":\"some output\"} </forge_tool_result_json>"
+        text = "<app_tool_result_json> {\"tool_name\":\"my_tool\",\"content\":\"some output\"} </app_tool_result_json>"
         decoded = decode_tool_result_payload(text)
         assert decoded is not None
         assert decoded[0] == "my_tool"
@@ -747,9 +747,9 @@ class TestRegexPatterns:
 
     def test_tool_result_decode_payload_with_colons_and_urls(self):
         text = (
-            "<forge_tool_result_json>"
+            "<app_tool_result_json>"
             "{\"tool_name\":\"browser\",\"content\":\"see https://example.com:8443/path: done\"}"
-            "</forge_tool_result_json>"
+            "</app_tool_result_json>"
         )
         decoded = decode_tool_result_payload(text)
         assert decoded is not None
@@ -760,7 +760,7 @@ class TestRegexPatterns:
         content = [
             {
                 "type": "text",
-                "text": "<forge_tool_result_json>{\"tool_name\":\"t\",\"content\":\"out:line\"}</forge_tool_result_json>",
+                "text": "<app_tool_result_json>{\"tool_name\":\"t\",\"content\":\"out:line\"}</app_tool_result_json>",
             },
         ]
         assert _find_tool_result_match(content) is not None

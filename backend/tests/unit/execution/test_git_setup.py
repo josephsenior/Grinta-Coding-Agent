@@ -186,7 +186,7 @@ class TestInstallPreCommitHook:
             CmdOutputObservation(content="", command="chmod", exit_code=0)
         ]  # chmod
         result = runtime._install_pre_commit_hook(
-            ".Forge/pre-commit.sh", ".git/hooks/pre-commit"
+            ".app/pre-commit.sh", ".git/hooks/pre-commit"
         )
         assert result is True
 
@@ -196,7 +196,7 @@ class TestInstallPreCommitHook:
             "Write error"
         )
         result = runtime._install_pre_commit_hook(
-            ".Forge/pre-commit.sh", ".git/hooks/pre-commit"
+            ".app/pre-commit.sh", ".git/hooks/pre-commit"
         )
         assert result is False
 
@@ -207,7 +207,7 @@ class TestInstallPreCommitHook:
             CmdOutputObservation(content="chmod failed", command="chmod", exit_code=1)
         ]
         result = runtime._install_pre_commit_hook(
-            ".Forge/pre-commit.sh", ".git/hooks/pre-commit"
+            ".app/pre-commit.sh", ".git/hooks/pre-commit"
         )
         assert result is False
 
@@ -220,13 +220,13 @@ class TestInstallPreCommitHook:
 class TestMaybeRunSetupScript:
     def test_no_setup_script(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results[".Forge/setup.sh"] = ErrorObservation("Not found")
+        runtime._read_results[".app/setup.sh"] = ErrorObservation("Not found")
         runtime.maybe_run_setup_script()
         # Should return early without running action
 
     def test_setup_script_exists(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results[".Forge/setup.sh"] = MagicMock(
+        runtime._read_results[".app/setup.sh"] = MagicMock(
             content="#!/bin/bash\necho 'setup'"
         )
         runtime._run_results = [
@@ -237,7 +237,7 @@ class TestMaybeRunSetupScript:
 
     def test_setup_script_with_status_callback(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results[".Forge/setup.sh"] = MagicMock(content="#!/bin/bash")
+        runtime._read_results[".app/setup.sh"] = MagicMock(content="#!/bin/bash")
         runtime._run_results = [
             CmdOutputObservation(content="", command="chmod", exit_code=0)
         ]
@@ -254,13 +254,13 @@ class TestMaybeRunSetupScript:
 class TestMaybeSetupGitHooks:
     def test_no_pre_commit_script(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results[".Forge/pre-commit.sh"] = ErrorObservation("Not found")
+        runtime._read_results[".app/pre-commit.sh"] = ErrorObservation("Not found")
         runtime.maybe_setup_git_hooks()
         # Should return early
 
     def test_hooks_directory_creation_fails(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results[".Forge/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
+        runtime._read_results[".app/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
         runtime._run_results = [
             CmdOutputObservation(content="mkdir failed", command="mkdir", exit_code=1)
         ]
@@ -269,7 +269,7 @@ class TestMaybeSetupGitHooks:
 
     def test_chmod_pre_commit_script_fails(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results[".Forge/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
+        runtime._read_results[".app/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
         runtime._run_results = [
             CmdOutputObservation(content="", command="mkdir", exit_code=0),  # mkdir
             CmdOutputObservation(
@@ -281,7 +281,7 @@ class TestMaybeSetupGitHooks:
 
     def test_preserve_existing_hook(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results[".Forge/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
+        runtime._read_results[".app/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
         runtime._read_results[".git/hooks/pre-commit"] = MagicMock(
             content="#!/bin/bash\nexisting hook"
         )
@@ -304,11 +304,11 @@ class TestMaybeSetupGitHooks:
         runtime.maybe_setup_git_hooks()
         # Should preserve existing hook
 
-    def test_skip_if_forge_installed(self):
+    def test_skip_if_app_installed(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results[".Forge/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
+        runtime._read_results[".app/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
         runtime._read_results[".git/hooks/pre-commit"] = MagicMock(
-            content="#!/bin/bash\n# This hook was installed by Forge\n"
+            content="#!/bin/bash\n# This hook was installed by APP\n"
         )
         runtime._run_results = [
             CmdOutputObservation(content="", command="mkdir", exit_code=0),  # mkdir
@@ -321,11 +321,11 @@ class TestMaybeSetupGitHooks:
         ]
         runtime._write_results[".git/hooks/pre-commit"] = MagicMock()
         runtime.maybe_setup_git_hooks()
-        # Should not preserve if already Forge hook
+        # Should not preserve if already APP hook
 
     def test_preserve_fails(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results[".Forge/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
+        runtime._read_results[".app/pre-commit.sh"] = MagicMock(content="#!/bin/bash")
         runtime._read_results[".git/hooks/pre-commit"] = MagicMock(content="existing")
         runtime._run_results = [
             CmdOutputObservation(content="", command="mkdir", exit_code=0),  # mkdir
@@ -434,9 +434,11 @@ async def test_clone_or_init_no_branch():
     )
     with patch(
         "backend.execution.git_setup.call_sync_from_async", new_callable=AsyncMock
-    ):
+    ) as mock_call:
         result = await runtime.clone_or_init_repo(None, "owner/MyRepo", None)
     assert result == "myrepo"
+    checkout_action = mock_call.await_args_list[1].args[1]
+    assert "git checkout -b app-workspace-" in checkout_action.command
 
 
 @pytest.mark.asyncio

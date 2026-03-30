@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional, cast
 
 from backend.execution.utils.process_registry import TaskCancellationService
 from backend.execution.utils.unified_shell import UnifiedShellSession, create_shell_session
 
 if TYPE_CHECKING:
     from backend.execution.utils.tool_registry import ToolRegistry
+    from backend.execution.utils.unified_shell import ShellToolRegistryLike
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class SessionManager:
         self,
         work_dir: str,
         username: str,
-        tool_registry: Optional[ToolRegistry] = None,
+        tool_registry: Optional[ShellToolRegistryLike] = None,
         max_memory_gb: Optional[int] = None,
         cancellation_service: Optional[TaskCancellationService] = None,
     ) -> None:
@@ -52,7 +53,7 @@ class SessionManager:
             try:
                 from backend.execution.utils.tool_registry import ToolRegistry
 
-                self.tool_registry = ToolRegistry()
+                self.tool_registry = cast("ShellToolRegistryLike", ToolRegistry())
             except ImportError:
                 # This should ideally not happen if properly installed
                 logger.warning("Failed to import ToolRegistry")
@@ -109,7 +110,7 @@ class SessionManager:
     def close_all(self) -> None:
         """Close all active sessions."""
         self.cancellation_service.cancel_all()
-        for session_id, session in list(self.sessions.items()):
+        for _session_id, session in list(self.sessions.items()):
             try:
                 session.close()
             except Exception:

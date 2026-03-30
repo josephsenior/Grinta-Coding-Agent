@@ -1,8 +1,8 @@
-# Forge Runtime
+# App Runtime
 
 ## Introduction
 
-The Forge Runtime folder contains the core components responsible for executing actions and managing the runtime environment for the Forge project. This README provides an overview of the main components and their interactions.
+The App Runtime folder contains the core components responsible for executing actions and managing the runtime environment for the App project. This README provides an overview of the main components and their interactions.
 
 ## Main Components
 
@@ -20,11 +20,11 @@ The `base.py` file defines the `Runtime` class, which serves as the primary [int
 
 The `local_runtime_inprocess.py` file contains the `LocalRuntime` class (aliased as `LocalRuntimeInProcess`), which implements the Runtime interface.
 
-This implementation runs the runtime executor (`ActionExecutor` in the current codebase) directly in the same process as the Forge backend, eliminating the overhead of subprocesses or HTTP communication. It is designed for desktop applications and local development.
+This implementation runs the runtime executor (`RuntimeExecutor`) directly in the same process as the App backend, eliminating the overhead of subprocesses or HTTP communication. It is designed for desktop applications and local development.
 
 ### 3. action_execution_server.py
 
-The `action_execution_server.py` file contains the runtime executor class (`ActionExecutor`), which is responsible for executing actions directly.
+The `action_execution_server.py` file contains the runtime executor class (`RuntimeExecutor`), which is responsible for executing actions directly.
 
 Key features of the runtime executor:
 
@@ -69,12 +69,12 @@ The Local Runtime is the primary and only supported runtime in this architecture
 - Fastest execution speed
 - Simplified architecture
 
-**Important: This runtime provides no isolation as it runs directly on the host machine. All actions are executed with the same permissions as the user running Forge.**
+**Important: This runtime provides no isolation as it runs directly on the host machine. All actions are executed with the same permissions as the user running App.**
 
-Forge also supports a `hardened_local` execution profile. This adds stricter local policy enforcement for workspace-scoped commands, file access, sensitive paths, network-capable commands, package installs, background processes, and interactive terminal behavior. It improves local safety, but it is still not sandboxing or host isolation.
+App also supports a `hardened_local` execution profile. This adds stricter local policy enforcement for workspace-scoped commands, file access, sensitive paths, network-capable commands, package installs, background processes, and interactive terminal behavior. It improves local safety, but it is still not sandboxing or host isolation.
 
 ## Related Components
 
 - The runtime interacts closely with the ledger defined in `backend.ledger`.
-- It relies on configuration classes from `forge.core.config`.
-- Logging is handled through `forge.core.logger`.
+- It relies on configuration classes from `app.core.config`.
+- Logging is handled through `app.core.logger`.

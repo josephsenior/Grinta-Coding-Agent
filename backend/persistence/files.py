@@ -1,4 +1,4 @@
-"""Abstract file storage interface implemented by Forge storage backends."""
+"""Abstract file storage interface implemented by App storage backends."""
 
 from __future__ import annotations
 

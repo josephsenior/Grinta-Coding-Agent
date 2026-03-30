@@ -13,7 +13,7 @@ from collections import deque
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.config import get_event_runtime_defaults
 from backend.ledger.event import Event
 
@@ -38,11 +38,11 @@ class BackpressureManager:
     """
 
     _DEFAULTS: ClassVar[dict[str, str]] = {
-        "max_queue_size": "FORGE_EVENTSTREAM_MAX_QUEUE",
-        "drop_policy": "FORGE_EVENTSTREAM_POLICY",
-        "hwm_ratio": "FORGE_EVENTSTREAM_HWM_RATIO",
-        "block_timeout": "FORGE_EVENTSTREAM_BLOCK_TIMEOUT",
-        "rate_window_seconds": "FORGE_EVENTSTREAM_RATE_WINDOW_SECONDS",
+        "max_queue_size": "APP_EVENTSTREAM_MAX_QUEUE",
+        "drop_policy": "APP_EVENTSTREAM_POLICY",
+        "hwm_ratio": "APP_EVENTSTREAM_HWM_RATIO",
+        "block_timeout": "APP_EVENTSTREAM_BLOCK_TIMEOUT",
+        "rate_window_seconds": "APP_EVENTSTREAM_RATE_WINDOW_SECONDS",
     }
 
     def __init__(

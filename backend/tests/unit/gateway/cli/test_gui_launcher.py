@@ -73,14 +73,14 @@ class TestLaunchGUIServer(unittest.TestCase):
         mock_cwd: Mock,
         mock_ensure_config: Mock,
     ) -> None:
-        """Test sets FORGE_RUNTIME environment variable to 'local'."""
+        """Test sets APP_RUNTIME environment variable to 'local'."""
         mock_cwd.return_value = Path("/home/user/project")
 
         launch_gui_server()
 
         call_kwargs = mock_subprocess_run.call_args[1]
         env = call_kwargs["env"]
-        self.assertEqual(env["FORGE_RUNTIME"], "local")
+        self.assertEqual(env["APP_RUNTIME"], "local")
 
     @patch("backend.gateway.cli.gui_launcher.ensure_config_dir_exists")
     @patch("pathlib.Path.cwd")

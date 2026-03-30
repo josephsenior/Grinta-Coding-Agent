@@ -7,7 +7,7 @@ from backend.inference.model_features import PROMPT_CACHE_PATTERNS, model_matche
 
 
 def model_supports_prompt_cache_hints(model: str) -> bool:
-    """True if Forge may attach cache hints for this model.
+    """True if App may attach cache hints for this model.
 
     Catalog ``supports_prompt_cache`` is authoritative when present and true.
     Otherwise we fall back to :func:`get_features` pattern matching (e.g. uncatalogued

@@ -223,3 +223,8 @@ class Event:
     def response_id(self, value: str) -> None:
         """Set LLM response ID."""
         self._response_id = value
+
+
+Record = Event
+
+__all__ = ["Event", "Record", "EventSource"]

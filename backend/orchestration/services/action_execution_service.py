@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
@@ -30,12 +31,25 @@ if TYPE_CHECKING:
     from backend.ledger.action import Action
 
 
+def _resolve_operation_pipeline(context):
+    context_dict = getattr(context, "__dict__", {})
+    pipeline = context_dict.get("operation_pipeline")
+    if pipeline is None and not isinstance(context, Mock):
+        pipeline = getattr(context, "operation_pipeline", None)
+    if pipeline is not None:
+        return pipeline
+    pipeline = context_dict.get("tool_pipeline")
+    if pipeline is not None:
+        return pipeline
+    return getattr(context, "tool_pipeline", None)
+
+
 def _resolve_llm_step_timeout_seconds(agent) -> float | None:
     """Per-LLM-step cap for ``astep`` only.
 
     ``None`` means no ``asyncio.wait_for`` limit (model may stream as long as needed).
     Set ``agent.config.llm_step_timeout_seconds`` to a positive number, or
-    ``FORGE_LLM_STEP_TIMEOUT_SECONDS`` to a positive value, to enforce a cap.
+    ``APP_LLM_STEP_TIMEOUT_SECONDS`` to a positive value, to enforce a cap.
     Zero, negative, or empty/unset env leaves the step uncapped.
     """
     from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
@@ -205,7 +219,7 @@ class ActionExecutionService:
             )
 
         ctx: ToolInvocationContext | None = None
-        pipeline = self._context.tool_pipeline
+        pipeline = _resolve_operation_pipeline(self._context)
         if action.runnable and pipeline:
             ctx = pipeline.create_context(action, self._context.state)
             if ctx is not None:

@@ -21,7 +21,7 @@ from backend.orchestration.agent import Agent
 from backend.orchestration.state.state import State
 from backend.core.constants import GENERAL_TIMEOUT
 from backend.core.errors import AgentNotRegisteredError
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger import EventStream
 from backend.context.agent_memory import Memory
 from backend.inference.llm_registry import LLMRegistry
@@ -31,7 +31,7 @@ from backend.persistence.data_models.user_secrets import UserSecrets
 from backend.utils.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
-    from backend.core.config import AgentConfig, ForgeConfig
+    from backend.core.config import AgentConfig, AppConfig
     from backend.ledger.event import Event
     from backend.playbooks.engine.playbook import BasePlaybook
     from backend.core.provider_types import (
@@ -50,7 +50,7 @@ def _instantiate_runtime(runtime_cls: type[object], **kwargs: Any) -> Runtime:
 
 def _resolve_agent_config(
     agent: Agent | None,
-    config: ForgeConfig | None,
+    config: AppConfig | None,
     agent_cls_name: str | None,
 ) -> AgentConfig | None:
     """Resolve AgentConfig from agent or config + agent_cls_name."""
@@ -85,14 +85,14 @@ def _apply_agent_disabled_plugins(
 def filter_plugins_by_config(
     plugins: list[PluginRequirement],
     agent: Agent | None = None,
-    config: ForgeConfig | None = None,
+    config: AppConfig | None = None,
     agent_cls_name: str | None = None,
 ) -> list[PluginRequirement]:
     """Filter plugins through two layers:
 
     1. **Environment allowlist** — delegates to
        ``backend.execution.plugins.filter_plugins_by_config`` which honours the
-       ``FORGE_PLUGINS`` env-var (comma-separated allowlist).  When the var is
+         ``APP_PLUGINS`` env-var (comma-separated allowlist).  When the var is
        unset every plugin passes through.
     2. **Agent-config denylist** — if an ``AgentConfig`` is reachable (via
        *agent* or *config* + *agent_cls_name*), its ``disabled_plugins``
@@ -101,7 +101,7 @@ def filter_plugins_by_config(
     Args:
         plugins: List of plugin requirements to filter.
         agent: Optional agent instance to derive config from.
-        config: Optional ForgeConfig to look up per-agent config.
+        config: Optional AppConfig to look up per-agent config.
         agent_cls_name: Agent class name used to resolve config.
 
     Returns:
@@ -117,7 +117,7 @@ def filter_plugins_by_config(
 
 
 def create_runtime(
-    config: ForgeConfig,
+    config: AppConfig,
     llm_registry: LLMRegistry | None = None,
     sid: str | None = None,
     headless_mode: bool = True,
@@ -288,7 +288,7 @@ def create_memory(
 def _ensure_agent_class_available(agent_name: str) -> None:
     """Ensure the requested agent class has been registered.
 
-    Attempts to import `forge.engine` (and its submodules) lazily so that the
+    Attempts to import `app.engine` (and its submodules) lazily so that the
     built-in agents are registered even when the CLI is exercised in isolation,
     such as during unit tests.
     """
@@ -298,16 +298,16 @@ def _ensure_agent_class_available(agent_name: str) -> None:
     except AgentNotRegisteredError:
         pass
     try:
-        importlib.import_module("forge.engine")
+        importlib.import_module("app.engine")
     except Exception as exc:  # pragma: no cover - defensive logging
-        logger.debug("Failed to auto-import forge.engine: %s", exc)
+        logger.debug("Failed to auto-import app.engine: %s", exc)
     try:
         Agent.get_cls(agent_name)
     except AgentNotRegisteredError as exc:
         raise AgentNotRegisteredError(agent_name) from exc
 
 
-def create_agent(config: ForgeConfig, llm_registry: LLMRegistry) -> Agent:
+def create_agent(config: AppConfig, llm_registry: LLMRegistry) -> Agent:
     """Create agent instance from configuration.
 
     Args:
@@ -331,7 +331,7 @@ def create_agent(config: ForgeConfig, llm_registry: LLMRegistry) -> Agent:
 def create_controller(
     agent: Agent,
     runtime: Runtime,
-    config: ForgeConfig,
+    config: AppConfig,
     conversation_stats: ConversationStats,
     headless_mode: bool = True,
     replay_events: list[Event] | None = None,
@@ -343,7 +343,7 @@ def create_controller(
     Args:
         agent: Agent instance
         runtime: Runtime environment
-        config: Forge configuration
+        config: App configuration
         conversation_stats: Conversation statistics tracker
         headless_mode: Whether running in headless mode
         replay_events: Optional events to replay
@@ -403,7 +403,7 @@ def create_controller(
     return (controller, initial_state)
 
 
-def generate_sid(config: ForgeConfig, session_name: str | None = None) -> str:
+def generate_sid(config: AppConfig, session_name: str | None = None) -> str:
     """Generate a unique session id.
 
     The session ID is kept short to ensure it's easy to manage.

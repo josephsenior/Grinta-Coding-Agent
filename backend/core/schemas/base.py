@@ -1,4 +1,4 @@
-"""Base Pydantic schemas for Forge events with versioning support."""
+"""Base Pydantic schemas for App events with versioning support."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def _create_default_event_metadata() -> EventMetadata:
 
 
 class BaseEventSchema(BaseModel):
-    """Base schema for all Forge events with versioning support."""
+    """Base schema for all App events with versioning support."""
 
     schema_version: EventVersion = Field(
         EventVersion.V1, description="Schema version for this event"

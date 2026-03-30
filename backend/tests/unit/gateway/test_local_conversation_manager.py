@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -66,7 +67,7 @@ def test_session_needs_restart_for_unhealthy_cached_session():
 
 @pytest.mark.asyncio
 async def test_send_event_to_conversation_restarts_broken_cached_session(monkeypatch):
-    manager = LocalConversationManager.__new__(LocalConversationManager)
+    manager = cast(Any, LocalConversationManager.__new__(LocalConversationManager))
 
     broken_session = SimpleNamespace(
         sid="sid-1",

@@ -17,7 +17,7 @@
 
 {% if mcp_server_hints %}
 <MCP_SERVER_HINTS>
-**Configured MCP servers (when to use each — from your Forge MCP settings):**
+**Configured MCP servers (when to use each — from your MCP settings):**
 {% for row in mcp_server_hints %}
 - **`{{ row.server }}`:** {{ row.hint }}
 {% endfor %}

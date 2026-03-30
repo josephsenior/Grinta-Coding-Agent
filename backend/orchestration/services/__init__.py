@@ -2,7 +2,7 @@
 
 from .action_execution_service import ActionExecutionService
 from .action_service import ActionService
-from .autonomy_service import AutonomyService
+from .autonomy_service import AutonomyService, ExecutionPolicyService
 from .budget_guard_service import BudgetGuardService
 from .circuit_breaker_service import CircuitBreakerService
 from .confirmation_service import ConfirmationService
@@ -14,7 +14,7 @@ from .iteration_service import IterationService
 from .lifecycle_service import LifecycleService
 from .metrics_service import MetricsService
 from .observation_service import ObservationService
-from .pending_action_service import PendingActionService
+from .pending_action_service import OpenOperationService, PendingActionService
 from .recovery_service import RecoveryService
 from .retry_service import RetryService
 from .safety_service import SafetyService
@@ -33,6 +33,7 @@ __all__ = [
     "ActionService",
     "ActionExecutionService",
     "AutonomyService",
+    "ExecutionPolicyService",
     "CircuitBreakerService",
     "OrchestrationContext",
     "EventRouterService",
@@ -48,6 +49,7 @@ __all__ = [
     "LifecycleService",
     "MetricsService",
     "ObservationService",
+    "OpenOperationService",
     "PendingActionService",
     "RecoveryService",
     "SafetyService",

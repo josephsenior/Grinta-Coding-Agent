@@ -1,4 +1,4 @@
-"""Tests for backend.core.plugin module (PluginRegistry, ForgePlugin).
+"""Tests for backend.core.plugin module (PluginRegistry, AppPlugin).
 
 Targets low coverage in plugin.py.
 """
@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.core.plugin import (
-    ForgePlugin,
+    AppPlugin,
     HookType,
     PluginRegistry,
 )
@@ -22,7 +22,7 @@ from backend.core.plugin import (
 # -----------------------------------------------------------
 
 
-class _SimplePlugin(ForgePlugin):
+class _SimplePlugin(AppPlugin):
     name = "simple-plugin"
     version = "1.0.0"
     description = "A test plugin"
@@ -37,7 +37,7 @@ class _SimplePlugin(ForgePlugin):
         pass
 
 
-class _MutatingPlugin(ForgePlugin):
+class _MutatingPlugin(AppPlugin):
     name = "mutating-plugin"
     version = "1.0.0"
     description = "Mutates data"
@@ -64,7 +64,7 @@ class _MutatingPlugin(ForgePlugin):
         return tool_args
 
 
-class _RaisingPlugin(ForgePlugin):
+class _RaisingPlugin(AppPlugin):
     name = "raising-plugin"
     version = "1.0.0"
     description = "Always raises"
@@ -244,16 +244,16 @@ class TestDispatchHooks:
 
 
 # -----------------------------------------------------------
-# ForgePlugin.validate
+# AppPlugin.validate
 # -----------------------------------------------------------
 
 
-class TestForgePluginValidate:
+class TestAppPluginValidate:
     def test_no_warnings_when_configured(self):
         assert _SimplePlugin().validate() == []
 
     def test_default_name_warns(self):
-        class _DefaultPlugin(ForgePlugin):
+        class _DefaultPlugin(AppPlugin):
             async def on_event(self, e):
                 pass
 
@@ -274,11 +274,11 @@ class TestForgePluginValidate:
 
 
 # -----------------------------------------------------------
-# ForgePlugin default hooks
+# AppPlugin default hooks
 # -----------------------------------------------------------
 
 
-class TestForgePluginDefaultHooks:
+class TestAppPluginDefaultHooks:
     @pytest.mark.asyncio
     async def test_on_action_pre_passthrough(self):
         action = MagicMock()

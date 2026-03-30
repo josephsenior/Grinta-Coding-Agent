@@ -1,4 +1,4 @@
-"""Convenience exports for Forge's Model Context Protocol client utilities."""
+"""Convenience exports for App's Model Context Protocol client utilities."""
 
 from backend.gateway.integrations.mcp.client import MCPClient
 from backend.gateway.integrations.mcp.error_collector import mcp_error_collector

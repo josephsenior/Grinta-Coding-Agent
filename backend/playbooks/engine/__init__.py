@@ -1,4 +1,4 @@
-"""Public playbook interfaces and metadata types for Forge."""
+"""Public playbook interfaces and metadata types for App."""
 
 from .playbook import (
     BasePlaybook,

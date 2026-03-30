@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 import json
+from typing import Any, cast
 
 from backend.engine.tools import error_recovery_memory
 
@@ -104,9 +105,9 @@ def test_build_doc_name_is_deterministic() -> None:
 
 
 def test_migration_imports_once_and_dedupes(monkeypatch, tmp_path) -> None:
-    local_file = tmp_path / ".forge" / "query_error_solutions.json"
-    global_file = tmp_path / ".forge" / "global_query_error_solutions.json"
-    marker_file = tmp_path / ".forge" / "error_recovery_migration_done.json"
+    local_file = tmp_path / ".app" / "query_error_solutions.json"
+    global_file = tmp_path / ".app" / "global_query_error_solutions.json"
+    marker_file = tmp_path / ".app" / "error_recovery_migration_done.json"
 
     local_file.parent.mkdir(parents=True, exist_ok=True)
     local_file.write_text(
@@ -142,11 +143,11 @@ def test_migration_imports_once_and_dedupes(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(error_recovery_memory, "_record", _fake_record)
 
     first = error_recovery_memory._run_one_time_migration(
-        manager=SimpleNamespace(),
+        manager=cast(Any, SimpleNamespace()),
         collection_id="col-1",
     )
     second = error_recovery_memory._run_one_time_migration(
-        manager=SimpleNamespace(),
+        manager=cast(Any, SimpleNamespace()),
         collection_id="col-1",
     )
 

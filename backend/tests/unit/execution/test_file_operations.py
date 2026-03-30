@@ -11,6 +11,7 @@ import pytest
 
 from backend.execution.file_operations import (
     _format_directory_listing,
+    _get_max_cmd_output_chars,
     _list_directory_recursive,
     _parse_insert_line,
     encode_binary_file,
@@ -64,7 +65,7 @@ class TestTruncateLargeText:
     def test_truncation(self):
         big = "x" * 200
         result = truncate_large_text(big, 50, label="test")
-        assert "Truncated by Forge" in result
+        assert "Truncated by app" in result
         assert len(result) < 200
 
     def test_max_chars_zero(self):
@@ -75,9 +76,13 @@ class TestTruncateCmdOutput:
     def test_truncate_cmd_output_head_tail_notice(self):
         output = "".join(f"line-{i}\n" for i in range(200))
         truncated = truncate_cmd_output(output, max_chars=300)
-        assert "[FORGE: Output truncated" in truncated
+        assert "[APP: Output truncated" in truncated
         assert "line-0" in truncated
         assert "line-199" in truncated
+
+    def test_get_max_cmd_output_chars_reads_app_env(self):
+        with patch.dict(os.environ, {"APP_MAX_CMD_OUTPUT_CHARS": "1234"}):
+            assert _get_max_cmd_output_chars(None) == 1234
 
 
 # ---------------------------------------------------------------------------
@@ -86,19 +91,19 @@ class TestTruncateCmdOutput:
 class TestGetMaxEditObservationChars:
     def test_default(self):
         with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("FORGE_MAX_EDIT_OBS_CHARS", None)
+            os.environ.pop("APP_MAX_EDIT_OBS_CHARS", None)
             assert get_max_edit_observation_chars() == 200000
 
     def test_custom_value(self):
-        with patch.dict(os.environ, {"FORGE_MAX_EDIT_OBS_CHARS": "5000"}):
+        with patch.dict(os.environ, {"APP_MAX_EDIT_OBS_CHARS": "5000"}):
             assert get_max_edit_observation_chars() == 5000
 
     def test_invalid_value(self):
-        with patch.dict(os.environ, {"FORGE_MAX_EDIT_OBS_CHARS": "abc"}):
+        with patch.dict(os.environ, {"APP_MAX_EDIT_OBS_CHARS": "abc"}):
             assert get_max_edit_observation_chars() == 200000
 
     def test_negative_value(self):
-        with patch.dict(os.environ, {"FORGE_MAX_EDIT_OBS_CHARS": "-1"}):
+        with patch.dict(os.environ, {"APP_MAX_EDIT_OBS_CHARS": "-1"}):
             assert get_max_edit_observation_chars() == 200000
 
 

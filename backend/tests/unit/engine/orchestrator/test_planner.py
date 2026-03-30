@@ -393,9 +393,9 @@ class TestBuildLlmParams:
         assert out[-1]["content"] == "task"
         # Control message is inserted immediately before the last user message.
         assert out[-2]["role"] == "system"
-        assert "<FORGE_CONTEXT_STATUS" in out[-2]["content"]
+        assert "<APP_CONTEXT_STATUS" in out[-2]["content"]
         assert "memory_pressure=WARNING" in out[-2]["content"]
-        assert "<FORGE_DIRECTIVE>" in out[-2]["content"]
+        assert "<APP_DIRECTIVE>" in out[-2]["content"]
 
     def test_merges_control_into_primary_system_when_configured(self):
         p = _make_planner(config=_make_config(merge_control_system_into_primary=True))
@@ -421,9 +421,9 @@ class TestBuildLlmParams:
         assert len(out) == 2
         assert out[0]["role"] == "system"
         assert out[0]["content"].startswith("base sys")
-        assert "<FORGE_CONTEXT_STATUS" in out[0]["content"]
+        assert "<APP_CONTEXT_STATUS" in out[0]["content"]
         assert "memory_pressure=WARNING" in out[0]["content"]
-        assert "<FORGE_DIRECTIVE>" in out[0]["content"]
+        assert "<APP_DIRECTIVE>" in out[0]["content"]
         assert out[-1]["role"] == "user"
         assert out[-1]["content"] == "task"
 

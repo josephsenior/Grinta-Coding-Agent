@@ -64,7 +64,7 @@ try:  # pragma: no cover - exercised in integration tests
 except ImportError:  # pragma: no cover - handled in __init__
     TREE_SITTER_AVAILABLE = False
 
-from backend.core.logger import forge_logger as logger  # noqa: E402
+from backend.core.logger import app_logger as logger  # noqa: E402
 
 
 @dataclass
@@ -237,7 +237,7 @@ class TreeSitterEditor:
             raise ImportError(
                 "🚨 CRITICAL: Tree-sitter not available!\n\n"
                 "Ultimate Editor requires Tree-sitter for structure-aware editing.\n"
-                "This is Forge's competitive advantage - without it, only basic editing works.\n\n"
+                "This is App's competitive advantage - without it, only basic editing works.\n\n"
                 "PRODUCTION DEPLOYMENT ERROR:\n"
                 "  Tree-sitter should be a required dependency in pyproject.toml.\n"
                 "  Check that your runtime environment has the latest dependencies installed.\n\n"

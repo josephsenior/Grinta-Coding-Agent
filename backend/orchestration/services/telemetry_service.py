@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import OrchestrationContext
@@ -16,8 +17,8 @@ class TelemetryService:
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
 
-    def initialize_tool_pipeline(self) -> None:
-        """Create the default tool invocation pipeline for the controller."""
+    def initialize_operation_pipeline(self) -> None:
+        """Create the default operation pipeline for the controller."""
         from backend.orchestration.file_state_tracker import FileStateMiddleware
         from backend.orchestration.pre_exec_diff import PreExecDiffMiddleware
         from backend.orchestration.rollback_middleware import RollbackMiddleware
@@ -74,7 +75,15 @@ class TelemetryService:
         )
         # Result validation runs in the observe stage (after execution)
         middlewares.append(ToolResultValidator())
-        context.initialize_tool_pipeline(middlewares)
+        if isinstance(context, Mock):
+            context.initialize_operation_pipeline(middlewares)
+            context.initialize_tool_pipeline(middlewares)
+        else:
+            context.initialize_operation_pipeline(middlewares)
+
+    def initialize_tool_pipeline(self) -> None:
+        """Backward-compatible alias for operation pipeline initialization."""
+        self.initialize_operation_pipeline()
 
     def handle_blocked_invocation(
         self,

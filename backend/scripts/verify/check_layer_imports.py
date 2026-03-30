@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce layer dependency rules for the Forge backend.
+"""Enforce layer dependency rules for the App backend.
 
 Run via:  python -m backend.scripts.verify.check_layer_imports
 Or:       python backend/scripts/verify/check_layer_imports.py

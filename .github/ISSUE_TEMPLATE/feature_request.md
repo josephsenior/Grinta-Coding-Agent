@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an idea for Forge
+about: Suggest an idea for App
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''
@@ -25,7 +25,7 @@ What alternatives have you considered?
 ## Additional Context
 
 - Would you be willing to implement this feature?
-- Is this blocking your usage of Forge?
+- Is this blocking your usage of App?
 - Any relevant examples from other tools?
 
 ## Example Usage

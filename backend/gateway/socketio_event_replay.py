@@ -6,7 +6,7 @@ concern is isolated from connection lifecycle and event routing.
 
 from __future__ import annotations
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import NullAction
 from backend.ledger.action.agent import RecallAction
 from backend.ledger.async_event_store_wrapper import AsyncEventStoreWrapper
@@ -31,7 +31,7 @@ async def replay_events(
 
     async for event in async_store:
         event_count += 1
-        logger.debug("forge_event: %s", event.__class__.__name__)
+        logger.debug("app_event: %s", event.__class__.__name__)
 
         if isinstance(event, NullAction | NullObservation | RecallAction):
             continue
@@ -40,7 +40,7 @@ async def replay_events(
             logger.info("Found AgentStateChangedObservation: %s", event.agent_state)
             agent_state_changed = event
         else:
-            await sio.emit("forge_event", event_to_dict(event), to=connection_id)
+            await sio.emit("app_event", event_to_dict(event), to=connection_id)
 
     logger.info("Replayed %s events", event_count)
     return agent_state_changed
@@ -67,7 +67,7 @@ async def send_agent_state(
         )
         conn_manager.update_activity(connection_id)
         await sio.emit(
-            "forge_event", event_to_dict(agent_state_changed), to=connection_id
+            "app_event", event_to_dict(agent_state_changed), to=connection_id
         )
         return True
 
@@ -91,7 +91,7 @@ async def send_agent_state(
                 )
                 conn_manager.update_activity(connection_id)
                 await sio.emit(
-                    "forge_event", event_to_dict(current_state), to=connection_id
+                    "app_event", event_to_dict(current_state), to=connection_id
                 )
                 return True
             logger.warning(
@@ -142,7 +142,7 @@ async def replay_event_stream(
             conn_manager = get_connection_manager()
             conn_manager.update_activity(connection_id)
             await sio.emit(
-                "forge_event", event_to_dict(default_state), to=connection_id
+                "app_event", event_to_dict(default_state), to=connection_id
             )
         except Exception as e:
             logger.error(

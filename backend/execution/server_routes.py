@@ -1,7 +1,7 @@
 ﻿"""FastAPI route handlers for the runtime action execution server.
 
 Extracted from action_execution_server.py to separate HTTP route definitions
-from the ActionExecutor class. Contains: exception handlers, auth middleware,
+from the RuntimeExecutor class. Contains: exception handlers, auth middleware,
 and all REST endpoints (execute_action, upload, download, list_files, etc.).
 """
 
@@ -24,7 +24,7 @@ from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.core.config.mcp_config import MCPStdioServerConfig
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import Action
 from backend.ledger.serialization import event_from_dict, event_to_dict
 from backend.execution.utils.system_stats import (
@@ -104,7 +104,7 @@ def register_routes(
 
     Args:
         app: FastAPI application
-        get_client: Callable that returns the current ActionExecutor instance
+        get_client: Callable that returns the current RuntimeExecutor instance
         get_mcp_proxy: Callable that returns the current MCPProxyManager instance
     """
 

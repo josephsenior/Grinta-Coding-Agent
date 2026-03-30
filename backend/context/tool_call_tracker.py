@@ -2,7 +2,7 @@
 
 All functions are pure — they receive data and return results without touching
 any instance state.  Extracted from
-:class:`~backend.context.conversation_memory.ConversationMemory` to improve
+:class:`~backend.context.conversation_memory.ContextMemory` to improve
 modularity and testability.
 """
 

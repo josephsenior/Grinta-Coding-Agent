@@ -1,4 +1,4 @@
-"""Serialization and deserialization for Forge event schemas with version migration."""
+"""Serialization and deserialization for App event schemas with version migration."""
 
 from __future__ import annotations
 

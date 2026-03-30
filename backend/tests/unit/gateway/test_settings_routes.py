@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -98,7 +99,7 @@ def test_resolve_settings_provider_prefers_explicit_provider() -> None:
 
 
 def test_ensure_secrets_store_adds_empty_when_missing() -> None:
-    bare = Settings.model_construct(agent="Orchestrator", secrets_store=None)
+    bare = Settings.model_construct(agent="Orchestrator", secrets_store=cast(Any, None))
     merged = _ensure_secrets_store(bare)
 
     assert merged.secrets_store is not None
@@ -141,6 +142,7 @@ def test_build_recovery_snapshot_ok_and_degraded() -> None:
     ):
         snap2 = _build_recovery_snapshot()
 
+    assert snap2 is not None
     assert snap2["status"] == "degraded"
 
 

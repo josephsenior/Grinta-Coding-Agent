@@ -1,6 +1,6 @@
 # MCP Utilities
 
-This directory contains the Model Context Protocol (MCP) integration utilities for Forge.
+This directory contains the Model Context Protocol (MCP) integration utilities for App.
 
 ## Components
 
@@ -18,7 +18,7 @@ This directory contains the Model Context Protocol (MCP) integration utilities f
 - Eligible tools (deterministic, frequently reused): `list_components`, `list_blocks`, `get_component`, `get_block`, `get_component_metadata`.
 - Key format: `<tool_name>::<stable_sorted_args_json>` (control flags `refresh` & `no_cache` are excluded from the key).
 - TTL: 600s (10 minutes) by default; large entries (>5MB serialized by default) are skipped.
-- Max per-entry size is configurable via env var `FORGE_MCP_CACHE_MAX_ENTRY_BYTES` (bytes).
+- Max per-entry size is configurable via env var `APP_MCP_CACHE_MAX_ENTRY_BYTES` (bytes).
 - Errors (payloads including `isError: true`) are not cached.
 - Bypass controls: pass `{"refresh": true}` or `{"no_cache": true}` in tool arguments.
 - Helper API: `get_cached`, `set_cache`, `clear_cache(prefix?)`.

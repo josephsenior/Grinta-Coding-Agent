@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import TypeAdapter
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.persistence import get_file_store
 from backend.persistence.conversation.conversation_store import ConversationStore
 from backend.persistence.data_models.conversation_metadata import ConversationMetadata
@@ -24,7 +24,7 @@ from backend.utils.async_utils import call_sync_from_async
 from backend.utils.search_utils import offset_to_page_id, page_id_to_offset
 
 if TYPE_CHECKING:
-    from backend.core.config.forge_config import ForgeConfig
+    from backend.core.config.app_config import AppConfig
     from backend.persistence.files import FileStore
 
 conversation_metadata_type_adapter = TypeAdapter(ConversationMetadata)
@@ -36,14 +36,14 @@ class FileConversationStore(ConversationStore):
     def __init__(
         self,
         file_store: FileStore,
-        config: ForgeConfig | None | None = None,
+        config: AppConfig | None | None = None,
         user_id: str | None = None,
     ) -> None:
         """Capture configuration, file store, and ensure local directories exist."""
         if config is None:
-            from backend.core.config.forge_config import ForgeConfig
+            from backend.core.config.app_config import AppConfig
 
-            config = ForgeConfig()
+            config = AppConfig()
         self.config = config
         self.file_store = file_store
         self.user_id = user_id
@@ -52,7 +52,7 @@ class FileConversationStore(ConversationStore):
 
         wb = (self.config.project_root or "").strip()
         conv_root = Path(wb).expanduser().resolve() if wb else Path(get_app_settings_root())
-        base_path = conv_root / ".Forge" / "conversations"
+        base_path = conv_root / ".app" / "conversations"
         if user_id:
             base_path = base_path / user_id
         base_path.mkdir(parents=True, exist_ok=True)
@@ -234,12 +234,12 @@ class FileConversationStore(ConversationStore):
 
     @classmethod
     async def get_instance(
-        cls, config: ForgeConfig, user_id: str | None
+        cls, config: AppConfig, user_id: str | None
     ) -> FileConversationStore:
         """Get FileConversationStore singleton instance.
 
         Args:
-            config: Forge configuration
+            config: Application configuration
             user_id: Optional user ID for scoping
 
         Returns:

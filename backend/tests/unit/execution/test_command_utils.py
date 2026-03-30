@@ -88,8 +88,8 @@ class TestValidateEnvPart:
 class TestValidateAndGetUsername:
     """Tests for _validate_and_get_username."""
 
-    def test_default_forge_user(self):
-        assert _validate_and_get_username(None, True) == "forge"
+    def test_default_runtime_user(self):
+        assert _validate_and_get_username(None, True) == "app"
 
     def test_default_root_user(self):
         assert _validate_and_get_username(None, False) == "root"
@@ -99,7 +99,7 @@ class TestValidateAndGetUsername:
 
     def test_dangerous_username_rejected(self):
         result = _validate_and_get_username("user;cmd", True)
-        assert result == "forge"  # falls back to default
+        assert result == "app"  # falls back to default
 
     def test_space_in_username_rejected(self):
         result = _validate_and_get_username("user name", False)
@@ -107,7 +107,7 @@ class TestValidateAndGetUsername:
 
     def test_newline_in_username_rejected(self):
         result = _validate_and_get_username("user\ncmd", True)
-        assert result == "forge"
+        assert result == "app"
 
 
 # ---------------------------------------------------------------------------
@@ -121,12 +121,12 @@ class TestGetStartupCommand:
     def _make_config(
         self,
         *,
-        run_as_forge=True,
+        run_as_runtime_user=True,
         enable_browser=True,
         workspace_mount="/workspace",
     ):
         cfg = MagicMock()
-        cfg.run_as_Forge = run_as_forge
+        cfg.run_as_runtime_user = run_as_runtime_user
         cfg.enable_browser = enable_browser
         cfg.workspace_mount_path_in_runtime = workspace_mount
         return cfg

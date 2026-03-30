@@ -40,30 +40,30 @@ class TestConversationValidatorInit:
         assert v._mode == "strict"
 
     def test_env_var_override(self, monkeypatch):
-        monkeypatch.setenv("FORGE_VALIDATION_MODE", "strict")
+        monkeypatch.setenv("APP_VALIDATION_MODE", "strict")
         v = ConversationValidator()
         assert v._mode == "strict"
 
     def test_env_var_permissive(self, monkeypatch):
-        monkeypatch.setenv("FORGE_VALIDATION_MODE", "permissive")
+        monkeypatch.setenv("APP_VALIDATION_MODE", "permissive")
         v = ConversationValidator()
         assert v._mode == "permissive"
 
     def test_env_var_invalid_falls_to_config(self, monkeypatch):
-        monkeypatch.setenv("FORGE_VALIDATION_MODE", "bogus")
+        monkeypatch.setenv("APP_VALIDATION_MODE", "bogus")
         mock_config = MagicMock()
         mock_config.security.validation_mode = "strict"
         with patch(
-            "backend.persistence.conversation.conversation_validator.load_forge_config",
+            "backend.persistence.conversation.conversation_validator.load_app_config",
             return_value=mock_config,
         ):
             v = ConversationValidator()
             assert v._mode == "strict"
 
     def test_fallback_default_permissive(self, monkeypatch):
-        monkeypatch.delenv("FORGE_VALIDATION_MODE", raising=False)
+        monkeypatch.delenv("APP_VALIDATION_MODE", raising=False)
         with patch(
-            "backend.persistence.conversation.conversation_validator.load_forge_config",
+            "backend.persistence.conversation.conversation_validator.load_app_config",
             side_effect=RuntimeError("no config"),
         ):
             v = ConversationValidator()
@@ -153,7 +153,7 @@ class TestValidateStrictInternal:
 
         with (
             patch(
-                "backend.persistence.conversation.conversation_validator.load_forge_config",
+                "backend.persistence.conversation.conversation_validator.load_app_config",
                 return_value=mock_config,
             ),
             patch(
@@ -183,7 +183,7 @@ class TestValidateStrictInternal:
 
         with (
             patch(
-                "backend.persistence.conversation.conversation_validator.load_forge_config",
+                "backend.persistence.conversation.conversation_validator.load_app_config",
                 return_value=mock_config,
             ),
             patch(
@@ -236,7 +236,7 @@ class TestCreateConversationValidatorFactory:
 
     def test_uses_env_var_class(self, monkeypatch):
         monkeypatch.setenv(
-            "FORGE_CONVERSATION_VALIDATOR_CLS",
+            "APP_CONVERSATION_VALIDATOR_CLS",
             "backend.persistence.conversation.conversation_validator.ConversationValidator",
         )
         with patch(

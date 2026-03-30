@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from backend.orchestration.safety_validator import ValidationResult
     from backend.ledger.action import Action
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
 from backend.telemetry.models import AuditEntry
 

@@ -13,7 +13,7 @@ from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
 from backend.core.constants import CONVERSATION_METADATA_UPDATE_SYNC_TIMEOUT
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.schemas import EventSource, ObservationType
 from backend.ledger.action import MessageAction
 from backend.ledger.observation.commands import CmdOutputObservation
@@ -294,7 +294,7 @@ class ConversationMetadataTracker:
             if self._loop is not None:
                 await run_in_loop(
                     self._sio.emit(
-                        "forge_event",
+                        "app_event",
                         status_update_dict,
                         to=ROOM_KEY.format(sid=conversation_id),
                     ),
@@ -302,7 +302,7 @@ class ConversationMetadataTracker:
                 )
             else:
                 await self._sio.emit(
-                    "forge_event",
+                    "app_event",
                     status_update_dict,
                     to=ROOM_KEY.format(sid=conversation_id),
                 )

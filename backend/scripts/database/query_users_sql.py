@@ -89,14 +89,14 @@ async def query_users_sql():
     try:
         # Get connection parameters from environment
         dsn = (
-            f"postgresql://{os.getenv('DB_USER', 'forge')}:"
-            f"{os.getenv('DB_PASSWORD', 'forge')}@"
+            f"postgresql://{os.getenv('DB_USER', 'app')}:"
+            f"{os.getenv('DB_PASSWORD', 'app')}@"
             f"{os.getenv('DB_HOST', 'localhost')}:"
             f"{os.getenv('DB_PORT', '5432')}/"
-            f"{os.getenv('DB_NAME', 'forge')}"
+            f"{os.getenv('DB_NAME', 'app')}"
         )
 
-        print(f"Connecting to database: {os.getenv('DB_NAME', 'forge')}...")
+        print(f"Connecting to database: {os.getenv('DB_NAME', 'app')}...")
         conn = await asyncpg.connect(dsn)
 
         try:
@@ -141,7 +141,7 @@ async def query_users_sql():
         print("   Please check your database connection settings:", file=sys.stderr)
         print(f"   DB_HOST={os.getenv('DB_HOST', 'localhost')}", file=sys.stderr)
         print(f"   DB_PORT={os.getenv('DB_PORT', '5432')}", file=sys.stderr)
-        print(f"   DB_NAME={os.getenv('DB_NAME', 'forge')}", file=sys.stderr)
+        print(f"   DB_NAME={os.getenv('DB_NAME', 'app')}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         print(f"[ERROR] {e}", file=sys.stderr)

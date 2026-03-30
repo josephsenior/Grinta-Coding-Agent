@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.inference.llm_registry import LLMRegistry
 from backend.execution import get_runtime_cls
 from backend.gateway.app_accessors import get_event_service_adapter
 
 if TYPE_CHECKING:
-    from backend.core.config import ForgeConfig
+    from backend.core.config import AppConfig
     from backend.ledger.stream import EventStream
     from backend.execution.base import Runtime
     from backend.persistence.files import FileStore
@@ -30,7 +30,7 @@ class ServerConversation:
         self,
         sid: str,
         file_store: FileStore,
-        config: ForgeConfig,
+        config: AppConfig,
         user_id: str | None,
         event_stream: EventStream | None = None,
         runtime: Runtime | None = None,

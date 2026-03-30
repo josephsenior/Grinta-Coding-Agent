@@ -14,7 +14,7 @@ from backend.orchestration.state.control_flags import (
     BudgetControlFlag,
     IterationControlFlag,
 )
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import PlaybookFinishAction
@@ -372,7 +372,7 @@ class TrackedHistoryList(list):
 
 @dataclass
 class State:
-    """Represents the running state of an agent in the Forge system, saving data of its operation and memory.
+    """Represents the running state of an agent in the App system, saving data of its operation and memory.
 
     - Multi-agent/delegate state:
       - store the task (conversation between the agent and the user)
@@ -927,7 +927,7 @@ class State:
             f"model:{model_name}",
             f"agent:{agent_name}",
             f"web_host:{os.environ.get('WEB_HOST', 'unspecified')}",
-            f"FORGE_version:{backend.__version__}",
+            f"APP_version:{backend.__version__}",
         ]
         return {
             "session_id": self.session_id,
@@ -973,3 +973,6 @@ class State:
             self._view_history_version = history_version
             self._view = View.from_events(self.history)
         return self._view
+
+
+RunState = State

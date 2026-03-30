@@ -59,7 +59,7 @@ class ChromaDBBackend(VectorBackend):
 
     def __init__(
         self,
-        collection_name: str = "FORGE_memory",
+        collection_name: str = "APP_memory",
         persist_directory: Path | None = None,
     ) -> None:
         r"""Initialize ChromaDB local vector store.
@@ -70,7 +70,7 @@ class ChromaDBBackend(VectorBackend):
 
         """
         if persist_directory is None:
-            persist_directory = Path.home() / ".Forge" / "memory" / "chroma"
+            persist_directory = Path.home() / ".app" / "memory" / "chroma"
         persist_directory.mkdir(parents=True, exist_ok=True)
 
         self.client = chromadb.PersistentClient(
@@ -227,11 +227,11 @@ class SQLiteBM25Backend(VectorBackend):
 
     def __init__(
         self,
-        collection_name: str = "FORGE_memory",
+        collection_name: str = "APP_memory",
         persist_directory: Path | None = None,
     ) -> None:
         if persist_directory is None:
-            persist_directory = Path.home() / ".Forge" / "memory" / "sqlite"
+            persist_directory = Path.home() / ".app" / "memory" / "sqlite"
         persist_directory.mkdir(parents=True, exist_ok=True)
         self.db_path = persist_directory / f"{collection_name}_fts.db"
         self._init_db()

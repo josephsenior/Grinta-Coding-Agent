@@ -18,7 +18,7 @@ from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.tool import ToolCallMetadata
 from backend.gateway.integrations.mcp.mcp_utils import call_tool_mcp
-from backend.context.conversation_memory import ConversationMemory
+from backend.context.conversation_memory import ContextMemory
 from backend.context.memory_types import DecisionType
 from backend.context.message_formatting import (
     apply_user_message_formatting,
@@ -49,12 +49,12 @@ def _make_config(**overrides):
 
 def _make_prompt_manager():
     pm = MagicMock()
-    pm.get_system_message.return_value = "You are Forge agent."
+    pm.get_system_message.return_value = "You are App agent."
     return pm
 
 
-def _make_memory(**config_overrides) -> ConversationMemory:
-    return ConversationMemory(
+def _make_memory(**config_overrides) -> ContextMemory:
+    return ContextMemory(
         config=_make_config(**config_overrides),
         prompt_manager=_make_prompt_manager(),
     )
@@ -96,7 +96,7 @@ class TestErrorObservationNotifyUiOnly:
 
 
 class TestToolResultPropagation:
-    def test_tool_result_ok_is_propagated_to_forge_tool_ok(self):
+    def test_tool_result_ok_is_propagated_to_tool_ok(self):
         mem = _make_memory()
         obs = MCPObservation(content='{"ok": true}', name="remote_tool", arguments={"x": 1})
         obs.tool_result = {"ok": True, "retryable": False}
@@ -115,9 +115,9 @@ class TestToolResultPropagation:
         )
 
         assert out == []
-        assert tool_messages["call_1"].forge_tool_ok is True
+        assert tool_messages["call_1"].tool_ok is True
 
-    def test_tool_result_failure_is_propagated_to_forge_tool_ok(self):
+    def test_tool_result_failure_is_propagated_to_tool_ok(self):
         mem = _make_memory()
         obs = MCPObservation(content='{"ok": false}', name="remote_tool", arguments={})
         obs.tool_result = {"ok": False, "retryable": True, "error_code": "TIMEOUT"}
@@ -136,7 +136,7 @@ class TestToolResultPropagation:
         )
 
         assert out == []
-        assert tool_messages["call_2"].forge_tool_ok is False
+        assert tool_messages["call_2"].tool_ok is False
 
     def test_cmd_output_exit_code_zero_propagates_success(self):
         mem = _make_memory()
@@ -160,7 +160,7 @@ class TestToolResultPropagation:
         )
 
         assert out == []
-        assert tool_messages["call_3"].forge_tool_ok is True
+        assert tool_messages["call_3"].tool_ok is True
 
     @pytest.mark.asyncio
     async def test_mcp_failure_envelope_reaches_tool_message_cleanly(self):
@@ -184,7 +184,7 @@ class TestToolResultPropagation:
         )
 
         assert out == []
-        assert tool_messages["call_4"].forge_tool_ok is False
+        assert tool_messages["call_4"].tool_ok is False
         payload = json.loads(obs.content)
         assert payload["error_code"] == "MCP_NO_CLIENTS"
         assert payload["retryable"] is True
@@ -201,18 +201,18 @@ class TestStaticHelpers:
 
     def test_is_valid_image_url_valid(self):
         assert (
-            ConversationMemory._is_valid_image_url("https://example.com/img.png")
+            ContextMemory._is_valid_image_url("https://example.com/img.png")
             is True
         )
 
     def test_is_valid_image_url_none(self):
-        assert ConversationMemory._is_valid_image_url(None) is False
+        assert ContextMemory._is_valid_image_url(None) is False
 
     def test_is_valid_image_url_empty(self):
-        assert ConversationMemory._is_valid_image_url("") is False
+        assert ContextMemory._is_valid_image_url("") is False
 
     def test_is_valid_image_url_whitespace(self):
-        assert ConversationMemory._is_valid_image_url("   ") is False
+        assert ContextMemory._is_valid_image_url("   ") is False
 
 
 class TestVectorMemoryInit:

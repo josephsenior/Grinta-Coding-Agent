@@ -1,4 +1,4 @@
-"""Pydantic schemas for all Forge observation types."""
+"""Pydantic schemas for all App observation types."""
 
 from __future__ import annotations
 

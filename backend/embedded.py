@@ -1,6 +1,6 @@
 """Embedded (single-process) mode for solo local-first use.
 
-Starts the Forge FastAPI/Socket.IO backend in a *background thread* using
+Starts the App FastAPI/Socket.IO backend in a *background thread* using
 uvicorn, waits until it is ready, then opens the web UI in a browser and
 keeps the process alive until Ctrl+C.
 
@@ -31,7 +31,7 @@ from backend.gateway.cli.server_startup import (
     validate_storage_contract,
 )
 
-logger = logging.getLogger("forge.embedded")
+logger = logging.getLogger("app.embedded")
 
 _STARTUP_POLL_INTERVAL = 0.25   # seconds between readiness probes
 _STARTUP_TIMEOUT = 30.0         # seconds before giving up
@@ -100,11 +100,11 @@ def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = Fals
     )
 
     env = os.environ.copy()
-    env["FORGE_HOST"] = host
+    env["APP_HOST"] = host
     env["HOST"] = host
-    env["FORGE_PORT"] = str(port)
+    env["APP_PORT"] = str(port)
     env["PORT"] = str(port)
-    env["FORGE_WATCH"] = "0"
+    env["APP_WATCH"] = "0"
 
     plan = build_server_startup_plan(project_root, env)
     validate_storage_contract(env)
@@ -119,7 +119,7 @@ def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = Fals
         target=_run_server,
         args=(plan.host, plan.resolved_port),
         daemon=True,
-        name="forge-server",
+        name="app-server",
     )
     server_thread.start()
 
@@ -160,9 +160,9 @@ def run_embedded(host: str = "127.0.0.1", port: int = 3000, verbose: bool = Fals
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="forge",
+        prog="app",
         description=(
-            "Forge — single-process embedded mode.  "
+            "App — single-process embedded mode.  "
             "Starts the backend server and opens the web UI."
         ),
     )

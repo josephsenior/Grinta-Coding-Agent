@@ -1,4 +1,4 @@
-"""API key management utilities for Forge configuration workflows."""
+"""API key management utilities for app configuration workflows."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ from typing import Any
 from pydantic import BaseModel, Field, SecretStr
 
 from backend._canonical import CanonicalModelMetaclass
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 
 from .provider_config import provider_config_manager
 
-_INSTANCE_NAME = "forge_api_key_manager_instance"
+_INSTANCE_NAME = "app_api_key_manager_instance"
 
 
 class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
@@ -377,6 +377,10 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         """Legacy no-op retained for compatibility with older tests/helpers."""
         return "unknown"
 
+    def extract_provider(self, model: str) -> str:
+        """Return the provider identifier for a model string."""
+        return self._extract_provider(model)
+
     def _extract_provider(self, model: str) -> str:
         """Extract provider from model identifier using resolver.
 
@@ -446,6 +450,10 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
 
         # Fallback to generic
         return os.environ.get("LLM_API_KEY")
+
+    def get_provider_key_from_env(self, provider: str) -> str | None:
+        """Return the configured environment API key for a provider, if present."""
+        return self._get_provider_key_from_env(provider)
 
     def validate_and_clean_completion_params(
         self, model: str, params: dict[str, Any]

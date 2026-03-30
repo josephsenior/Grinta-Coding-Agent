@@ -12,7 +12,7 @@ import shlex
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Any
 
-from backend.core.logger import forge_logger as logger
+from backend.core.logger import app_logger as logger
 from backend.security.command_analyzer import CommandAnalyzer
 
 if TYPE_CHECKING:
