@@ -16,7 +16,6 @@ from backend.core.config.app_config import (
     FileUploadsConfig,
     AppConfig,
     GitIdentityConfig,
-    TranscriptConfig,
     TrajectoryConfig,
 )
 from backend.core.config.llm_config import LLMConfig
@@ -46,7 +45,6 @@ __all__ = [
     "AppConfig",
     "GitIdentityConfig",
     "FileUploadsConfig",
-    "TranscriptConfig",
     "TrajectoryConfig",
     "EventStreamConfig",
     "RuntimeConfig",

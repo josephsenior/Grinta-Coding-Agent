@@ -19,7 +19,7 @@ from backend.gateway.session.conversation_init_data import ConversationInitData
 from backend.gateway.app_accessors import (
     ConversationStoreImpl,
     SettingsStoreImpl,
-    config,
+    get_config,
     get_conversation_manager,
 )
 from backend.gateway.store_factory import (
@@ -65,7 +65,7 @@ async def initialize_conversation(
     if conversation_id is None:
         conversation_id = uuid.uuid4().hex
     conversation_store = await get_conversation_store_instance(
-        ConversationStoreImpl, config, user_id
+        ConversationStoreImpl, get_config(), user_id
     )
     if not await conversation_store.exists(conversation_id):
         logger.info(
@@ -302,7 +302,7 @@ async def start_conversation(
     # Load and validate settings
     logger.info("Loading settings")
     settings_store = await get_settings_store_instance(
-        SettingsStoreImpl, config, user_id
+        SettingsStoreImpl, get_config(), user_id
     )
     settings = await settings_store.load()
     logger.info("Settings loaded")
@@ -450,14 +450,14 @@ async def setup_init_conversation_settings(
         RuntimeError: If conversation metadata is unavailable.
     """
     conversation_store = await get_conversation_store_instance(
-        ConversationStoreImpl, config, user_id
+        ConversationStoreImpl, get_config(), user_id
     )
     conversation_metadata = await conversation_store.get_metadata(conversation_id)
     if not conversation_metadata:
         raise RuntimeError(f"Conversation metadata not found for {conversation_id}")
 
     settings_store = await get_settings_store_instance(
-        SettingsStoreImpl, config, user_id
+        SettingsStoreImpl, get_config(), user_id
     )
     settings = await settings_store.load()
 

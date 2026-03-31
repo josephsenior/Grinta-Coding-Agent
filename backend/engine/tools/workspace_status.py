@@ -1,8 +1,7 @@
-"""workspace_status tool — quick snapshot of project state in one call.
+"""workspace_status tool — project state, diffs, checkpoints, rollback.
 
-Returns git status, recent changes, file tree summary, and running
-processes so the agent can orient without multiple bash round-trips.
-Platform-aware: uses PowerShell on Windows, bash on Unix.
+Unified workspace management tool combining status snapshots, session diffs,
+checkpoint save/view/clear, and workspace rollback. Platform-aware.
 """
 
 from __future__ import annotations
@@ -19,25 +18,55 @@ def create_workspace_status_tool() -> dict:
         "function": {
             "name": WORKSPACE_STATUS_TOOL_NAME,
             "description": (
-                "Get a quick snapshot of the current workspace: git status, "
-                "recent commits, top-level directory tree, and any running "
-                "background processes. Use this to orient yourself at the "
-                "start of a task or after context condensation."
+                "Workspace management: status snapshots, session diffs, checkpoints, and rollback.\n"
+                "Commands:\n"
+                "  status (default) — git status, recent commits, directory tree, background processes\n"
+                "  diff — show cumulative git diff of all session changes (use before finish)\n"
+                "  checkpoint_save — save a progress checkpoint with label\n"
+                "  checkpoint_view — list all saved checkpoints\n"
+                "  checkpoint_clear — clear all checkpoints\n"
+                "  revert — rollback workspace to a checkpoint"
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "command": {
+                        "type": "string",
+                        "enum": ["status", "diff", "checkpoint_save", "checkpoint_view", "checkpoint_clear", "revert"],
+                        "description": "Operation to perform (default: status).",
+                    },
                     "include_git": {
-                        "description": "Include git status and recent log (default: true).",
+                        "description": "For status: include git info (default: true).",
                         "type": "boolean",
                     },
                     "include_tree": {
-                        "description": "Include directory tree summary (default: true).",
+                        "description": "For status: include directory tree (default: true).",
                         "type": "boolean",
                     },
                     "tree_depth": {
-                        "description": "Max depth for directory tree listing (default: 2).",
+                        "description": "For status: tree depth (default: 2).",
                         "type": "integer",
+                    },
+                    "stat_only": {
+                        "description": "For diff: if 'true', show summary only.",
+                        "type": "string",
+                        "enum": ["true", "false"],
+                    },
+                    "path": {
+                        "description": "For diff: limit to a specific file or directory.",
+                        "type": "string",
+                    },
+                    "label": {
+                        "description": "For checkpoint_save: short description of completed work.",
+                        "type": "string",
+                    },
+                    "files_modified": {
+                        "description": "For checkpoint_save: comma-separated list of changed files.",
+                        "type": "string",
+                    },
+                    "checkpoint_id": {
+                        "description": "For revert: specific checkpoint ID to revert to.",
+                        "type": "string",
                     },
                 },
                 "required": [],
@@ -105,6 +134,25 @@ def _build_powershell_command(
 
 
 def build_workspace_status_action(arguments: dict):
+    """Route to the appropriate sub-handler based on *command*."""
+    command = arguments.get("command", "status")
+
+    if command == "diff":
+        return _build_diff_action(arguments)
+    if command == "checkpoint_save":
+        return _build_checkpoint_action("save", arguments)
+    if command == "checkpoint_view":
+        return _build_checkpoint_action("view", arguments)
+    if command == "checkpoint_clear":
+        return _build_checkpoint_action("clear", arguments)
+    if command == "revert":
+        return _build_revert_action(arguments)
+
+    # Default: status snapshot
+    return _build_status_action(arguments)
+
+
+def _build_status_action(arguments: dict):
     """Build a CmdRunAction that gathers workspace state in one command."""
     from backend.ledger.action.commands import CmdRunAction
 
@@ -115,11 +163,41 @@ def build_workspace_status_action(arguments: dict):
         tree_depth = 2
 
     if sys.platform == "win32":
-        command = _build_powershell_command(include_git, include_tree, tree_depth)
+        cmd = _build_powershell_command(include_git, include_tree, tree_depth)
     else:
-        command = _build_bash_command(include_git, include_tree, tree_depth)
+        cmd = _build_bash_command(include_git, include_tree, tree_depth)
 
-    return CmdRunAction(
-        command=command,
-        thought="Gathering workspace status snapshot",
+    return CmdRunAction(command=cmd, thought="Gathering workspace status snapshot")
+
+
+def _build_diff_action(arguments: dict):
+    """Show cumulative git diff of session changes."""
+    import shlex
+
+    from backend.ledger.action.commands import CmdRunAction
+
+    stat_only = arguments.get("stat_only", "false") == "true"
+    path = arguments.get("path", "")
+    safe_path = shlex.quote(path) if path else ""
+    stat_flag = " --stat" if stat_only else ""
+
+    cmd = (
+        f"echo '=== SESSION CHANGES ===' && "
+        f"git diff HEAD{stat_flag} {safe_path} 2>/dev/null || "
+        f"echo '(not a git repository)'"
     )
+    return CmdRunAction(command=cmd)
+
+
+def _build_checkpoint_action(sub_command: str, arguments: dict):
+    """Delegate to the checkpoint module."""
+    from backend.engine.tools.checkpoint import build_checkpoint_action
+
+    return build_checkpoint_action({"command": sub_command, **arguments})
+
+
+def _build_revert_action(arguments: dict):
+    """Delegate to the revert_to_checkpoint module."""
+    from backend.engine.tools.revert_to_checkpoint import build_revert_to_checkpoint_action
+
+    return build_revert_to_checkpoint_action(arguments)

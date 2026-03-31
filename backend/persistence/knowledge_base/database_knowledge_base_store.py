@@ -9,8 +9,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-import asyncpg
-from asyncpg import Pool
+try:
+    import asyncpg
+    from asyncpg import Pool
+except ImportError as _exc:
+    raise ImportError(
+        "asyncpg is required for database storage mode. "
+        "Install with:  uv pip install 'app-ai[database]'"
+    ) from _exc
 
 from backend.core.logger import app_logger as logger
 from backend.persistence.data_models.knowledge_base import (

@@ -5,8 +5,6 @@ offering a lightweight and stable alternative to multi-provider abstraction libr
 """
 
 from __future__ import annotations
-
-import json
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
@@ -17,6 +15,7 @@ import httpx
 from anthropic import Anthropic, AsyncAnthropic
 from openai import AsyncOpenAI, OpenAI
 
+from backend.core import json_compat as json
 from backend.core.logger import app_logger as logger
 
 # ---------------------------------------------------------------------------
@@ -166,7 +165,7 @@ class LLMResponse:
             func = tc.get("function", {})
             args = func.get("arguments", "{}")
             if isinstance(args, dict):
-                args_str = json.dumps(args)
+                args_str = json.dumps(args, ensure_ascii=False, separators=(",", ":"))
             elif isinstance(args, str):
                 args_str = args
             else:
@@ -225,7 +224,13 @@ def _stringify_openai_metadata_value(value: Any) -> str:
             if item
         )
     if isinstance(value, dict):
-        return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
     return str(value)
 
 
@@ -1083,9 +1088,17 @@ class GeminiClient(DirectLLMClient):
                                 args_dict = dict(args_dict.items())  # type: ignore[union-attr]
 
                             if isinstance(args_dict, dict):
-                                args_str = json.dumps(args_dict)
+                                args_str = json.dumps(
+                                    args_dict,
+                                    ensure_ascii=False,
+                                    separators=(",", ":"),
+                                )
                             else:
-                                args_str = json.dumps(getattr(fc, "args", {}))
+                                args_str = json.dumps(
+                                    getattr(fc, "args", {}),
+                                    ensure_ascii=False,
+                                    separators=(",", ":"),
+                                )
                         except Exception:
                             args_str = "{}"
                         yield {

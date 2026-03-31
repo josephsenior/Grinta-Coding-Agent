@@ -154,9 +154,9 @@ class TestProviderConfigurationManager:
         env_var = self.mgr.get_environment_variable("openai")
         assert env_var == "OPENAI_API_KEY"
 
-    def test_gemini_alias(self):
+    def test_gemini_provider_is_unknown(self):
         cfg = self.mgr.get_provider_config("gemini")
-        assert cfg.name == "google"
+        assert cfg.name == "unknown"
 
     def test_case_insensitive(self):
         cfg = self.mgr.get_provider_config("OpenAI")

@@ -352,7 +352,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         prefix_patterns = {
             "openai": ["openai/"],
             "anthropic": ["anthropic/"],
-            "google": ["google/", "gemini/"],
+            "google": ["google/"],
             "xai": ["xai/"],
             "groq": ["groq/"],
             "openhands": ["openhands/"],

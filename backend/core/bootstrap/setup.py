@@ -288,19 +288,21 @@ def create_memory(
 def _ensure_agent_class_available(agent_name: str) -> None:
     """Ensure the requested agent class has been registered.
 
-    Attempts to import `app.engine` (and its submodules) lazily so that the
-    built-in agents are registered even when the CLI is exercised in isolation,
-    such as during unit tests.
+    Attempts to import the built-in engine package lazily so that the built-in
+    agents are registered even when the CLI is exercised in isolation, such as
+    during unit tests.
     """
     try:
         Agent.get_cls(agent_name)
         return
     except AgentNotRegisteredError:
         pass
-    try:
-        importlib.import_module("app.engine")
-    except Exception as exc:  # pragma: no cover - defensive logging
-        logger.debug("Failed to auto-import app.engine: %s", exc)
+
+    for module_name in ("backend.engine", "app.engine"):
+        try:
+            importlib.import_module(module_name)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug("Failed to auto-import %s: %s", module_name, exc)
     try:
         Agent.get_cls(agent_name)
     except AgentNotRegisteredError as exc:

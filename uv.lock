@@ -6,6 +6,9 @@ resolution-markers = [
     "python_full_version < '3.13'",
 ]
 
+[manifest]
+constraints = [{ name = "transformers", specifier = "<4.47.0" }]
+
 [[package]]
 name = "aiofiles"
 version = "25.1.0"
@@ -150,7 +153,6 @@ dependencies = [
     { name = "asyncpg" },
     { name = "bashlex" },
     { name = "binaryornot" },
-    { name = "chardet" },
     { name = "chromadb" },
     { name = "diff-match-patch" },
     { name = "fastapi" },
@@ -165,6 +167,7 @@ dependencies = [
     { name = "memory-profiler" },
     { name = "openai" },
     { name = "opencv-python" },
+    { name = "orjson" },
     { name = "pillow" },
     { name = "prompt-toolkit" },
     { name = "psutil" },
@@ -179,8 +182,6 @@ dependencies = [
     { name = "python-pptx" },
     { name = "python-socketio" },
     { name = "rapidfuzz" },
-    { name = "redis" },
-    { name = "requests" },
     { name = "rich" },
     { name = "sentence-transformers" },
     { name = "sse-starlette" },
@@ -188,7 +189,6 @@ dependencies = [
     { name = "tenacity" },
     { name = "termcolor" },
     { name = "tomli-w" },
-    { name = "transformers" },
     { name = "tree-sitter" },
     { name = "tree-sitter-language-pack" },
     { name = "uvicorn" },
@@ -198,13 +198,21 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "asyncpg" },
     { name = "docker" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "protobuf" },
+    { name = "redis" },
 ]
 containers = [
     { name = "docker" },
+]
+database = [
+    { name = "asyncpg" },
+]
+redis = [
+    { name = "redis" },
 ]
 telemetry = [
     { name = "opentelemetry-api" },
@@ -216,7 +224,6 @@ telemetry = [
 dev = [
     { name = "bandit" },
     { name = "build" },
-    { name = "flake8" },
     { name = "grpcio" },
     { name = "grpcio-tools" },
     { name = "mypy" },
@@ -232,6 +239,7 @@ test = [
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
     { name = "pytest-xdist" },
+    { name = "requests" },
 ]
 
 [package.metadata]
@@ -240,10 +248,11 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.9,!=3.11.13" },
     { name = "anthropic", specifier = ">=0.40,<1" },
     { name = "anyio", specifier = ">=4.9,<5" },
-    { name = "asyncpg", specifier = ">=0.30,<0.31" },
+    { name = "asyncpg", specifier = ">=0.30.0" },
+    { name = "asyncpg", marker = "extra == 'all'", specifier = ">=0.30,<0.31" },
+    { name = "asyncpg", marker = "extra == 'database'", specifier = ">=0.30,<0.31" },
     { name = "bashlex", specifier = ">=0.18,<0.19" },
     { name = "binaryornot", specifier = ">=0.4.4,<0.5.0" },
-    { name = "chardet", specifier = ">=5.2.0,<6" },
     { name = "chromadb", specifier = ">=1.4,<2" },
     { name = "diff-match-patch", specifier = ">=20241021,<20260000" },
     { name = "docker", marker = "extra == 'all'", specifier = ">=7.1,<8" },
@@ -264,6 +273,7 @@ requires-dist = [
     { name = "opentelemetry-api", marker = "extra == 'telemetry'", specifier = ">=1.33.1,<2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'all'", specifier = ">=1.33.1,<2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'telemetry'", specifier = ">=1.33.1,<2" },
+    { name = "orjson", specifier = ">=3.10,<4" },
     { name = "pillow", specifier = ">=11.3,<12" },
     { name = "prompt-toolkit", specifier = ">=3.0.50,<4" },
     { name = "protobuf", marker = "extra == 'all'", specifier = ">=5,<6" },
@@ -280,8 +290,8 @@ requires-dist = [
     { name = "python-pptx", specifier = ">=1.0,<2" },
     { name = "python-socketio", specifier = ">=5.14,<6" },
     { name = "rapidfuzz", specifier = ">=3.9,<4" },
-    { name = "redis", specifier = ">=5.2,<7" },
-    { name = "requests", specifier = ">=2.32.4,<3" },
+    { name = "redis", marker = "extra == 'all'", specifier = ">=5.2,<7" },
+    { name = "redis", marker = "extra == 'redis'", specifier = ">=5.2,<7" },
     { name = "rich", specifier = ">=14.0,<15" },
     { name = "sentence-transformers", specifier = ">=5.2,<6" },
     { name = "sse-starlette", specifier = ">=2.1.3,<3" },
@@ -289,20 +299,18 @@ requires-dist = [
     { name = "tenacity", specifier = ">=8.5,<10" },
     { name = "termcolor", specifier = ">=3.1,<4" },
     { name = "tomli-w", specifier = ">=1.1.0,<2" },
-    { name = "transformers", specifier = "<4.47.0" },
     { name = "tree-sitter", specifier = ">=0.24,<0.25" },
     { name = "tree-sitter-language-pack", specifier = ">=0.7.3,<0.8" },
     { name = "uvicorn", specifier = ">=0.30,<1" },
     { name = "websockets", specifier = ">=15.0.1,<16" },
     { name = "whatthepatch", specifier = ">=1.0.6,<2" },
 ]
-provides-extras = ["all", "browser", "caching", "containers", "telemetry"]
+provides-extras = ["all", "containers", "database", "redis", "telemetry"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "bandit", specifier = ">=1.9.3" },
     { name = "build", specifier = ">=1.2.2" },
-    { name = "flake8", specifier = ">=7.3.0,<8.0.0" },
     { name = "grpcio", specifier = ">=1.70.0" },
     { name = "grpcio-tools", specifier = ">=1.70.0" },
     { name = "mypy", specifier = "==1.17.0" },
@@ -319,6 +327,7 @@ test = [
     { name = "pytest-cov", specifier = ">=4.1.0,<7.0.0" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0,<4.0.0" },
+    { name = "requests", specifier = ">=2.32.4,<3" },
 ]
 
 [[package]]
@@ -1003,20 +1012,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/77/18/a1fd2231c679dcb9726204645721b12498aeac28e1ad0601038f94b42556/filelock-3.25.0.tar.gz", hash = "sha256:8f00faf3abf9dc730a1ffe9c354ae5c04e079ab7d3a683b7c32da5dd05f26af3", size = 40158, upload-time = "2026-03-01T15:08:45.916Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f9/0b/de6f54d4a8bedfe8645c41497f3c18d749f0bd3218170c667bf4b81d0cdd/filelock-3.25.0-py3-none-any.whl", hash = "sha256:5ccf8069f7948f494968fc0713c10e5c182a9c9d9eef3a636307a20c2490f047", size = 26427, upload-time = "2026-03-01T15:08:44.593Z" },
-]
-
-[[package]]
-name = "flake8"
-version = "7.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mccabe" },
-    { name = "pycodestyle" },
-    { name = "pyflakes" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/af/fbfe3c4b5a657d79e5c47a2827a362f9e1b763336a52f926126aa6dc7123/flake8-7.3.0.tar.gz", hash = "sha256:fe044858146b9fc69b551a4b490d69cf960fcb78ad1edcb84e7fbb1b4a8e3872", size = 48326, upload-time = "2025-06-20T19:31:35.838Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9f/56/13ab06b4f93ca7cac71078fbe37fcea175d3216f31f85c3168a6bbd0bb9a/flake8-7.3.0-py2.py3-none-any.whl", hash = "sha256:b9696257b9ce8beb888cdbe31cf885c90d31928fe202be0889a7cdafad32f01e", size = 57922, upload-time = "2025-06-20T19:31:34.425Z" },
 ]
 
 [[package]]
@@ -1713,15 +1708,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/80/d6/2d1b89f6ca4bff1036499b1e29a1d02d282259f3681540e16563f27ebc23/markupsafe-3.0.3-cp313-cp313t-win32.whl", hash = "sha256:69c0b73548bc525c8cb9a251cddf1931d1db4d2258e9599c28c07ef3580ef354", size = 14612, upload-time = "2025-09-27T18:37:02.639Z" },
     { url = "https://files.pythonhosted.org/packages/2b/98/e48a4bfba0a0ffcf9925fe2d69240bfaa19c6f7507b8cd09c70684a53c1e/markupsafe-3.0.3-cp313-cp313t-win_amd64.whl", hash = "sha256:1b4b79e8ebf6b55351f0d91fe80f893b4743f104bff22e90697db1590e47a218", size = 15200, upload-time = "2025-09-27T18:37:03.582Z" },
     { url = "https://files.pythonhosted.org/packages/0e/72/e3cc540f351f316e9ed0f092757459afbc595824ca724cbc5a5d4263713f/markupsafe-3.0.3-cp313-cp313t-win_arm64.whl", hash = "sha256:ad2cf8aa28b8c020ab2fc8287b0f823d0a7d8630784c31e9ee5edea20f406287", size = 13973, upload-time = "2025-09-27T18:37:04.929Z" },
-]
-
-[[package]]
-name = "mccabe"
-version = "0.7.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e7/ff/0ffefdcac38932a54d2b5eed4e0ba8a408f215002cd178ad1df0f2806ff8/mccabe-0.7.0.tar.gz", hash = "sha256:348e0240c33b60bbdf4e523192ef919f28cb2c3d7d5c7794f74009290f236325", size = 9658, upload-time = "2022-01-24T01:14:51.113Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/27/1a/1f68f9ba0c207934b35b86a8ca3aad8395a3d6dd7921c0686e23853ff5a9/mccabe-0.7.0-py2.py3-none-any.whl", hash = "sha256:6c2d30ab6be0e4a46919781807b4f0d834ebdd6c6e3dca0bda5a15f863427b6e", size = 7350, upload-time = "2022-01-24T01:14:49.62Z" },
 ]
 
 [[package]]
@@ -2708,15 +2694,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pycodestyle"
-version = "2.14.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/11/e0/abfd2a0d2efe47670df87f3e3a0e2edda42f055053c85361f19c0e2c1ca8/pycodestyle-2.14.0.tar.gz", hash = "sha256:c4b5b517d278089ff9d0abdec919cd97262a3367449ea1c8b49b91529167b783", size = 39472, upload-time = "2025-06-20T18:49:48.75Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/27/a58ddaf8c588a3ef080db9d0b7e0b97215cee3a45df74f3a94dbbf5c893a/pycodestyle-2.14.0-py2.py3-none-any.whl", hash = "sha256:dd6bf7cb4ee77f8e016f9c8e74a35ddd9f67e1d5fd4184d86c3b98e07099f42d", size = 31594, upload-time = "2025-06-20T18:49:47.491Z" },
-]
-
-[[package]]
 name = "pycparser"
 version = "3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2824,15 +2801,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/23/9d/f37e1d07c56a11c09e4478fd49e0dc9d57cb4199d20c7e1ab9900760fce8/pydocket-0.18.1.tar.gz", hash = "sha256:7c9410c68c9cc4171e3718f4b691dbae0ed1fc5b108adbcf8f30a915fc645d28", size = 354955, upload-time = "2026-03-06T14:01:44.325Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/b8/e83bac21701e17a5dd7de9a3343396df6b8a2c8df7112a43c115f569dacc/pydocket-0.18.1-py3-none-any.whl", hash = "sha256:cbb0ff262a0ffc746c60d8d643d975efcb99bd0abf4998d0b31375a06b6353c3", size = 98939, upload-time = "2026-03-06T14:01:42.607Z" },
-]
-
-[[package]]
-name = "pyflakes"
-version = "3.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/45/dc/fd034dc20b4b264b3d015808458391acbf9df40b1e54750ef175d39180b1/pyflakes-3.4.0.tar.gz", hash = "sha256:b24f96fafb7d2ab0ec5075b7350b3d2d2218eab42003821c06344973d3ea2f58", size = 64669, upload-time = "2025-06-20T18:45:27.834Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c2/2f/81d580a0fb83baeb066698975cb14a618bdbed7720678566f1b046a95fe8/pyflakes-3.4.0-py2.py3-none-any.whl", hash = "sha256:f742a7dbd0d9cb9ea41e9a24a918996e8170c799fa528688d40dd582c8265f4f", size = 63551, upload-time = "2025-06-20T18:45:26.937Z" },
 ]
 
 [[package]]

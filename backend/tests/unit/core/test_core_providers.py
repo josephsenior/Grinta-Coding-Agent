@@ -31,23 +31,17 @@ class TestProviderPrefixPatterns:
         assert "anthropic/" in PROVIDER_PREFIX_PATTERNS["anthropic"]
 
     def test_google(self):
-        assert "google/" in PROVIDER_PREFIX_PATTERNS["google"]
+        assert PROVIDER_PREFIX_PATTERNS["google"] == ["google/"]
 
 
 class TestProviderKeywordPatterns:
-    def test_google_gemini(self):
-        assert "gemini" in PROVIDER_KEYWORD_PATTERNS["google"]
-
-    def test_xai_grok(self):
-        assert "grok" in PROVIDER_KEYWORD_PATTERNS["xai"]
+    def test_keyword_patterns_empty(self):
+        assert PROVIDER_KEYWORD_PATTERNS == {}
 
 
 class TestProviderFallbackPatterns:
-    def test_openai(self):
-        assert "gpt" in PROVIDER_FALLBACK_PATTERNS["openai"]
-
-    def test_anthropic(self):
-        assert "claude" in PROVIDER_FALLBACK_PATTERNS["anthropic"]
+    def test_fallback_patterns_empty(self):
+        assert PROVIDER_FALLBACK_PATTERNS == {}
 
 
 class TestLazyModelList:

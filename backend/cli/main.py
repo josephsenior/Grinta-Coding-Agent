@@ -9,10 +9,160 @@ Usage::
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import io
 import logging
 import sys
+
+from rich.align import Align
+from rich.console import Console, Group
+from rich.text import Text
+
+
+_CRIMSON = "bold #DC143C"
+_PROMPT_WHITE = "bold #FFFFFF"
+_EYE_WHITE = "bold #FFFFFF"
+
+
+def _configure_redirected_streams(*streams: io.TextIOBase | None) -> None:
+    """Prefer UTF-8 when writing Rich output to redirected streams."""
+
+    for stream in streams:
+        if stream is None:
+            continue
+        if bool(getattr(stream, "isatty", lambda: True)()):
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+
+
+def _styled_line(*segments: tuple[str, str]) -> Text:
+    line = Text()
+    for text, style in segments:
+        line.append(text, style=style)
+    return line
+
+
+def show_grinta_splash(console: Console | None = None) -> None:
+    """Render the GRINTA boot splash in the terminal."""
+    console = console or Console()
+
+    splash = Group(
+        Text(""),
+        Align.center(
+            _styled_line(
+                ("                _________________________________                ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("          ______/                                 \\______          ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("         /_____/    ", _CRIMSON),
+                (" .-^^^^-. ", _EYE_WHITE),
+                ("         ", _CRIMSON),
+                (" .-^^^^-. ", _EYE_WHITE),
+                ("    \\_____\\         ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("        /_____/    ", _CRIMSON),
+                ("/ o  o \\", _EYE_WHITE),
+                ("_________", _CRIMSON),
+                ("/ o  o \\", _EYE_WHITE),
+                ("    \\_____\\        ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("            ||      ", _CRIMSON),
+                ("\\  --  /", _EYE_WHITE),
+                ("  _____  ", _CRIMSON),
+                ("\\  --  /", _EYE_WHITE),
+                ("      ||            ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("            ||           \\____/           ||            ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("      _____||_______", _CRIMSON),
+                ("'----'", _EYE_WHITE),
+                ("  | ", _CRIMSON),
+                (">", _PROMPT_WHITE),
+                ("_", _PROMPT_WHITE),
+                (" |  ", _CRIMSON),
+                ("'----'", _EYE_WHITE),
+                ("_______||_____      ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("     /_______________________|_____|_______________________\\     ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("                 \\              /_____|              /                 ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("                  \\____________/      \\____________/                  ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("                   |_____|              |_____|                   ", _CRIMSON),
+            )
+        ),
+        Text(""),
+        Align.center(
+            _styled_line(
+                ("  GGGGGG   RRRRRR   IIIIIIII  NNN   NN  TTTTTTTT   AAAAAA   ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                (" GG    GG  RR   RR     II     NNNN  NN     TT     AA    AA  ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                (" GG        RRRRRR      II     NN NN NN     TT     AAAAAAAA  ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                (" GG  GGGG  RR  RR      II     NN  NNNN     TT     AA    AA  ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                (" GG    GG  RR   RR     II     NN   NNN     TT     AA    AA  ", _CRIMSON),
+            )
+        ),
+        Align.center(
+            _styled_line(
+                ("  GGGGGG   RR    RR  IIIIIIII NN    NN     TT     AA    AA  ", _CRIMSON),
+            )
+        ),
+        Text(""),
+    )
+
+    console.print(splash)
 
 
 def _setup_logging() -> None:
@@ -38,30 +188,61 @@ def _setup_logging() -> None:
         logging.getLogger(name).setLevel(logging.ERROR)
 
 
-def _suppress_stdout() -> io.TextIOWrapper | None:
-    """Capture stray stdout writes from the backend into a buffer."""
-    original = sys.stdout
-    sys.stdout = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", write_through=True)
-    return original
+def _resolve_invocation(
+    *,
+    model: str | None,
+    project: str | None,
+) -> tuple[str | None, str | None, bool]:
+    """Resolve CLI flags when grinta is invoked as the console script.
 
+    ``backend.cli.entry`` already parses these flags before calling ``main()``.
+    This fallback keeps ``grinta`` and ``python -m backend.cli.main`` working
+    when they are invoked directly.
+    """
 
-def _restore_stdout(original: io.TextIOWrapper | None) -> None:
-    if original is not None:
-        sys.stdout = original
+    if model is not None or project is not None:
+        return model, project, False
 
+    argv = sys.argv[1:]
+    if not argv:
+        return None, None, False
+
+    if argv[0] == "serve":
+        sys.argv = [sys.argv[0]] + argv[1:]
+        from backend.embedded import main as serve_main
+
+        serve_main()
+        return None, None, True
+
+    parser = argparse.ArgumentParser(
+        prog="grinta",
+        description="Grinta interactive CLI",
+        epilog="Subcommands: 'grinta serve' starts the backend API server.",
+    )
+    parser.add_argument(
+        "--model",
+        "-m",
+        help="Override LLM model (e.g. anthropic/claude-sonnet-4-20250514)",
+    )
+    parser.add_argument(
+        "--project",
+        "-p",
+        help="Set project root directory",
+    )
+    args = parser.parse_args(argv)
+    return args.model, args.project, False
 
 async def _async_main(
     *,
     model: str | None = None,
     project: str | None = None,
 ) -> None:
-    from rich.console import Console
-
     from backend.core.config import load_app_config
     from backend.cli.config_manager import needs_onboarding, run_onboarding
     from backend.cli.repl import Repl
 
     console = Console()
+    show_grinta_splash(console)
 
     # -- load config -------------------------------------------------------
     config = load_app_config()
@@ -104,6 +285,10 @@ def main(
     project: str | None = None,
 ) -> None:
     """Synchronous entry point for the ``grinta`` console_script."""
+    _configure_redirected_streams(sys.stdout, sys.stderr)
+    model, project, handled = _resolve_invocation(model=model, project=project)
+    if handled:
+        return
     try:
         asyncio.run(_async_main(model=model, project=project))
     except KeyboardInterrupt:

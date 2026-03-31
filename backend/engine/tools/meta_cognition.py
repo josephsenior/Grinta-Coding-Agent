@@ -11,13 +11,8 @@ from backend.engine.contracts import ChatCompletionToolParam
 COMMUNICATE_TOOL_NAME = "communicate_with_user"
 
 _COMMUNICATE_DESCRIPTION = (
-    "Use this tool when you need to interact with the user or system to express doubt, "
-    "ask for clarification, propose options, or escalate when stuck.\n\n"
-    "Intents:\n"
-    "- 'clarification': Ask a question before making assumptions.\n"
-    "- 'uncertainty': Flag doubt when hypotheses fail or info is missing.\n"
-    "- 'proposal': Present options before committing to a risky/irreversible path.\n"
-    "- 'escalate': Request human assistance when completely stuck."
+    "Interact with the user: ask for clarification, flag uncertainty, "
+    "propose options before risky actions, or escalate when stuck."
 )
 
 

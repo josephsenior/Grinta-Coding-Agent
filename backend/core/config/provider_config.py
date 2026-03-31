@@ -100,10 +100,6 @@ class ProviderConfigurationManager:
         for provider_name, config_data in PROVIDER_CONFIGURATIONS.items():
             configs[provider_name] = ProviderConfig(**config_data)
 
-        # Alias for gemini
-        if "google" in configs:
-            configs["gemini"] = configs["google"]
-
         return configs
 
     def _create_unknown_provider_config(self) -> ProviderConfig:

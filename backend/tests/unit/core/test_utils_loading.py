@@ -208,6 +208,25 @@ class TestMainEntryPoints:
                                 # This will execute the body of load_app_config
                                 load_app_config(set_logging_levels=True)
 
+    def test_load_app_config_uses_app_root_for_default_settings(self, tmp_path):
+        settings_root = tmp_path / "app-root"
+        settings_root.mkdir()
+        expected_settings = settings_root / "settings.json"
+
+        with patch.dict(os.environ, {"APP_ROOT": str(settings_root)}, clear=False):
+            with patch("backend.core.config.config_loader.rebuild_config_models"):
+                with patch("backend.core.config.config_loader.load_from_json") as mock_json:
+                    with patch("backend.core.config.config_loader.load_from_env"):
+                        with patch("backend.core.config.config_loader.finalize_config"):
+                            with patch("backend.core.config.config_loader.export_llm_api_keys"):
+                                with patch(
+                                    "backend.core.config.config_loader.register_custom_agents"
+                                ):
+                                    load_app_config(set_logging_levels=False)
+
+        mock_json.assert_called_once()
+        assert mock_json.call_args[0][1] == str(expected_settings)
+
     def test_setup_config_from_args_execution(self):
         args = MagicMock()
         args.config_file = "settings.json"

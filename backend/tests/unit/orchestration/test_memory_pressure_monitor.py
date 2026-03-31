@@ -18,21 +18,30 @@ class TestMemoryPressureMonitorInit:
         assert m._warn_mb == 768
         assert m._crit_mb == 1536
         assert m._check_interval == 10.0
+        assert m._cooldown_s == 30.0
 
     def test_custom_thresholds(self):
-        m = MemoryPressureMonitor(warn_mb=512, crit_mb=1024, check_interval_s=5.0)
+        m = MemoryPressureMonitor(
+            warn_mb=512,
+            crit_mb=1024,
+            check_interval_s=5.0,
+            cooldown_s=8.0,
+        )
         assert m._warn_mb == 512
         assert m._crit_mb == 1024
         assert m._check_interval == 5.0
+        assert m._cooldown_s == 8.0
 
     def test_env_var_thresholds(self, monkeypatch):
         monkeypatch.setenv("APP_MEM_WARN_MB", "256")
         monkeypatch.setenv("APP_MEM_CRIT_MB", "512")
         monkeypatch.setenv("APP_MEM_CHECK_INTERVAL", "2")
+        monkeypatch.setenv("APP_MEM_CONDENSE_COOLDOWN_S", "9")
         m = MemoryPressureMonitor()
         assert m._warn_mb == 256
         assert m._crit_mb == 512
         assert m._check_interval == 2.0
+        assert m._cooldown_s == 9.0
 
 
 # ── should_condense ───────────────────────────────────────────────────
@@ -55,6 +64,22 @@ class TestShouldCondense:
         m = MemoryPressureMonitor(check_interval_s=0)
         m._process = None
         assert m.should_condense() is False
+
+    def test_false_during_warning_cooldown(self):
+        m = MemoryPressureMonitor(warn_mb=400, crit_mb=1200, check_interval_s=0, cooldown_s=30)
+        with patch.object(m, "_sample_rss", return_value=500.0):
+            with patch("backend.orchestration.memory_pressure.time.monotonic", return_value=100.0):
+                m.record_condensation()
+            with patch("backend.orchestration.memory_pressure.time.monotonic", return_value=110.0):
+                assert m.should_condense() is False
+
+    def test_critical_bypasses_warning_cooldown(self):
+        m = MemoryPressureMonitor(warn_mb=400, crit_mb=800, check_interval_s=0, cooldown_s=30)
+        with patch.object(m, "_sample_rss", return_value=900.0):
+            with patch("backend.orchestration.memory_pressure.time.monotonic", return_value=100.0):
+                m.record_condensation()
+            with patch("backend.orchestration.memory_pressure.time.monotonic", return_value=110.0):
+                assert m.should_condense() is True
 
 
 # ── is_critical ───────────────────────────────────────────────────────

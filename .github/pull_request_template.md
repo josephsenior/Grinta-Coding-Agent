@@ -32,7 +32,7 @@ How have you tested these changes?
 
 ## Checklist
 
-- [ ] Code follows style guidelines (Black, Ruff, ESLint)
+- [ ] Code follows style guidelines (Ruff, ESLint)
 - [ ] Self-review completed
 - [ ] Comments added for complex code
 - [ ] Documentation updated (if applicable)

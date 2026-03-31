@@ -81,6 +81,4 @@ class AutonomyService:
         controller._add_system_message()
 
 
-ExecutionPolicyService = AutonomyService
-
-__all__ = ["AutonomyService", "ExecutionPolicyService"]
+__all__ = ["AutonomyService"]

@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 
 def _pending_action_for_observation_cause(controller) -> object | None:
     """Current pending action (if any) for correlating guard observations."""
-    svc = getattr(controller, "open_operation_service", None)
-    if svc is not None:
-        return svc.get()
-    svc = getattr(controller, "pending_action_service", None)
+    services = getattr(controller, "services", None)
+    svc = getattr(services, "pending_action", None) if services is not None else None
+    if svc is None:
+        svc = getattr(controller, "pending_action_service", None)
     if svc is not None:
         return svc.get()
     return getattr(controller, "_pending_action", None)

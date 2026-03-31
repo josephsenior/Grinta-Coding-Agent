@@ -38,6 +38,4 @@ def export_transcript(
     return trajectory
 
 
-export_trajectory = export_transcript
-
-__all__ = ["export_transcript", "export_trajectory"]
+__all__ = ["export_transcript"]

@@ -18,6 +18,7 @@ def temp_stream(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
     monkeypatch.setenv("APP_EVENTSTREAM_ASYNC_WRITE", "true")
+    monkeypatch.setenv("APP_SQLITE_EVENTS", "0")  # Force file writes to test async write performance
     file_store = get_file_store("local", str(tmp_path))
     stream = EventStream("stress-session", file_store)
     try:

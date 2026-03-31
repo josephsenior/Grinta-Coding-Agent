@@ -92,7 +92,7 @@ from backend.inference import LLM
 llm = LLM(model="ollama/llama3.2")
 
 # Or LM Studio
-llm = LLM(model="lmstudio/qwen2.5-coder")
+llm = LLM(model="lm_studio/qwen2.5-coder")
 
 # Or vLLM
 llm = LLM(model="vllm/mistral-7b")

@@ -115,7 +115,7 @@ class TestInitProject(TestCase):
         self.assertIn("# test-project", content)
         self.assertIn("This is a App agent project.", content)
         self.assertIn("## Getting Started", content)
-        self.assertIn("app start", content)
+        self.assertIn("app serve", content)
 
     @patch("backend.gateway.cli.cli.init_project.Path.cwd")
     @patch("backend.gateway.cli.cli.init_project.logger")

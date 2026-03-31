@@ -294,10 +294,6 @@ class StateTracker:
                 trajectory.append(serialized)
         return trajectory
 
-    def get_trajectory(self, include_screenshots: bool = False) -> list[dict]:
-        """Backward-compatible alias for transcript export."""
-        return self.get_transcript(include_screenshots)
-
     def maybe_increase_control_flags_limits(self, headless_mode: bool) -> None:
         """Conditionally increase iteration and budget limits.
 

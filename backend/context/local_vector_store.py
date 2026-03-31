@@ -14,9 +14,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-import chromadb
-from chromadb.config import Settings
-
 logger = logging.getLogger(__name__)
 
 
@@ -73,6 +70,9 @@ class ChromaDBBackend(VectorBackend):
             persist_directory = Path.home() / ".app" / "memory" / "chroma"
         persist_directory.mkdir(parents=True, exist_ok=True)
 
+        import chromadb
+        from chromadb.config import Settings
+
         self.client = chromadb.PersistentClient(
             path=str(persist_directory),
             settings=Settings(anonymized_telemetry=False),
@@ -80,7 +80,10 @@ class ChromaDBBackend(VectorBackend):
 
         # Use a high-quality code-centric embedding model for software contexts
         model_name = os.getenv("EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
-        logger.info("Loading local embedding model: %s", model_name)
+        logger.info(
+            "Loading embedding model '%s' (first run downloads ~500 MB)…",
+            model_name,
+        )
         from sentence_transformers import SentenceTransformer
 
         self.model = SentenceTransformer(model_name, trust_remote_code=True)

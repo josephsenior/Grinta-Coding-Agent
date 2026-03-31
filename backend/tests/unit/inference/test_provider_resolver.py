@@ -57,6 +57,11 @@ class TestProviderResolver(TestCase):
             self.resolver.resolve_provider("google/gemini-2.0-flash"), "google"
         )
 
+    def test_resolve_provider_prefixed_gemini_model_raises(self):
+        """Legacy provider aliases are no longer accepted as prefixes."""
+        with self.assertRaises(ValueError):
+            self.resolver.resolve_provider("gemini/gemini-2.0-flash")
+
     def test_resolve_provider_catalog_entry_xai(self):
         """Exact catalog entries remain valid without heuristics."""
         self.assertEqual(self.resolver.resolve_provider("grok-3"), "xai")
@@ -98,8 +103,7 @@ class TestProviderResolver(TestCase):
     def test_is_local_model_true(self):
         """Test is_local_model identifies local models."""
         self.assertTrue(self.resolver.is_local_model("ollama/llama3.2"))
-        self.assertTrue(self.resolver.is_local_model("lm-studio/qwen"))
-        self.assertTrue(self.resolver.is_local_model("lmstudio/model"))
+        self.assertTrue(self.resolver.is_local_model("lm_studio/qwen"))
         self.assertTrue(self.resolver.is_local_model("vllm/mistral"))
         self.assertTrue(self.resolver.is_local_model("local-model"))
 
@@ -108,6 +112,8 @@ class TestProviderResolver(TestCase):
         self.assertFalse(self.resolver.is_local_model("gpt-4o"))
         self.assertFalse(self.resolver.is_local_model("claude-3-7-sonnet"))
         self.assertFalse(self.resolver.is_local_model("gemini-2.0-flash"))
+        self.assertFalse(self.resolver.is_local_model("lmstudio/model"))
+        self.assertFalse(self.resolver.is_local_model("lm-studio/qwen"))
 
     def test_resolve_base_url_explicit(self):
         """Test resolve_base_url returns explicit URL if provided."""
@@ -372,6 +378,13 @@ class TestProviderResolver(TestCase):
         """Test strip_provider_prefix preserves unknown prefixes."""
         self.assertEqual(
             self.resolver.strip_provider_prefix("custom/model"), "custom/model"
+        )
+        self.assertEqual(
+            self.resolver.strip_provider_prefix("gemini/gemini-2.0-flash"),
+            "gemini/gemini-2.0-flash",
+        )
+        self.assertEqual(
+            self.resolver.strip_provider_prefix("lmstudio/qwen"), "lmstudio/qwen"
         )
 
     def test_strip_provider_prefix_no_prefix(self):

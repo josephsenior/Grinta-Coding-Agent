@@ -152,6 +152,34 @@ def _check_startup() -> dict:
 _start_time = time.monotonic()
 
 
+def get_ready_status_snapshot() -> dict:
+    """Return the same readiness payload used by the HTTP readiness endpoint."""
+    config_check = _check_config()
+    storage_check = _check_storage()
+    redis_check = _check_redis()
+    database_check = _check_database()
+    tmux_check = _check_tmux()
+    recovery_check = _check_recovery()
+    startup_check = _check_startup()
+
+    checks = {
+        "config": config_check,
+        "storage": storage_check,
+        "redis": redis_check,
+        "database": database_check,
+        "tmux": tmux_check,
+        "recovery": recovery_check,
+        "startup": startup_check,
+    }
+
+    all_ok = all(c.get("status") == "ok" for c in (config_check, storage_check))
+    return {
+        "status": "ready" if all_ok else "not_ready",
+        "checks": checks,
+        "uptime_seconds": round(time.monotonic() - _start_time, 1),
+    }
+
+
 def add_health_endpoints(app: FastAPI) -> None:
     """Add health check endpoints to the FastAPI application.
 
@@ -186,36 +214,11 @@ def add_health_endpoints(app: FastAPI) -> None:
 
         Returns 200 if critical checks pass, 503 if a critical check fails.
         """
-        config_check = _check_config()
-        storage_check = _check_storage()
-        redis_check = _check_redis()
-        database_check = _check_database()
-        tmux_check = _check_tmux()
-        recovery_check = _check_recovery()
-        startup_check = _check_startup()
-
-        checks = {
-            "config": config_check,
-            "storage": storage_check,
-            "redis": redis_check,
-            "database": database_check,
-            "tmux": tmux_check,
-            "recovery": recovery_check,
-            "startup": startup_check,
-        }
-
-        all_ok = all(
-            c.get("status") == "ok"
-            for c in (config_check, storage_check)
-        )
-        status_code = 200 if all_ok else 503
+        snapshot = get_ready_status_snapshot()
+        status_code = 200 if snapshot["status"] == "ready" else 503
 
         return JSONResponse(
-            content={
-                "status": "ready" if all_ok else "not_ready",
-                "checks": checks,
-                "uptime_seconds": round(time.monotonic() - _start_time, 1),
-            },
+            content=snapshot,
             status_code=status_code,
         )
 

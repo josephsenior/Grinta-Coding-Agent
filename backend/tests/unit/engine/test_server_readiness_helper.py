@@ -24,45 +24,45 @@ from backend.engine.tools.server_readiness_helper import (
 
 class TestWaitForServerReady:
     @patch("backend.engine.tools.server_readiness_helper.time")
-    @patch("backend.engine.tools.server_readiness_helper.requests")
-    def test_returns_true_when_server_responds(self, mock_requests, mock_time):
+    @patch("backend.engine.tools.server_readiness_helper.httpx")
+    def test_returns_true_when_server_responds(self, mock_httpx, mock_time):
         mock_time.time.side_effect = [0, 0, 1]
         resp = MagicMock(status_code=200)
-        mock_requests.head.return_value = resp
-        mock_requests.exceptions.RequestException = Exception
+        mock_httpx.head.return_value = resp
+        mock_httpx.HTTPError = Exception
 
         assert wait_for_server_ready("http://localhost:3000", max_wait_time=5) is True
 
     @patch("backend.engine.tools.server_readiness_helper.time")
-    @patch("backend.engine.tools.server_readiness_helper.requests")
-    def test_returns_false_on_timeout(self, mock_requests, mock_time):
+    @patch("backend.engine.tools.server_readiness_helper.httpx")
+    def test_returns_false_on_timeout(self, mock_httpx, mock_time):
         """time.time() returns increasing values that exceed max_wait_time."""
         mock_time.time.side_effect = [0, 0, 100]
-        mock_requests.head.side_effect = Exception("conn refused")
-        mock_requests.exceptions.RequestException = Exception
+        mock_httpx.head.side_effect = Exception("conn refused")
+        mock_httpx.HTTPError = Exception
 
         assert wait_for_server_ready("http://localhost:3000", max_wait_time=5) is False
 
     @patch("backend.engine.tools.server_readiness_helper.time")
-    @patch("backend.engine.tools.server_readiness_helper.requests")
-    def test_server_error_keeps_trying(self, mock_requests, mock_time):
+    @patch("backend.engine.tools.server_readiness_helper.httpx")
+    def test_server_error_keeps_trying(self, mock_httpx, mock_time):
         """Status 500 is treated as not-ready, keeps trying."""
         mock_time.time.side_effect = [0, 0, 0, 1, 1, 100]
         mock_time.sleep = MagicMock()
         resp500 = MagicMock(status_code=500)
-        mock_requests.head.return_value = resp500
-        mock_requests.exceptions.RequestException = Exception
+        mock_httpx.head.return_value = resp500
+        mock_httpx.HTTPError = Exception
 
         assert wait_for_server_ready("http://localhost:3000", max_wait_time=5) is False
 
     @patch("backend.engine.tools.server_readiness_helper.time")
-    @patch("backend.engine.tools.server_readiness_helper.requests")
-    def test_accepts_non_200_below_500(self, mock_requests, mock_time):
+    @patch("backend.engine.tools.server_readiness_helper.httpx")
+    def test_accepts_non_200_below_500(self, mock_httpx, mock_time):
         """Any status_code < 500 is considered ready."""
         mock_time.time.side_effect = [0, 0, 1]
         resp = MagicMock(status_code=302)
-        mock_requests.head.return_value = resp
-        mock_requests.exceptions.RequestException = Exception
+        mock_httpx.head.return_value = resp
+        mock_httpx.HTTPError = Exception
 
         assert wait_for_server_ready("http://localhost:3000") is True
 
@@ -73,24 +73,24 @@ class TestWaitForServerReady:
 
 
 class TestCheckServerReady:
-    @patch("backend.engine.tools.server_readiness_helper.requests")
-    def test_returns_true_when_healthy(self, mock_requests):
+    @patch("backend.engine.tools.server_readiness_helper.httpx")
+    def test_returns_true_when_healthy(self, mock_httpx):
         resp = MagicMock(status_code=200)
-        mock_requests.head.return_value = resp
-        mock_requests.exceptions.RequestException = Exception
+        mock_httpx.head.return_value = resp
+        mock_httpx.HTTPError = Exception
         assert check_server_ready("http://localhost:8080") is True
 
-    @patch("backend.engine.tools.server_readiness_helper.requests")
-    def test_returns_false_on_500(self, mock_requests):
+    @patch("backend.engine.tools.server_readiness_helper.httpx")
+    def test_returns_false_on_500(self, mock_httpx):
         resp = MagicMock(status_code=500)
-        mock_requests.head.return_value = resp
-        mock_requests.exceptions.RequestException = Exception
+        mock_httpx.head.return_value = resp
+        mock_httpx.HTTPError = Exception
         assert check_server_ready("http://localhost:8080") is False
 
-    @patch("backend.engine.tools.server_readiness_helper.requests")
-    def test_returns_false_on_exception(self, mock_requests):
-        mock_requests.head.side_effect = Exception("conn")
-        mock_requests.exceptions.RequestException = Exception
+    @patch("backend.engine.tools.server_readiness_helper.httpx")
+    def test_returns_false_on_exception(self, mock_httpx):
+        mock_httpx.head.side_effect = Exception("conn")
+        mock_httpx.HTTPError = Exception
         assert check_server_ready("http://localhost:8080") is False
 
 

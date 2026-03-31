@@ -111,6 +111,7 @@ class TestShutdownFinal:
             request_process_shutdown()
         finally:
             remove_shutdown_listener(lid)
+            mod._should_exit = False
         listener.assert_not_called()
 
 

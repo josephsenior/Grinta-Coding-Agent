@@ -103,7 +103,7 @@ class EventPersistence:
 
         # Optional SQLite accelerator
         self._sqlite_store: Any = None
-        if str(os.getenv("APP_SQLITE_EVENTS", "false")).lower() in (
+        if str(os.getenv("APP_SQLITE_EVENTS", "true")).lower() in (
             "1",
             "true",
             "yes",

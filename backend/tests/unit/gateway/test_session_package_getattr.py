@@ -19,3 +19,10 @@ def test_session_package_unknown_attr_raises() -> None:
 
     with pytest.raises(AttributeError, match="foo"):
         _ = session_pkg.foo  # type: ignore[attr-defined]
+
+
+def test_session_package_run_alias_removed() -> None:
+    import backend.gateway.session as session_pkg
+
+    with pytest.raises(AttributeError, match="Run"):
+        _ = session_pkg.Run  # type: ignore[attr-defined]

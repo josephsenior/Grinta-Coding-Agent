@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING
-from unittest.mock import Mock
 
 from backend.core.errors import AgentRuntimeError, LLMContextWindowExceedError
 from backend.core.logger import app_logger as logger
@@ -21,13 +20,13 @@ if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import OrchestrationContext
 
 
-def _resolve_open_operation_service(controller):
+def _resolve_pending_action_service(controller):
     controller_dict = getattr(controller, "__dict__", {})
-    service = controller_dict.get("open_operation_service")
-    if service is None and not isinstance(controller, Mock):
-        service = getattr(controller, "open_operation_service", None)
-    if service is not None:
-        return service
+    services = controller_dict.get("services")
+    if services is not None:
+        service = getattr(services, "pending_action", None)
+        if service is not None:
+            return service
     service = controller_dict.get("pending_action_service")
     if service is not None:
         return service
@@ -50,7 +49,7 @@ class RecoveryService:
         except Exception:
             logger.debug("circuit_breaker record_error failed", exc_info=True)
 
-        pending_svc = _resolve_open_operation_service(controller)
+        pending_svc = _resolve_pending_action_service(controller)
         if pending_svc is not None:
             pending = pending_svc.get()
             if pending is not None:

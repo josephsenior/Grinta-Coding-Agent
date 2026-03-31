@@ -150,11 +150,8 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-OperationPipeline = ToolInvocationPipeline
-
 __all__ = [
     "ToolInvocationContext",
     "ToolInvocationMiddleware",
     "ToolInvocationPipeline",
-    "OperationPipeline",
 ]

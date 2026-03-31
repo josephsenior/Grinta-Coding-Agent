@@ -210,7 +210,7 @@ def test_create_agent_retry(mock_get_cls, mock_import):
 
     llm_registry = MagicMock()
     create_agent(mock_config, llm_registry)
-    mock_import.assert_called_with("app.engine")
+    mock_import.assert_any_call("backend.engine")
 
 
 @patch("backend.orchestration.agent.Agent.get_cls")

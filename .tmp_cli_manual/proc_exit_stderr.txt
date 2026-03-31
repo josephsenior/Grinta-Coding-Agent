@@ -1,0 +1,2 @@
+C:\Users\GIGABYTE\.cache\huggingface\modules\transformers_modules\jinaai\jina-bert-v2-qk-post-norm\3baf9e3ac750e76e8edd3019170176884695fb94\configuration_bert.py:29: UserWarning: optimum is not installed. To use OnnxConfig and BertOnnxConfig, make sure that `optimum` package is installed
+  warnings.warn("optimum is not installed. To use OnnxConfig and BertOnnxConfig, make sure that `optimum` package is installed")

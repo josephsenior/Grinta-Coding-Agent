@@ -2,6 +2,4 @@
 
 from backend.core.rollback.rollback_manager import Checkpoint, RollbackManager
 
-Snapshot = Checkpoint
-
-__all__ = ["Checkpoint", "Snapshot", "RollbackManager"]
+__all__ = ["Checkpoint", "RollbackManager"]

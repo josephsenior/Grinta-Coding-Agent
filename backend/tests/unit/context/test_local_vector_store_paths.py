@@ -22,11 +22,11 @@ def test_chromadb_backend_defaults_to_home_app_memory_chroma(tmp_path) -> None:
     with (
         patch("backend.context.local_vector_store.Path.home", return_value=tmp_path),
         patch(
-            "backend.context.local_vector_store.chromadb.PersistentClient",
+            "chromadb.PersistentClient",
             return_value=fake_client,
         ),
         patch(
-            "backend.context.local_vector_store.Settings",
+            "chromadb.config.Settings",
             side_effect=lambda **kwargs: kwargs,
         ),
         patch.dict(

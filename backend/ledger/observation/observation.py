@@ -40,6 +40,4 @@ class Observation(Event, metaclass=CanonicalMeta):
         self._exit_code = value
 
 
-Outcome = Observation
-
-__all__ = ["Observation", "Outcome"]
+__all__ = ["Observation"]

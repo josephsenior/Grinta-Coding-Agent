@@ -34,40 +34,43 @@ class TestEventStreamSubscriber:
 
 
 class TestWarnUnclosedStream:
-    @patch("backend.ledger.stream.logger")
-    def test_warn_unclosed_stream_logs_warning(self, mock_logger):
-        """Test that _warn_unclosed_stream logs a warning."""
-        _warn_unclosed_stream("session123")
+    def test_warn_unclosed_stream_logs_warning(self):
+        """Test that _warn_unclosed_stream writes a warning to stderr."""
+        import io
 
-        mock_logger.warning.assert_called_once()
-        # Logger uses %s formatting, so format string and args are separate
-        call_args = mock_logger.warning.call_args[0]
-        assert "%s" in call_args[0] or "session123" in str(call_args)
-        assert "GC'd without close" in call_args[0]
+        fake_stderr = io.StringIO()
+        with patch("sys.stderr", fake_stderr), patch("sys.is_finalizing", return_value=False):
+            _warn_unclosed_stream("session123")
 
-    @patch("backend.ledger.stream.logger")
-    def test_warn_unclosed_stream_message_format(self, mock_logger):
+        output = fake_stderr.getvalue()
+        assert "session123" in output
+        assert "GC'd without close" in output
+
+    def test_warn_unclosed_stream_message_format(self):
         """Test warning message format."""
-        _warn_unclosed_stream("test-sid")
+        import io
 
-        mock_logger.warning.assert_called_once()
-        message = mock_logger.warning.call_args[0][0]
-        assert "EventStream" in message
-        # test-sid is in args, not the format string
-        assert "%s" in message
-        assert "resources may leak" in message
+        fake_stderr = io.StringIO()
+        with patch("sys.stderr", fake_stderr), patch("sys.is_finalizing", return_value=False):
+            _warn_unclosed_stream("test-sid")
 
-    @patch("backend.ledger.stream.logger")
-    def test_warn_unclosed_stream_different_sids(self, mock_logger):
+        output = fake_stderr.getvalue()
+        assert "EventStream" in output
+        assert "test-sid" in output
+        assert "resources may leak" in output
+
+    def test_warn_unclosed_stream_different_sids(self):
         """Test warning with different session IDs."""
-        _warn_unclosed_stream("sid-1")
-        # sid-1 is in the args, not in format string
-        assert mock_logger.warning.call_args[0][1] == "sid-1"
+        import io
 
-        mock_logger.reset_mock()
+        fake_stderr = io.StringIO()
+        with patch("sys.stderr", fake_stderr), patch("sys.is_finalizing", return_value=False):
+            _warn_unclosed_stream("sid-1")
+            _warn_unclosed_stream("sid-2")
 
-        _warn_unclosed_stream("sid-2")
-        assert mock_logger.warning.call_args[0][1] == "sid-2"
+        output = fake_stderr.getvalue()
+        assert "sid-1" in output
+        assert "sid-2" in output
 
 
 class TestSessionExists:

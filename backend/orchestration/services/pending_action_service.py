@@ -198,6 +198,4 @@ class PendingActionService:
             self._watchdog_handle = None
 
 
-OpenOperationService = PendingActionService
-
-__all__ = ["PendingActionService", "OpenOperationService"]
+__all__ = ["PendingActionService"]

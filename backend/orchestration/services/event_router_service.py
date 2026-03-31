@@ -98,6 +98,23 @@ class EventRouterService:
                     extra={"agent_state": action.agent_state},
                 )
             else:
+                # Guard: discard a stale startup AWAITING_USER_INPUT signal that
+                # was queued on the ENVIRONMENT background queue before the user
+                # message arrived.  If the agent is already RUNNING (meaning a
+                # user message was processed inline), an ENVIRONMENT-sourced
+                # AWAITING_USER_INPUT would race to override the active RUNNING
+                # state and permanently freeze the agent loop.
+                if (
+                    target_state == AgentState.AWAITING_USER_INPUT
+                    and action.source == EventSource.ENVIRONMENT
+                    and self._ctrl.get_agent_state() == AgentState.RUNNING
+                ):
+                    self._ctrl.log(
+                        "debug",
+                        "Discarding stale startup ChangeAgentStateAction(AWAITING_USER_INPUT) "
+                        "— agent is already RUNNING",
+                    )
+                    return
                 await self._ctrl.set_agent_state_to(target_state)
         elif isinstance(action, MessageAction):
             await self._handle_message_action(action)

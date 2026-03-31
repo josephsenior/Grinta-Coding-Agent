@@ -82,16 +82,12 @@ class TestOrchestrationContextProperties:
 
 
 class TestPendingAction:
-    def test_from_open_operation_service(self):
-        svc = MagicMock()
-        svc.get.return_value = "action_obj"
-        ctx = _make_ctx(open_operation_service=svc)
-        assert ctx.open_operation == "action_obj"
-
     def test_from_pending_action_service(self):
         svc = MagicMock()
         svc.get.return_value = "action_obj"
-        ctx = _make_ctx(pending_action_service=svc)
+        services = MagicMock()
+        services.pending_action = svc
+        ctx = _make_ctx(services=services)
         assert ctx.pending_action == "action_obj"
 
     def test_fallback_to_action_service(self):

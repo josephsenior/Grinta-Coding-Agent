@@ -150,8 +150,8 @@ class TestObservationService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(log_args[0], "warning")
         self.assertIn("did not match pending action", log_args[1])
 
-    async def test_late_observation_after_timeout_only_logs_mismatch(self):
-        """A late observation after timeout should not clear or re-resolve pending state."""
+    async def test_late_observation_after_timeout_is_ignored_without_pending(self):
+        """A late observation after timeout should not emit a false mismatch warning."""
         mock_observation = MagicMock(spec=Observation)
         mock_observation.cause = "action-123"
 
@@ -161,8 +161,7 @@ class TestObservationService(unittest.IsolatedAsyncioTestCase):
 
         self.mock_pending_service.set.assert_not_called()
         self.mock_context.trigger_step.assert_not_called()
-        self.mock_controller.log.assert_called_once()
-        self.assertIn("did not match pending action", self.mock_controller.log.call_args[0][1])
+        self.mock_controller.log.assert_not_called()
 
     async def test_handle_pending_action_observation_matches_int_like_ids(self):
         """Cause matching should tolerate int/string normalization."""

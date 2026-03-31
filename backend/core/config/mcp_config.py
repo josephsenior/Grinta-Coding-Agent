@@ -238,11 +238,6 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         )
 
 
-# Backward compat: type aliases for imports (mark as deprecated)
-MCPRemoteServerConfig = MCPServerConfig
-MCPStdioServerConfig = MCPServerConfig
-
-
 class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for MCP (Message Control Protocol) settings.
 
@@ -257,47 +252,6 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     #: Internal orchestrator tool names reserved when exposing MCP tools (runtime + API must match).
     mcp_exposed_name_reserved: frozenset[str] = Field(default_factory=frozenset)
     model_config = ConfigDict(extra="forbid")
-
-    @model_validator(mode="before")
-    @classmethod
-    def coerce_legacy_server_lists(cls, data):
-        """Support legacy MCP config formats.
-
-        Historically, MCP servers were provided as separate lists like
-        ``stdio_servers`` / ``sse_servers`` / ``shttp_servers``. The current
-        unified format uses a single ``servers`` list. This coercion allows
-        older config sources (including playbook metadata) to be parsed.
-        """
-        if not isinstance(data, dict):
-            return data
-
-        legacy_keys = ("stdio_servers", "sse_servers", "shttp_servers")
-        if not any(k in data for k in legacy_keys):
-            return data
-
-        servers = list(data.get("servers") or [])
-
-        def _extend_from(key: str, server_type: str) -> None:
-            items = data.get(key) or []
-            if isinstance(items, dict):
-                items = list(items.values())
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                srv = dict(item)
-                srv.setdefault("type", server_type)
-                servers.append(srv)
-
-        _extend_from("stdio_servers", "stdio")
-        _extend_from("sse_servers", "sse")
-        _extend_from("shttp_servers", "shttp")
-
-        coerced = dict(data)
-        coerced["servers"] = servers
-        for k in legacy_keys:
-            coerced.pop(k, None)
-        coerced.setdefault("enabled", bool(servers))
-        return coerced
 
     def validate_servers(self) -> None:
         """Validate that server URLs (for remote servers) are unique."""
@@ -353,21 +307,6 @@ class MCPConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             | other.mcp_exposed_name_reserved,
         )
 
-    @property
-    def sse_servers(self) -> list:
-        """Backward compat: return SSE servers from unified list."""
-        return [s for s in self.servers if s.type == "sse"]
-
-    @property
-    def stdio_servers(self) -> list:
-        """Backward compat: return stdio servers from unified list."""
-        return [s for s in self.servers if s.type == "stdio"]
-
-    @property
-    def shttp_servers(self) -> list:
-        """Backward compat: return sHTTP servers from unified list."""
-        return [s for s in self.servers if s.type == "shttp"]
-
 
 def _bundled_mcp_defaults_disabled() -> bool:
     v = (os.getenv(NO_BUNDLED_MCP_DEFAULTS_ENV) or "").strip().lower()
@@ -375,18 +314,29 @@ def _bundled_mcp_defaults_disabled() -> bool:
 
 
 def _bundled_mcp_json_path() -> Path | None:
-    """Location of packaged ``backend/runtime/mcp/config.json`` (single source for path)."""
+    """Location of packaged bundled MCP defaults.
+
+    Prefer the current ``backend/execution/mcp/config.json`` location but keep the
+    older ``backend/runtime/mcp/config.json`` path as a compatibility fallback for
+    environments that still ship the legacy layout.
+    """
     try:
         backend_root = Path(__file__).resolve().parent.parent.parent
-        candidate = backend_root / "runtime" / "mcp" / "config.json"
-        if candidate.is_file():
-            return candidate
+        for candidate in (
+            backend_root / "execution" / "mcp" / "config.json",
+            backend_root / "runtime" / "mcp" / "config.json",
+        ):
+            if candidate.is_file():
+                return candidate
     except Exception:
         pass
     try:
-        cwd_candidate = Path("backend") / "runtime" / "mcp" / "config.json"
-        if cwd_candidate.is_file():
-            return cwd_candidate.resolve()
+        for cwd_candidate in (
+            Path("backend") / "execution" / "mcp" / "config.json",
+            Path("backend") / "runtime" / "mcp" / "config.json",
+        ):
+            if cwd_candidate.is_file():
+                return cwd_candidate.resolve()
     except Exception:
         pass
     return None
@@ -446,6 +396,32 @@ def dedupe_default_mcp_http_servers(mcp: MCPConfig) -> None:
     mcp.servers = kept
 
 
+def _get_local_app_mcp_tool_count() -> int:
+    try:
+        from backend.gateway.routes.mcp import get_registered_tool_count
+
+        return get_registered_tool_count()
+    except Exception as exc:
+        logger.debug("Unable to inspect local app-mcp tool registry: %s", exc)
+        return 0
+
+
+def _matches_default_app_mcp_server(
+    server: MCPServerConfig,
+    default_server: MCPServerConfig,
+) -> bool:
+    return (
+        server.name == default_server.name
+        and server.type == default_server.type
+        and server.transport == default_server.transport
+        and server.url == default_server.url
+        and not server.api_key
+        and not server.command
+        and not server.args
+        and not server.env
+    )
+
+
 def ensure_default_mcp_http_server(cfg: Any) -> None:
     """Ensure the default SHTTP MCP server exists once (single source of truth)."""
     dedupe_default_mcp_http_servers(cfg.mcp)
@@ -455,6 +431,14 @@ def ensure_default_mcp_http_server(cfg: Any) -> None:
         None,
     )
     if default is None:
+        return
+    if _get_local_app_mcp_tool_count() <= 0:
+        cfg.mcp.servers = [
+            server
+            for server in cfg.mcp.servers
+            if not _matches_default_app_mcp_server(server, default)
+        ]
+        logger.debug("Skipping default app-mcp server because no local MCP tools are registered")
         return
     if any(s.name == "app-mcp" for s in cfg.mcp.servers):
         return
@@ -500,14 +484,14 @@ class AppMCPConfig:
             )
             return (None, stdio_servers)
 
-        shttp_servers = MCPServerConfig(
+        shttp_server = MCPServerConfig(
             name="app-mcp",
             type="shttp",
             url=f"http://{normalized_host}/mcp/mcp",
             api_key=None,
             transport="shttp",
         )
-        return (shttp_servers, stdio_servers)
+        return (shttp_server, stdio_servers)
 
 
 configured_mcp_config_cls = os.environ.get(
@@ -517,8 +501,6 @@ configured_mcp_config_cls = os.environ.get(
 AppMCPConfigImpl = get_impl(AppMCPConfig, configured_mcp_config_cls)
 
 __all__ = [
-    "MCPRemoteServerConfig",
-    "MCPStdioServerConfig",
     "MCPConfig",
     "AppMCPConfig",
     "AppMCPConfigImpl",

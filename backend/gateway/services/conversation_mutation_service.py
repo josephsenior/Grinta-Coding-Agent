@@ -23,7 +23,7 @@ from backend.gateway.services.service_dependencies import (
     get_conversation_manager_instance,
     require_conversation_manager,
 )
-from backend.gateway.app_accessors import config
+from backend.gateway.app_accessors import get_config
 from backend.persistence.data_models.conversation_metadata import ConversationTrigger
 from backend.persistence.data_models.conversation_status import ConversationStatus
 
@@ -159,7 +159,7 @@ async def search_playbook_conversations(
 
     result_set = await store.search(page_id, limit)
     aged = filter_conversations_by_age(
-        result_set.results, config.conversation_max_age_seconds
+        result_set.results, get_config().conversation_max_age_seconds
     )
 
     final: list = []

@@ -3,36 +3,36 @@ from unittest.mock import MagicMock
 from backend.orchestration.session_orchestrator import SessionOrchestrator
 from backend.orchestration.services.step_guard_service import StepGuardService
 from backend.orchestration.agent_circuit_breaker import CircuitBreakerResult
-from backend.ledger.action import SystemMessageAction
 from backend.ledger.observation import ErrorObservation
 
 class TestCircuitBreakerIntegration:
     @pytest.mark.asyncio
-    async def test_circuit_breaker_switch_context_integration(self):
+    async def test_circuit_breaker_warning_trip(self):
         """
-        Verify that when the circuit breaker returns a 'switch_context' action,
+        Verify that when the circuit breaker trips within the warning limit,
         the StepGuardService:
-        1. Injects a SystemMessageAction into the event stream.
-        2. Injects an ErrorObservation (for visibility) into the event stream.
-        3. Returns True (allows the step to proceed so the agent can see the message).
+        1. Injects an ErrorObservation with CIRCUIT_BREAKER_WARNING.
+        2. Returns True (allows the step to proceed so the agent can self-correct).
         """
-        # Setup Controller Context Mock
         mock_context = MagicMock()
         mock_controller = MagicMock(spec=SessionOrchestrator)
         mock_context.get_controller.return_value = mock_controller
 
-        # Setup Event Stream
         mock_controller.event_stream = MagicMock()
         mock_controller.event_stream.add_event = MagicMock()
 
-        # Setup Circuit Breaker Service on Controller
+        # Provide state with extra_data for warning trip counting
+        mock_state = MagicMock()
+        mock_state.extra_data = {}
+        mock_controller.state = mock_state
+
         mock_cb_service = MagicMock()
         mock_controller.circuit_breaker_service = mock_cb_service
+        # No stuck_service so _handle_stuck_detection is a no-op
+        mock_controller.stuck_service = None
 
-        # Create StepGuardService with the mock context
         step_guard = StepGuardService(mock_context)
 
-        # Configure Circuit Breaker to return 'switch_context'
         mock_cb_service.check.return_value = CircuitBreakerResult(
             tripped=True,
             reason="Stuck loop detected (2)",
@@ -41,45 +41,49 @@ class TestCircuitBreakerIntegration:
             recommendation="Use escalate() or analyze_project_structure()."
         )
 
-        # Execute
         can_step = await step_guard.ensure_can_step()
 
-        # Assert 1: Step should be allowed (True) so agent can process the new message
-        assert can_step is True, "Step should be allowed for context switching"
+        # Warning trip allows stepping
+        assert can_step is True, "Step should be allowed during warning trip"
 
-        # Assert 2: Verify SystemMessageAction injection
-        # Check calls to event_stream.add_event
+        # Verify warning ErrorObservation was injected
         calls = mock_controller.event_stream.add_event.call_args_list
-        assert len(calls) >= 2, "Should add at least SystemMessage and ErrorObservation"
+        assert len(calls) >= 1, "Should add at least one ErrorObservation"
 
-        # Find SystemMessageAction
-        sys_msg_call = next((call for call in calls if isinstance(call[0][0], SystemMessageAction)), None)
-        assert sys_msg_call is not None, "SystemMessageAction was not added"
-        sys_msg = sys_msg_call[0][0]
-        assert "Switch context immediately" in sys_msg.content
-
-        # Find ErrorObservation
-        error_obs_call = next((call for call in calls if isinstance(call[0][0], ErrorObservation)), None)
+        error_obs_call = next(
+            (call for call in calls if isinstance(call[0][0], ErrorObservation)),
+            None,
+        )
         assert error_obs_call is not None, "ErrorObservation was not added"
         error_obs = error_obs_call[0][0]
-        assert "SYSTEM INTERVENTION" in error_obs.content
-        assert error_obs.error_id == "CIRCUIT_BREAKER_SWITCH_CONTEXT"
+        assert error_obs.error_id == "CIRCUIT_BREAKER_WARNING"
+        assert "Stuck loop detected" in error_obs.content
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_stop_action(self):
         """
-        Verify that 'stop' action actually stops the agent.
+        Verify that 'stop' action actually stops the agent after warning limit is exceeded.
         """
-        # Setup
         mock_context = MagicMock()
         mock_controller = MagicMock(spec=SessionOrchestrator)
         mock_context.get_controller.return_value = mock_controller
         mock_controller.event_stream = MagicMock()
+        mock_controller.stuck_service = None
+
+        # Pre-fill warning trip counts to exceed the default limit of 3
+        # so the next trip goes straight to hard stop.
+        mock_state = MagicMock()
+        mock_state.extra_data = {
+            StepGuardService._WARNING_TRIP_COUNTS_KEY: {
+                "stop:Too many errors": 4,
+            }
+        }
+        mock_controller.state = mock_state
+
         mock_cb_service = MagicMock()
         mock_controller.circuit_breaker_service = mock_cb_service
         step_guard = StepGuardService(mock_context)
 
-        # Configure Circuit Breaker to return 'stop'
         mock_cb_service.check.return_value = CircuitBreakerResult(
             tripped=True,
             reason="Too many errors",
@@ -87,9 +91,7 @@ class TestCircuitBreakerIntegration:
             recommendation="Restart."
         )
 
-        # Execute
         can_step = await step_guard.ensure_can_step()
 
-        # Assert
         assert can_step is False, "Step should be blocked for stop action"
-        mock_controller.set_agent_state_to.assert_called() # Should call with STOPPED
+        mock_controller.set_agent_state_to.assert_called()

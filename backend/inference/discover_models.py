@@ -24,6 +24,11 @@ def print_section(title: str) -> None:
     print("=" * 60)
 
 
+def _display_provider_name(provider: str) -> str:
+    """Render provider ids in a user-facing format."""
+    return provider.upper().replace("_", " ")
+
+
 def discover_command() -> None:
     """Discover all available local models."""
     print_section("Local Model Discovery")
@@ -43,7 +48,7 @@ def discover_command() -> None:
     print(f"\n✓ Found {total_models} models across {len(models)} providers:\n")
 
     for provider, model_list in models.items():
-        print(f"📦 {provider.upper()}")
+        print(f"📦 {_display_provider_name(provider)}")
         for model in model_list:
             print(f"   - {model}")
 
@@ -63,7 +68,8 @@ def status_command() -> None:
     for provider, is_running in status.items():
         status_icon = "✓" if is_running else "✗"
         status_text = "RUNNING" if is_running else "NOT FOUND"
-        print(f"{status_icon} {provider.upper():<15} {status_text}")
+        provider_name = _display_provider_name(provider)
+        print(f"{status_icon} {provider_name:<15} {status_text}")
 
     if not any(status.values()):
         print("\n💡 No local providers are running.")

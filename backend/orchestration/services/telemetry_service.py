@@ -77,13 +77,8 @@ class TelemetryService:
         middlewares.append(ToolResultValidator())
         if isinstance(context, Mock):
             context.initialize_operation_pipeline(middlewares)
-            context.initialize_tool_pipeline(middlewares)
         else:
             context.initialize_operation_pipeline(middlewares)
-
-    def initialize_tool_pipeline(self) -> None:
-        """Backward-compatible alias for operation pipeline initialization."""
-        self.initialize_operation_pipeline()
 
     def handle_blocked_invocation(
         self,

@@ -16,7 +16,13 @@ if sys.platform == "win32":
     sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer, "strict")
     sys.stderr = codecs.getwriter("utf-8")(sys.stderr.buffer, "strict")
 
-import asyncpg
+try:
+    import asyncpg
+except ImportError as _exc:
+    raise ImportError(
+        "asyncpg is required for database migrations. "
+        "Install with:  uv pip install 'app-ai[database]'"
+    ) from _exc
 
 
 async def run_migrations():

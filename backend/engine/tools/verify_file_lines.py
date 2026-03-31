@@ -23,13 +23,8 @@ from backend.ledger.action.agent import AgentThinkAction
 VERIFY_FILE_LINES_TOOL_NAME = "verify_file_lines"
 
 _DESCRIPTION = (
-    "Validate your mental model of a file's current contents before editing. "
-    "Pass a file path and a list of assertions (line number + expected substring). "
-    "Returns PASS/FAIL for each assertion, helping you catch stale-model errors "
-    "before attempting a replace_text that would fail.\n\n"
-    "Use this after context condensation or after many edits to confirm "
-    "your understanding of the file is still accurate.\n\n"
-    "Example: verify_file_lines(path='main.py', line_checks='42:def process|100:return response')"
+    "Validate file contents before editing by checking line assertions (line number + expected substring). "
+    "Returns PASS/FAIL per assertion. Use after condensation or many edits to catch stale-model errors."
 )
 
 

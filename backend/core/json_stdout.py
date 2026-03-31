@@ -8,10 +8,11 @@ it remains safe to import from CLI scripts.
 
 from __future__ import annotations
 
-import json
 import logging
 import sys
 from typing import Any
+
+from backend.core import json_compat as json
 
 logger = logging.getLogger(__name__)
 

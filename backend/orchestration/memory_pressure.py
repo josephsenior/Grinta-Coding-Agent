@@ -36,6 +36,8 @@ class MemoryPressureMonitor:
     - ``APP_MEM_WARN_MB``  — warning threshold (default 768 MB)
     - ``APP_MEM_CRIT_MB``  — critical threshold (default 1536 MB)
     - ``APP_MEM_CHECK_INTERVAL`` — minimum seconds between checks (default 10)
+        - ``APP_MEM_CONDENSE_COOLDOWN_S`` — warning-level cooldown after a
+            condensation pass (default 30)
 
     The monitor exposes three levels:
 
@@ -49,15 +51,20 @@ class MemoryPressureMonitor:
         warn_mb: int | None = None,
         crit_mb: int | None = None,
         check_interval_s: float | None = None,
+        cooldown_s: float | None = None,
     ) -> None:
         self._warn_mb = warn_mb or int(os.getenv("APP_MEM_WARN_MB", "768"))
         self._crit_mb = crit_mb or int(os.getenv("APP_MEM_CRIT_MB", "1536"))
         self._check_interval = check_interval_s or float(
             os.getenv("APP_MEM_CHECK_INTERVAL", "10")
         )
+        self._cooldown_s = cooldown_s or float(
+            os.getenv("APP_MEM_CONDENSE_COOLDOWN_S", "30")
+        )
         self._last_check: float = 0.0
         self._last_rss_mb: float = 0.0
         self._condensation_count: int = 0
+        self._last_condensation_at: float = 0.0
         self._process: Any = None
         if _HAS_PSUTIL:
             self._process = psutil.Process(os.getpid())
@@ -71,7 +78,15 @@ class MemoryPressureMonitor:
         rss = self._sample_rss()
         if rss is None:
             return False
-        return rss >= self._warn_mb
+        if rss >= self._crit_mb:
+            return True
+        if rss < self._warn_mb:
+            return False
+        if self._last_condensation_at > 0:
+            elapsed = time.monotonic() - self._last_condensation_at
+            if elapsed < self._cooldown_s:
+                return False
+        return True
 
     def is_critical(self) -> bool:
         """Return True if memory is at a critical level."""
@@ -83,6 +98,7 @@ class MemoryPressureMonitor:
     def record_condensation(self) -> None:
         """Call after a condensation pass completes."""
         self._condensation_count += 1
+        self._last_condensation_at = time.monotonic()
 
     def snapshot(self) -> dict[str, Any]:
         """Return diagnostic snapshot for debug endpoints."""
@@ -90,6 +106,7 @@ class MemoryPressureMonitor:
             "rss_mb": self._last_rss_mb,
             "warn_threshold_mb": self._warn_mb,
             "crit_threshold_mb": self._crit_mb,
+            "cooldown_s": self._cooldown_s,
             "condensation_count": self._condensation_count,
             "psutil_available": _HAS_PSUTIL,
             "level": self._level_str(),

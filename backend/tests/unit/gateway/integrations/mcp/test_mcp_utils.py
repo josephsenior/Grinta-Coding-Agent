@@ -35,7 +35,6 @@ class TestIsWindowsMcpDisabled:
 class TestGetMcpConnectTimeoutSec:
     def test_reads_app_env_override(self, monkeypatch):
         monkeypatch.setenv("APP_MCP_CONNECT_TIMEOUT_SEC", "12.5")
-        monkeypatch.delenv("APP_MCP_CONNECT_TIMEOUT_SEC", raising=False)
 
         assert _get_mcp_connect_timeout_sec() == 12.5
 

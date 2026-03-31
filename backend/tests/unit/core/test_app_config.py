@@ -11,7 +11,6 @@ from backend.core.config.app_config import (
     FileUploadsConfig,
     AppConfig,
     GitIdentityConfig,
-    TranscriptConfig,
     TrajectoryConfig,
 )
 from backend.core.config.llm_config import LLMConfig
@@ -42,11 +41,6 @@ class TestTrajectoryConfig:
         assert t.replay_path is None
         assert t.save_path is None
         assert t.save_screenshots is False
-
-
-class TestTranscriptConfig:
-    def test_alias(self):
-        assert TranscriptConfig is TrajectoryConfig
 
 
 class TestEventStreamConfig:
@@ -167,14 +161,15 @@ class TestAppConfigPostInit:
         cfg = AppConfig(replay_trajectory_path="/tmp/replay.json")
         assert cfg.trajectory.replay_path == "/tmp/replay.json"
 
-    def test_transcript_property_setters_sync_trajectory_fields(self):
-        cfg = AppConfig()
-        cfg.replay_transcript_path = "/tmp/replay-transcript.json"
-        cfg.save_transcript_path = "/tmp/save-transcript.json"
-        cfg.save_screenshots_in_transcript = True
-        assert cfg.replay_trajectory_path == "/tmp/replay-transcript.json"
-        assert cfg.save_trajectory_path == "/tmp/save-transcript.json"
-        assert cfg.save_screenshots_in_trajectory is True
+    def test_trajectory_fields_sync_submodel(self):
+        cfg = AppConfig(
+            replay_trajectory_path="/tmp/replay-trajectory.json",
+            save_trajectory_path="/tmp/save-trajectory.json",
+            save_screenshots_in_trajectory=True,
+        )
+        assert cfg.trajectory.replay_path == "/tmp/replay-trajectory.json"
+        assert cfg.trajectory.save_path == "/tmp/save-trajectory.json"
+        assert cfg.trajectory.save_screenshots is True
 
     def test_git_init_synced(self):
         cfg = AppConfig(init_git_in_empty_workspace=True)

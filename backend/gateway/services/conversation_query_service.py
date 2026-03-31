@@ -19,7 +19,7 @@ from backend.gateway.schemas.conversation_info_result_set import (
 from backend.gateway.services.service_dependencies import (
     require_conversation_manager as _require_conversation_manager,
 )
-from backend.gateway.app_accessors import ConversationStoreImpl, config
+from backend.gateway.app_accessors import ConversationStoreImpl, get_config
 from backend.gateway.store_factory import get_conversation_store_instance
 from backend.persistence.conversation.conversation_store import ConversationStore
 from backend.persistence.data_models.conversation_metadata import (
@@ -50,7 +50,7 @@ async def resolve_conversation_store(
 
     if not is_missing(user_id) and user_id is not None:
         return await get_conversation_store_instance(
-            ConversationStoreImpl, config, str(user_id)
+            ConversationStoreImpl, get_config(), str(user_id)
         )
     return await _resolve_store(None)
 
@@ -217,7 +217,7 @@ async def search_conversations(
     )
     filtered_results = filter_conversations_by_age(
         conversation_metadata_result_set.results,
-        config.conversation_max_age_seconds,
+        get_config().conversation_max_age_seconds,
     )
     final_filtered_results = _apply_search_filters(
         filtered_results,
@@ -275,7 +275,7 @@ async def delete_conversation_entry(
     manager = _require_conversation_manager()
     if await manager.is_agent_loop_running(conversation_id):
         await manager.close_session(conversation_id)
-    runtime_cls = get_runtime_cls(config.runtime)
+    runtime_cls = get_runtime_cls(get_config().runtime)
     await runtime_cls.delete(conversation_id)
     await store.delete_metadata(conversation_id)
     return True
@@ -311,7 +311,7 @@ async def delete_all_conversations(
         if await manager.is_agent_loop_running(conv.conversation_id):
             await manager.close_session(conv.conversation_id)
         try:
-            runtime_cls = get_runtime_cls(config.runtime)
+            runtime_cls = get_runtime_cls(get_config().runtime)
             await runtime_cls.delete(conv.conversation_id)
         except Exception as e:
             logger.warning("Failed to delete runtime for %s: %s", conv.conversation_id, e)

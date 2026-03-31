@@ -8,12 +8,12 @@ to the centralised AppState container.
 directly from ``AppState``, ensuring a single source of truth.
 
 .. deprecated::
-    Route files should inject ``config``, ``file_store``, and ``server_config``
+    Route files should inject ``AppConfig``, ``file_store``, and ``server_config``
     via FastAPI ``Depends()`` providers defined in
     ``backend.gateway.services.service_dependencies`` (``get_app_config``,
-    ``get_file_store``, ``get_server_config``).  Direct imports from this
-    module remain supported for non-route code (CLI, tests, utilities) that
-    cannot use the DI system.
+    ``get_file_store``, ``get_server_config``). Direct accessor imports from
+    this module remain supported for non-route code (CLI, tests, utilities)
+    that cannot use the DI system.
 """
 
 from __future__ import annotations
@@ -34,10 +34,6 @@ sio = _state.sio
 def get_config():
     """Get the current AppConfig reference."""
     return _state.config
-
-# Note: 'config' is a legacy reference that might be stale if AppState.config is reloaded.
-# Prefer calling get_config() for fresh configuration.
-config = get_config()
 file_store = _state.file_store
 monitoring_listener = _state.monitoring_listener
 

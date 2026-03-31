@@ -22,13 +22,9 @@ def create_signal_progress_tool() -> dict[str, Any]:
         "function": {
             "name": SIGNAL_PROGRESS_TOOL_NAME,
             "description": (
-                "Signal to the system that you are making deliberate, intentional forward "
-                "progress on a long-running task (e.g. migrating 20 files, refactoring a "
-                "large module). This prevents false stuck-loop detection from interrupting "
-                "you mid-task.\n\n"
-                "WHEN TO USE: Call every 10–15 steps during sustained multi-file operations.\n"
-                "DO NOT CALL if you are actually stuck — use escalate() instead.\n"
-                "DO NOT CALL more than once every 5 steps."
+                "Signal forward progress on a long-running task to prevent stuck-loop detection. "
+                "Call every 10-15 steps during sustained multi-file operations. "
+                "Do NOT call if actually stuck — use escalate() instead."
             ),
             "parameters": {
                 "type": "object",

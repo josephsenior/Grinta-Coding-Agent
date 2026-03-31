@@ -62,9 +62,6 @@ class TrajectoryConfig(BaseModel):
     save_screenshots: bool = Field(default=False)
 
 
-TranscriptConfig = TrajectoryConfig
-
-
 class EventStreamConfig(BaseModel):
     """Centralized EventStream queue/coalescing/backpressure defaults."""
 
@@ -339,33 +336,6 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         if not AppConfig.defaults_dict:
             AppConfig.defaults_dict = model_defaults_to_dict(self)
-
-    @property
-    def replay_transcript_path(self) -> str | None:
-        return self.replay_trajectory_path
-
-    @replay_transcript_path.setter
-    def replay_transcript_path(self, value: str | None) -> None:
-        self.replay_trajectory_path = value
-        self.trajectory.replay_path = value
-
-    @property
-    def save_transcript_path(self) -> str | None:
-        return self.save_trajectory_path
-
-    @save_transcript_path.setter
-    def save_transcript_path(self, value: str | None) -> None:
-        self.save_trajectory_path = value
-        self.trajectory.save_path = value
-
-    @property
-    def save_screenshots_in_transcript(self) -> bool:
-        return self.save_screenshots_in_trajectory
-
-    @save_screenshots_in_transcript.setter
-    def save_screenshots_in_transcript(self, value: bool) -> None:
-        self.save_screenshots_in_trajectory = value
-        self.trajectory.save_screenshots = value
 
 
 # Rebuild the model after all dependencies are loaded to resolve forward references

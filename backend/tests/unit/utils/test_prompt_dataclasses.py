@@ -100,44 +100,23 @@ class TestPromptManagerInit:
         with pytest.raises(ValueError, match="Prompt directory is not set"):
             PromptManager(prompt_dir=None)
 
-    def test_missing_template_raises(self):
+    def test_missing_template_no_longer_raises(self):
+        """PromptManager no longer validates template files on init (uses prompt_builder)."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with pytest.raises(FileNotFoundError, match="not found"):
-                PromptManager(prompt_dir=tmpdir)
-
-    def test_valid_dir_loads(self):
-        """PromptManager loads if all required templates exist."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            for name in [
-                "system_prompt.j2",
-                "user_prompt.j2",
-                "additional_info.j2",
-                "playbook_info.j2",
-                "knowledge_base_info.j2",
-            ]:
-                with open(os.path.join(tmpdir, name), "w", encoding="utf-8") as f:
-                    f.write("{{ content }}")
-
             pm = PromptManager(prompt_dir=tmpdir)
             assert pm.prompt_dir == tmpdir
-            assert pm.system_template is not None
-            assert pm.user_template is not None
+
+    def test_valid_dir_loads(self):
+        """PromptManager stores prompt_dir."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pm = PromptManager(prompt_dir=tmpdir)
+            assert pm.prompt_dir == tmpdir
 
     def test_custom_system_prompt(self):
-        """PromptManager loads a custom system_prompt filename."""
+        """PromptManager accepts system_prompt_filename param (ignored in new builder)."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            for name in [
-                "custom.j2",
-                "user_prompt.j2",
-                "additional_info.j2",
-                "playbook_info.j2",
-                "knowledge_base_info.j2",
-            ]:
-                with open(os.path.join(tmpdir, name), "w", encoding="utf-8") as f:
-                    f.write("custom")
-
             pm = PromptManager(prompt_dir=tmpdir, system_prompt_filename="custom.j2")
-            assert pm.system_template is not None
+            assert pm.prompt_dir == tmpdir
 
 
 # ── PromptManager template rendering ─────────────────────────────────
@@ -146,20 +125,11 @@ class TestPromptManagerInit:
 class TestPromptManagerRendering:
     @pytest.fixture
     def pm(self, tmp_path):
-        """Fixture providing a PromptManager with minimal templates."""
-        (tmp_path / "system_prompt.j2").write_text("System: {{ msg }}")
-        (tmp_path / "user_prompt.j2").write_text("User example")
-        (tmp_path / "additional_info.j2").write_text(
-            "Repo: {{ repository_info.repo_name if repository_info else 'none' }}"
-        )
-        (tmp_path / "playbook_info.j2").write_text(
-            "Agents: {{ triggered_agents|length }}"
-        )
-        (tmp_path / "knowledge_base_info.j2").write_text("KB: {{ kb_results|length }}")
+        """Fixture providing a PromptManager."""
         return PromptManager(prompt_dir=str(tmp_path))
 
     def test_get_example_user_message(self, pm):
-        assert pm.get_example_user_message() == "User example"
+        assert pm.get_example_user_message() == ""
 
     def test_build_workspace_context(self, pm):
         repo = RepositoryInfo(repo_name="my-repo")
@@ -176,25 +146,29 @@ class TestPromptManagerRendering:
             runtime_info=None,
             conversation_instructions=None,
         )
-        assert "none" in result
+        # With no repo info, output should be empty or not contain a repo name
+        assert "my-repo" not in result
 
     def test_build_playbook_info(self, pm):
-        result = pm.build_playbook_info(triggered_agents=["a", "b"])
-        assert "2" in result
+        mock_agent = MagicMock()
+        mock_agent.name = "agent_a"
+        mock_agent.trigger = "trigger_a"
+        mock_agent.content = "content_a"
+        result = pm.build_playbook_info(triggered_agents=[mock_agent])
+        assert "agent_a" in result
 
     def test_build_knowledge_base_info(self, pm):
-        result = pm.build_knowledge_base_info(kb_results=[1, 2, 3])
-        assert "3" in result
+        mock_result = MagicMock()
+        mock_result.filename = "doc.md"
+        mock_result.relevance_score = 0.9
+        mock_result.chunk_content = "some kb content"
+        result = pm.build_knowledge_base_info(kb_results=[mock_result])
+        assert "some kb content" in result
 
 
 class TestPromptManagerTurnsReminder:
     def test_add_turns_left_reminder(self, tmp_path):
         """Test turns left reminder is appended to user message."""
-        (tmp_path / "system_prompt.j2").write_text("S")
-        (tmp_path / "user_prompt.j2").write_text("U")
-        (tmp_path / "additional_info.j2").write_text("A")
-        (tmp_path / "playbook_info.j2").write_text("P")
-        (tmp_path / "knowledge_base_info.j2").write_text("K")
         pm = PromptManager(prompt_dir=str(tmp_path))
 
         msg = Message(role="user", content=[TextContent(text="Help me")])
@@ -214,35 +188,32 @@ class TestPromptManagerTurnsReminder:
 class TestOrchestratorPromptManager:
     @pytest.fixture
     def pm(self, tmp_path):
-        """Fixture providing OrchestratorPromptManager with minimal templates."""
-        (tmp_path / "system_prompt.j2").write_text("System: {{ msg }}")
-        (tmp_path / "user_prompt.j2").write_text("User")
-        (tmp_path / "additional_info.j2").write_text("Info")
-        (tmp_path / "playbook_info.j2").write_text("Playbook")
-        (tmp_path / "knowledge_base_info.j2").write_text("KB")
+        """Fixture providing OrchestratorPromptManager."""
         return OrchestratorPromptManager(prompt_dir=str(tmp_path))
 
     def test_get_system_message_injects_identity(self, pm):
-        """Test system message has identity prefix."""
+        """Test system message has identity content."""
         with patch(
             "backend.utils.prompt.OrchestratorPromptManager._inject_scratchpad",
             side_effect=lambda x: x,
         ):
-            result = pm.get_system_message(msg="hello")
-            assert "You are App agent." in result
-            assert "System: hello" in result
+            result = pm.get_system_message()
+            assert "You are App" in result
 
     def test_get_system_message_with_config(self, pm):
         """Test system message with config injects context."""
         config = MagicMock()
         config.cli_mode = True
+        config.autonomy_level = "balanced"
+        config.enable_checkpoints = False
+        config.enable_permissions = False
         pm._config = config
         with patch(
             "backend.utils.prompt.OrchestratorPromptManager._inject_scratchpad",
             side_effect=lambda x: x,
         ):
-            result = pm.get_system_message(msg="hi")
-            assert "You are App agent." in result
+            result = pm.get_system_message()
+            assert "You are App" in result
 
     def test_inject_scratchpad_success(self, pm):
         """Test scratchpad injection when notes exist."""

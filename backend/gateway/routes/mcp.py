@@ -37,9 +37,9 @@ def get_server_config():
 
 def get_config():
     """Return application configuration without importing at module import time."""
-    from backend.gateway.app_accessors import config
+    from backend.gateway.app_accessors import get_config as _get_config
 
-    return config
+    return _get_config()
 
 
 mcp_server = FastMCP("mcp", mask_error_details=True)
@@ -165,7 +165,7 @@ def _mcp_span(tool_name: str, resource: str, conversation_id: str | None):
             raise
 
 
-async def _execute_with_tracing[ReturnT](
+async def _execute_with_tracing(
     tool_name: str,
     resource: str,
     conversation_id: str | None,
@@ -179,3 +179,211 @@ async def _execute_with_tracing[ReturnT](
         error = f"{error_prefix}: {exc}"
         logger.error(error)
         raise ToolError(error) from exc
+
+
+def _registered_tools() -> dict[str, Any]:
+    tool_manager = getattr(mcp_server, "_tool_manager", None)
+    tools = getattr(tool_manager, "_tools", None)
+    if isinstance(tools, dict):
+        return tools
+    return {}
+
+
+def get_registered_tool_names() -> list[str]:
+    """Return the local app-mcp tool names currently registered on FastMCP."""
+    return sorted(str(name) for name in _registered_tools())
+
+
+def get_registered_tool_count() -> int:
+    """Return the local app-mcp tool count for config-layer gating."""
+    return len(_registered_tools())
+
+
+def _build_server_ready_status() -> dict[str, Any]:
+    from backend.gateway.routes.health import get_ready_status_snapshot
+
+    return get_ready_status_snapshot()
+
+
+def _build_workspace_info() -> dict[str, Any]:
+    from backend.core.workspace_resolution import get_effective_workspace_root
+
+    config = get_config()
+    workspace_root = get_effective_workspace_root()
+    return {
+        "path": str(workspace_root) if workspace_root is not None else None,
+        "project_root": str(getattr(config, "project_root", None) or ""),
+        "local_data_root": str(getattr(config, "local_data_root", "") or ""),
+    }
+
+
+def _build_public_server_config() -> dict[str, Any]:
+    return get_server_config().get_config()
+
+
+def _build_configured_mcp_servers() -> list[dict[str, Any]]:
+    config = get_config()
+    return [
+        {
+            "name": server.name,
+            "type": server.type,
+            "transport": server.transport,
+            "url": server.url,
+            "command": server.command,
+            "args": list(server.args),
+            "usage_hint": server.usage_hint,
+        }
+        for server in config.mcp.servers
+    ]
+
+
+def _list_available_models() -> list[str]:
+    from backend.gateway.app_state import get_app_state
+    from backend.inference.model_catalog import get_supported_llm_models
+
+    return get_supported_llm_models(get_app_state().config)
+
+
+def _list_available_agents() -> list[str]:
+    from importlib import import_module
+
+    import_module("backend.engine")
+    from backend.orchestration.agent import Agent
+
+    return sorted(Agent.list_agents())
+
+
+def _list_security_analyzers() -> list[str]:
+    from backend.security.options import SecurityAnalyzers
+
+    return sorted(SecurityAnalyzers.keys())
+
+
+@mcp_server.tool(description="Return the gateway readiness snapshot and dependency checks.")
+async def get_server_ready_status() -> dict[str, Any]:
+    context = await _request_context()
+
+    async def action() -> dict[str, Any]:
+        return _build_server_ready_status()
+
+    return await _execute_with_tracing(
+        "get_server_ready_status",
+        "server.health.ready",
+        context.conversation_id,
+        action,
+        "Failed to load server readiness status",
+    )
+
+
+@mcp_server.tool(description="Return system metrics and runtime server information.")
+async def get_server_info() -> dict[str, Any]:
+    context = await _request_context()
+
+    async def action() -> dict[str, Any]:
+        from backend.gateway.routes.health import get_system_info
+
+        return get_system_info()
+
+    return await _execute_with_tracing(
+        "get_server_info",
+        "server.info",
+        context.conversation_id,
+        action,
+        "Failed to load server info",
+    )
+
+
+@mcp_server.tool(description="Return the active workspace and local storage roots.")
+async def get_workspace_info() -> dict[str, Any]:
+    context = await _request_context()
+
+    async def action() -> dict[str, Any]:
+        return _build_workspace_info()
+
+    return await _execute_with_tracing(
+        "get_workspace_info",
+        "workspace.info",
+        context.conversation_id,
+        action,
+        "Failed to load workspace info",
+    )
+
+
+@mcp_server.tool(description="List the LLM models currently exposed by the gateway.")
+async def list_available_models() -> list[str]:
+    context = await _request_context()
+
+    async def action() -> list[str]:
+        return _list_available_models()
+
+    return await _execute_with_tracing(
+        "list_available_models",
+        "options.models",
+        context.conversation_id,
+        action,
+        "Failed to load available models",
+    )
+
+
+@mcp_server.tool(description="List the registered agent implementations available on the gateway.")
+async def list_available_agents() -> list[str]:
+    context = await _request_context()
+
+    async def action() -> list[str]:
+        return _list_available_agents()
+
+    return await _execute_with_tracing(
+        "list_available_agents",
+        "options.agents",
+        context.conversation_id,
+        action,
+        "Failed to load available agents",
+    )
+
+
+@mcp_server.tool(description="List the configured security analyzers exposed by the gateway.")
+async def list_security_analyzers() -> list[str]:
+    context = await _request_context()
+
+    async def action() -> list[str]:
+        return _list_security_analyzers()
+
+    return await _execute_with_tracing(
+        "list_security_analyzers",
+        "options.security_analyzers",
+        context.conversation_id,
+        action,
+        "Failed to load security analyzers",
+    )
+
+
+@mcp_server.tool(description="Return the public server configuration snapshot used by the gateway.")
+async def get_public_server_config() -> dict[str, Any]:
+    context = await _request_context()
+
+    async def action() -> dict[str, Any]:
+        return _build_public_server_config()
+
+    return await _execute_with_tracing(
+        "get_public_server_config",
+        "options.config",
+        context.conversation_id,
+        action,
+        "Failed to load public server config",
+    )
+
+
+@mcp_server.tool(description="List the MCP servers currently configured on the gateway.")
+async def list_configured_mcp_servers() -> list[dict[str, Any]]:
+    context = await _request_context()
+
+    async def action() -> list[dict[str, Any]]:
+        return _build_configured_mcp_servers()
+
+    return await _execute_with_tracing(
+        "list_configured_mcp_servers",
+        "mcp.servers",
+        context.conversation_id,
+        action,
+        "Failed to load configured MCP servers",
+    )

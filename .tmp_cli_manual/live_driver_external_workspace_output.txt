@@ -1,0 +1,220 @@
+
+                       _________________________________                       
+                ______/                                 \______                
+              /_____/     .-^^^^-.           .-^^^^-.     \_____\              
+                /_____/    / o  o \_________/ o  o \    \_____\                
+                   ||      \  --  /  _____  \  --  /      ||                   
+                       ||           \____/           ||                        
+              _____||_______'----'  | >_ |  '----'_______||_____               
+            /_______________________|_____|_______________________\            
+                     \              /_____|              /                     
+                      \____________/      \____________/                       
+                         |_____|              |_____|                          
+
+           GGGGGG   RRRRRR   IIIIIIII  NNN   NN  TTTTTTTT   AAAAAA             
+          GG    GG  RR   RR     II     NNNN  NN     TT     AA    AA            
+          GG        RRRRRR      II     NN NN NN     TT     AAAAAAAA            
+          GG  GGGG  RR  RR      II     NN  NNNN     TT     AA    AA            
+          GG    GG  RR   RR     II     NN   NNN     TT     AA    AA            
+           GGGGGG   RR    RR  IIIIIIII NN    NN     TT     AA    AA            
+
+{"asctime": "2026-03-30 23:26:52,931", "message": "[LLM registry 85ea4a4c-2803-48e1-bf19-d72300419975]: Registering service for agent", "level": "INFO", "timestamp": "2026-03-30T21:26:52.931757+00:00"}
+WARNING  Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY. 
+C:\Users\GIGABYTE\.cache\huggingface\modules\transformers_modules\jinaai\jina-bert-v2-qk-post-norm\3baf9e3ac750e76e8edd3019170176884695fb94\configuration_bert.py:29: UserWarning: optimum is not installed. To use OnnxConfig and BertOnnxConfig, make sure that `optimum` package is installed
+  warnings.warn("optimum is not installed. To use OnnxConfig and BertOnnxConfig, make sure that `optimum` package is installed")
+{"asctime": "2026-03-30 23:27:00,677", "message": "\u2705 Vector memory initialized for ContextMemory\n   Accuracy: 92% | Hybrid retrieval: enabled", "level": "INFO", "timestamp": "2026-03-30T21:27:00.677220+00:00"}
+{"asctime": "2026-03-30 23:27:00,681", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T21:27:00.681144+00:00"}
+{"asctime": "2026-03-30 23:27:00,681", "message": "\ud83c\udfe5 APP PRODUCTION HEALTH CHECK", "level": "INFO", "timestamp": "2026-03-30T21:27:00.681144+00:00"}
+{"asctime": "2026-03-30 23:27:00,681", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T21:27:00.681144+00:00"}
+{"asctime": "2026-03-30 23:27:00,683", "message": "\u2705 Ultimate Editor: Tree-sitter is READY", "level": "INFO", "timestamp": "2026-03-30T21:27:00.683124+00:00"}
+{"asctime": "2026-03-30 23:27:00,684", "message": "   - Structure-aware editing: ENABLED", "level": "INFO", "timestamp": "2026-03-30T21:27:00.684122+00:00"}
+{"asctime": "2026-03-30 23:27:00,684", "message": "   - Language support: 40+ languages", "level": "INFO", "timestamp": "2026-03-30T21:27:00.684122+00:00"}
+{"asctime": "2026-03-30 23:27:00,687", "message": "\u2705 Atomic Refactoring: READY", "level": "INFO", "timestamp": "2026-03-30T21:27:00.687136+00:00"}
+{"asctime": "2026-03-30 23:27:00,687", "message": "   - Multi-file transactions: ENABLED", "level": "INFO", "timestamp": "2026-03-30T21:27:00.687136+00:00"}
+{"asctime": "2026-03-30 23:27:00,687", "message": "   - Rollback system: ENABLED", "level": "INFO", "timestamp": "2026-03-30T21:27:00.687136+00:00"}
+{"asctime": "2026-03-30 23:27:00,687", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T21:27:00.687136+00:00"}
+{"asctime": "2026-03-30 23:27:00,688", "message": "\u2705 HEALTH CHECK PASSED", "level": "INFO", "timestamp": "2026-03-30T21:27:00.688127+00:00"}
+{"asctime": "2026-03-30 23:27:00,688", "message": "   App is production-ready!", "level": "INFO", "timestamp": "2026-03-30T21:27:00.688127+00:00"}
+{"asctime": "2026-03-30 23:27:00,688", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T21:27:00.688127+00:00"}
+{"asctime": "2026-03-30 23:27:00,694", "message": "Initializing ToolRegistry for cross-platform support...", "level": "INFO", "timestamp": "2026-03-30T21:27:00.694124+00:00"}
+{"asctime": "2026-03-30 23:27:00,695", "message": "\ud83d\udd0d Detecting available tools...", "level": "INFO", "timestamp": "2026-03-30T21:27:00.695125+00:00"}
+{"asctime": "2026-03-30 23:27:06,088", "message": "Runtime context: platform=win32 container=False wsl=False", "level": "INFO", "timestamp": "2026-03-30T21:27:06.088432+00:00"}
+{"asctime": "2026-03-30 23:27:06,088", "message": "\u2705 Shell: pwsh (7.5.5)", "level": "INFO", "timestamp": "2026-03-30T21:27:06.088432+00:00"}
+{"asctime": "2026-03-30 23:27:06,088", "message": "\u2705 Bash: bash (GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu))", "level": "INFO", "timestamp": "2026-03-30T21:27:06.088432+00:00"}
+{"asctime": "2026-03-30 23:27:06,088", "message": "\u2705 Search: findstr", "level": "INFO", "timestamp": "2026-03-30T21:27:06.088432+00:00"}
+{"asctime": "2026-03-30 23:27:06,089", "message": "\u2705 Git: git (git version 2.51.0.windows.2)", "level": "INFO", "timestamp": "2026-03-30T21:27:06.089433+00:00"}
+{"asctime": "2026-03-30 23:27:06,089", "message": "Running on Windows with pwsh shell", "level": "INFO", "timestamp": "2026-03-30T21:27:06.089433+00:00"}
+{"asctime": "2026-03-30 23:27:06,089", "message": "Initializing In-Process LocalRuntime. User ID: 0. Username: GIGABYTE.", "level": "INFO", "timestamp": "2026-03-30T21:27:06.089433+00:00"}
+{"asctime": "2026-03-30 23:27:06,089", "message": "Subscriber not found during unsubscribe: EventStreamSubscriber.RUNTIME", "level": "WARNING", "timestamp": "2026-03-30T21:27:06.089433+00:00"}
+{"asctime": "2026-03-30 23:27:06,094", "message": "Creating RuntimeExecutor in-process...", "level": "INFO", "timestamp": "2026-03-30T21:27:06.094433+00:00"}
+{"asctime": "2026-03-30 23:27:06,094", "message": "Initializing RuntimeExecutor...", "level": "INFO", "timestamp": "2026-03-30T21:27:06.094433+00:00"}
+{"asctime": "2026-03-30 23:27:06,095", "message": "Step 1/5: Initializing default shell session...", "level": "INFO", "timestamp": "2026-03-30T21:27:06.095432+00:00"}
+{"asctime": "2026-03-30 23:27:06,095", "message": "Creating shell session for platform: win32", "level": "INFO", "timestamp": "2026-03-30T21:27:06.095432+00:00"}
+{"asctime": "2026-03-30 23:27:06,095", "message": "Detected shell: pwsh", "level": "INFO", "timestamp": "2026-03-30T21:27:06.095432+00:00"}
+{"asctime": "2026-03-30 23:27:06,095", "message": "Has tmux: False", "level": "INFO", "timestamp": "2026-03-30T21:27:06.095432+00:00"}
+{"asctime": "2026-03-30 23:27:06,095", "message": "Runtime context: container=False wsl=False", "level": "INFO", "timestamp": "2026-03-30T21:27:06.095432+00:00"}
+{"asctime": "2026-03-30 23:27:06,096", "message": "Using SimpleBashSession (Linux-style command path via Git Bash on Windows)", "level": "INFO", "timestamp": "2026-03-30T21:27:06.096433+00:00"}
+{"asctime": "2026-03-30 23:27:06,096", "message": "Initializing SimpleBashSession (no tmux). Work dir: C:\\Users\\GIGABYTE\\Desktop\\Forge", "level": "INFO", "timestamp": "2026-03-30T21:27:06.096433+00:00"}
+{"asctime": "2026-03-30 23:27:06,096", "message": "SimpleBashSession initialized successfully", "level": "INFO", "timestamp": "2026-03-30T21:27:06.096433+00:00"}
+{"asctime": "2026-03-30 23:27:06,096", "message": "Step 2/5: Starting browser initialization (background)...", "level": "INFO", "timestamp": "2026-03-30T21:27:06.096433+00:00"}
+{"asctime": "2026-03-30 23:27:06,097", "message": "Step 3/5: Initializing plugins...", "level": "INFO", "timestamp": "2026-03-30T21:27:06.097433+00:00"}
+{"asctime": "2026-03-30 23:27:06,097", "message": "Plugin agent_skills initialized", "level": "INFO", "timestamp": "2026-03-30T21:27:06.097433+00:00"}
+{"asctime": "2026-03-30 23:27:06,097", "message": "Step 4/5: Setting up bash commands...", "level": "INFO", "timestamp": "2026-03-30T21:27:06.097433+00:00"}
+{"asctime": "2026-03-30 23:27:06,097", "message": "Executing command: 'git config --global user.name \"GIGABYTE\" && git config --global user.email \"GIGABYTE@example.com\"', Timeout: 60s, background: False", "level": "INFO", "timestamp": "2026-03-30T21:27:06.097433+00:00"}
+{"asctime": "2026-03-30 23:27:06,239", "message": "Executing command: 'alias env_check='echo \"=== PYTHON ===\" && python3 --version 2>/dev/null || python --version 2>/dev/null && echo \"=== KEY PACKAGES ===\" && pip list --format=freeze 2>/dev/null | head -30 && echo \"=== DISK ===\" && df -h . 2>/dev/null && echo \"=== MEMORY ===\" && free -h 2>/dev/null || vm_stat 2>/dev/null; true'', Timeout: 60s, background: False", "level": "INFO", "timestamp": "2026-03-30T21:27:06.239951+00:00"}
+{"asctime": "2026-03-30 23:27:06,378", "message": "Step 5/5: Starting memory monitor...", "level": "INFO", "timestamp": "2026-03-30T21:27:06.378589+00:00"}
+{"asctime": "2026-03-30 23:27:06,379", "message": "All initialization steps completed successfully", "level": "INFO", "timestamp": "2026-03-30T21:27:06.379591+00:00"}
+{"asctime": "2026-03-30 23:27:06,385", "message": "\ud83d\ude80 In-process runtime ready in 0.29s", "level": "INFO", "timestamp": "2026-03-30T21:27:06.385590+00:00"}
+{"asctime": "2026-03-30 23:27:06,386", "message": "Initializing browser environment...", "level": "INFO", "timestamp": "2026-03-30T21:27:06.386590+00:00"}
+WARNING  Browser environment is a stub and will not function. Ensure           
+         browser-use MCP is configured.                                        
+{"asctime": "2026-03-30 23:27:06,389", "message": "Browser environment initialized successfully", "level": "INFO", "timestamp": "2026-03-30T21:27:06.389608+00:00"}
+{"asctime": "2026-03-30 23:27:06,402", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] Selected repo: None, loading playbooks from C:\\Users\\GIGABYTE\\Desktop\\Forge\\.app\\playbooks (inside runtime)", "level": "INFO", "timestamp": "2026-03-30T21:27:06.402591+00:00"}
+{"asctime": "2026-03-30 23:27:06,404", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] Attempting to list files in repository playbooks directory: C:\\Users\\GIGABYTE\\Desktop\\Forge\\.app\\playbooks", "level": "INFO", "timestamp": "2026-03-30T21:27:06.404591+00:00"}
+{"asctime": "2026-03-30 23:27:06,405", "message": "Loading user workspace playbooks: []", "level": "INFO", "timestamp": "2026-03-30T21:27:06.405590+00:00"}
+{"asctime": "2026-03-30 23:27:06,405", "message": "Initializing MCP agent for app-mcp with SHTTP connection...", "level": "INFO", "timestamp": "2026-03-30T21:27:06.405590+00:00"}
+{"asctime": "2026-03-30 23:27:08,997", "message": "Error connecting to http://localhost:3000/mcp/mcp: Client failed to connect: All connection attempts failed", "level": "ERROR", "timestamp": "2026-03-30T21:27:08.997540+00:00"}
+{"asctime": "2026-03-30 23:27:08,998", "message": "Failed to connect to http://localhost:3000/mcp/mcp: Client failed to connect: All connection attempts failed", "level": "ERROR", "exc_info": "Traceback (most recent call last):\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 649, in _session_runner\n    await stack.enter_async_context(self._context_manager())\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 659, in enter_async_context\n    result = await _enter(cm)\n             ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 210, in __aenter__\n    return await anext(self.gen)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 425, in _context_manager\n    with catch(get_catch_handlers()):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\exceptiongroup\\_catch.py\", line 39, in __exit__\n    raise unhandled from exc.__cause__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\exceptiongroup\\_catch.py\", line 65, in handle_exception\n    result = handler(matched)\n             ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\utilities\\exceptions.py\", line 29, in _exception_handler\n    raise leaf\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\mcp\\client\\streamable_http.py\", line 565, in handle_request_async\n    await self._handle_post_request(ctx)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\mcp\\client\\streamable_http.py\", line 340, in _handle_post_request\n    async with ctx.client.stream(\n               ^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 210, in __aenter__\n    return await anext(self.gen)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1583, in stream\n    response = await self.send(\n               ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1629, in send\n    response = await self._send_handling_auth(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1657, in _send_handling_auth\n    response = await self._send_handling_redirects(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1694, in _send_handling_redirects\n    response = await self._send_single_request(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1730, in _send_single_request\n    response = await transport.handle_async_request(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_transports\\default.py\", line 393, in handle_async_request\n    with map_httpcore_exceptions():\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_transports\\default.py\", line 118, in map_httpcore_exceptions\n    raise mapped_exc(message) from exc\nhttpx.ConnectError: All connection attempts failed\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\gateway\\integrations\\mcp\\mcp_utils.py\", line 220, in _connect_http_server\n    await asyncio.wait_for(\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\gateway\\integrations\\mcp\\client.py\", line 228, in connect_http\n    await self._open_session()\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\gateway\\integrations\\mcp\\client.py\", line 107, in _open_session\n    await self.client.__aenter__()  # pylint: disable=unnecessary-dunder-call\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 496, in __aenter__\n    return await self._connect()\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 587, in _connect\n    raise RuntimeError(\nRuntimeError: Client failed to connect: All connection attempts failed", "timestamp": "2026-03-30T21:27:08.998525+00:00"}
+{"asctime": "2026-03-30 23:27:09,002", "message": "No MCP clients were successfully connected; exposing degraded capability status tool only", "level": "WARNING", "timestamp": "2026-03-30T21:27:09.002526+00:00"}
+{"asctime": "2026-03-30 23:27:09,002", "message": "Loaded 1 MCP tools: ['mcp_capabilities_status']", "level": "INFO", "timestamp": "2026-03-30T21:27:09.002526+00:00"}
+{"asctime": "2026-03-30 23:27:09,002", "message": "Setting 1 MCP tools for agent Orchestrator: ['mcp_capabilities_status']", "level": "INFO", "timestamp": "2026-03-30T21:27:09.002526+00:00"}
+{"asctime": "2026-03-30 23:27:09,003", "message": "Tools updated for agent Orchestrator, total 30: ['execute_bash', 'think', 'finish', 'summarize_context', 'memory_manager', 'apply_patch', 'batch_edit', 'search_available_tools', 'task_tracker', 'search_code', 'explore_tree_structure', 'read_symbol_definition', 'terminal_manager', 'check_tool_status', 'error_recovery_memory', 'lsp_query', 'signal_progress', 'delegate_task', 'shared_task_board', 'revert_to_checkpoint', 'workspace_status', 'checkpoint', 'analyze_project_structure', 'session_diff', 'verify_file_lines', 'communicate_with_user', 'verify_ui_change', 'str_replace_editor', 'ast_code_editor', 'call_mcp_tool']", "level": "INFO", "timestamp": "2026-03-30T21:27:09.003526+00:00"}
+┌────────────────────────────────── Grinta ───────────────────────────────────┐
+│ ┌──────────────────────────────── grinta ─────────────────────────────────┐ │
+│ │ grinta ready. Type a task or /help for commands.                        │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+ Model: google/gemini-3.1-flash-lite-preview │ Context: 0/? Tokens │ Cost:     >>> {"asctime": "2026-03-30 23:27:09,144", "message": "SessionOrchestrator 3f270847-5545-45-6fbc076de4e83be - created new state. start_id: 0", "level": "INFO", "timestamp": "2026-03-30T21:27:09.144913+00:00"}
+{"asctime": "2026-03-30 23:27:09,168", "message": "Using config class None", "level": "INFO", "timestamp": "2026-03-30T21:27:09.168914+00:00"}
+{"asctime": "2026-03-30 23:27:09,229", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received SystemMessageAction (id=0), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:09.229913+00:00"}
+{"asctime": "2026-03-30 23:27:09,230", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START SystemMessageAction (id=0)", "level": "INFO", "timestamp": "2026-03-30T21:27:09.230912+00:00"}
+{"asctime": "2026-03-30 23:27:09,232", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation NullObservation for SystemMessageAction (id=0)", "level": "INFO", "timestamp": "2026-03-30T21:27:09.232911+00:00"}
+{"asctime": "2026-03-30 23:27:09,232", "message": "CircuitBreaker initialized: max_consecutive_errors=5, max_high_risk_actions=10 (adaptive=True)", "level": "INFO", "timestamp": "2026-03-30T21:27:09.232911+00:00"}
+{"asctime": "2026-03-30 23:27:09,233", "message": "Circuit breaker enabled for anomaly detection", "level": "INFO", "timestamp": "2026-03-30T21:27:09.233912+00:00"}
+{"asctime": "2026-03-30 23:27:13,348", "message": "Redis unreachable (Error 10061 connecting to localhost:6379. No connection could be made because the target machine actively refused it.). RetryQueue falling back to in-memory backend.", "level": "WARNING", "timestamp": "2026-03-30T21:27:13.348746+00:00"}
+{"asctime": "2026-03-30 23:27:13,358", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received MessageAction (id=1), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:13.358748+00:00"}
+{"asctime": "2026-03-30 23:27:13,359", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START MessageAction (id=1)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.359748+00:00"}
+{"asctime": "2026-03-30 23:27:13,372", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received RecallAction (id=2), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:13.372746+00:00"}
+{"asctime": "2026-03-30 23:27:13,372", "message": "Setting agent(Orchestrator) state from AgentState.LOADING to AgentState.RUNNING", "level": "INFO", "timestamp": "2026-03-30T21:27:13.372746+00:00"}
+{"asctime": "2026-03-30 23:27:13,386", "message": "Saved converation stats", "level": "INFO", "conversation_id": "3f270847-5545-45-6fbc076de4e83be", "timestamp": "2026-03-30T21:27:13.386745+00:00"}
+{"asctime": "2026-03-30 23:27:13,387", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START RecallAction (id=2)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.387747+00:00"}
+{"asctime": "2026-03-30 23:27:13,388", "message": "ActionExecutionService.get_next_action: invoking astep for agent=Orchestrator (attempt=0)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.388756+00:00"}
+{"asctime": "2026-03-30 23:27:13,390", "message": "ActionExecutionService.get_next_action: obtained action=ActionType.THINK from agent=Orchestrator", "level": "INFO", "timestamp": "2026-03-30T21:27:13.390756+00:00"}
+{"asctime": "2026-03-30 23:27:13,400", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received AgentThinkAction (id=4), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:13.400753+00:00"}
+{"asctime": "2026-03-30 23:27:13,401", "message": "Memory pressure WARNING (RSS=1143 MB) \u2014 signalling condensation", "level": "WARNING", "timestamp": "2026-03-30T21:27:13.401752+00:00"}
+{"asctime": "2026-03-30 23:27:13,403", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation NullObservation for MessageAction (id=1)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.403259+00:00"}
+{"asctime": "2026-03-30 23:27:13,404", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation NullObservation for RecallAction (id=2)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.404267+00:00"}
+{"asctime": "2026-03-30 23:27:13,405", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START AgentThinkAction (id=4)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.405266+00:00"}
+{"asctime": "2026-03-30 23:27:13,408", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation AgentThinkObservation for AgentThinkAction (id=4)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.408267+00:00"}
+{"asctime": "2026-03-30 23:27:13,418", "message": "ActionExecutionService.get_next_action: invoking astep for agent=Orchestrator (attempt=0)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.418269+00:00"}
+{"asctime": "2026-03-30 23:27:13,421", "message": "Memory pressure WARNING: forcing compaction", "level": "INFO", "timestamp": "2026-03-30T21:27:13.421268+00:00"}
+{"asctime": "2026-03-30 23:27:13,421", "message": "All recent events are dangling observations, which we truncate. This means the agent has only the essential first events. This should not happen.", "level": "WARNING", "timestamp": "2026-03-30T21:27:13.421268+00:00"}
+{"asctime": "2026-03-30 23:27:13,421", "message": "ConversationWindowCompactor: Keeping 4 events, pruning 1 events.", "level": "INFO", "timestamp": "2026-03-30T21:27:13.421268+00:00"}
+{"asctime": "2026-03-30 23:27:13,422", "message": "ActionExecutionService.get_next_action: obtained action=ActionType.CONDENSATION from agent=Orchestrator", "level": "INFO", "timestamp": "2026-03-30T21:27:13.422268+00:00"}
+{"asctime": "2026-03-30 23:27:13,427", "message": "Observation cause 4 did not match pending action id None for AgentThinkObservation", "level": "WARNING", "timestamp": "2026-03-30T21:27:13.427267+00:00"}
+{"asctime": "2026-03-30 23:27:13,427", "message": "[Agent Controller 3f270847-5545-45-6fbc076de4e83be] Observation cause 4 did not match pending action id None for AgentThinkObservation", "level": "WARNING", "session_id": "3f270847-5545-45-6fbc076de4e83be", "msg_type": "OBSERVATION_MISMATCH", "timestamp": "2026-03-30T21:27:13.427267+00:00"}
+{"asctime": "2026-03-30 23:27:13,433", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received CondensationAction (id=7), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:13.433268+00:00"}
+{"asctime": "2026-03-30 23:27:13,434", "message": "ActionExecutionService.get_next_action: invoking astep for agent=Orchestrator (attempt=0)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.434268+00:00"}
+{"asctime": "2026-03-30 23:27:13,434", "message": "ActionExecutionService.get_next_action: obtained action=ActionType.THINK from agent=Orchestrator", "level": "INFO", "timestamp": "2026-03-30T21:27:13.434268+00:00"}
+{"asctime": "2026-03-30 23:27:13,436", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START CondensationAction (id=7)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.436267+00:00"}
+{"asctime": "2026-03-30 23:27:13,438", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation NullObservation for CondensationAction (id=7)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.438267+00:00"}
+{"asctime": "2026-03-30 23:27:13,443", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received AgentThinkAction (id=8), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:13.443267+00:00"}
+{"asctime": "2026-03-30 23:27:13,445", "message": "ActionExecutionService.get_next_action: invoking astep for agent=Orchestrator (attempt=0)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.445267+00:00"}
+{"asctime": "2026-03-30 23:27:13,447", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START AgentThinkAction (id=8)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.447267+00:00"}
+{"asctime": "2026-03-30 23:27:13,449", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation AgentThinkObservation for AgentThinkAction (id=8)", "level": "INFO", "timestamp": "2026-03-30T21:27:13.449267+00:00"}
+{"asctime": "2026-03-30 23:27:13,456", "message": "\ud83d\udccc Anchored requirement: Reply with exactly EXTERNAL_WS_TOKEN_20260330 and ...", "level": "INFO", "timestamp": "2026-03-30T21:27:13.456266+00:00"}
+{"asctime": "2026-03-30 23:27:13,485", "message": "Observation cause 8 did not match pending action id None for AgentThinkObservation", "level": "WARNING", "timestamp": "2026-03-30T21:27:13.485267+00:00"}
+{"asctime": "2026-03-30 23:27:13,486", "message": "[Agent Controller 3f270847-5545-45-6fbc076de4e83be] Observation cause 8 did not match pending action id None for AgentThinkObservation", "level": "WARNING", "session_id": "3f270847-5545-45-6fbc076de4e83be", "msg_type": "OBSERVATION_MISMATCH", "timestamp": "2026-03-30T21:27:13.486266+00:00"}
+{"asctime": "2026-03-30 23:27:13,619", "message": "Removing default fields and unsupported formats from tools for Gemini model google/gemini-3.1-flash-lite-preview since Gemini models have limited format support (only 'enum' and 'date-time' for STRING types).", "level": "INFO", "timestamp": "2026-03-30T21:27:13.619265+00:00"}
+{"asctime": "2026-03-30 23:27:13,621", "message": "OrchestratorExecutor.async_execute: calling LLM.astream", "level": "INFO", "timestamp": "2026-03-30T21:27:13.621265+00:00"}
+C:\Users\GIGABYTE\Desktop\Forge\.venv\Lib\site-packages\google\genai\_api_client.py:770: DeprecationWarning: Inheritance class AiohttpClientSession from ClientSession is discouraged
+  class AiohttpClientSession(aiohttp.ClientSession):  # type: ignore[misc]
+{"asctime": "2026-03-30 23:27:16,894", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received StreamingChunkAction (id=10), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:16.894073+00:00"}
+{"asctime": "2026-03-30 23:27:16,907", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START StreamingChunkAction (id=10)", "level": "INFO", "timestamp": "2026-03-30T21:27:16.907100+00:00"}
+{"asctime": "2026-03-30 23:27:16,938", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation NullObservation for StreamingChunkAction (id=10)", "level": "INFO", "timestamp": "2026-03-30T21:27:16.938640+00:00"}
+{"asctime": "2026-03-30 23:27:16,939", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received StreamingChunkAction (id=11), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:16.939630+00:00"}
+{"asctime": "2026-03-30 23:27:16,948", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START StreamingChunkAction (id=11)", "level": "INFO", "timestamp": "2026-03-30T21:27:16.948644+00:00"}
+{"asctime": "2026-03-30 23:27:16,994", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation NullObservation for StreamingChunkAction (id=11)", "level": "INFO", "timestamp": "2026-03-30T21:27:16.994637+00:00"}
+{"asctime": "2026-03-30 23:27:17,011", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received StreamingChunkAction (id=12), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:17.011630+00:00"}
+{"asctime": "2026-03-30 23:27:17,013", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START StreamingChunkAction (id=12)", "level": "INFO", "timestamp": "2026-03-30T21:27:17.013629+00:00"}
+{"asctime": "2026-03-30 23:27:17,020", "message": "OrchestratorExecutor.async_execute done in 3.399s", "level": "INFO", "timestamp": "2026-03-30T21:27:17.020646+00:00"}
+{"asctime": "2026-03-30 23:27:17,023", "message": "ActionExecutionService.get_next_action: obtained action=ActionType.MESSAGE from agent=Orchestrator", "level": "INFO", "timestamp": "2026-03-30T21:27:17.023631+00:00"}
+{"asctime": "2026-03-30 23:27:17,025", "message": "Setting agent(Orchestrator) state from AgentState.RUNNING to AgentState.AWAITING_USER_INPUT", "level": "INFO", "timestamp": "2026-03-30T21:27:17.025646+00:00"}
+{"asctime": "2026-03-30 23:27:17,033", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation NullObservation for StreamingChunkAction (id=12)", "level": "INFO", "timestamp": "2026-03-30T21:27:17.033637+00:00"}
+{"asctime": "2026-03-30 23:27:17,073", "message": "Saved converation stats", "level": "INFO", "conversation_id": "3f270847-5545-45-6fbc076de4e83be", "timestamp": "2026-03-30T21:27:17.073637+00:00"}
+{"asctime": "2026-03-30 23:27:17,103", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] on_event received MessageAction (id=14), dispatching via run_or_schedule", "level": "INFO", "timestamp": "2026-03-30T21:27:17.103650+00:00"}
+{"asctime": "2026-03-30 23:27:17,111", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action START MessageAction (id=14)", "level": "INFO", "timestamp": "2026-03-30T21:27:17.111645+00:00"}
+{"asctime": "2026-03-30 23:27:17,138", "message": "Setting agent(Orchestrator) state from AgentState.AWAITING_USER_INPUT to AgentState.AWAITING_USER_INPUT", "level": "INFO", "timestamp": "2026-03-30T21:27:17.138630+00:00"}
+┌────────────────────────────────── Grinta ───────────────────────────────────┐
+│ ┌──────────────────────────────── grinta ─────────────────────────────────┐ │
+│ │ grinta ready. Type a task or /help for commands.                        │ │
+│{"asctime": "2026-03-30 23:27:17,155", "message": "[runtime 3f270847-5545-45-6fbc076de4e83be] _handle_action GOT observation NullObservation for MessageAction (id=14)", "level": "INFO", "timestamp": "2026-03-30T21:27:17.155638+00:00"}
+ └─────────────────────────────────────────────────────────────────────────┘ │
+│ ┌────────────────────────────────── You ──────────────────────────────────┐ │
+│ │ Reply with exactly EXTERNAL_WS_TOKEN_20260330 and nothing else.         │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│   📚 Recalled workspace_context                                             │
+│ ┌──────────────────────────────── Grinta ─────────────────────────────────┐ │
+│ │ EXTERNAL_WS_TOKEN_20260330                                              │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+ Model: google/gemini-3.1-flash-lite-preview │ Context: 0/? Tokens │ Cost:     >>> ┌────────────────────────────────── Grinta ───────────────────────────────────┐
+│ ┌──────────────────────────────── grinta ─────────────────────────────────┐ │
+│ │ grinta ready. Type a task or /help for commands.                        │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│ ┌────────────────────────────────── You ──────────────────────────────────┐ │
+│ │ Reply with exactly EXTERNAL_WS_TOKEN_20260330 and nothing else.         │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│   📚 Recalled workspace_context                                             │
+│ ┌──────────────────────────────── Grinta ─────────────────────────────────┐ │
+│ │ EXTERNAL_WS_TOKEN_20260330                                              │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│ ┌──────────────────────────────── grinta ─────────────────────────────────┐ │
+│ │ Goodbye.                                                                │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+ Model: google/gemini-3.1-flash-lite-preview │ Context: 0/? Tokens │ Cost:     {"asctime": "2026-03-30 23:27:17,243", "message": "[TaskCancellationService:sessions:C:\\Users\\GIGABYTE\\Desktop\\Forge] HARD KILL: terminating 0 tracked pids (0 handles)", "level": "INFO", "timestamp": "2026-03-30T21:27:17.243089+00:00"}
+{"asctime": "2026-03-30 23:27:17,243", "message": "[TaskCancellationService:sessions:C:\\Users\\GIGABYTE\\Desktop\\Forge] Hard kill complete", "level": "INFO", "timestamp": "2026-03-30T21:27:17.243089+00:00"}
+{"asctime": "2026-03-30 23:27:17,244", "message": "Shell session closed: SimpleBashSession", "level": "INFO", "timestamp": "2026-03-30T21:27:17.244101+00:00"}
+{"asctime": "2026-03-30 23:27:19,780", "message": "Failed to remove workspace C:\\Users\\GIGABYTE\\Desktop\\Forge after 3 attempts: [WinError 5] Access is denied: 'C:\\\\Users\\\\GIGABYTE\\\\Desktop\\\\Forge\\\\.git\\\\objects\\\\00\\\\0323c5e1471c46a0c16220aedc24cf3a5a4fd5'", "level": "WARNING", "timestamp": "2026-03-30T21:27:19.780744+00:00"}
+{"asctime": "2026-03-30 23:27:19,781", "message": "EventStream '3f270847-5545-45-6fbc076de4e83be' was GC'd without close(); resources may leak.", "level": "WARNING", "timestamp": "2026-03-30T21:27:19.781755+00:00"}

@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from backend.core.config.mcp_config import MCPStdioServerConfig
+from backend.core.config.mcp_config import MCPServerConfig
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import Action
 from backend.ledger.serialization import event_from_dict, event_to_dict
@@ -185,7 +185,7 @@ def register_routes(
             "Updating MCP server with tools: %s",
             json.dumps(mcp_tools_to_sync, indent=2),
         )
-        mcp_tools_to_sync = [MCPStdioServerConfig(**tool) for tool in mcp_tools_to_sync]
+        mcp_tools_to_sync = [MCPServerConfig(**tool) for tool in mcp_tools_to_sync]
         try:
             await mcp_proxy_manager.update_and_remount(app, mcp_tools_to_sync, ["*"])
             logger.info("MCP Proxy Manager updated and remounted successfully")

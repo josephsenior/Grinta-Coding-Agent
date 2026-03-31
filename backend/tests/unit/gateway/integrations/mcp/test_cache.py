@@ -25,7 +25,6 @@ from backend.gateway.integrations.mcp.cache import (
 class TestCacheConfig:
     def test_max_cache_entry_bytes_reads_app_env(self, monkeypatch):
         monkeypatch.setenv("APP_MCP_CACHE_MAX_ENTRY_BYTES", "1234")
-        monkeypatch.delenv("APP_MCP_CACHE_MAX_ENTRY_BYTES", raising=False)
 
         module_path = (
             Path(__file__).resolve().parents[5]

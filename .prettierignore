@@ -3,7 +3,7 @@ node_modules/
 .venv/
 .venv-wsl-backup/
 
-# Python files (handled by Black)
+# Python files (handled by Ruff)
 *.py
 
 # Build outputs

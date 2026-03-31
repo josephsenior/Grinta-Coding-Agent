@@ -1,12 +1,11 @@
 """Serialization and deserialization for App event schemas with version migration."""
 
 from __future__ import annotations
-
-import json
 from typing import Any, cast
 
 from pydantic import ValidationError
 
+from backend.core import json_compat as json
 from backend.core.schemas.actions import ActionSchemaUnion
 from backend.core.schemas.base import BaseEventSchema, EventVersion
 from backend.core.schemas.observations import ObservationSchemaUnion

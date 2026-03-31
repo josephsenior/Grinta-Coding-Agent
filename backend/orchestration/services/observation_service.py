@@ -12,7 +12,7 @@ from backend.ledger.serialization.event import truncate_content
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import OrchestrationContext
-    from backend.orchestration.services.pending_action_service import OpenOperationService
+    from backend.orchestration.services.pending_action_service import PendingActionService
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
@@ -44,10 +44,10 @@ class ObservationService:
     def __init__(
         self,
         context: OrchestrationContext,
-        open_operation_service: OpenOperationService,
+        pending_action_service: PendingActionService,
     ) -> None:
         self._context = context
-        self._pending_service = open_operation_service
+        self._pending_service = pending_action_service
 
     async def handle_observation(self, observation: Observation) -> None:
         controller = self._context.get_controller()
@@ -63,6 +63,9 @@ class ObservationService:
     ) -> None:
         controller = self._context.get_controller()
         pending_action = self._pending_service.get()
+        if pending_action is None:
+            return
+
         if not self._matches_pending_action(pending_action, observation):
             if observation.cause is not None:
                 self._report_pending_action_mismatch(

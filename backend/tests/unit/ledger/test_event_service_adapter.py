@@ -14,6 +14,26 @@ def file_store_factory():
     return MagicMock(return_value=MagicMock())
 
 
+@pytest.fixture(autouse=True)
+def cleanup_adapter_streams():
+    """Automatically close any streams created by test adapters to prevent GC resource leak warnings."""
+    adapters = []
+    
+    # We patch __init__ so we can track all adapter instances created in the test
+    original_init = EventServiceAdapter.__init__
+    
+    def wrapped_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        adapters.append(self)
+        
+    EventServiceAdapter.__init__ = wrapped_init
+    yield
+    EventServiceAdapter.__init__ = original_init
+    for adapter in adapters:
+        for stream in adapter._streams.values():
+            stream.close()
+
+
 class TestEventServiceAdapterInit:
     def test_basic_init(self, file_store_factory):
         adapter = EventServiceAdapter(file_store_factory=file_store_factory)
@@ -80,6 +100,7 @@ class TestGetEventStream:
         adapter = EventServiceAdapter(file_store_factory=file_store_factory)
         adapter.start_session(session_id="s1", user_id="u1")
         # Remove stream but keep session info
+        adapter._streams["s1"].close()
         del adapter._streams["s1"]
         stream = adapter.get_event_stream("s1")
         assert stream is not None

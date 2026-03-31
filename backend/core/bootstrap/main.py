@@ -166,11 +166,11 @@ async def _setup_memory_and_mcp(
 def _setup_replay_events(
     config_: AppConfig, initial_action: Action
 ) -> tuple[list[Event] | None, Action]:
-    """Setup replay events if transcript replay is enabled."""
-    if config_.replay_transcript_path:
+    """Setup replay events if trajectory replay is enabled."""
+    if config_.replay_trajectory_path:
         logger.info("Transcript replay is enabled")
         assert isinstance(initial_action, NullAction)
-        return load_replay_log(config_.replay_transcript_path)
+        return load_replay_log(config_.replay_trajectory_path)
     return None, initial_action
 
 
@@ -298,22 +298,17 @@ def _create_event_handler(
     return on_event
 
 
-def _save_transcript(config_: AppConfig, session_id: str, controller) -> None:
-    """Save transcript to file if configured."""
-    if config_.save_transcript_path is not None:
-        if os.path.isdir(config_.save_transcript_path):
-            file_path = os.path.join(config_.save_transcript_path, f"{session_id}.json")
+def _save_trajectory(config_: AppConfig, session_id: str, controller) -> None:
+    """Save trajectory output to file if configured."""
+    if config_.save_trajectory_path is not None:
+        if os.path.isdir(config_.save_trajectory_path):
+            file_path = os.path.join(config_.save_trajectory_path, f"{session_id}.json")
         else:
-            file_path = config_.save_transcript_path
+            file_path = config_.save_trajectory_path
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        histories = controller.get_transcript(config_.save_screenshots_in_transcript)
+        histories = controller.get_transcript(config_.save_screenshots_in_trajectory)
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(histories, f, indent=4)
-
-
-def _save_trajectory(config_: AppConfig, session_id: str, controller) -> None:
-    """Backward-compatible wrapper for transcript saving."""
-    _save_transcript(config_, session_id, controller)
 
 
 def _initialize_session_components(

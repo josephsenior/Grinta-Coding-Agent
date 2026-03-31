@@ -8,8 +8,6 @@ from dataclasses import dataclass, field
 from itertools import islice
 from typing import TYPE_CHECKING
 
-from jinja2 import Environment, FileSystemLoader, Template
-
 from backend.core.message import Message, TextContent
 
 if TYPE_CHECKING:
@@ -70,12 +68,10 @@ def _content_has_app_identity(content: str) -> bool:
 
 
 class PromptManager:
-    """Manages prompt templates and includes information from the user's workspace micro-agents and global micro-agents.
-
-    This class is dedicated to loading and rendering prompts (system prompt, user prompt).
+    """Manages prompt assembly using Python-based prompt builder (no Jinja2).
 
     Attributes:
-        prompt_dir: Directory containing prompt templates.
+        prompt_dir: Directory containing prompt .md partials.
 
     """
 
@@ -84,83 +80,21 @@ class PromptManager:
         prompt_dir: str | None,
         system_prompt_filename: str = "system_prompt.j2",
     ) -> None:
-        """Initialize Jinja environment and load core prompt templates."""
+        """Initialize prompt manager with the given prompt directory."""
         if prompt_dir is None:
             msg = "Prompt directory is not set"
             raise ValueError(msg)
         self.prompt_dir: str = prompt_dir
 
-        # We include orchestrator prompts as a shared fallback for common templates.
-        # IMPORTANT: system prompts must always come from the engine's own prompt_dir,
-        # otherwise a missing engine prompt could accidentally fall back to the
-        # orchestrator's system prompt.
-        shared_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "engines",
-            "orchestrator",
-            "prompts",
-        )
-        search_paths = [prompt_dir]
-        if os.path.isdir(shared_dir) and shared_dir not in search_paths:
-            search_paths.append(shared_dir)
-
-        # nosec B701 - Template rendering for prompts (not HTML), autoescape enabled
-        self.env = Environment(loader=FileSystemLoader(search_paths), autoescape=True)
-        self._system_env = Environment(
-            loader=FileSystemLoader([prompt_dir]), autoescape=True
-        )
-        self.system_template = self._load_template(
-            system_prompt_filename, env=self._system_env, template_dir=prompt_dir
-        )
-        self.user_template: Template = self._load_template("user_prompt.j2")
-        self.additional_info_template: Template = self._load_template(
-            "additional_info.j2"
-        )
-        self.playbook_info_template: Template = self._load_template("playbook_info.j2")
-        self.knowledge_base_info_template: Template = self._load_template(
-            "knowledge_base_info.j2"
-        )
-
-    def _load_template(
-        self,
-        template_name: str,
-        *,
-        env: Environment | None = None,
-        template_dir: str | None = None,
-    ) -> Template:
-        """Load a template from the prompt directory.
-
-        Args:
-            template_name: Full filename of the template to load, including the .j2 extension.
-
-        Returns:
-            The loaded Jinja2 template.
-
-        Raises:
-            FileNotFoundError: If the template file is not found.
-
-        """
-        env = env or self.env
-        template_dir = template_dir or self.prompt_dir
-        try:
-            return env.get_template(template_name)
-        except Exception as e:
-            template_path = os.path.join(template_dir, template_name)
-            msg = f"Prompt file {template_path} not found"
-            raise FileNotFoundError(msg) from e
-
-
     def get_system_message(self, **context) -> str:
-        """Render system prompt with optional context and apply refinement helpers."""
+        """Render system prompt via Python prompt builder and apply refinement."""
+        from backend.engine.prompts.prompt_builder import build_system_prompt
         from backend.engine.tools.prompt import refine_prompt
 
-        # On Windows, set is_windows=False when bash is available so the
-        # system prompt teaches bash (not PowerShell) — matching the shell
-        # that will actually execute commands.
         import shutil
         _on_windows = sys.platform == "win32"
         context.setdefault("is_windows", _on_windows and not shutil.which("bash"))
-        system_message = self.system_template.render(**context).strip()
+        system_message = build_system_prompt(**context).strip()
         return refine_prompt(system_message)
 
     def set_prompt_tier(self, tier: str) -> None:
@@ -174,17 +108,8 @@ class PromptManager:
         self._prompt_tier = tier
 
     def get_example_user_message(self) -> str:
-        """This is an initial user message that can be provided to the agent.
-
-        before *actual* user instructions are provided.
-
-        It can be used to provide a demonstration of how the agent
-        should behave in order to solve the user's task. And it may
-        optionally contain some additional context about the user's task.
-        These additional context will convert the current generic agent
-        into a more specialized agent that is tailored to the user's task.
-        """
-        return self.user_template.render().strip()
+        """Return the initial example user message (empty by default)."""
+        return ""
 
     def build_workspace_context(
         self,
@@ -193,36 +118,26 @@ class PromptManager:
         conversation_instructions: ConversationInstructions | None,
         repo_instructions: str = "",
     ) -> str:
-        """Renders the additional info template with the stored repository/runtime info."""
-        return self.additional_info_template.render(
+        """Render the additional info / workspace context block."""
+        from backend.engine.prompts.prompt_builder import build_workspace_context as _build
+        return _build(
             repository_info=repository_info,
-            repository_instructions=repo_instructions,
             runtime_info=runtime_info,
             conversation_instructions=conversation_instructions,
-        ).strip()
+            repo_instructions=repo_instructions,
+        )
 
     def build_playbook_info(self, triggered_agents: list[PlaybookKnowledge]) -> str:
-        """Renders the playbook info template with the triggered agents.
-
-        Args:
-            triggered_agents: A list of PlaybookKnowledge objects containing information
-                              about triggered playbooks.
-
-        """
-        return self.playbook_info_template.render(
-            triggered_agents=triggered_agents
-        ).strip()
+        """Render playbook info for triggered agents."""
+        from backend.engine.prompts.prompt_builder import build_playbook_info as _build
+        return _build(triggered_agents)
 
     def build_knowledge_base_info(
         self, kb_results: list[KnowledgeBaseSearchResult]
     ) -> str:
-        """Renders the knowledge base info template with the search results.
-
-        Args:
-            kb_results: A list of KnowledgeBaseSearchResult objects.
-
-        """
-        return self.knowledge_base_info_template.render(kb_results=kb_results).strip()
+        """Render knowledge base search results."""
+        from backend.engine.prompts.prompt_builder import build_knowledge_base_info as _build
+        return _build(kb_results)
 
     def add_turns_left_reminder(self, messages: list[Message], state: State) -> None:
         """Append reminder about remaining turns to the most recent user message."""

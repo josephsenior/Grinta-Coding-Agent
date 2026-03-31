@@ -36,11 +36,11 @@ class ActionService:
     def __init__(
         self,
         context: OrchestrationContext,
-        open_operation_service,
+        pending_action_service,
         confirmation_service: ConfirmationService,
     ) -> None:
         self._context = context
-        self._pending_service = open_operation_service
+        self._pending_service = pending_action_service
         self._confirmation_service = confirmation_service
 
     async def run(self, action: Action, ctx: ToolInvocationContext | None) -> None:

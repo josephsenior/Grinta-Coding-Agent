@@ -266,22 +266,18 @@ class TestBuildToolset:
 class TestAddBrowsingTool:
     def test_windows_uses_web_reader_tool(self):
         # NOTE: Browsing implementation moved to MCP in recent versions.
-        # _add_browsing_tool always adds verify_ui_change for frontend verification.
         cfg = _make_config(enable_browsing=True)
         p = _make_planner(config=cfg)
         tools: list[Any] = []
         p._add_browsing_tool(tools)
-        assert len(tools) == 1
-        assert tools[0].get("function", {}).get("name") == "verify_ui_change"
+        assert len(tools) == 0
 
     def test_browsing_disabled_adds_nothing(self):
-        # _add_browsing_tool always adds verify_ui_change for frontend verification.
         cfg = _make_config(enable_browsing=False)
         p = _make_planner(config=cfg)
         tools: list[Any] = []
         p._add_browsing_tool(tools)
-        assert len(tools) == 1
-        assert tools[0].get("function", {}).get("name") == "verify_ui_change"
+        assert len(tools) == 0
 
 
 # ---------------------------------------------------------------------------

@@ -80,7 +80,7 @@ class TestDiscoverCommand(TestCase):
         """Test discover with multiple providers."""
         mock_discover.return_value = {
             "ollama": ["model1", "model2"],
-            "lmstudio": ["model3"],
+            "lm_studio": ["model3"],
         }
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
@@ -90,7 +90,7 @@ class TestDiscoverCommand(TestCase):
         self.assertIn("Found 3 models", output)
         self.assertIn("2 providers", output)
         self.assertIn("OLLAMA", output)
-        self.assertIn("LMSTUDIO", output)
+        self.assertIn("LM STUDIO", output)
 
     @patch("backend.inference.discover_models.discover_all_local_models")
     def test_discover_shows_usage_examples(self, mock_discover):
@@ -111,7 +111,7 @@ class TestStatusCommand(TestCase):
     @patch("backend.inference.discover_models.check_local_providers")
     def test_status_all_running(self, mock_check):
         """Test status when all providers are running."""
-        mock_check.return_value = {"ollama": True, "lmstudio": True}
+        mock_check.return_value = {"ollama": True, "lm_studio": True}
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
             status_command()
@@ -119,12 +119,12 @@ class TestStatusCommand(TestCase):
 
         self.assertIn("OLLAMA", output)
         self.assertIn("RUNNING", output)
-        self.assertIn("LMSTUDIO", output)
+        self.assertIn("LM STUDIO", output)
 
     @patch("backend.inference.discover_models.check_local_providers")
     def test_status_none_running(self, mock_check):
         """Test status when no providers are running."""
-        mock_check.return_value = {"ollama": False, "lmstudio": False}
+        mock_check.return_value = {"ollama": False, "lm_studio": False}
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
             status_command()
@@ -137,7 +137,7 @@ class TestStatusCommand(TestCase):
     @patch("backend.inference.discover_models.check_local_providers")
     def test_status_mixed(self, mock_check):
         """Test status with mixed provider availability."""
-        mock_check.return_value = {"ollama": True, "lmstudio": False}
+        mock_check.return_value = {"ollama": True, "lm_studio": False}
 
         with patch("sys.stdout", new=StringIO()) as fake_out:
             status_command()

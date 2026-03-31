@@ -35,6 +35,7 @@ from backend.core.config.env_loader import export_llm_api_keys
 from backend.core.config.env_loader import (
     load_from_env,
 )
+from backend.core.app_paths import get_app_settings_root
 from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 from backend.core.config.model_rebuild import rebuild_config_models
@@ -176,11 +177,10 @@ def load_from_json(cfg: AppConfig, json_file: str = "settings.json") -> None:
             if "llm_base_url" in data and data["llm_base_url"]:
                 raw_url = str(data["llm_base_url"]).strip()
                 model_str = str(llm_dict.get("model") or "").lower()
-                # Google/Gemini routes through the SDK — a custom base_url breaks
+                # Google Gemini routes through the SDK — a custom base_url breaks
                 # litellm and is always ignored in the API route; replicate that here.
-                _is_google = (
-                    model_str.startswith(("google/", "gemini/", "gemini-"))
-                    or "gemini" in model_str
+                _is_google = model_str.startswith("google/") or model_str.startswith(
+                    "gemini-"
                 )
                 if not _is_google:
                     llm_dict["base_url"] = raw_url
@@ -464,17 +464,21 @@ def load_app_config(
     """
     rebuild_config_models()
 
+    resolved_config_file = config_file
+    if config_file == "settings.json" and not os.path.isabs(config_file):
+        resolved_config_file = os.path.join(get_app_settings_root(), config_file)
+
     config = AppConfig()
 
     from backend.core.config.api_key_manager import api_key_manager
 
     # Suppress API key manager side effects until JSON (and env) have been applied.
     # Otherwise get_llm_config() during load_from_env creates LLMConfig with the
-    # default model (gemini → google) and validates settings.json's key against
+    # default model and validates settings.json's key against
     # Google prefixes even when llm_model in that file is another provider.
     with api_key_manager.suppress_env_export_context():
         load_from_env(config, dict(os.environ))
-        load_from_json(config, config_file)
+        load_from_json(config, resolved_config_file)
         llm_cfg = config.get_llm_config()
         config.set_llm_config(
             llm_cfg.__class__.model_validate(llm_cfg.model_dump(exclude_none=True))

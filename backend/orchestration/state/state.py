@@ -973,6 +973,3 @@ class State:
             self._view_history_version = history_version
             self._view = View.from_events(self.history)
         return self._view
-
-
-RunState = State

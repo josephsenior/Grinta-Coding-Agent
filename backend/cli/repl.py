@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -58,6 +59,14 @@ def _build_bindings() -> KeyBindings:
         event.current_buffer.insert_text("\n")
 
     return kb
+
+
+def _supports_prompt_session(input_stream: Any, output_stream: Any) -> bool:
+    """Use prompt_toolkit only when both streams are attached to a TTY."""
+
+    input_is_tty = bool(getattr(input_stream, "isatty", lambda: False)())
+    output_is_tty = bool(getattr(output_stream, "isatty", lambda: False)())
+    return input_is_tty and output_is_tty
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +188,14 @@ class Repl:
     def handle_command(self, text: str) -> bool:
         return self._handle_command(text)
 
+    async def _read_non_interactive_input(self) -> str:
+        if self._renderer is not None:
+            with self._renderer.suspend_live():
+                self._console.print(">>> ", end="")
+        else:
+            self._console.print(">>> ", end="")
+        return await asyncio.to_thread(sys.stdin.readline)
+
     # -- public entry point ------------------------------------------------
 
     async def run(self) -> None:
@@ -268,11 +285,13 @@ class Repl:
         self._renderer.subscribe(event_stream, event_stream.sid)
 
         # -- setup prompt_toolkit session ----------------------------------
-        session: PromptSession[str] = PromptSession(
-            history=FileHistory(str(_ensure_history())),
-            key_bindings=_build_bindings(),
-            multiline=False,  # Alt+Enter adds lines; Enter submits
-        )
+        session: PromptSession[str] | None = None
+        if _supports_prompt_session(sys.stdin, sys.stdout):
+            session = PromptSession(
+                history=FileHistory(str(_ensure_history())),
+                key_bindings=_build_bindings(),
+                multiline=False,  # Alt+Enter adds lines; Enter submits
+            )
 
         # -- controller & agent loop setup ---------------------------------
         controller = None
@@ -301,8 +320,13 @@ class Repl:
 
                 while self._running:
                     try:
-                        with patch_stdout():
-                            user_input = await session.prompt_async(">>> ")
+                        if session is None:
+                            user_input = await self._read_non_interactive_input()
+                            if user_input == "":
+                                raise EOFError
+                        else:
+                            with patch_stdout():
+                                user_input = await session.prompt_async(">>> ")
                     except KeyboardInterrupt:
                         continue
                     except EOFError:

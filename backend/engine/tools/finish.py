@@ -5,15 +5,8 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.inference.tool_names import FINISH_TOOL_NAME
 
 _FINISH_DESCRIPTION = (
-    "Signals the completion of the current task or conversation.\n\nUse this tool when:\n"
-    "- You have successfully completed the user's requested task\n"
-    "- You cannot proceed further due to technical limitations or missing information\n\n"
-    "The message should include:\n"
-    "- A clear summary of actions taken and their results\n"
-    "- Any next steps for the user\n"
-    "- Explanation if you're unable to complete the task\n"
-    "- Any follow-up questions if more information is needed\n"
-    "\nOptionally provide structured completion metadata via the other fields."
+    "Signal task completion. Include a summary of actions taken, results, and any next steps. "
+    "Use when the task is done or you cannot proceed further."
 )
 
 

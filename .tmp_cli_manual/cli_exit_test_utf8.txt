@@ -1,0 +1,135 @@
+
+                       _________________________________                       
+                ______/                                 \______                
+              /_____/     .-^^^^-.           .-^^^^-.     \_____\              
+                /_____/    / o  o \_________/ o  o \    \_____\                
+                   ||      \  --  /  _____  \  --  /      ||                   
+                       ||           \____/           ||                        
+              _____||_______'----'  | >_ |  '----'_______||_____               
+            /_______________________|_____|_______________________\            
+                     \              /_____|              /                     
+                      \____________/      \____________/                       
+                         |_____|              |_____|                          
+
+           GGGGGG   RRRRRR   IIIIIIII  NNN   NN  TTTTTTTT   AAAAAA             
+          GG    GG  RR   RR     II     NNNN  NN     TT     AA    AA            
+          GG        RRRRRR      II     NN NN NN     TT     AAAAAAAA            
+          GG  GGGG  RR  RR      II     NN  NNNN     TT     AA    AA            
+          GG    GG  RR   RR     II     NN   NNN     TT     AA    AA            
+           GGGGGG   RR    RR  IIIIIIII NN    NN     TT     AA    AA            
+
+{"asctime": "2026-03-30 22:39:32,675", "message": "API key for openai doesn't match expected prefixes: ['sk-']", "level": "WARNING", "timestamp": "2026-03-30T20:39:32.675751+00:00"}
+{"asctime": "2026-03-30 22:39:34,860", "message": "[LLM registry 9640d18a-30d9-4930-8654-e3a0c41b434e]: Registering service for agent", "level": "INFO", "timestamp": "2026-03-30T20:39:34.860807+00:00"}
+C:\Users\GIGABYTE\.cache\huggingface\modules\transformers_modules\jinaai\jina-bert-v2-qk-post-norm\3baf9e3ac750e76e8edd3019170176884695fb94\configuration_bert.py:29: UserWarning: optimum is not installed. To use OnnxConfig and BertOnnxConfig, make sure that `optimum` package is installed
+  warnings.warn("optimum is not installed. To use OnnxConfig and BertOnnxConfig, make sure that `optimum` package is installed")
+{"asctime": "2026-03-30 22:39:43,053", "message": "\u2705 Vector memory initialized for ContextMemory\n   Accuracy: 92% | Hybrid retrieval: enabled", "level": "INFO", "timestamp": "2026-03-30T20:39:43.053213+00:00"}
+{"asctime": "2026-03-30 22:39:43,058", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T20:39:43.058218+00:00"}
+{"asctime": "2026-03-30 22:39:43,059", "message": "\ud83c\udfe5 APP PRODUCTION HEALTH CHECK", "level": "INFO", "timestamp": "2026-03-30T20:39:43.059211+00:00"}
+{"asctime": "2026-03-30 22:39:43,059", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T20:39:43.059211+00:00"}
+{"asctime": "2026-03-30 22:39:43,061", "message": "\u2705 Ultimate Editor: Tree-sitter is READY", "level": "INFO", "timestamp": "2026-03-30T20:39:43.061213+00:00"}
+{"asctime": "2026-03-30 22:39:43,062", "message": "   - Structure-aware editing: ENABLED", "level": "INFO", "timestamp": "2026-03-30T20:39:43.062220+00:00"}
+{"asctime": "2026-03-30 22:39:43,062", "message": "   - Language support: 40+ languages", "level": "INFO", "timestamp": "2026-03-30T20:39:43.062220+00:00"}
+{"asctime": "2026-03-30 22:39:43,067", "message": "\u2705 Atomic Refactoring: READY", "level": "INFO", "timestamp": "2026-03-30T20:39:43.067213+00:00"}
+{"asctime": "2026-03-30 22:39:43,067", "message": "   - Multi-file transactions: ENABLED", "level": "INFO", "timestamp": "2026-03-30T20:39:43.067213+00:00"}
+{"asctime": "2026-03-30 22:39:43,067", "message": "   - Rollback system: ENABLED", "level": "INFO", "timestamp": "2026-03-30T20:39:43.067213+00:00"}
+{"asctime": "2026-03-30 22:39:43,067", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T20:39:43.067213+00:00"}
+{"asctime": "2026-03-30 22:39:43,068", "message": "\u2705 HEALTH CHECK PASSED", "level": "INFO", "timestamp": "2026-03-30T20:39:43.068215+00:00"}
+{"asctime": "2026-03-30 22:39:43,068", "message": "   App is production-ready!", "level": "INFO", "timestamp": "2026-03-30T20:39:43.068215+00:00"}
+{"asctime": "2026-03-30 22:39:43,068", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T20:39:43.068215+00:00"}
+{"asctime": "2026-03-30 22:39:43,073", "message": "API key for openai doesn't match expected prefixes: ['sk-']", "level": "WARNING", "timestamp": "2026-03-30T20:39:43.073217+00:00"}
+{"asctime": "2026-03-30 22:39:43,078", "message": "Initializing ToolRegistry for cross-platform support...", "level": "INFO", "timestamp": "2026-03-30T20:39:43.078212+00:00"}
+{"asctime": "2026-03-30 22:39:43,079", "message": "\ud83d\udd0d Detecting available tools...", "level": "INFO", "timestamp": "2026-03-30T20:39:43.079211+00:00"}
+{"asctime": "2026-03-30 22:39:46,776", "message": "Runtime context: platform=win32 container=False wsl=False", "level": "INFO", "timestamp": "2026-03-30T20:39:46.776187+00:00"}
+{"asctime": "2026-03-30 22:39:46,777", "message": "\u2705 Shell: pwsh (7.5.5)", "level": "INFO", "timestamp": "2026-03-30T20:39:46.777190+00:00"}
+{"asctime": "2026-03-30 22:39:46,777", "message": "\u2705 Bash: bash (GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu))", "level": "INFO", "timestamp": "2026-03-30T20:39:46.777190+00:00"}
+{"asctime": "2026-03-30 22:39:46,777", "message": "\u2705 Search: findstr", "level": "INFO", "timestamp": "2026-03-30T20:39:46.777190+00:00"}
+{"asctime": "2026-03-30 22:39:46,777", "message": "\u2705 Git: git (git version 2.51.0.windows.2)", "level": "INFO", "timestamp": "2026-03-30T20:39:46.777190+00:00"}
+{"asctime": "2026-03-30 22:39:46,778", "message": "Running on Windows with pwsh shell", "level": "INFO", "timestamp": "2026-03-30T20:39:46.778188+00:00"}
+{"asctime": "2026-03-30 22:39:46,778", "message": "Initializing In-Process LocalRuntime. User ID: 0. Username: GIGABYTE.", "level": "INFO", "timestamp": "2026-03-30T20:39:46.778188+00:00"}
+{"asctime": "2026-03-30 22:39:46,778", "message": "Subscriber not found during unsubscribe: EventStreamSubscriber.RUNTIME", "level": "WARNING", "timestamp": "2026-03-30T20:39:46.778188+00:00"}
+{"asctime": "2026-03-30 22:39:46,782", "message": "Creating RuntimeExecutor in-process...", "level": "INFO", "timestamp": "2026-03-30T20:39:46.782191+00:00"}
+{"asctime": "2026-03-30 22:39:46,783", "message": "Initializing RuntimeExecutor...", "level": "INFO", "timestamp": "2026-03-30T20:39:46.783189+00:00"}
+{"asctime": "2026-03-30 22:39:46,783", "message": "Step 1/5: Initializing default shell session...", "level": "INFO", "timestamp": "2026-03-30T20:39:46.783189+00:00"}
+{"asctime": "2026-03-30 22:39:46,784", "message": "Creating shell session for platform: win32", "level": "INFO", "timestamp": "2026-03-30T20:39:46.784190+00:00"}
+{"asctime": "2026-03-30 22:39:46,784", "message": "Detected shell: pwsh", "level": "INFO", "timestamp": "2026-03-30T20:39:46.784190+00:00"}
+{"asctime": "2026-03-30 22:39:46,784", "message": "Has tmux: False", "level": "INFO", "timestamp": "2026-03-30T20:39:46.784190+00:00"}
+{"asctime": "2026-03-30 22:39:46,784", "message": "Runtime context: container=False wsl=False", "level": "INFO", "timestamp": "2026-03-30T20:39:46.784190+00:00"}
+{"asctime": "2026-03-30 22:39:46,785", "message": "Using SimpleBashSession (Linux-style command path via Git Bash on Windows)", "level": "INFO", "timestamp": "2026-03-30T20:39:46.785190+00:00"}
+{"asctime": "2026-03-30 22:39:46,785", "message": "Initializing SimpleBashSession (no tmux). Work dir: C:\\Users\\GIGABYTE\\Desktop\\Forge", "level": "INFO", "timestamp": "2026-03-30T20:39:46.785190+00:00"}
+{"asctime": "2026-03-30 22:39:46,786", "message": "SimpleBashSession initialized successfully", "level": "INFO", "timestamp": "2026-03-30T20:39:46.786191+00:00"}
+{"asctime": "2026-03-30 22:39:46,786", "message": "Step 2/5: Starting browser initialization (background)...", "level": "INFO", "timestamp": "2026-03-30T20:39:46.786191+00:00"}
+{"asctime": "2026-03-30 22:39:46,786", "message": "Step 3/5: Initializing plugins...", "level": "INFO", "timestamp": "2026-03-30T20:39:46.786191+00:00"}
+{"asctime": "2026-03-30 22:39:46,786", "message": "Plugin agent_skills initialized", "level": "INFO", "timestamp": "2026-03-30T20:39:46.786191+00:00"}
+{"asctime": "2026-03-30 22:39:46,786", "message": "Step 4/5: Setting up bash commands...", "level": "INFO", "timestamp": "2026-03-30T20:39:46.786191+00:00"}
+{"asctime": "2026-03-30 22:39:46,787", "message": "Executing command: 'git config --global user.name \"GIGABYTE\" && git config --global user.email \"GIGABYTE@example.com\"', Timeout: 60s, background: False", "level": "INFO", "timestamp": "2026-03-30T20:39:46.787195+00:00"}
+{"asctime": "2026-03-30 22:39:46,916", "message": "Executing command: 'alias env_check='echo \"=== PYTHON ===\" && python3 --version 2>/dev/null || python --version 2>/dev/null && echo \"=== KEY PACKAGES ===\" && pip list --format=freeze 2>/dev/null | head -30 && echo \"=== DISK ===\" && df -h . 2>/dev/null && echo \"=== MEMORY ===\" && free -h 2>/dev/null || vm_stat 2>/dev/null; true'', Timeout: 60s, background: False", "level": "INFO", "timestamp": "2026-03-30T20:39:46.916193+00:00"}
+{"asctime": "2026-03-30 22:39:47,063", "message": "Step 5/5: Starting memory monitor...", "level": "INFO", "timestamp": "2026-03-30T20:39:47.063593+00:00"}
+{"asctime": "2026-03-30 22:39:47,064", "message": "All initialization steps completed successfully", "level": "INFO", "timestamp": "2026-03-30T20:39:47.064594+00:00"}
+{"asctime": "2026-03-30 22:39:47,077", "message": "\ud83d\ude80 In-process runtime ready in 0.30s", "level": "INFO", "timestamp": "2026-03-30T20:39:47.077592+00:00"}
+{"asctime": "2026-03-30 22:39:47,078", "message": "Initializing browser environment...", "level": "INFO", "timestamp": "2026-03-30T20:39:47.078594+00:00"}
+WARNING  Browser environment is a stub and will not function. Ensure           
+         browser-use MCP is configured.                                        
+{"asctime": "2026-03-30 22:39:47,084", "message": "Browser environment initialized successfully", "level": "INFO", "timestamp": "2026-03-30T20:39:47.084593+00:00"}
+{"asctime": "2026-03-30 22:39:47,098", "message": "[runtime 66a28569-e623-41-12524632f31020b] Selected repo: None, loading playbooks from C:\\Users\\GIGABYTE\\Desktop\\Forge\\.app\\playbooks (inside runtime)", "level": "INFO", "timestamp": "2026-03-30T20:39:47.098589+00:00"}
+{"asctime": "2026-03-30 22:39:47,100", "message": "[runtime 66a28569-e623-41-12524632f31020b] Attempting to list files in repository playbooks directory: C:\\Users\\GIGABYTE\\Desktop\\Forge\\.app\\playbooks", "level": "INFO", "timestamp": "2026-03-30T20:39:47.100590+00:00"}
+{"asctime": "2026-03-30 22:39:47,101", "message": "Loading user workspace playbooks: []", "level": "INFO", "timestamp": "2026-03-30T20:39:47.101589+00:00"}
+{"asctime": "2026-03-30 22:39:47,102", "message": "Initializing MCP agent for app-mcp with SHTTP connection...", "level": "INFO", "timestamp": "2026-03-30T20:39:47.102589+00:00"}
+{"asctime": "2026-03-30 22:39:49,692", "message": "Error connecting to http://localhost:3000/mcp/mcp: Client failed to connect: All connection attempts failed", "level": "ERROR", "timestamp": "2026-03-30T20:39:49.692852+00:00"}
+{"asctime": "2026-03-30 22:39:49,692", "message": "Failed to connect to http://localhost:3000/mcp/mcp: Client failed to connect: All connection attempts failed", "level": "ERROR", "exc_info": "Traceback (most recent call last):\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 649, in _session_runner\n    await stack.enter_async_context(self._context_manager())\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 659, in enter_async_context\n    result = await _enter(cm)\n             ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 210, in __aenter__\n    return await anext(self.gen)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 425, in _context_manager\n    with catch(get_catch_handlers()):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\exceptiongroup\\_catch.py\", line 39, in __exit__\n    raise unhandled from exc.__cause__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\exceptiongroup\\_catch.py\", line 65, in handle_exception\n    result = handler(matched)\n             ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\utilities\\exceptions.py\", line 29, in _exception_handler\n    raise leaf\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\mcp\\client\\streamable_http.py\", line 565, in handle_request_async\n    await self._handle_post_request(ctx)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\mcp\\client\\streamable_http.py\", line 340, in _handle_post_request\n    async with ctx.client.stream(\n               ^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 210, in __aenter__\n    return await anext(self.gen)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1583, in stream\n    response = await self.send(\n               ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1629, in send\n    response = await self._send_handling_auth(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1657, in _send_handling_auth\n    response = await self._send_handling_redirects(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1694, in _send_handling_redirects\n    response = await self._send_single_request(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1730, in _send_single_request\n    response = await transport.handle_async_request(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_transports\\default.py\", line 393, in handle_async_request\n    with map_httpcore_exceptions():\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_transports\\default.py\", line 118, in map_httpcore_exceptions\n    raise mapped_exc(message) from exc\nhttpx.ConnectError: All connection attempts failed\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\gateway\\integrations\\mcp\\mcp_utils.py\", line 220, in _connect_http_server\n    await asyncio.wait_for(\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\gateway\\integrations\\mcp\\client.py\", line 228, in connect_http\n    await self._open_session()\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\gateway\\integrations\\mcp\\client.py\", line 107, in _open_session\n    await self.client.__aenter__()  # pylint: disable=unnecessary-dunder-call\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 496, in __aenter__\n    return await self._connect()\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 587, in _connect\n    raise RuntimeError(\nRuntimeError: Client failed to connect: All connection attempts failed", "timestamp": "2026-03-30T20:39:49.692852+00:00"}
+{"asctime": "2026-03-30 22:39:49,697", "message": "No MCP clients were successfully connected; exposing degraded capability status tool only", "level": "WARNING", "timestamp": "2026-03-30T20:39:49.697852+00:00"}
+{"asctime": "2026-03-30 22:39:49,698", "message": "Loaded 1 MCP tools: ['mcp_capabilities_status']", "level": "INFO", "timestamp": "2026-03-30T20:39:49.698854+00:00"}
+{"asctime": "2026-03-30 22:39:49,698", "message": "Setting 1 MCP tools for agent Orchestrator: ['mcp_capabilities_status']", "level": "INFO", "timestamp": "2026-03-30T20:39:49.698854+00:00"}
+{"asctime": "2026-03-30 22:39:49,698", "message": "Tools updated for agent Orchestrator, total 30: ['execute_bash', 'think', 'finish', 'summarize_context', 'memory_manager', 'apply_patch', 'batch_edit', 'search_available_tools', 'task_tracker', 'search_code', 'explore_tree_structure', 'read_symbol_definition', 'terminal_manager', 'check_tool_status', 'error_recovery_memory', 'lsp_query', 'signal_progress', 'delegate_task', 'shared_task_board', 'revert_to_checkpoint', 'workspace_status', 'checkpoint', 'analyze_project_structure', 'session_diff', 'verify_file_lines', 'communicate_with_user', 'verify_ui_change', 'str_replace_editor', 'ast_code_editor', 'call_mcp_tool']", "level": "INFO", "timestamp": "2026-03-30T20:39:49.698854+00:00"}
+ÔöîÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ Grinta ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÉ
+Ôöé ÔöîÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ grinta ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÉ Ôöé
+Ôöé Ôöé grinta ready. Type a task or /help for commands.                        Ôöé Ôöé
+Ôöé ÔööÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÿ Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+ÔööÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÿ
+ Model: openai/lightning-ai/minimax-m2.5 Ôöé Context: 0/? Tokens Ôöé Cost: $0.0000 >>> ÔöîÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ Grinta ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÉ
+Ôöé ÔöîÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ grinta ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÉ Ôöé
+Ôöé Ôöé grinta ready. Type a task or /help for commands.                        Ôöé Ôöé
+Ôöé ÔööÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÿ Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+Ôöé                                                                             Ôöé
+ÔööÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÿ
+ Model: openai/lightning-ai/minimax-m2.5 Ôöé Context: 0/? Tokens Ôöé Cost: $0.0000 {"asctime": "2026-03-30 22:39:49,717", "message": "[TaskCancellationService:sessions:C:\\Users\\GIGABYTE\\Desktop\\Forge] HARD KILL: terminating 0 tracked pids (0 handles)", "level": "INFO", "timestamp": "2026-03-30T20:39:49.717029+00:00"}
+{"asctime": "2026-03-30 22:39:49,718", "message": "[TaskCancellationService:sessions:C:\\Users\\GIGABYTE\\Desktop\\Forge] Hard kill complete", "level": "INFO", "timestamp": "2026-03-30T20:39:49.718030+00:00"}
+{"asctime": "2026-03-30 22:39:49,718", "message": "Shell session closed: SimpleBashSession", "level": "INFO", "timestamp": "2026-03-30T20:39:49.718030+00:00"}
+{"asctime": "2026-03-30 22:39:52,228", "message": "Failed to remove workspace C:\\Users\\GIGABYTE\\Desktop\\Forge after 3 attempts: [WinError 5] Access is denied: 'C:\\\\Users\\\\GIGABYTE\\\\Desktop\\\\Forge\\\\.git\\\\objects\\\\00\\\\0323c5e1471c46a0c16220aedc24cf3a5a4fd5'", "level": "WARNING", "timestamp": "2026-03-30T20:39:52.228516+00:00"}
+{"asctime": "2026-03-30 22:39:52,228", "message": "EventStream '66a28569-e623-41-12524632f31020b' was GC'd without close(); resources may leak.", "level": "WARNING", "timestamp": "2026-03-30T20:39:52.228516+00:00"}

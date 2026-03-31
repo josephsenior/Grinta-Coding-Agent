@@ -81,29 +81,11 @@ class TestPromptManager:
         with pytest.raises(ValueError, match="Prompt directory is not set"):
             PromptManager(prompt_dir=None)
 
-    def test_missing_template_raises(self, tmp_path):
+    def test_valid_init(self, tmp_path):
         from backend.utils.prompt import PromptManager
-
-        with pytest.raises(FileNotFoundError):
-            PromptManager(prompt_dir=str(tmp_path))
-
-    def test_valid_templates_load(self, tmp_path):
-        from backend.utils.prompt import PromptManager
-
-        # Create minimal template files
-        for name in [
-            "system_prompt.j2",
-            "user_prompt.j2",
-            "additional_info.j2",
-            "playbook_info.j2",
-            "knowledge_base_info.j2",
-        ]:
-            (tmp_path / name).write_text("{{ content }}", encoding="utf-8")
 
         pm = PromptManager(prompt_dir=str(tmp_path))
         assert pm.prompt_dir == str(tmp_path)
-        assert pm.system_template is not None
-        assert pm.user_template is not None
 
     @patch(
         "backend.engine.tools.prompt.refine_prompt",
@@ -112,35 +94,16 @@ class TestPromptManager:
     def test_get_system_message(self, mock_refine, tmp_path):
         from backend.utils.prompt import PromptManager
 
-        for name in [
-            "system_prompt.j2",
-            "user_prompt.j2",
-            "additional_info.j2",
-            "playbook_info.j2",
-            "knowledge_base_info.j2",
-        ]:
-            (tmp_path / name).write_text("Hello {{ name }}", encoding="utf-8")
-
         pm = PromptManager(prompt_dir=str(tmp_path))
-        result = pm.get_system_message(name="World")
-        assert "Hello World" in result
+        result = pm.get_system_message()
+        assert "You are App" in result
 
     def test_get_example_user_message(self, tmp_path):
         from backend.utils.prompt import PromptManager
 
-        for name in [
-            "system_prompt.j2",
-            "user_prompt.j2",
-            "additional_info.j2",
-            "playbook_info.j2",
-            "knowledge_base_info.j2",
-        ]:
-            content = "User prompt content" if name == "user_prompt.j2" else "x"
-            (tmp_path / name).write_text(content, encoding="utf-8")
-
         pm = PromptManager(prompt_dir=str(tmp_path))
         result = pm.get_example_user_message()
-        assert result == "User prompt content"
+        assert result == ""
 
     def test_build_workspace_context(self, tmp_path):
         from backend.utils.prompt import (
@@ -149,20 +112,6 @@ class TestPromptManager:
             RepositoryInfo,
             RuntimeInfo,
         )
-
-        for name in [
-            "system_prompt.j2",
-            "user_prompt.j2",
-            "additional_info.j2",
-            "playbook_info.j2",
-            "knowledge_base_info.j2",
-        ]:
-            content = (
-                "repo={{ repository_info.repo_name }}"
-                if name == "additional_info.j2"
-                else "x"
-            )
-            (tmp_path / name).write_text(content, encoding="utf-8")
 
         pm = PromptManager(prompt_dir=str(tmp_path))
         result = pm.build_workspace_context(
@@ -181,18 +130,11 @@ class TestOrchestratorPromptManager:
     def test_identity_prefix_added(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
-        for name in [
-            "system_prompt.j2",
-            "user_prompt.j2",
-            "additional_info.j2",
-            "playbook_info.j2",
-            "knowledge_base_info.j2",
-        ]:
-            (tmp_path / name).write_text("Prompt body", encoding="utf-8")
-
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
         result = opm.get_system_message()
-        assert result.startswith("You are App agent.")
+        # prompt_builder always starts with "You are App" so OrchestratorPromptManager
+        # should not duplicate the prefix but the result should contain it.
+        assert "You are App" in result
 
     @patch(
         "backend.engine.tools.prompt.refine_prompt",
@@ -201,20 +143,11 @@ class TestOrchestratorPromptManager:
     def test_identity_prefix_not_duplicated(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
-        for name in [
-            "system_prompt.j2",
-            "user_prompt.j2",
-            "additional_info.j2",
-            "playbook_info.j2",
-            "knowledge_base_info.j2",
-        ]:
-            (tmp_path / name).write_text(
-                "You are App agent.\nMore content", encoding="utf-8"
-            )
-
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
         result = opm.get_system_message()
-        assert result.count("You are App agent.") == 1
+        # prompt_builder starts with "You are App" so the OrchestratorPromptManager
+        # should skip its own prefix. Only one occurrence of "You are App" expected.
+        assert result.count("You are App") == 1
 
     @patch(
         "backend.engine.tools.prompt.refine_prompt",
@@ -223,56 +156,44 @@ class TestOrchestratorPromptManager:
     def test_config_injected(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
-        for name in [
-            "system_prompt.j2",
-            "user_prompt.j2",
-            "additional_info.j2",
-            "playbook_info.j2",
-            "knowledge_base_info.j2",
-        ]:
-            (tmp_path / name).write_text("cli={{ cli_mode }}", encoding="utf-8")
-
         mock_config = MagicMock()
         mock_config.cli_mode = True
+        mock_config.autonomy_level = "full"
+        mock_config.enable_checkpoints = False
+        mock_config.enable_permissions = False
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=mock_config)
         result = opm.get_system_message()
-        assert "cli=True" in result
+        # cli_mode=True triggers CLI-specific security risk block
+        assert "Security Risk Policy" in result
+        # Full autonomy should be reflected
+        assert "FULL AUTONOMOUS MODE" in result
 
     def test_build_playbook_info(self, tmp_path):
         from backend.utils.prompt import PromptManager
 
-        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2",
-                    "playbook_info.j2", "knowledge_base_info.j2"]:
-            (tmp_path / name).write_text("playbook={{ triggered_agents[0].name }}", encoding="utf-8")
-
         pm = PromptManager(prompt_dir=str(tmp_path))
         mock_agent = MagicMock()
         mock_agent.name = "test_playbook"
+        mock_agent.trigger = "test_trigger"
+        mock_agent.content = "playbook content"
         result = pm.build_playbook_info([mock_agent])
         assert "test_playbook" in result
 
     def test_build_knowledge_base_info(self, tmp_path):
         from backend.utils.prompt import PromptManager
 
-        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2",
-                    "playbook_info.j2", "knowledge_base_info.j2"]:
-            (tmp_path / name).write_text("kb={{ kb_results[0].content }}", encoding="utf-8")
-
         pm = PromptManager(prompt_dir=str(tmp_path))
         mock_result = MagicMock()
         mock_result.content = "kb_content"
+        mock_result.filename = "doc.md"
+        mock_result.relevance_score = 0.95
+        mock_result.chunk_content = "kb_content"
         result = pm.build_knowledge_base_info([mock_result])
         assert "kb_content" in result
 
     def test_add_turns_left_reminder(self, tmp_path):
         from backend.core.message import Message, TextContent
         from backend.utils.prompt import PromptManager
-
-        # Need valid templates even if we don't render them for this specific test
-        # because __init__ loads them.
-        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2",
-                    "playbook_info.j2", "knowledge_base_info.j2"]:
-            (tmp_path / name).write_text("x", encoding="utf-8")
 
         pm = PromptManager(prompt_dir=str(tmp_path))
         msg = Message(role="user", content=[TextContent(text="Hello")])
@@ -289,10 +210,6 @@ class TestOrchestratorPromptManager:
     @patch("backend.engine.tools.prompt.refine_prompt", side_effect=lambda x: x)
     def test_inject_lessons_learned(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
-
-        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2",
-                    "playbook_info.j2", "knowledge_base_info.j2"]:
-            (tmp_path / name).write_text("body", encoding="utf-8")
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
         opm.set_prompt_tier("debug")
@@ -318,10 +235,6 @@ class TestOrchestratorPromptManager:
     @patch("backend.engine.tools.prompt.refine_prompt", side_effect=lambda x: x)
     def test_inject_scratchpad(self, mock_refine, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
-
-        for name in ["system_prompt.j2", "user_prompt.j2", "additional_info.j2",
-                    "playbook_info.j2", "knowledge_base_info.j2"]:
-            (tmp_path / name).write_text("body", encoding="utf-8")
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
 

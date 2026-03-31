@@ -29,18 +29,10 @@ WORKING_MEMORY_TOOL_NAME = "working_memory"
 _VALID_SECTIONS = ("hypothesis", "findings", "blockers", "file_context", "decisions", "plan")
 
 _DESCRIPTION = (
-    "Maintain a structured cognitive workspace that survives context condensation. "
-    "Unlike 'note' (flat key-value), working_memory has typed sections that "
-    "represent your current thinking state.\n\n"
-    "Sections: hypothesis (current approach), findings (discovered facts), "
-    "blockers (obstacles), file_context (key files and roles), "
-    "decisions (choices made), plan (current action plan).\n\n"
-    "Commands:\n"
-    "  update — append or replace content in a section\n"
-    "  get — retrieve one section or 'all' for full dump\n"
-    "  clear_section — reset a specific section\n\n"
-    "Use this to maintain structured context across long sessions. "
-    "After condensation, your working memory is automatically restored."
+    "Structured cognitive workspace that survives context condensation. "
+    "Sections: hypothesis, findings, blockers, file_context, decisions, plan. "
+    "Commands: update (append/replace section content), get (retrieve section or 'all'), "
+    "clear_section (reset a section). Auto-restored after condensation."
 )
 
 

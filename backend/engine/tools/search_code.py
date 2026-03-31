@@ -12,45 +12,44 @@ import shlex
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action import CmdRunAction
 
+
+_SEARCH_EXCLUDED_DIRS = (
+    ".git",
+    ".venv",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
+    "node_modules",
+    ".tmp_cli_manual",
+    "logs",
+    "storage",
+    "build",
+    "dist",
+)
+
 _SEARCH_CODE_DESCRIPTION = """\
-Search for text patterns, symbols, or file paths in the codebase.
+Search for text patterns, symbols, or file paths in the codebase using ripgrep (falls back to grep).
 
-Use this instead of execute_bash + grep when you need to:
-- Find all usages of a function, class, or variable
-- Locate files containing a specific string or pattern
-- Discover which files match a glob pattern
-- Find error messages or log strings
+Modes:
+1. Text/regex search — set `pattern` to find matching lines across files.
+2. File discovery — omit `pattern`, set `file_pattern` only to list matching files.
 
-Prefer this when the target location is unknown or you need literal text/regex search.
-If you already know the file and symbol position and need precise references/definitions,
-use `lsp_query` instead. If you need architecture or dependency traversal,
-use `read_symbol_definition` / `explore_tree_structure`.
-
-MODES:
-
-1. **Text / regex search** (default) — finds lines matching `pattern` across files.
-   - Tries ripgrep (`rg`) first, falls back to `grep -rn`
-   - Results format: `file:line: matched line` with N context lines before/after
-   - Supports full regex syntax (Python/Perl-compatible)
-
-2. **File discovery** — omit `pattern`, set `file_pattern` only — lists files matching the glob.
-
-PARAMETERS:
-- `pattern` — regex/text to search (omit to just list matching files)
-- `path` — directory or file to search in (default: current directory)
-- `file_pattern` — glob to restrict which files are searched (e.g. `*.py`, `**/*.ts`, `src/**`)
-- `context_lines` — lines of context before/after each match (default: 2)
-- `case_sensitive` — "true" or "false" (default: "false" — case-insensitive)
-- `max_results` — cap on returned matches (default: 50; increase if needed)
-
-EXAMPLES:
-- Find all callers of `process_data`:  pattern="process_data", file_pattern="*.py"
-- Find TODO comments: pattern="TODO|FIXME|HACK", file_pattern="*.py"
-- Find all TypeScript files in src/: path="src/", file_pattern="*.ts" (no pattern)
-- Find imports of a module: pattern="from backend.inference import", case_sensitive="true"
+Use this when target location is unknown. For precise symbol refs at known positions, use `lsp_query`. \
+For dependency traversal, use `explore_tree_structure`.
 """
 
 SEARCH_CODE_TOOL_NAME = "search_code"
+
+
+def _build_pruned_find_command(path: str) -> str:
+    """Build a find prefix that skips generated and cache directories."""
+
+    safe_path = shlex.quote(path)
+    prune_terms = " -o ".join(
+        f"-name {shlex.quote(dir_name)}" for dir_name in _SEARCH_EXCLUDED_DIRS
+    )
+    return f"find {safe_path} \\( {prune_terms} \\) -prune -o"
 
 
 def create_search_code_tool():
@@ -130,13 +129,14 @@ def build_search_code_action(
 
     if not pattern:
         # File-discovery mode: just list matching files
+        find_prefix = _build_pruned_find_command(path)
         if file_pattern:
-            safe_path = shlex.quote(path)
             safe_glob = shlex.quote(file_pattern)
-            cmd = f"find {safe_path} -type f -name {safe_glob} | head -n {max_results}"
+            cmd = (
+                f"{find_prefix} -type f -name {safe_glob} -print | head -n {max_results}"
+            )
         else:
-            safe_path = shlex.quote(path)
-            cmd = f"find {safe_path} -type f | head -n {max_results}"
+            cmd = f"{find_prefix} -type f -print | head -n {max_results}"
         return CmdRunAction(command=cmd)
 
     # Search mode — build rg command with grep fallback, then wrap in structured XML
@@ -149,6 +149,12 @@ def build_search_code_action(
     if not is_case_sensitive:
         rg_flags.append("--ignore-case")
         grep_flags.append("-i")
+
+    rg_flags.extend(f"--glob=!**/{dir_name}/**" for dir_name in _SEARCH_EXCLUDED_DIRS)
+    grep_flags.extend(
+        ["-I", "--binary-files=without-match"]
+        + [f"--exclude-dir={shlex.quote(dir_name)}" for dir_name in _SEARCH_EXCLUDED_DIRS]
+    )
 
     if file_pattern:
         safe_glob = shlex.quote(file_pattern)

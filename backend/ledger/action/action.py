@@ -39,6 +39,4 @@ class Action(Event, metaclass=CanonicalMeta):
             self.confirmation_state = ActionConfirmationStatus.CONFIRMED
 
 
-Operation = Action
-
-__all__ = ["Action", "Operation", "ActionConfirmationStatus"]
+__all__ = ["Action", "ActionConfirmationStatus"]

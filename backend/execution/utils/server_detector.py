@@ -17,7 +17,7 @@ import socket
 from dataclasses import dataclass
 from typing import Any, Literal
 
-import requests
+import httpx
 
 try:
     import aiohttp as _aiohttp  # type: ignore[import]
@@ -159,7 +159,7 @@ def health_check_http(port: int, host: str = "localhost", timeout: float = 2.0) 
     scheme = "http" if scheme_host in ("localhost", "127.0.0.1") else "https"
     url = f"{scheme}://{scheme_host}:{port}"
     try:
-        response = requests.get(url, timeout=timeout, allow_redirects=False)
+        response = httpx.get(url, timeout=timeout, follow_redirects=False)
         # Accept 2xx, 3xx, and even 404 (single-page apps often show 404 for API routes)
         if response.status_code < 500:
             logger.info(
@@ -168,7 +168,7 @@ def health_check_http(port: int, host: str = "localhost", timeout: float = 2.0) 
             return "healthy"
         logger.warning("Health check failed: %s returned %d", url, response.status_code)
         return "unhealthy"
-    except requests.RequestException as e:
+    except httpx.HTTPError as e:
         logger.debug("Health check failed: %s - %s", url, type(e).__name__)
         return "unhealthy"
 

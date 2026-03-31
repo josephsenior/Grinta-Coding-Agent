@@ -20,7 +20,7 @@ router = APIRouter(
 
 
 @router.get("/")
-async def get_trajectory(
+async def get_transcript(
     conversation_id: Annotated[
         str, Path(..., min_length=1, description="Conversation ID")
     ],
@@ -54,11 +54,9 @@ async def get_trajectory(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"transcript": transcript, "trajectory": transcript},
+        content={"transcript": transcript},
     )
 
 
-get_transcript = get_trajectory
-
-__all__ = ["router", "get_trajectory", "get_transcript"]
+__all__ = ["router", "get_transcript"]
 

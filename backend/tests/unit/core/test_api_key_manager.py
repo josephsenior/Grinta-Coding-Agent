@@ -37,8 +37,8 @@ class TestExtractProvider:
     def test_google_prefix(self):
         assert self.mgr._extract_provider("google/gemini-pro") == "google"
 
-    def test_gemini_prefix(self):
-        assert self.mgr._extract_provider("gemini/1.5-pro") == "google"
+    def test_gemini_prefix_is_unknown(self):
+        assert self.mgr._extract_provider("gemini/1.5-pro") == "unknown"
 
     def test_xai_prefix(self):
         assert self.mgr._extract_provider("xai/grok-2") == "xai"
@@ -111,6 +111,9 @@ class TestCheckPrefixMatch:
 
     def test_openai_slash(self):
         assert self.mgr._check_prefix_match("openai/gpt-4", "openai/gpt-4") == "openai"
+
+    def test_gemini_alias_prefix_no_longer_matches(self):
+        assert self.mgr._check_prefix_match("gemini/1.5-pro", "gemini/1.5-pro") is None
 
     def test_no_match(self):
         assert self.mgr._check_prefix_match("mistral-large", "mistral-large") is None

@@ -225,6 +225,4 @@ class Event:
         self._response_id = value
 
 
-Record = Event
-
-__all__ = ["Event", "Record", "EventSource"]
+__all__ = ["Event", "EventSource"]

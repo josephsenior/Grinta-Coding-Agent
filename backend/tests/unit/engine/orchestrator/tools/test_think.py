@@ -33,7 +33,7 @@ class TestCreateThinkTool:
         function = tool.get("function", {})
         description = function.get("description", "")
         assert description
-        assert "think" in description.lower()
+        assert "reasoning" in description.lower()
 
     def test_description_mentions_brainstorming(self):
         """Test description mentions brainstorming use case."""

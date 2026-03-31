@@ -16,8 +16,9 @@ from backend.cli.confirmation import _risk_label
 from backend.cli.diff_renderer import DiffPanel
 from backend.cli.event_renderer import CLIEventRenderer
 from backend.cli.hud import HUDBar
+from backend.cli.main import _configure_redirected_streams, show_grinta_splash
 from backend.cli.reasoning_display import ReasoningDisplay
-from backend.cli.repl import Repl
+from backend.cli.repl import Repl, _supports_prompt_session
 from backend.core.config import AppConfig
 from backend.core.enums import ActionSecurityRisk, AgentState, EventSource
 from backend.inference.metrics import Metrics, TokenUsage
@@ -112,6 +113,8 @@ async def test_repl_restarts_agent_loop_after_terminal_state() -> None:
     assert resolved_controller is controller
     controller.set_agent_state_to.assert_awaited_once_with(AgentState.RUNNING)
     assert restarted_task is not completed_task
+    assert restarted_task is not None
+    restarted_task = cast(asyncio.Task[None], restarted_task)
     await restarted_task
 
 
@@ -164,6 +167,44 @@ def test_diff_panel_existing_file_with_groups() -> None:
     output = _console_output(console)
     assert "edited" in output
     assert "README.md" in output
+
+
+def test_show_grinta_splash_renders_logo_text() -> None:
+    console = _make_console(width=120)
+    show_grinta_splash(console)
+    output = _console_output(console)
+
+    assert "GGGGGG" in output
+    assert "RRRRRR" in output
+    assert "TTTTTTTT" in output
+    assert ">_" in output
+    assert "o  o" in output
+
+
+def test_prompt_session_requires_tty_streams() -> None:
+    interactive_stream = MagicMock()
+    interactive_stream.isatty.return_value = True
+    piped_stream = MagicMock()
+    piped_stream.isatty.return_value = False
+
+    assert _supports_prompt_session(interactive_stream, interactive_stream) is True
+    assert _supports_prompt_session(piped_stream, interactive_stream) is False
+    assert _supports_prompt_session(interactive_stream, piped_stream) is False
+
+
+def test_configure_redirected_streams_uses_utf8_for_non_tty() -> None:
+    redirected = MagicMock()
+    redirected.isatty.return_value = False
+    redirected.reconfigure = MagicMock()
+
+    interactive = MagicMock()
+    interactive.isatty.return_value = True
+    interactive.reconfigure = MagicMock()
+
+    _configure_redirected_streams(redirected, interactive, None)
+
+    redirected.reconfigure.assert_called_once_with(encoding="utf-8", errors="replace")
+    interactive.reconfigure.assert_not_called()
 
 
 def test_confirmation_handles_all_risk_levels() -> None:
@@ -302,6 +343,36 @@ def test_entry_point_parses_both_flags() -> None:
             mock_repl.assert_called_once_with(
                 model="anthropic/claude-sonnet-4-20250514", project="/tmp/proj"
             )
+
+
+def test_grinta_main_parses_project_flag() -> None:
+    """grinta should parse --project even when invoked via backend.cli.main."""
+    import sys
+
+    with patch.object(sys, "argv", ["grinta", "--project", "/tmp/myrepo"]):
+        with patch("backend.cli.main._async_main", new_callable=MagicMock) as mock_async_main:
+            with patch("backend.cli.main.asyncio.run") as mock_asyncio_run:
+                from backend.cli.main import main
+
+                main()
+
+    mock_async_main.assert_called_once_with(model=None, project="/tmp/myrepo")
+    mock_asyncio_run.assert_called_once()
+
+
+def test_grinta_main_dispatches_serve() -> None:
+    """grinta should dispatch serve-style subcommands from backend.cli.main."""
+    import sys
+
+    with patch.object(sys, "argv", ["grinta", "serve", "--port", "3030"]):
+        with patch("backend.embedded.main") as mock_serve:
+            with patch("backend.cli.main.asyncio.run") as mock_asyncio_run:
+                from backend.cli.main import main
+
+                main()
+
+    mock_serve.assert_called_once()
+    mock_asyncio_run.assert_not_called()
 
 
 # ── New tests: Ctrl+C handling ───────────────────────────────────────────

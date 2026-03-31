@@ -19,16 +19,16 @@ def _make_context(**overrides) -> MagicMock:
     return ctx
 
 
-# ── initialize_tool_pipeline ─────────────────────────────────────────
+# ── initialize_operation_pipeline ────────────────────────────────────
 
 
-class TestInitializeToolPipeline:
+class TestInitializeOperationPipeline:
     def test_creates_default_pipeline(self):
         ctx = _make_context()
         svc = TelemetryService(ctx)
-        svc.initialize_tool_pipeline()
-        ctx.initialize_tool_pipeline.assert_called_once()
-        middlewares = ctx.initialize_tool_pipeline.call_args[0][0]
+        svc.initialize_operation_pipeline()
+        ctx.initialize_operation_pipeline.assert_called_once()
+        middlewares = ctx.initialize_operation_pipeline.call_args[0][0]
         assert (
             len(middlewares) >= 5
         )  # at least safety, idempotency, cb, cost, rollback, ...
@@ -40,8 +40,8 @@ class TestInitializeToolPipeline:
         )
         ctx = _make_context(agent_config=config)
         svc = TelemetryService(ctx)
-        svc.initialize_tool_pipeline()
-        middlewares = ctx.initialize_tool_pipeline.call_args[0][0]
+        svc.initialize_operation_pipeline()
+        middlewares = ctx.initialize_operation_pipeline.call_args[0][0]
         class_names = [type(m).__name__ for m in middlewares]
         assert "ReflectionMiddleware" in class_names
 
@@ -52,8 +52,8 @@ class TestInitializeToolPipeline:
         )
         ctx = _make_context(agent_config=config)
         svc = TelemetryService(ctx)
-        svc.initialize_tool_pipeline()
-        middlewares = ctx.initialize_tool_pipeline.call_args[0][0]
+        svc.initialize_operation_pipeline()
+        middlewares = ctx.initialize_operation_pipeline.call_args[0][0]
         class_names = [type(m).__name__ for m in middlewares]
         assert "PlanningMiddleware" not in class_names
         assert "ReflectionMiddleware" not in class_names

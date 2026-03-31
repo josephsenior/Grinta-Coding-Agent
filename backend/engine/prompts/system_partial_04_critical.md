@@ -1,0 +1,8 @@
+<CRITICAL_TOOL_EXECUTION_RULES>
+MANDATORY:
+1. **File changes require tool calls** — never claim "I created/edited" without an editor tool invocation.
+2. After a successful write → **next step**; no `ls`/re-read to "confirm" unless the tool errored.
+3. **Hallucination check:** if you are about to say you changed a file, verify you actually called the tool.
+
+HALLUCINATION PREVENTION: Before "I created/edited", confirm a tool ran; if not, call it now.
+</CRITICAL_TOOL_EXECUTION_RULES>

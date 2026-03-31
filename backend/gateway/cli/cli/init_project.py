@@ -31,7 +31,7 @@ This is a App agent project.
 ## Getting Started
 
 1. Copy `.env.example` to `.env` and fill in your API keys.
-2. Run `app start` to launch the agent.
+2. Run `app serve` to launch the agent.
 """
 
 

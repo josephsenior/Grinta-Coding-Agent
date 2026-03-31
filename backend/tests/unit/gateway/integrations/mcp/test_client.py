@@ -12,10 +12,7 @@ from mcp import McpError
 from mcp.types import CallToolResult, ErrorData, Tool
 from pydantic import ValidationError
 
-from backend.core.config.mcp_config import (
-    MCPRemoteServerConfig,
-    MCPStdioServerConfig,
-)
+from backend.core.config.mcp_config import MCPServerConfig
 from backend.gateway.integrations.mcp.client import (
     MCPClient,
     _mcp_call_total_budget_sec,
@@ -153,7 +150,7 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         mock_client_class.return_value = mock_client_instance
 
         mcp_client = MCPClient()
-        server_config = MCPRemoteServerConfig(
+        server_config = MCPServerConfig(
             name="test-sse",
             type="sse",
             url="http://localhost:8000/sse",
@@ -179,7 +176,7 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         mock_client_class.return_value = mock_client_instance
 
         mcp_client = MCPClient()
-        server_config = MCPRemoteServerConfig(
+        server_config = MCPServerConfig(
             name="test-shttp",
             type="shttp",
             url="http://localhost:8000/mcp",
@@ -197,7 +194,7 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         MCPClient()
 
         with self.assertRaises(ValidationError):
-            MCPRemoteServerConfig(name="bad", type="sse", url="", transport="sse")
+            MCPServerConfig(name="bad", type="sse", url="", transport="sse")
 
     @patch("backend.gateway.integrations.mcp.client.Client")
     @patch("backend.gateway.integrations.mcp.client.SSETransport")
@@ -211,7 +208,7 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         mock_client_class.return_value = mock_client_instance
 
         mcp_client = MCPClient()
-        server_config = MCPRemoteServerConfig(
+        server_config = MCPServerConfig(
             name="test-sse",
             type="sse",
             url="http://localhost:8000/sse",
@@ -239,7 +236,7 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         mock_client_class.return_value = mock_client_instance
 
         mcp_client = MCPClient()
-        server_config = MCPRemoteServerConfig(
+        server_config = MCPServerConfig(
             name="test-sse",
             type="sse",
             url="http://localhost:8000/sse",
@@ -264,7 +261,7 @@ class TestMCPClientHTTPConnection(unittest.IsolatedAsyncioTestCase):
         mock_client_class.return_value = mock_client_instance
 
         mcp_client = MCPClient()
-        server_config = MCPRemoteServerConfig(
+        server_config = MCPServerConfig(
             name="test-sse",
             type="sse",
             url="http://localhost:8000/sse",
@@ -290,7 +287,7 @@ class TestMCPClientStdioConnection(unittest.IsolatedAsyncioTestCase):
         mock_client_class.return_value = mock_client_instance
 
         mcp_client = MCPClient()
-        server_config = MCPStdioServerConfig(
+        server_config = MCPServerConfig(
             name="test-server",
             type="stdio",
             command="python",
@@ -315,7 +312,7 @@ class TestMCPClientStdioConnection(unittest.IsolatedAsyncioTestCase):
         mock_stdio_transport.side_effect = OSError("Command not found")
 
         mcp_client = MCPClient()
-        server_config = MCPStdioServerConfig(
+        server_config = MCPServerConfig(
             name="bad-server",
             type="stdio",
             command="nonexistent_mcp_server",

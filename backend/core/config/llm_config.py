@@ -63,7 +63,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         temperature: The temperature for the API.
         top_p: The top p for the API.
         top_k: The top k for the API.
-        custom_llm_provider: The custom LLM provider to use (openai, anthropic, gemini, xai).
+        custom_llm_provider: The custom LLM provider to use (openai, anthropic, google, xai).
         max_input_tokens: The maximum number of input tokens.
         max_output_tokens: The maximum number of output tokens.
         input_cost_per_token: The cost per input token.
@@ -140,7 +140,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     custom_llm_provider: str | None = Field(
         default=None,
-        description="The custom LLM provider to use (openai, anthropic, gemini, xai)",
+        description="The custom LLM provider to use (openai, anthropic, google, xai)",
     )
     max_input_tokens: int | None = Field(
         default=None, ge=1, description="The maximum number of input tokens"
@@ -204,7 +204,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 "gemini" in model_l
                 or (
                     self.custom_llm_provider
-                    and "gemini" in self.custom_llm_provider.lower()
+                    and "google" in self.custom_llm_provider.lower()
                 )
             ):
                 self.reasoning_effort = "high"
@@ -407,10 +407,15 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     def _configure_model_defaults(self) -> None:
         """Configure model-specific default settings."""
-        # Set reasoning_effort to 'high' by default for non-Gemini models
+        # Set reasoning_effort to 'high' by default for non-Google Gemini models.
+        uses_google_provider = bool(
+            self.custom_llm_provider
+            and self.custom_llm_provider.strip().lower() == "google"
+        )
         if (
             self.model
             and self.reasoning_effort is None
             and "gemini-2.5-pro" not in self.model
+            and not uses_google_provider
         ):
             self.reasoning_effort = "high"

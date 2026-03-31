@@ -132,12 +132,6 @@ def get_cli_parser() -> argparse.ArgumentParser:
         metavar="COMMAND",
     )
     subparsers.add_parser("serve", help="Launch the App GUI server (web interface)")
-    subparsers.add_parser(
-        "all", help="Alias for 'serve' (launch the web GUI server)"
-    )
-    subparsers.add_parser(
-        "start", help="Alias for 'serve' (launch the web GUI server)"
-    )
 
     subparsers.add_parser(
         "health", help="Run production health checks for critical dependencies"

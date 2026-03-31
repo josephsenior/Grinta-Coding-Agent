@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from fastapi import Depends, HTTPException, Request, status
 
 from backend.core.logger import app_logger as logger
-from backend.gateway.app_accessors import ConversationStoreImpl, config
+from backend.gateway.app_accessors import ConversationStoreImpl, get_config
 from backend.gateway.store_factory import get_conversation_store_instance
 from backend.gateway.user_auth import get_user_id
 from backend.persistence.conversation.conversation_store import ConversationStore
@@ -78,7 +78,7 @@ async def resolve_conversation_store(
     """
     if request is None:
         return await get_conversation_store_instance(
-            ConversationStoreImpl, config, None
+            ConversationStoreImpl, get_config(), None
         )
 
     conversation_store: ConversationStore | None = getattr(
@@ -88,7 +88,7 @@ async def resolve_conversation_store(
         return conversation_store
     user_id = get_user_id(request)
     conversation_store = await get_conversation_store_instance(
-        ConversationStoreImpl, config, user_id
+        ConversationStoreImpl, get_config(), user_id
     )
     request.state.conversation_store = conversation_store
     return conversation_store
@@ -145,7 +145,7 @@ async def get_conversation(
 
     # First check if conversation exists in conversation store
     conversation_store = await get_conversation_store_instance(
-        ConversationStoreImpl, config, user_id
+        ConversationStoreImpl, get_config(), user_id
     )
     conversation_metadata = await conversation_store.get_metadata(conversation_id)
     if not conversation_metadata:

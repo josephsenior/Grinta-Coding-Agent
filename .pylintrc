@@ -30,7 +30,7 @@ max-statements=70
 max-attributes=12
 
 [FORMAT]
-# Maximum line length (already using black with 120)
+# Maximum line length (120)
 max-line-length=120
 
 [BASIC]

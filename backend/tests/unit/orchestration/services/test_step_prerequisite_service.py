@@ -100,7 +100,7 @@ class TestStepPrerequisiteService(unittest.TestCase):
         self.assertIn("unknown", call_args[1])
 
     def test_can_step_allows_pending_recall_action(self):
-        """Recall actions should not block the main step path."""
+        """KNOWLEDGE recall actions should not block the main step path."""
         self.mock_controller.get_agent_state.return_value = AgentState.RUNNING
         self.mock_context.pending_action = RecallAction(
             query="q", recall_type=RecallType.KNOWLEDGE
@@ -111,6 +111,27 @@ class TestStepPrerequisiteService(unittest.TestCase):
         self.assertTrue(result)
         call_kwargs = self.mock_controller.log.call_args[1]
         self.assertEqual(call_kwargs["extra"]["msg_type"], "STEP_ALLOWED_PENDING_RECALL")
+
+    def test_can_step_blocks_workspace_context_recall(self):
+        """WORKSPACE_CONTEXT recall must block stepping until context is ready.
+
+        On the first user message the agent loads critical workspace context
+        (playbook, project knowledge).  If the LLM steps before this lands,
+        it responds without that context and blocks in AWAITING_USER_INPUT
+        before the recall can inform it — leaving the agent stuck.
+        """
+        self.mock_controller.get_agent_state.return_value = AgentState.RUNNING
+        self.mock_context.pending_action = RecallAction(
+            query="q", recall_type=RecallType.WORKSPACE_CONTEXT
+        )
+
+        result = self.service.can_step()
+
+        self.assertFalse(result)
+        call_kwargs = self.mock_controller.log.call_args[1]
+        self.assertEqual(
+            call_kwargs["extra"]["msg_type"], "STEP_BLOCKED_RECALL_CONTEXT"
+        )
 
     def test_can_step_log_message_type_state(self):
         """Test can_step logs correct message type for state block."""

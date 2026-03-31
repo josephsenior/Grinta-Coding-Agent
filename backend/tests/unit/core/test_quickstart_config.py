@@ -2,42 +2,45 @@
 
 from __future__ import annotations
 
+import json
+
 from backend.core.config.quickstart import generate_quickstart_config
 
 
 class TestGenerateQuickstartConfig:
     def test_default_values(self):
         result = generate_quickstart_config()
-        assert "[core]" in result
-        assert "[llm]" in result
-        assert "[agent]" in result
-        assert 'api_key = ""' in result
-        assert "claude-sonnet-4-20250514" in result
-        assert "max_budget_per_task = 5.0" in result
-        # No base_url by default — should be commented out
-        assert '# base_url = ""' in result
+        data = json.loads(result)
+        assert data["llm_api_key"] == ""
+        assert data["llm_model"] == "gemini-2.5-flash"
+        assert data["max_budget_per_task"] == 5.0
+        assert data["llm_base_url"] == ""
+        assert data["project_root"] == "./workspace"
 
     def test_custom_api_key(self):
         result = generate_quickstart_config(api_key="sk-test123")
-        assert 'api_key = "sk-test123"' in result
+        data = json.loads(result)
+        assert data["llm_api_key"] == "sk-test123"
 
     def test_custom_model(self):
         result = generate_quickstart_config(model="gpt-4o")
-        assert 'model = "gpt-4o"' in result
+        data = json.loads(result)
+        assert data["llm_model"] == "gpt-4o"
 
     def test_custom_base_url(self):
         result = generate_quickstart_config(base_url="https://api.example.com")
-        assert 'base_url = "https://api.example.com"' in result
-        # Should NOT be commented out
-        assert "# base_url" not in result
+        data = json.loads(result)
+        assert data["llm_base_url"] == "https://api.example.com"
 
     def test_custom_budget(self):
         result = generate_quickstart_config(max_budget=10.0)
-        assert "max_budget_per_task = 10.0" in result
+        data = json.loads(result)
+        assert data["max_budget_per_task"] == 10.0
 
     def test_empty_base_url_commented(self):
         result = generate_quickstart_config(base_url="")
-        assert '# base_url = ""' in result
+        data = json.loads(result)
+        assert data["llm_base_url"] == ""
 
     def test_all_custom(self):
         result = generate_quickstart_config(
@@ -46,7 +49,8 @@ class TestGenerateQuickstartConfig:
             base_url="http://localhost:11434",
             max_budget=1.0,
         )
-        assert 'api_key = "key1"' in result
-        assert 'model = "llama3"' in result
-        assert 'base_url = "http://localhost:11434"' in result
-        assert "max_budget_per_task = 1.0" in result
+        data = json.loads(result)
+        assert data["llm_api_key"] == "key1"
+        assert data["llm_model"] == "llama3"
+        assert data["llm_base_url"] == "http://localhost:11434"
+        assert data["max_budget_per_task"] == 1.0

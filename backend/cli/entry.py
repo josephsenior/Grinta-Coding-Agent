@@ -4,8 +4,6 @@ Subcommands::
 
     app             # Launch interactive REPL (default)
     app serve       # Start the backend API server
-    app start       # Alias for serve
-    app all         # Alias for serve
 
 REPL flags::
 
@@ -23,7 +21,7 @@ def main() -> None:
     """Dispatch to the appropriate mode based on the first positional arg."""
     subcommand = sys.argv[1] if len(sys.argv) > 1 else None
 
-    if subcommand in ("serve", "start", "all"):
+    if subcommand == "serve":
         # Strip the subcommand so embedded's argparse sees only flags.
         sys.argv = [sys.argv[0]] + sys.argv[2:]
         from backend.embedded import main as serve_main
@@ -35,7 +33,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         prog="app",
         description="Grinta interactive CLI",
-        epilog="Subcommands: 'app serve|start|all' starts the backend API server.",
+        epilog="Subcommands: 'app serve' starts the backend API server.",
     )
     parser.add_argument(
         "--model", "-m",

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-__all__ = ["Session", "Run"]
+__all__ = ["Session"]
 
 
 def __getattr__(name: str) -> Any:
-    if name in {"Session", "Run"}:
+    if name == "Session":
         from backend.gateway.session.session import Session
 
         return Session

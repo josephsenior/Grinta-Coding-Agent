@@ -6,7 +6,7 @@ the server is ready before attempting to browse to it.
 
 import time
 
-import requests
+import httpx
 
 from backend.core.logger import app_logger as logger
 
@@ -35,13 +35,13 @@ def wait_for_server_ready(
     while time.time() - start_time < max_wait_time:
         try:
             # Try to make a simple HEAD request to check if server is responding
-            response = requests.head(url, timeout=timeout, allow_redirects=True)
+            response = httpx.head(url, timeout=timeout, follow_redirects=True)
             if response.status_code < 500:  # Accept any non-server-error response
                 logger.info(
                     "Server at %s is ready (status: %s)", url, response.status_code
                 )
                 return True
-        except requests.exceptions.RequestException as e:
+        except httpx.HTTPError as e:
             logger.debug("Server at %s not ready yet: %s", url, e)
 
         time.sleep(check_interval)
@@ -64,9 +64,9 @@ def check_server_ready(url: str, timeout: int = 5) -> bool:
 
     """
     try:
-        response = requests.head(url, timeout=timeout, allow_redirects=True)
+        response = httpx.head(url, timeout=timeout, follow_redirects=True)
         return response.status_code < 500
-    except requests.exceptions.RequestException:
+    except httpx.HTTPError:
         return False
 
 
@@ -127,7 +127,7 @@ def safe_navigate_to_url(
     return f"""
 # Wait for server to be ready before navigating
 import time
-import requests
+import urllib.request
 
 def wait_for_server_ready():
     \"\"\"Wait for a server to become ready before proceeding.
@@ -148,9 +148,11 @@ def wait_for_server_ready():
     while time.time() - start_time < max_wait:
         try:
             # Try to make a simple HEAD request to check if server is responding
-            response = requests.head(url, timeout=5, allow_redirects=True)
-            if response.status_code < 500:  # Accept any non-server-error response
-                print(f"✅ Server is ready! Status: {{response.status_code}}")
+            req = urllib.request.Request(url, method='HEAD')
+            response = urllib.request.urlopen(req, timeout=5)
+            status_code = response.getcode()
+            if status_code < 500:  # Accept any non-server-error response
+                print(f"✅ Server is ready! Status: {{status_code}}")
                 return True
         except Exception as e:
             # Server not ready yet

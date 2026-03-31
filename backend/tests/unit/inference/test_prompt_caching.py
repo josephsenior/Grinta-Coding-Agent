@@ -16,7 +16,7 @@ def test_model_supports_hints_pattern_claude3() -> None:
 
 
 def test_model_supports_hints_gemini_pattern() -> None:
-    assert model_supports_prompt_cache_hints("gemini/gemini-2.0-flash")
+    assert model_supports_prompt_cache_hints("google/gemini-2.0-flash")
     assert model_supports_prompt_cache_hints("gemini-2.5-pro")
 
 

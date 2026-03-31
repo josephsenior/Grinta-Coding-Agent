@@ -102,6 +102,11 @@ class TestSetDefaults:
             cfg = LLMConfig(model="gemini-2.5-pro")
         assert cfg.reasoning_effort is None
 
+    def test_custom_google_provider_keeps_none_reasoning_effort(self):
+        with suppress_llm_env_export():
+            cfg = LLMConfig(model="custom-model", custom_llm_provider="google")
+        assert cfg.reasoning_effort is None
+
     def test_explicit_reasoning_effort_preserved(self):
         with suppress_llm_env_export():
             cfg = LLMConfig(model="gpt-4o", reasoning_effort="low")

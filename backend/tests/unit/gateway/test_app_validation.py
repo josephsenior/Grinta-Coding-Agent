@@ -22,23 +22,26 @@ from backend.gateway.app import (
 class TestCheckBudgetSanity:
     def test_no_budget_warns(self):
         warnings: list[str] = []
-        with patch("backend.gateway.app._app_config") as mock_cfg:
-            mock_cfg.max_budget_per_task = None
+        mock_cfg = MagicMock()
+        mock_cfg.max_budget_per_task = None
+        with patch("backend.gateway.app._get_app_config", return_value=mock_cfg):
             _check_budget_sanity(warnings)
         assert len(warnings) == 1
         assert "unlimited" in warnings[0].lower()
 
     def test_zero_budget_warns(self):
         warnings: list[str] = []
-        with patch("backend.gateway.app._app_config") as mock_cfg:
-            mock_cfg.max_budget_per_task = 0
+        mock_cfg = MagicMock()
+        mock_cfg.max_budget_per_task = 0
+        with patch("backend.gateway.app._get_app_config", return_value=mock_cfg):
             _check_budget_sanity(warnings)
         assert len(warnings) == 1
 
     def test_valid_budget_no_warnings(self):
         warnings: list[str] = []
-        with patch("backend.gateway.app._app_config") as mock_cfg:
-            mock_cfg.max_budget_per_task = 5.0
+        mock_cfg = MagicMock()
+        mock_cfg.max_budget_per_task = 5.0
+        with patch("backend.gateway.app._get_app_config", return_value=mock_cfg):
             _check_budget_sanity(warnings)
         assert not warnings
 

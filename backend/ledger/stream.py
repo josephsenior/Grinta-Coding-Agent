@@ -68,18 +68,26 @@ async def session_exists(
 
 def _warn_unclosed_stream(sid: str) -> None:
     """weakref.finalize callback — fires if a stream is GC'd without close()."""
-    message = "EventStream '%s' was GC'd without close(); resources may leak."
-    try:
-        logger.warning(message, sid)
-    except (ValueError, OSError, AttributeError, BrokenPipeError):
-        try:
-            import sys
+    import sys
 
-            s = getattr(sys, "stderr", None)
-            if s is not None:
-                s.write(f"{message % sid}\n")
-        except (ValueError, OSError, AttributeError, BrokenPipeError):
-            pass
+    # During interpreter/test shutdown, logging handlers and IO streams may
+    # already be torn down.  The logging module prints noisy
+    # ``--- Logging error --- / ValueError: I/O operation on closed file``
+    # tracebacks internally *before* raising, so a try/except cannot silence
+    # them.  Bypass the logging subsystem entirely and write to stderr
+    # directly — if it is still usable.
+    if sys.is_finalizing():
+        return
+    stderr = getattr(sys, "stderr", None)
+    if stderr is None or getattr(stderr, "closed", True):
+        return
+    try:
+        stderr.write(
+            f"WARNING: EventStream '{sid}' was GC'd without close(); "
+            "resources may leak.\n"
+        )
+    except (ValueError, OSError):
+        pass
 
 
 class EventStream(EventStore):
@@ -680,11 +688,7 @@ def get_aggregated_event_stream_stats() -> dict[str, int]:
     return _impl()
 
 
-Ledger = EventStream
-
-
 __all__ = [
-    "Ledger",
     "EventStream",
     "EventStreamSubscriber",
     "get_aggregated_event_stream_stats",

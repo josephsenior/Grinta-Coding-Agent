@@ -48,7 +48,7 @@ def test_validate_run_controller_inputs():
 
 def test_setup_replay_events_none():
     config = MagicMock(spec=AppConfig)
-    config.replay_transcript_path = None
+    config.replay_trajectory_path = None
     action = MessageAction(content="test")
 
     events, act = _setup_replay_events(config, action)
@@ -59,7 +59,7 @@ def test_setup_replay_events_none():
 @patch("backend.core.bootstrap.main.load_replay_log")
 def test_setup_replay_events_enabled(mock_load):
     config = MagicMock(spec=AppConfig)
-    config.replay_transcript_path = "path.json"
+    config.replay_trajectory_path = "path.json"
     action = NullAction()
 
     mock_load.return_value = ([], action)
@@ -191,7 +191,8 @@ def test_create_event_handler(mock_read_input):
 @patch("backend.core.bootstrap.main.json.dump")
 def test_save_trajectory(mock_json, mock_open, mock_mkdir):
     config = AppConfig()
-    config.save_transcript_path = "/tmp/trajectories"
+    config.save_trajectory_path = "/tmp/trajectories"
+    config.save_screenshots_in_trajectory = False
     mock_controller = MagicMock()
     mock_controller.get_transcript.return_value = {"events": []}
 

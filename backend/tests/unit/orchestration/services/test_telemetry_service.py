@@ -114,12 +114,6 @@ class TestTelemetryService(unittest.TestCase):
         # Should still initialize pipeline
         self.mock_context.initialize_operation_pipeline.assert_called_once()
 
-    def test_initialize_tool_pipeline_alias(self):
-        with patch.object(self.service, "initialize_operation_pipeline") as mock_initialize:
-            self.service.initialize_tool_pipeline()
-
-        mock_initialize.assert_called_once_with()
-
     @patch("backend.orchestration.tool_telemetry.ToolTelemetry")
     @patch("backend.ledger.observation.ErrorObservation")
     def test_handle_blocked_invocation(self, mock_error_obs, mock_tool_telemetry):

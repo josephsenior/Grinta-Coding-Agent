@@ -17,6 +17,17 @@ def _disable_bundled_mcp_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(NO_BUNDLED_MCP_DEFAULTS_ENV, "1")
 
 
+def test_bundled_mcp_json_path_uses_execution_layout() -> None:
+    from backend.core.config import mcp_config as mcp_config_mod
+
+    path = getattr(mcp_config_mod, "_bundled_mcp_json_path")()
+
+    assert path is not None
+    assert str(path).replace("\\", "/").endswith(
+        "backend/execution/mcp/config.json"
+    )
+
+
 # ── _validate_mcp_url ───────────────────────────────────────────────
 
 
@@ -238,7 +249,7 @@ class TestMCPServerConfigStdio:
         mcp_dir.mkdir(parents=True)
         config_json = mcp_dir / "config.json"
 
-        with open(config_json, "w") as f:
+        with open(config_json, "w", encoding="utf-8") as f:
             f.write("invalid json")
 
         from backend.core.config import mcp_config as mcp_config_mod
@@ -384,17 +395,12 @@ class TestMCPConfig:
         with pytest.raises(ValueError, match="Invalid MCP configuration"):
             MCPConfig.from_toml_section({"unknown_field": True})
 
-    def test_sse_servers_compat_property(self):
-        """Backward-compat property returns only SSE servers."""
-        cfg = MCPConfig(
-            servers=[
-                MCPServerConfig(name="a", type="sse", url="http://a.com"),
-                MCPServerConfig(name="b", type="stdio", command="npx"),
-            ]
-        )
-        assert len(cfg.sse_servers) == 1
-        assert len(cfg.stdio_servers) == 1
-        assert len(cfg.shttp_servers) == 0
+    def test_legacy_server_lists_are_rejected(self):
+        with pytest.raises(Exception):
+            MCPConfig(
+                enabled=True,
+                stdio_servers=[{"name": "legacy", "command": "npx", "type": "stdio"}],
+            )
 
     def test_from_toml_section_loads_json_config(self, tmp_path, monkeypatch):
         """Bundled defaults path is merged into from_toml_section (same rule as finalize_config)."""
@@ -403,7 +409,7 @@ class TestMCPConfig:
         config_json = mcp_dir / "config.json"
 
         import json
-        with open(config_json, "w") as f:
+        with open(config_json, "w", encoding="utf-8") as f:
             json.dump({
                 "mcpServers": {
                     "json-server": {"command": "npx", "args": ["test"]}
@@ -448,3 +454,29 @@ class TestAppMCPConfig:
         assert shttp is None
         assert isinstance(stdio, list)
         assert not stdio
+
+    def test_ensure_default_mcp_http_server_skips_empty_local_server(self, monkeypatch):
+        from backend.core.config.app_config import AppConfig
+        from backend.core.config import mcp_config as mcp_config_mod
+
+        config = AppConfig()
+        config.mcp_host = "localhost:3000"
+        monkeypatch.setattr(mcp_config_mod, "_get_local_app_mcp_tool_count", lambda: 0)
+
+        mcp_config_mod.ensure_default_mcp_http_server(config)
+
+        assert [server for server in config.mcp.servers if server.name == "app-mcp"] == []
+
+    def test_ensure_default_mcp_http_server_adds_local_server_when_tools_exist(self, monkeypatch):
+        from backend.core.config.app_config import AppConfig
+        from backend.core.config import mcp_config as mcp_config_mod
+
+        config = AppConfig()
+        config.mcp_host = "localhost:3000"
+        monkeypatch.setattr(mcp_config_mod, "_get_local_app_mcp_tool_count", lambda: 3)
+
+        mcp_config_mod.ensure_default_mcp_http_server(config)
+
+        app_mcp_servers = [server for server in config.mcp.servers if server.name == "app-mcp"]
+        assert len(app_mcp_servers) == 1
+        assert app_mcp_servers[0].url == "http://localhost:3000/mcp/mcp"

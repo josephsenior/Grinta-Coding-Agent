@@ -41,7 +41,7 @@ from backend.gateway.middleware.security_headers import (
 from backend.gateway.middleware.audit_logger import AuditLoggerMiddleware
 from backend.gateway.route_registry import register_routes
 from backend.gateway.routes.mcp import mcp_server
-from backend.gateway.app_accessors import config as _app_config
+from backend.gateway.app_accessors import get_config as _get_app_config
 from backend.gateway.app_accessors import (
     get_conversation_manager,
 )
@@ -164,7 +164,7 @@ def _collect_validation_issues(strict: bool) -> tuple[list[str], list[str]]:
 
 def _check_budget_sanity(warnings: list[str]) -> None:
     """Warn on unlimited task budget."""
-    budget = getattr(_app_config, "max_budget_per_task", None)
+    budget = getattr(_get_app_config(), "max_budget_per_task", None)
     if budget is None or budget == 0 or budget == 0.0:
         warnings.append(
             "max_budget_per_task is unlimited (None / 0). Long sessions with "
@@ -203,7 +203,7 @@ def _check_config_file_existence(warnings: list[str]) -> None:
 
 def _check_mcp_host_config(warnings: list[str]) -> None:
     """Warn when mcp_host is empty or disabled (default is localhost:3000 in AppConfig)."""
-    raw = getattr(_app_config, "mcp_host", None)
+    raw = getattr(_get_app_config(), "mcp_host", None)
     normalized = (raw or "").strip()
     if not normalized or normalized.lower() in {"none", "null"}:
         warnings.append(

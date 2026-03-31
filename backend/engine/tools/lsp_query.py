@@ -26,17 +26,10 @@ def create_lsp_query_tool() -> dict[str, Any]:
         "function": {
             "name": LSP_QUERY_TOOL_NAME,
             "description": (
-                "Query the language server for code navigation. "
-                "Use this when you already know the file and symbol position and need precise cross-file navigation. "
-                "If the location is still unknown, use search_code first. "
-                "If the task is architectural dependency exploration rather than exact references, "
-                "use read_symbol_definition or explore_tree_structure.\n\n"
-                "Commands:\n"
-                "  find_definition – jump to where a symbol is defined\n"
-                "  find_references – find every usage of a symbol in the project\n"
-                "  hover           – show the docstring / type signature of a symbol\n"
-                "  list_symbols    – list all functions and classes defined in a file\n\n"
-                "Falls back gracefully if the language server is not installed."
+                "Code navigation via language server. Commands: find_definition, find_references, "
+                "hover, list_symbols. Use when you know the file and position. "
+                "For text search use search_code; for dependency graphs use explore_tree_structure. "
+                "Falls back gracefully if LSP is not installed."
             ),
             "parameters": {
                 "type": "object",

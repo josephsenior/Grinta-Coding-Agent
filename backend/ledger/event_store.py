@@ -69,6 +69,25 @@ class EventStore(EventStoreABC):
     cache_size: int = 25
     _cur_id: int | None = None
 
+    def __post_init__(self) -> None:
+        """Initialize the optional SQLite event store."""
+        import os
+        self._sqlite_store: Any = None
+        if str(os.getenv("APP_SQLITE_EVENTS", "true")).lower() in ("1", "true", "yes"):
+            try:
+                from backend.persistence.sqlite_event_store import SQLiteEventStore
+                events_dir = get_conversation_events_dir(self.sid, self.user_id)
+                db_path = os.path.join(
+                    self.file_store.get_base_path()
+                    if hasattr(self.file_store, "get_base_path")
+                    else ".",
+                    events_dir,
+                    "events.db",
+                )
+                self._sqlite_store = SQLiteEventStore(db_path=db_path)
+            except Exception as exc:
+                logger.warning("Failed to init SQLite store in EventStore: %s", exc)
+
     @property
     def cur_id(self) -> int:
         """Lazy calculated property for the current event ID."""
@@ -83,16 +102,24 @@ class EventStore(EventStoreABC):
 
     def _calculate_cur_id(self) -> int:
         """Calculate the current event ID based on file system content."""
+        max_id = -1
+        if getattr(self, "_sqlite_store", None) is not None:
+            max_id = max(max_id, self._sqlite_store.max_id())
+        
         events = []
         try:
             events_dir = get_conversation_events_dir(self.sid, self.user_id)
             events = self.file_store.list(events_dir)
         except FileNotFoundError:
-            logger.debug("No events found for session %s at %s", self.sid, events_dir)
-        if not events:
+            if max_id == -1:
+                logger.debug("No events found for session %s at %s", self.sid, events_dir)
+        
+        if not events and max_id == -1:
             return 0
-        max_id = -1
+            
         for event_str in events:
+            if event_str == "events.db" or event_str.endswith(".db-wal") or event_str.endswith(".db-shm"):
+                continue
             event_id = self._get_id_from_filename(event_str)
             max_id = max(event_id, max_id)
         return max_id + 1
@@ -208,6 +235,11 @@ class EventStore(EventStoreABC):
             FileNotFoundError: If event doesn't exist
 
         """
+        if getattr(self, "_sqlite_store", None) is not None:
+            data = self._sqlite_store.read_event(event_id)
+            if data is not None:
+                return event_from_dict(data)
+
         filename = self._get_filename_for_id(event_id, self.user_id)
         last_error: Exception | None = None
         for _ in range(5):
@@ -298,6 +330,4 @@ class EventStore(EventStoreABC):
             return -1
 
 
-LedgerStore = EventStore
-
-__all__ = ["EventStore", "LedgerStore"]
+__all__ = ["EventStore"]

@@ -72,6 +72,3 @@ class TestExportTranscript:
                     conversation=mock_conversation,
                     cursor=cursor
                 )
-
-    def test_legacy_export_trajectory_alias(self):
-        assert trajectory_service.export_trajectory is trajectory_service.export_transcript

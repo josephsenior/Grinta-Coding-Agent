@@ -19,7 +19,7 @@ import time
 from collections import OrderedDict
 from typing import Any
 
-from .local_vector_store import ChromaDBBackend, SQLiteBM25Backend
+from .local_vector_store import SQLiteBM25Backend
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +183,8 @@ class EnhancedVectorStore:
             cache_ttl: Cache TTL in seconds
 
         """
+        from .local_vector_store import ChromaDBBackend
+
         self.backend: ChromaDBBackend = ChromaDBBackend(collection_name)
         self.bm25_backend = SQLiteBM25Backend(collection_name)
 

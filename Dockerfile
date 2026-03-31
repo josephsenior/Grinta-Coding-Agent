@@ -22,7 +22,7 @@ WORKDIR /build
 # Copy full source (hatchling needs README.md + backend/playbooks for force-include)
 COPY pyproject.toml README.md settings.template.json start_server.py ./
 COPY backend/ ./backend/
-RUN /uv/bin/uv pip install --system --no-cache .
+RUN /uv/bin/uv pip install --system --no-cache ".[all]"
 
 # --- Runtime stage: minimal image ---
 FROM python:3.12-slim AS runtime

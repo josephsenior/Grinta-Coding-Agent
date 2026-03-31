@@ -128,9 +128,7 @@ class SessionOrchestrator:
     _SERVICE_ALIASES: ClassVar[dict[str, str]] = {
         "action_service": "action",
         "pending_action_service": "pending_action",
-        "open_operation_service": "open_operation",
         "autonomy_service": "autonomy",
-        "execution_policy_service": "execution_policy",
         "iteration_service": "iteration",
         "lifecycle_service": "lifecycle",
         "state_service": "state",
@@ -334,9 +332,7 @@ class SessionOrchestrator:
             self._step_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._step_task
-        pending_service = getattr(self, "open_operation_service", None)
-        if pending_service is None:
-            pending_service = getattr(self, "pending_action_service", None)
+        pending_service = self.services.pending_action
         if pending_service is not None:
             pending_service.shutdown()
         if set_stop_state:
@@ -345,7 +341,7 @@ class SessionOrchestrator:
         self.event_stream.unsubscribe(
             EventStreamSubscriber.AGENT_CONTROLLER, self.id or ""
         )
-        await self.retry_service.shutdown()
+        await self.services.retry.shutdown()
         self._lifecycle = LifecyclePhase.CLOSED
 
     def log(self, level: str, message: str, extra: dict | None = None) -> None:
@@ -365,7 +361,7 @@ class SessionOrchestrator:
 
     async def _react_to_exception(self, e: Exception) -> None:
         """Delegate exception handling to the recovery service."""
-        await self.recovery_service.react_to_exception(e)
+        await self.services.recovery.react_to_exception(e)
 
     def step(self) -> None:
         """Trigger agent to take one step asynchronously.
@@ -507,7 +503,7 @@ class SessionOrchestrator:
 
     async def set_agent_state_to(self, new_state: AgentState) -> None:
         """Delegate to the state transition service for consistency."""
-        await self.state_service.set_agent_state(new_state)
+        await self.services.state.set_agent_state(new_state)
 
     def get_agent_state(self) -> AgentState:
         """Returns the current state of the agent.
@@ -593,16 +589,16 @@ class SessionOrchestrator:
 
         # Reset retry count on successful action execution
         # This prevents getting stuck if a previous error has been resolved
-        if self.retry_service.retry_count > 0:
+        if self.services.retry.retry_count > 0:
             logger.debug(
                 "Resetting retry count from %d to 0 after successful execution",
-                self.retry_service.retry_count,
+                self.services.retry.retry_count,
             )
-            self.retry_service.reset_retry_metrics()
+            self.services.retry.reset_retry_metrics()
 
         if isinstance(action, SignalProgressAction):
-            if hasattr(self.circuit_breaker_service, "record_progress_signal"):
-                self.circuit_breaker_service.record_progress_signal(
+            if hasattr(self.services.circuit_breaker, "record_progress_signal"):
+                self.services.circuit_breaker.record_progress_signal(
                     action.progress_note
                 )
 
@@ -743,9 +739,7 @@ class SessionOrchestrator:
 
     @property
     def _pending_action(self) -> Action | None:
-        pending_service = getattr(self, "open_operation_service", None)
-        if pending_service is None:
-            pending_service = getattr(self, "pending_action_service", None)
+        pending_service = self.services.pending_action
         if pending_service:
             return pending_service.get()
         service = getattr(self, "action_service", None)
@@ -755,9 +749,7 @@ class SessionOrchestrator:
 
     @_pending_action.setter
     def _pending_action(self, action: Action | None) -> None:
-        pending_service = getattr(self, "open_operation_service", None)
-        if pending_service is None:
-            pending_service = getattr(self, "pending_action_service", None)
+        pending_service = self.services.pending_action
         if pending_service:
             pending_service.set(action)
             return
@@ -818,21 +810,7 @@ class SessionOrchestrator:
             raise RuntimeError(
                 f"get_transcript() requires the controller to be closed. Current phase: {self._lifecycle.value}"
             )
-        getter = getattr(self.state_tracker, "get_transcript", None)
-        if getter is None:
-            getter = self.state_tracker.get_trajectory
-        return getter(include_screenshots)
-
-    def get_trajectory(self, include_screenshots: bool = False) -> list[dict]:
-        """Backward-compatible alias for transcript export."""
-        if self._lifecycle != LifecyclePhase.CLOSED:
-            raise RuntimeError(
-                f"get_trajectory() requires the controller to be closed. Current phase: {self._lifecycle.value}"
-            )
-        getter = getattr(self.state_tracker, "get_trajectory", None)
-        if getter is None:
-            getter = self.state_tracker.get_transcript
-        return getter(include_screenshots)
+        return self.state_tracker.get_transcript(include_screenshots)
 
     def _is_stuck(self) -> bool:
         """Checks if the agent is stuck in a loop.
@@ -841,12 +819,7 @@ class SessionOrchestrator:
             bool: True if the agent is stuck, False otherwise.
 
         """
-        headless_mode = getattr(
-            self,
-            "headless_mode",
-            getattr(getattr(self, "config", None), "headless_mode", False),
-        )
-        return self.stuck_service.is_stuck(headless_mode=headless_mode)
+        return self.services.stuck.is_stuck()
 
     def __repr__(self) -> str:
         """Get string representation of controller with key state information.

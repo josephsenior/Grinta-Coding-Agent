@@ -6,7 +6,7 @@ strict JSON envelope wrapped in explicit tags so parsing stays deterministic.
 
 from __future__ import annotations
 
-import json
+from backend.core import json_compat as json
 
 TOOL_RESULT_BLOCK_PREFIX = "<app_tool_result_json>"
 TOOL_RESULT_BLOCK_SUFFIX = "</app_tool_result_json>"

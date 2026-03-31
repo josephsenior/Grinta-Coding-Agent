@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 from backend.inference.llm_utils import check_tools
 from backend.inference.catalog_loader import supports_tool_choice
-from backend.engine.tools.verify_ui import create_verify_ui_change_tool
 
 ChatCompletionToolParam = Any
 
@@ -138,16 +137,12 @@ class OrchestratorPlanner:
             tools.append(create_memory_manager_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
-        """Add apply_patch, batch_edit, task_tracker, search_code, explore_code tools."""
+        """Add apply_patch, task_tracker, search_code, explore_code tools."""
         from backend.engine.tools.apply_patch import (
             create_apply_patch_tool,
         )
-        from backend.engine.tools.batch_edit import create_batch_edit_tool
         from backend.engine.tools.task_tracker import (
             create_task_tracker_tool,
-        )
-        from backend.engine.tools.search_available_tools import (
-            create_search_available_tools_tool,
         )
         from backend.engine.tools.search_code import (
             create_search_code_tool,
@@ -159,9 +154,7 @@ class OrchestratorPlanner:
 
         if getattr(self._config, "enable_apply_patch", True):
             tools.append(create_apply_patch_tool())
-            tools.append(create_batch_edit_tool())
         if getattr(self._config, "enable_internal_task_tracker", True):
-            tools.append(create_search_available_tools_tool())
             tools.append(create_task_tracker_tool())
         if getattr(self._config, "enable_search_code", True):
             tools.append(create_search_code_tool())
@@ -184,32 +177,21 @@ class OrchestratorPlanner:
             tools.append(create_terminal_manager_tool())
 
     def _add_optional_feature_tools(self, tools: list) -> None:
-        """Add check_tool_status, delegate, rollback, workspace_status, etc."""
+        """Add workspace_status, delegate, analyze_project_structure, etc."""
         from backend.engine.tools.check_tool_status import (
             create_check_tool_status_tool,
         )
         from backend.engine.tools.delegate_task import (
             create_delegate_task_tool,
         )
-        from backend.engine.tools.revert_to_checkpoint import (
-            create_revert_to_checkpoint_tool,
-        )
         from backend.engine.tools.lsp_query import create_lsp_query_tool
         from backend.engine.tools.signal_progress import (
             create_signal_progress_tool,
-        )
-        from backend.engine.tools.error_recovery_memory import (
-            create_error_recovery_memory_tool,
         )
 
         if getattr(self._config, "enable_check_tool_status", False):
             tools.append(create_check_tool_status_tool())
 
-        tools.append(create_error_recovery_memory_tool())
-
-        # Optional feature tools remain flag-gated; note that enable_lsp_query
-        # currently defaults to True in AgentConfig while the others below are
-        # mostly default-off.
         if getattr(self._config, "enable_lsp_query", False):
             tools.append(create_lsp_query_tool())
         if getattr(self._config, "enable_signal_progress", False):
@@ -220,8 +202,6 @@ class OrchestratorPlanner:
         from backend.engine.tools.blackboard import create_blackboard_tool
         if getattr(self._config, "enable_blackboard", False):
             tools.append(create_blackboard_tool())
-        if getattr(self._config, "enable_rollback", False):
-            tools.append(create_revert_to_checkpoint_tool())
         self._add_lazy_import_tools(
             tools,
             [
@@ -231,19 +211,7 @@ class OrchestratorPlanner:
                     "workspace_status",
                     "create_workspace_status_tool",
                 ),
-                (
-                    "enable_checkpoints",
-                    False,
-                    "checkpoint",
-                    "create_checkpoint_tool",
-                ),
                 ("enable_analyze_project_structure", False, "analyze_project_structure", "create_analyze_project_structure_tool"),
-                (
-                    "enable_session_diff",
-                    False,
-                    "session_diff",
-                    "create_session_diff_tool",
-                ),
                 (
                     "enable_verify_file_lines",
                     False,
@@ -281,9 +249,6 @@ class OrchestratorPlanner:
         if getattr(self._config, "enable_browsing", False):
             # We now rely on external MCP (like browser-use)
             pass
-
-        if getattr(self._config, "enable_verify_ui_change", False):
-            tools.append(create_verify_ui_change_tool())
 
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, "enable_editor", True):

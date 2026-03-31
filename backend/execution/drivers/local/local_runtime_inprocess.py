@@ -98,6 +98,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
         # Setup workspace
         self._temp_workspace: str | None = project_root
+        self._owns_workspace = project_root is None
         self.status_callback = status_callback
 
         # RuntimeExecutor instance (created in connect()). Typed against the
@@ -192,6 +193,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         if self._temp_workspace is None:
             # If project_root is provided in init, use it; otherwise create temp
             base = getattr(self, "project_root", None)
+            self._owns_workspace = not bool(base)
             if base:
                 self._temp_workspace = base
                 os.makedirs(base, exist_ok=True)
@@ -201,12 +203,19 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                 )
             self.config.workspace_mount_path_in_runtime = self._temp_workspace
             logger.info("Using workspace: %s", self._temp_workspace)
-            # Initialize git repository for workspace change tracking
-            import subprocess
-            try:
-                subprocess.run(['git', 'init'], cwd=self._temp_workspace, check=True, capture_output=True)
-            except Exception as e:
-                logger.warning("Failed to init git in temp workspace: %s", e)
+            if self._owns_workspace:
+                # Temporary workspaces need a disposable git repo for change tracking.
+                import subprocess
+
+                try:
+                    subprocess.run(
+                        ['git', 'init'],
+                        cwd=self._temp_workspace,
+                        check=True,
+                        capture_output=True,
+                    )
+                except Exception as e:
+                    logger.warning("Failed to init git in temp workspace: %s", e)
             return
 
         self.config.workspace_mount_path_in_runtime = self._temp_workspace
@@ -489,8 +498,8 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
         time.sleep(0.5)  # Brief wait for Windows file handle release
 
-        # Clean up workspace with retry logic
-        if self._temp_workspace and os.path.exists(self._temp_workspace):
+        # Clean up workspace with retry logic, but never remove a user workspace.
+        if self._owns_workspace and self._temp_workspace and os.path.exists(self._temp_workspace):
             import shutil
 
             max_retries = 3

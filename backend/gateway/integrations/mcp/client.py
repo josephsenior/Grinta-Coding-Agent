@@ -15,10 +15,7 @@ from fastmcp.client.transports import (
 from mcp import McpError
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-from backend.core.config.mcp_config import (
-    MCPRemoteServerConfig,
-    MCPStdioServerConfig,
-)
+from backend.core.config.mcp_config import MCPServerConfig
 from backend.core.logger import app_logger as logger
 from backend.gateway.integrations.mcp.error_collector import mcp_error_collector
 from backend.gateway.integrations.mcp.tool import MCPClientTool
@@ -75,9 +72,7 @@ class MCPClient(BaseModel):
     _mcp_alias_peers: list[Any] | None = PrivateAttr(default=None)
     _mcp_alias_reserved: frozenset[str] | None = PrivateAttr(default=None)
     _connect_kwargs: dict | None = None
-    _server_config: (
-        MCPStdioServerConfig | MCPRemoteServerConfig | None
-    ) = None
+    _server_config: MCPServerConfig | None = None
 
     # ------------------------------------------------------------------
     # Internal session management
@@ -198,7 +193,7 @@ class MCPClient(BaseModel):
 
     async def connect_http(
         self,
-        server: MCPRemoteServerConfig,
+        server: MCPServerConfig,
         conversation_id: str | None = None,
         timeout: float = 30.0,
     ) -> None:
@@ -250,14 +245,14 @@ class MCPClient(BaseModel):
             headers["X-App-ServerConversation-ID"] = conversation_id
         return headers
 
-    def _create_http_transport(self, server: MCPRemoteServerConfig, server_url: str, headers: dict):
+    def _create_http_transport(self, server: MCPServerConfig, server_url: str, headers: dict):
         """Create appropriate HTTP transport."""
         if server.transport == "shttp":
             return StreamableHttpTransport(url=server_url, headers=headers or None)
         return SSETransport(url=server_url, headers=headers or None)
 
     def _handle_connection_error(
-        self, server_url: str, server: MCPRemoteServerConfig, error: Exception, is_mcp_error: bool = False
+        self, server_url: str, server: MCPServerConfig, error: Exception, is_mcp_error: bool = False
     ) -> None:
         """Handle and record connection errors."""
         error_prefix = "McpError" if is_mcp_error else "Error"
@@ -272,7 +267,7 @@ class MCPClient(BaseModel):
         )
 
     async def connect_stdio(
-        self, server: MCPStdioServerConfig, timeout: float = 30.0
+        self, server: MCPServerConfig, timeout: float = 30.0
     ) -> None:
         """Connect to MCP server using stdio transport."""
         try:

@@ -298,8 +298,8 @@ def _handle_search_code_tool(arguments: dict) -> CmdRunAction:
     )
 
 
-def _handle_workspace_status_tool(arguments: dict) -> CmdRunAction:
-    """Handle workspace_status tool: gather project state snapshot."""
+def _handle_workspace_status_tool(arguments: dict):
+    """Handle workspace_status tool: status, diff, checkpoints, revert."""
     return build_workspace_status_action(arguments)
 
 
@@ -667,6 +667,12 @@ def _is_preview_enabled(raw: Any) -> bool:
 
 def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     """Handle str_replace_editor tool call."""
+    command = arguments.get("command", "")
+
+    # batch_replace is handled separately — it doesn't need path validation
+    if command == "batch_replace":
+        return _handle_batch_replace_command(arguments)
+
     path, command = _validate_str_replace_editor_args(arguments)
     command, normalized_args = _normalize_file_editor_command_and_args(
         command, arguments
@@ -721,6 +727,17 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     )
     set_security_risk(action, arguments)
     return action
+
+
+def _handle_batch_replace_command(arguments: dict) -> CmdRunAction:
+    """Handle batch_replace command — atomic multi-file edits with rollback."""
+    edits = arguments.get("edits")
+    if not edits or not isinstance(edits, list):
+        raise FunctionCallValidationError(
+            'batch_replace requires "edits" array of {path, old_str, new_str}'
+        )
+    preview = arguments.get("preview", False)
+    return build_batch_edit_action(edits, preview=bool(preview))
 
 
 def _handle_check_tool_status_tool(
@@ -1169,7 +1186,6 @@ def _handle_search_available_tools_tool(
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
-        SEARCH_AVAILABLE_TOOLS_TOOL_NAME: _handle_search_available_tools_tool,
         create_cmd_run_tool()["function"]["name"]: _handle_cmd_run_tool,
         create_finish_tool()["function"]["name"]: _handle_finish_tool,
         create_llm_based_edit_tool()["function"][
@@ -1191,20 +1207,14 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         "check_tool_status": lambda args: _handle_check_tool_status_tool(
             args, {}
-        ),  # Simplified for static map
+        ),
         WORKSPACE_STATUS_TOOL_NAME: _handle_workspace_status_tool,
-        ERROR_RECOVERY_MEMORY_TOOL_NAME: _handle_error_recovery_memory_tool,
-        CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
-        REVERT_TO_CHECKPOINT_TOOL_NAME: build_revert_to_checkpoint_action,
-        SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,
         VERIFY_FILE_LINES_TOOL_NAME: _handle_verify_file_lines_tool,
         DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
         LSP_QUERY_TOOL_NAME: build_lsp_query_action,
         SIGNAL_PROGRESS_TOOL_NAME: build_signal_progress_action,
-        VERIFY_UI_CHANGE_TOOL_NAME: build_verify_ui_change_action,
         BLACKBOARD_TOOL_NAME: build_blackboard_action,
-        BATCH_EDIT_TOOL_NAME: _handle_batch_edit_tool,
         TERMINAL_MANAGER_TOOL_NAME: handle_terminal_manager_tool,
         "explore_tree_structure": build_explore_tree_structure_action,
         "read_symbol_definition": build_read_symbol_definition_action,
@@ -1212,6 +1222,14 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
         # MCP gateway
         EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
+        # Backward compatibility — retired tools still dispatch if called
+        BATCH_EDIT_TOOL_NAME: _handle_batch_edit_tool,
+        SEARCH_AVAILABLE_TOOLS_TOOL_NAME: _handle_search_available_tools_tool,
+        ERROR_RECOVERY_MEMORY_TOOL_NAME: _handle_error_recovery_memory_tool,
+        CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
+        REVERT_TO_CHECKPOINT_TOOL_NAME: build_revert_to_checkpoint_action,
+        SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,
+        VERIFY_UI_CHANGE_TOOL_NAME: build_verify_ui_change_action,
     }
 
 

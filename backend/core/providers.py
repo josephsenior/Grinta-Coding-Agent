@@ -64,7 +64,7 @@ VERIFIED_GROQ_MODELS: Any = _LazyModelList("groq")
 PROVIDER_PREFIX_PATTERNS = {
     "openai": ["openai/"],
     "anthropic": ["anthropic/"],
-    "google": ["google/", "gemini/"],
+    "google": ["google/"],
     "xai": ["xai/"],
     "groq": ["groq/"],
     "openhands": ["openhands/"],

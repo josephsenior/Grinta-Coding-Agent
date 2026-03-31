@@ -67,11 +67,11 @@ class TestModelMatches:
 
     def test_provider_qualified_pattern_matches_full(self):
         """Patterns containing '/' match against the full lowercased string."""
-        assert model_matches("gemini/gemini-1.5-pro", ["gemini/gemini-1.5-*"]) is True
+        assert model_matches("google/gemini-1.5-pro", ["google/gemini-1.5-*"]) is True
 
     def test_provider_qualified_does_not_match_bare_name(self):
         # The pattern includes '/' so it must match the full string
-        assert model_matches("gemini-1.5-pro", ["gemini/gemini-1.5-*"]) is False
+        assert model_matches("gemini-1.5-pro", ["google/gemini-1.5-*"]) is False
 
     def test_bare_pattern_matches_normalized_name(self):
         """Patterns without '/' match against normalized basename."""
@@ -126,7 +126,7 @@ class TestPatternSanity:
         [
             "claude-3-5-sonnet-20241022",
             "gpt-4o-2024-11-20",
-            "gemini/gemini-2.0-flash",
+            "google/gemini-2.0-flash",
             "grok-3",
         ],
     )
@@ -145,7 +145,7 @@ class TestPatternSanity:
         [
             "claude-3.5-sonnet-20241022",
             "claude-3-haiku-20240307",
-            "gemini/gemini-2.0-flash",
+            "google/gemini-2.0-flash",
             "gemini-2.5-pro",
         ],
     )
@@ -161,7 +161,7 @@ class TestPatternSanity:
 
     @pytest.mark.parametrize(
         "model",
-        ["gpt-4o", "claude-3.5-sonnet-20241022", "gemini/gemini-2.0-flash"],
+        ["gpt-4o", "claude-3.5-sonnet-20241022", "google/gemini-2.0-flash"],
     )
     def test_response_schema_models(self, model):
         assert model_matches(model, RESPONSE_SCHEMA_PATTERNS)

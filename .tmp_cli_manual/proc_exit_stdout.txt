@@ -1,0 +1,133 @@
+
+                       _________________________________                       
+                ______/                                 \______                
+              /_____/     .-^^^^-.           .-^^^^-.     \_____\              
+                /_____/    / o  o \_________/ o  o \    \_____\                
+                   ||      \  --  /  _____  \  --  /      ||                   
+                       ||           \____/           ||                        
+              _____||_______'----'  | >_ |  '----'_______||_____               
+            /_______________________|_____|_______________________\            
+                     \              /_____|              /                     
+                      \____________/      \____________/                       
+                         |_____|              |_____|                          
+
+           GGGGGG   RRRRRR   IIIIIIII  NNN   NN  TTTTTTTT   AAAAAA             
+          GG    GG  RR   RR     II     NNNN  NN     TT     AA    AA            
+          GG        RRRRRR      II     NN NN NN     TT     AAAAAAAA            
+          GG  GGGG  RR  RR      II     NN  NNNN     TT     AA    AA            
+          GG    GG  RR   RR     II     NN   NNN     TT     AA    AA            
+           GGGGGG   RR    RR  IIIIIIII NN    NN     TT     AA    AA            
+
+{"asctime": "2026-03-30 22:42:29,897", "message": "API key for openai doesn't match expected prefixes: ['sk-']", "level": "WARNING", "timestamp": "2026-03-30T20:42:29.897523+00:00"}
+{"asctime": "2026-03-30 22:42:35,389", "message": "[LLM registry eb807184-8296-451f-83e6-68fcfa8f4c1a]: Registering service for agent", "level": "INFO", "timestamp": "2026-03-30T20:42:35.389433+00:00"}
+{"asctime": "2026-03-30 22:42:52,662", "message": "\u2705 Vector memory initialized for ContextMemory\n   Accuracy: 92% | Hybrid retrieval: enabled", "level": "INFO", "timestamp": "2026-03-30T20:42:52.662058+00:00"}
+{"asctime": "2026-03-30 22:42:52,678", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T20:42:52.678160+00:00"}
+{"asctime": "2026-03-30 22:42:52,679", "message": "\ud83c\udfe5 APP PRODUCTION HEALTH CHECK", "level": "INFO", "timestamp": "2026-03-30T20:42:52.679155+00:00"}
+{"asctime": "2026-03-30 22:42:52,679", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T20:42:52.679155+00:00"}
+{"asctime": "2026-03-30 22:42:52,687", "message": "\u2705 Ultimate Editor: Tree-sitter is READY", "level": "INFO", "timestamp": "2026-03-30T20:42:52.687421+00:00"}
+{"asctime": "2026-03-30 22:42:52,687", "message": "   - Structure-aware editing: ENABLED", "level": "INFO", "timestamp": "2026-03-30T20:42:52.687421+00:00"}
+{"asctime": "2026-03-30 22:42:52,688", "message": "   - Language support: 40+ languages", "level": "INFO", "timestamp": "2026-03-30T20:42:52.688435+00:00"}
+{"asctime": "2026-03-30 22:42:52,696", "message": "\u2705 Atomic Refactoring: READY", "level": "INFO", "timestamp": "2026-03-30T20:42:52.696496+00:00"}
+{"asctime": "2026-03-30 22:42:52,697", "message": "   - Multi-file transactions: ENABLED", "level": "INFO", "timestamp": "2026-03-30T20:42:52.697495+00:00"}
+{"asctime": "2026-03-30 22:42:52,697", "message": "   - Rollback system: ENABLED", "level": "INFO", "timestamp": "2026-03-30T20:42:52.697495+00:00"}
+{"asctime": "2026-03-30 22:42:52,698", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T20:42:52.698506+00:00"}
+{"asctime": "2026-03-30 22:42:52,698", "message": "\u2705 HEALTH CHECK PASSED", "level": "INFO", "timestamp": "2026-03-30T20:42:52.698506+00:00"}
+{"asctime": "2026-03-30 22:42:52,699", "message": "   App is production-ready!", "level": "INFO", "timestamp": "2026-03-30T20:42:52.699498+00:00"}
+{"asctime": "2026-03-30 22:42:52,700", "message": "============================================================", "level": "INFO", "timestamp": "2026-03-30T20:42:52.700507+00:00"}
+{"asctime": "2026-03-30 22:42:52,709", "message": "API key for openai doesn't match expected prefixes: ['sk-']", "level": "WARNING", "timestamp": "2026-03-30T20:42:52.709035+00:00"}
+{"asctime": "2026-03-30 22:42:52,721", "message": "Initializing ToolRegistry for cross-platform support...", "level": "INFO", "timestamp": "2026-03-30T20:42:52.721449+00:00"}
+{"asctime": "2026-03-30 22:42:52,721", "message": "\ud83d\udd0d Detecting available tools...", "level": "INFO", "timestamp": "2026-03-30T20:42:52.721449+00:00"}
+{"asctime": "2026-03-30 22:42:58,386", "message": "Runtime context: platform=win32 container=False wsl=False", "level": "INFO", "timestamp": "2026-03-30T20:42:58.386300+00:00"}
+{"asctime": "2026-03-30 22:42:58,386", "message": "\u2705 Shell: pwsh (7.5.5)", "level": "INFO", "timestamp": "2026-03-30T20:42:58.386300+00:00"}
+{"asctime": "2026-03-30 22:42:58,387", "message": "\u2705 Bash: bash (GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu))", "level": "INFO", "timestamp": "2026-03-30T20:42:58.387297+00:00"}
+{"asctime": "2026-03-30 22:42:58,387", "message": "\u2705 Search: findstr", "level": "INFO", "timestamp": "2026-03-30T20:42:58.387297+00:00"}
+{"asctime": "2026-03-30 22:42:58,388", "message": "\u2705 Git: git (git version 2.51.0.windows.2)", "level": "INFO", "timestamp": "2026-03-30T20:42:58.388294+00:00"}
+{"asctime": "2026-03-30 22:42:58,388", "message": "Running on Windows with pwsh shell", "level": "INFO", "timestamp": "2026-03-30T20:42:58.388294+00:00"}
+{"asctime": "2026-03-30 22:42:58,391", "message": "Initializing In-Process LocalRuntime. User ID: 0. Username: GIGABYTE.", "level": "INFO", "timestamp": "2026-03-30T20:42:58.391315+00:00"}
+{"asctime": "2026-03-30 22:42:58,392", "message": "Subscriber not found during unsubscribe: EventStreamSubscriber.RUNTIME", "level": "WARNING", "timestamp": "2026-03-30T20:42:58.392301+00:00"}
+{"asctime": "2026-03-30 22:42:58,410", "message": "Creating RuntimeExecutor in-process...", "level": "INFO", "timestamp": "2026-03-30T20:42:58.410429+00:00"}
+{"asctime": "2026-03-30 22:42:58,411", "message": "Initializing RuntimeExecutor...", "level": "INFO", "timestamp": "2026-03-30T20:42:58.411426+00:00"}
+{"asctime": "2026-03-30 22:42:58,412", "message": "Step 1/5: Initializing default shell session...", "level": "INFO", "timestamp": "2026-03-30T20:42:58.412425+00:00"}
+{"asctime": "2026-03-30 22:42:58,413", "message": "Creating shell session for platform: win32", "level": "INFO", "timestamp": "2026-03-30T20:42:58.413418+00:00"}
+{"asctime": "2026-03-30 22:42:58,414", "message": "Detected shell: pwsh", "level": "INFO", "timestamp": "2026-03-30T20:42:58.414412+00:00"}
+{"asctime": "2026-03-30 22:42:58,414", "message": "Has tmux: False", "level": "INFO", "timestamp": "2026-03-30T20:42:58.414412+00:00"}
+{"asctime": "2026-03-30 22:42:58,415", "message": "Runtime context: container=False wsl=False", "level": "INFO", "timestamp": "2026-03-30T20:42:58.415896+00:00"}
+{"asctime": "2026-03-30 22:42:58,416", "message": "Using SimpleBashSession (Linux-style command path via Git Bash on Windows)", "level": "INFO", "timestamp": "2026-03-30T20:42:58.416894+00:00"}
+{"asctime": "2026-03-30 22:42:58,417", "message": "Initializing SimpleBashSession (no tmux). Work dir: C:\\Users\\GIGABYTE\\Desktop\\Forge", "level": "INFO", "timestamp": "2026-03-30T20:42:58.417907+00:00"}
+{"asctime": "2026-03-30 22:42:58,417", "message": "SimpleBashSession initialized successfully", "level": "INFO", "timestamp": "2026-03-30T20:42:58.417907+00:00"}
+{"asctime": "2026-03-30 22:42:58,418", "message": "Step 2/5: Starting browser initialization (background)...", "level": "INFO", "timestamp": "2026-03-30T20:42:58.418894+00:00"}
+{"asctime": "2026-03-30 22:42:58,418", "message": "Step 3/5: Initializing plugins...", "level": "INFO", "timestamp": "2026-03-30T20:42:58.418894+00:00"}
+{"asctime": "2026-03-30 22:42:58,420", "message": "Plugin agent_skills initialized", "level": "INFO", "timestamp": "2026-03-30T20:42:58.420891+00:00"}
+{"asctime": "2026-03-30 22:42:58,421", "message": "Step 4/5: Setting up bash commands...", "level": "INFO", "timestamp": "2026-03-30T20:42:58.421890+00:00"}
+{"asctime": "2026-03-30 22:42:58,421", "message": "Executing command: 'git config --global user.name \"GIGABYTE\" && git config --global user.email \"GIGABYTE@example.com\"', Timeout: 60s, background: False", "level": "INFO", "timestamp": "2026-03-30T20:42:58.421890+00:00"}
+{"asctime": "2026-03-30 22:42:58,961", "message": "Executing command: 'alias env_check='echo \"=== PYTHON ===\" && python3 --version 2>/dev/null || python --version 2>/dev/null && echo \"=== KEY PACKAGES ===\" && pip list --format=freeze 2>/dev/null | head -30 && echo \"=== DISK ===\" && df -h . 2>/dev/null && echo \"=== MEMORY ===\" && free -h 2>/dev/null || vm_stat 2>/dev/null; true'', Timeout: 60s, background: False", "level": "INFO", "timestamp": "2026-03-30T20:42:58.961187+00:00"}
+{"asctime": "2026-03-30 22:42:59,344", "message": "Step 5/5: Starting memory monitor...", "level": "INFO", "timestamp": "2026-03-30T20:42:59.344265+00:00"}
+{"asctime": "2026-03-30 22:42:59,345", "message": "All initialization steps completed successfully", "level": "INFO", "timestamp": "2026-03-30T20:42:59.345282+00:00"}
+{"asctime": "2026-03-30 22:42:59,394", "message": "\ud83d\ude80 In-process runtime ready in 0.99s", "level": "INFO", "timestamp": "2026-03-30T20:42:59.394730+00:00"}
+{"asctime": "2026-03-30 22:42:59,397", "message": "Initializing browser environment...", "level": "INFO", "timestamp": "2026-03-30T20:42:59.397729+00:00"}
+WARNING  Browser environment is a stub and will not function. Ensure           
+         browser-use MCP is configured.                                        
+{"asctime": "2026-03-30 22:42:59,412", "message": "Browser environment initialized successfully", "level": "INFO", "timestamp": "2026-03-30T20:42:59.412297+00:00"}
+{"asctime": "2026-03-30 22:42:59,484", "message": "[runtime b63cedc1-5e34-48-d13e7150b211e1c] Selected repo: None, loading playbooks from C:\\Users\\GIGABYTE\\Desktop\\Forge\\.app\\playbooks (inside runtime)", "level": "INFO", "timestamp": "2026-03-30T20:42:59.484834+00:00"}
+{"asctime": "2026-03-30 22:42:59,514", "message": "[runtime b63cedc1-5e34-48-d13e7150b211e1c] Attempting to list files in repository playbooks directory: C:\\Users\\GIGABYTE\\Desktop\\Forge\\.app\\playbooks", "level": "INFO", "timestamp": "2026-03-30T20:42:59.514550+00:00"}
+{"asctime": "2026-03-30 22:42:59,521", "message": "Loading user workspace playbooks: []", "level": "INFO", "timestamp": "2026-03-30T20:42:59.521634+00:00"}
+{"asctime": "2026-03-30 22:42:59,524", "message": "Initializing MCP agent for app-mcp with SHTTP connection...", "level": "INFO", "timestamp": "2026-03-30T20:42:59.524134+00:00"}
+{"asctime": "2026-03-30 22:43:03,058", "message": "Error connecting to http://localhost:3000/mcp/mcp: Client failed to connect: All connection attempts failed", "level": "ERROR", "timestamp": "2026-03-30T20:43:03.058422+00:00"}
+{"asctime": "2026-03-30 22:43:03,059", "message": "Failed to connect to http://localhost:3000/mcp/mcp: Client failed to connect: All connection attempts failed", "level": "ERROR", "exc_info": "Traceback (most recent call last):\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 649, in _session_runner\n    await stack.enter_async_context(self._context_manager())\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 659, in enter_async_context\n    result = await _enter(cm)\n             ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 210, in __aenter__\n    return await anext(self.gen)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 425, in _context_manager\n    with catch(get_catch_handlers()):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\exceptiongroup\\_catch.py\", line 39, in __exit__\n    raise unhandled from exc.__cause__\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\exceptiongroup\\_catch.py\", line 65, in handle_exception\n    result = handler(matched)\n             ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\utilities\\exceptions.py\", line 29, in _exception_handler\n    raise leaf\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\mcp\\client\\streamable_http.py\", line 565, in handle_request_async\n    await self._handle_post_request(ctx)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\mcp\\client\\streamable_http.py\", line 340, in _handle_post_request\n    async with ctx.client.stream(\n               ^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 210, in __aenter__\n    return await anext(self.gen)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1583, in stream\n    response = await self.send(\n               ^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1629, in send\n    response = await self._send_handling_auth(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1657, in _send_handling_auth\n    response = await self._send_handling_redirects(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1694, in _send_handling_redirects\n    response = await self._send_single_request(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_client.py\", line 1730, in _send_single_request\n    response = await transport.handle_async_request(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_transports\\default.py\", line 393, in handle_async_request\n    with map_httpcore_exceptions():\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\httpx\\_transports\\default.py\", line 118, in map_httpcore_exceptions\n    raise mapped_exc(message) from exc\nhttpx.ConnectError: All connection attempts failed\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\gateway\\integrations\\mcp\\mcp_utils.py\", line 220, in _connect_http_server\n    await asyncio.wait_for(\n  File \"C:\\Users\\GIGABYTE\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\gateway\\integrations\\mcp\\client.py\", line 228, in connect_http\n    await self._open_session()\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\backend\\gateway\\integrations\\mcp\\client.py\", line 107, in _open_session\n    await self.client.__aenter__()  # pylint: disable=unnecessary-dunder-call\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 496, in __aenter__\n    return await self._connect()\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\GIGABYTE\\Desktop\\Forge\\.venv\\Lib\\site-packages\\fastmcp\\client\\client.py\", line 587, in _connect\n    raise RuntimeError(\nRuntimeError: Client failed to connect: All connection attempts failed", "timestamp": "2026-03-30T20:43:03.059434+00:00"}
+{"asctime": "2026-03-30 22:43:03,088", "message": "No MCP clients were successfully connected; exposing degraded capability status tool only", "level": "WARNING", "timestamp": "2026-03-30T20:43:03.088576+00:00"}
+{"asctime": "2026-03-30 22:43:03,089", "message": "Loaded 1 MCP tools: ['mcp_capabilities_status']", "level": "INFO", "timestamp": "2026-03-30T20:43:03.089577+00:00"}
+{"asctime": "2026-03-30 22:43:03,090", "message": "Setting 1 MCP tools for agent Orchestrator: ['mcp_capabilities_status']", "level": "INFO", "timestamp": "2026-03-30T20:43:03.090567+00:00"}
+{"asctime": "2026-03-30 22:43:03,090", "message": "Tools updated for agent Orchestrator, total 30: ['execute_bash', 'think', 'finish', 'summarize_context', 'memory_manager', 'apply_patch', 'batch_edit', 'search_available_tools', 'task_tracker', 'search_code', 'explore_tree_structure', 'read_symbol_definition', 'terminal_manager', 'check_tool_status', 'error_recovery_memory', 'lsp_query', 'signal_progress', 'delegate_task', 'shared_task_board', 'revert_to_checkpoint', 'workspace_status', 'checkpoint', 'analyze_project_structure', 'session_diff', 'verify_file_lines', 'communicate_with_user', 'verify_ui_change', 'str_replace_editor', 'ast_code_editor', 'call_mcp_tool']", "level": "INFO", "timestamp": "2026-03-30T20:43:03.090567+00:00"}
+┌────────────────────────────────── Grinta ───────────────────────────────────┐
+│ ┌──────────────────────────────── grinta ─────────────────────────────────┐ │
+│ │ grinta ready. Type a task or /help for commands.                        │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+ Model: openai/lightning-ai/minimax-m2.5 │ Context: 0/? Tokens │ Cost: $0.0000 >>> ┌────────────────────────────────── Grinta ───────────────────────────────────┐
+│ ┌──────────────────────────────── grinta ─────────────────────────────────┐ │
+│ │ grinta ready. Type a task or /help for commands.                        │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+ Model: openai/lightning-ai/minimax-m2.5 │ Context: 0/? Tokens │ Cost: $0.0000 {"asctime": "2026-03-30 22:43:03,128", "message": "[TaskCancellationService:sessions:C:\\Users\\GIGABYTE\\Desktop\\Forge] HARD KILL: terminating 0 tracked pids (0 handles)", "level": "INFO", "timestamp": "2026-03-30T20:43:03.128133+00:00"}
+{"asctime": "2026-03-30 22:43:03,130", "message": "[TaskCancellationService:sessions:C:\\Users\\GIGABYTE\\Desktop\\Forge] Hard kill complete", "level": "INFO", "timestamp": "2026-03-30T20:43:03.130132+00:00"}
+{"asctime": "2026-03-30 22:43:03,131", "message": "Shell session closed: SimpleBashSession", "level": "INFO", "timestamp": "2026-03-30T20:43:03.131141+00:00"}
+{"asctime": "2026-03-30 22:43:05,665", "message": "Failed to remove workspace C:\\Users\\GIGABYTE\\Desktop\\Forge after 3 attempts: [WinError 5] Access is denied: 'C:\\\\Users\\\\GIGABYTE\\\\Desktop\\\\Forge\\\\.git\\\\objects\\\\00\\\\0323c5e1471c46a0c16220aedc24cf3a5a4fd5'", "level": "WARNING", "timestamp": "2026-03-30T20:43:05.665858+00:00"}
+{"asctime": "2026-03-30 22:43:05,666", "message": "EventStream 'b63cedc1-5e34-48-d13e7150b211e1c' was GC'd without close(); resources may leak.", "level": "WARNING", "timestamp": "2026-03-30T20:43:05.666868+00:00"}

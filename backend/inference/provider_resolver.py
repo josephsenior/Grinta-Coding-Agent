@@ -13,7 +13,7 @@ import time
 import httpx
 
 from backend.core.logger import app_logger as logger
-from backend.inference.catalog_loader import lookup
+from backend.inference.catalog_loader import ModelEntry, lookup
 
 _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     "groq": "https://api.groq.com/openai/v1",
@@ -29,11 +29,9 @@ KNOWN_PROVIDER_PREFIXES: set[str] = {
     "deepinfra",
     "deepseek",
     "fireworks",
-    "gemini",
     "google",
     "groq",
     "lm_studio",
-    "lmstudio",
     "mistral",
     "nvidia",
     "ollama",
@@ -47,20 +45,15 @@ KNOWN_PROVIDER_PREFIXES: set[str] = {
     "xai",
 }
 
-_PROVIDER_ALIASES: dict[str, str] = {
-    "gemini": "google",
-    "lmstudio": "lm_studio",
-}
-
 
 def normalize_provider_name(provider: str | None) -> str | None:
-    """Normalize user-provided provider names to canonical ids."""
+    """Normalize provider names for stable comparisons."""
     if provider is None:
         return None
     normalized = str(provider).strip().lower()
     if not normalized:
         return None
-    return _PROVIDER_ALIASES.get(normalized, normalized)
+    return normalized
 
 
 def extract_provider_prefix(model_name: str | None) -> str | None:
@@ -71,6 +64,14 @@ def extract_provider_prefix(model_name: str | None) -> str | None:
     if prefix in KNOWN_PROVIDER_PREFIXES:
         return prefix
     return None
+
+
+def _catalog_entry_matches_exactly(model_name: str, entry: ModelEntry) -> bool:
+    """Return True when a catalog hit came from an exact name or alias match."""
+    model_lower = model_name.strip().lower()
+    if model_lower == entry.name.lower():
+        return True
+    return any(model_lower == alias.lower() for alias in entry.aliases)
 
 
 def canonicalize_model_selection(
@@ -151,6 +152,12 @@ class ProviderResolver:
 
         entry = lookup(model_name)
         if entry:
+            if "/" in model_name and not _catalog_entry_matches_exactly(model_name, entry):
+                raise ValueError(
+                    "Provider is ambiguous for model "
+                    f"'{model_name}'. Use an explicit provider prefix like 'openai/{model_name}' "
+                    "or configure llm_provider alongside llm_model."
+                )
             return entry.provider
 
         raise ValueError(
@@ -171,7 +178,7 @@ class ProviderResolver:
         model_lower = model_name.lower()
         return any(
             provider in model_lower
-            for provider in ["ollama", "lm-studio", "lmstudio", "vllm", "local"]
+            for provider in ["ollama", "lm_studio", "vllm", "local"]
         )
 
     def resolve_base_url(
