@@ -1320,5 +1320,6 @@ def _set_tool_call_metadata(
 
 def _create_message_action_from_content(content) -> list[Action]:
     """Create message action from content when no tool calls are present."""
-    content_str = str(content) if content else ''
+    from backend.engine.common import strip_thinking_tags
+    content_str = strip_thinking_tags(str(content)) if content else ''
     return [MessageAction(content=content_str, wait_for_response=True)]

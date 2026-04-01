@@ -22,7 +22,7 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'openrouter': 'https://openrouter.ai/api/v1',
     'openhands': 'https://llm-proxy.app.all-hands.dev/v1',
     'nvidia': 'https://integrate.api.nvidia.com/v1',
-    'lightning': 'https://api.lightning.ai/v1',
+    'lightning': 'https://lightning.ai/api/v1',
 }
 
 KNOWN_PROVIDER_PREFIXES: set[str] = {

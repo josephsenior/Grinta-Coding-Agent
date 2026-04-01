@@ -1,12 +1,26 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+import re
 from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
+_THINK_TAG_RE = re.compile(r'<think>.*?</think>', re.DOTALL | re.IGNORECASE)
+
+
+def strip_thinking_tags(text: str) -> str:
+    """Remove <think>...</think> blocks emitted by reasoning models (e.g. MiniMax, DeepSeek R1).
+
+    These blocks contain chain-of-thought that should not appear in the final
+    user-facing response.  The surrounding whitespace is collapsed so the
+    result reads cleanly.
+    """
+    stripped = _THINK_TAG_RE.sub('', text)
+    return re.sub(r'\n{3,}', '\n\n', stripped).strip()
 
 from backend.core.logger import app_logger as logger
-from backend.ledger.action import Action
 from backend.inference.tool_types import make_function_chunk, make_tool_param
+from backend.ledger.action import Action
 
 if TYPE_CHECKING:
     from backend.engine.contracts import ChatCompletionToolParam
@@ -24,18 +38,18 @@ class FunctionCallNotExistsError(FunctionCallValidationError):
 
 def validate_response_choices(response: ModelResponse) -> None:
     """Validate that response has exactly one choice."""
-    assert len(response.choices) == 1, "Only one choice is supported for now"
+    assert len(response.choices) == 1, 'Only one choice is supported for now'
 
 
 def extract_assistant_message(response: ModelResponse) -> Any:
     """Extract assistant message from model response."""
-    if not getattr(response, "choices", None) or len(response.choices) == 0:
-        raise FunctionCallValidationError("Model response has no choices")
+    if not getattr(response, 'choices', None) or len(response.choices) == 0:
+        raise FunctionCallValidationError('Model response has no choices')
     choice = response.choices[0]
-    assistant_msg = getattr(choice, "message", None)
+    assistant_msg = getattr(choice, 'message', None)
     if assistant_msg is None:
         raise FunctionCallValidationError(
-            "Model response choice is missing a message payload"
+            'Model response choice is missing a message payload'
         )
     return assistant_msg
 
@@ -43,7 +57,9 @@ def extract_assistant_message(response: ModelResponse) -> Any:
 def set_response_id_for_actions(actions: list[Action], response: ModelResponse) -> None:
     """Set the response ID for a list of actions."""
     if not actions:
-        raise FunctionCallValidationError("set_response_id_for_actions requires a non-empty actions list")
+        raise FunctionCallValidationError(
+            'set_response_id_for_actions requires a non-empty actions list'
+        )
     for action in actions:
         action.response_id = response.id
 
@@ -55,7 +71,7 @@ def parse_tool_call_arguments(tool_call: Any) -> dict[str, Any]:
             return tool_call.function.arguments
         return json.loads(tool_call.function.arguments)
     except (json.JSONDecodeError, AttributeError) as e:
-        msg = f"Failed to parse tool call arguments: {e}. Raw arguments: {tool_call.function.arguments}"
+        msg = f'Failed to parse tool call arguments: {e}. Raw arguments: {tool_call.function.arguments}'
         raise FunctionCallValidationError(msg) from e
 
 
@@ -78,7 +94,7 @@ def build_tool_call_metadata(
 
 def extract_thought_from_message(assistant_msg: Any) -> str:
     """Extract thought text from assistant message content."""
-    content = getattr(assistant_msg, "content", None)
+    content = getattr(assistant_msg, 'content', None)
     return _coerce_message_content_text(content)
 
 
@@ -90,14 +106,17 @@ def _coerce_message_content_text(content: Any) -> str:
     - ``list[str]``
     - ``list[dict]`` with ``{"text": ...}`` (any ``type``)
     - ``dict`` with ``{"text": ...}``
+
+    ``<think>...</think>`` blocks emitted by reasoning models are stripped so
+    they never appear in the user-facing response.
     """
     if content is None:
-        return ""
+        return ''
     if isinstance(content, str):
-        return content
+        return strip_thinking_tags(content)
     if isinstance(content, dict):
-        text = content.get("text")
-        return text if isinstance(text, str) else ""
+        text = content.get('text')
+        return strip_thinking_tags(text) if isinstance(text, str) else ''
     if isinstance(content, list):
         parts: list[str] = []
         for item in content:
@@ -106,11 +125,11 @@ def _coerce_message_content_text(content: Any) -> str:
                     parts.append(item)
                 continue
             if isinstance(item, dict):
-                text = item.get("text")
+                text = item.get('text')
                 if isinstance(text, str) and text:
                     parts.append(text)
-        return "".join(parts)
-    return ""
+        return strip_thinking_tags(''.join(parts))
+    return ''
 
 
 def process_tool_calls(
@@ -122,10 +141,10 @@ def process_tool_calls(
 ) -> list[Action]:
     """Common logic for processing tool calls and converting them to actions."""
     actions: list[Action] = []
-    thought = extract_thought_fn(getattr(assistant_msg, "content", None))
+    thought = extract_thought_fn(getattr(assistant_msg, 'content', None))
 
     for i, tool_call in enumerate(assistant_msg.tool_calls):
-        logger.debug("Processing tool call: %s", tool_call)
+        logger.debug('Processing tool call: %s', tool_call)
         arguments = parse_tool_call_arguments(tool_call)
         action = create_action_fn(tool_call, arguments)
 
@@ -156,11 +175,11 @@ def common_response_to_actions(
     validate_response_choices(response)
     assistant_msg = extract_assistant_message(response)
 
-    tool_calls = getattr(assistant_msg, "tool_calls", None)
+    tool_calls = getattr(assistant_msg, 'tool_calls', None)
     if tool_calls:
         # Pass mcp_tool_names through tool_call object for the factory function
         for tc in tool_calls:
-            setattr(tc, "_mcp_tool_names", mcp_tool_names)
+            setattr(tc, '_mcp_tool_names', mcp_tool_names)
 
         actions = process_tool_calls(
             assistant_msg,
@@ -170,7 +189,7 @@ def common_response_to_actions(
             combine_thought_fn,
         )
     else:
-        content = getattr(assistant_msg, "content", None)
+        content = getattr(assistant_msg, 'content', None)
         text_content = _coerce_message_content_text(content)
         from backend.ledger.action import MessageAction
 
@@ -189,15 +208,15 @@ def create_tool_definition(
 ) -> ChatCompletionToolParam:
     """Create a standardized tool definition."""
     return make_tool_param(
-        type="function",
+        type='function',
         function=make_function_chunk(
             name=name,
             description=description,
             parameters={
-                "type": "object",
-                "properties": properties,
-                "required": required,
-                "additionalProperties": additional_properties,
+                'type': 'object',
+                'properties': properties,
+                'required': required,
+                'additionalProperties': additional_properties,
             },
         ),
     )
@@ -206,24 +225,24 @@ def create_tool_definition(
 def get_common_path_param(description: str | None = None) -> dict[str, Any]:
     """Get common path parameter definition."""
     return {
-        "type": "string",
-        "description": description or "Absolute path to file or directory.",
+        'type': 'string',
+        'description': description or 'Absolute path to file or directory.',
     }
 
 
 def get_common_pattern_param(description: str) -> dict[str, Any]:
     """Get common pattern parameter definition."""
     return {
-        "type": "string",
-        "description": description,
+        'type': 'string',
+        'description': description,
     }
 
 
 def get_common_timeout_param(
-    description: str = "Optional timeout in seconds.",
+    description: str = 'Optional timeout in seconds.',
 ) -> dict[str, Any]:
     """Get a standardized timeout parameter definition."""
     return {
-        "type": "number",
-        "description": description,
+        'type': 'number',
+        'description': description,
     }
