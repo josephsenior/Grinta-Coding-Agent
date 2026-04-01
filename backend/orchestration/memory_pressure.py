@@ -52,31 +52,59 @@ class MemoryPressureMonitor:
         crit_mb: int | None = None,
         check_interval_s: float | None = None,
         cooldown_s: float | None = None,
+        min_history_events: int | None = None,
     ) -> None:
-        self._warn_mb = warn_mb or int(os.getenv("APP_MEM_WARN_MB", "768"))
-        self._crit_mb = crit_mb or int(os.getenv("APP_MEM_CRIT_MB", "1536"))
+        self._warn_delta_mb = warn_mb or int(os.getenv('APP_MEM_WARN_MB', '768'))
+        self._crit_delta_mb = crit_mb or int(os.getenv('APP_MEM_CRIT_MB', '1536'))
         self._check_interval = check_interval_s or float(
-            os.getenv("APP_MEM_CHECK_INTERVAL", "10")
+            os.getenv('APP_MEM_CHECK_INTERVAL', '10')
         )
         self._cooldown_s = cooldown_s or float(
-            os.getenv("APP_MEM_CONDENSE_COOLDOWN_S", "30")
+            os.getenv('APP_MEM_CONDENSE_COOLDOWN_S', '30')
+        )
+        self._min_history_events = (
+            min_history_events
+            if min_history_events is not None
+            else int(os.getenv('APP_MEM_MIN_HISTORY_EVENTS', '30'))
         )
         self._last_check: float = 0.0
         self._last_rss_mb: float = 0.0
         self._condensation_count: int = 0
         self._last_condensation_at: float = 0.0
         self._process: Any = None
+        self._baseline_rss_mb: float = 0.0
         if _HAS_PSUTIL:
             self._process = psutil.Process(os.getpid())
+            try:
+                info = self._process.memory_info()
+                self._baseline_rss_mb = info.rss / (1024 * 1024)
+            except Exception:
+                self._baseline_rss_mb = 0.0
+
+    @property
+    def _warn_mb(self) -> float:
+        """Effective warning threshold: baseline + configured delta."""
+        return self._baseline_rss_mb + self._warn_delta_mb
+
+    @property
+    def _crit_mb(self) -> float:
+        """Effective critical threshold: baseline + configured delta."""
+        return self._baseline_rss_mb + self._crit_delta_mb
 
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
 
-    def should_condense(self) -> bool:
-        """Return True if memory pressure warrants proactive condensation."""
+    def should_condense(self, history_events: int | None = None) -> bool:
+        """Return True if memory pressure warrants proactive condensation.
+
+        When ``history_events`` is provided, very short sessions are ignored
+        because condensation cannot reduce history meaningfully yet.
+        """
         rss = self._sample_rss()
         if rss is None:
+            return False
+        if history_events is not None and history_events < self._min_history_events:
             return False
         if rss >= self._crit_mb:
             return True
@@ -103,13 +131,17 @@ class MemoryPressureMonitor:
     def snapshot(self) -> dict[str, Any]:
         """Return diagnostic snapshot for debug endpoints."""
         return {
-            "rss_mb": self._last_rss_mb,
-            "warn_threshold_mb": self._warn_mb,
-            "crit_threshold_mb": self._crit_mb,
-            "cooldown_s": self._cooldown_s,
-            "condensation_count": self._condensation_count,
-            "psutil_available": _HAS_PSUTIL,
-            "level": self._level_str(),
+            'rss_mb': self._last_rss_mb,
+            'baseline_rss_mb': self._baseline_rss_mb,
+            'warn_threshold_mb': self._warn_mb,
+            'crit_threshold_mb': self._crit_mb,
+            'warn_delta_mb': self._warn_delta_mb,
+            'crit_delta_mb': self._crit_delta_mb,
+            'cooldown_s': self._cooldown_s,
+            'min_history_events': self._min_history_events,
+            'condensation_count': self._condensation_count,
+            'psutil_available': _HAS_PSUTIL,
+            'level': self._level_str(),
         }
 
     # ------------------------------------------------------------------ #
@@ -132,12 +164,12 @@ class MemoryPressureMonitor:
             self._last_rss_mb = info.rss / (1024 * 1024)
             return self._last_rss_mb
         except Exception:
-            logger.debug("Failed to read RSS", exc_info=True)
+            logger.debug('Failed to read RSS', exc_info=True)
             return None
 
     def _level_str(self) -> str:
         if self._last_rss_mb >= self._crit_mb:
-            return "critical"
+            return 'critical'
         if self._last_rss_mb >= self._warn_mb:
-            return "warning"
-        return "normal"
+            return 'warning'
+        return 'normal'

@@ -12,10 +12,10 @@ and ``setup_config_from_args()``.
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import sys
-import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 from uuid import uuid4
@@ -23,20 +23,19 @@ from uuid import uuid4
 from pydantic import SecretStr, ValidationError
 
 from backend.core import logger
+from backend.core.app_paths import get_app_settings_root
 from backend.core.config.agent_config import AgentConfig
+from backend.core.config.app_config import AppConfig
 from backend.core.config.cli_config import (
+    _load_json_config,
     apply_additional_overrides,
     apply_llm_config_override,
     get_llm_config_arg,
-    _load_json_config,
 )
-
-from backend.core.config.env_loader import export_llm_api_keys
 from backend.core.config.env_loader import (
+    export_llm_api_keys,
     load_from_env,
 )
-from backend.core.app_paths import get_app_settings_root
-from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 from backend.core.config.model_rebuild import rebuild_config_models
 from backend.core.constants import JWT_SECRET_FILE as JWT_SECRET
@@ -70,25 +69,25 @@ class ConfigLoadSummary:
         self._issues: list[_ConfigIssue] = []
 
     def record(self, section: str, reason: str, detail: str) -> None:
-        detail_str = (detail or "").strip()
+        detail_str = (detail or '').strip()
         if len(detail_str) > 240:
-            detail_str = f"{detail_str[:237]}..."
+            detail_str = f'{detail_str[:237]}...'
         self._issues.append(
             _ConfigIssue(section=section, reason=reason, detail=detail_str)
         )
 
     def has_fatal_issues(self) -> bool:
-        return any(issue.reason in {"invalid", "error"} for issue in self._issues)
+        return any(issue.reason in {'invalid', 'error'} for issue in self._issues)
 
     def format_fatal_issues(self) -> str:
-        fatal = [i for i in self._issues if i.reason in {"invalid", "error"}]
+        fatal = [i for i in self._issues if i.reason in {'invalid', 'error'}]
         if not fatal:
-            return ""
-        parts = [f"{i.section}: {i.reason}: {i.detail}" for i in fatal]
-        return "; ".join(parts)
+            return ''
+        parts = [f'{i.section}: {i.reason}: {i.detail}' for i in fatal]
+        return '; '.join(parts)
 
     def record_missing(self, section: str, detail: str) -> None:
-        self.record(section, "missing", detail)
+        self.record(section, 'missing', detail)
 
     def emit(self) -> None:
         if not self._issues:
@@ -98,15 +97,15 @@ class ConfigLoadSummary:
             grouped.setdefault(issue.section, []).append(issue)
         lines: list[str] = []
         for section in sorted(grouped.keys()):
-            reasons = "; ".join(
-                f"{issue.reason}: {issue.detail}" if issue.detail else issue.reason
+            reasons = '; '.join(
+                f'{issue.reason}: {issue.detail}' if issue.detail else issue.reason
                 for issue in grouped[section]
             )
-            lines.append(f"[{section}] {reasons}")
+            lines.append(f'[{section}] {reasons}')
         logger.app_logger.warning(
-            "Configuration sections skipped or partially applied while loading %s:\n%s",
+            'Configuration sections skipped or partially applied while loading %s:\n%s',
             self._toml_file,
-            "\n".join(lines),
+            '\n'.join(lines),
         )
 
 
@@ -119,14 +118,14 @@ def _to_posix_workspace_path(path: str) -> str:
     """Convert an OS-specific absolute path to a POSIX-style path."""
     if not path:
         return path
-    p = path.replace("\\", "/")
-    if len(p) >= 2 and p[1] == ":":
+    p = path.replace('\\', '/')
+    if len(p) >= 2 and p[1] == ':':
         p = p[2:]
-    if not p.startswith("/"):
-        p = f"/{p}"
-    while "//" in p:
-        p = p.replace("//", "/")
-    return p.rstrip("/") if p != "/" else p
+    if not p.startswith('/'):
+        p = f'/{p}'
+    while '//' in p:
+        p = p.replace('//', '/')
+    return p.rstrip('/') if p != '/' else p
 
 
 # ---------------------------------------------------------------------------
@@ -134,88 +133,86 @@ def _to_posix_workspace_path(path: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def load_from_json(cfg: AppConfig, json_file: str = "settings.json") -> None:
+def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
     """Load the config from the flat settings.json file."""
-    strict_config = os.getenv("APP_STRICT_CONFIG", "false").lower() in (
-        "1",
-        "true",
-        "yes",
+    strict_config = os.getenv('APP_STRICT_CONFIG', 'false').lower() in (
+        '1',
+        'true',
+        'yes',
     )
     summary = ConfigLoadSummary(json_file)
     try:
         try:
-            with open(json_file, "r", encoding="utf-8") as json_contents:
+            with open(json_file, 'r', encoding='utf-8') as json_contents:
                 data = json.load(json_contents)
         except FileNotFoundError:
             return
         except Exception as e:
             logger.app_logger.warning(
-                "Cannot parse config from json, json values have not been applied.\nError: %s",
+                'Cannot parse config from json, json values have not been applied.\nError: %s',
                 e,
             )
             if strict_config:
-                raise ValueError(f"Invalid JSON in {json_file}") from e
+                raise ValueError(f'Invalid JSON in {json_file}') from e
             return
 
         # LLM — merge JSON over existing cfg (env/TOML). If llm_model appears in JSON,
         # it overrides LLM_MODEL from the environment even when both are set.
-        llm_keys = ("llm_model", "llm_api_key", "llm_base_url", "llm_provider")
+        llm_keys = ('llm_model', 'llm_api_key', 'llm_base_url', 'llm_provider')
         if any(k in data for k in llm_keys):
             from backend.inference.provider_resolver import canonicalize_model_selection
 
-            base = cfg.llms.get("llm")
+            base = cfg.llms.get('llm')
             llm_dict = base.model_dump(exclude_none=True) if base else {}
-            if "llm_model" in data:
-                raw_m = data["llm_model"]
+            if 'llm_model' in data:
+                raw_m = data['llm_model']
                 if raw_m is not None and str(raw_m).strip():
-                    llm_dict["model"] = str(raw_m).strip()
+                    llm_dict['model'] = str(raw_m).strip()
                 else:
-                    llm_dict["model"] = None
-            if "llm_api_key" in data and data["llm_api_key"]:
-                llm_dict["api_key"] = data["llm_api_key"]
-            provider = data.get("llm_provider") or llm_dict.get("provider")
-            if "llm_base_url" in data and data["llm_base_url"]:
-                raw_url = str(data["llm_base_url"]).strip()
-                model_str = str(llm_dict.get("model") or "").lower()
+                    llm_dict['model'] = None
+            if 'llm_api_key' in data and data['llm_api_key']:
+                llm_dict['api_key'] = data['llm_api_key']
+            provider = data.get('llm_provider') or llm_dict.get('provider')
+            if 'llm_base_url' in data and data['llm_base_url']:
+                raw_url = str(data['llm_base_url']).strip()
+                model_str = str(llm_dict.get('model') or '').lower()
                 # Google Gemini routes through the SDK — a custom base_url breaks
                 # litellm and is always ignored in the API route; replicate that here.
-                _is_google = model_str.startswith("google/") or model_str.startswith(
-                    "gemini-"
+                _is_google = model_str.startswith('google/') or model_str.startswith(
+                    'gemini-'
                 )
                 if not _is_google:
-                    llm_dict["base_url"] = raw_url
+                    llm_dict['base_url'] = raw_url
 
             model_value, provider_value = canonicalize_model_selection(
-                cast(str | None, llm_dict.get("model")),
+                cast(str | None, llm_dict.get('model')),
                 str(provider) if provider is not None else None,
             )
             if model_value:
-                llm_dict["model"] = model_value
-            if llm_dict.get("model") and not provider_value:
-                msg = (
-                    "llm_provider is required when llm_model does not include a provider prefix"
-                )
+                llm_dict['model'] = model_value
+            if llm_dict.get('model') and not provider_value:
+                msg = 'llm_provider is required when llm_model does not include a provider prefix'
                 if strict_config:
                     raise ValueError(msg)
                 logger.app_logger.warning(
-                    "Skipping LLM config from %s: %s", json_file, msg
+                    'Skipping LLM config from %s: %s', json_file, msg
                 )
             else:
                 cfg.set_llm_config(LLMConfig.model_validate(llm_dict))
 
         # Top-level app config fields (mcp_host, project_root, etc.)
-        if "mcp_host" in data and data["mcp_host"]:
-            cfg.mcp_host = data["mcp_host"]
-        if "project_root" in data and data["project_root"]:
-            cfg.project_root = data["project_root"]
+        if 'mcp_host' in data and data['mcp_host']:
+            cfg.mcp_host = data['mcp_host']
+        if 'project_root' in data and data['project_root']:
+            cfg.project_root = data['project_root']
 
     finally:
         summary.emit()
 
     if strict_config and summary.has_fatal_issues():
         raise ValueError(
-            f"Strict config mode enabled (APP_STRICT_CONFIG=true): config load issues in {json_file}: "
-            f"{summary.format_fatal_issues()}"
+            f'Strict config mode enabled (APP_STRICT_CONFIG=true): config load issues in {json_file}: '
+            f'{summary.format_fatal_issues()}'
         )
 
 
@@ -234,6 +231,40 @@ def get_or_create_jwt_secret(file_store: FileStore) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Finalization helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_active_agent_config(cfg: AppConfig) -> AgentConfig:
+    agent_name = getattr(cfg, 'default_agent', None) or 'agent'
+    return cfg.get_agent_config(agent_name)
+
+
+def _is_cli_mode(cfg: AppConfig) -> bool:
+    try:
+        cli_mode = getattr(_get_active_agent_config(cfg), 'cli_mode', False)
+    except Exception:
+        return False
+    return cli_mode if isinstance(cli_mode, bool) else False
+
+
+def _ensure_active_agent_auto_compactor(cfg: AppConfig) -> None:
+    from backend.core.config.compactor_config import AutoCompactorConfig
+
+    agent_config = _get_active_agent_config(cfg)
+    compactor_config = getattr(agent_config, 'compactor_config', None)
+    if compactor_config is None:
+        agent_config.compactor_config = AutoCompactorConfig(
+            llm_config=cfg.get_llm_config_from_agent(cfg.default_agent)
+        )
+        return
+    if isinstance(compactor_config, AutoCompactorConfig) and compactor_config.llm_config is None:
+        agent_config.compactor_config = AutoCompactorConfig(
+            llm_config=cfg.get_llm_config_from_agent(cfg.default_agent)
+        )
+
+
+# ---------------------------------------------------------------------------
 # Finalization
 # ---------------------------------------------------------------------------
 
@@ -245,8 +276,20 @@ def finalize_config(cfg: AppConfig) -> None:
         extend_mcp_servers_with_bundled_defaults,
     )
 
-    extend_mcp_servers_with_bundled_defaults(cfg.mcp.servers)
-    ensure_default_mcp_http_server(cfg)
+    _ensure_active_agent_auto_compactor(cfg)
+    if _is_cli_mode(cfg):
+        logger.app_logger.debug(
+            'Skipping bundled/default MCP servers while running in CLI mode'
+        )
+        # Disable browser initialization in CLI mode — the browser env
+        # is a stub that only emits noisy warnings.
+        cfg.enable_browser = False
+        agent_cfg = cfg.get_agent_config(cfg.default_agent)
+        if agent_cfg is not None:
+            agent_cfg.enable_browsing = False
+    else:
+        extend_mcp_servers_with_bundled_defaults(cfg.mcp.servers)
+        ensure_default_mcp_http_server(cfg)
     _configure_llm_logging(cfg)
     _ensure_cache_directory(cfg)
     _configure_jwt_secret(cfg)
@@ -277,17 +320,17 @@ def _configure_jwt_secret(cfg: AppConfig) -> None:
 
 
 def get_agent_config_arg(
-    agent_config_arg: str, json_file: str = "settings.json"
+    agent_config_arg: str, json_file: str = 'settings.json'
 ) -> AgentConfig | None:
     """Get a group of agent settings from the config file."""
-    agent_config_arg = agent_config_arg.strip("[]").removeprefix("agent.")
-    logger.app_logger.debug("Loading agent config from %s", agent_config_arg)
+    agent_config_arg = agent_config_arg.strip('[]').removeprefix('agent.')
+    logger.app_logger.debug('Loading agent config from %s', agent_config_arg)
     json_config = _load_json_config(json_file)
     if json_config is None:
         return None
-    if "agent" in json_config and agent_config_arg in json_config["agent"]:
-        return AgentConfig(**json_config["agent"][agent_config_arg])
-    logger.app_logger.debug("Loading from toml failed for %s", agent_config_arg)
+    if 'agent' in json_config and agent_config_arg in json_config['agent']:
+        return AgentConfig(**json_config['agent'][agent_config_arg])
+    logger.app_logger.debug('Loading from toml failed for %s', agent_config_arg)
     return None
 
 
@@ -299,21 +342,21 @@ def get_agent_config_arg(
 def _validate_compactor_section(
     json_config: dict, compactor_config_arg: str, json_file: str
 ) -> dict | None:
-    if "compactor_type" not in json_config:
+    if 'compactor_type' not in json_config:
         logger.app_logger.error(
-            "Compactor config section [compactor.%s] not found in %s",
+            'Compactor config section [compactor.%s] not found in %s',
             compactor_config_arg,
             json_file,
         )
         return None
 
-    compactor_dict = {"type": json_config.get("compactor_type")}
-    if json_config.get("compactor_max_events") is not None:
-        compactor_dict["max_events"] = json_config.get("compactor_max_events")
-    if json_config.get("compactor_keep_first") is not None:
-        compactor_dict["keep_first"] = json_config.get("compactor_keep_first")
-    if json_config.get("compactor_llm_config") is not None:
-        compactor_dict["llm_config"] = json_config.get("compactor_llm_config")
+    compactor_dict = {'type': json_config.get('compactor_type')}
+    if json_config.get('compactor_max_events') is not None:
+        compactor_dict['max_events'] = json_config.get('compactor_max_events')
+    if json_config.get('compactor_keep_first') is not None:
+        compactor_dict['keep_first'] = json_config.get('compactor_keep_first')
+    if json_config.get('compactor_llm_config') is not None:
+        compactor_dict['llm_config'] = json_config.get('compactor_llm_config')
 
     return compactor_dict
 
@@ -321,19 +364,19 @@ def _validate_compactor_section(
 def _process_llm_compactor(
     compactor_data: dict, compactor_config_arg: str, json_file: str
 ) -> dict | None:
-    llm_config_name = compactor_data.get("llm_config")
+    llm_config_name = compactor_data.get('llm_config')
     if not llm_config_name:
         return None
 
     logger.app_logger.debug(
-        "Compactor [%s] requires LLM config [%s]. Loading it...",
+        'Compactor [%s] requires LLM config [%s]. Loading it...',
         compactor_config_arg,
         llm_config_name,
     )
     if referenced_llm_config := get_llm_config_arg(
         llm_config_name, json_file=json_file
     ):
-        compactor_data["llm_config"] = referenced_llm_config
+        compactor_data['llm_config'] = referenced_llm_config
         return compactor_data
     logger.app_logger.error(
         "Failed to load required LLM config '%s' for compactor '%s'.",
@@ -346,23 +389,23 @@ def _process_llm_compactor(
 def _process_compactor_data(
     compactor_data: dict, compactor_config_arg: str, json_file: str
 ) -> dict | None:
-    compactor_type = compactor_data.get("type")
+    compactor_type = compactor_data.get('type')
     if (
-        compactor_type in ("llm", "llm_attention", "structured")
-        and "llm_config" in compactor_data
-        and isinstance(compactor_data["llm_config"], str)
+        compactor_type in ('llm', 'llm_attention', 'structured')
+        and 'llm_config' in compactor_data
+        and isinstance(compactor_data['llm_config'], str)
     ):
         return _process_llm_compactor(compactor_data, compactor_config_arg, json_file)
     return compactor_data
 
 
 def get_compactor_config_arg(
-    compactor_config_arg: str, json_file: str = "settings.json"
+    compactor_config_arg: str, json_file: str = 'settings.json'
 ) -> CompactorConfig | None:
     """Get a group of compactor settings from the config file by name."""
-    compactor_config_arg = compactor_config_arg.strip("[]").removeprefix("compactor.")
+    compactor_config_arg = compactor_config_arg.strip('[]').removeprefix('compactor.')
     logger.app_logger.debug(
-        "Loading compactor config [%s] from %s", compactor_config_arg, json_file
+        'Loading compactor config [%s] from %s', compactor_config_arg, json_file
     )
 
     json_config = _load_json_config(json_file)
@@ -375,7 +418,7 @@ def get_compactor_config_arg(
     if compactor_data is None:
         return None
 
-    compactor_type = compactor_data.get("type")
+    compactor_type = compactor_data.get('type')
     if not compactor_type:
         logger.app_logger.error(
             'Missing "type" field in [compactor.%s] section of %s',
@@ -395,14 +438,14 @@ def get_compactor_config_arg(
 
         config = create_compactor_config(compactor_type, compactor_data)
         logger.app_logger.info(
-            "Successfully loaded compactor config [%s] from %s",
+            'Successfully loaded compactor config [%s] from %s',
             compactor_config_arg,
             json_file,
         )
         return config
     except (ValidationError, ValueError) as e:
         logger.app_logger.error(
-            "Invalid compactor configuration for [%s]: %s.", compactor_config_arg, e
+            'Invalid compactor configuration for [%s]: %s.', compactor_config_arg, e
         )
         return None
 
@@ -417,7 +460,7 @@ def register_custom_agents(config: AppConfig) -> None:
     from backend.orchestration.agent import Agent
 
     for agent_name, agent_config in config.agents.items():
-        classpath = getattr(agent_config, "classpath", None)
+        classpath = getattr(agent_config, 'classpath', None)
         if classpath:
             try:
                 agent_cls = get_impl(Agent, classpath)
@@ -453,7 +496,7 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def load_app_config(
-    set_logging_levels: bool = True, config_file: str = "settings.json"
+    set_logging_levels: bool = True, config_file: str = 'settings.json'
 ) -> AppConfig:
     """Load the configuration from environment variables and the specified config file.
 
@@ -465,7 +508,7 @@ def load_app_config(
     rebuild_config_models()
 
     resolved_config_file = config_file
-    if config_file == "settings.json" and not os.path.isabs(config_file):
+    if config_file == 'settings.json' and not os.path.isabs(config_file):
         resolved_config_file = os.path.join(get_app_settings_root(), config_file)
 
     config = AppConfig()
@@ -495,7 +538,9 @@ def load_app_config(
                 continue
             if llm_cfg.api_key:
                 api_key_manager.set_api_key(llm_cfg.model, llm_cfg.api_key)
-                api_key_manager.set_environment_variables(llm_cfg.model, llm_cfg.api_key)
+                api_key_manager.set_environment_variables(
+                    llm_cfg.model, llm_cfg.api_key
+                )
             else:
                 # If no key in config, try to load from environment
                 provider = api_key_manager.extract_provider(llm_cfg.model)
@@ -503,8 +548,10 @@ def load_app_config(
                 if env_key:
                     llm_cfg.api_key = SecretStr(env_key)
                     api_key_manager.set_api_key(llm_cfg.model, llm_cfg.api_key)
-                    api_key_manager.set_environment_variables(llm_cfg.model, llm_cfg.api_key)
-    
+                    api_key_manager.set_environment_variables(
+                        llm_cfg.model, llm_cfg.api_key
+                    )
+
     # Export all keys to environment after sync
     export_llm_api_keys(config)
 

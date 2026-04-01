@@ -96,7 +96,7 @@ class CircuitBreakerResult:
     tripped: bool
     reason: str
     action: str  # 'pause', 'stop', or 'switch_context'
-    recommendation: str = ""
+    recommendation: str = ''
     system_message: str | None = None
 
 
@@ -129,8 +129,8 @@ class CircuitBreaker:
         )
 
         logger.info(
-            "CircuitBreaker initialized: max_consecutive_errors=%s, "
-            "max_high_risk_actions=%s (adaptive=%s)",
+            'CircuitBreaker initialized: max_consecutive_errors=%s, '
+            'max_high_risk_actions=%s (adaptive=%s)',
             config.max_consecutive_errors,
             config.max_high_risk_actions,
             config.adaptive,
@@ -146,8 +146,8 @@ class CircuitBreaker:
         if not self.config.enabled:
             return CircuitBreakerResult(
                 tripped=False,
-                reason="Circuit breaker disabled",
-                action="continue",
+                reason='Circuit breaker disabled',
+                action='continue',
             )
 
         # Check various trip conditions
@@ -156,11 +156,11 @@ class CircuitBreaker:
         if self.consecutive_errors >= self.config.max_consecutive_errors:
             return CircuitBreakerResult(
                 tripped=True,
-                reason=f"Too many consecutive errors ({self.consecutive_errors})",
-                action="pause",
+                reason=f'Too many consecutive errors ({self.consecutive_errors})',
+                action='pause',
                 recommendation=(
-                    f"The agent has encountered {self.consecutive_errors} consecutive errors. "
-                    f"Please review the error logs and adjust the approach before continuing."
+                    f'The agent has encountered {self.consecutive_errors} consecutive errors. '
+                    f'Please review the error logs and adjust the approach before continuing.'
                 ),
             )
 
@@ -168,11 +168,11 @@ class CircuitBreaker:
         if self.high_risk_action_count >= self.config.max_high_risk_actions:
             return CircuitBreakerResult(
                 tripped=True,
-                reason=f"Too many high-risk actions ({self.high_risk_action_count})",
-                action="pause",
+                reason=f'Too many high-risk actions ({self.high_risk_action_count})',
+                action='pause',
                 recommendation=(
-                    f"The agent has attempted {self.high_risk_action_count} high-risk actions. "
-                    f"Please review the actions and ensure the agent is behaving correctly."
+                    f'The agent has attempted {self.high_risk_action_count} high-risk actions. '
+                    f'Please review the actions and ensure the agent is behaving correctly.'
                 ),
             )
 
@@ -182,11 +182,11 @@ class CircuitBreaker:
         if self.stuck_detection_count >= self.config.max_stuck_detections:
             return CircuitBreakerResult(
                 tripped=True,
-                reason=f"Too many stuck loop detections ({self.stuck_detection_count})",
-                action="stop",
+                reason=f'Too many stuck loop detections ({self.stuck_detection_count})',
+                action='stop',
                 recommendation=(
-                    f"The agent has been detected stuck in loops {self.stuck_detection_count} times. "
-                    f"Stopping to prevent further wasted computation."
+                    f'The agent has been detected stuck in loops {self.stuck_detection_count} times. '
+                    f'Stopping to prevent further wasted computation.'
                 ),
             )
 
@@ -198,19 +198,19 @@ class CircuitBreaker:
         ):
             return CircuitBreakerResult(
                 tripped=True,
-                reason=f"Error rate too high ({error_rate:.1%} in last {len(self.recent_actions_success)} actions)",
-                action="pause",
+                reason=f'Error rate too high ({error_rate:.1%} in last {len(self.recent_actions_success)} actions)',
+                action='pause',
                 recommendation=(
-                    f"The agent has a {error_rate:.1%} error rate in recent actions. "
-                    f"Please review the strategy and errors before continuing."
+                    f'The agent has a {error_rate:.1%} error rate in recent actions. '
+                    f'Please review the strategy and errors before continuing.'
                 ),
             )
 
         # No trip conditions met
         return CircuitBreakerResult(
             tripped=False,
-            reason="All checks passed",
-            action="continue",
+            reason='All checks passed',
+            action='continue',
         )
 
     def record_error(self, error: Exception) -> None:
@@ -242,14 +242,14 @@ class CircuitBreaker:
     def record_stuck_detection(self) -> None:
         """Record a stuck loop detection."""
         self.stuck_detection_count += 1
-        logger.warning("Stuck detection #%s recorded", self.stuck_detection_count)
+        logger.warning('Stuck detection #%s recorded', self.stuck_detection_count)
 
     def record_progress_signal(self, note: str) -> None:
         """Proactively decrement the stuck loop detection count when LLM signals progress."""
         old_count = self.stuck_detection_count
         self.stuck_detection_count = max(0, self.stuck_detection_count - 2)
         logger.info(
-            "Progress signal received: %r. Reduced stuck_detection_count from %d to %d.",
+            'Progress signal received: %r. Reduced stuck_detection_count from %d to %d.',
             note,
             old_count,
             self.stuck_detection_count,
@@ -263,8 +263,8 @@ class CircuitBreaker:
         new_config = self.config.scaled(complexity, max_iterations)
         if new_config is not self.config:
             logger.info(
-                "CircuitBreaker adapted: max_errors %s→%s, max_risk %s→%s, "
-                "error_rate %.0f%%→%.0f%%, window %s→%s",
+                'CircuitBreaker adapted: max_errors %s→%s, max_risk %s→%s, '
+                'error_rate %.0f%%→%.0f%%, window %s→%s',
                 self.config.max_consecutive_errors,
                 new_config.max_consecutive_errors,
                 self.config.max_high_risk_actions,
@@ -283,7 +283,7 @@ class CircuitBreaker:
         self.stuck_detection_count = 0
         self.recent_errors.clear()
         self.recent_actions_success.clear()
-        logger.info("Circuit breaker reset")
+        logger.info('Circuit breaker reset')
 
     def _update_metrics(self, state: State) -> None:
         """Update metrics from state.

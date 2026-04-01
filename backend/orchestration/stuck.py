@@ -4,6 +4,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Sequence
 
+from backend.core.logger import app_logger as logger
+from backend.ledger.action.action import Action
+from backend.ledger.action.agent import AgentThinkAction
+from backend.ledger.action.commands import CmdRunAction
+from backend.ledger.action.empty import NullAction
+from backend.ledger.action.files import FileEditAction, FileReadAction, FileWriteAction
+from backend.ledger.action.message import MessageAction
+from backend.ledger.event import Event, EventSource
+from backend.ledger.observation import CmdOutputObservation
+from backend.ledger.observation.agent import AgentCondensationObservation
+from backend.ledger.observation.empty import NullObservation
+from backend.ledger.observation.error import ErrorObservation
+from backend.ledger.observation.files import FileEditObservation
+from backend.ledger.observation.observation import Observation
 from backend.orchestration.stuck_patterns import (
     eq_no_pid,
     has_enough_events_for_analysis,
@@ -13,21 +27,7 @@ from backend.orchestration.stuck_patterns import (
     is_stuck_repeating_action_error,
     is_stuck_repeating_action_observation,
 )
-from backend.core.logger import app_logger as logger
 from backend.validation.command_classification import classify_shell_intent
-from backend.ledger.action.action import Action
-from backend.ledger.action.agent import AgentThinkAction
-from backend.ledger.action.commands import CmdRunAction
-from backend.ledger.action.files import FileEditAction, FileReadAction, FileWriteAction
-from backend.ledger.action.empty import NullAction
-from backend.ledger.action.message import MessageAction
-from backend.ledger.event import Event, EventSource
-from backend.ledger.observation import CmdOutputObservation
-from backend.ledger.observation.agent import AgentCondensationObservation
-from backend.ledger.observation.empty import NullObservation
-from backend.ledger.observation.error import ErrorObservation
-from backend.ledger.observation.files import FileEditObservation
-from backend.ledger.observation.observation import Observation
 
 if TYPE_CHECKING:
     from backend.orchestration.state.state import State
@@ -45,9 +45,9 @@ class StuckDetector:
     """
 
     SYNTAX_ERROR_MESSAGES = [
-        "SyntaxError: unterminated string literal (detected at line",
-        "SyntaxError: invalid syntax. Perhaps you forgot a comma?",
-        "SyntaxError: incomplete input",
+        'SyntaxError: unterminated string literal (detected at line',
+        'SyntaxError: invalid syntax. Perhaps you forgot a comma?',
+        'SyntaxError: incomplete input',
     ]
 
     def __init__(self, state: State) -> None:
@@ -77,9 +77,9 @@ class StuckDetector:
         """Filter history to remove irrelevant events.
 
         Excludes user messages, null events, and error observations injected
-        by the stuck detector itself (STUCK_LOOP_RECOVERY) to prevent a
-        feedback loop where stuck-recovery errors trigger further stuck
-        detections.
+        by the stuck detector itself (STUCK_LOOP_RECOVERY) or circuit breaker
+        warnings to prevent a feedback loop where guard-injected errors
+        trigger further stuck detections.
         """
         return [
             event
@@ -89,10 +89,12 @@ class StuckDetector:
                 or isinstance(event, NullAction | NullObservation)
                 or (
                     isinstance(event, ErrorObservation)
-                    and getattr(event, "error_id", None) in (
-                        "STUCK_LOOP_RECOVERY",
-                        "CIRCUIT_BREAKER_TRIPPED",
-                        "INCOMPLETE_TASK",
+                    and getattr(event, 'error_id', None)
+                    in (
+                        'STUCK_LOOP_RECOVERY',
+                        'CIRCUIT_BREAKER_TRIPPED',
+                        'CIRCUIT_BREAKER_WARNING',
+                        'INCOMPLETE_TASK',
                     )
                 )
             )
@@ -202,9 +204,7 @@ class StuckDetector:
         )
 
         # Check if we have enough events to analyze
-        if not has_enough_events_for_analysis(
-            last_six_actions, last_six_observations
-        ):
+        if not has_enough_events_for_analysis(last_six_actions, last_six_observations):
             return False
 
         # Check for repeating patterns
@@ -213,7 +213,7 @@ class StuckDetector:
         ) and has_repeating_observation_pattern(
             last_six_observations,
         ):
-            logger.warning("Action, Observation pattern detected")
+            logger.warning('Action, Observation pattern detected')
             return True
 
         return False
@@ -289,7 +289,7 @@ class StuckDetector:
             )
             if not has_other_events:
                 logger.warning(
-                    "Context window error loop detected - repeated condensation events"
+                    'Context window error loop detected - repeated condensation events'
                 )
                 return True
         return False
@@ -347,8 +347,8 @@ class StuckDetector:
         # Detect semantic loop: low diversity + high failure rate
         if intent_diversity < 0.4 and failure_rate > 0.6:
             logger.warning(
-                "Semantic loop detected: intent_diversity=%.2f, "
-                "failure_rate=%.2f, unique_intents=%s/%s",
+                'Semantic loop detected: intent_diversity=%.2f, '
+                'failure_rate=%.2f, unique_intents=%s/%s',
                 intent_diversity,
                 failure_rate,
                 len(set(action_intents)),
@@ -423,9 +423,7 @@ class StuckDetector:
             return 0.0
 
         failures = sum(
-            1
-            for outcome in observation_outcomes
-            if outcome in ("error", "no_change")
+            1 for outcome in observation_outcomes if outcome in ('error', 'no_change')
         )
         return failures / len(observation_outcomes)
 
@@ -441,9 +439,9 @@ class StuckDetector:
         """
         if isinstance(action, CmdRunAction):
             return self._categorize_cmd_action(action.command)
-        if hasattr(action, "path"):
-            return f"file_op_{getattr(action, 'path')}"
-        return "other_action"
+        if hasattr(action, 'path'):
+            return f'file_op_{getattr(action, "path")}'
+        return 'other_action'
 
     def _extract_observation_outcome(self, observation: Observation) -> str | None:
         """Extract the outcome/result of an observation.
@@ -456,37 +454,37 @@ class StuckDetector:
 
         """
         if isinstance(observation, ErrorObservation):
-            return "error"
+            return 'error'
         if isinstance(observation, CmdOutputObservation):
             return self._categorize_cmd_output(observation)
-        content = getattr(observation, "content", "") or ""
-        if content.startswith("SKIPPED:"):
-            return "no_change"
+        content = getattr(observation, 'content', '') or ''
+        if content.startswith('SKIPPED:'):
+            return 'no_change'
         # Detect silent-success re-creation: old_content == new_content means
         # the file already existed and nothing was actually written.
         if isinstance(observation, FileEditObservation):
-            old = getattr(observation, "old_content", None)
-            new = getattr(observation, "new_content", None)
+            old = getattr(observation, 'old_content', None)
+            new = getattr(observation, 'new_content', None)
             if old is not None and old == new:
-                return "no_change"
-        return "unknown"
+                return 'no_change'
+        return 'unknown'
 
     def _categorize_cmd_output(self, observation: CmdOutputObservation) -> str:
         """Categorize command output from exit code and structured tool metadata only."""
         code = observation.exit_code
         if code is not None and code != 0:
-            return "error"
-        tr_raw = getattr(observation, "tool_result", None)
+            return 'error'
+        tr_raw = getattr(observation, 'tool_result', None)
         tr = tr_raw if isinstance(tr_raw, dict) else None
-        if tr is not None and tr.get("ok") is False:
-            return "error"
+        if tr is not None and tr.get('ok') is False:
+            return 'error'
         if code == 0:
-            if len((observation.content or "").strip()) == 0:
-                return "no_output"
-            return "success"
-        if len((observation.content or "").strip()) == 0:
-            return "no_output"
-        return "unknown"
+            if len((observation.content or '').strip()) == 0:
+                return 'no_output'
+            return 'success'
+        if len((observation.content or '').strip()) == 0:
+            return 'no_output'
+        return 'unknown'
 
     def _is_stuck_token_repetition(self, filtered_history: list[Event]) -> bool:
         """Detect exact token-level repetition in agent messages.
@@ -511,7 +509,7 @@ class StuckDetector:
             # And the content is non-trivial (ignore empty/short acks)
             if len(last_three[0].content) > 10:
                 logger.warning(
-                    "Token-level repetition detected (identical agent messages)"
+                    'Token-level repetition detected (identical agent messages)'
                 )
                 return True
 
@@ -544,7 +542,7 @@ class StuckDetector:
         # (Average 10k per step is high sustained output indicative of un-truncated runaway commands)
         if recent_growth > 50000:
             logger.warning(
-                "Cost acceleration detected: %s tokens added in last 5 steps",
+                'Cost acceleration detected: %s tokens added in last 5 steps',
                 recent_growth,
             )
             return True
@@ -554,7 +552,7 @@ class StuckDetector:
         if prompt_tokens[-1] > 100000:  # 100k context warning
             # Check if we are still growing
             if recent_growth > 1000:
-                logger.warning("High context window with continued growth detected")
+                logger.warning('High context window with continued growth detected')
                 return True
 
         return False
@@ -580,8 +578,8 @@ class StuckDetector:
         # Check if the last 6 actions are ALL AgentThinkAction
         if all(isinstance(a, AgentThinkAction) for a in recent_actions[-6:]):
             logger.warning(
-                "Think-only loop detected: last 6+ actions are all AgentThinkAction "
-                "with no real tool use."
+                'Think-only loop detected: last 6+ actions are all AgentThinkAction '
+                'with no real tool use.'
             )
             return True
 
@@ -591,8 +589,8 @@ class StuckDetector:
         """Extract prompt tokens for the last 10 steps."""
         prompt_tokens: list[int] = []
         for e in events_with_metrics[-10:]:
-            llm_metrics = getattr(e, "llm_metrics", None)
-            token_usages = getattr(llm_metrics, "token_usages", None)
+            llm_metrics = getattr(e, 'llm_metrics', None)
+            token_usages = getattr(llm_metrics, 'token_usages', None)
             if not token_usages:
                 continue
             try:
@@ -619,9 +617,10 @@ class StuckDetector:
         if not last_observations:
             return 0.0
         error_count = sum(
-            1 for o in last_observations
+            1
+            for o in last_observations
             if isinstance(o, ErrorObservation)
-            or (isinstance(o, CmdOutputObservation) and getattr(o, "exit_code", 0) != 0)
+            or (isinstance(o, CmdOutputObservation) and getattr(o, 'exit_code', 0) != 0)
         )
         return min(1.0, error_count / 3.0)
 
@@ -666,25 +665,48 @@ class StuckDetector:
 
         return round(max(scores), 2) if scores else 0.0
 
-    _READONLY_COMMANDS = frozenset([
-        "ls", "dir", "cat", "get-content", "type", "find", "pwd",
-        "head", "tail", "more", "less", "wc", "file", "stat", "tree",
-        "get-childitem", "get-item", "test-path", "resolve-path",
-        "select-string", "get-location",
-    ])
+    _READONLY_COMMANDS = frozenset(
+        [
+            'ls',
+            'dir',
+            'cat',
+            'get-content',
+            'type',
+            'find',
+            'pwd',
+            'head',
+            'tail',
+            'more',
+            'less',
+            'wc',
+            'file',
+            'stat',
+            'tree',
+            'get-childitem',
+            'get-item',
+            'test-path',
+            'resolve-path',
+            'select-string',
+            'get-location',
+        ]
+    )
 
     def _is_readonly_command(self, command: str) -> bool:
         """Check if a command is read-only (listing, reading, inspecting)."""
         cmd_lower = command.strip().lower()
         # Strip leading powershell call if present
-        for prefix in ("powershell -c ", "powershell.exe -c ", "cmd /c "):
+        for prefix in ('powershell -c ', 'powershell.exe -c ', 'cmd /c '):
             if cmd_lower.startswith(prefix):
-                cmd_lower = cmd_lower[len(prefix):].strip().strip('"').strip("'")
+                cmd_lower = cmd_lower[len(prefix) :].strip().strip('"').strip("'")
                 break
-        first_token = cmd_lower.split()[0] if cmd_lower.split() else ""
+        first_token = cmd_lower.split()[0] if cmd_lower.split() else ''
         # Also handle piped/chained commands — check if ALL parts are read-only
         # For simplicity, check the first token and common patterns
-        return first_token in self._READONLY_COMMANDS or first_token.startswith("ls") or first_token.startswith("dir")
+        return (
+            first_token in self._READONLY_COMMANDS
+            or first_token.startswith('ls')
+            or first_token.startswith('dir')
+        )
 
     def _is_stuck_readonly_inspection_loop(self, filtered_history: list[Event]) -> bool:
         """Detect when agent only runs read-only commands without any writes.
@@ -708,7 +730,7 @@ class StuckDetector:
             if isinstance(e, CmdRunAction) and self._is_readonly_command(e.command):
                 readonly_commands.append(e.command.strip())
             elif isinstance(e, FileReadAction):
-                readonly_commands.append(f"__read__{getattr(e, 'path', '')}")
+                readonly_commands.append(f'__read__{getattr(e, "path", "")}')
             elif isinstance(e, (FileWriteAction, FileEditAction)):
                 write_count += 1
 
@@ -725,8 +747,8 @@ class StuckDetector:
         # High diversity = legitimate exploration
         if diversity < 0.25:
             logger.warning(
-                "Read-only inspection loop detected: %d read-only actions "
-                "(%d unique, %.0f%% diversity), %d writes in last %d events",
+                'Read-only inspection loop detected: %d read-only actions '
+                '(%d unique, %.0f%% diversity), %d writes in last %d events',
                 readonly_count,
                 unique_commands,
                 diversity * 100,

@@ -9,19 +9,28 @@ import pytest
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
 
 
+def _make_monitor(**kwargs) -> MemoryPressureMonitor:
+    """Create a monitor with zero baseline for deterministic threshold tests."""
+    m = MemoryPressureMonitor(**kwargs)
+    m._baseline_rss_mb = 0.0
+    return m
+
+
 # ── __init__ ──────────────────────────────────────────────────────────
 
 
 class TestMemoryPressureMonitorInit:
     def test_default_thresholds(self):
-        m = MemoryPressureMonitor()
+        m = _make_monitor()
+        assert m._warn_delta_mb == 768
+        assert m._crit_delta_mb == 1536
         assert m._warn_mb == 768
         assert m._crit_mb == 1536
         assert m._check_interval == 10.0
         assert m._cooldown_s == 30.0
 
     def test_custom_thresholds(self):
-        m = MemoryPressureMonitor(
+        m = _make_monitor(
             warn_mb=512,
             crit_mb=1024,
             check_interval_s=5.0,
@@ -33,15 +42,22 @@ class TestMemoryPressureMonitorInit:
         assert m._cooldown_s == 8.0
 
     def test_env_var_thresholds(self, monkeypatch):
-        monkeypatch.setenv("APP_MEM_WARN_MB", "256")
-        monkeypatch.setenv("APP_MEM_CRIT_MB", "512")
-        monkeypatch.setenv("APP_MEM_CHECK_INTERVAL", "2")
-        monkeypatch.setenv("APP_MEM_CONDENSE_COOLDOWN_S", "9")
-        m = MemoryPressureMonitor()
+        monkeypatch.setenv('APP_MEM_WARN_MB', '256')
+        monkeypatch.setenv('APP_MEM_CRIT_MB', '512')
+        monkeypatch.setenv('APP_MEM_CHECK_INTERVAL', '2')
+        monkeypatch.setenv('APP_MEM_CONDENSE_COOLDOWN_S', '9')
+        m = _make_monitor()
         assert m._warn_mb == 256
         assert m._crit_mb == 512
         assert m._check_interval == 2.0
         assert m._cooldown_s == 9.0
+
+    def test_baseline_aware(self):
+        """Thresholds are baseline + delta."""
+        m = MemoryPressureMonitor(warn_mb=768, crit_mb=1536)
+        baseline = m._baseline_rss_mb
+        assert m._warn_mb == baseline + 768
+        assert m._crit_mb == baseline + 1536
 
 
 # ── should_condense ───────────────────────────────────────────────────
@@ -49,36 +65,52 @@ class TestMemoryPressureMonitorInit:
 
 class TestShouldCondense:
     def test_false_when_below_threshold(self):
-        m = MemoryPressureMonitor(warn_mb=1000, check_interval_s=0)
+        m = _make_monitor(warn_mb=1000, check_interval_s=0)
         m._process = MagicMock()
         m._process.memory_info.return_value = MagicMock(rss=500 * 1024 * 1024)
         assert m.should_condense() is False
 
     def test_true_when_above_warn(self):
-        m = MemoryPressureMonitor(warn_mb=400, check_interval_s=0)
+        m = _make_monitor(warn_mb=400, check_interval_s=0)
         m._process = MagicMock()
         m._process.memory_info.return_value = MagicMock(rss=500 * 1024 * 1024)
         assert m.should_condense() is True
 
     def test_false_when_no_psutil(self):
-        m = MemoryPressureMonitor(check_interval_s=0)
+        m = _make_monitor(check_interval_s=0)
         m._process = None
         assert m.should_condense() is False
 
     def test_false_during_warning_cooldown(self):
-        m = MemoryPressureMonitor(warn_mb=400, crit_mb=1200, check_interval_s=0, cooldown_s=30)
-        with patch.object(m, "_sample_rss", return_value=500.0):
-            with patch("backend.orchestration.memory_pressure.time.monotonic", return_value=100.0):
+        m = _make_monitor(
+            warn_mb=400, crit_mb=1200, check_interval_s=0, cooldown_s=30
+        )
+        with patch.object(m, '_sample_rss', return_value=500.0):
+            with patch(
+                'backend.orchestration.memory_pressure.time.monotonic',
+                return_value=100.0,
+            ):
                 m.record_condensation()
-            with patch("backend.orchestration.memory_pressure.time.monotonic", return_value=110.0):
+            with patch(
+                'backend.orchestration.memory_pressure.time.monotonic',
+                return_value=110.0,
+            ):
                 assert m.should_condense() is False
 
     def test_critical_bypasses_warning_cooldown(self):
-        m = MemoryPressureMonitor(warn_mb=400, crit_mb=800, check_interval_s=0, cooldown_s=30)
-        with patch.object(m, "_sample_rss", return_value=900.0):
-            with patch("backend.orchestration.memory_pressure.time.monotonic", return_value=100.0):
+        m = _make_monitor(
+            warn_mb=400, crit_mb=800, check_interval_s=0, cooldown_s=30
+        )
+        with patch.object(m, '_sample_rss', return_value=900.0):
+            with patch(
+                'backend.orchestration.memory_pressure.time.monotonic',
+                return_value=100.0,
+            ):
                 m.record_condensation()
-            with patch("backend.orchestration.memory_pressure.time.monotonic", return_value=110.0):
+            with patch(
+                'backend.orchestration.memory_pressure.time.monotonic',
+                return_value=110.0,
+            ):
                 assert m.should_condense() is True
 
 
@@ -87,13 +119,13 @@ class TestShouldCondense:
 
 class TestIsCritical:
     def test_false_below_critical(self):
-        m = MemoryPressureMonitor(crit_mb=2000, check_interval_s=0)
+        m = _make_monitor(crit_mb=2000, check_interval_s=0)
         m._process = MagicMock()
         m._process.memory_info.return_value = MagicMock(rss=1000 * 1024 * 1024)
         assert m.is_critical() is False
 
     def test_true_above_critical(self):
-        m = MemoryPressureMonitor(crit_mb=500, check_interval_s=0)
+        m = _make_monitor(crit_mb=500, check_interval_s=0)
         m._process = MagicMock()
         m._process.memory_info.return_value = MagicMock(rss=600 * 1024 * 1024)
         assert m.is_critical() is True
@@ -117,29 +149,30 @@ class TestRecordCondensation:
 
 class TestSnapshot:
     def test_returns_diagnostic_dict(self):
-        m = MemoryPressureMonitor(warn_mb=768, crit_mb=1536)
+        m = _make_monitor(warn_mb=768, crit_mb=1536)
         snap = m.snapshot()
-        assert snap["warn_threshold_mb"] == 768
-        assert snap["crit_threshold_mb"] == 1536
-        assert snap["condensation_count"] == 0
-        assert "level" in snap
-        assert "rss_mb" in snap
-        assert "psutil_available" in snap
+        assert snap['warn_threshold_mb'] == 768
+        assert snap['crit_threshold_mb'] == 1536
+        assert snap['condensation_count'] == 0
+        assert 'level' in snap
+        assert 'rss_mb' in snap
+        assert 'psutil_available' in snap
+        assert snap['baseline_rss_mb'] == 0.0
 
     def test_level_normal(self):
-        m = MemoryPressureMonitor(warn_mb=1000, crit_mb=2000)
+        m = _make_monitor(warn_mb=1000, crit_mb=2000)
         m._last_rss_mb = 500
-        assert m._level_str() == "normal"
+        assert m._level_str() == 'normal'
 
     def test_level_warning(self):
-        m = MemoryPressureMonitor(warn_mb=400, crit_mb=2000)
+        m = _make_monitor(warn_mb=400, crit_mb=2000)
         m._last_rss_mb = 500
-        assert m._level_str() == "warning"
+        assert m._level_str() == 'warning'
 
     def test_level_critical(self):
-        m = MemoryPressureMonitor(warn_mb=400, crit_mb=500)
+        m = _make_monitor(warn_mb=400, crit_mb=500)
         m._last_rss_mb = 600
-        assert m._level_str() == "critical"
+        assert m._level_str() == 'critical'
 
 
 # ── _sample_rss rate-limiting ─────────────────────────────────────────
@@ -147,14 +180,14 @@ class TestSnapshot:
 
 class TestSampleRss:
     def test_rate_limits_checks(self):
-        m = MemoryPressureMonitor(check_interval_s=9999)
+        m = _make_monitor(check_interval_s=9999)
         m._process = MagicMock()
         m._process.memory_info.return_value = MagicMock(rss=100 * 1024 * 1024)
         m._last_check = 0
 
-        with patch("backend.orchestration.memory_pressure._HAS_PSUTIL", True):
+        with patch('backend.orchestration.memory_pressure._HAS_PSUTIL', True):
             # Mock time.monotonic to control rate limiting precisely
-            with patch("backend.orchestration.memory_pressure.time") as mock_time:
+            with patch('backend.orchestration.memory_pressure.time') as mock_time:
                 # First call: monotonic returns 100_000, well past _last_check=0
                 mock_time.monotonic.return_value = 100_000.0
                 result = m._sample_rss()
@@ -169,8 +202,8 @@ class TestSampleRss:
                 assert result2 == pytest.approx(100.0)  # Returns cached value
 
     def test_handles_memory_info_error(self):
-        m = MemoryPressureMonitor(check_interval_s=0)
+        m = _make_monitor(check_interval_s=0)
         m._process = MagicMock()
-        m._process.memory_info.side_effect = OSError("no access")
+        m._process.memory_info.side_effect = OSError('no access')
         result = m._sample_rss()
         assert result is None
