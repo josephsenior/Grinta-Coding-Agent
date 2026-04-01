@@ -1,6 +1,7 @@
 {
   "project_root": "",
   "local_data_root": "",
+  "llm_provider": "",
   "llm_model": "",
   "llm_api_key": "",
   "llm_base_url": "",

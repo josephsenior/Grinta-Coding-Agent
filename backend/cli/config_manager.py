@@ -23,10 +23,26 @@ _DEFAULT_MODEL_BY_PROVIDER = {
     'anthropic': 'anthropic/claude-sonnet-4-20250514',
     'google': 'google/gemini-2.5-flash',
     'groq': 'groq/meta-llama/llama-4-scout',
+    'lightning': 'lightning/meta-llama/Meta-Llama-3.1-8B-Instruct',
     'openai': _DEFAULT_ONBOARDING_MODEL,
     'openrouter': 'openrouter/anthropic/claude-3.5-sonnet',
     'xai': 'xai/grok-4.1-fast',
 }
+
+# Providers shown during onboarding, in display order
+_ONBOARDING_PROVIDERS: list[tuple[str, str]] = [
+    ('openai', 'OpenAI'),
+    ('anthropic', 'Anthropic'),
+    ('google', 'Google (Gemini)'),
+    ('groq', 'Groq'),
+    ('xai', 'xAI (Grok)'),
+    ('openrouter', 'OpenRouter'),
+    ('lightning', 'Lightning AI'),
+    ('deepseek', 'DeepSeek'),
+    ('nvidia', 'NVIDIA'),
+    ('ollama', 'Ollama (local)'),
+    ('lm_studio', 'LM Studio (local)'),
+]
 
 # ---------------------------------------------------------------------------
 # Settings file location
@@ -182,8 +198,7 @@ def ensure_default_model(config: AppConfig) -> str | None:
 
 
 def run_onboarding() -> AppConfig:
-    """Interactive first-run: collect API key (and optionally model), persist, return config."""
-    # Non-interactive stdin cannot drive the onboarding prompts.
+    """Interactive first-run: Provider → Model → API Key, persist, return config."""
     if not os.isatty(0):
         _console.print(
             '[red]No API key configured and stdin is not interactive.[/red]\n'
@@ -198,9 +213,8 @@ def run_onboarding() -> AppConfig:
         Panel(
             Text.from_markup(
                 '[bold cyan]Welcome to Grinta[/bold cyan]\n\n'
-                'No API key detected.  Enter your LLM provider key to get started.\n'
-                'Supported providers: OpenAI, Anthropic, Google, DeepSeek, OpenRouter, and more.\n\n'
-                '[dim]Your key is stored locally in settings.json — never sent anywhere else.[/dim]'
+                'Let\'s configure your LLM provider.\n\n'
+                '[dim]Your settings are stored locally in settings.json — never sent anywhere else.[/dim]'
             ),
             title='[bold]First-Run Setup[/bold]',
             border_style='bright_cyan',
@@ -210,21 +224,138 @@ def run_onboarding() -> AppConfig:
     )
     _console.print()
 
-    api_key = Prompt.ask('[bold]API Key[/bold]', console=_console).strip()
-    inferred_model = _default_model_for_api_key(api_key)
-    model = Prompt.ask(
-        '[bold]Model[/bold] [dim](optional — press Enter to keep the suggested default)[/dim]',
-        default=inferred_model,
-        console=_console,
-    ).strip()
+    # ── Step 1: Select provider ──
+    _console.print('[bold]Step 1:[/bold] Choose your LLM provider\n')
+    for i, (_, label) in enumerate(_ONBOARDING_PROVIDERS, 1):
+        _console.print(f'  [cyan]{i:>2}[/cyan]  {label}')
+    _console.print(f'  [cyan]{len(_ONBOARDING_PROVIDERS) + 1:>2}[/cyan]  [dim]Custom (OpenAI-compatible endpoint)[/dim]')
+    _console.print()
 
+    provider_key: str | None = None
+    base_url: str | None = None
+    custom_provider_name: str | None = None
+
+    while True:
+        choice = Prompt.ask(
+            '[bold]Provider number[/bold]',
+            console=_console,
+        ).strip()
+        try:
+            idx = int(choice)
+        except ValueError:
+            _console.print('[red]  Enter a number from the list above.[/red]')
+            continue
+
+        if 1 <= idx <= len(_ONBOARDING_PROVIDERS):
+            provider_key, _ = _ONBOARDING_PROVIDERS[idx - 1]
+            break
+        elif idx == len(_ONBOARDING_PROVIDERS) + 1:
+            provider_key = 'custom'
+            break
+        else:
+            _console.print('[red]  Enter a number from the list above.[/red]')
+
+    _console.print()
+
+    # ── Custom provider details ──
+    if provider_key == 'custom':
+        _console.print('[bold]Custom Provider Configuration[/bold]\n')
+        custom_provider_name = Prompt.ask(
+            '  Provider name [dim](e.g. together, fireworks)[/dim]',
+            console=_console,
+        ).strip()
+
+        base_url = Prompt.ask(
+            '  Base URL [dim](OpenAI-compatible, e.g. https://api.together.xyz/v1)[/dim]',
+            console=_console,
+        ).strip()
+        if not base_url:
+            _console.print('[red]  Base URL is required for custom providers.[/red]')
+            raise SystemExit(1)
+
+        model = Prompt.ask(
+            '  Model name [dim](e.g. meta-llama/Llama-3-70b-chat-hf)[/dim]',
+            console=_console,
+        ).strip()
+        if not model:
+            _console.print('[red]  Model name is required.[/red]')
+            raise SystemExit(1)
+
+        _console.print()
+        api_key = Prompt.ask(
+            '  [bold]API Key[/bold]',
+            console=_console,
+        ).strip()
+
+        # For custom provider, prefix with provider name if given
+        if custom_provider_name:
+            full_model = f'{custom_provider_name}/{model}' if '/' not in model else model
+        else:
+            full_model = model
+
+    else:
+        # ── Step 2: Model name ──
+        default_model = _DEFAULT_MODEL_BY_PROVIDER.get(provider_key, '')
+        hint = f' [dim](default: {default_model})[/dim]' if default_model else ''
+        _console.print(f'[bold]Step 2:[/bold] Enter the model name{hint}\n')
+
+        model_input = Prompt.ask(
+            '  [bold]Model[/bold]',
+            default=default_model or None,
+            console=_console,
+        ).strip()
+
+        if not model_input:
+            if default_model:
+                model_input = default_model
+            else:
+                _console.print('[red]  Model name is required.[/red]')
+                raise SystemExit(1)
+
+        # Ensure model has provider prefix
+        if '/' not in model_input:
+            full_model = f'{provider_key}/{model_input}'
+        else:
+            full_model = model_input
+
+        _console.print()
+
+        # ── Step 3: API Key ──
+        local_providers = {'ollama', 'lm_studio', 'vllm'}
+        if provider_key in local_providers:
+            _console.print('[dim]  Local provider — no API key needed (press Enter to skip).[/dim]')
+            api_key = Prompt.ask(
+                '  [bold]API Key[/bold] [dim](optional)[/dim]',
+                default='',
+                console=_console,
+            ).strip()
+        else:
+            _console.print('[bold]Step 3:[/bold] Enter your API key\n')
+            api_key = Prompt.ask(
+                '  [bold]API Key[/bold]',
+                console=_console,
+            ).strip()
+
+    # ── Persist ──
     settings = _load_raw_settings()
+    settings['llm_model'] = full_model
     settings['llm_api_key'] = api_key
-    settings['llm_model'] = model or inferred_model
+    if provider_key and provider_key != 'custom':
+        settings['llm_provider'] = provider_key
+    elif custom_provider_name:
+        settings['llm_provider'] = custom_provider_name
+    if base_url:
+        settings['llm_base_url'] = base_url
     _save_raw_settings(settings)
 
+    _console.print()
     _console.print(
-        Panel('[green]Configuration saved.[/green]', border_style='green'),
+        Panel(
+            f'[green]✓ Configuration saved.[/green]\n'
+            f'  Provider: [bold]{custom_provider_name or provider_key}[/bold]\n'
+            f'  Model:    [bold]{full_model}[/bold]',
+            border_style='green',
+        ),
         justify='center',
     )
     _console.print()
@@ -296,9 +427,13 @@ def get_masked_api_key(config: AppConfig) -> str:
         return '(not set)'
 
 
-def update_model(model: str) -> None:
+def update_model(model: str, provider: str | None = None, base_url: str | None = None) -> None:
     settings = _load_raw_settings()
     settings['llm_model'] = model
+    if provider:
+        settings['llm_provider'] = provider
+    if base_url:
+        settings['llm_base_url'] = base_url
     _save_raw_settings(settings)
 
 

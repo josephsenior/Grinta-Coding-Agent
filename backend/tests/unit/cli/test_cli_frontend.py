@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
 import io
 import json
 import os
+import sys
+from contextlib import suppress
 from pathlib import Path
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,9 +17,13 @@ from backend.cli.confirmation import _risk_label
 from backend.cli.diff_renderer import DiffPanel
 from backend.cli.event_renderer import CLIEventRenderer
 from backend.cli.hud import HUDBar
-from backend.cli.main import _configure_redirected_streams, show_grinta_splash
+from backend.cli.main import (
+    _configure_redirected_streams,
+    _read_piped_stdin,
+    show_grinta_splash,
+)
 from backend.cli.reasoning_display import ReasoningDisplay
-from backend.cli.repl import Repl, _supports_prompt_session
+from backend.cli.repl import Repl, _prompt_toolkit_available, _supports_prompt_session
 from backend.core.config import AppConfig
 from backend.core.enums import ActionSecurityRisk, AgentState, EventSource
 from backend.inference.metrics import Metrics, TokenUsage
@@ -56,30 +61,30 @@ async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
         TokenUsage(prompt_tokens=10, completion_tokens=5, context_window=1000)
     ]
 
-    chunk = StreamingChunkAction(chunk="Hello", accumulated="Hello", is_final=False)
+    chunk = StreamingChunkAction(chunk='Hello', accumulated='Hello', is_final=False)
     chunk.source = EventSource.AGENT
     chunk.llm_metrics = metrics
 
     await renderer.handle_event(chunk)
 
-    assert renderer.streaming_preview == "Hello"
+    assert renderer.streaming_preview == 'Hello'
     assert hud.state.cost_usd == 1.25
     assert hud.state.context_tokens == 15
     assert hud.state.context_limit == 1000
 
-    final_message = MessageAction(content="Hello", wait_for_response=True)
+    final_message = MessageAction(content='Hello', wait_for_response=True)
     final_message.source = EventSource.AGENT
     await renderer.handle_event(final_message)
 
-    assert renderer.streaming_preview == ""
+    assert renderer.streaming_preview == ''
     assert len(renderer.history) == 1
 
 
 def test_confirmation_uses_backend_security_risk() -> None:
-    action = CmdRunAction(command="echo hello")
+    action = CmdRunAction(command='echo hello')
     action.security_risk = ActionSecurityRisk.HIGH
 
-    assert _risk_label(action) == ("HIGH", "bold red")
+    assert _risk_label(action) == ('HIGH', 'bold red')
 
 
 @pytest.mark.asyncio
@@ -136,28 +141,28 @@ def test_hud_tracks_llm_call_count() -> None:
 def test_diff_panel_new_file() -> None:
     """DiffPanel should show creation info for new files."""
     obs = MagicMock()
-    obs.path = "src/main.py"
+    obs.path = 'src/main.py'
     obs.prev_exist = False
     obs.new_content = "print('hello')\nprint('world')\n"
-    obs.content = "File created"
+    obs.content = 'File created'
 
     panel = DiffPanel(obs)
     console = _make_console(width=80)
     console.print(panel)
     output = _console_output(console)
-    assert "created" in output
-    assert "src/main.py" in output
+    assert 'created' in output
+    assert 'src/main.py' in output
 
 
 def test_diff_panel_existing_file_with_groups() -> None:
     """DiffPanel should render edit groups for existing file edits."""
     obs = MagicMock()
-    obs.path = "README.md"
+    obs.path = 'README.md'
     obs.prev_exist = True
     obs.get_edit_groups.return_value = [
         {
-            "before_edits": ["- old line 1"],
-            "after_edits": ["+ new line 1", "+ new line 2"],
+            'before_edits': ['- old line 1'],
+            'after_edits': ['+ new line 1', '+ new line 2'],
         }
     ]
 
@@ -165,8 +170,8 @@ def test_diff_panel_existing_file_with_groups() -> None:
     console = _make_console(width=80)
     console.print(panel)
     output = _console_output(console)
-    assert "edited" in output
-    assert "README.md" in output
+    assert 'edited' in output
+    assert 'README.md' in output
 
 
 def test_show_grinta_splash_renders_logo_text() -> None:
@@ -174,11 +179,11 @@ def test_show_grinta_splash_renders_logo_text() -> None:
     show_grinta_splash(console)
     output = _console_output(console)
 
-    assert "GGGGGG" in output
-    assert "RRRRRR" in output
-    assert "TTTTTTTT" in output
-    assert ">_" in output
-    assert "o  o" in output
+    assert 'GGGGGG' in output
+    assert 'RRRRRR' in output
+    assert 'TTTTTTTT' in output
+    assert '>_' in output
+    assert 'o  o' in output
 
 
 def test_prompt_session_requires_tty_streams() -> None:
@@ -187,9 +192,31 @@ def test_prompt_session_requires_tty_streams() -> None:
     piped_stream = MagicMock()
     piped_stream.isatty.return_value = False
 
-    assert _supports_prompt_session(interactive_stream, interactive_stream) is True
+    with patch('backend.cli.repl._prompt_toolkit_available', return_value=True):
+        assert _supports_prompt_session(interactive_stream, interactive_stream) is True
     assert _supports_prompt_session(piped_stream, interactive_stream) is False
     assert _supports_prompt_session(interactive_stream, piped_stream) is False
+
+
+def test_prompt_session_requires_prompt_toolkit() -> None:
+    interactive_stream = MagicMock()
+    interactive_stream.isatty.return_value = True
+
+    with patch('backend.cli.repl._prompt_toolkit_available', return_value=False):
+        assert _supports_prompt_session(interactive_stream, interactive_stream) is False
+
+
+def test_prompt_toolkit_available_returns_false_when_missing() -> None:
+    original = sys.modules.get('prompt_toolkit')
+    sys.modules.pop('prompt_toolkit', None)
+    try:
+        with patch.dict('sys.modules', {'prompt_toolkit': None}):
+            assert _prompt_toolkit_available() is False
+    finally:
+        if original is not None:
+            sys.modules['prompt_toolkit'] = original
+        else:
+            sys.modules.pop('prompt_toolkit', None)
 
 
 def test_configure_redirected_streams_uses_utf8_for_non_tty() -> None:
@@ -203,19 +230,36 @@ def test_configure_redirected_streams_uses_utf8_for_non_tty() -> None:
 
     _configure_redirected_streams(redirected, interactive, None)
 
-    redirected.reconfigure.assert_called_once_with(encoding="utf-8", errors="replace")
+    redirected.reconfigure.assert_called_once_with(encoding='utf-8', errors='replace')
     interactive.reconfigure.assert_not_called()
+
+
+def test_read_piped_stdin_returns_none_for_tty() -> None:
+    stdin = MagicMock()
+    stdin.isatty.return_value = True
+
+    with patch.object(sys, 'stdin', stdin):
+        assert _read_piped_stdin() is None
+
+
+def test_read_piped_stdin_reads_non_tty_once() -> None:
+    stdin = MagicMock()
+    stdin.isatty.return_value = False
+    stdin.read.return_value = 'queued task\n'
+
+    with patch.object(sys, 'stdin', stdin):
+        assert _read_piped_stdin() == 'queued task\n'
 
 
 def test_confirmation_handles_all_risk_levels() -> None:
     """All ActionSecurityRisk levels should map to readable labels."""
     for risk_val, expected_label in [
-        (ActionSecurityRisk.HIGH, "HIGH"),
-        (ActionSecurityRisk.MEDIUM, "MEDIUM"),
-        (ActionSecurityRisk.LOW, "LOW"),
-        (ActionSecurityRisk.UNKNOWN, "ASK"),
+        (ActionSecurityRisk.HIGH, 'HIGH'),
+        (ActionSecurityRisk.MEDIUM, 'MEDIUM'),
+        (ActionSecurityRisk.LOW, 'LOW'),
+        (ActionSecurityRisk.UNKNOWN, 'ASK'),
     ]:
-        action = CmdRunAction(command="test")
+        action = CmdRunAction(command='test')
         action.security_risk = risk_val
         label, _ = _risk_label(action)
         assert label == expected_label
@@ -232,18 +276,20 @@ async def test_renderer_handles_error_observation() -> None:
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
 
-    error_obs = ErrorObservation(content="FileNotFoundError: x.py\nTraceback detail here")
+    error_obs = ErrorObservation(
+        content='FileNotFoundError: x.py\nTraceback detail here'
+    )
     await renderer.handle_event(error_obs)
 
-    assert hud.state.ledger_status == "Error"
+    assert hud.state.ledger_status == 'Error'
     assert len(renderer.history) == 1
 
 
 @pytest.mark.asyncio
 async def test_renderer_shows_recall_observation() -> None:
     """RecallObservation should show a brief recall indicator."""
-    from backend.ledger.observation.agent import RecallObservation
     from backend.core.enums import RecallType
+    from backend.ledger.observation.agent import RecallObservation
 
     console = _make_console()
     hud = HUDBar()
@@ -252,7 +298,7 @@ async def test_renderer_shows_recall_observation() -> None:
     )
 
     recall_obs = RecallObservation(
-        content="recalled",
+        content='recalled',
         recall_type=RecallType.WORKSPACE_CONTEXT,
     )
     await renderer.handle_event(recall_obs)
@@ -266,10 +312,10 @@ def test_autonomy_command_shows_current_level() -> None:
     mock_renderer = MagicMock()
     repl.set_renderer(mock_renderer)
 
-    repl.handle_autonomy_command("/autonomy")
+    repl.handle_autonomy_command('/autonomy')
     mock_renderer.add_system_message.assert_called_once()
     call_text = mock_renderer.add_system_message.call_args[0][0]
-    assert "balanced" in call_text
+    assert 'balanced' in call_text
 
 
 def test_autonomy_command_sets_level() -> None:
@@ -279,13 +325,13 @@ def test_autonomy_command_sets_level() -> None:
     repl.set_renderer(mock_renderer)
 
     ac = MagicMock()
-    ac.autonomy_level = "balanced"
+    ac.autonomy_level = 'balanced'
     controller = MagicMock()
     controller.autonomy_controller = ac
     repl.set_controller(controller)
 
-    repl.handle_autonomy_command("/autonomy full")
-    assert ac.autonomy_level == "full"
+    repl.handle_autonomy_command('/autonomy full')
+    assert ac.autonomy_level == 'full'
     mock_renderer.add_system_message.assert_called_once()
 
 
@@ -293,13 +339,14 @@ def test_entry_point_dispatches_serve() -> None:
     """Entry point should dispatch 'serve' to embedded main."""
     import sys
 
-    with patch.object(sys, "argv", ["app", "serve", "--port", "3030"]):
-        with patch("backend.embedded.main") as mock_serve:
+    with patch.object(sys, 'argv', ['app', 'serve', '--port', '3030']):
+        with patch('backend.embedded.main') as mock_serve:
             from backend.cli.entry import main
+
             main()
             mock_serve.assert_called_once()
             # argv should have been modified to strip 'serve'
-            assert sys.argv == ["app", "--port", "3030"]
+            assert sys.argv == ['app', '--port', '3030']
 
 
 # ── New tests: CLI flags ─────────────────────────────────────────────────
@@ -309,24 +356,24 @@ def test_entry_point_parses_model_flag() -> None:
     """--model flag should be forwarded to repl main."""
     import sys
 
-    with patch.object(sys, "argv", ["app", "--model", "openai/gpt-4.1"]):
-        with patch("backend.cli.main.main") as mock_repl:
+    with patch.object(sys, 'argv', ['app', '--model', 'openai/gpt-4.1']):
+        with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
-            mock_repl.assert_called_once_with(model="openai/gpt-4.1", project=None)
+            mock_repl.assert_called_once_with(model='openai/gpt-4.1', project=None)
 
 
 def test_entry_point_parses_project_flag() -> None:
     """--project flag should be forwarded to repl main."""
     import sys
 
-    with patch.object(sys, "argv", ["app", "--project", "/tmp/myrepo"]):
-        with patch("backend.cli.main.main") as mock_repl:
+    with patch.object(sys, 'argv', ['app', '--project', '/tmp/myrepo']):
+        with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
-            mock_repl.assert_called_once_with(model=None, project="/tmp/myrepo")
+            mock_repl.assert_called_once_with(model=None, project='/tmp/myrepo')
 
 
 def test_entry_point_parses_both_flags() -> None:
@@ -334,45 +381,157 @@ def test_entry_point_parses_both_flags() -> None:
     import sys
 
     with patch.object(
-        sys, "argv", ["app", "-m", "anthropic/claude-sonnet-4-20250514", "-p", "/tmp/proj"]
+        sys,
+        'argv',
+        ['app', '-m', 'anthropic/claude-sonnet-4-20250514', '-p', '/tmp/proj'],
     ):
-        with patch("backend.cli.main.main") as mock_repl:
+        with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
             mock_repl.assert_called_once_with(
-                model="anthropic/claude-sonnet-4-20250514", project="/tmp/proj"
+                model='anthropic/claude-sonnet-4-20250514', project='/tmp/proj'
             )
 
 
 def test_grinta_main_parses_project_flag() -> None:
-    """grinta should parse --project even when invoked via backend.cli.main."""
+    """Grinta should parse --project even when invoked via backend.cli.main."""
     import sys
 
-    with patch.object(sys, "argv", ["grinta", "--project", "/tmp/myrepo"]):
-        with patch("backend.cli.main._async_main", new_callable=MagicMock) as mock_async_main:
-            with patch("backend.cli.main.asyncio.run") as mock_asyncio_run:
+    with patch.object(sys, 'argv', ['grinta', '--project', '/tmp/myrepo']):
+        with patch(
+            'backend.cli.main._async_main', new_callable=MagicMock
+        ) as mock_async_main:
+            with patch('backend.cli.main.asyncio.run') as mock_asyncio_run:
                 from backend.cli.main import main
 
                 main()
 
-    mock_async_main.assert_called_once_with(model=None, project="/tmp/myrepo")
+    mock_async_main.assert_called_once_with(model=None, project='/tmp/myrepo')
     mock_asyncio_run.assert_called_once()
 
 
 def test_grinta_main_dispatches_serve() -> None:
-    """grinta should dispatch serve-style subcommands from backend.cli.main."""
+    """Grinta should dispatch serve-style subcommands from backend.cli.main."""
     import sys
 
-    with patch.object(sys, "argv", ["grinta", "serve", "--port", "3030"]):
-        with patch("backend.embedded.main") as mock_serve:
-            with patch("backend.cli.main.asyncio.run") as mock_asyncio_run:
+    with patch.object(sys, 'argv', ['grinta', 'serve', '--port', '3030']):
+        with patch('backend.embedded.main') as mock_serve:
+            with patch('backend.cli.main.asyncio.run') as mock_asyncio_run:
                 from backend.cli.main import main
 
                 main()
 
     mock_serve.assert_called_once()
     mock_asyncio_run.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_async_main_defaults_workspace_to_cwd(tmp_path: Path) -> None:
+    config = AppConfig()
+    config.get_llm_config().model = 'openai/gpt-4.1'
+
+    repl = MagicMock()
+    repl.run = AsyncMock()
+
+    with patch('backend.core.config.load_app_config', return_value=config):
+        with patch('backend.cli.main.Console', return_value=_make_console()):
+            with patch('backend.cli.repl.Repl', return_value=repl):
+                with patch('backend.cli.config_manager.needs_onboarding', return_value=False):
+                    with patch('backend.cli.config_manager.ensure_default_model', return_value='openai/gpt-4.1'):
+                        with patch('backend.cli.main._setup_logging'):
+                            with patch('pathlib.Path.cwd', return_value=tmp_path):
+                                from backend.cli.main import _async_main
+
+                                await _async_main()
+
+    resolved = str(tmp_path.resolve())
+    assert config.project_root == resolved
+    assert config.local_data_root == resolved
+    assert config.get_agent_config(config.default_agent).cli_mode is True
+    repl.run.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
+    config = AppConfig()
+    config.get_llm_config().model = 'openai/gpt-4.1'
+
+    repl = MagicMock()
+    repl.run = AsyncMock()
+
+    stdin = MagicMock()
+    stdin.isatty.return_value = False
+    stdin.read.return_value = 'queued task\n'
+
+    with patch.object(sys, 'stdin', stdin):
+        with patch('backend.core.config.load_app_config', return_value=config):
+            with patch('backend.cli.main.Console', return_value=_make_console()):
+                with patch('backend.cli.repl.Repl', return_value=repl):
+                    with patch(
+                        'backend.cli.config_manager.needs_onboarding',
+                        return_value=False,
+                    ):
+                        with patch(
+                            'backend.cli.config_manager.ensure_default_model',
+                            return_value='openai/gpt-4.1',
+                        ):
+                            with patch('backend.cli.main._setup_logging'):
+                                with patch('pathlib.Path.cwd', return_value=tmp_path):
+                                    from backend.cli.main import _async_main
+
+                                    await _async_main()
+
+    repl.queue_initial_input.assert_called_once_with('queued task\n')
+    repl.run.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_async_main_keeps_explicit_project_override(tmp_path: Path) -> None:
+    config = AppConfig()
+    config.get_llm_config().model = 'openai/gpt-4.1'
+    repl = MagicMock()
+    repl.run = AsyncMock()
+
+    with patch('backend.core.config.load_app_config', return_value=config):
+        with patch('backend.cli.main.Console', return_value=_make_console()):
+            with patch('backend.cli.repl.Repl', return_value=repl):
+                with patch('backend.cli.config_manager.needs_onboarding', return_value=False):
+                    with patch('backend.cli.config_manager.ensure_default_model', return_value='openai/gpt-4.1'):
+                        with patch('backend.cli.main._setup_logging'):
+                            from backend.cli.main import _async_main
+
+                            await _async_main(project=str(tmp_path))
+
+    resolved = str(tmp_path.resolve())
+    assert config.project_root == resolved
+    assert config.local_data_root == resolved
+    assert config.get_agent_config(config.default_agent).cli_mode is True
+
+
+@pytest.mark.asyncio
+async def test_repl_non_interactive_uses_queued_input_before_stdin() -> None:
+    repl = Repl(_make_config(), _make_console())
+    repl.queue_initial_input('queued task\n')
+
+    stdin = MagicMock()
+    stdin.readline.return_value = ''
+
+    with patch.object(sys, 'stdin', stdin):
+        result = await repl._read_non_interactive_input()
+
+    assert result == 'queued task\n'
+    stdin.readline.assert_not_called()
+
+
+def test_find_sessions_root_prefers_workspace_conversations(tmp_path: Path) -> None:
+    from backend.cli.session_manager import _find_sessions_root
+
+    conversations = tmp_path / '.grinta' / 'conversations'
+    conversations.mkdir(parents=True)
+
+    with patch.dict(os.environ, {'APP_ROOT': str(tmp_path)}, clear=False):
+        assert _find_sessions_root() == conversations
 
 
 # ── New tests: Ctrl+C handling ───────────────────────────────────────────
@@ -394,7 +553,7 @@ async def test_cancel_agent_stops_task() -> None:
 
     assert task.cancelled()
     mock_renderer.add_system_message.assert_called_once()
-    assert "Interrupted" in mock_renderer.add_system_message.call_args[0][0]
+    assert 'Interrupted' in mock_renderer.add_system_message.call_args[0][0]
 
 
 # ── New tests: Reasoning elapsed time ────────────────────────────────────
@@ -403,18 +562,20 @@ async def test_cancel_agent_stops_task() -> None:
 def test_reasoning_display_elapsed_time() -> None:
     """ReasoningDisplay should show elapsed time when active."""
     rd = ReasoningDisplay()
-    with patch("backend.cli.reasoning_display.time.monotonic", side_effect=[100.0, 105.0]):
+    with patch(
+        'backend.cli.reasoning_display.time.monotonic', side_effect=[100.0, 105.0]
+    ):
         rd.start()
         console = _make_console(width=80)
         console.print(rd.renderable())
     output = _console_output(console)
-    assert "(5s)" in output
+    assert '(5s)' in output
 
 
 def test_reasoning_display_stop_resets_timer() -> None:
     """stop() should reset the start time."""
     rd = ReasoningDisplay()
-    with patch("backend.cli.reasoning_display.time.monotonic", return_value=100.0):
+    with patch('backend.cli.reasoning_display.time.monotonic', return_value=100.0):
         rd.start()
     assert rd.elapsed_seconds is not None
     rd.stop()
@@ -426,19 +587,19 @@ def test_reasoning_display_stop_resets_timer() -> None:
 
 def test_atomic_settings_write(tmp_path: Path) -> None:
     """_save_raw_settings should write atomically via tempfile + rename."""
-    from backend.cli.config_manager import _save_raw_settings, _load_raw_settings
+    from backend.cli.config_manager import _load_raw_settings, _save_raw_settings
 
-    settings_file = tmp_path / "settings.json"
-    with patch("backend.cli.config_manager._settings_path", return_value=settings_file):
-        data = {"llm_api_key": "sk-test123", "llm_model": "test/model"}
+    settings_file = tmp_path / 'settings.json'
+    with patch('backend.cli.config_manager._settings_path', return_value=settings_file):
+        data = {'llm_api_key': 'sk-test123', 'llm_model': 'test/model'}
         _save_raw_settings(data)
 
         loaded = _load_raw_settings()
-        assert loaded["llm_api_key"] == "sk-test123"
-        assert loaded["llm_model"] == "test/model"
+        assert loaded['llm_api_key'] == 'sk-test123'
+        assert loaded['llm_model'] == 'test/model'
 
         # No stale .tmp files left behind
-        tmp_files = list(settings_file.parent.glob("*.tmp"))
+        tmp_files = list(settings_file.parent.glob('*.tmp'))
         assert len(tmp_files) == 0
 
 
@@ -448,12 +609,12 @@ def test_get_masked_api_key_returns_not_set_when_missing() -> None:
 
     llm_cfg = MagicMock()
     llm_cfg.api_key = None
-    llm_cfg.model = "openai/gpt-4.1"
+    llm_cfg.model = 'openai/gpt-4.1'
     config = MagicMock()
     config.get_llm_config.return_value = llm_cfg
 
     with patch.dict(os.environ, {}, clear=True):
-        assert get_masked_api_key(config) == "(not set)"
+        assert get_masked_api_key(config) == '(not set)'
 
 
 def test_get_masked_api_key_reads_env_fallback() -> None:
@@ -462,16 +623,85 @@ def test_get_masked_api_key_reads_env_fallback() -> None:
 
     llm_cfg = MagicMock()
     llm_cfg.api_key = None
-    llm_cfg.model = ""
+    llm_cfg.model = ''
     config = MagicMock()
     config.get_llm_config.return_value = llm_cfg
 
-    with patch.dict(os.environ, {"LLM_API_KEY": "env-secret-12345678"}, clear=True):
+    with patch.dict(os.environ, {'LLM_API_KEY': 'env-secret-12345678'}, clear=True):
         masked = get_masked_api_key(config)
 
-    assert masked.startswith("env-")
-    assert masked.endswith("5678")
-    assert "•" in masked
+    assert masked.startswith('env-')
+    assert masked.endswith('5678')
+    assert '•' in masked
+
+
+def test_ensure_default_model_sets_model_from_google_key() -> None:
+    from backend.cli.config_manager import ensure_default_model
+
+    llm_cfg = MagicMock()
+    llm_cfg.api_key = None
+    llm_cfg.model = None
+    config = MagicMock()
+    config.get_llm_config.return_value = llm_cfg
+
+    with patch.dict(os.environ, {'LLM_API_KEY': 'AIzaSyBxxxxxxxxxxxxxxx'}, clear=True):
+        selected = ensure_default_model(config)
+
+    assert selected == 'google/gemini-2.5-flash'
+    assert llm_cfg.model == 'google/gemini-2.5-flash'
+
+
+def test_ensure_default_model_preserves_existing_model() -> None:
+    from backend.cli.config_manager import ensure_default_model
+
+    llm_cfg = MagicMock()
+    llm_cfg.api_key = None
+    llm_cfg.model = 'anthropic/claude-sonnet-4-20250514'
+    config = MagicMock()
+    config.get_llm_config.return_value = llm_cfg
+
+    with patch.dict(os.environ, {'LLM_API_KEY': 'sk-test12345678901234567890'}, clear=True):
+        selected = ensure_default_model(config)
+
+    assert selected == 'anthropic/claude-sonnet-4-20250514'
+    assert llm_cfg.model == 'anthropic/claude-sonnet-4-20250514'
+
+
+def test_ensure_default_model_uses_provider_specific_env_var() -> None:
+    from backend.cli.config_manager import ensure_default_model
+
+    llm_cfg = MagicMock()
+    llm_cfg.api_key = None
+    llm_cfg.model = None
+    config = MagicMock()
+    config.get_llm_config.return_value = llm_cfg
+
+    with patch.dict(os.environ, {'OPENAI_API_KEY': 'sk-test12345678901234567890'}, clear=True):
+        selected = ensure_default_model(config)
+
+    assert selected == 'openai/gpt-4.1'
+    assert llm_cfg.model == 'openai/gpt-4.1'
+
+
+def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
+    from backend.cli.config_manager import run_onboarding
+
+    settings_file = tmp_path / 'settings.json'
+    # New flow: 1) provider number (2 = Anthropic), 2) model (accept default), 3) API key
+    entered = iter(['2', '', 'sk-ant-api03-test-value'])
+    loaded_config = MagicMock()
+
+    with patch('backend.cli.config_manager._settings_path', return_value=settings_file):
+        with patch('backend.cli.config_manager.Prompt.ask', side_effect=lambda *args, **kwargs: next(entered)):
+            with patch('backend.cli.config_manager.load_app_config', return_value=loaded_config):
+                with patch('os.isatty', return_value=True):
+                    result = run_onboarding()
+
+    saved = json.loads(settings_file.read_text(encoding='utf-8'))
+    assert saved['llm_api_key'] == 'sk-ant-api03-test-value'
+    assert saved['llm_model'] == 'anthropic/claude-sonnet-4-20250514'
+    assert saved['llm_provider'] == 'anthropic'
+    assert result is loaded_config
 
 
 # ── New tests: Budget warnings ───────────────────────────────────────────
@@ -492,11 +722,9 @@ async def test_budget_warning_at_80_percent() -> None:
 
     metrics = Metrics()
     metrics.accumulated_cost = 0.85
-    metrics.token_usages = [
-        TokenUsage(prompt_tokens=100, completion_tokens=50)
-    ]
+    metrics.token_usages = [TokenUsage(prompt_tokens=100, completion_tokens=50)]
 
-    chunk = StreamingChunkAction(chunk="x", accumulated="x", is_final=False)
+    chunk = StreamingChunkAction(chunk='x', accumulated='x', is_final=False)
     chunk.source = EventSource.AGENT
     chunk.llm_metrics = metrics
 
@@ -523,11 +751,9 @@ async def test_budget_exceeded_at_100_percent() -> None:
 
     metrics = Metrics()
     metrics.accumulated_cost = 1.05
-    metrics.token_usages = [
-        TokenUsage(prompt_tokens=100, completion_tokens=50)
-    ]
+    metrics.token_usages = [TokenUsage(prompt_tokens=100, completion_tokens=50)]
 
-    chunk = StreamingChunkAction(chunk="x", accumulated="x", is_final=False)
+    chunk = StreamingChunkAction(chunk='x', accumulated='x', is_final=False)
     chunk.source = EventSource.AGENT
     chunk.llm_metrics = metrics
 
@@ -550,11 +776,9 @@ async def test_no_budget_warning_when_no_budget_set() -> None:
 
     metrics = Metrics()
     metrics.accumulated_cost = 999.0
-    metrics.token_usages = [
-        TokenUsage(prompt_tokens=100, completion_tokens=50)
-    ]
+    metrics.token_usages = [TokenUsage(prompt_tokens=100, completion_tokens=50)]
 
-    chunk = StreamingChunkAction(chunk="x", accumulated="x", is_final=False)
+    chunk = StreamingChunkAction(chunk='x', accumulated='x', is_final=False)
     chunk.source = EventSource.AGENT
     chunk.llm_metrics = metrics
 
@@ -573,9 +797,9 @@ def test_resume_command_sets_pending() -> None:
     mock_renderer = MagicMock()
     repl.set_renderer(mock_renderer)
 
-    result = repl.handle_command("/resume 1")
+    result = repl.handle_command('/resume 1')
     assert result is True
-    assert repl.pending_resume == "1"
+    assert repl.pending_resume == '1'
 
 
 def test_resume_command_no_arg_warns() -> None:
@@ -584,11 +808,11 @@ def test_resume_command_no_arg_warns() -> None:
     mock_renderer = MagicMock()
     repl.set_renderer(mock_renderer)
 
-    result = repl.handle_command("/resume")
+    result = repl.handle_command('/resume')
     assert result is True
     assert repl.pending_resume is None
     mock_renderer.add_system_message.assert_called_once()
-    assert "Usage" in mock_renderer.add_system_message.call_args[0][0]
+    assert 'Usage' in mock_renderer.add_system_message.call_args[0][0]
 
 
 def test_resume_command_with_session_id() -> None:
@@ -597,26 +821,26 @@ def test_resume_command_with_session_id() -> None:
     mock_renderer = MagicMock()
     repl.set_renderer(mock_renderer)
 
-    result = repl.handle_command("/resume abc-def-123")
+    result = repl.handle_command('/resume abc-def-123')
     assert result is True
-    assert repl.pending_resume == "abc-def-123"
+    assert repl.pending_resume == 'abc-def-123'
 
 
 @pytest.mark.asyncio
 async def test_resume_session_uses_persisted_session_index(tmp_path: Path) -> None:
     """resume_session should resolve numeric indexes from the real session storage layout."""
-    sessions_root = tmp_path / "storage" / ".app" / "conversations"
-    older = sessions_root / "session-old"
-    newer = sessions_root / "session-new"
+    sessions_root = tmp_path / 'storage' / '.grinta' / 'conversations'
+    older = sessions_root / 'session-old'
+    newer = sessions_root / 'session-new'
     older.mkdir(parents=True)
     newer.mkdir(parents=True)
-    (older / "metadata.json").write_text(
-        json.dumps({"last_updated_at": "2026-03-29T10:00:00"}),
-        encoding="utf-8",
+    (older / 'metadata.json').write_text(
+        json.dumps({'last_updated_at': '2026-03-29T10:00:00'}),
+        encoding='utf-8',
     )
-    (newer / "metadata.json").write_text(
-        json.dumps({"last_updated_at": "2026-03-30T10:00:00"}),
-        encoding="utf-8",
+    (newer / 'metadata.json').write_text(
+        json.dumps({'last_updated_at': '2026-03-30T10:00:00'}),
+        encoding='utf-8',
     )
 
     repl = Repl(_make_config(), _make_console())
@@ -626,11 +850,11 @@ async def test_resume_session_uses_persisted_session_index(tmp_path: Path) -> No
         agent=MagicMock(),
         llm_registry=MagicMock(),
         conversation_stats=MagicMock(),
-        acquire_result="old-runtime-handle",
+        acquire_result='old-runtime-handle',
     )
 
     event_stream = MagicMock()
-    event_stream.sid = "session-new"
+    event_stream.sid = 'session-new'
     runtime = MagicMock()
     runtime.event_stream = event_stream
     memory = MagicMock()
@@ -639,23 +863,25 @@ async def test_resume_session_uses_persisted_session_index(tmp_path: Path) -> No
     async def fake_run_agent_until_done(*args, **kwargs) -> None:
         await asyncio.sleep(0)
 
-    with patch.dict(os.environ, {"APP_ROOT": str(tmp_path)}, clear=False):
+    with patch.dict(os.environ, {'APP_ROOT': str(tmp_path)}, clear=False):
         with patch(
-            "backend.core.bootstrap.main._setup_runtime_for_controller",
-            return_value=(runtime, None, "new-runtime-handle"),
+            'backend.core.bootstrap.main._setup_runtime_for_controller',
+            return_value=(runtime, None, 'new-runtime-handle'),
         ) as mock_setup_runtime:
             with patch(
-                "backend.core.bootstrap.main._setup_memory_and_mcp",
+                'backend.core.bootstrap.main._setup_memory_and_mcp',
                 new=AsyncMock(return_value=memory),
             ) as mock_setup_memory:
                 with patch(
-                    "backend.execution.runtime_orchestrator.release"
+                    'backend.execution.runtime_orchestrator.release'
                 ) as mock_release:
-                    create_controller = MagicMock(return_value=(controller, MagicMock()))
+                    create_controller = MagicMock(
+                        return_value=(controller, MagicMock())
+                    )
                     create_status_callback = MagicMock(return_value=MagicMock())
 
                     resumed = await repl.resume_session(
-                        "1",
+                        '1',
                         MagicMock(),
                         create_controller,
                         create_status_callback,
@@ -666,11 +892,11 @@ async def test_resume_session_uses_persisted_session_index(tmp_path: Path) -> No
     assert resumed is not None
     resumed_controller, agent_task = resumed
     assert resumed_controller is controller
-    assert mock_setup_runtime.call_args[0][2] == "session-new"
+    assert mock_setup_runtime.call_args[0][2] == 'session-new'
     mock_setup_memory.assert_awaited_once()
-    mock_release.assert_called_once_with("old-runtime-handle")
+    mock_release.assert_called_once_with('old-runtime-handle')
     renderer.reset_subscription.assert_called_once()
-    renderer.subscribe.assert_called_once_with(event_stream, "session-new")
+    renderer.subscribe.assert_called_once_with(event_stream, 'session-new')
 
     with suppress(asyncio.CancelledError):
         if not agent_task.done():
