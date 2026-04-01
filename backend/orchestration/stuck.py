@@ -338,14 +338,15 @@ class StuckDetector:
             recent_window
         )
 
-        if len(action_intents) < 6 or len(observation_outcomes) < 6:
+        if len(action_intents) < 10 or len(observation_outcomes) < 10:
             return False
 
         intent_diversity = self._calculate_intent_diversity(action_intents)
         failure_rate = self._calculate_failure_rate(observation_outcomes)
 
-        # Detect semantic loop: low diversity + high failure rate
-        if intent_diversity < 0.4 and failure_rate > 0.6:
+        # Detect semantic loop: very low diversity + very high failure rate
+        # Raised thresholds to reduce false positives on legitimate diagnostic retries
+        if intent_diversity < 0.3 and failure_rate > 0.75:
             logger.warning(
                 'Semantic loop detected: intent_diversity=%.2f, '
                 'failure_rate=%.2f, unique_intents=%s/%s',
@@ -506,8 +507,8 @@ class StuckDetector:
 
         # If all three have identical content
         if all(msg.content == last_three[0].content for msg in last_three[1:]):
-            # And the content is non-trivial (ignore empty/short acks)
-            if len(last_three[0].content) > 10:
+            # Require non-trivial length (50+ chars) to ignore short planning phrases
+            if len(last_three[0].content) > 50:
                 logger.warning(
                     'Token-level repetition detected (identical agent messages)'
                 )
@@ -572,11 +573,11 @@ class StuckDetector:
             if isinstance(e, Action) and not isinstance(e, NullAction)
         ]
 
-        if len(recent_actions) < 6:
+        if len(recent_actions) < 10:
             return False
 
-        # Check if the last 6 actions are ALL AgentThinkAction
-        if all(isinstance(a, AgentThinkAction) for a in recent_actions[-6:]):
+        # Check if the last 10 actions are ALL AgentThinkAction
+        if all(isinstance(a, AgentThinkAction) for a in recent_actions[-10:]):
             logger.warning(
                 'Think-only loop detected: last 6+ actions are all AgentThinkAction '
                 'with no real tool use.'
@@ -711,18 +712,13 @@ class StuckDetector:
     def _is_stuck_readonly_inspection_loop(self, filtered_history: list[Event]) -> bool:
         """Detect when agent only runs read-only commands without any writes.
 
-        This catches verification loops where the agent repeatedly does
-        ls/dir, cat/Get-Content, or file reads without creating new content.
-        Any write (even to an existing path) counts as progress to avoid
-        false positives during multi-file creation tasks.
-
-        To avoid false positives on legitimate research/exploration, we only
-        trigger when the agent repeats the SAME readonly command multiple
-        times (low diversity).  Diverse exploration (different directories)
-        is considered progress.
+        Disabled in normal operation — codebase exploration (many greps, reads, finds)
+        is legitimate work, not a stuck loop. Only triggers on extreme cases: 20+
+        read-only commands with near-zero diversity (<10% unique), which is a true
+        degenerate poll loop (e.g., repeatedly calling the same `ls` with no args).
+        The iteration limit and other heuristics handle genuine stuck cases.
         """
-        # Use a window of last 20 events — only trigger if overwhelmingly read-only
-        window = filtered_history[-20:]
+        window = filtered_history[-30:]
         readonly_commands: list[str] = []
         write_count = 0
 
@@ -735,17 +731,14 @@ class StuckDetector:
                 write_count += 1
 
         readonly_count = len(readonly_commands)
-        if readonly_count < 8 or write_count > 0:
+        if readonly_count < 20 or write_count > 0:
             return False
 
-        # Check diversity: if commands are diverse (exploring different paths),
-        # that's legitimate research, not a loop
         unique_commands = len(set(readonly_commands))
         diversity = unique_commands / readonly_count if readonly_count else 1.0
 
-        # Low diversity (< 25% unique) = stuck loop (allows polling 4-5 times safely)
-        # High diversity = legitimate exploration
-        if diversity < 0.25:
+        # Only fire on truly degenerate loops: 20+ reads, <10% unique commands
+        if diversity < 0.10:
             logger.warning(
                 'Read-only inspection loop detected: %d read-only actions '
                 '(%d unique, %.0f%% diversity), %d writes in last %d events',
