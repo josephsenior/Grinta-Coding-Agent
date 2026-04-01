@@ -443,6 +443,19 @@ def update_api_key(key: str) -> None:
     _save_raw_settings(settings)
 
 
+def update_budget(budget: float) -> None:
+    settings = _load_raw_settings()
+    settings['max_budget_per_task'] = budget
+    _save_raw_settings(settings)
+
+
+def get_budget(config: AppConfig) -> str:
+    budget = getattr(config, 'max_budget_per_task', None)
+    if budget is None:
+        return 'unlimited'
+    return f'${budget:.2f}'
+
+
 def get_mcp_servers(config: AppConfig) -> list[dict[str, Any]]:
     try:
         if config.mcp and config.mcp.servers:

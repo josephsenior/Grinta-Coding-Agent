@@ -11,10 +11,12 @@ from rich.text import Text
 from backend.cli.config_manager import (
     _ONBOARDING_PROVIDERS,
     add_mcp_server,
+    get_budget,
     get_current_model,
     get_masked_api_key,
     get_mcp_servers,
     update_api_key,
+    update_budget,
     update_model,
 )
 from backend.core.config import load_app_config
@@ -91,13 +93,14 @@ def _render_ai_tab(console: Console) -> None:
 
     table.add_row('Model', get_current_model(config))
     table.add_row('API Key', get_masked_api_key(config))
+    table.add_row('Budget/task', get_budget(config))
 
     console.print(
         Panel(table, title='[bold]AI Configuration[/bold]', border_style='cyan')
     )
     console.print()
     console.print(
-        '[dim]Commands:  [bold]m[/bold] change model  │  [bold]k[/bold] change api key  │  [bold]q[/bold] back[/dim]'
+        '[dim]Commands:  [bold]m[/bold] change model  │  [bold]k[/bold] change api key  │  [bold]b[/bold] set budget  │  [bold]q[/bold] back[/dim]'
     )
 
 
@@ -141,6 +144,17 @@ def _handle_ai_command(console: Console) -> bool:
         if new_key.strip():
             update_api_key(new_key.strip())
             console.print('[green]  API key updated.[/green]')
+    elif cmd == 'b':
+        val = Prompt.ask(
+            '  Budget per task in USD [dim](e.g. 5.0 — enter 0 for unlimited)[/dim]',
+            console=console,
+        ).strip()
+        try:
+            budget_val = float(val)
+            update_budget(budget_val if budget_val > 0 else None)  # type: ignore[arg-type]
+            console.print('[green]  Budget updated.[/green]')
+        except ValueError:
+            console.print('[red]  Invalid number.[/red]')
     return True
 
 
@@ -219,6 +233,17 @@ def open_settings(console: Console) -> None:
                 if new_key.strip():
                     update_api_key(new_key.strip())
                     console.print('[green]  API key updated.[/green]')
+            elif cmd == 'b':
+                val = Prompt.ask(
+                    '  Budget per task in USD [dim](e.g. 5.0 — enter 0 for unlimited)[/dim]',
+                    console=console,
+                ).strip()
+                try:
+                    budget_val = float(val)
+                    update_budget(budget_val if budget_val > 0 else None)  # type: ignore[arg-type]
+                    console.print('[green]  Budget updated.[/green]')
+                except ValueError:
+                    console.print('[red]  Invalid number.[/red]')
         else:
             _render_mcp_tab(console)
             console.print()
