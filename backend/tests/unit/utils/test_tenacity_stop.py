@@ -5,9 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-
 from backend.utils.tenacity_stop import stop_if_should_exit
-
 
 # ── stop_if_should_exit ────────────────────────────────────────────────
 
@@ -33,14 +31,14 @@ class TestStopIfShouldExit:
         def mock_should_exit():
             return True
 
-        original = getattr(backend.utils.tenacity_stop, "should_exit", None)
+        original = getattr(backend.utils.tenacity_stop, 'should_exit', None)
         try:
             cast(Any, backend.utils.tenacity_stop).should_exit = mock_should_exit
             result = stop_condition(retry_state)
             assert result is True
         finally:
             if original is None:
-                delattr(backend.utils.tenacity_stop, "should_exit")
+                delattr(backend.utils.tenacity_stop, 'should_exit')
             else:
                 cast(Any, backend.utils.tenacity_stop).should_exit = original
 
@@ -49,7 +47,7 @@ class TestStopIfShouldExit:
         stop_condition = stop_if_should_exit()
         retry_state = MagicMock()
 
-        with patch("backend.utils.shutdown_listener.should_exit", return_value=False):
+        with patch('backend.utils.shutdown_listener.should_exit', return_value=False):
             result = stop_condition(retry_state)
             assert result is False
 
@@ -59,8 +57,8 @@ class TestStopIfShouldExit:
         retry_state = MagicMock()
 
         with patch(
-            "backend.utils.shutdown_listener.should_exit",
-            side_effect=RuntimeError("error"),
+            'backend.utils.shutdown_listener.should_exit',
+            side_effect=RuntimeError('error'),
         ):
             result = stop_condition(retry_state)
             # Should not crash, returns False
@@ -77,14 +75,14 @@ class TestStopIfShouldExit:
         def mock_should_exit():
             return True
 
-        original = getattr(backend.utils.tenacity_stop, "should_exit", None)
+        original = getattr(backend.utils.tenacity_stop, 'should_exit', None)
         try:
             cast(Any, backend.utils.tenacity_stop).should_exit = mock_should_exit
             result = stop_condition(retry_state)
             assert result is True
         finally:
             if original is None:
-                delattr(backend.utils.tenacity_stop, "should_exit")
+                delattr(backend.utils.tenacity_stop, 'should_exit')
             else:
                 cast(Any, backend.utils.tenacity_stop).should_exit = original
 
@@ -95,7 +93,7 @@ class TestStopIfShouldExit:
 
         # When module resolution fails, uses local if callable
         with patch(
-            "backend.utils.shutdown_listener.should_exit", side_effect=Exception
+            'backend.utils.shutdown_listener.should_exit', side_effect=Exception
         ):
             result = stop_condition(retry_state)
             # Local not set, should return False
@@ -113,7 +111,7 @@ class TestStopIfShouldExit:
 
         @retry(stop=stop_after_attempt(3))
         def sample_func():
-            return "success"
+            return 'success'
 
         # Create a retry call state
         retry_mgr = cast(Any, sample_func).retry
@@ -121,7 +119,7 @@ class TestStopIfShouldExit:
             retry_object=retry_mgr, fn=sample_func, args=(), kwargs={}
         )
 
-        with patch("backend.utils.shutdown_listener.should_exit", return_value=False):
+        with patch('backend.utils.shutdown_listener.should_exit', return_value=False):
             result = stop_condition(retry_state)
             assert result is False
 
@@ -135,13 +133,25 @@ class TestStopIfShouldExit:
         assert stop_cond2 is not None
 
     def test_local_fallback_callable_returns_true(self):
-        """Test that line 36 is covered when mod.should_exit() fails."""
+        """Test that line 35 is covered when mod.should_exit() fails."""
+        from backend.utils import tenacity_stop as ts_mod
+
         stop_condition = stop_if_should_exit()
         retry_state = MagicMock()
 
-        # Patch the module's should_exit (module may not have it initially)
-        with patch(
-            "backend.utils.tenacity_stop.should_exit",
-            side_effect=[RuntimeError("Fail"), False],
-        ):
-            assert stop_condition(retry_state) is False
+        # Inject a callable into the module's globals so the local fallback fires
+        ts_mod.should_exit = lambda: False  # type: ignore[attr-defined]
+        try:
+            # Make the canonical import_module path raise so local fallback runs
+            def side_effect(name):
+                if name == 'backend.utils.tenacity_stop':
+                    m = MagicMock()
+                    m.should_exit.side_effect = RuntimeError('Fail')
+                    return m
+                import importlib
+                return importlib.import_module(name)
+
+            with patch('importlib.import_module', side_effect=side_effect):
+                assert stop_condition(retry_state) is False
+        finally:
+            del ts_mod.should_exit  # type: ignore[attr-defined]
