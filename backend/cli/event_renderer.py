@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.layout import Layout
-from rich.markdown import Markdown
 from rich.live import Live
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
@@ -51,10 +51,11 @@ from backend.ledger.observation import (
     UserRejectObservation,
 )
 
+from backend.cli.hud import HUDBar
+
 if TYPE_CHECKING:
-    from backend.ledger.stream import EventStream
-    from backend.cli.hud import HUDBar
     from backend.cli.reasoning_display import ReasoningDisplay
+    from backend.ledger.stream import EventStream
 
 # Events to silently skip (mirrors gateway filtering).
 _SKIP_ACTIONS = (NullAction,)
@@ -90,15 +91,19 @@ class CLIEventRenderer:
         self._loop = loop or asyncio.get_event_loop()
         self._history: deque[Any] = deque(maxlen=96)
         self._live: Live | None = None
-        self._streaming_accumulated = ""
+        self._streaming_accumulated = ''
         self._streaming_final = False
         self._current_state: AgentState | None = None
         self._state_event = asyncio.Event()
-        self._body_title = "Grinta"
+        self._body_title = 'Grinta'
         self._subscribed = False
         self._max_budget = max_budget
         self._budget_warned_80 = False
         self._budget_warned_100 = False
+        # Per-turn metric snapshots (used to compute deltas at turn completion)
+        self._turn_start_cost: float = 0.0
+        self._turn_start_tokens: int = 0
+        self._turn_start_calls: int = 0
 
     @property
     def current_state(self) -> AgentState | None:
@@ -140,7 +145,7 @@ class CLIEventRenderer:
         try:
             live.stop()
         except Exception:
-            logger.debug("Live.stop() failed during suspend", exc_info=True)
+            logger.debug('Live.stop() failed during suspend', exc_info=True)
 
         try:
             yield
@@ -148,7 +153,7 @@ class CLIEventRenderer:
             try:
                 live.start()
             except Exception:
-                logger.debug("Live.start() failed during resume", exc_info=True)
+                logger.debug('Live.start() failed during resume', exc_info=True)
             self.refresh()
 
     def refresh(self) -> None:
@@ -157,13 +162,19 @@ class CLIEventRenderer:
 
     def begin_turn(self) -> None:
         self._current_state = AgentState.RUNNING
-        self._hud.update_ledger("Healthy")
+        self._hud.update_ledger('Healthy')
         self._state_event.clear()
+        # Snapshot metrics so we can compute per-turn deltas at completion.
+        self._turn_start_cost = self._hud.state.cost_usd
+        self._turn_start_tokens = self._hud.state.context_tokens
+        self._turn_start_calls = self._hud.state.llm_calls
         self.refresh()
 
-    async def wait_for_state_change(self, timeout: float = 0.25) -> AgentState | None:
+    async def wait_for_state_change(
+        self, wait_timeout_sec: float = 0.25
+    ) -> AgentState | None:
         try:
-            await asyncio.wait_for(self._state_event.wait(), timeout=timeout)
+            await asyncio.wait_for(self._state_event.wait(), timeout=wait_timeout_sec)
         except asyncio.TimeoutError:
             return self._current_state
         self._state_event.clear()
@@ -179,18 +190,18 @@ class CLIEventRenderer:
         self._append_history(
             Panel(
                 Markdown(text),
-                title="[bold cyan]You[/bold cyan]",
-                border_style="cyan",
+                title='[bold cyan]You[/bold cyan]',
+                border_style='cyan',
                 padding=(0, 1),
             )
         )
 
-    def add_system_message(self, text: str, *, title: str = "Info") -> None:
+    def add_system_message(self, text: str, *, title: str = 'Info') -> None:
         self._append_history(
             Panel(
-                Text(text, style="dim"),
+                Text(text, style='dim'),
                 title=title,
-                border_style="bright_black",
+                border_style='bright_black',
                 padding=(0, 1),
             )
         )
@@ -200,7 +211,7 @@ class CLIEventRenderer:
             Panel(
                 Markdown(text),
                 title=title,
-                border_style="bright_black",
+                border_style='bright_black',
                 padding=(0, 1),
             )
         )
@@ -226,7 +237,7 @@ class CLIEventRenderer:
         if self._reasoning.active:
             body_items.append(self._reasoning.renderable())
         if not body_items:
-            body_items.append(Text("Ready for input.", style="dim"))
+            body_items.append(Text('Ready for input.', style='dim'))
 
         layout = Layout()
         layout.split_column(
@@ -234,13 +245,13 @@ class CLIEventRenderer:
                 Panel(
                     Group(*body_items),
                     title=self._body_title,
-                    border_style="bright_black",
+                    border_style='bright_black',
                     padding=(0, 1),
                 ),
                 ratio=1,
-                name="body",
+                name='body',
             ),
-            Layout(self._hud, size=1, name="footer"),
+            Layout(self._hud, size=1, name='footer'),
         )
         yield layout
 
@@ -253,7 +264,7 @@ class CLIEventRenderer:
 
         self._update_metrics(event)
 
-        source = getattr(event, "source", None)
+        source = getattr(event, 'source', None)
 
         # --- actions from AGENT -------------------------------------------
         if isinstance(event, Action) and source == EventSource.AGENT:
@@ -281,8 +292,8 @@ class CLIEventRenderer:
                 self._append_history(
                     Panel(
                         Markdown(action.content),
-                        title="[bold magenta]Grinta[/bold magenta]",
-                        border_style="magenta",
+                        title='[bold magenta]Grinta[/bold magenta]',
+                        border_style='magenta',
                         padding=(0, 1),
                     )
                 )
@@ -294,7 +305,7 @@ class CLIEventRenderer:
             self._clear_streaming_preview()
 
         if isinstance(action, AgentThinkAction):
-            thought = getattr(action, "thought", "") or getattr(action, "content", "")
+            thought = getattr(action, 'thought', '') or getattr(action, 'content', '')
             if thought:
                 self._ensure_reasoning()
                 self._reasoning.update_thought(thought)
@@ -305,27 +316,27 @@ class CLIEventRenderer:
             self._ensure_reasoning()
             cmd_display = action.command
             if len(cmd_display) > 120:
-                cmd_display = cmd_display[:117] + "…"
-            self._reasoning.update_action(f"Running: {cmd_display}")
+                cmd_display = cmd_display[:117] + '…'
+            self._reasoning.update_action(f'Running: {cmd_display}')
             self.refresh()
             return
 
         if isinstance(action, FileEditAction):
             self._ensure_reasoning()
-            self._reasoning.update_action(f"Editing: {action.path}")
+            self._reasoning.update_action(f'Editing: {action.path}')
             self.refresh()
             return
 
         if isinstance(action, FileWriteAction):
             self._ensure_reasoning()
-            self._reasoning.update_action(f"Writing: {action.path}")
+            self._reasoning.update_action(f'Writing: {action.path}')
             self.refresh()
             return
 
         if isinstance(action, RecallAction):
             self._ensure_reasoning()
-            query = getattr(action, "query", "")
-            label = f"Recalling: {query}" if query else "Recalling context…"
+            query = getattr(action, 'query', '')
+            label = f'Recalling: {query}' if query else 'Recalling context…'
             self._reasoning.update_action(label)
             self.refresh()
             return
@@ -345,7 +356,7 @@ class CLIEventRenderer:
             return
 
         if isinstance(obs, AgentThinkObservation):
-            thought = getattr(obs, "thought", "") or getattr(obs, "content", "")
+            thought = getattr(obs, 'thought', '') or getattr(obs, 'content', '')
             if thought:
                 self._ensure_reasoning()
                 self._reasoning.update_thought(thought)
@@ -354,31 +365,31 @@ class CLIEventRenderer:
 
         if isinstance(obs, CmdOutputObservation):
             self._reasoning.stop()
-            exit_code = getattr(obs, "exit_code", None)
-            output = getattr(obs, "content", "")
-            header_style = "green" if exit_code == 0 else "red"
-            header = f"exit {exit_code}" if exit_code is not None else "output"
+            exit_code = getattr(obs, 'exit_code', None)
+            output = getattr(obs, 'content', '')
+            header_style = 'green' if exit_code == 0 else 'red'
+            header = f'exit {exit_code}' if exit_code is not None else 'output'
             truncated = len(output) > 4000
             display_output = output[:4000]
             body_parts: list[Any] = []
             if display_output:
                 body_parts.append(
-                    Syntax(display_output, "text", word_wrap=True, theme="monokai")
+                    Syntax(display_output, 'text', word_wrap=True, theme='monokai')
                 )
             else:
-                body_parts.append(Text("(no output)", style="dim"))
+                body_parts.append(Text('(no output)', style='dim'))
             if truncated:
                 body_parts.append(
                     Text(
-                        f"\n⚠ Output truncated ({len(output):,} chars total, showing first 4,000)",
-                        style="yellow dim",
+                        f'\n⚠ Output truncated ({len(output):,} chars total, showing first 4,000)',
+                        style='yellow dim',
                     )
                 )
             self._append_history(
                 Panel(
                     Group(*body_parts),
-                    title=f"[{header_style}]{header}[/{header_style}]",
-                    border_style="bright_black",
+                    title=f'[{header_style}]{header}[/{header_style}]',
+                    border_style='bright_black',
                     padding=(0, 1),
                 )
             )
@@ -386,62 +397,64 @@ class CLIEventRenderer:
 
         if isinstance(obs, (FileEditObservation, FileWriteObservation)):
             self._reasoning.stop()
-            path = getattr(obs, "path", "")
+            path = getattr(obs, 'path', '')
             if isinstance(obs, FileEditObservation):
                 from backend.cli.diff_renderer import DiffPanel
+
                 self._append_history(DiffPanel(obs))
             else:
                 self._append_history(
-                    Text(f"  ✓ {path}", style="green"),
+                    Text(f'  ✓ {path}', style='green'),
                 )
             return
 
         if isinstance(obs, ErrorObservation):
             self._reasoning.stop()
-            error_content = getattr(obs, "content", str(obs))
-            error_lines = error_content.strip().split("\n")
-            summary = error_lines[0] if error_lines else "Unknown error"
+            error_content = getattr(obs, 'content', str(obs))
+            error_lines = error_content.strip().split('\n')
+            summary = error_lines[0] if error_lines else 'Unknown error'
             body = Text()
-            body.append(summary + "\n", style="red bold")
+            body.append(summary + '\n', style='red bold')
             if len(error_lines) > 1:
-                detail = "\n".join(error_lines[1:])
+                detail = '\n'.join(error_lines[1:])
                 if len(detail) > 2000:
-                    detail = detail[:2000] + "\n… (truncated)"
-                body.append(detail, style="red dim")
+                    detail = detail[:2000] + '\n… (truncated)'
+                body.append(detail, style='red dim')
             self._append_history(
                 Panel(
                     body,
-                    title="[red bold]Error[/red bold]",
-                    border_style="red",
+                    title='[red bold]Error[/red bold]',
+                    border_style='red',
                     padding=(0, 1),
                 ),
             )
-            self._hud.update_ledger("Error")
+            self._hud.update_ledger('Error')
             return
 
         if isinstance(obs, UserRejectObservation):
-            self._append_history(Text("  Action rejected.", style="yellow"))
+            self._append_history(Text('  Action rejected.', style='yellow'))
             return
 
         if isinstance(obs, RecallObservation):
             # Show brief recall summary — full content goes to the agent
-            kb_results = getattr(obs, "knowledge_base_results", []) or []
-            recall_type = getattr(obs, "recall_type", None)
-            label = str(recall_type.value) if recall_type else "context"
+            kb_results = getattr(obs, 'knowledge_base_results', []) or []
+            recall_type = getattr(obs, 'recall_type', None)
+            label = str(recall_type.value) if recall_type else 'context'
             if kb_results:
                 self._append_history(
-                    Text(f"  📚 Recalled {label} ({len(kb_results)} knowledge results)", style="dim blue")
+                    Text(
+                        f'  📚 Recalled {label} ({len(kb_results)} knowledge results)',
+                        style='dim blue',
+                    )
                 )
             else:
-                self._append_history(
-                    Text(f"  📚 Recalled {label}", style="dim blue")
-                )
+                self._append_history(Text(f'  📚 Recalled {label}', style='dim blue'))
             return
 
         if isinstance(obs, StatusObservation):
-            content = getattr(obs, "content", "")
+            content = getattr(obs, 'content', '')
             if content:
-                self._append_history(Text(f"  ℹ {content}", style="dim"))
+                self._append_history(Text(f'  ℹ {content}', style='dim'))
             return
 
         self.refresh()
@@ -454,18 +467,18 @@ class CLIEventRenderer:
             try:
                 state = AgentState(state)
             except ValueError:
-                logger.debug("Ignoring unknown agent state: %s", state)
+                logger.debug('Ignoring unknown agent state: %s', state)
                 return
         self._current_state = state
         self._state_event.set()
 
         # Update HUD ledger indicator on terminal states.
         if state in (AgentState.ERROR, AgentState.REJECTED):
-            self._hud.update_ledger("Error")
+            self._hud.update_ledger('Error')
         elif state in (AgentState.FINISHED, AgentState.STOPPED):
-            self._hud.update_ledger("Idle")
+            self._hud.update_ledger('Idle')
         elif state == AgentState.RUNNING:
-            self._hud.update_ledger("Healthy")
+            self._hud.update_ledger('Healthy')
 
         if state == AgentState.AWAITING_USER_CONFIRMATION:
             self._reasoning.stop()
@@ -480,19 +493,23 @@ class CLIEventRenderer:
         if state == AgentState.FINISHED:
             self._reasoning.stop()
             self._clear_streaming_preview()
+            stats = self._turn_stats_text()
             self._append_history(
-                Text("  ✓ Task complete. Enter a new task or /exit.", style="green dim"),
+                Text(
+                    f'  ✓ Task complete. Enter a new task or /exit.{stats}', style='green dim'
+                ),
             )
             return
 
         if state == AgentState.ERROR:
             self._reasoning.stop()
             self._clear_streaming_preview()
+            stats = self._turn_stats_text()
             self._append_history(
                 Text(
-                    "  ✗ Agent stopped with an error. "
-                    "Enter a follow-up message to retry, or /exit.",
-                    style="red dim",
+                    f'  ✗ Agent stopped with an error. '
+                    f'Enter a follow-up message to retry, or /exit.{stats}',
+                    style='red dim',
                 ),
             )
             return
@@ -504,6 +521,20 @@ class CLIEventRenderer:
 
     # -- helpers -----------------------------------------------------------
 
+    def _turn_stats_text(self) -> str:
+        """Format per-turn token/cost delta as a short summary string."""
+        cost_delta = self._hud.state.cost_usd - self._turn_start_cost
+        tokens_delta = self._hud.state.context_tokens - self._turn_start_tokens
+        calls_delta = self._hud.state.llm_calls - self._turn_start_calls
+        parts: list[str] = []
+        if tokens_delta > 0:
+            parts.append(HUDBar._format_tokens(tokens_delta) + ' tokens')
+        if cost_delta > 0.0:
+            parts.append(f'${cost_delta:.4f}')
+        if calls_delta > 0:
+            parts.append(f'{calls_delta} LLM call{"s" if calls_delta != 1 else ""}')
+        return '  [' + ' · '.join(parts) + ']' if parts else ''
+
     def _ensure_reasoning(self) -> None:
         if not self._reasoning.active:
             self._reasoning.start()
@@ -513,23 +544,23 @@ class CLIEventRenderer:
         self.refresh()
 
     def _clear_streaming_preview(self) -> None:
-        self._streaming_accumulated = ""
+        self._streaming_accumulated = ''
         self._streaming_final = False
         self.refresh()
 
     def _render_streaming_preview(self) -> Panel:
-        title = "[bold cyan]Streaming[/bold cyan]"
+        title = '[bold cyan]Streaming[/bold cyan]'
         if self._streaming_final:
-            title = "[bold cyan]Streaming (finalizing)[/bold cyan]"
+            title = '[bold cyan]Streaming (finalizing)[/bold cyan]'
         return Panel(
-            Markdown(self._streaming_accumulated or ""),
+            Markdown(self._streaming_accumulated or ''),
             title=title,
-            border_style="cyan",
+            border_style='cyan',
             padding=(0, 1),
         )
 
     def _update_metrics(self, event: Any) -> None:
-        llm_metrics = getattr(event, "llm_metrics", None)
+        llm_metrics = getattr(event, 'llm_metrics', None)
         if llm_metrics is not None:
             self._hud.update_from_llm_metrics(llm_metrics)
             self._check_budget()
@@ -543,11 +574,11 @@ class CLIEventRenderer:
             self._append_history(
                 Panel(
                     Text(
-                        f"Budget limit reached: ${cost:.4f} / ${self._max_budget:.4f}",
-                        style="red bold",
+                        f'Budget limit reached: ${cost:.4f} / ${self._max_budget:.4f}',
+                        style='red bold',
                     ),
-                    title="[red bold]Budget Exceeded[/red bold]",
-                    border_style="red",
+                    title='[red bold]Budget Exceeded[/red bold]',
+                    border_style='red',
                     padding=(0, 1),
                 )
             )
@@ -556,11 +587,11 @@ class CLIEventRenderer:
             self._append_history(
                 Panel(
                     Text(
-                        f"Approaching budget: ${cost:.4f} / ${self._max_budget:.4f} (80%)",
-                        style="yellow",
+                        f'Approaching budget: ${cost:.4f} / ${self._max_budget:.4f} (80%)',
+                        style='yellow',
                     ),
-                    title="[yellow]Budget Warning[/yellow]",
-                    border_style="yellow",
+                    title='[yellow]Budget Warning[/yellow]',
+                    border_style='yellow',
                     padding=(0, 1),
                 )
             )

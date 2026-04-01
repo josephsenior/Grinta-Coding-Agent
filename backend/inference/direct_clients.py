@@ -5,14 +5,15 @@ offering a lightweight and stable alternative to multi-provider abstraction libr
 """
 
 from __future__ import annotations
+
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
-from google import genai
 import httpx
 from anthropic import Anthropic, AsyncAnthropic
+from google import genai
 from openai import AsyncOpenAI, OpenAI
 
 from backend.core import json_compat as json
@@ -41,7 +42,7 @@ _pool_lock = threading.Lock()
 
 def _pool_key(provider: str, base_url: str | None) -> str:
     """Deterministic cache key for a provider + base_url pair."""
-    return f"{provider}::{base_url or 'default'}"
+    return f'{provider}::{base_url or "default"}'
 
 
 def get_shared_http_client(provider: str, base_url: str | None = None) -> httpx.Client:
@@ -55,7 +56,7 @@ def get_shared_http_client(provider: str, base_url: str | None = None) -> httpx.
                     timeout=httpx.Timeout(timeout=600.0, connect=10.0),
                     follow_redirects=True,
                 )
-                logger.debug("Created shared sync httpx pool for %s", key)
+                logger.debug('Created shared sync httpx pool for %s', key)
     return _shared_sync_clients[key]
 
 
@@ -72,7 +73,7 @@ def get_shared_async_http_client(
                     timeout=httpx.Timeout(timeout=600.0, connect=10.0),
                     follow_redirects=True,
                 )
-                logger.debug("Created shared async httpx pool for %s", key)
+                logger.debug('Created shared async httpx pool for %s', key)
     return _shared_async_clients[key]
 
 
@@ -84,15 +85,15 @@ class LLMResponse:
         content: str,
         model: str,
         usage: dict[str, int],
-        response_id: str = "",
-        finish_reason: str = "stop",
+        response_id: str = '',
+        finish_reason: str = 'stop',
         tool_calls: list[dict[str, Any]] | None = None,
         **kwargs,
     ):
         self.content = content
         self.model = model
         self.usage = usage
-        self.id = kwargs.get("response_id", kwargs.get("id", response_id))
+        self.id = kwargs.get('response_id', kwargs.get('id', response_id))
         self.finish_reason = self._normalize_finish_reason(finish_reason)
         self.tool_calls = self._normalize_tool_calls(tool_calls)
 
@@ -101,29 +102,29 @@ class LLMResponse:
             def __init__(self, name: str, arguments: str):
                 self.name = name
                 self.arguments = arguments
-            
+
             def model_dump(self):
-                return {"name": self.name, "arguments": self.arguments}
+                return {'name': self.name, 'arguments': self.arguments}
 
         class ToolCall:
             def __init__(self, tc_dict: dict[str, Any]):
-                self.id = tc_dict.get("id")
-                self.type = tc_dict.get("type", "function")
-                func_dict = tc_dict.get("function", {})
+                self.id = tc_dict.get('id')
+                self.type = tc_dict.get('type', 'function')
+                func_dict = tc_dict.get('function', {})
                 self.function = ToolCallFunction(
-                    name=func_dict.get("name", ""),
-                    arguments=func_dict.get("arguments", "{}"),
+                    name=func_dict.get('name', ''),
+                    arguments=func_dict.get('arguments', '{}'),
                 )
                 # Support any other fields via setattr to be safe
                 for k, v in tc_dict.items():
-                    if k not in ["id", "type", "function"]:
+                    if k not in ['id', 'type', 'function']:
                         setattr(self, k, v)
-            
+
             def model_dump(self):
                 return {
-                    "id": self.id,
-                    "type": self.type,
-                    "function": self.function.model_dump()
+                    'id': self.id,
+                    'type': self.type,
+                    'function': self.function.model_dump(),
                 }
 
         class Message:
@@ -141,31 +142,35 @@ class LLMResponse:
                 self.message = Message(content, role, tool_calls_dict)
                 self.finish_reason = finish_reason
 
-        self.choices = [Choice(self.content, "assistant", self.finish_reason, self.tool_calls)]
-    
+        self.choices = [
+            Choice(self.content, 'assistant', self.finish_reason, self.tool_calls)
+        ]
+
     @staticmethod
     def _normalize_finish_reason(reason: str | None) -> str:
         if not reason:
-            return "stop"
+            return 'stop'
         reason = str(reason).strip().lower()
         mapping = {
-            "end_turn": "stop",
-            "max_tokens": "length",
-            "tool_use": "tool_calls",
+            'end_turn': 'stop',
+            'max_tokens': 'length',
+            'tool_use': 'tool_calls',
         }
         return mapping.get(reason, reason)
 
     @staticmethod
-    def _normalize_tool_calls(tool_calls: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+    def _normalize_tool_calls(
+        tool_calls: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]] | None:
         if not tool_calls:
             return None
         normalized = []
         for i, tc in enumerate(tool_calls):
             # Ensure function arguments are JSON strings
-            func = tc.get("function", {})
-            args = func.get("arguments", "{}")
+            func = tc.get('function', {})
+            args = func.get('arguments', '{}')
             if isinstance(args, dict):
-                args_str = json.dumps(args, ensure_ascii=False, separators=(",", ":"))
+                args_str = json.dumps(args, ensure_ascii=False, separators=(',', ':'))
             elif isinstance(args, str):
                 args_str = args
             else:
@@ -173,11 +178,11 @@ class LLMResponse:
 
             normalized.append(
                 {
-                    "id": tc.get("id", f"call_{i + 1}"),
-                    "type": tc.get("type", "function"),
-                    "function": {
-                        "name": func.get("name", ""),
-                        "arguments": args_str,
+                    'id': tc.get('id', f'call_{i + 1}'),
+                    'type': tc.get('type', 'function'),
+                    'function': {
+                        'name': func.get('name', ''),
+                        'arguments': args_str,
                     },
                 }
             )
@@ -185,19 +190,19 @@ class LLMResponse:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": self.id,
-            "model": self.model,
-            "choices": [
+            'id': self.id,
+            'model': self.model,
+            'choices': [
                 {
-                    "message": {
-                        "content": self.content,
-                        "role": "assistant",
-                        "tool_calls": self.tool_calls,
+                    'message': {
+                        'content': self.content,
+                        'role': 'assistant',
+                        'tool_calls': self.tool_calls,
                     },
-                    "finish_reason": self.finish_reason,
+                    'finish_reason': self.finish_reason,
                 }
             ],
-            "usage": self.usage,
+            'usage': self.usage,
         }
 
     def __getitem__(self, key: str):
@@ -210,15 +215,15 @@ def _stringify_openai_metadata_value(value: Any) -> str:
     Several compatible providers reject metadata unless all values are strings.
     """
     if value is None:
-        return ""
+        return ''
     if isinstance(value, str):
         return value
     if isinstance(value, bool):
-        return "true" if value else "false"
+        return 'true' if value else 'false'
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, (list, tuple, set)):
-        return ",".join(
+        return ','.join(
             item
             for item in (_stringify_openai_metadata_value(part) for part in value)
             if item
@@ -228,7 +233,7 @@ def _stringify_openai_metadata_value(value: Any) -> str:
             value,
             ensure_ascii=False,
             sort_keys=True,
-            separators=(",", ":"),
+            separators=(',', ':'),
             default=str,
         )
     return str(value)
@@ -237,26 +242,26 @@ def _stringify_openai_metadata_value(value: Any) -> str:
 def _sanitize_openai_compatible_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     """Normalize request kwargs for OpenAI-compatible APIs."""
     sanitized = dict(kwargs)
-    extra_body = sanitized.get("extra_body")
+    extra_body = sanitized.get('extra_body')
     if not isinstance(extra_body, dict):
         return sanitized
-    metadata = extra_body.get("metadata")
+    metadata = extra_body.get('metadata')
     if not isinstance(metadata, dict):
         return sanitized
 
     sanitized_extra_body = dict(extra_body)
-    sanitized_extra_body["metadata"] = {
+    sanitized_extra_body['metadata'] = {
         str(key): _stringify_openai_metadata_value(value)
         for key, value in metadata.items()
     }
-    sanitized["extra_body"] = sanitized_extra_body
+    sanitized['extra_body'] = sanitized_extra_body
     return sanitized
 
 
 class DirectLLMClient(ABC):
     """Abstract base class for direct LLM clients."""
 
-    _model_name: str = ""
+    _model_name: str = ''
 
     @abstractmethod
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
@@ -273,7 +278,7 @@ class DirectLLMClient(ABC):
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
         """Stream responses asynchronously. Returns an async iterator."""
-        yield {} # type: ignore
+        yield {}  # type: ignore
 
     def __init_subclass__(cls, **kwargs):
         """Ensure subclasses define model_name attribute."""
@@ -283,7 +288,7 @@ class DirectLLMClient(ABC):
     def model_name(self) -> str:
         """Get the model name. Must be implemented by subclasses."""
         if not self._model_name:
-            raise NotImplementedError("Subclasses must set _model_name attribute")
+            raise NotImplementedError('Subclasses must set _model_name attribute')
         return self._model_name
 
     def get_completion_cost(
@@ -312,12 +317,12 @@ class OpenAIClient(DirectLLMClient):
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
-            http_client=get_shared_http_client("openai", base_url),
+            http_client=get_shared_http_client('openai', base_url),
         )
         self.async_client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            http_client=get_shared_async_http_client("openai", base_url),
+            http_client=get_shared_async_http_client('openai', base_url),
         )
 
     @staticmethod
@@ -329,49 +334,54 @@ class OpenAIClient(DirectLLMClient):
     def _map_openai_error(self, exc: Exception) -> Exception:
         """Map openai SDK exceptions to App LLM exceptions."""
         import openai
+
         from backend.inference.exceptions import (
-            RateLimitError,
+            APIConnectionError,
             AuthenticationError,
             BadRequestError,
             ContextWindowExceededError,
-            NotFoundError,
-            APIConnectionError,
             InternalServerError,
+            NotFoundError,
+            RateLimitError,
             Timeout,
-            APIError as ProviderAPIError,
             is_context_window_error,
+        )
+        from backend.inference.exceptions import (
+            APIError as ProviderAPIError,
         )
 
         if isinstance(exc, (openai.APITimeoutError, httpx.TimeoutException)):
-            return Timeout(str(exc), llm_provider="openai", model=self.model_name)
+            return Timeout(str(exc), llm_provider='openai', model=self.model_name)
         if isinstance(exc, (openai.APIConnectionError, httpx.RequestError)):
-            return APIConnectionError(str(exc), llm_provider="openai", model=self.model_name)
+            return APIConnectionError(
+                str(exc), llm_provider='openai', model=self.model_name
+            )
         if isinstance(exc, openai.RateLimitError):
             # OpenAI uses HTTP 429 for both transient rate limits and non-transient
             # "insufficient_quota" (billing/credits). The latter should NOT be retried.
-            code = getattr(exc, "code", None)
+            code = getattr(exc, 'code', None)
             message = str(exc)
 
             # The OpenAI SDK may not surface the provider error code directly
             # on the exception, but it typically includes a parsed response body.
-            body = getattr(exc, "body", None)
+            body = getattr(exc, 'body', None)
             if not code and isinstance(body, dict):
-                err = body.get("error")
+                err = body.get('error')
                 if isinstance(err, dict):
-                    code = err.get("code") or err.get("type") or code
-                    body_msg = err.get("message")
+                    code = err.get('code') or err.get('type') or code
+                    body_msg = err.get('message')
                     if isinstance(body_msg, str) and body_msg:
                         message = body_msg
 
             lowered = message.lower()
-            status_code = getattr(exc, "status_code", None) or 429
-            if isinstance(code, str) and code and f"code={code}" not in message:
-                message = f"{message} (code={code})"
+            status_code = getattr(exc, 'status_code', None) or 429
+            if isinstance(code, str) and code and f'code={code}' not in message:
+                message = f'{message} (code={code})'
 
-            if code == "insufficient_quota" or "insufficient_quota" in lowered:
+            if code == 'insufficient_quota' or 'insufficient_quota' in lowered:
                 return AuthenticationError(
                     message,
-                    llm_provider="openai",
+                    llm_provider='openai',
                     model=self.model_name,
                     status_code=status_code,
                     code=code,
@@ -379,27 +389,35 @@ class OpenAIClient(DirectLLMClient):
                 )
             return RateLimitError(
                 message,
-                llm_provider="openai",
+                llm_provider='openai',
                 model=self.model_name,
                 status_code=status_code,
                 code=code,
                 body=body,
             )
         if isinstance(exc, openai.AuthenticationError):
-            return AuthenticationError(str(exc), llm_provider="openai", model=self.model_name)
+            return AuthenticationError(
+                str(exc), llm_provider='openai', model=self.model_name
+            )
         if isinstance(exc, openai.BadRequestError):
             error_str = str(exc).lower()
             if is_context_window_error(error_str, exc):
-                return ContextWindowExceededError(str(exc), llm_provider="openai", model=self.model_name)
-            return BadRequestError(str(exc), llm_provider="openai", model=self.model_name)
+                return ContextWindowExceededError(
+                    str(exc), llm_provider='openai', model=self.model_name
+                )
+            return BadRequestError(
+                str(exc), llm_provider='openai', model=self.model_name
+            )
         if isinstance(exc, openai.NotFoundError):
-            return NotFoundError(str(exc), llm_provider="openai", model=self.model_name)
+            return NotFoundError(str(exc), llm_provider='openai', model=self.model_name)
         if isinstance(exc, openai.InternalServerError):
-            return InternalServerError(str(exc), llm_provider="openai", model=self.model_name)
+            return InternalServerError(
+                str(exc), llm_provider='openai', model=self.model_name
+            )
         if isinstance(exc, openai.APIStatusError):
             return ProviderAPIError(
                 str(exc),
-                llm_provider="openai",
+                llm_provider='openai',
                 model=self.model_name,
                 status_code=exc.status_code,
             )
@@ -408,13 +426,13 @@ class OpenAIClient(DirectLLMClient):
     def _strip_unsupported_params(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """Remove request parameters not supported by this provider."""
         if not self._supports_request_metadata:
-            extra_body = kwargs.get("extra_body")
-            if isinstance(extra_body, dict) and "metadata" in extra_body:
-                extra_body = {k: v for k, v in extra_body.items() if k != "metadata"}
+            extra_body = kwargs.get('extra_body')
+            if isinstance(extra_body, dict) and 'metadata' in extra_body:
+                extra_body = {k: v for k, v in extra_body.items() if k != 'metadata'}
                 if extra_body:
-                    kwargs = {**kwargs, "extra_body": extra_body}
+                    kwargs = {**kwargs, 'extra_body': extra_body}
                 else:
-                    kwargs = {k: v for k, v in kwargs.items() if k != "extra_body"}
+                    kwargs = {k: v for k, v in kwargs.items() if k != 'extra_body'}
         return kwargs
 
     def _clean_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -423,19 +441,21 @@ class OpenAIClient(DirectLLMClient):
             return messages
         cleaned = []
         for msg in messages:
-            if isinstance(msg, dict) and "tool_ok" in msg:
-                msg = {k: v for k, v in msg.items() if k != "tool_ok"}
+            if isinstance(msg, dict) and 'tool_ok' in msg:
+                msg = {k: v for k, v in msg.items() if k != 'tool_ok'}
             cleaned.append(msg)
         return cleaned
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
-        from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
+        from backend.inference.mappers.openai import (
+            strip_prompt_cache_hints_from_messages,
+        )
 
         messages = strip_prompt_cache_hints_from_messages(messages)
         messages = self._clean_messages(messages)
         kwargs = _sanitize_openai_compatible_kwargs(kwargs)
         kwargs = self._strip_unsupported_params(kwargs)
-        kwargs["model"] = self.model_name
+        kwargs['model'] = self.model_name
         try:
             response = self.client.chat.completions.create(
                 messages=messages,  # type: ignore[arg-type]
@@ -443,11 +463,12 @@ class OpenAIClient(DirectLLMClient):
             )
         except Exception as e:
             raise self._map_openai_error(e) from e
-        if not getattr(response, "choices", None) or len(response.choices) == 0:
+        if not getattr(response, 'choices', None) or len(response.choices) == 0:
             from backend.inference.exceptions import BadRequestError
+
             raise BadRequestError(
-                "OpenAI completion returned no choices",
-                llm_provider="openai",
+                'OpenAI completion returned no choices',
+                llm_provider='openai',
                 model=self.model_name,
             )
         first = response.choices[0]
@@ -457,44 +478,49 @@ class OpenAIClient(DirectLLMClient):
         # Some OpenAI-compatible APIs (or parameter combos) can yield a response
         # where `content` is empty and no tool call is present. This is almost
         # always a provider-side anomaly, so capture enough context to debug.
-        content_value = getattr(msg, "content", None)
-        if (content_value is None or (isinstance(content_value, str) and not content_value.strip())) and not tool_calls:
+        content_value = getattr(msg, 'content', None)
+        if (
+            content_value is None
+            or (isinstance(content_value, str) and not content_value.strip())
+        ) and not tool_calls:
             try:
-                msg_dump = msg.model_dump() if hasattr(msg, "model_dump") else str(msg)
+                msg_dump = msg.model_dump() if hasattr(msg, 'model_dump') else str(msg)
             except Exception:
                 msg_dump = str(msg)
             logger.warning(
-                "OpenAI-compatible completion returned empty message (no tool calls). "
-                "model=%s finish_reason=%s msg=%s",
+                'OpenAI-compatible completion returned empty message (no tool calls). '
+                'model=%s finish_reason=%s msg=%s',
                 self.model_name,
-                getattr(first, "finish_reason", None),
+                getattr(first, 'finish_reason', None),
                 msg_dump,
             )
         return LLMResponse(
-            content=msg.content or "",
+            content=msg.content or '',
             model=response.model,
             usage={
-                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                "completion_tokens": response.usage.completion_tokens
+                'prompt_tokens': response.usage.prompt_tokens if response.usage else 0,
+                'completion_tokens': response.usage.completion_tokens
                 if response.usage
                 else 0,
-                "total_tokens": response.usage.total_tokens if response.usage else 0,
+                'total_tokens': response.usage.total_tokens if response.usage else 0,
             },
             id=response.id,
-            finish_reason=getattr(first, "finish_reason", None) or "",
+            finish_reason=getattr(first, 'finish_reason', None) or '',
             tool_calls=tool_calls,
         )
 
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
-        from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
+        from backend.inference.mappers.openai import (
+            strip_prompt_cache_hints_from_messages,
+        )
 
         messages = strip_prompt_cache_hints_from_messages(messages)
         messages = self._clean_messages(messages)
         kwargs = _sanitize_openai_compatible_kwargs(kwargs)
         kwargs = self._strip_unsupported_params(kwargs)
-        kwargs.pop("model", None)
+        kwargs.pop('model', None)
         try:
             response = await self.async_client.chat.completions.create(
                 model=self.model_name,
@@ -503,43 +529,46 @@ class OpenAIClient(DirectLLMClient):
             )
         except Exception as e:
             raise self._map_openai_error(e) from e
-        if not getattr(response, "choices", None) or len(response.choices) == 0:
+        if not getattr(response, 'choices', None) or len(response.choices) == 0:
             from backend.inference.exceptions import BadRequestError
+
             raise BadRequestError(
-                "OpenAI completion returned no choices",
-                llm_provider="openai",
+                'OpenAI completion returned no choices',
+                llm_provider='openai',
                 model=self.model_name,
             )
         first = response.choices[0]
         msg = first.message
         tool_calls = self._extract_openai_tool_calls(msg)
         return LLMResponse(
-            content=msg.content or "",
+            content=msg.content or '',
             model=response.model,
             usage={
-                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                "completion_tokens": response.usage.completion_tokens
+                'prompt_tokens': response.usage.prompt_tokens if response.usage else 0,
+                'completion_tokens': response.usage.completion_tokens
                 if response.usage
                 else 0,
-                "total_tokens": response.usage.total_tokens if response.usage else 0,
+                'total_tokens': response.usage.total_tokens if response.usage else 0,
             },
             id=response.id,
-            finish_reason=getattr(first, "finish_reason", None) or "",
+            finish_reason=getattr(first, 'finish_reason', None) or '',
             tool_calls=tool_calls,
         )
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        from backend.inference.mappers.openai import strip_prompt_cache_hints_from_messages
+        from backend.inference.mappers.openai import (
+            strip_prompt_cache_hints_from_messages,
+        )
 
         messages = strip_prompt_cache_hints_from_messages(messages)
         messages = self._clean_messages(messages)
         kwargs = _sanitize_openai_compatible_kwargs(kwargs)
         kwargs = self._strip_unsupported_params(kwargs)
         # OpenAI-compatible APIs require stream=True for token streaming.
-        kwargs["stream"] = True
-        kwargs.pop("model", None)
+        kwargs['stream'] = True
+        kwargs.pop('model', None)
         try:
             stream = await self.async_client.chat.completions.create(
                 model=self.model_name,
@@ -562,11 +591,11 @@ class AnthropicClient(DirectLLMClient):
         self._model_name = model_name
         self.client = Anthropic(
             api_key=api_key,
-            http_client=get_shared_http_client("anthropic"),
+            http_client=get_shared_http_client('anthropic'),
         )
         self.async_client = AsyncAnthropic(
             api_key=api_key,
-            http_client=get_shared_async_http_client("anthropic"),
+            http_client=get_shared_async_http_client('anthropic'),
         )
 
     @staticmethod
@@ -587,40 +616,57 @@ class AnthropicClient(DirectLLMClient):
     def _map_anthropic_error(self, exc: Exception) -> Exception:
         """Map anthropic SDK exceptions to App LLM exceptions."""
         import anthropic
+
         from backend.inference.exceptions import (
-            RateLimitError,
+            APIConnectionError,
             AuthenticationError,
             BadRequestError,
             ContextWindowExceededError,
-            NotFoundError,
-            APIConnectionError,
             InternalServerError,
+            NotFoundError,
+            RateLimitError,
             Timeout,
-            APIError as ProviderAPIError,
             is_context_window_error,
+        )
+        from backend.inference.exceptions import (
+            APIError as ProviderAPIError,
         )
 
         if isinstance(exc, (anthropic.APITimeoutError, httpx.TimeoutException)):
-            return Timeout(str(exc), llm_provider="anthropic", model=self.model_name)
+            return Timeout(str(exc), llm_provider='anthropic', model=self.model_name)
         if isinstance(exc, (anthropic.APIConnectionError, httpx.RequestError)):
-            return APIConnectionError(str(exc), llm_provider="anthropic", model=self.model_name)
+            return APIConnectionError(
+                str(exc), llm_provider='anthropic', model=self.model_name
+            )
         if isinstance(exc, anthropic.RateLimitError):
-            return RateLimitError(str(exc), llm_provider="anthropic", model=self.model_name)
+            return RateLimitError(
+                str(exc), llm_provider='anthropic', model=self.model_name
+            )
         if isinstance(exc, anthropic.AuthenticationError):
-            return AuthenticationError(str(exc), llm_provider="anthropic", model=self.model_name)
+            return AuthenticationError(
+                str(exc), llm_provider='anthropic', model=self.model_name
+            )
         if isinstance(exc, anthropic.BadRequestError):
             error_str = str(exc).lower()
             if is_context_window_error(error_str, exc):
-                return ContextWindowExceededError(str(exc), llm_provider="anthropic", model=self.model_name)
-            return BadRequestError(str(exc), llm_provider="anthropic", model=self.model_name)
+                return ContextWindowExceededError(
+                    str(exc), llm_provider='anthropic', model=self.model_name
+                )
+            return BadRequestError(
+                str(exc), llm_provider='anthropic', model=self.model_name
+            )
         if isinstance(exc, anthropic.NotFoundError):
-            return NotFoundError(str(exc), llm_provider="anthropic", model=self.model_name)
+            return NotFoundError(
+                str(exc), llm_provider='anthropic', model=self.model_name
+            )
         if isinstance(exc, anthropic.InternalServerError):
-            return InternalServerError(str(exc), llm_provider="anthropic", model=self.model_name)
+            return InternalServerError(
+                str(exc), llm_provider='anthropic', model=self.model_name
+            )
         if isinstance(exc, anthropic.APIStatusError):
             return ProviderAPIError(
                 str(exc),
-                llm_provider="anthropic",
+                llm_provider='anthropic',
                 model=self.model_name,
                 status_code=exc.status_code,
             )
@@ -628,7 +674,7 @@ class AnthropicClient(DirectLLMClient):
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
         filtered, kwargs = self._prepare_anthropic_kwargs(messages, kwargs)
-        model = kwargs.pop("model", self.model_name)
+        model = kwargs.pop('model', self.model_name)
         try:
             response = self.client.messages.create(
                 model=model,
@@ -642,13 +688,13 @@ class AnthropicClient(DirectLLMClient):
             content=content,
             model=response.model,
             usage={
-                "prompt_tokens": response.usage.input_tokens,
-                "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens
+                'prompt_tokens': response.usage.input_tokens,
+                'completion_tokens': response.usage.output_tokens,
+                'total_tokens': response.usage.input_tokens
                 + response.usage.output_tokens,
             },
             id=response.id,
-            finish_reason=response.stop_reason or "stop",
+            finish_reason=response.stop_reason or 'stop',
             tool_calls=tool_calls,
         )
 
@@ -656,7 +702,7 @@ class AnthropicClient(DirectLLMClient):
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
         filtered, kwargs = self._prepare_anthropic_kwargs(messages, kwargs)
-        model = kwargs.pop("model", self.model_name)
+        model = kwargs.pop('model', self.model_name)
         try:
             response = await self.async_client.messages.create(
                 model=model,
@@ -670,26 +716,32 @@ class AnthropicClient(DirectLLMClient):
             content=content,
             model=response.model,
             usage={
-                "prompt_tokens": response.usage.input_tokens,
-                "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens
+                'prompt_tokens': response.usage.input_tokens,
+                'completion_tokens': response.usage.output_tokens,
+                'total_tokens': response.usage.input_tokens
                 + response.usage.output_tokens,
             },
             id=response.id,
-            finish_reason=response.stop_reason or "stop",
+            finish_reason=response.stop_reason or 'stop',
             tool_calls=tool_calls,
         )
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        system_msg = next(
-            (m["content"] for m in messages if m["role"] == "system"), None
-        )
-        filtered_messages = [m for m in messages if m["role"] != "system"]
+        from backend.inference.mappers.anthropic import _apply_system_cache_control
 
-        if "model" not in kwargs:
-            kwargs["model"] = self.model_name
+        system_raw = next(
+            (m['content'] for m in messages if m['role'] == 'system'), None
+        )
+        filtered_messages = [m for m in messages if m['role'] != 'system']
+
+        if 'model' not in kwargs:
+            kwargs['model'] = self.model_name
+
+        system_msg = _apply_system_cache_control(
+            system_raw, kwargs.get('model', self.model_name), kwargs
+        )
 
         try:
             async with self.async_client.messages.stream(
@@ -699,46 +751,66 @@ class AnthropicClient(DirectLLMClient):
             ) as stream:
                 async for event in stream:
                     # Convert Anthropic events to OpenAI-like chunks for compatibility
-                    if event.type == "content_block_start" and event.content_block.type == "tool_use":
+                    if (
+                        event.type == 'content_block_start'
+                        and event.content_block.type == 'tool_use'
+                    ):
                         yield {
-                            "choices": [{
-                                "delta": {
-                                    "tool_calls": [{
-                                        "index": event.index,
-                                        "id": event.content_block.id,
-                                        "type": "function",
-                                        "function": {
-                                            "name": event.content_block.name,
-                                            "arguments": ""
-                                        }
-                                    }]
-                                },
-                                "finish_reason": None
-                            }]
-                        }
-                    elif event.type == "content_block_delta" and event.delta.type == "input_json_delta":
-                        yield {
-                            "choices": [{
-                                "delta": {
-                                    "tool_calls": [{
-                                        "index": event.index,
-                                        "function": {"arguments": getattr(event.delta, "partial_json", "")}
-                                    }]
-                                },
-                                "finish_reason": None
-                            }]
-                        }
-                    elif event.type == "content_block_delta":
-                        yield {
-                            "choices": [
+                            'choices': [
                                 {
-                                    "delta": {"content": getattr(event.delta, "text", "")},  # type: ignore[union-attr]
-                                    "finish_reason": None,
+                                    'delta': {
+                                        'tool_calls': [
+                                            {
+                                                'index': event.index,
+                                                'id': event.content_block.id,
+                                                'type': 'function',
+                                                'function': {
+                                                    'name': event.content_block.name,
+                                                    'arguments': '',
+                                                },
+                                            }
+                                        ]
+                                    },
+                                    'finish_reason': None,
                                 }
                             ]
                         }
-                    elif event.type == "message_stop":
-                        yield {"choices": [{"delta": {}, "finish_reason": "stop"}]}
+                    elif (
+                        event.type == 'content_block_delta'
+                        and event.delta.type == 'input_json_delta'
+                    ):
+                        yield {
+                            'choices': [
+                                {
+                                    'delta': {
+                                        'tool_calls': [
+                                            {
+                                                'index': event.index,
+                                                'function': {
+                                                    'arguments': getattr(
+                                                        event.delta, 'partial_json', ''
+                                                    )
+                                                },
+                                            }
+                                        ]
+                                    },
+                                    'finish_reason': None,
+                                }
+                            ]
+                        }
+                    elif event.type == 'content_block_delta':
+                        yield {
+                            'choices': [
+                                {
+                                    'delta': {
+                                        'content': getattr(event.delta, 'text', '')
+                                    },  # type: ignore[union-attr]
+                                    'finish_reason': None,
+                                }
+                            ]
+                        }
+                    elif event.type == 'message_stop':
+                        yield {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}
         except Exception as e:
             raise self._map_anthropic_error(e) from e
 
@@ -749,22 +821,23 @@ class GeminiClient(DirectLLMClient):
     def __init__(self, model_name: str, api_key: str):
         # Never log secrets (even partial key prefixes/suffixes).
         logger.debug(
-            "Initializing Gemini client (api_key_set=%s, api_key_len=%s)",
+            'Initializing Gemini client (api_key_set=%s, api_key_len=%s)',
             bool(api_key),
             len(api_key) if api_key else 0,
         )
         self._model_name = model_name
         self.api_key = api_key
-        
+
         # Add timeout to prevent infinite hanging when the API is overloaded
         from google.genai.types import HttpOptions
-        http_options = HttpOptions(timeout=120000) # 2 minutes
+
+        http_options = HttpOptions(timeout=120000)  # 2 minutes
         self.client = genai.Client(api_key=api_key, http_options=http_options)
 
     def _resolve_gemini_model_name(self, model_name: str | None) -> str:
         """Normalize model name for Gemini API."""
         name = model_name or self.model_name
-        return name.split("/")[-1] if "/" in name else name
+        return name.split('/')[-1] if '/' in name else name
 
     def _get_gemini_cache_name(
         self,
@@ -789,39 +862,41 @@ class GeminiClient(DirectLLMClient):
         )
 
     def _extract_gemini_text(self, message: dict[str, Any]) -> str:
-        parts = message.get("parts") or []
+        parts = message.get('parts') or []
         text_parts: list[str] = []
         for part in parts:
             if isinstance(part, dict):
-                text = part.get("text")
+                text = part.get('text')
                 if isinstance(text, str) and text:
                     text_parts.append(text)
-        return "\n".join(text_parts)
+        return '\n'.join(text_parts)
 
     def _split_gemini_history_and_prompt(
         self, gemini_messages: list[dict[str, Any]]
     ) -> tuple[list[dict[str, Any]], str]:
         if not gemini_messages:
-            return [], ""
+            return [], ''
 
         active_messages = list(gemini_messages)
-        while active_messages and active_messages[-1].get("role") != "user":
+        while active_messages and active_messages[-1].get('role') != 'user':
             active_messages.pop()
 
         if not active_messages:
             logger.warning(
-                "GeminiClient: no trailing user message found; falling back to last message text"
+                'GeminiClient: no trailing user message found; falling back to last message text'
             )
             fallback_prompt = self._extract_gemini_text(gemini_messages[-1])
             fallback_history = gemini_messages[:-1] if len(gemini_messages) > 1 else []
             return fallback_history, fallback_prompt
 
         prompt_start = len(active_messages) - 1
-        while prompt_start > 0 and active_messages[prompt_start - 1].get("role") == "user":
+        while (
+            prompt_start > 0 and active_messages[prompt_start - 1].get('role') == 'user'
+        ):
             prompt_start -= 1
 
         history = active_messages[:prompt_start]
-        prompt = "\n".join(
+        prompt = '\n'.join(
             text
             for text in (
                 self._extract_gemini_text(message)
@@ -838,8 +913,8 @@ class GeminiClient(DirectLLMClient):
     ]:
         """Shared setup for Gemini completion / acompletion / astream."""
         from backend.inference.mappers.gemini import (
-            extract_generation_config,
             convert_messages,
+            extract_generation_config,
         )
 
         model_name_raw, gen_cfg, tools = extract_generation_config(kwargs)
@@ -866,37 +941,43 @@ class GeminiClient(DirectLLMClient):
 
     def _map_gemini_error(self, exc: Exception) -> Exception:
         """Map google.genai exceptions to App LLM exceptions."""
+        import asyncio
+
+        import aiohttp
         from google.genai.errors import APIError
+
         from backend.inference.exceptions import (
-            RateLimitError,
+            APIConnectionError,
             AuthenticationError,
             BadRequestError,
             ContextWindowExceededError,
-            NotFoundError,
             InternalServerError,
+            NotFoundError,
+            RateLimitError,
             ServiceUnavailableError,
             Timeout,
-            APIConnectionError,
-            APIError as ProviderAPIError,
             is_context_window_error,
         )
-        import asyncio
-        import aiohttp
+        from backend.inference.exceptions import (
+            APIError as ProviderAPIError,
+        )
 
-        logger.error("=" * 80)
-        logger.error("GOOGLE GENAI EXCEPTION: %s %s", type(exc), exc)
-        if hasattr(exc, "code"):
-            logger.error("CODE: %s", exc.code)
-        if hasattr(exc, "message"):
-            logger.error("MESSAGE: %s", exc.message)
-        if hasattr(exc, "details"):
-            logger.error("DETAILS: %s", exc.details)
-        logger.error("=" * 80)
+        logger.error('=' * 80)
+        logger.error('GOOGLE GENAI EXCEPTION: %s %s', type(exc), exc)
+        if hasattr(exc, 'code'):
+            logger.error('CODE: %s', exc.code)
+        if hasattr(exc, 'message'):
+            logger.error('MESSAGE: %s', exc.message)
+        if hasattr(exc, 'details'):
+            logger.error('DETAILS: %s', exc.details)
+        logger.error('=' * 80)
 
         if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
-            return Timeout(str(exc), llm_provider="google", model=self.model_name)
+            return Timeout(str(exc), llm_provider='google', model=self.model_name)
         if isinstance(exc, (aiohttp.ClientError, httpx.RequestError)):
-            return APIConnectionError(str(exc), llm_provider="google", model=self.model_name)
+            return APIConnectionError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
 
         if isinstance(exc, APIError):
             error_str = str(exc).lower()
@@ -904,37 +985,61 @@ class GeminiClient(DirectLLMClient):
             # Google Gemini sometimes returns 400 INVALID_ARGUMENT for invalid/unknown keys
             # (e.g., "API Key not found"), and the message can contain "not found" which
             # would otherwise be misclassified as a 404.
-            if "api key" in error_str and (
-                "not found" in error_str
-                or "invalid api key" in error_str
-                or "api_key_invalid" in error_str
+            if 'api key' in error_str and (
+                'not found' in error_str
+                or 'invalid api key' in error_str
+                or 'api_key_invalid' in error_str
             ):
                 return AuthenticationError(
-                    str(exc), llm_provider="google", model=self.model_name
+                    str(exc), llm_provider='google', model=self.model_name
                 )
 
-            if exc.code == 429 or "quota" in error_str or "rate limit" in error_str:
-                return RateLimitError(str(exc), llm_provider="google", model=self.model_name)
-            if exc.code == 401 or "unauthorized" in error_str or "invalid api key" in error_str:
-                return AuthenticationError(str(exc), llm_provider="google", model=self.model_name)
-            if exc.code == 404 or "not found" in error_str:
-                return NotFoundError(str(exc), llm_provider="google", model=self.model_name)
-            if exc.code in (500, 502, 503, 504) or "unavailable" in error_str or "overloaded" in error_str:
-                return ServiceUnavailableError(str(exc), llm_provider="google", model=self.model_name)
+            if exc.code == 429 or 'quota' in error_str or 'rate limit' in error_str:
+                return RateLimitError(
+                    str(exc), llm_provider='google', model=self.model_name
+                )
+            if (
+                exc.code == 401
+                or 'unauthorized' in error_str
+                or 'invalid api key' in error_str
+            ):
+                return AuthenticationError(
+                    str(exc), llm_provider='google', model=self.model_name
+                )
+            if exc.code == 404 or 'not found' in error_str:
+                return NotFoundError(
+                    str(exc), llm_provider='google', model=self.model_name
+                )
+            if (
+                exc.code in (500, 502, 503, 504)
+                or 'unavailable' in error_str
+                or 'overloaded' in error_str
+            ):
+                return ServiceUnavailableError(
+                    str(exc), llm_provider='google', model=self.model_name
+                )
             if exc.code == 400:
                 if is_context_window_error(error_str, exc):
-                    return ContextWindowExceededError(str(exc), llm_provider="google", model=self.model_name)
-                return BadRequestError(str(exc), llm_provider="google", model=self.model_name)
+                    return ContextWindowExceededError(
+                        str(exc), llm_provider='google', model=self.model_name
+                    )
+                return BadRequestError(
+                    str(exc), llm_provider='google', model=self.model_name
+                )
             if exc.code and exc.code >= 500:
-                return InternalServerError(str(exc), llm_provider="google", model=self.model_name)
-            return ProviderAPIError(str(exc), llm_provider="google", model=self.model_name)
+                return InternalServerError(
+                    str(exc), llm_provider='google', model=self.model_name
+                )
+            return ProviderAPIError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
         return exc
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
         from backend.inference.mappers.gemini import (
-            extract_tool_calls,
-            extract_text,
             ensure_non_empty_content,
+            extract_text,
+            extract_tool_calls,
             gemini_usage,
         )
 
@@ -944,36 +1049,40 @@ class GeminiClient(DirectLLMClient):
 
         config: Any = {
             **gen_cfg,
-            "tools": tools,
+            'tools': tools,
         }
         if cache_name:
-            config["cached_content"] = cache_name
+            config['cached_content'] = cache_name
         else:
-            config["system_instruction"] = system_instruction
+            config['system_instruction'] = system_instruction
 
-        logger.debug("Gemini config: %s", config)
+        logger.debug('Gemini config: %s', config)
         logger.info(
-            "GeminiClient.completion: model=%s, history_len=%d, prompt_len=%d, "
-            "tools=%s, remaining_kwargs=%s",
+            'GeminiClient.completion: model=%s, history_len=%d, prompt_len=%d, '
+            'tools=%s, remaining_kwargs=%s',
             model_name,
             len(history),
             len(prompt) if isinstance(prompt, str) else 0,
             len(tools) if tools else 0,
             sorted(kwargs.keys()),
         )
-        logger.info("GeminiClient.completion: creating chat session...")
+        logger.info('GeminiClient.completion: creating chat session...')
         chat = self.client.chats.create(
             model=model_name,
             config=config,
             history=cast(Any, history),
         )
-        logger.info("GeminiClient.completion: chat created, calling send_message...")
+        logger.info('GeminiClient.completion: chat created, calling send_message...')
         try:
             response = chat.send_message(prompt, **kwargs)
         except Exception as e:
-            logger.error("GeminiClient.completion: send_message raised %s: %s", type(e).__name__, e)
+            logger.error(
+                'GeminiClient.completion: send_message raised %s: %s',
+                type(e).__name__,
+                e,
+            )
             raise self._map_gemini_error(e) from e
-        logger.info("GeminiClient.completion: send_message returned successfully")
+        logger.info('GeminiClient.completion: send_message returned successfully')
         tool_calls = extract_tool_calls(response)
         content = extract_text(response)
         content = ensure_non_empty_content(response, content, tool_calls)
@@ -981,8 +1090,8 @@ class GeminiClient(DirectLLMClient):
             content=content,
             model=model_name,
             usage=gemini_usage(response),
-            id="",
-            finish_reason="stop",
+            id='',
+            finish_reason='stop',
             tool_calls=tool_calls,
         )
 
@@ -991,9 +1100,9 @@ class GeminiClient(DirectLLMClient):
     ) -> LLMResponse:
         """Asynchronous completion."""
         from backend.inference.mappers.gemini import (
-            extract_tool_calls,
-            extract_text,
             ensure_non_empty_content,
+            extract_text,
+            extract_tool_calls,
             gemini_usage,
         )
 
@@ -1003,14 +1112,14 @@ class GeminiClient(DirectLLMClient):
 
         config: Any = {
             **gen_cfg,
-            "tools": tools,
+            'tools': tools,
         }
         if cache_name:
-            config["cached_content"] = cache_name
+            config['cached_content'] = cache_name
         else:
-            config["system_instruction"] = system_instruction
+            config['system_instruction'] = system_instruction
 
-        logger.debug("Gemini config: %s", config)
+        logger.debug('Gemini config: %s', config)
 
         chat = self.client.aio.chats.create(
             model=model_name,
@@ -1029,8 +1138,8 @@ class GeminiClient(DirectLLMClient):
             content=content,
             model=model_name,
             usage=gemini_usage(response),
-            id="",
-            finish_reason="stop",
+            id='',
+            finish_reason='stop',
             tool_calls=tool_calls,
         )
 
@@ -1044,14 +1153,14 @@ class GeminiClient(DirectLLMClient):
 
         config: Any = {
             **gen_cfg,
-            "tools": tools,
+            'tools': tools,
         }
         if cache_name:
-            config["cached_content"] = cache_name
+            config['cached_content'] = cache_name
         else:
-            config["system_instruction"] = system_instruction
+            config['system_instruction'] = system_instruction
 
-        logger.debug("Gemini config: %s", config)
+        logger.debug('Gemini config: %s', config)
 
         chat = self.client.aio.chats.create(
             model=model_name,
@@ -1066,61 +1175,70 @@ class GeminiClient(DirectLLMClient):
             # unique indices rather than all defaulting to 0 via enumerate().
             fc_idx_counter = 0
             async for chunk in stream:
-                fcs = getattr(chunk, "function_calls", None)
+                fcs = getattr(chunk, 'function_calls', None)
                 if fcs:
                     for fc in fcs:
                         try:
-                            _args = getattr(fc, "args", {})
-                            if hasattr(type(fc), "to_dict") and _args:
-                                _to_dict = getattr(type(fc), "to_dict")
+                            _args = getattr(fc, 'args', {})
+                            if hasattr(type(fc), 'to_dict') and _args:
+                                _to_dict = getattr(type(fc), 'to_dict')
                                 if callable(_to_dict):
                                     args_dict = _to_dict(_args)
                                 else:
                                     args_dict = _args
-                            elif hasattr(_args, "items"):
+                            elif hasattr(_args, 'items'):
                                 args_dict = dict(_args.items())  # type: ignore[union-attr]
-                            elif hasattr(_args, "__dict__"):
+                            elif hasattr(_args, '__dict__'):
                                 args_dict = _args.__dict__
                             else:
                                 args_dict = _args
 
-                            if hasattr(args_dict, "pb") and hasattr(args_dict, "items"):
+                            if hasattr(args_dict, 'pb') and hasattr(args_dict, 'items'):
                                 args_dict = dict(args_dict.items())  # type: ignore[union-attr]
 
                             if isinstance(args_dict, dict):
                                 args_str = json.dumps(
                                     args_dict,
                                     ensure_ascii=False,
-                                    separators=(",", ":"),
+                                    separators=(',', ':'),
                                 )
                             else:
                                 args_str = json.dumps(
-                                    getattr(fc, "args", {}),
+                                    getattr(fc, 'args', {}),
                                     ensure_ascii=False,
-                                    separators=(",", ":"),
+                                    separators=(',', ':'),
                                 )
                         except Exception:
-                            args_str = "{}"
+                            args_str = '{}'
                         yield {
-                            "choices": [{
-                                "delta": {
-                                    "tool_calls": [{
-                                        "index": fc_idx_counter,
-                                        "id": f"call_{fc.name}_{fc_idx_counter}",
-                                        "type": "function",
-                                        "function": {"name": fc.name, "arguments": args_str}
-                                    }]
-                                },
-                                "finish_reason": None
-                            }]
+                            'choices': [
+                                {
+                                    'delta': {
+                                        'tool_calls': [
+                                            {
+                                                'index': fc_idx_counter,
+                                                'id': f'call_{fc.name}_{fc_idx_counter}',
+                                                'type': 'function',
+                                                'function': {
+                                                    'name': fc.name,
+                                                    'arguments': args_str,
+                                                },
+                                            }
+                                        ]
+                                    },
+                                    'finish_reason': None,
+                                }
+                            ]
                         }
                         fc_idx_counter += 1
-                text = chunk.text or ""
+                text = chunk.text or ''
                 if text:
-                    yield {"choices": [{"delta": {"content": text}, "finish_reason": None}]}
+                    yield {
+                        'choices': [{'delta': {'content': text}, 'finish_reason': None}]
+                    }
         except Exception as e:
             raise self._map_gemini_error(e) from e
-        yield {"choices": [{"delta": {}, "finish_reason": "stop"}]}
+        yield {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}
 
 
 def get_direct_client(
@@ -1130,7 +1248,7 @@ def get_direct_client(
 
     This function automatically resolves the provider and base URL based on:
     1. Explicit provider prefix (``provider/model``)
-    2. Exact model catalog entries (catalog.toml)
+    2. Exact model catalog entries (catalog.json)
     3. Local endpoint discovery (Ollama, LM Studio, vLLM)
 
     Args:
@@ -1155,23 +1273,23 @@ def get_direct_client(
     resolved_base_url = resolver.resolve_base_url(model, base_url)
 
     logger.debug(
-        "Resolved model=%s → provider=%s, base_url=%s, stripped=%s",
+        'Resolved model=%s → provider=%s, base_url=%s, stripped=%s',
         model,
         provider,
-        resolved_base_url or "default",
+        resolved_base_url or 'default',
         stripped_model,
     )
 
     # Route to appropriate client based on provider
-    if provider == "anthropic":
+    if provider == 'anthropic':
         return AnthropicClient(model_name=stripped_model, api_key=api_key)
 
-    if provider == "google":
+    if provider == 'google':
         return GeminiClient(model_name=stripped_model, api_key=api_key)
 
-    if provider == "openhands":
+    if provider == 'openhands':
         return OpenAIClient(
-            model_name=f"litellm_proxy/{stripped_model}",
+            model_name=f'litellm_proxy/{stripped_model}',
             api_key=api_key,
             base_url=resolved_base_url,
             supports_request_metadata=False,
@@ -1185,5 +1303,5 @@ def get_direct_client(
         model_name=stripped_model,
         api_key=api_key,
         base_url=resolved_base_url,
-        supports_request_metadata=(provider == "openai"),
+        supports_request_metadata=(provider == 'openai'),
     )

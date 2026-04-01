@@ -447,7 +447,9 @@ async def test_async_main_defaults_workspace_to_cwd(tmp_path: Path) -> None:
 
     resolved = str(tmp_path.resolve())
     assert config.project_root == resolved
-    assert config.local_data_root == resolved
+    # local_data_root is intentionally NOT set to project_root in CLI mode;
+    # it stays at the global default so Grinta never pollutes the user's workspace.
+    assert config.local_data_root == '~/.grinta/storage'
     assert config.get_agent_config(config.default_agent).cli_mode is True
     repl.run.assert_awaited_once()
 
@@ -505,7 +507,8 @@ async def test_async_main_keeps_explicit_project_override(tmp_path: Path) -> Non
 
     resolved = str(tmp_path.resolve())
     assert config.project_root == resolved
-    assert config.local_data_root == resolved
+    # local_data_root is intentionally NOT set to project_root in CLI mode.
+    assert config.local_data_root == '~/.grinta/storage'
     assert config.get_agent_config(config.default_agent).cli_mode is True
 
 

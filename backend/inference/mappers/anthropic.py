@@ -15,33 +15,55 @@ def extract_tool_calls(
     text_parts: list[str] = []
     tool_calls: list[dict[str, Any]] = []
     for block in content_blocks:
-        block_type = getattr(block, "type", None)
-        if block_type == "text":
+        block_type = getattr(block, 'type', None)
+        if block_type == 'text':
             text_parts.append(block.text)
-        elif block_type == "tool_use":
+        elif block_type == 'tool_use':
             tool_calls.append(
                 {
-                    "id": block.id,
-                    "type": "function",
-                    "function": {
-                        "name": block.name,
-                        "arguments": json.dumps(block.input)
+                    'id': block.id,
+                    'type': 'function',
+                    'function': {
+                        'name': block.name,
+                        'arguments': json.dumps(block.input)
                         if isinstance(block.input, dict)
                         else str(block.input),
                     },
                 }
             )
-    return "\n".join(text_parts), tool_calls or None
+    return '\n'.join(text_parts), tool_calls or None
+
+
+def _apply_system_cache_control(
+    system_content: Any, model: str, kwargs: dict[str, Any]
+) -> Any:
+    """Return system content with cache_control if the model supports prompt caching.
+
+    When caching is supported, converts a plain string into the list-of-blocks
+    format Anthropic requires and adds the ``prompt-caching-2024-07-31`` beta
+    header.  Otherwise returns ``system_content`` unchanged.
+    """
+    from backend.inference.prompt_caching import model_supports_prompt_cache_hints
+
+    if system_content is None:
+        return None
+    if model_supports_prompt_cache_hints(model):
+        text = system_content if isinstance(system_content, str) else str(system_content)
+        if 'betas' not in kwargs:
+            kwargs['betas'] = ['prompt-caching-2024-07-31']
+        return [{'type': 'text', 'text': text, 'cache_control': {'type': 'ephemeral'}}]
+    return system_content
 
 
 def prepare_kwargs(
     messages: list[dict[str, Any]], kwargs: dict[str, Any], default_model: str
 ) -> tuple[list, dict[str, Any]]:
     """Extract system message and set model for Anthropic calls."""
-    system_msg = next((m["content"] for m in messages if m["role"] == "system"), None)
-    filtered = [m for m in messages if m["role"] != "system"]
-    if "model" not in kwargs:
-        kwargs["model"] = default_model
+    system_msg = next((m['content'] for m in messages if m['role'] == 'system'), None)
+    filtered = [m for m in messages if m['role'] != 'system']
+    if 'model' not in kwargs:
+        kwargs['model'] = default_model
     if system_msg is not None:
-        kwargs["system"] = system_msg
+        model = kwargs.get('model', default_model)
+        kwargs['system'] = _apply_system_cache_control(system_msg, model, kwargs)
     return filtered, kwargs
