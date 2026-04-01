@@ -170,10 +170,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         description='Enable task planning and decomposition (task tracker tool)',
     )
     enable_mcp: bool = Field(default=DEFAULT_AGENT_MCP_ENABLED)
-    enable_web_search: bool = Field(
-        default=False,
-        description='Deprecated no-op flag retained for backward compatibility.',
-    )
     enable_auto_planning: bool = Field(
         default=DEFAULT_AGENT_AUTO_PLANNING_ENABLED,
         description='Automatically decompose complex tasks before execution',
@@ -323,6 +319,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         if isinstance(data, dict):
             data = dict(data)
             data.pop('enable_prompt_caching', None)
+            data.pop('enable_web_search', None)
         return data
 
     @field_validator('name', 'autonomy_level', 'system_prompt_filename')

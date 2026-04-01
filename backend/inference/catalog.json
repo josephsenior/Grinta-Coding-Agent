@@ -138,14 +138,6 @@
       "supports_response_schema": true,
       "supports_vision": true
     },
-    "gpt-4-32k": {
-      "provider": "openai",
-      "max_input_tokens": 32768,
-      "max_output_tokens": 4096,
-      "input_price_per_m": 60.0,
-      "output_price_per_m": 120.0,
-      "verified": true
-    },
     "o1-mini": {
       "provider": "openai",
       "aliases": [
@@ -321,22 +313,6 @@
       "strip_reasoning_effort": true,
       "thinking_mode": "disabled",
       "strip_top_p": true
-    },
-    "claude-2.1": {
-      "provider": "anthropic",
-      "max_input_tokens": 200000,
-      "max_output_tokens": 4096,
-      "input_price_per_m": 8.0,
-      "output_price_per_m": 24.0,
-      "verified": true
-    },
-    "claude-2": {
-      "provider": "anthropic",
-      "max_input_tokens": 100000,
-      "max_output_tokens": 4096,
-      "input_price_per_m": 8.0,
-      "output_price_per_m": 24.0,
-      "verified": true
     },
     "gemini-pro-latest": {
       "provider": "google",
@@ -609,30 +585,6 @@
       "input_price_per_m": 1.0,
       "output_price_per_m": 3.0,
       "verified": true
-    },
-    "kimi-k2": {
-      "provider": "openai",
-      "max_input_tokens": 128000,
-      "max_output_tokens": 8192,
-      "supports_function_calling": true
-    },
-    "moonshotai/kimi-k2.5": {
-      "provider": "nvidia",
-      "aliases": [
-        "moonshotai/kimi-k2-5",
-        "kimi-k2.5",
-        "nvidia/moonshotai/kimi-k2.5"
-      ],
-      "max_input_tokens": 256000,
-      "max_output_tokens": 8192,
-      "supports_function_calling": true,
-      "supports_vision": true
-    },
-    "qwen3": {
-      "provider": "openai",
-      "max_input_tokens": 128000,
-      "max_output_tokens": 8192,
-      "supports_function_calling": true
     }
   },
   "tier_pricing": {

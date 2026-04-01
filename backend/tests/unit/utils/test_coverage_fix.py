@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, cast
 import importlib
 import unittest.mock
+from typing import Any, cast
+
 import pytest
 
 import backend.utils.async_utils as async_utils
+import backend.utils.circuit_breaker as circuit_breaker
 import backend.utils.import_utils as import_utils
 import backend.utils.tenacity_metrics as tenacity_metrics
 import backend.utils.tenacity_stop as tenacity_stop
-import backend.utils.circuit_breaker as circuit_breaker
 
 
 class TestImportUtilsFinal:
@@ -20,15 +21,18 @@ class TestImportUtilsFinal:
 
     def test_get_impl_mro_match_true(self):
         """Covers lines 78, 81 (returning True from MRO match)."""
+
         class Base:
             pass
-        Base.__module__ = "mod"
-        Base.__name__ = "Name"
+
+        Base.__module__ = 'mod'
+        Base.__name__ = 'Name'
 
         class SameNameBase:
             pass
-        SameNameBase.__module__ = "mod"
-        SameNameBase.__name__ = "Name"
+
+        SameNameBase.__module__ = 'mod'
+        SameNameBase.__name__ = 'Name'
 
         class Impl(SameNameBase):
             pass
@@ -47,9 +51,11 @@ class TestAsyncUtilsFinal:
             cast(asyncio.Task[Any], unittest.mock.MagicMock(spec=asyncio.Task))
         }
         pending_task = list(pending)[0]
-        cast(Any, pending_task).get_coro.return_value = None  # Force "Unable to get task names"
+        cast(
+            Any, pending_task
+        ).get_coro.return_value = None  # Force "Unable to get task names"
 
-        with unittest.mock.patch("logging.getLogger") as mock_logger:
+        with unittest.mock.patch('logging.getLogger') as mock_logger:
             async_utils._handle_pending_tasks(done, pending)
             mock_logger.return_value.error.assert_called()
 
@@ -60,27 +66,31 @@ class TestCircuitBreakerFinal:
     @pytest.mark.asyncio
     async def test_half_open_probes_exhausted(self):
         """Covers lines 48-49."""
-        cb = circuit_breaker.CircuitBreaker("test")
-        cb.state.state = "half_open"
+        cb = circuit_breaker.CircuitBreaker('test')
+        cb.state.state = 'half_open'
         cb.state.half_open_probes_left = 0
 
-        async def dummy(): return "ok"
+        async def dummy():
+            return 'ok'
 
-        with pytest.raises(RuntimeError, match="circuit_half_open_block"):
+        with pytest.raises(RuntimeError, match='circuit_half_open_block'):
             await cb.async_call(dummy)
 
     @pytest.mark.asyncio
     async def test_on_close_success_metric(self):
         """Covers line 176 (on_close_success)."""
-        cb = circuit_breaker.CircuitBreaker("test")
-        cb.state.state = "half_open"
+        cb = circuit_breaker.CircuitBreaker('test')
+        cb.state.state = 'half_open'
         cb.state.half_open_probes_left = 1
 
-        async def success(): return "ok"
+        async def success():
+            return 'ok'
 
-        with unittest.mock.patch("backend.utils.circuit_breaker._CB_METRICS") as mock_metrics:
+        with unittest.mock.patch(
+            'backend.utils.circuit_breaker._CB_METRICS'
+        ) as mock_metrics:
             await cb.async_call(success)
-            mock_metrics.on_close_success.assert_called_with("test")
+            mock_metrics.on_close_success.assert_called_with('test')
 
 
 class TestSearchUtilsFinal:
@@ -89,7 +99,8 @@ class TestSearchUtilsFinal:
     def test_page_id_to_offset_invalid_format(self):
         """Covers line 49."""
         from backend.utils.search_utils import page_id_to_offset
-        assert page_id_to_offset("not-base64-json!!!") == 0
+
+        assert page_id_to_offset('not-base64-json!!!') == 0
 
 
 class TestShutdownFinal:
@@ -97,7 +108,6 @@ class TestShutdownFinal:
 
     def test_request_process_shutdown_noop_when_already_exiting(self):
         import backend.utils.shutdown_listener as mod
-
         from backend.utils.shutdown_listener import (
             add_shutdown_listener,
             remove_shutdown_listener,
@@ -123,31 +133,38 @@ class TestTenacityStopFinal:
         stop_cond = tenacity_stop.stop_if_should_exit()
 
         def side_effect(name):
-            if name == "backend.utils.tenacity_stop":
+            if name == 'backend.utils.tenacity_stop':
                 m = unittest.mock.MagicMock()
-                m.should_exit.side_effect = RuntimeError("fail")
+                m.should_exit.side_effect = RuntimeError('fail')
                 return m
             return importlib.import_module(name)
 
-        with unittest.mock.patch("importlib.import_module", side_effect=side_effect):
+        with unittest.mock.patch('importlib.import_module', side_effect=side_effect):
             # local fallback should return False (by default)
             assert stop_cond(cast(Any, unittest.mock.MagicMock())) is False
 
-
     def test_stop_if_should_exit_local_fallback(self):
-        """Covers line 38 (local fallback)."""
+        """Covers line 35 (local fallback via globals)."""
         stop_cond = tenacity_stop.stop_if_should_exit()
 
-        with unittest.mock.patch("backend.utils.tenacity_stop.should_exit", return_value=True):
+        # Inject a callable into the module's globals so the local fallback fires
+        sentinel = lambda: True  # noqa: E731
+        tenacity_stop.should_exit = sentinel  # type: ignore[attr-defined]
+        try:
+
             def side_effect_mock(name):
-                if name == "backend.utils.tenacity_stop":
+                if name == 'backend.utils.tenacity_stop':
                     m = unittest.mock.MagicMock()
-                    m.should_exit.side_effect = Exception("fail")
+                    m.should_exit.side_effect = Exception('fail')
                     return m
                 return importlib.import_module(name)
 
-            with unittest.mock.patch("importlib.import_module", side_effect=side_effect_mock):
+            with unittest.mock.patch(
+                'importlib.import_module', side_effect=side_effect_mock
+            ):
                 assert stop_cond(cast(Any, unittest.mock.MagicMock())) is True
+        finally:
+            del tenacity_stop.should_exit  # type: ignore[attr-defined]
 
 
 class TestPromptFinal:
@@ -155,12 +172,15 @@ class TestPromptFinal:
 
     def test_add_turns_left_reminder_no_text_content(self):
         """Covers lines 243-244 (Message with no TextContent)."""
-        from backend.core.message import Message, ImageContent
+        from backend.core.message import ImageContent, Message
         from backend.utils.prompt import PromptManager
 
         pm = unittest.mock.MagicMock(spec=PromptManager)
 
-        msg = Message(role="user", content=[ImageContent(image_urls=["http://example.com/img.png"])])
+        msg = Message(
+            role='user',
+            content=[ImageContent(image_urls=['http://example.com/img.png'])],
+        )
         state = unittest.mock.MagicMock()
         PromptManager.add_turns_left_reminder(pm, [msg], state)
 
@@ -170,18 +190,21 @@ class TestTenacityMetricsFinal:
 
     def test_tenacity_before_sleep_exception(self):
         """Covers lines 57-72 (exception in _before_sleep)."""
-        hook = tenacity_metrics.tenacity_before_sleep_factory("op")
+        hook = tenacity_metrics.tenacity_before_sleep_factory('op')
         hook(cast(Any, None))
 
     def test_tenacity_after_exception_in_sanitize(self):
         """Covers lines 95-100 (exception in _after start)."""
-        hook = tenacity_metrics.tenacity_after_factory("op")
-        with unittest.mock.patch("backend.utils.tenacity_metrics.sanitize_operation_label", side_effect=Exception):
+        hook = tenacity_metrics.tenacity_after_factory('op')
+        with unittest.mock.patch(
+            'backend.utils.tenacity_metrics.sanitize_operation_label',
+            side_effect=Exception,
+        ):
             hook(unittest.mock.MagicMock())
 
     def test_tenacity_after_failed_outcome_check(self):
         """Covers lines 128-129 (final catch-all)."""
-        hook = tenacity_metrics.tenacity_after_factory("op")
+        hook = tenacity_metrics.tenacity_after_factory('op')
         rs = unittest.mock.MagicMock()
-        rs.outcome = "not an object"
+        rs.outcome = 'not an object'
         hook(rs)

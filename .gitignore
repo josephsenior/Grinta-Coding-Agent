@@ -86,3 +86,5 @@ pylint_*.txt
 # Debug/error logs
 *.out
 tsc_errors*.txt
+
+backend/MagicMock/
