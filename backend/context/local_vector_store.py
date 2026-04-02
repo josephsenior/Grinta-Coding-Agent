@@ -80,7 +80,7 @@ class ChromaDBBackend(VectorBackend):
         )
 
         # Embedding model — lazy-loaded in a background thread so __init__ is instant.
-        self._model_name = os.getenv('EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
+        self._model_name = os.getenv('EMBEDDING_MODEL', 'nomic-ai/nomic-embed-text-v1.5')
         self._model: Any | None = None
         self._model_lock = threading.Lock()
 

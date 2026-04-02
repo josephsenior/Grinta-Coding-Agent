@@ -52,6 +52,7 @@ dependencies = [
   "whatthepatch>=1.0.6,<2",
   "chromadb>=1.4,<2",
   "sentence-transformers>=5.2,<6",
+  "einops>=0.8,<1",
   "python-docx>=1.1,<2",
   "PyPDF2>=3.0,<4",
   "python-pptx>=1.0,<2",
