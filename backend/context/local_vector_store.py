@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import io
 import json
 import logging
 import os
 import sqlite3
+import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -76,33 +79,66 @@ class ChromaDBBackend(VectorBackend):
             settings=Settings(anonymized_telemetry=False),
         )
 
-        # Use a high-quality code-centric embedding model for software contexts
-        model_name = os.getenv('EMBEDDING_MODEL', 'jinaai/jina-embeddings-v2-base-code')
-        logger.info(
-            "Loading embedding model '%s' (first run downloads ~500 MB)…",
-            model_name,
-        )
-        from sentence_transformers import SentenceTransformer
+        # Embedding model — lazy-loaded in a background thread so __init__ is instant.
+        self._model_name = os.getenv('EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
+        self._model: Any | None = None
+        self._model_lock = threading.Lock()
 
-        # Suppress noisy HuggingFace/requests connection errors that leak to
-        # stdout/stderr even when logging is silenced (they use warnings/print).
-        import io
-        import contextlib
-        with contextlib.redirect_stderr(io.StringIO()), \
-             contextlib.redirect_stdout(io.StringIO()):
-            self.model = SentenceTransformer(model_name, trust_remote_code=True)
-
+        # Load or create collection, handling embedding model changes
+        self._collection_name = collection_name
         try:
             self.collection = self.client.get_collection(name=collection_name)
-            logger.info(
-                'Loaded ChromaDB collection with %s documents', self.collection.count()
-            )
+            stored_model = self.collection.metadata.get('embedding_model', '')
+            if stored_model and stored_model != self._model_name:
+                logger.info(
+                    'Embedding model changed (%s → %s), recreating collection',
+                    stored_model, self._model_name,
+                )
+                self.client.delete_collection(name=collection_name)
+                self.collection = self._create_collection(collection_name)
+            else:
+                logger.info(
+                    'Loaded ChromaDB collection with %s documents',
+                    self.collection.count(),
+                )
         except Exception:
-            self.collection = self.client.create_collection(
-                name=collection_name,
-                metadata={'hnsw:space': 'cosine'},
-            )
-            logger.info('Created new ChromaDB collection')
+            self.collection = self._create_collection(collection_name)
+
+        # Start background model loading so it's ready by first user message
+        threading.Thread(target=self._load_model, daemon=True).start()
+
+    def _create_collection(self, name: str) -> Any:
+        """Create a new ChromaDB collection with model metadata."""
+        collection = self.client.create_collection(
+            name=name,
+            metadata={'hnsw:space': 'cosine', 'embedding_model': self._model_name},
+        )
+        logger.info('Created new ChromaDB collection')
+        return collection
+
+    def _load_model(self) -> None:
+        """Load the embedding model. Thread-safe, called from background thread."""
+        if self._model is not None:
+            return
+        with self._model_lock:
+            if self._model is not None:
+                return
+            logger.info("Loading embedding model '%s'…", self._model_name)
+            from sentence_transformers import SentenceTransformer
+
+            with contextlib.redirect_stderr(io.StringIO()), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                self._model = SentenceTransformer(
+                    self._model_name, trust_remote_code=True,
+                )
+            logger.info('Embedding model loaded')
+
+    @property
+    def model(self) -> Any:
+        """Lazy-loaded embedding model. Blocks on first access if still loading."""
+        if self._model is None:
+            self._load_model()
+        return self._model
 
     def add(
         self,
