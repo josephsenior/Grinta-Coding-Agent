@@ -5,12 +5,12 @@ requires = [
 ]
 
 [project]
-name = "app-ai"
+name = "grinta-ai"
 version = "0.55.0"
-description = "App: Your AI-Powered Development Platform"
+description = "Grinta: Your AI-Powered Development Platform"
 readme = "README.md"
 license = "MIT"
-authors = [ { name = "App Team" } ]
+authors = [ { name = "Grinta Team" } ]
 requires-python = ">=3.12,<3.14"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
@@ -29,7 +29,6 @@ dependencies = [
   "websockets>=15.0.1,<16",
   "html2text>=2025.4.15,<2026",
   "httpx>=0.27,<1",
-  "jinja2>=3.1.3,<4",
   "json-repair>=0.48,<1",
   "orjson>=3.10,<4",
   "libtmux>=0.37,<0.40",
@@ -66,6 +65,7 @@ dependencies = [
   "rich>=14.0,<15",
   "prompt_toolkit>=3.0.50,<4",
   "asyncpg>=0.30.0",
+  "optimum[onnxruntime]>=2.1.0",
 ]
 
 optional-dependencies.all = [
@@ -92,8 +92,9 @@ optional-dependencies.telemetry = [
   "protobuf>=5,<6",
 ]
 urls = { Repository = "https://github.com/App/App" }
-scripts.app = "backend.cli.entry:main"
-scripts.grinta = "backend.cli.entry:main"
+# Console script disabled — Windows Application Control blocks pip-generated
+# .exe launchers.  Use the grinta.cmd wrapper in Scripts/ instead, or run
+# directly: python -m backend.cli.entry
 
 [tool.hatch.build.targets.wheel]
 packages = [
@@ -107,6 +108,7 @@ packages = [
 [dependency-groups]
 dev = [
   "ruff==0.12.5",
+  "pylint>=4.0.5,<5",
   "mypy==1.17.0",
   "pre-commit==4.2.0",
   "build>=1.2.2",
@@ -162,8 +164,24 @@ lint.flake8-quotes.inline-quotes = "single"
 lint.pydocstyle.convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"backend/tests/*" = ["ASYNC"]
-"backend/scripts/*" = ["ASYNC"]
+"backend/tests/**" = [
+  "ASYNC",
+  "B017",
+  "B028",
+  "D205",
+  "D301",
+  "D417",
+  "E402",
+  "F841",
+]
+"backend/scripts/**" = ["ASYNC"]
+"backend/cli/config_manager.py" = ["E402"]
+"backend/cli/event_renderer.py" = ["E402"]
+"backend/cli/repl.py" = ["E402"]
+"backend/gateway/app_accessors.py" = ["E402"]
+"backend/gateway/integrations/mcp/mcp_utils.py" = ["E402"]
+"backend/gateway/routes/public.py" = ["E402"]
+"backend/persistence/data_models/settings.py" = ["E402"]
 
 [tool.coverage.run]
 source = [
