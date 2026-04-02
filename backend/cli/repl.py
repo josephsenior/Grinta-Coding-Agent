@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -529,6 +530,9 @@ class Repl:
             AgentState.REJECTED,
         }
 
+        _HARD_TIMEOUT = 300  # 5 minutes absolute ceiling
+        _start = time.monotonic()
+
         while True:
             renderer = cast(Any, self._renderer)
 
@@ -544,13 +548,10 @@ class Repl:
                 await self._handle_confirmation(controller)
                 continue
 
-            # Agent task finished — give delivery threads a moment to process
-            # the final events, then break regardless.
+            # Agent task finished — events are processed directly in the
+            # delivery thread (no async hop), so just yield once.
             if agent_task and agent_task.done():
-                for _ in range(4):
-                    if renderer is not None and renderer.current_state in idle_states:
-                        break
-                    await asyncio.sleep(0.05)
+                await asyncio.sleep(0.05)
                 break
 
             # Normal poll: yield so pending callbacks run.
@@ -558,6 +559,18 @@ class Repl:
                 await asyncio.sleep(0.25)
             else:
                 await renderer.wait_for_state_change(wait_timeout_sec=0.25)
+
+            # Hard timeout — surface error and return to prompt instead of
+            # hanging forever (e.g. LLM API unresponsive).
+            if time.monotonic() - _start > _HARD_TIMEOUT:
+                logger.warning('Agent wait exceeded %ds hard timeout', _HARD_TIMEOUT)
+                if renderer is not None:
+                    renderer.add_system_message(
+                        'Agent timed out after 5 minutes. Returning to prompt.',
+                        title='⏱ Timeout',
+                    )
+                    renderer.refresh()
+                break
 
     # -- interrupt handler -------------------------------------------------
 

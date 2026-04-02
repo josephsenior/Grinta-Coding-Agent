@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-import threading
 from collections import deque
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -104,7 +103,6 @@ class CLIEventRenderer:
         self._body_title = 'Grinta'
         self._subscribed = False
         self._max_budget = max_budget
-        self._event_lock = threading.Lock()
         self._budget_warned_80 = False
         self._budget_warned_100 = False
         # Per-turn metric snapshots (used to compute deltas at turn completion)
@@ -240,12 +238,15 @@ class CLIEventRenderer:
         immediately.  ``Live.update()`` is thread-safe (uses threading.Lock
         internally).  Only ``_state_event.set()`` is forwarded to the main
         loop because ``asyncio.Event`` is not cross-thread safe.
+
+        No explicit lock is needed: CPython's GIL protects simple attribute
+        mutations, ``deque`` operations are atomic, and ``Live`` serialises
+        its own rendering via its internal ``_lock``.
         """
-        with self._event_lock:
-            self._process_event(event)
+        self._process_event(event)
 
     def _process_event(self, event: Any) -> None:
-        """Core event dispatch — called from any thread (under _event_lock)."""
+        """Core event dispatch — called from the delivery thread pool."""
         if isinstance(event, _SKIP_ACTIONS) or isinstance(event, _SKIP_OBSERVATIONS):
             return
 
@@ -478,6 +479,11 @@ class CLIEventRenderer:
                 )
             else:
                 self._append_history(Text(f'  📚 Recalled {label}', style='dim blue'))
+            # The next agent step will call the LLM — show activity indicator
+            # so the user doesn't think the agent is stuck.
+            self._ensure_reasoning()
+            self._reasoning.update_action('Thinking…')
+            self.refresh()
             return
 
         if isinstance(obs, StatusObservation):
