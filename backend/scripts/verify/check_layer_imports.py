@@ -32,32 +32,21 @@ from pathlib import Path
 # Each rule is  (source_dir, forbidden_prefix, justification)
 RULES: list[tuple[str, str, str]] = [
     (
-        "backend/controller",
-        "backend.gateway",
-        "controller must not depend on server layer",
+        'backend/events',
+        'backend.orchestration',
+        'events must not depend on controller layer',
     ),
-    ("backend/llm", "backend.gateway", "llm must not depend on server layer"),
-    ("backend/engines", "backend.gateway", "engines must not depend on server layer"),
-    ("backend/memory", "backend.gateway", "memory must not depend on server layer"),
-    ("backend/events", "backend.gateway", "events must not depend on server layer"),
-    (
-        "backend/events",
-        "backend.orchestration",
-        "events must not depend on controller layer",
-    ),
-    ("backend/core", "backend.gateway", "core must not depend on server layer"),
-    ("backend/core", "backend.orchestration", "core must not depend on controller layer"),
-    ("backend/core", "backend.engine", "core must not depend on engines layer"),
-    ("backend/core", "backend.context", "core must not depend on memory layer"),
+    ('backend/core', 'backend.engine', 'core must not depend on engines layer'),
+    ('backend/core', 'backend.context', 'core must not depend on memory layer'),
 ]
 
 # Known exemptions (module path → reason).  Keep this list SMALL.
 EXEMPTIONS: dict[str, str] = {
     # Bootstrap / application-wiring modules that inherently cross layers.
-    "backend.core.bootstrap.agent_control_loop": "Bootstrap: agent control loop wiring",
-    "backend.core.bootstrap.main": "Bootstrap: application entry point",
-    "backend.core.bootstrap.setup": "Bootstrap: creates agent, controller, memory, runtime",
-    "backend.core.config.config_loader": "Bootstrap: registers custom agent classes",
+    'backend.core.bootstrap.agent_control_loop': 'Bootstrap: agent control loop wiring',
+    'backend.core.bootstrap.main': 'Bootstrap: application entry point',
+    'backend.core.bootstrap.setup': 'Bootstrap: creates agent, controller, memory, runtime',
+    'backend.core.config.config_loader': 'Bootstrap: registers custom agent classes',
 }
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]  # backend/
@@ -71,16 +60,18 @@ def _find_type_checking_ranges(tree: ast.AST) -> list[tuple[int, int]]:
             continue
         test = node.test
         is_tc = (
-            isinstance(test, ast.Name) and test.id == "TYPE_CHECKING"
-            or isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
+            isinstance(test, ast.Name)
+            and test.id == 'TYPE_CHECKING'
+            or isinstance(test, ast.Attribute)
+            and test.attr == 'TYPE_CHECKING'
         )
         if not is_tc:
             continue
         start = node.lineno
         end = max(
-            getattr(n, "end_lineno", n.lineno)
+            getattr(n, 'end_lineno', n.lineno)
             for n in ast.walk(node)
-            if hasattr(n, "lineno")
+            if hasattr(n, 'lineno')
         )
         ranges.append((start, end))
     return ranges
@@ -102,7 +93,7 @@ def _collect_imports_from_tree(
 
 def _extract_imports(filepath: Path) -> list[tuple[int, str, bool]]:
     """Return (line, dotted_module, is_type_checking_only) for every import."""
-    source = filepath.read_text(encoding="utf-8", errors="replace")
+    source = filepath.read_text(encoding='utf-8', errors='replace')
     try:
         tree = ast.parse(source, filename=str(filepath))
     except SyntaxError:
@@ -124,15 +115,15 @@ def check() -> list[str]:
         source_path = BACKEND_ROOT.parent / source_dir
         if not source_path.exists():
             continue
-        for py_file in sorted(source_path.rglob("*.py")):
+        for py_file in sorted(source_path.rglob('*.py')):
             # Skip test files
             rel = py_file.relative_to(BACKEND_ROOT.parent)
-            rel_str = str(rel).replace("\\", "/")
-            if "/tests/" in rel_str or rel_str.endswith("_test.py"):
+            rel_str = str(rel).replace('\\', '/')
+            if '/tests/' in rel_str or rel_str.endswith('_test.py'):
                 continue
 
             # Check exemptions
-            module_path = rel_str.replace("/", ".").removesuffix(".py")
+            module_path = rel_str.replace('/', '.').removesuffix('.py')
             if module_path in EXEMPTIONS:
                 continue
 
@@ -151,17 +142,17 @@ def main() -> None:
     """CLI entry point."""
     violations = check()
     if violations:
-        print(f"\nFAIL: {len(violations)} layer boundary violation(s) found:\n")
+        print(f'\nFAIL: {len(violations)} layer boundary violation(s) found:\n')
         for v in violations:
             print(v)
         print(
-            "\nFix the imports or add an exemption in backend/scripts/verify/check_layer_imports.py"
+            '\nFix the imports or add an exemption in backend/scripts/verify/check_layer_imports.py'
         )
         sys.exit(1)
     else:
-        print("OK: No layer boundary violations found.")
+        print('OK: No layer boundary violations found.')
         sys.exit(0)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

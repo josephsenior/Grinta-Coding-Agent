@@ -11,20 +11,14 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from backend.utils.async_utils import run_or_schedule
 
 if TYPE_CHECKING:
+    from backend.core.config import AgentConfig, LLMConfig
+    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.ledger.event import Event
     from backend.orchestration.replay import ReplayManager
     from backend.orchestration.state.state_tracker import StateTracker
-    from backend.core.config import AgentConfig, LLMConfig
-    from backend.ledger.event import Event
-    from backend.security.analyzer import SecurityAnalyzer
-    from backend.gateway.services.conversation_stats import ConversationStats
     from backend.persistence.files import FileStore
+    from backend.security.analyzer import SecurityAnalyzer
 
-from backend.orchestration.agent import Agent
-from backend.orchestration.orchestration_config import OrchestrationConfig, OrchestrationServices
-from backend.orchestration.memory_pressure import MemoryPressureMonitor
-from backend.orchestration.rate_governor import LLMRateGovernor
-from backend.orchestration.state.state import State
-from backend.orchestration.tool_pipeline import ToolInvocationContext
 from backend.core.constants import DEFAULT_PENDING_ACTION_TIMEOUT
 from backend.core.enums import LifecyclePhase
 from backend.core.logger import app_logger as logger
@@ -35,27 +29,36 @@ from backend.ledger.action import (
     MessageAction,
     SystemMessageAction,
 )
+from backend.ledger.action.signal import SignalProgressAction
 from backend.ledger.observation import (
     AgentStateChangedObservation,
     ErrorObservation,
     Observation,
 )
 from backend.ledger.observation_cause import attach_observation_cause
-from backend.ledger.action.signal import SignalProgressAction
+from backend.orchestration.agent import Agent
+from backend.orchestration.memory_pressure import MemoryPressureMonitor
+from backend.orchestration.orchestration_config import (
+    OrchestrationConfig,
+    OrchestrationServices,
+)
+from backend.orchestration.rate_governor import LLMRateGovernor
+from backend.orchestration.state.state import State
+from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 TRAFFIC_CONTROL_REMINDER = (
     "Please click on resume button if you'd like to continue, or start a new task."
 )
-ERROR_ACTION_NOT_EXECUTED_STOPPED_ID = "AGENT_ERROR$ERROR_ACTION_NOT_EXECUTED_STOPPED"
-ERROR_ACTION_NOT_EXECUTED_ERROR_ID = "AGENT_ERROR$ERROR_ACTION_NOT_EXECUTED_ERROR"
+ERROR_ACTION_NOT_EXECUTED_STOPPED_ID = 'AGENT_ERROR$ERROR_ACTION_NOT_EXECUTED_STOPPED'
+ERROR_ACTION_NOT_EXECUTED_ERROR_ID = 'AGENT_ERROR$ERROR_ACTION_NOT_EXECUTED_ERROR'
 ERROR_ACTION_NOT_EXECUTED_STOPPED = (
-    "Stop button pressed. The action has not been executed."
+    'Stop button pressed. The action has not been executed.'
 )
 ERROR_ACTION_NOT_EXECUTED_ERROR = (
-    "The action has not been executed due to a runtime error. "
-    "The runtime system may have crashed and restarted due to resource constraints. "
-    "Any previously established system state, dependencies, or environment variables "
-    "may have been lost."
+    'The action has not been executed due to a runtime error. '
+    'The runtime system may have crashed and restarted due to resource constraints. '
+    'Any previously established system state, dependencies, or environment variables '
+    'may have been lost.'
 )
 
 
@@ -126,28 +129,28 @@ class SessionOrchestrator:
     # ------------------------------------------------------------------
 
     _SERVICE_ALIASES: ClassVar[dict[str, str]] = {
-        "action_service": "action",
-        "pending_action_service": "pending_action",
-        "autonomy_service": "autonomy",
-        "iteration_service": "iteration",
-        "lifecycle_service": "lifecycle",
-        "state_service": "state",
-        "retry_service": "retry",
-        "recovery_service": "recovery",
-        "stuck_service": "stuck",
-        "circuit_breaker_service": "circuit_breaker",
-        "telemetry_service": "telemetry",
-        "observation_service": "observation",
-        "task_validation_service": "task_validation",
+        'action_service': 'action',
+        'pending_action_service': 'pending_action',
+        'autonomy_service': 'autonomy',
+        'iteration_service': 'iteration',
+        'lifecycle_service': 'lifecycle',
+        'state_service': 'state',
+        'retry_service': 'retry',
+        'recovery_service': 'recovery',
+        'stuck_service': 'stuck',
+        'circuit_breaker_service': 'circuit_breaker',
+        'telemetry_service': 'telemetry',
+        'observation_service': 'observation',
+        'task_validation_service': 'task_validation',
         # Attributes whose names already match the OrchestrationServices field:
-        "iteration_guard": "iteration_guard",
-        "step_guard": "step_guard",
-        "step_prerequisites": "step_prerequisites",
-        "budget_guard": "budget_guard",
-        "exception_handler": "exception_handler",
-        "event_router": "event_router",
-        "step_decision": "step_decision",
-        "action_execution": "action_execution",
+        'iteration_guard': 'iteration_guard',
+        'step_guard': 'step_guard',
+        'step_prerequisites': 'step_prerequisites',
+        'budget_guard': 'budget_guard',
+        'exception_handler': 'exception_handler',
+        'event_router': 'event_router',
+        'step_decision': 'step_decision',
+        'action_execution': 'action_execution',
     }
 
     def __getattr__(self, name: str) -> Any:
@@ -156,11 +159,11 @@ class SessionOrchestrator:
         if svc_attr is not None:
             # ``self.services`` is set in __init__; access via __dict__
             # to avoid infinite recursion if called before __init__ finishes.
-            services = self.__dict__.get("services")
+            services = self.__dict__.get('services')
             if services is not None:
                 return getattr(services, svc_attr)
         raise AttributeError(
-            f"{type(self).__name__!r} object has no attribute {name!r}"
+            f'{type(self).__name__!r} object has no attribute {name!r}'
         )
 
     @property
@@ -191,7 +194,9 @@ class SessionOrchestrator:
         # even when called from EventStream's thread-pool dispatcher
         # (which runs on throw-away event loops).
         try:
-            self._main_loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
+            self._main_loop: asyncio.AbstractEventLoop | None = (
+                asyncio.get_running_loop()
+            )
         except RuntimeError:
             self._main_loop = None
 
@@ -258,17 +263,17 @@ class SessionOrchestrator:
         self, action: Action, ctx: ToolInvocationContext
     ) -> None:
         """Register an invocation context before execution."""
-        if hasattr(self, "_action_contexts_by_object"):
+        if hasattr(self, '_action_contexts_by_object'):
             self._action_contexts_by_object[id(action)] = ctx
 
     def _bind_action_context(self, action: Action, ctx: ToolInvocationContext) -> None:
         """Bind a context to an action's event ID after emission."""
-        if not hasattr(self, "_action_contexts_by_event_id"):
+        if not hasattr(self, '_action_contexts_by_event_id'):
             return
         ctx.action_id = action.id
         if ctx.action_id is not None:
             self._action_contexts_by_event_id[ctx.action_id] = ctx
-        if hasattr(self, "_action_contexts_by_object"):
+        if hasattr(self, '_action_contexts_by_object'):
             with contextlib.suppress(KeyError):
                 self._action_contexts_by_object.pop(id(action))
 
@@ -279,7 +284,7 @@ class SessionOrchestrator:
         action: Action | None = None,
     ) -> None:
         """Remove context bookkeeping entries."""
-        if hasattr(self, "_action_contexts_by_object"):
+        if hasattr(self, '_action_contexts_by_object'):
             if action is not None:
                 with contextlib.suppress(KeyError):
                     self._action_contexts_by_object.pop(id(action))
@@ -292,7 +297,7 @@ class SessionOrchestrator:
                 for key in keys_to_remove:
                     with contextlib.suppress(KeyError):
                         self._action_contexts_by_object.pop(key)
-        if hasattr(self, "_action_contexts_by_event_id") and ctx.action_id is not None:
+        if hasattr(self, '_action_contexts_by_event_id') and ctx.action_id is not None:
             with contextlib.suppress(KeyError):
                 self._action_contexts_by_event_id.pop(ctx.action_id)
 
@@ -310,11 +315,11 @@ class SessionOrchestrator:
         system_message = self.agent.get_system_message()
         if system_message and system_message.content:
             preview = (
-                f"{system_message.content[:50]}..."
+                f'{system_message.content[:50]}...'
                 if len(system_message.content) > 50
                 else system_message.content
             )
-            logger.debug("System message: %s", preview)
+            logger.debug('System message: %s', preview)
             self.event_stream.add_event(system_message, EventSource.AGENT)
 
     @property
@@ -339,7 +344,7 @@ class SessionOrchestrator:
             await self.set_agent_state_to(AgentState.STOPPED)
         self.state_tracker.close(self.event_stream)
         self.event_stream.unsubscribe(
-            EventStreamSubscriber.AGENT_CONTROLLER, self.id or ""
+            EventStreamSubscriber.AGENT_CONTROLLER, self.id or ''
         )
         await self.services.retry.shutdown()
         self._lifecycle = LifecyclePhase.CLOSED
@@ -353,10 +358,10 @@ class SessionOrchestrator:
             extra (dict | None, optional): Additional fields to log. Includes session_id by default.
 
         """
-        message = f"[Agent Controller {self.id}] {message}"
+        message = f'[Agent Controller {self.id}] {message}'
         if extra is None:
             extra = {}
-        extra_merged = {"session_id": self.id, **extra}
+        extra_merged = {'session_id': self.id, **extra}
         getattr(logger, level)(message, extra=extra_merged, stacklevel=2)
 
     async def _react_to_exception(self, e: Exception) -> None:
@@ -394,9 +399,10 @@ class SessionOrchestrator:
             self._step_pending = True
             return
         from backend.utils.async_utils import create_tracked_task
+
         self._step_task = create_tracked_task(
             self._step_with_exception_handling(),
-            name="agent-step",
+            name='agent-step',
         )
 
     async def _step_with_exception_handling(self) -> None:
@@ -440,15 +446,15 @@ class SessionOrchestrator:
 
     def _clear_action_contexts(self) -> None:
         """Clear action context caches."""
-        if hasattr(self, "_action_contexts_by_object"):
+        if hasattr(self, '_action_contexts_by_object'):
             self._action_contexts_by_object.clear()
-        if hasattr(self, "_action_contexts_by_event_id"):
+        if hasattr(self, '_action_contexts_by_event_id'):
             self._action_contexts_by_event_id.clear()
 
     def _emit_pending_action_error_if_unmatched(self) -> None:
         """Emit ErrorObservation if pending action has no matching observation."""
         if not self._pending_action or not hasattr(
-            self._pending_action, "tool_call_metadata"
+            self._pending_action, 'tool_call_metadata'
         ):
             return
         meta = self._pending_action.tool_call_metadata
@@ -466,35 +472,35 @@ class SessionOrchestrator:
         obs = ErrorObservation(content=content, error_id=err_id)
         obs.tool_call_metadata = meta
         attach_observation_cause(
-            obs, self._pending_action, context="agent_controller.pending_unmatched"
+            obs, self._pending_action, context='agent_controller.pending_unmatched'
         )
         self.event_stream.add_event(obs, EventSource.AGENT)
 
     def _emit_dropped_agent_actions(self) -> None:
         """Emit ErrorObservations for agent-queued actions dropped by reset."""
-        agent_pending = getattr(self.agent, "pending_actions", None)
+        agent_pending = getattr(self.agent, 'pending_actions', None)
         if not agent_pending:
             return
         for dropped in list(agent_pending):
-            meta = getattr(dropped, "tool_call_metadata", None)
+            meta = getattr(dropped, 'tool_call_metadata', None)
             if not meta:
                 continue
             obs = ErrorObservation(
                 content=(
-                    "Action dropped: agent was reset before this tool call "
-                    "could execute. Re-run this action if still needed."
+                    'Action dropped: agent was reset before this tool call '
+                    'could execute. Re-run this action if still needed.'
                 ),
                 error_id=ERROR_ACTION_NOT_EXECUTED_ERROR_ID,
             )
             obs.tool_call_metadata = meta
             attach_observation_cause(
-                obs, dropped, context="agent_controller.dropped_action"
+                obs, dropped, context='agent_controller.dropped_action'
             )
             self.event_stream.add_event(obs, EventSource.AGENT)
 
     async def stop(self) -> None:
         """Stop the agent and perform a hard kill on running processes."""
-        logger.info("Stopping agent...")
+        logger.info('Stopping agent...')
         # 2. Update state to STOPPED
         await self.set_agent_state_to(AgentState.STOPPED)
 
@@ -519,9 +525,9 @@ class SessionOrchestrator:
         local_step = self.state.get_local_step()
         global_step = self.state.iteration_flag.current_value
         self.log(
-            "debug",
-            f"LOCAL STEP {local_step} GLOBAL STEP {global_step}",
-            extra={"msg_type": "STEP"},
+            'debug',
+            f'LOCAL STEP {local_step} GLOBAL STEP {global_step}',
+            extra={'msg_type': 'STEP'},
         )
 
     async def _step(self) -> None:
@@ -591,13 +597,13 @@ class SessionOrchestrator:
         # This prevents getting stuck if a previous error has been resolved
         if self.services.retry.retry_count > 0:
             logger.debug(
-                "Resetting retry count from %d to 0 after successful execution",
+                'Resetting retry count from %d to 0 after successful execution',
                 self.services.retry.retry_count,
             )
             self.services.retry.reset_retry_metrics()
 
         if isinstance(action, SignalProgressAction):
-            if hasattr(self.services.circuit_breaker, "record_progress_signal"):
+            if hasattr(self.services.circuit_breaker, 'record_progress_signal'):
                 self.services.circuit_breaker.record_progress_signal(
                     action.progress_note
                 )
@@ -643,16 +649,16 @@ class SessionOrchestrator:
 
     # Action types that are safe to run concurrently (pure reads, no side effects)
     _PARALLEL_SAFE_ACTION_TYPES: ClassVar[tuple[str, ...]] = (
-        "read",  # FileReadAction
-        "think",  # AgentThinkAction (non-runnable in runtime)
-        "search_code",  # search_code tool result
-        "explore_tree",  # explore_tree_structure
-        "get_entity",  # get_entity_contents
+        'read',  # FileReadAction
+        'think',  # AgentThinkAction (non-runnable in runtime)
+        'search_code',  # search_code tool result
+        'explore_tree',  # explore_tree_structure
+        'get_entity',  # get_entity_contents
     )
 
     def _is_parallel_safe(self, action: Any) -> bool:
         """Return True if action type is safe to run concurrently with other reads."""
-        action_type = getattr(action, "action", "") or ""
+        action_type = getattr(action, 'action', '') or ''
         return any(action_type.startswith(t) for t in self._PARALLEL_SAFE_ACTION_TYPES)
 
     async def _try_parallel_read_batch(self) -> bool:
@@ -665,7 +671,7 @@ class SessionOrchestrator:
         Returns True if batch was executed (caller should skip the serial drain),
         False if any action is not parallel-safe (fall through to serial execution).
         """
-        pending = getattr(self.agent, "pending_actions", None)
+        pending = getattr(self.agent, 'pending_actions', None)
         if not pending or len(pending) < 2:
             return False
 
@@ -677,7 +683,7 @@ class SessionOrchestrator:
         pending.clear()
 
         logger.debug(
-            "[P2-B] Parallel read batch: executing %d read-only actions concurrently",
+            '[P2-B] Parallel read batch: executing %d read-only actions concurrently',
             len(batch),
         )
         try:
@@ -686,7 +692,7 @@ class SessionOrchestrator:
                 return_exceptions=True,
             )
         except Exception as exc:
-            logger.warning("[P2-B] Parallel batch encountered error: %s", exc)
+            logger.warning('[P2-B] Parallel batch encountered error: %s', exc)
         await self._handle_post_execution()
         return True
 
@@ -699,34 +705,38 @@ class SessionOrchestrator:
         """
         if self._pending_action:
             return False
-        pending = getattr(self.agent, "pending_actions", None)
+        pending = getattr(self.agent, 'pending_actions', None)
         return bool(pending)
 
     async def _handle_post_execution(self) -> None:
         """Handle post-execution tasks like rate limits and memory pressure."""
         # Check rate limits after action execution (which likely consumed tokens)
-        if hasattr(self.state, "metrics"):
+        if hasattr(self.state, 'metrics'):
             await self.rate_governor.check_and_wait(
                 self.state.metrics.accumulated_token_usage
             )
 
         # Feed LLM latency for adaptive backoff
-        llm_lat = getattr(self.agent, "_last_llm_latency", None)
+        llm_lat = getattr(self.agent, '_last_llm_latency', None)
         if llm_lat and llm_lat > 0:
             self.rate_governor.record_llm_latency(llm_lat)
 
         # Proactive condensation on memory pressure (deferred during batch drain)
-        if not self._draining_batch and self.memory_pressure.should_condense():
-            level = "CRITICAL" if self.memory_pressure.is_critical() else "WARNING"
+        history = getattr(self.state, 'history', None)
+        history_events = len(history) if history is not None else None
+        if not self._draining_batch and self.memory_pressure.should_condense(
+            history_events=history_events
+        ):
+            level = 'CRITICAL' if self.memory_pressure.is_critical() else 'WARNING'
             logger.warning(
-                "Memory pressure %s (RSS=%.0f MB) — signalling condensation",
+                'Memory pressure %s (RSS=%.0f MB) — signalling condensation',
                 level,
                 self.memory_pressure._last_rss_mb,
             )
             self.memory_pressure.record_condensation()
             # Set a metadata flag the orchestrator can check during next step()
-            if hasattr(self.state, "turn_signals"):
-                self.state.set_memory_pressure(level, source="SessionOrchestrator")
+            if hasattr(self.state, 'turn_signals'):
+                self.state.set_memory_pressure(level, source='SessionOrchestrator')
 
     async def _run_control_flags_safely(self) -> bool:
         """Run control flags with exception handling."""
@@ -742,7 +752,7 @@ class SessionOrchestrator:
         pending_service = self.services.pending_action
         if pending_service:
             return pending_service.get()
-        service = getattr(self, "action_service", None)
+        service = getattr(self, 'action_service', None)
         if service:
             return service.get_pending_action()
         return None
@@ -753,7 +763,7 @@ class SessionOrchestrator:
         if pending_service:
             pending_service.set(action)
             return
-        service = getattr(self, "action_service", None)
+        service = getattr(self, 'action_service', None)
         if service:
             service.set_pending_action(action)
 
@@ -785,7 +795,7 @@ class SessionOrchestrator:
 
         """
         self.state_tracker.set_initial_state(
-            self.id or "",
+            self.id or '',
             state,
             conversation_stats,
             max_iterations,
@@ -808,7 +818,7 @@ class SessionOrchestrator:
         """
         if self._lifecycle != LifecyclePhase.CLOSED:
             raise RuntimeError(
-                f"get_transcript() requires the controller to be closed. Current phase: {self._lifecycle.value}"
+                f'get_transcript() requires the controller to be closed. Current phase: {self._lifecycle.value}'
             )
         return self.state_tracker.get_transcript(include_screenshots)
 
@@ -828,26 +838,26 @@ class SessionOrchestrator:
             String representation including ID, agent state, and pending action info
 
         """
-        pending_action_info = "<none>"
-        action_service = getattr(self, "action_service", None)
+        pending_action_info = '<none>'
+        action_service = getattr(self, 'action_service', None)
         if action_service:
             info = action_service.get_pending_action_info()
             if info is not None:
                 action, timestamp = info
-                action_id = getattr(action, "id", "unknown")
+                action_id = getattr(action, 'id', 'unknown')
                 action_type = type(action).__name__
                 elapsed_time = time.time() - timestamp
                 pending_action_info = (
-                    f"{action_type}(id={action_id}, elapsed={elapsed_time:.2f}s)"
+                    f'{action_type}(id={action_id}, elapsed={elapsed_time:.2f}s)'
                 )
-        controller_id = getattr(self, "id", "<uninitialized>")
-        agent_obj = getattr(self, "agent", "<uninitialized>")
-        event_stream = getattr(self, "event_stream", "<uninitialized>")
-        state_obj = getattr(self, "state", "<uninitialized>")
+        controller_id = getattr(self, 'id', '<uninitialized>')
+        agent_obj = getattr(self, 'agent', '<uninitialized>')
+        event_stream = getattr(self, 'event_stream', '<uninitialized>')
+        state_obj = getattr(self, 'state', '<uninitialized>')
         return (
-            f"SessionOrchestrator(id={controller_id}, agent={agent_obj!r}, "
-            f"event_stream={event_stream!r}, state={state_obj!r}, "
-            f"_pending_action={pending_action_info})"
+            f'SessionOrchestrator(id={controller_id}, agent={agent_obj!r}, '
+            f'event_stream={event_stream!r}, state={state_obj!r}, '
+            f'_pending_action={pending_action_info})'
         )
 
     def _is_awaiting_observation(self) -> bool:
@@ -917,9 +927,11 @@ class SessionOrchestrator:
         from backend.validation.task_validator import Task
 
         description, meta = parse_task_from_user_message(first_msg.content)
-        raw_expected = meta.get("expected_output_files")
+        raw_expected = meta.get('expected_output_files')
         expected_files: list[str] | None = None
-        if isinstance(raw_expected, list) and all(isinstance(x, str) for x in raw_expected):
+        if isinstance(raw_expected, list) and all(
+            isinstance(x, str) for x in raw_expected
+        ):
             expected_files = list(raw_expected)
         return Task(
             description=description,
@@ -950,12 +962,12 @@ class SessionOrchestrator:
         Uses the audit_callback registered during session creation (injected
         by the server layer) so controller never imports server code.
         """
-        audit_fn = getattr(self, "_audit_callback", None)
+        audit_fn = getattr(self, '_audit_callback', None)
         if audit_fn is None or not callable(audit_fn):
             return
         try:
             task = self._get_initial_task()
-            task_name = task.description[:100] if task else "unknown_task"
+            task_name = task.description[:100] if task else 'unknown_task'
 
             stats = self.state.metrics
             tokens = (
@@ -974,4 +986,4 @@ class SessionOrchestrator:
                 cost=cost,
             )
         except Exception as e:
-            logger.debug("Audit log failed: %s", e)
+            logger.debug('Audit log failed: %s', e)

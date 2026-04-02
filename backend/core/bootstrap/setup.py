@@ -16,36 +16,36 @@ import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.orchestration import SessionOrchestrator
-from backend.orchestration.agent import Agent
-from backend.orchestration.state.state import State
+from backend.context.agent_memory import Memory
 from backend.core.constants import GENERAL_TIMEOUT
 from backend.core.errors import AgentNotRegisteredError
 from backend.core.logger import app_logger as logger
-from backend.ledger import EventStream
-from backend.context.agent_memory import Memory
-from backend.inference.llm_registry import LLMRegistry
 from backend.execution.plugins import PluginRequirement
+from backend.inference.llm_registry import LLMRegistry
+from backend.ledger import EventStream
+from backend.orchestration import SessionOrchestrator
+from backend.orchestration.agent import Agent
+from backend.orchestration.state.state import State
 from backend.persistence import get_file_store
 from backend.persistence.data_models.user_secrets import UserSecrets
 from backend.utils.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig, AppConfig
-    from backend.ledger.event import Event
-    from backend.playbooks.engine.playbook import BasePlaybook
     from backend.core.provider_types import (
-        ProviderTokenType,
         ProviderToken,
+        ProviderTokenType,
         ProviderType,
     )
     from backend.execution.base import Runtime
-    from backend.gateway.services.conversation_stats import ConversationStats
+    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.ledger.event import Event
+    from backend.playbooks.engine.playbook import BasePlaybook
 
 
 def _instantiate_runtime(runtime_cls: type[object], **kwargs: Any) -> Runtime:
     """Instantiate a runtime class and return it as Runtime protocol type."""
-    return cast("Runtime", runtime_cls(**kwargs))
+    return cast('Runtime', runtime_cls(**kwargs))
 
 
 def _resolve_agent_config(
@@ -55,7 +55,7 @@ def _resolve_agent_config(
 ) -> AgentConfig | None:
     """Resolve AgentConfig from agent or config + agent_cls_name."""
     if agent is not None:
-        return getattr(agent, "config", None)
+        return getattr(agent, 'config', None)
     if config is not None and agent_cls_name:
         try:
             return config.get_agent_config(agent_cls_name)
@@ -70,14 +70,14 @@ def _apply_agent_disabled_plugins(
     """Apply agent config disabled_plugins denylist."""
     if agent_config is None:
         return filtered
-    disabled = set(getattr(agent_config, "disabled_plugins", None) or [])
+    disabled = set(getattr(agent_config, 'disabled_plugins', None) or [])
     if not disabled:
         return filtered
     result = [p for p in filtered if p.name not in disabled]
     if len(result) < len(filtered):
         logger.info(
-            "Plugins disabled by agent config: %s",
-            ", ".join(sorted(disabled)),
+            'Plugins disabled by agent config: %s',
+            ', '.join(sorted(disabled)),
         )
     return result
 
@@ -88,7 +88,9 @@ def filter_plugins_by_config(
     config: AppConfig | None = None,
     agent_cls_name: str | None = None,
 ) -> list[PluginRequirement]:
-    """Filter plugins through two layers:
+    """Filter plugins through two layers using allowlists.
+
+    Process plugins with an environment allowlist and agent denylist.
 
     1. **Environment allowlist** — delegates to
        ``backend.execution.plugins.filter_plugins_by_config`` which honours the
@@ -170,12 +172,12 @@ def create_runtime(
 
     resolved_ws = project_root
     if resolved_ws is None:
-        wb = (getattr(config, "project_root", None) or "").strip()
+        wb = (getattr(config, 'project_root', None) or '').strip()
         if wb:
             resolved_ws = str(Path(wb).expanduser().resolve())
 
     runtime_cls = get_runtime_cls(config.runtime)
-    logger.debug("Initializing runtime: %s", runtime_cls.__name__)
+    logger.debug('Initializing runtime: %s', runtime_cls.__name__)
     runtime = _instantiate_runtime(
         runtime_cls,
         config=config,
@@ -190,7 +192,7 @@ def create_runtime(
         project_root=resolved_ws,
     )
     logger.debug(
-        "Runtime created with plugins: %s", [plugin.name for plugin in runtime.plugins]
+        'Runtime created with plugins: %s', [plugin.name for plugin in runtime.plugins]
     )
     return runtime
 
@@ -219,8 +221,9 @@ def initialize_repository_for_runtime(
     selected_repository: str | None = None,
     selected_branch: str | None = None,
 ) -> str | None:
-    """Initialize the repository for the runtime by cloning or initializing it,
-    running setup scripts, and setting up git hooks if present.
+    """Initialize the repository for the runtime.
+
+    Clones or initializes the repo, runs setup scripts, and sets up git hooks if present.
 
     Args:
         runtime: The runtime to initialize the repository for.
@@ -234,7 +237,7 @@ def initialize_repository_for_runtime(
     """
     if not immutable_provider_tokens:
         immutable_provider_tokens = get_provider_tokens()
-    logger.debug("Selected repository %s.", selected_repository)
+    logger.debug('Selected repository %s.', selected_repository)
     repo_directory = call_async_from_sync(
         runtime.clone_or_init_repo,
         GENERAL_TIMEOUT,
@@ -298,11 +301,11 @@ def _ensure_agent_class_available(agent_name: str) -> None:
     except AgentNotRegisteredError:
         pass
 
-    for module_name in ("backend.engine", "app.engine"):
+    for module_name in ('backend.engine', 'app.engine'):
         try:
             importlib.import_module(module_name)
         except Exception as exc:  # pragma: no cover - defensive logging
-            logger.debug("Failed to auto-import %s: %s", module_name, exc)
+            logger.debug('Failed to auto-import %s: %s', module_name, exc)
     try:
         Agent.get_cls(agent_name)
     except AgentNotRegisteredError as exc:
@@ -356,34 +359,26 @@ def create_controller(
     """
     event_stream = runtime.event_stream
     if event_stream is None:
-        raise RuntimeError("Runtime does not have an initialized event stream")
+        raise RuntimeError('Runtime does not have an initialized event stream')
     initial_state = None
     try:
         logger.debug(
-            "Trying to restore agent state from session %s if available",
+            'Trying to restore agent state from session %s if available',
             event_stream.sid,
         )
         initial_state = State.restore_from_session(
             event_stream.sid, event_stream.file_store
         )
-        provenance = getattr(initial_state, "restore_provenance", None)
+        provenance = getattr(initial_state, 'restore_provenance', None)
         if provenance is not None:
-            from backend.gateway.app_state import get_app_state
-
-            get_app_state().record_state_restore(
-                event_stream.sid,
-                source=provenance.source,
-                path=provenance.path,
-                primary_error=provenance.primary_error,
-            )
             logger.info(
-                "Restored controller state for %s from %s (%s)",
+                'Restored controller state for %s from %s (%s)',
                 event_stream.sid,
                 provenance.source,
                 provenance.path,
             )
     except Exception as e:
-        logger.debug("Cannot restore agent state: %s", e)
+        logger.debug('Cannot restore agent state: %s', e)
     from backend.orchestration.orchestration_config import OrchestrationConfig
 
     controller = SessionOrchestrator(
@@ -414,8 +409,8 @@ def generate_sid(config: AppConfig, session_name: str | None = None) -> str:
     # Use a simple hash of the session name
     hash_str = hashlib.sha256(session_name.encode()).hexdigest()
     if len(session_name) > 16:
-        session_id = f"{session_name[:16]}-{hash_str[:15]}"
+        session_id = f'{session_name[:16]}-{hash_str[:15]}'
     else:
         remaining_chars = 32 - len(session_name) - 1
-        session_id = f"{session_name}-{hash_str[:remaining_chars]}"
+        session_id = f'{session_name}-{hash_str[:remaining_chars]}'
     return session_id[:32]

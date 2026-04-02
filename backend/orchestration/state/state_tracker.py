@@ -2,11 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from backend.orchestration.state.control_flags import (
-    BudgetControlFlag,
-    IterationControlFlag,
-)
-from backend.orchestration.state.state import State
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import ChangeAgentStateAction
 from backend.ledger.action.empty import NullAction
@@ -14,6 +9,11 @@ from backend.ledger.event_filter import EventFilter
 from backend.ledger.observation.agent import AgentStateChangedObservation
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.serialization.event import event_to_trajectory
+from backend.orchestration.state.control_flags import (
+    BudgetControlFlag,
+    IterationControlFlag,
+)
+from backend.orchestration.state.state import State
 
 # Maximum number of events retained in state.history at runtime.
 # The compactor / View system controls what the LLM actually sees;
@@ -26,9 +26,9 @@ MAX_HISTORY_EVENTS: int = 10_000
 MAX_HISTORY_BYTES: int = 200 * 1024 * 1024  # 200 MB
 
 if TYPE_CHECKING:
+    from backend.orchestration.conversation_stats import ConversationStats
     from backend.ledger.event import Event
     from backend.ledger.stream import EventStream
-    from backend.gateway.services.conversation_stats import ConversationStats
     from backend.persistence.files import FileStore
 
 
@@ -92,7 +92,7 @@ class StateTracker:
         """
         if state is None:
             self.state = State(
-                session_id=session_id.removesuffix("-delegate"),
+                session_id=session_id.removesuffix('-delegate'),
                 user_id=self.user_id,
                 inputs={},
                 conversation_stats=conversation_stats,
@@ -114,7 +114,7 @@ class StateTracker:
             )
             self.state.start_id = 0
             logger.info(
-                "SessionOrchestrator %s - created new state. start_id: %s",
+                'SessionOrchestrator %s - created new state. start_id: %s',
                 session_id,
                 self.state.start_id,
             )
@@ -155,7 +155,7 @@ class StateTracker:
         """Validate the history range and set empty history if invalid."""
         if start_id > end_id + 1:
             logger.warning(
-                "start_id %s is greater than end_id + 1 (%s). History will be empty.",
+                'start_id %s is greater than end_id + 1 (%s). History will be empty.',
                 start_id,
                 end_id + 1,
             )
@@ -227,22 +227,22 @@ class StateTracker:
         """Trim history if count or estimated byte-size caps are exceeded."""
         history = self.state.history
         need_trim = False
-        reason = ""
+        reason = ''
 
         if len(history) > MAX_HISTORY_EVENTS:
             need_trim = True
-            reason = f"count {len(history)} > {MAX_HISTORY_EVENTS}"
+            reason = f'count {len(history)} > {MAX_HISTORY_EVENTS}'
         elif len(history) > 100:  # only estimate when list is non-trivial
             estimated_bytes = self._estimate_history_bytes(history)
             if estimated_bytes > MAX_HISTORY_BYTES:
                 need_trim = True
-                reason = f"estimated size {estimated_bytes // (1024 * 1024)}MB > {MAX_HISTORY_BYTES // (1024 * 1024)}MB"
+                reason = f'estimated size {estimated_bytes // (1024 * 1024)}MB > {MAX_HISTORY_BYTES // (1024 * 1024)}MB'
 
         if need_trim:
             trim_count = max(len(history) // 4, 1)
             self.state.history = history[trim_count:]
             logger.debug(
-                "Trimmed %d oldest events from state.history (%s, now %d)",
+                'Trimmed %d oldest events from state.history (%s, now %d)',
                 trim_count,
                 reason,
                 len(self.state.history),
@@ -267,7 +267,7 @@ class StateTracker:
             evt = history[i]
             size = sys.getsizeof(evt)
             # Also count large string fields if present
-            for attr in ("content", "message", "output", "text"):
+            for attr in ('content', 'message', 'output', 'text'):
                 val = getattr(evt, attr, None)
                 if isinstance(val, str):
                     size += len(val)

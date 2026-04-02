@@ -8,12 +8,16 @@ from typing import Literal
 
 from backend.core.config.config_loader import load_app_config
 from backend.core.logger import app_logger as logger
-from backend.gateway.config.server_config import ServerConfig
-from backend.gateway.user_auth import get_current_user_id
+from backend.core.auth import get_current_user_id
 from backend.persistence.conversation.conversation_store import ConversationStore
 from backend.persistence.data_models.conversation_metadata import ConversationMetadata
 from backend.utils.conversation_summary import get_default_conversation_title
 from backend.utils.import_utils import get_impl
+
+_DEFAULT_CONVERSATION_STORE_CLASS = os.environ.get(
+    'CONVERSATION_STORE_CLASS',
+    'backend.persistence.conversation.file_conversation_store.FileConversationStore',
+)
 
 
 class ConversationAccessDenied(Exception):
@@ -35,20 +39,20 @@ class ConversationValidator:
     fully-qualified class name to replace this implementation entirely.
     """
 
-    def __init__(self, mode: Literal["permissive", "strict"] | None = None) -> None:
+    def __init__(self, mode: Literal['permissive', 'strict'] | None = None) -> None:
         if mode is not None:
             self._mode = mode
         else:
             # Env-var override > config value > default
-            env_mode = os.environ.get("APP_VALIDATION_MODE")
-            if env_mode in ("permissive", "strict"):
+            env_mode = os.environ.get('APP_VALIDATION_MODE')
+            if env_mode in ('permissive', 'strict'):
                 self._mode = env_mode  # type: ignore[assignment]
             else:
                 try:
                     config = load_app_config()
                     self._mode = config.security.validation_mode
                 except Exception:
-                    self._mode = "permissive"
+                    self._mode = 'permissive'
 
     # ------------------------------------------------------------------
     # Public API
@@ -80,7 +84,7 @@ class ConversationValidator:
         """
         user_id: str | None = self._extract_user_id(authorization_header)
 
-        if self._mode == "strict":
+        if self._mode == 'strict':
             return await self._validate_strict(conversation_id, user_id)
 
         # Permissive: when the socket is anonymous, use the same default user id as
@@ -101,13 +105,12 @@ class ConversationValidator:
     ) -> str | None:
         if user_id is None:
             raise ConversationAccessDenied(
-                "Anonymous access is not allowed in strict validation mode."
+                'Anonymous access is not allowed in strict validation mode.'
             )
 
         config = load_app_config()
-        server_config = ServerConfig()
         store_cls: type[ConversationStore] = get_impl(
-            ConversationStore, server_config.conversation_store_class
+            ConversationStore, _DEFAULT_CONVERSATION_STORE_CLASS
         )
         store = await store_cls.get_instance(config, user_id)
 
@@ -119,7 +122,7 @@ class ConversationValidator:
 
         if metadata.user_id is not None and metadata.user_id != user_id:
             raise ConversationAccessDenied(
-                f"User {user_id} does not own conversation {conversation_id}."
+                f'User {user_id} does not own conversation {conversation_id}.'
             )
         return user_id
 
@@ -139,10 +142,9 @@ class ConversationValidator:
         self, conversation_id: str, user_id: str | None
     ) -> ConversationMetadata:
         config = load_app_config()
-        server_config = ServerConfig()
         conversation_store_class: type[ConversationStore] = get_impl(
             ConversationStore,
-            server_config.conversation_store_class,
+            _DEFAULT_CONVERSATION_STORE_CLASS,
         )
         conversation_store = await conversation_store_class.get_instance(
             config, user_id
@@ -151,9 +153,9 @@ class ConversationValidator:
             metadata = await conversation_store.get_metadata(conversation_id)
         except FileNotFoundError:
             logger.info(
-                "Creating new conversation metadata for %s",
+                'Creating new conversation metadata for %s',
                 conversation_id,
-                extra={"session_id": conversation_id},
+                extra={'session_id': conversation_id},
             )
             metadata = await self._create_metadata(
                 conversation_store, conversation_id, user_id
@@ -184,8 +186,8 @@ def create_conversation_validator() -> ConversationValidator:
         ConversationValidator instance (default or custom implementation)
     """
     conversation_validator_cls = os.environ.get(
-        "APP_CONVERSATION_VALIDATOR_CLS",
-        "backend.persistence.conversation.conversation_validator.ConversationValidator",
+        'APP_CONVERSATION_VALIDATOR_CLS',
+        'backend.persistence.conversation.conversation_validator.ConversationValidator',
     )
     ConversationValidatorImpl = get_impl(
         ConversationValidator, conversation_validator_cls

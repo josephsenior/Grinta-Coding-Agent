@@ -6,18 +6,20 @@ sizes within the repository guideline (~400 LOC).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.core.config import AgentConfig, LLMConfig
+    from backend.orchestration.conversation_stats import ConversationStats
     from backend.ledger.event import Event
-    from backend.security.analyzer import SecurityAnalyzer
-    from backend.gateway.services.conversation_stats import ConversationStats
+    from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.persistence.files import FileStore
+    from backend.security.analyzer import SecurityAnalyzer
 
+from backend.core.constants import DEFAULT_PENDING_ACTION_TIMEOUT
+from backend.ledger import EventStream
 from backend.orchestration.agent import Agent
 from backend.orchestration.services import (
     ActionExecutionService,
@@ -26,7 +28,6 @@ from backend.orchestration.services import (
     BudgetGuardService,
     CircuitBreakerService,
     ConfirmationService,
-    OrchestrationContext,
     EventRouterService,
     ExceptionHandlerService,
     IterationGuardService,
@@ -34,6 +35,7 @@ from backend.orchestration.services import (
     LifecycleService,
     MetricsService,
     ObservationService,
+    OrchestrationContext,
     PendingActionService,
     RecoveryService,
     RetryService,
@@ -47,8 +49,6 @@ from backend.orchestration.services import (
     TelemetryService,
 )
 from backend.orchestration.state.state import State
-from backend.core.constants import DEFAULT_PENDING_ACTION_TIMEOUT
-from backend.ledger import EventStream
 
 
 @dataclass

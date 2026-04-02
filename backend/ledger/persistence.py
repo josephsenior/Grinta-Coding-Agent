@@ -1,4 +1,4 @@
-﻿"""Event persistence with WAL crash-recovery and optional SQLite accelerator.
+"""Event persistence with WAL crash-recovery and optional SQLite accelerator.
 
 Encapsulates file-based event writing, write-ahead log markers, cache page
 management, and the optional durable async writer.  Used as a composition
@@ -12,8 +12,8 @@ import time
 from collections import deque
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from backend.gateway.adapters import json
 from backend.core.logger import app_logger as logger
+from backend.core.io_adapters import json
 from backend.ledger.durable_writer import DurableEventWriter, PersistedEvent
 from backend.persistence.locations import get_conversation_events_dir
 
@@ -45,23 +45,23 @@ class EventPersistence:
     """
 
     _CRITICAL_ACTIONS: ClassVar[set[str]] = {
-        "change_agent_state",
-        "finish",
-        "reject",
+        'change_agent_state',
+        'finish',
+        'reject',
     }
     _CRITICAL_OBSERVATIONS: ClassVar[set[str]] = {
-        "error",
-        "agent_state_changed",
-        "user_rejected",
+        'error',
+        'agent_state_changed',
+        'user_rejected',
     }
 
     @classmethod
     def is_critical_event(cls, event: Any) -> bool:
         """Check whether an Event instance represents a critical control/error event."""
-        action_name = getattr(event, "action", None)
+        action_name = getattr(event, 'action', None)
         if isinstance(action_name, str):
             return action_name in cls._CRITICAL_ACTIONS
-        observation_name = getattr(event, "observation", None)
+        observation_name = getattr(event, 'observation', None)
         if isinstance(observation_name, str):
             return observation_name in cls._CRITICAL_OBSERVATIONS
         return False
@@ -90,10 +90,10 @@ class EventPersistence:
             else deque(maxlen=500)
         )
         self.stats: dict[str, int] = {
-            "persist_failures": 0,
-            "cache_write_failures": 0,
-            "critical_sync_persistence": 0,
-            "durable_enqueue_failures": 0,
+            'persist_failures': 0,
+            'cache_write_failures': 0,
+            'critical_sync_persistence': 0,
+            'durable_enqueue_failures': 0,
         }
         self._last_confirmed_event_id: int | None = None
         self._last_confirmed_critical_event_id: int | None = None
@@ -103,10 +103,10 @@ class EventPersistence:
 
         # Optional SQLite accelerator
         self._sqlite_store: Any = None
-        if str(os.getenv("APP_SQLITE_EVENTS", "true")).lower() in (
-            "1",
-            "true",
-            "yes",
+        if str(os.getenv('APP_SQLITE_EVENTS', 'true')).lower() in (
+            '1',
+            'true',
+            'yes',
         ):
             try:
                 from backend.persistence.sqlite_event_store import SQLiteEventStore
@@ -114,19 +114,19 @@ class EventPersistence:
                 events_dir = get_conversation_events_dir(sid, user_id)
                 db_path = os.path.join(
                     file_store.get_base_path()
-                    if hasattr(file_store, "get_base_path")
-                    else ".",
+                    if hasattr(file_store, 'get_base_path')
+                    else '.',
                     events_dir,
-                    "events.db",
+                    'events.db',
                 )
                 self._sqlite_store = SQLiteEventStore(db_path=db_path)
                 logger.info(
-                    "SQLite event accelerator enabled for session %s",
+                    'SQLite event accelerator enabled for session %s',
                     sid,
                 )
             except Exception as exc:
                 logger.warning(
-                    "Failed to initialise SQLite event store, using file-based fallback: %s",
+                    'Failed to initialise SQLite event store, using file-based fallback: %s',
                     exc,
                 )
                 self._sqlite_store = None
@@ -139,7 +139,7 @@ class EventPersistence:
                 self._durable_writer.start()
             except Exception as exc:  # pragma: no cover
                 logger.warning(
-                    "Failed to start DurableEventWriter, falling back to sync persistence: %s",
+                    'Failed to start DurableEventWriter, falling back to sync persistence: %s',
                     exc,
                 )
                 self._durable_writer = None
@@ -162,7 +162,7 @@ class EventPersistence:
                 return
             except Exception as exc:
                 logger.warning(
-                    "SQLite write failed for event %d, falling back to file: %s",
+                    'SQLite write failed for event %d, falling back to file: %s',
                     event_id,
                     exc,
                 )
@@ -172,7 +172,7 @@ class EventPersistence:
 
         # Critical events are written synchronously to avoid loss.
         if is_critical:
-            self.stats["critical_sync_persistence"] += 1
+            self.stats['critical_sync_persistence'] += 1
             self._write_event_sync(filename, payload, cache_payload)
             return
 
@@ -187,7 +187,7 @@ class EventPersistence:
             )
             if writer.enqueue(persisted):
                 return
-            self.stats["durable_enqueue_failures"] += 1
+            self.stats['durable_enqueue_failures'] += 1
 
         self._write_event_sync(filename, payload, cache_payload)
 
@@ -198,7 +198,7 @@ class EventPersistence:
         """Return ``(filename, contents)`` when a full cache page is ready."""
         if not current_write_page or len(current_write_page) < self._cache_size:
             return None
-        start = current_write_page[0]["id"]
+        start = current_write_page[0]['id']
         end = start + self._cache_size
         contents = json.dumps(current_write_page)
         cache_filename = self._get_filename_for_cache(start, end)
@@ -208,16 +208,16 @@ class EventPersistence:
         """Return lightweight persistence-health diagnostics for recovery and ops."""
         last_success = self._last_persisted_at_monotonic
         last_failure = self._last_persist_failure_at_monotonic
-        health = "healthy"
+        health = 'healthy'
         if last_failure is not None and (
             last_success is None or last_failure >= last_success
         ):
-            health = "degraded"
+            health = 'degraded'
         return {
-            "persistence_health": health,
-            "last_confirmed_event_id": self._last_confirmed_event_id,
-            "last_confirmed_critical_event_id": self._last_confirmed_critical_event_id,
-            "last_persistence_mode": self._last_persistence_mode,
+            'persistence_health': health,
+            'last_confirmed_event_id': self._last_confirmed_event_id,
+            'last_confirmed_critical_event_id': self._last_confirmed_critical_event_id,
+            'last_persistence_mode': self._last_persistence_mode,
         }
 
     def _process_pending_file(
@@ -231,8 +231,9 @@ class EventPersistence:
                 return (0, 1)
             except Exception as exc:
                 logger.debug(
-                    "WAL cleanup: could not delete stale .pending file %s: %s",
-                    pending_path, exc,
+                    'WAL cleanup: could not delete stale .pending file %s: %s',
+                    pending_path,
+                    exc,
                 )
                 return (0, 0)
         except FileNotFoundError:
@@ -243,12 +244,16 @@ class EventPersistence:
                 return (1, 0)
             except Exception as exc:
                 logger.warning(
-                    "WAL replay: failed to recover %s for session %s: %s",
-                    pending_path, self.sid, exc,
+                    'WAL replay: failed to recover %s for session %s: %s',
+                    pending_path,
+                    self.sid,
+                    exc,
                 )
                 return (0, 0)
         except Exception:
-            logger.debug("WAL replay: skipping %s (read error)", pending_path, exc_info=True)
+            logger.debug(
+                'WAL replay: skipping %s (read error)', pending_path, exc_info=True
+            )
             return (0, 0)
 
     def replay_pending_events(self) -> None:
@@ -263,28 +268,30 @@ class EventPersistence:
         except FileNotFoundError:
             return
         except Exception:
-            logger.debug("WAL replay: could not list events dir for %s", self.sid, exc_info=True)
+            logger.debug(
+                'WAL replay: could not list events dir for %s', self.sid, exc_info=True
+            )
             return
 
-        pending_files = [f for f in all_files if f.endswith(".pending")]
+        pending_files = [f for f in all_files if f.endswith('.pending')]
         if not pending_files:
             return
 
         recovered, cleaned = 0, 0
         for pending_name in pending_files:
             pending_path = self._normalize_event_path(pending_name, events_dir)
-            event_path = pending_path.removesuffix(".pending")
+            event_path = pending_path.removesuffix('.pending')
             r, c = self._process_pending_file(pending_path, event_path, events_dir)
             recovered += r
             cleaned += c
 
         if recovered or cleaned:
             logger.info(
-                "WAL replay for session %s: recovered=%d, cleaned=%d stale markers",
+                'WAL replay for session %s: recovered=%d, cleaned=%d stale markers',
                 self.sid,
                 recovered,
                 cleaned,
-                extra={"session_id": self.sid, "user_id": self.user_id},
+                extra={'session_id': self.sid, 'user_id': self.user_id},
             )
 
     def close(self) -> None:
@@ -295,7 +302,7 @@ class EventPersistence:
             try:
                 self._sqlite_store.close()
             except Exception:
-                logger.debug("Error closing SQLite event store", exc_info=True)
+                logger.debug('Error closing SQLite event store', exc_info=True)
             self._sqlite_store = None
 
     # ------------------------------------------------------------------
@@ -311,11 +318,11 @@ class EventPersistence:
         This one-liner prevents the double-prefix bug permanently.
         """
         # Normalise separators
-        raw = raw_path.replace("\\", "/")
-        base = events_dir.replace("\\", "/")
+        raw = raw_path.replace('\\', '/')
+        base = events_dir.replace('\\', '/')
         if raw.startswith(base):
             return raw
-        return f"{base}{raw}"
+        return f'{base}{raw}'
 
     # ------------------------------------------------------------------
     # Internals
@@ -328,10 +335,10 @@ class EventPersistence:
 
     @classmethod
     def _is_critical_payload(cls, payload: dict[str, Any]) -> bool:
-        action_name = payload.get("action")
+        action_name = payload.get('action')
         if isinstance(action_name, str):
             return action_name in cls._CRITICAL_ACTIONS
-        observation_name = payload.get("observation")
+        observation_name = payload.get('observation')
         if isinstance(observation_name, str):
             return observation_name in cls._CRITICAL_OBSERVATIONS
         return False
@@ -348,38 +355,38 @@ class EventPersistence:
         max_event_bytes = 5 * 1024 * 1024  # 5 MB
         if json_len > max_event_bytes:
             logger.error(
-                "Event JSON exceeds hard cap (%dMB): %d bytes, filename: %s — "
-                "truncating large fields to fit.",
+                'Event JSON exceeds hard cap (%dMB): %d bytes, filename: %s — '
+                'truncating large fields to fit.',
                 max_event_bytes // (1024 * 1024),
                 json_len,
                 filename,
                 extra={
-                    "user_id": self.user_id,
-                    "session_id": self.sid,
-                    "size": json_len,
+                    'user_id': self.user_id,
+                    'session_id': self.sid,
+                    'size': json_len,
                 },
             )
             _truncate_payload(payload, max_event_bytes)
             event_json = json.dumps(payload)
         elif json_len > 1_000_000:
             logger.warning(
-                "Saving event JSON over 1MB: %s bytes, filename: %s",
+                'Saving event JSON over 1MB: %s bytes, filename: %s',
                 json_len,
                 filename,
                 extra={
-                    "user_id": self.user_id,
-                    "session_id": self.sid,
-                    "size": json_len,
+                    'user_id': self.user_id,
+                    'session_id': self.sid,
+                    'size': json_len,
                 },
             )
 
         try:
-            pending_file = filename + ".pending"
+            pending_file = filename + '.pending'
             try:
                 self.file_store.write(pending_file, event_json)
             except Exception as exc:
                 logger.debug(
-                    "WAL: could not write .pending marker %s: %s",
+                    'WAL: could not write .pending marker %s: %s',
                     pending_file,
                     exc,
                 )
@@ -390,28 +397,28 @@ class EventPersistence:
                 self.file_store.delete(pending_file)
             except Exception as exc:
                 logger.debug(
-                    "WAL: could not remove .pending marker %s: %s",
+                    'WAL: could not remove .pending marker %s: %s',
                     pending_file,
                     exc,
                 )
-            event_id = payload.get("id")
+            event_id = payload.get('id')
             if isinstance(event_id, int):
                 self._record_persist_success(
                     event_id,
                     is_critical=self._is_critical_payload(payload),
-                    mode="sync",
+                    mode='sync',
                 )
         except Exception as exc:  # pragma: no cover
-            self.stats["persist_failures"] += 1
+            self.stats['persist_failures'] += 1
             self._last_persist_failure_at_monotonic = time.monotonic()
             if self._recent_persist_failures is not None:
                 self._recent_persist_failures.append(time.monotonic())
             logger.error(
-                "Failed to persist event file %s for %s: %s",
+                'Failed to persist event file %s for %s: %s',
                 filename,
                 self.sid,
                 exc,
-                extra={"session_id": self.sid, "user_id": self.user_id},
+                extra={'session_id': self.sid, 'user_id': self.user_id},
             )
             return
 
@@ -420,9 +427,9 @@ class EventPersistence:
             try:
                 self.file_store.write(cache_filename, cache_contents)
             except Exception as exc:  # pragma: no cover
-                self.stats["cache_write_failures"] += 1
+                self.stats['cache_write_failures'] += 1
                 logger.debug(
-                    "Cache page write failed for %s (%s): %s",
+                    'Cache page write failed for %s (%s): %s',
                     self.sid,
                     cache_filename,
                     exc,
@@ -459,15 +466,15 @@ def _truncate_payload(payload: dict[str, Any], max_bytes: int) -> None:
     values, and truncates them until the estimated JSON size falls below
     *max_bytes*.
     """
-    trunc_marker = "\n\n[… truncated by App — event exceeded size cap …]"
+    trunc_marker = '\n\n[… truncated by App — event exceeded size cap …]'
 
-    def _string_fields(d: dict, prefix: str = "") -> list[tuple[str, dict, str]]:
+    def _string_fields(d: dict, prefix: str = '') -> list[tuple[str, dict, str]]:
         results: list[tuple[str, dict, str]] = []
         for k, v in d.items():
             if isinstance(v, str):
-                results.append((f"{prefix}{k}", d, k))
+                results.append((f'{prefix}{k}', d, k))
             elif isinstance(v, dict):
-                results.extend(_string_fields(v, f"{prefix}{k}."))
+                results.extend(_string_fields(v, f'{prefix}{k}.'))
         return results
 
     fields = _string_fields(payload)

@@ -6,11 +6,13 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from backend.engine.tools.common import create_tool_definition
 from backend.engine.contracts import ChatCompletionToolParam
+from backend.engine.tools.common import create_tool_definition
 
 
-def _extract_tool_names(mcp_tools: dict[str, Any] | list[dict[str, Any]] | None) -> list[str]:
+def _extract_tool_names(
+    mcp_tools: dict[str, Any] | list[dict[str, Any]] | None,
+) -> list[str]:
     """Extract MCP tool names from supported container shapes."""
     if not mcp_tools:
         return []
@@ -21,7 +23,7 @@ def _extract_tool_names(mcp_tools: dict[str, Any] | list[dict[str, Any]] | None)
     names: list[str] = []
     for tool in mcp_tools:
         try:
-            name = tool.get("function", {}).get("name")
+            name = tool.get('function', {}).get('name')
             if isinstance(name, str) and name:
                 names.append(name)
         except Exception:
@@ -32,40 +34,44 @@ def _extract_tool_names(mcp_tools: dict[str, Any] | list[dict[str, Any]] | None)
 def _collect_mcp_connection_errors(limit: int = 10) -> list[dict[str, Any]]:
     """Collect recent MCP connection errors for degraded-mode visibility."""
     try:
-        from backend.gateway.integrations.mcp.error_collector import mcp_error_collector
+        from backend.integrations.mcp.error_collector import mcp_error_collector
 
         recent_errors = mcp_error_collector.get_errors()[-limit:]
         return [
             {
-                "timestamp": error.timestamp,
-                "server": error.server_name,
-                "type": error.server_type,
-                "message": error.error_message,
+                'timestamp': error.timestamp,
+                'server': error.server_name,
+                'type': error.server_type,
+                'message': error.error_message,
             }
             for error in recent_errors
         ]
     except Exception:
         return []
 
+
 def create_check_tool_status_tool() -> ChatCompletionToolParam:
     """Create the check_tool_status tool."""
     return create_tool_definition(
-        name="check_tool_status",
-        description="Checks the availability and status of all registered tools and connected MCP servers.",
+        name='check_tool_status',
+        description='Checks the availability and status of all registered tools and connected MCP servers.',
         properties={
-            "tool_name": {
-                "type": "string",
-                "description": "Optional: Check status for a specific tool name. If omitted, checks all tools.",
+            'tool_name': {
+                'type': 'string',
+                'description': 'Optional: Check status for a specific tool name. If omitted, checks all tools.',
             }
         },
         required=[],
     )
 
-def build_check_tool_status_action(arguments: dict[str, Any], mcp_tools: dict[str, Any]) -> Any:
+
+def build_check_tool_status_action(
+    arguments: dict[str, Any], mcp_tools: dict[str, Any]
+) -> Any:
     """Run the health check for tools."""
     from backend.ledger.action import AgentThinkAction
 
-    tool_name = arguments.get("tool_name")
+    tool_name = arguments.get('tool_name')
     checked_at = datetime.now(UTC).isoformat()
 
     available_tools = _extract_tool_names(mcp_tools)
@@ -77,42 +83,46 @@ def build_check_tool_status_action(arguments: dict[str, Any], mcp_tools: dict[st
         tool_known = normalized_tool_name in available_tools
         tools_payload = [
             {
-                "name": normalized_tool_name,
-                "status": "ready" if tool_known else "not_found",
-                "scope": "mcp",
+                'name': normalized_tool_name,
+                'status': 'ready' if tool_known else 'not_found',
+                'scope': 'mcp',
             }
         ]
     else:
         tools_payload = [
-            {"name": name, "status": "ready", "scope": "mcp"}
+            {'name': name, 'status': 'ready', 'scope': 'mcp'}
             for name in available_tools
         ]
 
     payload = {
-        "checked_at": checked_at,
-        "scope": "mcp_tools",
-        "degraded": degraded,
-        "summary": {
-            "available_tool_count": len(available_tools),
-            "error_count": len(errors),
+        'checked_at': checked_at,
+        'scope': 'mcp_tools',
+        'degraded': degraded,
+        'summary': {
+            'available_tool_count': len(available_tools),
+            'error_count': len(errors),
         },
-        "tools": tools_payload,
-        "recent_connection_errors": errors,
+        'tools': tools_payload,
+        'recent_connection_errors': errors,
     }
 
     human_lines = [
-        f"Tool health checked at {checked_at}.",
-        f"MCP tools available: {len(available_tools)}.",
+        f'Tool health checked at {checked_at}.',
+        f'MCP tools available: {len(available_tools)}.',
     ]
     if tool_name:
         status_text = (
-            "READY" if tools_payload and tools_payload[0]["status"] == "ready" else "NOT FOUND"
+            'READY'
+            if tools_payload and tools_payload[0]['status'] == 'ready'
+            else 'NOT FOUND'
         )
         human_lines.append(f"Requested tool '{tool_name}': {status_text}.")
     if degraded:
         human_lines.append(
-            f"MCP is in DEGRADED mode ({len(errors)} recent connection error(s)); prefer fail-soft fallbacks."
+            f'MCP is in DEGRADED mode ({len(errors)} recent connection error(s)); prefer fail-soft fallbacks.'
         )
 
     structured = json.dumps(payload, ensure_ascii=False)
-    return AgentThinkAction(thought="\n".join(human_lines + [f"[TOOL_STATUS] {structured}"]))
+    return AgentThinkAction(
+        thought='\n'.join(human_lines + [f'[TOOL_STATUS] {structured}'])
+    )

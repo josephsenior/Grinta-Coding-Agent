@@ -3,16 +3,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from backend.ledger import EventStreamSubscriber
 from backend.orchestration.replay import ReplayManager
 from backend.orchestration.state.state_tracker import StateTracker
-from backend.ledger import EventStreamSubscriber
 
 if TYPE_CHECKING:
+    from backend.core.config import AgentConfig, LLMConfig
+    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.ledger.event import Event
     from backend.orchestration.agent import Agent
     from backend.orchestration.session_orchestrator import SessionOrchestrator
-    from backend.core.config import AgentConfig, LLMConfig
-    from backend.ledger.event import Event
-    from backend.gateway.services.conversation_stats import ConversationStats
     from backend.persistence.files import FileStore
 
 
@@ -45,8 +45,8 @@ class LifecycleService:
         # Ensure agents that support event streaming (e.g., Orchestrator)
         # receive the shared EventStream instance used by the controller.
         try:
-            if hasattr(agent, "event_stream"):
-                setattr(agent, "event_stream", event_stream)
+            if hasattr(agent, 'event_stream'):
+                setattr(agent, 'event_stream', event_stream)
         except Exception:
             # Wiring failure should not block controller bootstrap.
             pass

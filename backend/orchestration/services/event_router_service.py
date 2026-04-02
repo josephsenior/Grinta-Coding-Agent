@@ -10,8 +10,7 @@ import os
 from typing import TYPE_CHECKING
 
 from backend.core.schemas import AgentState
-from backend.ledger import EventSource, RecallType
-from backend.ledger import EventStream
+from backend.ledger import EventSource, EventStream, RecallType
 from backend.ledger.action import (
     Action,
     AgentRejectAction,
@@ -25,7 +24,6 @@ from backend.ledger.action.agent import (
     DelegateTaskAction,
     EscalateToHumanAction,
     ProposalAction,
-    SearchAvailableToolsAction,
     RecallAction,
     UncertaintyAction,
 )
@@ -37,8 +35,8 @@ from backend.ledger.observation.agent import DelegateTaskObservation
 from backend.ledger.observation_cause import attach_observation_cause
 
 if TYPE_CHECKING:
-    from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.ledger.event import Event
+    from backend.orchestration.session_orchestrator import SessionOrchestrator
 
 
 class EventRouterService:
@@ -58,7 +56,7 @@ class EventRouterService:
 
         Hidden events are silently dropped.  Plugin hooks fire first.
         """
-        if hasattr(event, "hidden") and event.hidden:
+        if hasattr(event, 'hidden') and event.hidden:
             return
 
         # Plugin hook: event_emitted
@@ -68,9 +66,9 @@ class EventRouterService:
             await get_plugin_registry().dispatch_event(event)
         except Exception as exc:
             self._ctrl.log(
-                "warning",
-                f"Plugin event_emitted hook failed for {type(event).__name__}: {exc}",
-                extra={"msg_type": "PLUGIN_EVENT_HOOK"},
+                'warning',
+                f'Plugin event_emitted hook failed for {type(event).__name__}: {exc}',
+                extra={'msg_type': 'PLUGIN_EVENT_HOOK'},
             )
 
         # StreamingChunkAction events are transient display hints — they
@@ -93,9 +91,9 @@ class EventRouterService:
                 target_state = AgentState(action.agent_state)
             except ValueError:
                 self._ctrl.log(
-                    "warning",
+                    'warning',
                     "Received unknown agent state '%s', ignoring.",
-                    extra={"agent_state": action.agent_state},
+                    extra={'agent_state': action.agent_state},
                 )
             else:
                 # Guard: discard a stale startup AWAITING_USER_INPUT signal that
@@ -110,9 +108,9 @@ class EventRouterService:
                     and self._ctrl.get_agent_state() == AgentState.RUNNING
                 ):
                     self._ctrl.log(
-                        "debug",
-                        "Discarding stale startup ChangeAgentStateAction(AWAITING_USER_INPUT) "
-                        "— agent is already RUNNING",
+                        'debug',
+                        'Discarding stale startup ChangeAgentStateAction(AWAITING_USER_INPUT) '
+                        '— agent is already RUNNING',
                     )
                     return
                 await self._ctrl.set_agent_state_to(target_state)
@@ -126,11 +124,14 @@ class EventRouterService:
             await self._handle_task_tracking_action(action)
         elif isinstance(action, DelegateTaskAction):
             await self._handle_delegate_task_action(action)
-        elif isinstance(action, SearchAvailableToolsAction):
-            await self._handle_search_available_tools_action(action)
         elif isinstance(
             action,
-            (ClarificationRequestAction, ProposalAction, UncertaintyAction, EscalateToHumanAction),
+            (
+                ClarificationRequestAction,
+                ProposalAction,
+                UncertaintyAction,
+                EscalateToHumanAction,
+            ),
         ):
             await self._handle_meta_cognition_action(action)
 
@@ -140,22 +141,22 @@ class EventRouterService:
 
         try:
             current_plan = self._ctrl.state.plan
-            current_title = current_plan.title if current_plan else "Current Plan"
+            current_title = current_plan.title if current_plan else 'Current Plan'
             self._ctrl.state.plan = build_active_plan_from_payload(
                 action.task_list,
                 title=current_title,
             )
-            self._ctrl.log("info", f"Plan updated with {len(action.task_list)} steps.")
+            self._ctrl.log('info', f'Plan updated with {len(action.task_list)} steps.')
         except Exception as e:
-            self._ctrl.log("error", f"Failed to update plan: {e}")
+            self._ctrl.log('error', f'Failed to update plan: {e}')
 
     async def _handle_finish_action(self, action: PlaybookFinishAction) -> None:
         """Handle agent finish action with completion validation."""
         if not await self._ctrl.task_validation_service.handle_finish(action):
             return
-        self._ctrl.state.set_outputs(action.outputs, source="EventRouterService.finish")
+        self._ctrl.state.set_outputs(action.outputs, source='EventRouterService.finish')
         await self._ctrl.set_agent_state_to(AgentState.FINISHED)
-        await self._ctrl.log_task_audit(status="success")
+        await self._ctrl.log_task_audit(status='success')
         await self._run_critics()
 
     async def _run_critics(self) -> None:
@@ -167,13 +168,17 @@ class EventRouterService:
         any value other than ``"true"`` (case-insensitive).
         """
         # User defaults: Critics are ON by default as an opinionated choice
-        if os.environ.get("ENABLE_REVIEW_CRITICS", "true").lower() != "true":
+        if os.environ.get('ENABLE_REVIEW_CRITICS', 'true').lower() != 'true':
             self._ctrl.log(
-                "debug", "Review critics skipped (ENABLE_REVIEW_CRITICS=false)"
+                'debug', 'Review critics skipped (ENABLE_REVIEW_CRITICS=false)'
             )
             return
 
-        from backend.governance import AgentFinishedCritic, BudgetCritic, SuitePassCritic
+        from backend.governance import (
+            AgentFinishedCritic,
+            BudgetCritic,
+            SuitePassCritic,
+        )
 
         events = list(self._ctrl.state.history)
         critics = [
@@ -186,29 +191,29 @@ class EventRouterService:
             name = type(critic).__name__
             try:
                 result = critic.evaluate(events)
-                scores[name] = {"score": result.score, "message": result.message}
+                scores[name] = {'score': result.score, 'message': result.message}
                 if result.message:
                     self._ctrl.log(
-                        "info",
-                        f"Critic [{name}]: score={result.score:.2f} — {result.message}",
+                        'info',
+                        f'Critic [{name}]: score={result.score:.2f} — {result.message}',
                         extra={
-                            "critic": name,
-                            "critic_score": result.score,
+                            'critic': name,
+                            'critic_score': result.score,
                         },
                     )
             except Exception as exc:
-                scores[name] = {"score": None, "message": f"error: {exc}"}
+                scores[name] = {'score': None, 'message': f'error: {exc}'}
                 self._ctrl.log(
-                    "warning",
-                    f"Critic [{name}] failed: {exc}",
+                    'warning',
+                    f'Critic [{name}] failed: {exc}',
                 )
 
         # Persist scores on the session state so the API / audit can surface them.
-        self._ctrl.state.extra_data["critic_scores"] = scores
+        self._ctrl.state.extra_data['critic_scores'] = scores
 
     async def _handle_reject_action(self, action: AgentRejectAction) -> None:
         """Handle agent reject action."""
-        self._ctrl.state.set_outputs(action.outputs, source="EventRouterService.reject")
+        self._ctrl.state.set_outputs(action.outputs, source='EventRouterService.reject')
         await self._ctrl.set_agent_state_to(AgentState.REJECTED)
 
     async def _handle_message_action(self, action: MessageAction) -> None:
@@ -221,11 +226,11 @@ class EventRouterService:
 
     async def _handle_user_message(self, action: MessageAction) -> None:
         """Handle user message: log, create recall, set pending, start agent."""
-        log_level = "info" if os.getenv("LOG_ALL_EVENTS") in ("true", "1") else "debug"
+        log_level = 'info' if os.getenv('LOG_ALL_EVENTS') in ('true', '1') else 'debug'
         self._ctrl.log(
             log_level,
             str(action),
-            extra={"msg_type": "ACTION", "event_source": EventSource.USER},
+            extra={'msg_type': 'ACTION', 'event_source': EventSource.USER},
         )
         first_user_message = next(
             (
@@ -244,11 +249,11 @@ class EventRouterService:
         # Assign stream id before pending so pending always references a stable id
         # (recall observations arrive later, after async recall work).
         self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
-        pending_service = getattr(self._ctrl, "pending_action_service", None)
+        pending_service = getattr(self._ctrl, 'pending_action_service', None)
         if pending_service is not None:
             pending_service.set(recall_action)
         else:
-            action_service = getattr(self._ctrl, "action_service", None)
+            action_service = getattr(self._ctrl, 'action_service', None)
             if action_service is not None:
                 action_service.set_pending_action(recall_action)
         if self._ctrl.get_agent_state() != AgentState.RUNNING:
@@ -257,77 +262,85 @@ class EventRouterService:
     async def _handle_delegate_task_action(self, action: DelegateTaskAction) -> None:
         """Handle delegating a subtask to a worker agent."""
         import uuid
-        from backend.utils.async_utils import run_or_schedule
-        from backend.gateway.services.conversation_stats import ConversationStats
-        from backend.orchestration.agent import Agent
-        from backend.orchestration.session_orchestrator import SessionOrchestrator
-        from backend.orchestration.orchestration_config import OrchestrationConfig
-        from backend.orchestration.blackboard import Blackboard
+
         from backend.core.config.agent_config import AgentConfig
+        from backend.orchestration.conversation_stats import ConversationStats
+        from backend.orchestration.agent import Agent
+        from backend.orchestration.blackboard import Blackboard
+        from backend.orchestration.orchestration_config import OrchestrationConfig
+        from backend.orchestration.session_orchestrator import SessionOrchestrator
+        from backend.utils.async_utils import run_or_schedule
 
         blackboard = Blackboard()
 
         # Background task so we don't block the routing loop
         async def _execute_single_worker(
-            task_description: str, files: list, shared_blackboard: Blackboard | None = None
+            task_description: str,
+            files: list,
+            shared_blackboard: Blackboard | None = None,
         ) -> tuple[bool, str, str]:
             """Run one worker agent and return (success, content, error_message)."""
             try:
                 # Get the base agent config but clear history
                 parent_config = self._ctrl.config
-                worker_id = f"{parent_config.sid}_sub_{uuid.uuid4().hex[:8]}"
+                worker_id = f'{parent_config.sid}_sub_{uuid.uuid4().hex[:8]}'
 
-                file_store = (
-                    parent_config.file_store
-                    or getattr(self._ctrl.event_stream, "file_store", None)
+                file_store = parent_config.file_store or getattr(
+                    self._ctrl.event_stream, 'file_store', None
                 )
                 if file_store is None:
-                    raise RuntimeError("No file_store available for worker event stream")
+                    raise RuntimeError(
+                        'No file_store available for worker event stream'
+                    )
 
-                user_id = getattr(parent_config, "user_id", None)
+                user_id = getattr(parent_config, 'user_id', None)
 
-                agent_configs = getattr(parent_config, "agent_configs", None) or {}
-                worker_agent_config = getattr(self._ctrl.agent, "config", None)
+                agent_configs = getattr(parent_config, 'agent_configs', None) or {}
+                worker_agent_config = getattr(self._ctrl.agent, 'config', None)
                 if worker_agent_config is None:
-                    worker_agent_config = agent_configs.get("Orchestrator")
+                    worker_agent_config = agent_configs.get('Orchestrator')
                 if worker_agent_config is None:
-                    worker_agent_config = AgentConfig(name="Orchestrator")
+                    worker_agent_config = AgentConfig(name='Orchestrator')
 
                 # Ensure config is a proper AgentConfig instance.
                 if not isinstance(worker_agent_config, AgentConfig):
                     try:
-                        worker_agent_config = AgentConfig.model_validate(worker_agent_config)
+                        worker_agent_config = AgentConfig.model_validate(
+                            worker_agent_config
+                        )
                     except Exception as exc:
                         raise RuntimeError(
-                            f"Invalid worker agent config type: {type(worker_agent_config)}"
+                            f'Invalid worker agent config type: {type(worker_agent_config)}'
                         ) from exc
 
                 # Prefer a dedicated LLM config if provided in agent_to_llm_config.
                 agent_to_llm_config = (
-                    getattr(parent_config, "agent_to_llm_config", None) or {}
+                    getattr(parent_config, 'agent_to_llm_config', None) or {}
                 )
                 llm_cfg = agent_to_llm_config.get(worker_agent_config.name)
                 if llm_cfg is not None:
                     worker_agent_config = worker_agent_config.model_copy(
-                        deep=True, update={"llm_config": llm_cfg}
+                        deep=True, update={'llm_config': llm_cfg}
                     )
 
                 # Setup isolated event stream
-                worker_stream = EventStream(worker_id, file_store=file_store, user_id=user_id)
+                worker_stream = EventStream(
+                    worker_id, file_store=file_store, user_id=user_id
+                )
                 self._ctrl.log(
-                    "info",
-                    f"Spawning worker agent {worker_id} for task: {task_description[:50]}...",
+                    'info',
+                    f'Spawning worker agent {worker_id} for task: {task_description[:50]}...',
                 )
 
                 # Send the initial user message/directive to the worker.
                 # Inject parent's working memory, notes, and task plan so the
                 # sub-agent has full context without needing to rediscover it.
                 parent_context_lines: list[str] = [
-                    f"You are a worker agent delegated the following task:\n\n{task_description}\n\nFocus ONLY on this task. Once completed, finish."
+                    f'You are a worker agent delegated the following task:\n\n{task_description}\n\nFocus ONLY on this task. Once completed, finish.'
                 ]
                 if shared_blackboard is not None:
                     parent_context_lines.append(
-                        "\n\nSHARED BLACKBOARD: Use the blackboard tool (get/set/keys) to coordinate with other parallel workers. Publish contracts, status, or shared data there."
+                        '\n\nSHARED BLACKBOARD: Use the blackboard tool (get/set/keys) to coordinate with other parallel workers. Publish contracts, status, or shared data there.'
                     )
 
                 # --- inherit parent working memory ---
@@ -335,63 +348,74 @@ class EventRouterService:
                     from backend.engine.tools.working_memory import (
                         get_full_working_memory,
                     )
+
                     wm = get_full_working_memory()
                     if wm:
                         parent_context_lines.append(
-                            f"\n\nPARENT WORKING MEMORY (read-only context):\n{wm}"
+                            f'\n\nPARENT WORKING MEMORY (read-only context):\n{wm}'
                         )
                 except Exception as e:
-                    self._ctrl.log("warning", f"Failed to inherit parent working memory: {e}")
+                    self._ctrl.log(
+                        'warning', f'Failed to inherit parent working memory: {e}'
+                    )
 
                 # --- inherit parent notes ---
                 try:
                     from backend.engine.tools.note import (
                         _load_notes,
                     )
+
                     notes = _load_notes()
                     if notes:
-                        notes_text = "\n".join(
-                            f"  {k}: {v}" for k, v in list(notes.items())[:20]
+                        notes_text = '\n'.join(
+                            f'  {k}: {v}' for k, v in list(notes.items())[:20]
                         )
                         parent_context_lines.append(
-                            f"\n\nPARENT NOTES (key-value context):\n{notes_text}"
+                            f'\n\nPARENT NOTES (key-value context):\n{notes_text}'
                         )
                 except Exception as e:
-                    self._ctrl.log("warning", f"Failed to inherit parent notes: {e}")
+                    self._ctrl.log('warning', f'Failed to inherit parent notes: {e}')
 
                 # --- inherit parent task plan ---
                 try:
                     from backend.engine.tools.task_tracker import (
                         TaskTracker,
                     )
+
                     tasks = TaskTracker().load_from_file()
                     if tasks:
-                        task_lines = ["PARENT TASK PLAN (for context):"]
+                        task_lines = ['PARENT TASK PLAN (for context):']
                         for t in tasks:
-                            status_icon = {"completed": "✓", "in_progress": "O", "failed": "X"}.get(
-                                t.get("status", ""), "-"
-                            )
+                            status_icon = {
+                                'completed': '✓',
+                                'in_progress': 'O',
+                                'failed': 'X',
+                            }.get(t.get('status', ''), '-')
                             task_lines.append(
-                                f"  [{status_icon}] {t.get('id', '?')} — {t.get('description', t.get('title', ''))}"
-                                f" ({t.get('status', 'pending')})"
+                                f'  [{status_icon}] {t.get("id", "?")} — {t.get("description", t.get("title", ""))}'
+                                f' ({t.get("status", "pending")})'
                             )
-                        parent_context_lines.append("\n\n" + "\n".join(task_lines))
+                        parent_context_lines.append('\n\n' + '\n'.join(task_lines))
                 except Exception as e:
-                    self._ctrl.log("warning", f"Failed to inherit parent task plan: {e}")
+                    self._ctrl.log(
+                        'warning', f'Failed to inherit parent task plan: {e}'
+                    )
 
                 # We need to reuse the same file store/workspace as the parent
-                llm_registry = getattr(self._ctrl.agent, "llm_registry", None)
+                llm_registry = getattr(self._ctrl.agent, 'llm_registry', None)
                 if llm_registry is None:
-                    raise RuntimeError("Parent agent does not expose llm_registry")
+                    raise RuntimeError('Parent agent does not expose llm_registry')
 
                 try:
                     agent_cls = Agent.get_cls(worker_agent_config.name)
                 except Exception as exc:
                     raise RuntimeError(
-                        f"Worker agent class not registered: {worker_agent_config.name}"
+                        f'Worker agent class not registered: {worker_agent_config.name}'
                     ) from exc
 
-                worker_agent = agent_cls(config=worker_agent_config, llm_registry=llm_registry)
+                worker_agent = agent_cls(
+                    config=worker_agent_config, llm_registry=llm_registry
+                )
                 if shared_blackboard is not None:
                     worker_agent.blackboard = shared_blackboard  # type: ignore[attr-defined]
                     worker_agent.tools = worker_agent.planner.build_toolset()  # type: ignore[attr-defined]
@@ -422,7 +446,7 @@ class EventRouterService:
 
                 worker_controller = SessionOrchestrator(worker_config)
 
-                init_msg = MessageAction(content="\n".join(parent_context_lines))
+                init_msg = MessageAction(content='\n'.join(parent_context_lines))
                 worker_controller.event_stream.add_event(init_msg, EventSource.USER)
 
                 # Ensure the worker starts running
@@ -430,7 +454,9 @@ class EventRouterService:
 
                 # Emulate the main execution loop for the headless worker.
                 # We reuse the controller's own step() logic.
-                max_steps = max(10, int(getattr(parent_config, "iteration_delta", 50) or 50))
+                max_steps = max(
+                    10, int(getattr(parent_config, 'iteration_delta', 50) or 50)
+                )
                 for _ in range(max_steps):
                     if worker_controller.get_agent_state() not in (
                         AgentState.RUNNING,
@@ -439,7 +465,7 @@ class EventRouterService:
                     ):
                         break
                     worker_controller.step()
-                    step_task = getattr(worker_controller, "_step_task", None)
+                    step_task = getattr(worker_controller, '_step_task', None)
                     if step_task is not None:
                         await step_task
 
@@ -448,8 +474,8 @@ class EventRouterService:
 
                 final_state = worker_controller.get_agent_state()
                 self._ctrl.log(
-                    "info",
-                    f"Worker agent {worker_id} finished with state {final_state.value}",
+                    'info',
+                    f'Worker agent {worker_id} finished with state {final_state.value}',
                 )
 
                 success = final_state == AgentState.FINISHED
@@ -460,30 +486,38 @@ class EventRouterService:
                 if outputs:
                     extracted_outputs = outputs
 
-                content = str(extracted_outputs) if extracted_outputs else f"Worker completed with status: {final_state.value}"
-                error_message = "" if success else f"Agent did not finish gracefully (State: {final_state.value})."
+                content = (
+                    str(extracted_outputs)
+                    if extracted_outputs
+                    else f'Worker completed with status: {final_state.value}'
+                )
+                error_message = (
+                    ''
+                    if success
+                    else f'Agent did not finish gracefully (State: {final_state.value}).'
+                )
                 return success, content, error_message
 
             except Exception as e:
-                self._ctrl.log("error", f"Worker execution failed: {e}")
-                return False, "", f"Worker execution crashed: {e}"
+                self._ctrl.log('error', f'Worker execution failed: {e}')
+                return False, '', f'Worker execution crashed: {e}'
 
         async def _run_subagent():
             """Dispatch single or parallel workers and post the final observation."""
             import asyncio
 
-            parallel_tasks = getattr(action, "parallel_tasks", [])
+            parallel_tasks = getattr(action, 'parallel_tasks', [])
             if parallel_tasks:
                 # Parallel mode — run all workers concurrently
                 self._ctrl.log(
-                    "info",
-                    f"Running {len(parallel_tasks)} sub-agents in parallel",
+                    'info',
+                    f'Running {len(parallel_tasks)} sub-agents in parallel',
                 )
                 results = await asyncio.gather(
                     *[
                         _execute_single_worker(
-                            t.get("task_description", ""),
-                            t.get("files", []),
+                            t.get('task_description', ''),
+                            t.get('files', []),
                             blackboard,
                         )
                         for t in parallel_tasks
@@ -493,27 +527,34 @@ class EventRouterService:
                 all_success = all(r[0] for r in results)
                 parts = []
                 for i, (s, c, e) in enumerate(results):
-                    label = parallel_tasks[i].get("task_description", f"Task {i+1}")[:40]
-                    status = "OK" if s else "FAILED"
-                    parts.append(f"[{status}] {label}\n{c or e}")
-                combined_content = "\n\n".join(parts)
+                    label = parallel_tasks[i].get('task_description', f'Task {i + 1}')[
+                        :40
+                    ]
+                    status = 'OK' if s else 'FAILED'
+                    parts.append(f'[{status}] {label}\n{c or e}')
+                combined_content = '\n\n'.join(parts)
                 if blackboard is not None and blackboard.snapshot():
-                    combined_content += "\n\n[SHARED BLACKBOARD SNAPSHOT]\n" + "\n".join(
-                        f"  {k}: {v}" for k, v in blackboard.snapshot().items()
+                    combined_content += (
+                        '\n\n[SHARED BLACKBOARD SNAPSHOT]\n'
+                        + '\n'.join(
+                            f'  {k}: {v}' for k, v in blackboard.snapshot().items()
+                        )
                     )
                 obs = DelegateTaskObservation(
                     success=all_success,
                     content=combined_content,
-                    error_message="" if all_success else "One or more parallel workers failed.",
+                    error_message=''
+                    if all_success
+                    else 'One or more parallel workers failed.',
                 )
             else:
                 # Single worker mode
                 success, content, error_message = await _execute_single_worker(
-                    action.task_description, getattr(action, "files", []), blackboard
+                    action.task_description, getattr(action, 'files', []), blackboard
                 )
                 if blackboard is not None and blackboard.snapshot():
-                    content += "\n\n[SHARED BLACKBOARD SNAPSHOT]\n" + "\n".join(
-                        f"  {k}: {v}" for k, v in blackboard.snapshot().items()
+                    content += '\n\n[SHARED BLACKBOARD SNAPSHOT]\n' + '\n'.join(
+                        f'  {k}: {v}' for k, v in blackboard.snapshot().items()
                     )
                 obs = DelegateTaskObservation(
                     success=success,
@@ -524,20 +565,20 @@ class EventRouterService:
             # Final delegate result: omit cause when background (early obs already cleared pending).
             attach_observation_cause(
                 obs,
-                None if getattr(action, "run_in_background", False) else action,
-                context="event_router.delegate_task",
+                None if getattr(action, 'run_in_background', False) else action,
+                context='event_router.delegate_task',
             )
             obs.tool_call_metadata = action.tool_call_metadata
             self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
 
-        if getattr(action, "run_in_background", False):
+        if getattr(action, 'run_in_background', False):
             early_obs = DelegateTaskObservation(
                 success=True,
-                content="Worker(s) started in background. Use the blackboard to coordinate.",
-                error_message="",
+                content='Worker(s) started in background. Use the blackboard to coordinate.',
+                error_message='',
             )
             attach_observation_cause(
-                early_obs, action, context="event_router.delegate_task_early"
+                early_obs, action, context='event_router.delegate_task_early'
             )
             early_obs.tool_call_metadata = action.tool_call_metadata
             self._ctrl.event_stream.add_event(early_obs, EventSource.ENVIRONMENT)
@@ -553,57 +594,20 @@ class EventRouterService:
         """
         from backend.orchestration.autonomy import AutonomyLevel
 
-        autonomy_ctrl = getattr(self._ctrl, "autonomy_controller", None)
+        autonomy_ctrl = getattr(self._ctrl, 'autonomy_controller', None)
         autonomy_level = (
-            getattr(autonomy_ctrl, "autonomy_level", AutonomyLevel.BALANCED.value)
+            getattr(autonomy_ctrl, 'autonomy_level', AutonomyLevel.BALANCED.value)
             if autonomy_ctrl
             else AutonomyLevel.BALANCED.value
         )
 
         if autonomy_level != AutonomyLevel.FULL.value:
             self._ctrl.log(
-                "info",
-                "Meta-cognition action requires user input, pausing agent.",
-                extra={"action_type": type(action).__name__},
+                'info',
+                'Meta-cognition action requires user input, pausing agent.',
+                extra={'action_type': type(action).__name__},
             )
             await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
-
-    async def _handle_search_available_tools_action(self, action: SearchAvailableToolsAction) -> None:
-        """Handle search_available_tools: return available tools matching the query."""
-        from backend.ledger.observation import NullObservation
-
-        query = (action.capability_query or "").lower()
-        agent = self._ctrl.agent
-
-        results: list[str] = []
-        for tool in getattr(agent, "tools", []):
-            fn = tool.get("function", {})
-            name = fn.get("name", "")
-            desc = fn.get("description", "")
-            if not query or query in name.lower() or query in desc.lower():
-                results.append(f"- {name}: {desc[:120]}")
-
-        mcp_tools = getattr(agent, "mcp_tools", {})
-        if mcp_tools:
-            for name, tool in mcp_tools.items():
-                fn = tool.get("function", {})
-                desc = fn.get("description", "")
-                if not query or query in name.lower() or query in desc.lower():
-                    results.append(f"- {name} [MCP]: {desc[:120]}")
-
-        content = (
-            f"Found {len(results)} tool(s) matching '{action.capability_query}':\n"
-            + "\n".join(results)
-            if results
-            else f"No tools found matching '{action.capability_query}'."
-        )
-
-        obs = NullObservation(content=content)
-        attach_observation_cause(
-            obs, action, context="event_router.search_available_tools"
-        )
-        obs.tool_call_metadata = action.tool_call_metadata
-        self._ctrl.event_stream.add_event(obs, EventSource.ENVIRONMENT)
 
     # ── observation dispatch ──────────────────────────────────────────
 

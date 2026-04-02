@@ -1,4 +1,4 @@
-﻿"""Runtime environment and execution infrastructure.
+"""Runtime environment and execution infrastructure.
 
 Classes:
     Runtime
@@ -25,8 +25,20 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 import httpx
 
+from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logger import app_logger as logger
+from backend.execution.capabilities import RuntimeCapabilities
+from backend.execution.command_timeout import CommandTimeoutMixin
+from backend.execution.env_manager import EnvManagerMixin
+from backend.execution.git_setup import GitSetupMixin
+from backend.execution.playbook_loader import PlaybookLoaderMixin
+from backend.execution.plugins import PluginRequirement
+from backend.execution.security_enforcement import SecurityEnforcementMixin
+from backend.execution.task_tracking import TaskTrackingMixin
+from backend.execution.utils.edit import FileEditRuntimeMixin
+from backend.execution.utils.git_handler import CommandResult, GitHandler
+from backend.core.provider_handler import ProviderHandler
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
 from backend.ledger.action import (
     Action,
@@ -47,18 +59,6 @@ from backend.ledger.observation import (
 )
 from backend.ledger.observation_cause import attach_observation_cause
 from backend.ledger.serialization.action import ACTION_TYPE_TO_CLASS
-from backend.gateway.provider_handler import ProviderHandler
-from backend.execution.capabilities import RuntimeCapabilities
-from backend.execution.command_timeout import CommandTimeoutMixin
-from backend.execution.env_manager import EnvManagerMixin
-from backend.execution.git_setup import GitSetupMixin
-from backend.execution.playbook_loader import PlaybookLoaderMixin
-from backend.execution.plugins import PluginRequirement
-from backend.core.enums import RuntimeStatus
-from backend.execution.security_enforcement import SecurityEnforcementMixin
-from backend.execution.task_tracking import TaskTrackingMixin
-from backend.execution.utils.edit import FileEditRuntimeMixin
-from backend.execution.utils.git_handler import CommandResult, GitHandler
 from backend.security import SecurityAnalyzer, options
 from backend.utils.async_utils import (
     GENERAL_TIMEOUT,
@@ -69,16 +69,17 @@ from backend.utils.async_utils import (
 
 if TYPE_CHECKING:
     from pydantic import SecretStr
+
     from backend.core.config import AppConfig, RuntimeConfig
     from backend.core.config.mcp_config import MCPConfig
-    from backend.ledger.event import Event
-    from backend.playbooks.engine import BasePlaybook
     from backend.core.provider_types import (
-        ProviderTokenType,
         ProviderToken,
+        ProviderTokenType,
         ProviderType,
     )
     from backend.inference.llm_registry import LLMRegistry
+    from backend.ledger.event import Event
+    from backend.playbooks.engine import BasePlaybook
 else:
     BasePlaybook = Any
 
@@ -87,25 +88,24 @@ else:
 # Defined once here to avoid duplication across run_action/validate_action.
 AGENT_LEVEL_ACTIONS: frozenset[str] = frozenset(
     {
-        "change_agent_state",
-        "message",
-        "recall",
-        "think",
-        "finish",
-        "reject",
-        "delegate",
-        "delegate_task",
-        "blackboard",
-        "condensation",
-        "condensation_request",
-        "task_tracking",
-        "search_available_tools",
-        "uncertainty",
-        "proposal",
-        "clarification",
-        "escalate",
-        "system",
-        "streaming_chunk",
+        'change_agent_state',
+        'message',
+        'recall',
+        'think',
+        'finish',
+        'reject',
+        'delegate',
+        'delegate_task',
+        'blackboard',
+        'condensation',
+        'condensation_request',
+        'task_tracking',
+        'uncertainty',
+        'proposal',
+        'clarification',
+        'escalate',
+        'system',
+        'streaming_chunk',
     }
 )
 
@@ -125,11 +125,11 @@ def _default_env_vars(runtime_config: RuntimeConfig) -> dict[str, str]:
     """
     ret = {}
     for key in os.environ:
-        if key.startswith("RUNTIME_ENV_"):
-            runtime_key = key.removeprefix("RUNTIME_ENV_")
+        if key.startswith('RUNTIME_ENV_'):
+            runtime_key = key.removeprefix('RUNTIME_ENV_')
             ret[runtime_key] = os.environ[key]
     if runtime_config.enable_auto_lint:
-        ret["ENABLE_AUTO_LINT"] = "true"
+        ret['ENABLE_AUTO_LINT'] = 'true'
     return ret
 
 
@@ -195,7 +195,7 @@ class Runtime(
         config: AppConfig,
         event_stream: EventStream | None,
         llm_registry: LLMRegistry,
-        sid: str = "default",
+        sid: str = 'default',
         plugins: list[PluginRequirement] | None = None,
         env_vars: dict[str, str] | None = None,
         status_callback: Callable[[str, RuntimeStatus, str], None] | None = None,
@@ -238,7 +238,7 @@ class Runtime(
         FileEditRuntimeMixin.__init__(
             self,
             enable_llm_editor=getattr(
-                config.get_agent_config(), "enable_llm_editor", False
+                config.get_agent_config(), 'enable_llm_editor', False
             ),
             llm_registry=llm_registry,
         )
@@ -253,25 +253,27 @@ class Runtime(
         self.security_analyzer = None
         if self.config.security.security_analyzer:
             # SecurityAnalyzers is a dict-like object in options module
-            analyzer_cls = getattr(options, "SecurityAnalyzers", {}).get(  # type: ignore[attr-defined]
+            analyzer_cls = getattr(options, 'SecurityAnalyzers', {}).get(  # type: ignore[attr-defined]
                 self.config.security.security_analyzer, SecurityAnalyzer
             )
             self.security_analyzer = analyzer_cls()
             logger.debug(
-                "Security analyzer %s initialized for runtime %s",
+                'Security analyzer %s initialized for runtime %s',
                 analyzer_cls.__name__,
                 self.sid,
             )
 
-    def rebind_event_stream(self, event_stream: EventStream | None, sid: str | None = None) -> None:
+    def rebind_event_stream(
+        self, event_stream: EventStream | None, sid: str | None = None
+    ) -> None:
         """Rebind runtime event subscription when the runtime is reused.
 
         Warm-pooled runtimes can outlive a conversation. When reattached to a new
         session, they must unsubscribe from the old stream and subscribe to the new
         one, otherwise actions are emitted but never executed by the runtime.
         """
-        old_stream = getattr(self, "event_stream", None)
-        old_sid = getattr(self, "sid", None)
+        old_stream = getattr(self, 'event_stream', None)
+        old_sid = getattr(self, 'sid', None)
 
         if old_stream is not None and old_sid is not None:
             try:
@@ -332,7 +334,7 @@ class Runtime(
         """
         if self.attach_to_existing:
             return
-        logger.debug("Adding env vars: %s", self.initial_env_vars.keys())
+        logger.debug('Adding env vars: %s', self.initial_env_vars.keys())
         self.add_env_vars(self.initial_env_vars)
         if self.config.runtime_config.runtime_startup_env_vars:
             self.add_env_vars(self.config.runtime_config.runtime_startup_env_vars)
@@ -347,15 +349,15 @@ class Runtime(
             return
         try:
             logger.info(
-                "🧹 Cleaning up %s long-running processes",
+                '🧹 Cleaning up %s long-running processes',
                 self.process_manager.count(),
             )
             self._cleanup_processes()
         except Exception as e:
-            logger.error("Failed to cleanup processes: %s", e)
+            logger.error('Failed to cleanup processes: %s', e)
 
     def _should_cleanup_processes(self) -> bool:
-        return hasattr(self, "process_manager") and self.process_manager.count() > 0
+        return hasattr(self, 'process_manager') and self.process_manager.count() > 0
 
     def _cleanup_processes(self) -> None:
         loop, created = self._resolve_event_loop()
@@ -364,7 +366,7 @@ class Runtime(
 
             create_tracked_task(
                 self.process_manager.cleanup_all(runtime=self),
-                name="process-cleanup",
+                name='process-cleanup',
             )
             return
         self._run_cleanup_synchronously(loop, created)
@@ -423,11 +425,11 @@ class Runtime(
             message: Message to log
 
         """
-        message = f"[runtime {self.sid}] {message}"
+        message = f'[runtime {self.sid}] {message}'
         getattr(logger, level)(message, stacklevel=2)
 
     def set_runtime_status(
-        self, runtime_status: RuntimeStatus, msg: str = "", level: str = "info"
+        self, runtime_status: RuntimeStatus, msg: str = '', level: str = 'info'
     ) -> None:
         """Sends a status message if the callback function was provided."""
         self.runtime_status = runtime_status
@@ -443,9 +445,9 @@ class Runtime(
         """
         if isinstance(event, Action):
             action_type = type(event).__name__
-            action_id = getattr(event, "id", "?")
+            action_id = getattr(event, 'id', '?')
             logger.info(
-                "[runtime %s] on_event received %s (id=%s), dispatching via run_or_schedule",
+                '[runtime %s] on_event received %s (id=%s), dispatching via run_or_schedule',
                 self.sid,
                 action_type,
                 action_id,
@@ -462,9 +464,9 @@ class Runtime(
         provider_handler = ProviderHandler(
             provider_tokens=self.vcs_provider_tokens,
         )
-        logger.info("Fetching latest provider tokens for runtime")
+        logger.info('Fetching latest provider tokens for runtime')
         env_vars = cast(
-            "dict[ProviderType, SecretStr]",
+            'dict[ProviderType, SecretStr]',
             await provider_handler.get_env_vars(
                 expose_secrets=False,
             ),
@@ -478,7 +480,7 @@ class Runtime(
                 )
             self.add_env_vars(provider_handler.expose_env_vars(env_vars))
         except Exception:
-            logger.warning("Failed to export latest provider tokens to runtime")
+            logger.warning('Failed to export latest provider tokens to runtime')
 
     async def _execute_action(self, event: Action) -> Observation:
         """Execute action and return observation.
@@ -516,10 +518,10 @@ class Runtime(
             if is_network_error
             else RuntimeStatus.ERROR
         )
-        error_message = f"{type(error).__name__}: {error!s}"
-        self.log("error", f"Unexpected error while running action: {error_message}")
-        self.log("error", f"Problematic action: {event!s}")
-        self.set_runtime_status(runtime_status, error_message, level="error")
+        error_message = f'{type(error).__name__}: {error!s}'
+        self.log('error', f'Unexpected error while running action: {error_message}')
+        self.log('error', f'Problematic action: {event!s}')
+        self.set_runtime_status(runtime_status, error_message, level='error')
 
     def _process_observation(self, observation: Observation, event: Action) -> bool:
         """Process observation result and add to event stream.
@@ -533,14 +535,14 @@ class Runtime(
 
         """
         attach_observation_cause(
-            observation, event, context="runtime._process_observation"
+            observation, event, context='runtime._process_observation'
         )
         observation.tool_call_metadata = event.tool_call_metadata
 
         # Attach a structured result payload for downstream consumers.
         # This avoids fragile parsing of free-form observation content.
         try:
-            exit_code: int | None = getattr(observation, "exit_code", None)
+            exit_code: int | None = getattr(observation, 'exit_code', None)
         except Exception:
             exit_code = None
 
@@ -549,16 +551,18 @@ class Runtime(
         )
         observation.tool_result = {
             **existing_tool_result,
-            "ok": existing_tool_result.get(
-                "ok", not isinstance(observation, ErrorObservation)
+            'ok': existing_tool_result.get(
+                'ok', not isinstance(observation, ErrorObservation)
             ),
-            "retryable": existing_tool_result.get(
-                "retryable", isinstance(observation, ErrorObservation)
+            'retryable': existing_tool_result.get(
+                'retryable', isinstance(observation, ErrorObservation)
             ),
-            "exit_code": existing_tool_result.get("exit_code", exit_code),
-            "action": existing_tool_result.get("action", getattr(event, "action", None)),
-            "observation": existing_tool_result.get(
-                "observation", getattr(observation, "observation", None)
+            'exit_code': existing_tool_result.get('exit_code', exit_code),
+            'action': existing_tool_result.get(
+                'action', getattr(event, 'action', None)
+            ),
+            'observation': existing_tool_result.get(
+                'observation', getattr(observation, 'observation', None)
             ),
         }
 
@@ -570,22 +574,27 @@ class Runtime(
     async def _handle_action(self, event: Action) -> None:
         """Handle action execution with timeout, error handling, and observation processing."""
         action_type = type(event).__name__
-        action_id = getattr(event, "id", "?")
+        action_id = getattr(event, 'id', '?')
         logger.info(
-            "[runtime %s] _handle_action START %s (id=%s)",
-            self.sid, action_type, action_id,
+            '[runtime %s] _handle_action START %s (id=%s)',
+            self.sid,
+            action_type,
+            action_id,
         )
         self._set_action_timeout(event)
 
         assert event.timeout is not None, (
-            f"Action {action_type} (id={action_id}) has no timeout after _set_action_timeout"
+            f'Action {action_type} (id={action_id}) has no timeout after _set_action_timeout'
         )
 
         try:
             observation = await self._execute_action(event)
             logger.info(
-                "[runtime %s] _handle_action GOT observation %s for %s (id=%s)",
-                self.sid, type(observation).__name__, action_type, action_id,
+                '[runtime %s] _handle_action GOT observation %s for %s (id=%s)',
+                self.sid,
+                type(observation).__name__,
+                action_type,
+                action_id,
             )
         except PermissionError as e:
             observation = ErrorObservation(content=str(e))
@@ -603,10 +612,10 @@ class Runtime(
             else:
                 self._handle_runtime_error(event, e, is_network_error=False)
                 observation = ErrorObservation(
-                    content=f"Unexpected error during action execution: {type(e).__name__}: {e}"
+                    content=f'Unexpected error during action execution: {type(e).__name__}: {e}'
                 )
                 logger.warning(
-                    "[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s",
+                    '[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s',
                     self.sid,
                     action_type,
                     action_id,
@@ -618,20 +627,27 @@ class Runtime(
             # Always emit an observation so the controller isn't stuck
             # waiting for the pending-action timeout.
             observation = ErrorObservation(
-                content=f"Runtime error during action execution: {type(e).__name__}: {e}"
+                content=f'Runtime error during action execution: {type(e).__name__}: {e}'
             )
             logger.warning(
-                "[runtime %s] _handle_action RUNTIME ERROR for %s (id=%s): %s",
-                self.sid, action_type, action_id, e,
+                '[runtime %s] _handle_action RUNTIME ERROR for %s (id=%s): %s',
+                self.sid,
+                action_type,
+                action_id,
+                e,
             )
         except Exception as e:
             self._handle_runtime_error(event, e, is_network_error=False)
             observation = ErrorObservation(
-                content=f"Unexpected error during action execution: {type(e).__name__}: {e}"
+                content=f'Unexpected error during action execution: {type(e).__name__}: {e}'
             )
             logger.warning(
-                "[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s",
-                self.sid, action_type, action_id, type(e).__name__, e,
+                '[runtime %s] _handle_action EXCEPTION for %s (id=%s): %s: %s',
+                self.sid,
+                action_type,
+                action_id,
+                type(e).__name__,
+                e,
             )
 
         if not self._process_observation(observation, event):
@@ -649,7 +665,7 @@ class Runtime(
         """
         # Handle special action types
         if isinstance(action, AgentThinkAction):
-            return AgentThinkObservation("Your thought has been logged.")
+            return AgentThinkObservation('Your thought has been logged.')
 
         if isinstance(action, TaskTrackingAction):
             return self._handle_task_tracking_action(action)
@@ -674,13 +690,14 @@ class Runtime(
 
         if action_type in AGENT_LEVEL_ACTIONS:
             # These actions are handled by the agent system, not the runtime
-            return NullObservation(content="")
+            return NullObservation(content='')
 
         # Execute the action (synchronous path)
         observation = self._execute_action_sync(action)
-        if hasattr(action, 'truncation_strategy') and getattr(action, 'truncation_strategy'):
+        if hasattr(action, 'truncation_strategy') and getattr(
+            action, 'truncation_strategy'
+        ):
             observation.truncation_strategy = getattr(action, 'truncation_strategy')
-
 
         # Verify critical actions (Layer 3: Post-Action Verification)
         verification_obs = self._verify_action_if_needed(action, observation)
@@ -688,10 +705,11 @@ class Runtime(
             # Return combined observation with verification result
             return verification_obs
 
-        if hasattr(action, 'truncation_strategy') and getattr(action, 'truncation_strategy'):
+        if hasattr(action, 'truncation_strategy') and getattr(
+            action, 'truncation_strategy'
+        ):
             observation.truncation_strategy = getattr(action, 'truncation_strategy')
         return observation
-
 
     def _verify_action_if_needed(
         self, action: Action, observation: Observation
@@ -719,12 +737,14 @@ class Runtime(
             # Normalize Unix-style absolute paths (e.g. /workspace/app.py) to
             # workspace-relative so they resolve correctly on Windows, where
             # PurePosixPath-style leading slashes confuse pathlib joins.
-            normalized = file_path.lstrip("/\\")
+            normalized = file_path.lstrip('/\\')
             # Strip the virtual /workspace prefix the LLM uses in paths.
-            if normalized.startswith("workspace/") or normalized.startswith("workspace\\"):
-                normalized = normalized[len("workspace/"):]
-            elif normalized == "workspace":
-                normalized = "."
+            if normalized.startswith('workspace/') or normalized.startswith(
+                'workspace\\'
+            ):
+                normalized = normalized[len('workspace/') :]
+            elif normalized == 'workspace':
+                normalized = '.'
             file_on_disk = Path(normalized)
 
             if not file_on_disk.is_absolute():
@@ -732,36 +752,36 @@ class Runtime(
 
             if not file_on_disk.is_file():
                 logger.error(
-                    "VERIFICATION FAILURE: File %s missing after file operation",
+                    'VERIFICATION FAILURE: File %s missing after file operation',
                     file_path,
                 )
                 error_msg = (
-                    "❌ CRITICAL VERIFICATION FAILURE:\n"
-                    f"File {file_path} does NOT exist after file operation execution.\n"
-                    "This indicates an execution failure or stale workspace base.\n\n"
-                    f"Original observation: {observation.content[:200]}\n\n"
-                    "Please retry the file creation."
+                    '❌ CRITICAL VERIFICATION FAILURE:\n'
+                    f'File {file_path} does NOT exist after file operation execution.\n'
+                    'This indicates an execution failure or stale workspace base.\n\n'
+                    f'Original observation: {observation.content[:200]}\n\n'
+                    'Please retry the file creation.'
                 )
                 return ErrorObservation(content=error_msg)
 
             # File exists - count lines (best-effort; don't fail if unreadable)
             try:
-                with file_on_disk.open("r", encoding="utf-8", errors="replace") as f:
+                with file_on_disk.open('r', encoding='utf-8', errors='replace') as f:
                     line_count = sum(1 for _ in f)
             except Exception:
                 line_count = None
 
             if line_count is not None:
                 enhanced_content = (
-                    f"{observation.content}\n\n"
-                    f"File written: {file_path} ({line_count} lines)"
+                    f'{observation.content}\n\n'
+                    f'File written: {file_path} ({line_count} lines)'
                 )
                 return FileWriteObservation(content=enhanced_content, path=file_path)
 
             return None
 
         except Exception as e:
-            logger.warning("Verification error for %s: %s", action.path, e)
+            logger.warning('Verification error for %s: %s', action.path, e)
             # Don't fail the action due to verification errors
             return None
 
@@ -770,7 +790,7 @@ class Runtime(
         action_type = action.action
 
         if action_type not in ACTION_TYPE_TO_CLASS:
-            return ErrorObservation(f"Action {action_type} does not exist.")
+            return ErrorObservation(f'Action {action_type} does not exist.')
 
         # Agent-level actions that should not be executed by runtime
         if action_type in AGENT_LEVEL_ACTIONS:
@@ -779,7 +799,7 @@ class Runtime(
 
         if not hasattr(self, action_type):
             return ErrorObservation(
-                f"Action {action_type} is not supported in the current runtime."
+                f'Action {action_type} is not supported in the current runtime.'
             )
 
         return None
@@ -909,10 +929,10 @@ class Runtime(
         if isinstance(obs, ErrorObservation):
             exit_code = -1
         else:
-            exit_attr = getattr(obs, "exit_code", None)
+            exit_attr = getattr(obs, 'exit_code', None)
             if isinstance(exit_attr, int):
                 exit_code = exit_attr
-        content = getattr(obs, "content", "")
+        content = getattr(obs, 'content', '')
         return CommandResult(content=content, exit_code=exit_code)
 
     def _create_file_fn_git_handler(self, path: str, content: str) -> int:
@@ -922,7 +942,7 @@ class Runtime(
 
     def additional_agent_instructions(self) -> str:
         """Provide runtime-specific instructions appended to agent prompts."""
-        return ""
+        return ''
 
     def subscribe_to_shell_stream(
         self, callback: Callable[[str], None] | None = None

@@ -1,12 +1,8 @@
-﻿"""Process shutdown coordination for long-running loops.
-
-Uvicorn (and other ASGI servers) install SIGINT/SIGTERM handlers and run FastAPI
-lifespan shutdown. This module does **not** register signal handlers — that
-avoided fighting the server and broken Ctrl+C on Windows.
+"""Process shutdown coordination for long-running loops.
 
 Callers that need to stop background work should use :func:`should_continue` /
-:func:`should_exit`. The API lifespan calls :func:`backend.gateway.graceful_shutdown`
-which invokes :func:`request_process_shutdown` so those loops unwind cleanly.
+:func:`should_exit`. The CLI repl calls :func:`request_process_shutdown` so
+those loops unwind cleanly.
 """
 
 from __future__ import annotations
@@ -38,7 +34,7 @@ def request_process_shutdown() -> None:
         try:
             listener()
         except Exception:
-            logger.exception("Error in shutdown listener")
+            logger.exception('Error in shutdown listener')
 
 
 def should_exit() -> bool:
@@ -85,7 +81,7 @@ async def async_sleep_if_should_continue(delay: float) -> None:
         await asyncio.sleep(delay)
         return
     start_time = time.time()
-    while time.time() - start_time < delay and should_continue():
+    while time.time() - start_time < delay and should_continue():  # noqa: ASYNC110
         await asyncio.sleep(1)
 
 

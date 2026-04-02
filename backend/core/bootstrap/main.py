@@ -1,4 +1,4 @@
-﻿"""Bootstrap entry point for the App agent framework.
+"""Bootstrap entry point for the App agent framework.
 
 Classes:
     FakeUserResponseFunc
@@ -21,28 +21,19 @@ from typing import TYPE_CHECKING, Protocol
 from backend.utils.async_utils import run_or_schedule
 
 if TYPE_CHECKING:
-    from backend.orchestration.agent import Agent
-    from backend.orchestration.state.state import State
+    from backend.context.agent_memory import Memory
+    from backend.core.provider_types import ProviderTokenType
+    from backend.execution.base import Runtime
+    from backend.orchestration.conversation_stats import ConversationStats
+    from backend.inference.llm_registry import LLMRegistry
     from backend.ledger.action.action import Action
     from backend.ledger.event import Event
     from backend.ledger.stream import EventStream
-    from backend.core.provider_types import ProviderTokenType
-    from backend.context.agent_memory import Memory
-    from backend.inference.llm_registry import LLMRegistry
-    from backend.execution.base import Runtime
-    from backend.gateway.services.conversation_stats import ConversationStats
+    from backend.orchestration.agent import Agent
+    from backend.orchestration.state.state import State
 
 
-from backend.gateway.adapters import read_input, read_task
-from backend.orchestration.replay import ReplayManager
-from backend.core.config import (
-    AppConfig,
-    parse_arguments,
-    setup_config_from_args,
-)
-from backend.core.logger import app_logger as logger
 from backend.core.bootstrap.agent_control_loop import run_agent_until_done
-from backend.core.schemas import AgentState
 from backend.core.bootstrap.setup import (
     create_agent,
     create_controller,
@@ -51,16 +42,25 @@ from backend.core.bootstrap.setup import (
     get_provider_tokens,
     initialize_repository_for_runtime,
 )
-from backend.ledger import EventSource, EventStreamSubscriber
-from backend.ledger.action import MessageAction, NullAction
-from backend.ledger.observation import AgentStateChangedObservation
-from backend.gateway.integrations.mcp import add_mcp_tools_to_agent
+from backend.core.config import (
+    AppConfig,
+    parse_arguments,
+    setup_config_from_args,
+)
+from backend.core.enums import RuntimeStatus
+from backend.core.logger import app_logger as logger
+from backend.core.schemas import AgentState
 from backend.execution import (
     RuntimeAcquireResult,
     RuntimeOrchestrator,
     runtime_orchestrator,
 )
-from backend.core.enums import RuntimeStatus
+from backend.core.io_adapters import read_input, read_task
+from backend.integrations.mcp import add_mcp_tools_to_agent
+from backend.ledger import EventSource, EventStreamSubscriber
+from backend.ledger.action import MessageAction, NullAction
+from backend.ledger.observation import AgentStateChangedObservation
+from backend.orchestration.replay import ReplayManager
 from backend.utils.async_utils import call_async_from_sync
 from backend.utils.core_utils import create_registry_and_conversation_stats
 
@@ -144,7 +144,7 @@ async def _setup_memory_and_mcp(
     """Setup memory and MCP tools."""
     event_stream = runtime.event_stream
     if event_stream is None:
-        raise RuntimeError("Runtime does not have an event stream")
+        raise RuntimeError('Runtime does not have an event stream')
 
     if memory is None:
         memory = create_memory(
@@ -168,7 +168,7 @@ def _setup_replay_events(
 ) -> tuple[list[Event] | None, Action]:
     """Setup replay events if trajectory replay is enabled."""
     if config_.replay_trajectory_path:
-        logger.info("Transcript replay is enabled")
+        logger.info('Transcript replay is enabled')
         assert isinstance(initial_action, NullAction)
         return load_replay_log(config_.replay_trajectory_path)
     return None, initial_action
@@ -182,7 +182,7 @@ def _create_early_status_callback(
     def _early_status_callback(
         msg_type: str, runtime_status: RuntimeStatus, msg: str
     ) -> None:
-        if msg_type == "error":
+        if msg_type == 'error':
             logger.error(msg)
             logger.info(
                 'MAIN._early_status_callback ENTER (runtime_status=%s, msg="%s")',
@@ -191,21 +191,21 @@ def _create_early_status_callback(
             )
             try:
                 controller.state.set_last_error(
-                    msg, source="main._early_status_callback"
+                    msg, source='main._early_status_callback'
                 )
                 if runtime_status == RuntimeStatus.ERROR_MEMORY:
                     logger.info(
-                        "MAIN._early_status_callback: recording memory error boundary at iteration %s",
+                        'MAIN._early_status_callback: recording memory error boundary at iteration %s',
                         controller.state.iteration_flag.current_value,
                     )
                     setattr(
                         controller.state,
-                        "_memory_error_boundary",
+                        '_memory_error_boundary',
                         controller.state.iteration_flag.current_value,
                     )
             except Exception:
                 logger.warning(
-                    "Failed to record error state on controller", exc_info=True
+                    'Failed to record error state on controller', exc_info=True
                 )
             # Schedule safely across threads without requiring a running loop
             try:
@@ -216,12 +216,12 @@ def _create_early_status_callback(
 
                     create_tracked_task(
                         controller.set_agent_state_to(AgentState.ERROR),
-                        name="error-state-last-resort",
+                        name='error-state-last-resort',
                     )
                 except Exception:
                     logger.error(
-                        "CRITICAL: Failed to transition agent to ERROR state — "
-                        "agent may be stuck in an inconsistent state",
+                        'CRITICAL: Failed to transition agent to ERROR state — '
+                        'agent may be stuck in an inconsistent state',
                         exc_info=True,
                     )
         else:
@@ -232,10 +232,10 @@ def _create_early_status_callback(
 
 def _validate_initial_action(initial_action: Action) -> None:
     """Validate that the initial action is properly formatted."""
-    if not hasattr(initial_action, "message") and (
-        not hasattr(initial_action, "content")
+    if not hasattr(initial_action, 'message') and (
+        not hasattr(initial_action, 'content')
     ):
-        msg = f"initial user actions must be an Action-like object, got {type(initial_action)}"
+        msg = f'initial user actions must be an Action-like object, got {type(initial_action)}'
         raise AssertionError(msg)
 
 
@@ -253,7 +253,7 @@ def _setup_initial_events(
         error_message = MessageAction(
             content=(
                 "Let's get back on track. If you experienced errors before, "
-                "do NOT resume your task. Ask me about it."
+                'do NOT resume your task. Ask me about it.'
             ),
         )
         if loop is not None:
@@ -287,7 +287,7 @@ def _create_event_handler(
             and event.agent_state == AgentState.AWAITING_USER_INPUT
         ):
             if exit_on_message:
-                message = "/exit"
+                message = '/exit'
             elif fake_user_response_fn is None:
                 message = read_input(config_.cli_multiline_input)
             else:
@@ -302,12 +302,12 @@ def _save_trajectory(config_: AppConfig, session_id: str, controller) -> None:
     """Save trajectory output to file if configured."""
     if config_.save_trajectory_path is not None:
         if os.path.isdir(config_.save_trajectory_path):
-            file_path = os.path.join(config_.save_trajectory_path, f"{session_id}.json")
+            file_path = os.path.join(config_.save_trajectory_path, f'{session_id}.json')
         else:
             file_path = config_.save_trajectory_path
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         histories = controller.get_transcript(config_.save_screenshots_in_trajectory)
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(histories, f, indent=4)
 
 
@@ -386,7 +386,7 @@ async def run_controller(
             memory=memory,
             conversation_instructions=conversation_instructions,
         )
-        saved_controller = getattr(runtime, "controller", None)
+        saved_controller = getattr(runtime, 'controller', None)
         if saved_controller is not None:
             _save_trajectory(config_, session_id, saved_controller)
         return state
@@ -421,7 +421,7 @@ async def _execute_controller_lifecycle(
 ) -> State:
     event_stream = runtime.event_stream
     if event_stream is None:
-        raise RuntimeError("Runtime does not have an event stream")
+        raise RuntimeError('Runtime does not have an event stream')
     resolved_memory = await _setup_memory_and_mcp(
         config_,
         runtime,
@@ -439,11 +439,11 @@ async def _execute_controller_lifecycle(
         conversation_stats,
         replay_events=replay_events,
     )
-    setattr(runtime, "controller", controller)  # retain for trajectory saving
+    setattr(runtime, 'controller', controller)  # retain for trajectory saving
     _attach_status_callback(resolved_memory, controller)
     _validate_initial_action(initial_action)
     logger.debug(
-        "Agent Controller Initialized: Running agent %s, model %s, with actions: %s",
+        'Agent Controller Initialized: Running agent %s, model %s, with actions: %s',
         agent.name,
         agent.llm.config.model,
         initial_action,
@@ -466,7 +466,7 @@ def _attach_status_callback(memory: Memory, controller) -> None:
     try:
         memory.status_callback = _early_status_callback
     except Exception:
-        logger.warning("Failed to attach status callback to memory", exc_info=True)
+        logger.warning('Failed to attach status callback to memory', exc_info=True)
 
 
 def _subscribe_controller_events(
@@ -493,13 +493,13 @@ async def _run_agent_loop(controller, runtime: Runtime, memory: Memory) -> None:
     try:
         await run_agent_until_done(controller, runtime, memory, end_states)
     except Exception as exc:
-        logger.error("Exception in main loop: %s", exc)
+        logger.error('Exception in main loop: %s', exc)
 
 
 async def _persist_controller_state(
     config_: AppConfig, controller, event_stream: EventStream
 ) -> None:
-    if config_.file_store is None or config_.file_store == "memory":
+    if config_.file_store is None or config_.file_store == 'memory':
         return
     end_state = controller.get_state()
     end_state.save_to_session(
@@ -513,15 +513,15 @@ async def _persist_controller_state(
 def _prepare_final_state(controller) -> State:
     state = controller.get_state()
     force_iteration_reset = getattr(
-        controller, "_force_iteration_reset", False
+        controller, '_force_iteration_reset', False
     ) or getattr(
         state,
-        "_force_iteration_reset",
+        '_force_iteration_reset',
         False,
     )
     if force_iteration_reset:
         logger.debug(
-            "run_controller: honoring forced iteration reset (current=%s)",
+            'run_controller: honoring forced iteration reset (current=%s)',
             state.iteration_flag.current_value,
         )
         state.iteration_flag.current_value = 0
@@ -538,9 +538,9 @@ def auto_continue_response(
     Tell the agent to proceed without asking for more input, or finish the interaction.
     """
     return (
-        "Please continue on whatever approach you think is suitable.\n"
-        "If you think you have solved the task, please finish the interaction.\n"
-        "IMPORTANT: YOU SHOULD NEVER ASK FOR HUMAN RESPONSE.\n"
+        'Please continue on whatever approach you think is suitable.\n'
+        'If you think you have solved the task, please finish the interaction.\n'
+        'IMPORTANT: YOU SHOULD NEVER ASK FOR HUMAN RESPONSE.\n'
     )
 
 
@@ -554,24 +554,28 @@ def load_replay_log(trajectory_path: str) -> tuple[list[Event] | None, Action]:
     try:
         path = Path(trajectory_path).resolve()
         if not path.exists():
-            msg = f"Trajectory file not found: {path}"
+            msg = f'Trajectory file not found: {path}'
             raise ValueError(msg)
         if not path.is_file():
-            msg = f"Trajectory path is a directory, not a file: {path}"
+            msg = f'Trajectory path is a directory, not a file: {path}'
             raise ValueError(msg)
-        with open(path, encoding="utf-8") as file:
+        with open(path, encoding='utf-8') as file:
             events = ReplayManager.get_replay_events(json.load(file))
             if not events:
-                raise ValueError(f"Trajectory file contains no events: {path}") from None
+                raise ValueError(
+                    f'Trajectory file contains no events: {path}'
+                ) from None
             if not isinstance(events[0], MessageAction):
-                raise ValueError(f"Trajectory first event must be MessageAction, got {type(events[0]).__name__}") from None
+                raise ValueError(
+                    f'Trajectory first event must be MessageAction, got {type(events[0]).__name__}'
+                ) from None
             return (events[1:], events[0])
     except json.JSONDecodeError as e:
-        msg = f"Invalid JSON format in {trajectory_path}: {e}"
+        msg = f'Invalid JSON format in {trajectory_path}: {e}'
         raise ValueError(msg) from e
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     args = parse_arguments()
     config_main: AppConfig = setup_config_from_args(args)
     task_str = read_task(args, config_main.cli_multiline_input)
@@ -579,13 +583,13 @@ if __name__ == "__main__":
     if config_main.replay_trajectory_path:
         if task_str:
             error_msg = (
-                "User-specified task is not supported under trajectory replay mode"
+                'User-specified task is not supported under trajectory replay mode'
             )
             raise ValueError(error_msg)
     elif task_str:
         initial_action_main = MessageAction(content=task_str)
     else:
-        error_msg = "No task provided. Please specify a task through -t, -f."
+        error_msg = 'No task provided. Please specify a task through -t, -f.'
         raise ValueError(error_msg)
     session_name = args.name
     sid_main = generate_sid(config_main, session_name)

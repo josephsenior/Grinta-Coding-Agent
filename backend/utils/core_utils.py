@@ -5,8 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
+from backend.orchestration.conversation_stats import ConversationStats
 from backend.inference.llm_registry import LLMRegistry
-from backend.gateway.services.conversation_stats import ConversationStats
 from backend.persistence import get_file_store
 
 if TYPE_CHECKING:
@@ -27,7 +27,7 @@ def setup_llm_config(config: AppConfig, settings: Settings) -> AppConfig:
     """
     config = deepcopy(config)
     llm_config = config.get_llm_config()
-    llm_config.model = settings.llm_model or ""
+    llm_config.model = settings.llm_model or ''
     llm_config.api_key = settings.llm_api_key
     llm_config.base_url = settings.llm_base_url
     config.set_llm_config(llm_config)
@@ -55,7 +55,7 @@ def create_registry_and_conversation_stats(
     user_config = config
     if user_settings:
         user_config = setup_llm_config(config, user_settings)
-    agent_cls = getattr(user_settings, "agent", None) if user_settings else None
+    agent_cls = getattr(user_settings, 'agent', None) if user_settings else None
     llm_registry = LLMRegistry(user_config, agent_cls)
     file_store = get_file_store(
         file_store_type=config.file_store,

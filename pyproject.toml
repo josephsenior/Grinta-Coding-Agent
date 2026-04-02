@@ -179,9 +179,7 @@ lint.pydocstyle.convention = "google"
 "backend/cli/config_manager.py" = ["E402"]
 "backend/cli/event_renderer.py" = ["E402"]
 "backend/cli/repl.py" = ["E402"]
-"backend/gateway/app_accessors.py" = ["E402"]
-"backend/gateway/integrations/mcp/mcp_utils.py" = ["E402"]
-"backend/gateway/routes/public.py" = ["E402"]
+"backend/integrations/mcp/mcp_utils.py" = ["E402"]
 "backend/persistence/data_models/settings.py" = ["E402"]
 
 [tool.coverage.run]

@@ -9,15 +9,15 @@ Tests cover:
 
 from __future__ import annotations
 
-from unittest.mock import Mock, patch
 from typing import cast
+from unittest.mock import Mock, patch
 
 import pytest
 
-from backend.inference.llm_registry import LLMRegistry
-from backend.gateway.services.conversation_stats import ConversationStats
-from backend.persistence.data_models.settings import Settings
 from backend.core.config.app_config import AppConfig
+from backend.orchestration.conversation_stats import ConversationStats
+from backend.inference.llm_registry import LLMRegistry
+from backend.persistence.data_models.settings import Settings
 from backend.utils.core_utils import (
     create_registry_and_conversation_stats,
     setup_llm_config,
@@ -31,16 +31,16 @@ def base_config() -> AppConfig:
 
     # Mock LLM config getter/setter
     mock_llm_config = Mock()
-    mock_llm_config.model = "gpt-4"
-    mock_llm_config.api_key = "base-key"
-    mock_llm_config.base_url = "https://api.openai.com/v1"
+    mock_llm_config.model = 'gpt-4'
+    mock_llm_config.api_key = 'base-key'
+    mock_llm_config.base_url = 'https://api.openai.com/v1'
 
     config.get_llm_config = Mock(return_value=mock_llm_config)
     config.set_llm_config = Mock()
 
     # Mock other config fields
-    config.file_store = "local"
-    config.local_data_root = "/tmp/files"
+    config.file_store = 'local'
+    config.local_data_root = '/tmp/files'
     config.file_store_web_hook_url = None
     config.file_store_web_hook_headers = None
     config.file_store_web_hook_batch = 10
@@ -52,9 +52,9 @@ def base_config() -> AppConfig:
 def user_settings() -> Settings:
     """Provide user settings."""
     settings = Mock(spec=Settings)
-    settings.llm_model = "gpt-4-turbo"
-    settings.llm_api_key = "user-api-key"
-    settings.llm_base_url = "https://custom-api.example.com/v1"
+    settings.llm_model = 'gpt-4-turbo'
+    settings.llm_api_key = 'user-api-key'
+    settings.llm_base_url = 'https://custom-api.example.com/v1'
     return settings
 
 
@@ -63,7 +63,7 @@ def minimal_settings() -> Settings:
     """Provide minimal user settings (some None values)."""
     settings = Mock(spec=Settings)
     settings.llm_model = None
-    settings.llm_api_key = "user-api-key"
+    settings.llm_api_key = 'user-api-key'
     settings.llm_base_url = None
     return settings
 
@@ -71,7 +71,7 @@ def minimal_settings() -> Settings:
 class TestSetupLlmConfig:
     """Test LLM configuration setup."""
 
-    @patch("backend.utils.core_utils.deepcopy")
+    @patch('backend.utils.core_utils.deepcopy')
     def test_setup_llm_config_applies_user_settings(
         self, mock_deepcopy: Mock, base_config: AppConfig, user_settings: Settings
     ) -> None:
@@ -84,11 +84,11 @@ class TestSetupLlmConfig:
         assert set_call_args is not None
 
         updated_llm_config = set_call_args[0][0]
-        assert updated_llm_config.model == "gpt-4-turbo"
-        assert updated_llm_config.api_key == "user-api-key"
-        assert updated_llm_config.base_url == "https://custom-api.example.com/v1"
+        assert updated_llm_config.model == 'gpt-4-turbo'
+        assert updated_llm_config.api_key == 'user-api-key'
+        assert updated_llm_config.base_url == 'https://custom-api.example.com/v1'
 
-    @patch("backend.utils.core_utils.deepcopy")
+    @patch('backend.utils.core_utils.deepcopy')
     def test_setup_llm_config_with_partial_settings(
         self, mock_deepcopy: Mock, base_config: AppConfig, minimal_settings: Settings
     ) -> None:
@@ -100,9 +100,9 @@ class TestSetupLlmConfig:
         updated_llm_config = set_call_args[0][0]
 
         # API key should be updated
-        assert updated_llm_config.api_key == "user-api-key"
+        assert updated_llm_config.api_key == 'user-api-key'
         # Model should become empty string (not provided)
-        assert updated_llm_config.model == ""
+        assert updated_llm_config.model == ''
         # Base URL should be None
         assert updated_llm_config.base_url is None
 
@@ -113,7 +113,7 @@ class TestSetupLlmConfig:
         result = setup_llm_config(base_config, user_settings)
         assert result is not None
 
-    @patch("backend.utils.core_utils.deepcopy")
+    @patch('backend.utils.core_utils.deepcopy')
     def test_setup_llm_config_get_llm_config_called(
         self, mock_deepcopy: Mock, base_config: AppConfig, user_settings: Settings
     ) -> None:
@@ -122,7 +122,7 @@ class TestSetupLlmConfig:
         setup_llm_config(base_config, user_settings)
         cast(Mock, base_config.get_llm_config).assert_called_once()
 
-    @patch("backend.utils.core_utils.deepcopy")
+    @patch('backend.utils.core_utils.deepcopy')
     def test_setup_llm_config_set_llm_config_called(
         self, mock_deepcopy: Mock, base_config: AppConfig, user_settings: Settings
     ) -> None:
@@ -142,24 +142,24 @@ class TestSetupLlmConfig:
         assert id(base_config) == original_id
         assert base_config != result
 
-    @patch("backend.utils.core_utils.deepcopy")
+    @patch('backend.utils.core_utils.deepcopy')
     def test_setup_llm_config_empty_model_string(
         self, mock_deepcopy: Mock, base_config: AppConfig
     ) -> None:
         """Test handling of empty model string in settings."""
         mock_deepcopy.side_effect = lambda x: x
         settings = Mock(spec=Settings)
-        settings.llm_model = ""
-        settings.llm_api_key = "key"
-        settings.llm_base_url = "url"
+        settings.llm_model = ''
+        settings.llm_api_key = 'key'
+        settings.llm_base_url = 'url'
 
         setup_llm_config(base_config, settings)
 
         set_call_args = cast(Mock, base_config.set_llm_config).call_args
         updated_llm_config = set_call_args[0][0]
-        assert updated_llm_config.model == ""
+        assert updated_llm_config.model == ''
 
-    @patch("backend.utils.core_utils.deepcopy")
+    @patch('backend.utils.core_utils.deepcopy')
     def test_setup_llm_config_preserves_unspecified_settings(
         self, mock_deepcopy: Mock, base_config: AppConfig, user_settings: Settings
     ) -> None:
@@ -167,22 +167,22 @@ class TestSetupLlmConfig:
         mock_deepcopy.side_effect = lambda x: x
         # Set a custom value in base config
         base_llm_config = cast(Mock, base_config.get_llm_config).return_value
-        base_llm_config.some_field = "preserved_value"
+        base_llm_config.some_field = 'preserved_value'
 
         setup_llm_config(base_config, user_settings)
 
         set_call_args = cast(Mock, base_config.set_llm_config).call_args
         updated_llm_config = set_call_args[0][0]
         # The field we didn't modify should still be there
-        assert updated_llm_config.some_field == "preserved_value"
+        assert updated_llm_config.some_field == 'preserved_value'
 
 
 class TestCreateRegistryAndStats:
     """Test registry and stats creation."""
 
-    @patch("backend.utils.core_utils.get_file_store")
-    @patch("backend.utils.core_utils.LLMRegistry")
-    @patch("backend.utils.core_utils.ConversationStats")
+    @patch('backend.utils.core_utils.get_file_store')
+    @patch('backend.utils.core_utils.LLMRegistry')
+    @patch('backend.utils.core_utils.ConversationStats')
     def test_create_registry_with_user_settings(
         self,
         mock_stats_class: Mock,
@@ -202,21 +202,21 @@ class TestCreateRegistryAndStats:
 
         # Call function
         registry, stats, config = create_registry_and_conversation_stats(
-            base_config, "sid_1", "user_1", user_settings
+            base_config, 'sid_1', 'user_1', user_settings
         )
 
         # Verify calls
         mock_registry_class.assert_called_once()
-        mock_stats_class.assert_called_once_with(mock_file_store, "sid_1", "user_1")
+        mock_stats_class.assert_called_once_with(mock_file_store, 'sid_1', 'user_1')
         mock_registry.subscribe.assert_called_once()
 
         # Verify returns
         assert registry == mock_registry
         assert stats == mock_conversation_stats
 
-    @patch("backend.utils.core_utils.get_file_store")
-    @patch("backend.utils.core_utils.LLMRegistry")
-    @patch("backend.utils.core_utils.ConversationStats")
+    @patch('backend.utils.core_utils.get_file_store')
+    @patch('backend.utils.core_utils.LLMRegistry')
+    @patch('backend.utils.core_utils.ConversationStats')
     def test_create_registry_without_user_settings(
         self,
         mock_stats_class: Mock,
@@ -235,7 +235,7 @@ class TestCreateRegistryAndStats:
 
         # Call function without user_settings
         registry, stats, config = create_registry_and_conversation_stats(
-            base_config, "sid_1", "user_1", None
+            base_config, 'sid_1', 'user_1', None
         )
 
         # Verify the base config was used (not modified)
@@ -244,9 +244,9 @@ class TestCreateRegistryAndStats:
         # First argument should be config
         assert call_args[0][0] == base_config
 
-    @patch("backend.utils.core_utils.get_file_store")
-    @patch("backend.utils.core_utils.LLMRegistry")
-    @patch("backend.utils.core_utils.ConversationStats")
+    @patch('backend.utils.core_utils.get_file_store')
+    @patch('backend.utils.core_utils.LLMRegistry')
+    @patch('backend.utils.core_utils.ConversationStats')
     def test_create_registry_returns_updated_config(
         self,
         mock_stats_class: Mock,
@@ -264,15 +264,15 @@ class TestCreateRegistryAndStats:
         mock_stats_class.return_value = mock_conversation_stats
 
         registry, stats, returned_config = create_registry_and_conversation_stats(
-            base_config, "sid_1", "user_1", user_settings
+            base_config, 'sid_1', 'user_1', user_settings
         )
 
         # Returned config should not be None
         assert returned_config is not None
 
-    @patch("backend.utils.core_utils.get_file_store")
-    @patch("backend.utils.core_utils.LLMRegistry")
-    @patch("backend.utils.core_utils.ConversationStats")
+    @patch('backend.utils.core_utils.get_file_store')
+    @patch('backend.utils.core_utils.LLMRegistry')
+    @patch('backend.utils.core_utils.ConversationStats')
     def test_create_registry_subscribes_stats(
         self,
         mock_stats_class: Mock,
@@ -290,15 +290,15 @@ class TestCreateRegistryAndStats:
         mock_stats_class.return_value = mock_conversation_stats
 
         create_registry_and_conversation_stats(
-            base_config, "sid_1", "user_1", user_settings
+            base_config, 'sid_1', 'user_1', user_settings
         )
 
         # Registry's subscribe method should be called with stats callback
         mock_registry.subscribe.assert_called_once()
 
-    @patch("backend.utils.core_utils.get_file_store")
-    @patch("backend.utils.core_utils.LLMRegistry")
-    @patch("backend.utils.core_utils.ConversationStats")
+    @patch('backend.utils.core_utils.get_file_store')
+    @patch('backend.utils.core_utils.LLMRegistry')
+    @patch('backend.utils.core_utils.ConversationStats')
     def test_create_registry_file_store_created(
         self,
         mock_stats_class: Mock,
@@ -316,21 +316,21 @@ class TestCreateRegistryAndStats:
         mock_stats_class.return_value = mock_conversation_stats
 
         create_registry_and_conversation_stats(
-            base_config, "sid_1", "user_1", user_settings
+            base_config, 'sid_1', 'user_1', user_settings
         )
 
         # Verify get_file_store was called with config values
         mock_get_file_store.assert_called_once_with(
-            file_store_type="local",
-            local_data_root="/tmp/files",
+            file_store_type='local',
+            local_data_root='/tmp/files',
             file_store_web_hook_url=None,
             file_store_web_hook_headers=None,
             file_store_web_hook_batch=10,
         )
 
-    @patch("backend.utils.core_utils.get_file_store")
-    @patch("backend.utils.core_utils.LLMRegistry")
-    @patch("backend.utils.core_utils.ConversationStats")
+    @patch('backend.utils.core_utils.get_file_store')
+    @patch('backend.utils.core_utils.LLMRegistry')
+    @patch('backend.utils.core_utils.ConversationStats')
     def test_create_registry_with_none_user_id(
         self,
         mock_stats_class: Mock,
@@ -348,15 +348,15 @@ class TestCreateRegistryAndStats:
         mock_stats_class.return_value = mock_conversation_stats
 
         create_registry_and_conversation_stats(
-            base_config, "sid_1", None, user_settings
+            base_config, 'sid_1', None, user_settings
         )
 
         # Stats should be created with None user_id
-        mock_stats_class.assert_called_once_with(mock_file_store, "sid_1", None)
+        mock_stats_class.assert_called_once_with(mock_file_store, 'sid_1', None)
 
-    @patch("backend.utils.core_utils.get_file_store")
-    @patch("backend.utils.core_utils.LLMRegistry")
-    @patch("backend.utils.core_utils.ConversationStats")
+    @patch('backend.utils.core_utils.get_file_store')
+    @patch('backend.utils.core_utils.LLMRegistry')
+    @patch('backend.utils.core_utils.ConversationStats')
     def test_create_registry_agent_class_passed(
         self,
         mock_stats_class: Mock,
@@ -374,16 +374,16 @@ class TestCreateRegistryAndStats:
         mock_stats_class.return_value = mock_conversation_stats
 
         create_registry_and_conversation_stats(
-            base_config, "sid_1", "user_1", user_settings
+            base_config, 'sid_1', 'user_1', user_settings
         )
 
         # Check that LLMRegistry was initialized with the agent class
         call_args = mock_registry_class.call_args
         assert call_args[0][1] is None
 
-    @patch("backend.utils.core_utils.get_file_store")
-    @patch("backend.utils.core_utils.LLMRegistry")
-    @patch("backend.utils.core_utils.ConversationStats")
+    @patch('backend.utils.core_utils.get_file_store')
+    @patch('backend.utils.core_utils.LLMRegistry')
+    @patch('backend.utils.core_utils.ConversationStats')
     def test_create_registry_agent_class_none(
         self,
         mock_stats_class: Mock,
@@ -399,7 +399,7 @@ class TestCreateRegistryAndStats:
         mock_conversation_stats = Mock(spec=ConversationStats)
         mock_stats_class.return_value = mock_conversation_stats
 
-        create_registry_and_conversation_stats(base_config, "sid_1", "user_1", None)
+        create_registry_and_conversation_stats(base_config, 'sid_1', 'user_1', None)
 
         # Agent class should be None
         call_args = mock_registry_class.call_args
@@ -409,9 +409,9 @@ class TestCreateRegistryAndStats:
 class TestConfigComplexity:
     """Test complex configuration scenarios."""
 
-    @patch("backend.utils.core_utils.get_file_store")
-    @patch("backend.utils.core_utils.LLMRegistry")
-    @patch("backend.utils.core_utils.ConversationStats")
+    @patch('backend.utils.core_utils.get_file_store')
+    @patch('backend.utils.core_utils.LLMRegistry')
+    @patch('backend.utils.core_utils.ConversationStats')
     def test_multiple_calls_independent(
         self,
         mock_stats_class: Mock,
@@ -432,10 +432,10 @@ class TestConfigComplexity:
 
         # Create two separate registries
         r1, s1, _ = create_registry_and_conversation_stats(
-            base_config, "sid_1", "user_1", user_settings
+            base_config, 'sid_1', 'user_1', user_settings
         )
         r2, s2, _ = create_registry_and_conversation_stats(
-            base_config, "sid_2", "user_2", user_settings
+            base_config, 'sid_2', 'user_2', user_settings
         )
 
         # They should be different objects
@@ -444,7 +444,7 @@ class TestConfigComplexity:
         assert mock_registry_class.call_count == 2
         assert mock_stats_class.call_count == 2
 
-    @patch("backend.utils.core_utils.deepcopy")
+    @patch('backend.utils.core_utils.deepcopy')
     def test_settings_with_special_characters(
         self, mock_deepcopy: Mock, base_config: AppConfig
     ) -> None:
@@ -452,8 +452,8 @@ class TestConfigComplexity:
         mock_deepcopy.side_effect = lambda x: x
         settings = Mock(spec=Settings)
         settings.llm_model = 'gpt-4 "special"'
-        settings.llm_api_key = "key with spaces & symbols"
-        settings.llm_base_url = "https://api.example.com:8080/v1/api?version=2"
+        settings.llm_api_key = 'key with spaces & symbols'
+        settings.llm_base_url = 'https://api.example.com:8080/v1/api?version=2'
 
         setup_llm_config(base_config, settings)
 
@@ -461,4 +461,4 @@ class TestConfigComplexity:
         assert set_call_args is not None
         updated_llm_config = set_call_args[0][0]
         assert updated_llm_config.model == 'gpt-4 "special"'
-        assert updated_llm_config.api_key == "key with spaces & symbols"
+        assert updated_llm_config.api_key == 'key with spaces & symbols'
