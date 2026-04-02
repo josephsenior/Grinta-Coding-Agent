@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
-import sqlite3
-import json
-import sqlite3
 import asyncio
+import json
 import logging
 import os
+import sqlite3
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -56,7 +54,7 @@ class ChromaDBBackend(VectorBackend):
 
     def __init__(
         self,
-        collection_name: str = "APP_memory",
+        collection_name: str = 'APP_memory',
         persist_directory: Path | None = None,
     ) -> None:
         r"""Initialize ChromaDB local vector store.
@@ -67,7 +65,7 @@ class ChromaDBBackend(VectorBackend):
 
         """
         if persist_directory is None:
-            persist_directory = Path.home() / ".app" / "memory" / "chroma"
+            persist_directory = Path.home() / '.grinta' / 'memory' / 'chroma'
         persist_directory.mkdir(parents=True, exist_ok=True)
 
         import chromadb
@@ -79,26 +77,32 @@ class ChromaDBBackend(VectorBackend):
         )
 
         # Use a high-quality code-centric embedding model for software contexts
-        model_name = os.getenv("EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
+        model_name = os.getenv('EMBEDDING_MODEL', 'jinaai/jina-embeddings-v2-base-code')
         logger.info(
             "Loading embedding model '%s' (first run downloads ~500 MB)…",
             model_name,
         )
         from sentence_transformers import SentenceTransformer
 
-        self.model = SentenceTransformer(model_name, trust_remote_code=True)
+        # Suppress noisy HuggingFace/requests connection errors that leak to
+        # stdout/stderr even when logging is silenced (they use warnings/print).
+        import io
+        import contextlib
+        with contextlib.redirect_stderr(io.StringIO()), \
+             contextlib.redirect_stdout(io.StringIO()):
+            self.model = SentenceTransformer(model_name, trust_remote_code=True)
 
         try:
             self.collection = self.client.get_collection(name=collection_name)
             logger.info(
-                "Loaded ChromaDB collection with %s documents", self.collection.count()
+                'Loaded ChromaDB collection with %s documents', self.collection.count()
             )
         except Exception:
             self.collection = self.client.create_collection(
                 name=collection_name,
-                metadata={"hnsw:space": "cosine"},
+                metadata={'hnsw:space': 'cosine'},
             )
-            logger.info("Created new ChromaDB collection")
+            logger.info('Created new ChromaDB collection')
 
     def add(
         self,
@@ -114,13 +118,13 @@ class ChromaDBBackend(VectorBackend):
         embedding = self.model.encode(text, show_progress_bar=False).tolist()
 
         doc_metadata = {
-            "step_id": step_id,
-            "role": role,
-            "timestamp": time.time(),
+            'step_id': step_id,
+            'role': role,
+            'timestamp': time.time(),
             **(metadata or {}),
         }
         if artifact_hash:
-            doc_metadata["artifact_hash"] = artifact_hash
+            doc_metadata['artifact_hash'] = artifact_hash
 
         self.collection.add(
             ids=[step_id],
@@ -141,25 +145,25 @@ class ChromaDBBackend(VectorBackend):
             query_embeddings=[query_embedding],  # type: ignore[arg-type]
             n_results=min(k, self.collection.count()),
             where=filter_metadata,
-            include=["documents", "metadatas", "distances"],
+            include=['documents', 'metadatas', 'distances'],
         )
 
         if (
-            not results["ids"]
-            or not results["documents"]
-            or not results["metadatas"]
-            or not results["distances"]
+            not results['ids']
+            or not results['documents']
+            or not results['metadatas']
+            or not results['distances']
         ):
             return []
 
         return [
             {
-                "step_id": results["ids"][0][i],
-                "score": 1.0 - results["distances"][0][i],
-                "excerpt": results["documents"][0][i],
-                **results["metadatas"][0][i],
+                'step_id': results['ids'][0][i],
+                'score': 1.0 - results['distances'][0][i],
+                'excerpt': results['documents'][0][i],
+                **results['metadatas'][0][i],
             }
-            for i in range(len(results["ids"][0]))
+            for i in range(len(results['ids'][0]))
         ]
 
     async def async_add(
@@ -189,28 +193,28 @@ class ChromaDBBackend(VectorBackend):
         """Delete documents matching metadata filters."""
         try:
             self.collection.delete(where=filter_metadata)
-            logger.info("Deleted documents from ChromaDB matching %s", filter_metadata)
+            logger.info('Deleted documents from ChromaDB matching %s', filter_metadata)
             return 1
         except Exception as e:
-            logger.error("Failed to delete from ChromaDB: %s", e)
+            logger.error('Failed to delete from ChromaDB: %s', e)
             return 0
 
     def delete_by_ids(self, ids: list[str]) -> int:
         """Delete documents by their IDs."""
         try:
             self.collection.delete(ids=ids)
-            logger.info("Deleted %s documents from ChromaDB", len(ids))
+            logger.info('Deleted %s documents from ChromaDB', len(ids))
             return len(ids)
         except Exception as e:
-            logger.error("Failed to delete from ChromaDB: %s", e)
+            logger.error('Failed to delete from ChromaDB: %s', e)
             return 0
 
     def stats(self) -> dict[str, Any]:
         """Return metadata about the local ChromaDB collection."""
         return {
-            "backend": "ChromaDB (Local)",
-            "num_documents": self.collection.count(),
-            "embedding_dim": self.model.get_sentence_embedding_dimension(),
+            'backend': 'ChromaDB (Local)',
+            'num_documents': self.collection.count(),
+            'embedding_dim': self.model.get_sentence_embedding_dimension(),
         }
 
     @staticmethod
@@ -221,8 +225,7 @@ class ChromaDBBackend(VectorBackend):
             parts.append(rationale)
         if content:
             parts.append(content[:2000])
-        return "\n".join(parts)
-
+        return '\n'.join(parts)
 
 
 class SQLiteBM25Backend(VectorBackend):
@@ -230,13 +233,13 @@ class SQLiteBM25Backend(VectorBackend):
 
     def __init__(
         self,
-        collection_name: str = "APP_memory",
+        collection_name: str = 'APP_memory',
         persist_directory: Path | None = None,
     ) -> None:
         if persist_directory is None:
-            persist_directory = Path.home() / ".app" / "memory" / "sqlite"
+            persist_directory = Path.home() / '.grinta' / 'memory' / 'sqlite'
         persist_directory.mkdir(parents=True, exist_ok=True)
-        self.db_path = persist_directory / f"{collection_name}_fts.db"
+        self.db_path = persist_directory / f'{collection_name}_fts.db'
         self._init_db()
 
     def _init_db(self) -> None:
@@ -260,46 +263,46 @@ class SQLiteBM25Backend(VectorBackend):
         metadata: dict[str, Any] | None = None,
     ) -> None:
         text = self._prepare_text(rationale, content_text)
-        
+
         doc_metadata = {
-            "step_id": step_id,
-            "role": role,
-            "timestamp": time.time(),
+            'step_id': step_id,
+            'role': role,
+            'timestamp': time.time(),
             **(metadata or {}),
         }
         if artifact_hash:
-            doc_metadata["artifact_hash"] = artifact_hash
-            
+            doc_metadata['artifact_hash'] = artifact_hash
+
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("DELETE FROM docs WHERE step_id = ?", (step_id,))
+            conn.execute('DELETE FROM docs WHERE step_id = ?', (step_id,))
             conn.execute(
-                "INSERT INTO docs (step_id, role, content, metadata) VALUES (?, ?, ?, ?)",
-                (step_id, role, text[:2000], json.dumps(doc_metadata))
+                'INSERT INTO docs (step_id, role, content, metadata) VALUES (?, ?, ?, ?)',
+                (step_id, role, text[:2000], json.dumps(doc_metadata)),
             )
 
     def search(
         self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
-        cleaned_query = "".join(c if c.isalnum() else " " for c in query).strip()
+        cleaned_query = ''.join(c if c.isalnum() else ' ' for c in query).strip()
         words = [w for w in cleaned_query.split() if w and len(w) > 2]
         if not words:
             return []
-            
-        match_query = " OR ".join(words)
-        
+
+        match_query = ' OR '.join(words)
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute(
                     """
                     SELECT step_id, content, metadata, bm25(docs) as score
-                    FROM docs 
-                    WHERE docs MATCH ? 
-                    ORDER BY score ASC 
+                    FROM docs
+                    WHERE docs MATCH ?
+                    ORDER BY score ASC
                     LIMIT ?
                     """,
-                    (match_query, k * 2)
+                    (match_query, k * 2),
                 )
-                
+
                 results = []
                 for step_id, content, meta_json, score in cursor:
                     meta = {}
@@ -307,7 +310,7 @@ class SQLiteBM25Backend(VectorBackend):
                         meta = json.loads(meta_json)
                     except Exception:
                         pass
-                        
+
                     if filter_metadata:
                         match = True
                         for fk, fv in filter_metadata.items():
@@ -316,38 +319,42 @@ class SQLiteBM25Backend(VectorBackend):
                                 break
                         if not match:
                             continue
-                            
-                    results.append({
-                        "step_id": step_id,
-                        "score": -score,
-                        "excerpt": content,
-                        **meta
-                    })
-                    
+
+                    results.append(
+                        {
+                            'step_id': step_id,
+                            'score': -score,
+                            'excerpt': content,
+                            **meta,
+                        }
+                    )
+
                     if len(results) >= k:
                         break
-                        
+
                 return results
         except sqlite3.OperationalError as e:
             logger.warning("SQLite FTS search failed for query '%s': %s", query, e)
             return []
 
     def delete_by_metadata(self, filter_metadata: dict[str, Any]) -> int:
-         return 0
+        return 0
 
     def delete_by_ids(self, ids: list[str]) -> int:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.executemany("DELETE FROM docs WHERE step_id = ?", [(i,) for i in ids])
+            cursor.executemany(
+                'DELETE FROM docs WHERE step_id = ?', [(i,) for i in ids]
+            )
             return cursor.rowcount
 
     def stats(self) -> dict[str, Any]:
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("SELECT count(*) FROM docs")
+            cursor = conn.execute('SELECT count(*) FROM docs')
             count = cursor.fetchone()[0]
         return {
-            "backend": "SQLite FTS5 (BM25)",
-            "num_documents": count,
+            'backend': 'SQLite FTS5 (BM25)',
+            'num_documents': count,
         }
 
     @staticmethod
@@ -357,7 +364,7 @@ class SQLiteBM25Backend(VectorBackend):
             parts.append(rationale)
         if content:
             parts.append(content[:2000])
-        return "\n".join(parts)
+        return '\n'.join(parts)
 
 
-__all__ = ["ChromaDBBackend", "SQLiteBM25Backend"]
+__all__ = ['ChromaDBBackend', 'SQLiteBM25Backend']
