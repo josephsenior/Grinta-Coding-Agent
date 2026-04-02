@@ -493,6 +493,7 @@ class Repl:
 
         current_state = controller.get_agent_state()
         if current_state in {
+            AgentState.AWAITING_USER_INPUT,
             AgentState.FINISHED,
             AgentState.ERROR,
             AgentState.REJECTED,
