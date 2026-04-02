@@ -55,7 +55,7 @@ def _silence_all_loggers() -> None:
 
     for name in (
         'uvicorn', 'httpcore', 'httpx', 'asyncio', 'filelock',
-        'litellm', 'openai', 'httpx._client', 'charset_normalizer',
+        'openai', 'httpx._client', 'charset_normalizer',
     ):
         logging.getLogger(name).setLevel(logging.CRITICAL)
 

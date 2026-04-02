@@ -1282,11 +1282,10 @@ def get_direct_client(
 
     # When a custom base_url is provided that differs from the provider's own
     # native endpoint, the caller is routing the model through a third-party
-    # proxy (e.g. Lightning AI, OpenRouter, LiteLLM).  In that case we MUST
-    # use the OpenAI-compatible client with the *original* model name so the
-    # proxy receives the full identifier it expects (e.g.
-    # "google/gemini-3-flash-preview" on Lightning AI, not just
-    # "gemini-3-flash-preview").
+    # proxy (e.g. Lightning AI, OpenRouter).  In that case we MUST use the
+    # OpenAI-compatible client with the *original* model name so the proxy
+    # receives the full identifier it expects (e.g.
+    # "google/gemini-3-flash-preview" on Lightning AI).
     if resolved_base_url:
         # Collect known native endpoints for providers that have their own SDK
         # clients (i.e. Anthropic and Google).  All other providers already use
@@ -1315,16 +1314,8 @@ def get_direct_client(
     if provider == 'google':
         return GeminiClient(model_name=stripped_model, api_key=api_key)
 
-    if provider == 'openhands':
-        return OpenAIClient(
-            model_name=f'litellm_proxy/{stripped_model}',
-            api_key=api_key,
-            base_url=resolved_base_url,
-            supports_request_metadata=False,
-        )
-
     # All OpenAI-compatible providers use OpenAI client
-    # (OpenAI, xAI, DeepSeek, Mistral, Ollama, LM Studio, vLLM, etc.)
+    # (OpenAI, xAI, DeepSeek, Mistral, Ollama, LM Studio, vLLM, Lightning, etc.)
     # Only the real OpenAI API supports the `metadata` request field; all other
     # compatible providers (Groq, Mistral, etc.) reject it with a 400 error.
     return OpenAIClient(

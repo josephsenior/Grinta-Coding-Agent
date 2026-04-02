@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import functools
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Sequence
 from typing import Any
 
-_CATALOG_PATH = Path(__file__).with_name("catalog.json")
+_CATALOG_PATH = Path(__file__).with_name('catalog.json')
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +49,7 @@ class ModelEntry:
 @functools.lru_cache(maxsize=1)
 def _load_raw() -> dict:
     """Load and cache the raw catalog data."""
-    with open(_CATALOG_PATH, encoding="utf-8") as f:
+    with open(_CATALOG_PATH, encoding='utf-8') as f:
         return json.load(f)
 
 
@@ -58,28 +58,28 @@ def get_catalog() -> tuple[ModelEntry, ...]:
     """Return all model entries from ``catalog.json``."""
     data = _load_raw()
     entries: list[ModelEntry] = []
-    for name, info in data.get("models", {}).items():
+    for name, info in data.get('models', {}).items():
         entries.append(
             ModelEntry(
                 name=name,
-                provider=info["provider"],
-                aliases=tuple(info.get("aliases", ())),
-                max_input_tokens=info.get("max_input_tokens"),
-                max_output_tokens=info.get("max_output_tokens"),
-                input_price_per_m=info.get("input_price_per_m"),
-                output_price_per_m=info.get("output_price_per_m"),
-                verified=info.get("verified", False),
-                featured=info.get("featured", False),
-                supports_function_calling=info.get("supports_function_calling", False),
-                supports_reasoning_effort=info.get("supports_reasoning_effort", False),
-                supports_prompt_cache=info.get("supports_prompt_cache", False),
-                supports_stop_words=info.get("supports_stop_words", True),
-                supports_response_schema=info.get("supports_response_schema", False),
-                supports_vision=info.get("supports_vision", False),
-                strip_reasoning_effort=info.get("strip_reasoning_effort", False),
-                thinking_mode=info.get("thinking_mode"),
-                strip_temperature=info.get("strip_temperature", False),
-                strip_top_p=info.get("strip_top_p", False),
+                provider=info['provider'],
+                aliases=tuple(info.get('aliases', ())),
+                max_input_tokens=info.get('max_input_tokens'),
+                max_output_tokens=info.get('max_output_tokens'),
+                input_price_per_m=info.get('input_price_per_m'),
+                output_price_per_m=info.get('output_price_per_m'),
+                verified=info.get('verified', False),
+                featured=info.get('featured', False),
+                supports_function_calling=info.get('supports_function_calling', False),
+                supports_reasoning_effort=info.get('supports_reasoning_effort', False),
+                supports_prompt_cache=info.get('supports_prompt_cache', False),
+                supports_stop_words=info.get('supports_stop_words', True),
+                supports_response_schema=info.get('supports_response_schema', False),
+                supports_vision=info.get('supports_vision', False),
+                strip_reasoning_effort=info.get('strip_reasoning_effort', False),
+                thinking_mode=info.get('thinking_mode'),
+                strip_temperature=info.get('strip_temperature', False),
+                strip_top_p=info.get('strip_top_p', False),
             )
         )
     return tuple(entries)
@@ -105,8 +105,8 @@ def lookup(model: str) -> ModelEntry | None:
     if entry:
         return entry
     # Strip provider prefix (e.g. "openai/gpt-4o" → "gpt-4o")
-    if "/" in key:
-        bare = key.split("/")[-1]
+    if '/' in key:
+        bare = key.split('/')[-1]
         entry = idx.get(bare) or idx.get(bare.lower())
         if entry:
             return entry
@@ -121,17 +121,17 @@ def get_pricing(model: str) -> dict[str, float] | None:
     entry = lookup(model)
     if entry and entry.input_price_per_m is not None:
         return {
-            "input": entry.input_price_per_m,
-            "output": entry.output_price_per_m or 0.0,
+            'input': entry.input_price_per_m,
+            'output': entry.output_price_per_m or 0.0,
         }
 
     # Tier fallback — substring matching
     data = _load_raw()
-    tier = data.get("tier_pricing", {})
-    bare = model.split("/")[-1].lower() if "/" in model else model.lower()
+    tier = data.get('tier_pricing', {})
+    bare = model.split('/')[-1].lower() if '/' in model else model.lower()
     for prefix, prices in tier.items():
         if prefix in bare:
-            return {"input": prices["input"], "output": prices["output"]}
+            return {'input': prices['input'], 'output': prices['output']}
     return None
 
 
@@ -145,7 +145,7 @@ def get_token_limits(model: str) -> tuple[int | None, int | None]:
 
 def get_featured_models() -> list[str]:
     """Return ``provider/name`` strings for models marked ``featured = true``."""
-    return [f"{e.provider}/{e.name}" for e in get_catalog() if e.featured]
+    return [f'{e.provider}/{e.name}' for e in get_catalog() if e.featured]
 
 
 def get_verified_models(provider: str | None = None) -> list[str]:
@@ -174,12 +174,12 @@ def is_openai_compatible(model: str) -> bool:
     entry = lookup(model)
     if entry:
         # These providers are OpenAI-compatible
-        return entry.provider in ["openai", "deepseek", "mistral", "openhands", "xai"]
+        return entry.provider in ['openai', 'deepseek', 'mistral', 'xai']
 
     from backend.inference.provider_resolver import extract_provider_prefix
 
     provider = extract_provider_prefix(model)
-    return provider in {"openai", "deepseek", "mistral", "openhands", "xai"}
+    return provider in {'openai', 'deepseek', 'mistral', 'xai'}
 
 
 def supports_tool_choice(model: str) -> bool:
@@ -192,14 +192,14 @@ def supports_tool_choice(model: str) -> bool:
     if entry is not None:
         if not entry.supports_function_calling:
             return False
-        return entry.provider != "google"
+        return entry.provider != 'google'
 
     from backend.inference.provider_resolver import extract_provider_prefix
 
     provider = extract_provider_prefix(model)
     if provider is None:
         return False
-    return provider != "google"
+    return provider != 'google'
 
 
 def prefers_short_tool_descriptions(model: str) -> bool:
@@ -208,11 +208,11 @@ def prefers_short_tool_descriptions(model: str) -> bool:
     if entry is None:
         return False
     normalized = entry.name.lower()
-    if entry.provider not in {"openai", "deepseek", "mistral", "xai"}:
+    if entry.provider not in {'openai', 'deepseek', 'mistral', 'xai'}:
         return False
-    if normalized in {"o1", "o3", "o4"}:
+    if normalized in {'o1', 'o3', 'o4'}:
         return True
-    return normalized.startswith(("gpt-", "o1-", "o3-", "o4-", "codex"))
+    return normalized.startswith(('gpt-', 'o1-', 'o3-', 'o4-', 'codex'))
 
 
 def get_provider_info(model: str) -> dict[str, Any]:
@@ -224,24 +224,24 @@ def get_provider_info(model: str) -> dict[str, Any]:
     entry = lookup(model)
     if entry:
         return {
-            "provider": entry.provider,
-            "supports_function_calling": entry.supports_function_calling,
-            "supports_vision": entry.supports_vision,
-            "supports_prompt_cache": entry.supports_prompt_cache,
-            "max_input_tokens": entry.max_input_tokens,
-            "max_output_tokens": entry.max_output_tokens,
+            'provider': entry.provider,
+            'supports_function_calling': entry.supports_function_calling,
+            'supports_vision': entry.supports_vision,
+            'supports_prompt_cache': entry.supports_prompt_cache,
+            'max_input_tokens': entry.max_input_tokens,
+            'max_output_tokens': entry.max_output_tokens,
         }
 
     from backend.inference.provider_resolver import extract_provider_prefix
 
     provider = extract_provider_prefix(model)
     return {
-        "provider": provider or "unknown",
-        "supports_function_calling": False,
-        "supports_vision": False,
-        "supports_prompt_cache": False,
-        "max_input_tokens": None,
-        "max_output_tokens": None,
+        'provider': provider or 'unknown',
+        'supports_function_calling': False,
+        'supports_vision': False,
+        'supports_prompt_cache': False,
+        'max_input_tokens': None,
+        'max_output_tokens': None,
     }
 
 
@@ -253,7 +253,7 @@ def _resolve_provider_for_sanitization(model: str) -> str:
 
     from backend.inference.provider_resolver import extract_provider_prefix
 
-    return extract_provider_prefix(model) or "unknown"
+    return extract_provider_prefix(model) or 'unknown'
 
 
 def sanitize_call_kwargs_for_provider(model: str, call_kwargs: dict) -> dict:
@@ -263,41 +263,40 @@ def sanitize_call_kwargs_for_provider(model: str, call_kwargs: dict) -> dict:
     It keeps planner/executor behavior stable while preventing provider-specific
     transport errors from unsupported OpenAI-style parameters.
     """
-
     sanitized = dict(call_kwargs)
     provider = _resolve_provider_for_sanitization(model)
 
     # Google Gemini native SDK accepts a narrower send_message() surface.
-    if provider == "google":
+    if provider == 'google':
         for key in (
-            "tool_choice",
-            "extra_body",
-            "extra_headers",
-            "response_format",
-            "frequency_penalty",
-            "presence_penalty",
-            "logit_bias",
-            "seed",
-            "user",
-            "reasoning_effort",
-            "reasoning",
-            "parallel_tool_calls",
-            "metadata",
+            'tool_choice',
+            'extra_body',
+            'extra_headers',
+            'response_format',
+            'frequency_penalty',
+            'presence_penalty',
+            'logit_bias',
+            'seed',
+            'user',
+            'reasoning_effort',
+            'reasoning',
+            'parallel_tool_calls',
+            'metadata',
         ):
             sanitized.pop(key, None)
         return sanitized
 
     # Anthropic SDK is not OpenAI-chat API compatible for several optional fields.
-    if provider == "anthropic":
+    if provider == 'anthropic':
         for key in (
-            "tool_choice",
-            "response_format",
-            "frequency_penalty",
-            "presence_penalty",
-            "logit_bias",
-            "parallel_tool_calls",
-            "extra_body",
-            "extra_headers",
+            'tool_choice',
+            'response_format',
+            'frequency_penalty',
+            'presence_penalty',
+            'logit_bias',
+            'parallel_tool_calls',
+            'extra_body',
+            'extra_headers',
         ):
             sanitized.pop(key, None)
 
@@ -330,55 +329,55 @@ def apply_model_param_overrides(
         # Unknown model - keep the call surface conservative.
         # Optional provider/model-specific knobs like reasoning_effort should
         # only be sent when the catalog explicitly says the target supports them.
-        call_kwargs.pop("reasoning_effort", None)
+        call_kwargs.pop('reasoning_effort', None)
         return call_kwargs
 
     # Strip reasoning_effort if the model doesn't support it natively
     if entry.strip_reasoning_effort:
-        call_kwargs.pop("reasoning_effort", None)
+        call_kwargs.pop('reasoning_effort', None)
 
     # Apply thinking mode configuration
     if entry.thinking_mode:
         _apply_thinking_mode(call_kwargs, entry, reasoning_effort, is_stream)
     elif reasoning_effort is not None and not entry.strip_reasoning_effort:
-        call_kwargs["reasoning_effort"] = reasoning_effort
+        call_kwargs['reasoning_effort'] = reasoning_effort
 
     # Conditional param stripping
     if entry.strip_top_p:
-        call_kwargs.pop("top_p", None)
+        call_kwargs.pop('top_p', None)
     if entry.strip_temperature:
-        call_kwargs.pop("temperature", None)
+        call_kwargs.pop('temperature', None)
 
     return call_kwargs
 
 
 def _apply_thinking_disabled(call_kwargs: dict) -> None:
-    call_kwargs["thinking"] = {"type": "disabled"}
-    call_kwargs.pop("reasoning_effort", None)
+    call_kwargs['thinking'] = {'type': 'disabled'}
+    call_kwargs.pop('reasoning_effort', None)
 
 
 def _apply_thinking_budget(
     call_kwargs: dict, mode: str, entry: ModelEntry, is_stream: bool
 ) -> None:
-    tokens = int(mode.split(":")[1])
+    tokens = int(mode.split(':')[1])
     if not is_stream:
-        call_kwargs["thinking"] = {"budget_tokens": tokens}
+        call_kwargs['thinking'] = {'budget_tokens': tokens}
         if entry.strip_temperature:
-            call_kwargs.pop("temperature", None)
+            call_kwargs.pop('temperature', None)
         if entry.strip_top_p:
-            call_kwargs.pop("top_p", None)
-    call_kwargs.pop("reasoning_effort", None)
+            call_kwargs.pop('top_p', None)
+    call_kwargs.pop('reasoning_effort', None)
 
 
 def _apply_thinking_enabled(
     call_kwargs: dict, mode: str, reasoning_effort: str | None
 ) -> None:
-    parts = mode.split(":")
+    parts = mode.split(':')
     low = int(parts[1]) if len(parts) > 1 else 1024
     high = int(parts[2]) if len(parts) > 2 else 4096
-    budget = low if reasoning_effort in ("low", None) else high
-    call_kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
-    call_kwargs.pop("reasoning_effort", None)
+    budget = low if reasoning_effort in ('low', None) else high
+    call_kwargs['thinking'] = {'type': 'enabled', 'budget_tokens': budget}
+    call_kwargs.pop('reasoning_effort', None)
 
 
 def _apply_thinking_mode(
@@ -395,9 +394,9 @@ def _apply_thinking_mode(
     - ``"enabled:<low_budget>:<high_budget>"`` → maps reasoning_effort to budget
     """
     mode = entry.thinking_mode
-    if mode == "disabled":
+    if mode == 'disabled':
         _apply_thinking_disabled(call_kwargs)
-    elif mode and mode.startswith("budget:"):
+    elif mode and mode.startswith('budget:'):
         _apply_thinking_budget(call_kwargs, mode, entry, is_stream)
-    elif mode and mode.startswith("enabled:"):
+    elif mode and mode.startswith('enabled:'):
         _apply_thinking_enabled(call_kwargs, mode, reasoning_effort)

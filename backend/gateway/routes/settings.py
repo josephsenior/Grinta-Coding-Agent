@@ -16,9 +16,9 @@ from backend.core.logger import app_logger as logger
 # Import these at runtime so FastAPI can resolve them in Annotated types
 from backend.core.provider_types import ProviderTokenType, ProviderType
 from backend.core.pydantic_compat import model_dump_with_options
+from backend.gateway.app_state import get_app_state
 from backend.gateway.route_dependencies import get_dependencies
 from backend.gateway.settings import GETSettingsModel
-from backend.gateway.app_state import get_app_state
 from backend.gateway.user_auth import (
     get_provider_tokens,
     get_secrets_store,
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 # Rebuild GETSettingsModel to resolve forward references
 GETSettingsModel.model_rebuild()
 
-router = APIRouter(prefix="/api/v1", dependencies=get_dependencies(), tags=["settings"])
+router = APIRouter(prefix='/api/v1', dependencies=get_dependencies(), tags=['settings'])
 
 # 🚀 PERFORMANCE FIX: Global cache for settings to avoid repeated database calls
 #   Cache key: user_id (or 'default' for single-tenant), Cache value: (settings_response, timestamp)
@@ -45,46 +45,45 @@ import time as time_module  # noqa: E402
 
 _settings_cache: dict[str, tuple[GETSettingsModel, float]] = {}
 _PROVIDER_TOKEN_MAPPING: dict[str, str] = {
-    "openrouter": "OPENROUTER_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "openhands": "OPENHANDS_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "google": "GOOGLE_API_KEY",
-    "groq": "GROQ_API_KEY",
-    "nvidia": "NVIDIA_API_KEY",
-    "deepseek": "DEEPSEEK_API_KEY",
-    "mistral": "MISTRAL_API_KEY",
-    "together": "TOGETHER_API_KEY",
-    "deepinfra": "DEEPINFRA_API_KEY",
-    "replicate": "REPLICATE_API_KEY",
-    "fireworks": "FIREWORKS_API_KEY",
-    "perplexity": "PERPLEXITY_API_KEY",
+    'openrouter': 'OPENROUTER_API_KEY',
+    'openai': 'OPENAI_API_KEY',
+    'anthropic': 'ANTHROPIC_API_KEY',
+    'google': 'GOOGLE_API_KEY',
+    'groq': 'GROQ_API_KEY',
+    'nvidia': 'NVIDIA_API_KEY',
+    'deepseek': 'DEEPSEEK_API_KEY',
+    'mistral': 'MISTRAL_API_KEY',
+    'together': 'TOGETHER_API_KEY',
+    'deepinfra': 'DEEPINFRA_API_KEY',
+    'replicate': 'REPLICATE_API_KEY',
+    'fireworks': 'FIREWORKS_API_KEY',
+    'perplexity': 'PERPLEXITY_API_KEY',
 }
 
 
 def _settings_to_dict(settings: Settings, **dump_kwargs: Any) -> dict[str, Any]:
-    context = dump_kwargs.pop("context", {}) or {}
-    context = {**context, "expose_secrets": True}
+    context = dump_kwargs.pop('context', {}) or {}
+    context = {**context, 'expose_secrets': True}
     return settings.model_dump(context=context, **dump_kwargs)
 
 
 def _secret_value(api_key: SecretStr | str | None) -> str | None:
     if api_key is None:
         return None
-    if hasattr(api_key, "get_secret_value"):
+    if hasattr(api_key, 'get_secret_value'):
         return cast(SecretStr, api_key).get_secret_value()
     return str(api_key)
 
 
 def _log_api_key_state(label: str, api_key: SecretStr | str | None) -> None:
-    logger.debug("[STORE_LLM_SETTINGS] API key state updated")
+    logger.debug('[STORE_LLM_SETTINGS] API key state updated')
 
 
 def _ensure_secrets_store(settings: Settings) -> Settings:
     if settings.secrets_store:
         return settings
     return settings.model_copy(
-        update={"secrets_store": UserSecrets(provider_tokens={}, custom_secrets={})}
+        update={'secrets_store': UserSecrets(provider_tokens={}, custom_secrets={})}
     )
 
 
@@ -102,14 +101,14 @@ def _merge_with_existing_settings(
 def _rebuild_settings_with(settings: Settings, **updates: Any) -> Settings:
     data = _settings_to_dict(settings)
     data.update(updates)
-    if "llm_api_key" not in updates:
-        data["llm_api_key"] = settings.llm_api_key
+    if 'llm_api_key' not in updates:
+        data['llm_api_key'] = settings.llm_api_key
 
-    secrets_store_override = updates.get("secrets_store")
+    secrets_store_override = updates.get('secrets_store')
     if isinstance(secrets_store_override, UserSecrets):
-        data["secrets_store"] = secrets_store_override.model_dump()
-    elif "secrets_store" not in updates:
-        data["secrets_store"] = settings.secrets_store.model_dump()
+        data['secrets_store'] = secrets_store_override.model_dump()
+    elif 'secrets_store' not in updates:
+        data['secrets_store'] = settings.secrets_store.model_dump()
 
     return Settings(**data)
 
@@ -122,7 +121,7 @@ def _provider_token_key_for(model: str | None) -> tuple[str | None, str | None]:
 
 
 def _resolve_settings_provider(settings: Settings) -> str | None:
-    if getattr(settings, "llm_provider", None):
+    if getattr(settings, 'llm_provider', None):
         return str(settings.llm_provider)
     if settings.llm_model:
         from backend.inference.provider_resolver import extract_provider_prefix
@@ -137,7 +136,7 @@ def _validate_llm_provider_selection(settings: Settings) -> None:
     if _resolve_settings_provider(settings):
         return
     raise ValueError(
-        "llm_provider is required unless llm_model already includes a provider prefix"
+        'llm_provider is required unless llm_model already includes a provider prefix'
     )
 
 
@@ -176,18 +175,18 @@ def _apply_provider_token(settings: Settings, token_key: str) -> Settings:
 def _ensure_openrouter_base_url(settings: Settings) -> Settings:
     if not (
         settings.llm_model
-        and settings.llm_model.startswith("openrouter/")
+        and settings.llm_model.startswith('openrouter/')
         and settings.llm_base_url
     ):
         return settings
 
     base_url_lower = str(settings.llm_base_url).lower()
-    if base_url_lower == "gemini-2.5-pro" or "gemini" in base_url_lower:
+    if base_url_lower == 'gemini-2.5-pro' or 'gemini' in base_url_lower:
         logger.debug(
             "🔧 STORE_LLM_SETTINGS FINAL FIX: Clearing base_url '%s' for OpenRouter model",
             settings.llm_base_url,
         )
-        return _rebuild_settings_with(settings, llm_base_url="")
+        return _rebuild_settings_with(settings, llm_base_url='')
 
     return settings
 
@@ -197,9 +196,9 @@ def _preserve_llm_api_key(
 ) -> None:
     incoming_key = _secret_value(settings.llm_api_key)
     if incoming_key:
-        logger.debug("[STORE SETTINGS] Received API key metadata")
+        logger.debug('[STORE SETTINGS] Received API key metadata')
         if incoming_key == SECRET_PLACEHOLDER:
-            logger.info("[STORE SETTINGS] Preserving existing API key (placeholder)")
+            logger.info('[STORE SETTINGS] Preserving existing API key (placeholder)')
             preserved_key = (
                 cast(SecretStr | None, existing_settings.llm_api_key)
                 if existing_settings and existing_settings.llm_api_key
@@ -207,15 +206,15 @@ def _preserve_llm_api_key(
             )
             if preserved_key:
                 settings.llm_api_key = preserved_key
-                logger.info("[STORE SETTINGS] Preserving existing API key")
+                logger.info('[STORE SETTINGS] Preserving existing API key')
             else:
-                logger.warning("[STORE SETTINGS] No existing API key to preserve")
+                logger.warning('[STORE SETTINGS] No existing API key to preserve')
                 settings.llm_api_key = cast(SecretStr | None, None)
         return
 
-    logger.info("[STORE SETTINGS] No API key received from client")
+    logger.info('[STORE SETTINGS] No API key received from client')
     if existing_settings and existing_settings.llm_api_key:
-        logger.info("[STORE SETTINGS] Preserving existing API key (None received)")
+        logger.info('[STORE SETTINGS] Preserving existing API key (None received)')
         settings.llm_api_key = cast(
             SecretStr | None,
             existing_settings.llm_api_key,  # type: ignore[arg-type]
@@ -234,22 +233,22 @@ def _set_environment_variables(
     try:
         api_key_manager.set_environment_variables(model, normalized_key)
         provider = api_key_manager.extract_provider(model)
-        if provider == "google":
-            os.environ.get("GEMINI_API_KEY")
-            logger.debug("GEMINI provider env key present")
+        if provider == 'google':
+            os.environ.get('GEMINI_API_KEY')
+            logger.debug('GEMINI provider env key present')
     except Exception as exc:  # pragma: no cover - defensive logging
-        logger.error("%s Failed to set environment variables: %s", stage, exc)
+        logger.error('%s Failed to set environment variables: %s', stage, exc)
 
 
 def _looks_like_model_identifier(value: str) -> bool:
     indicators = [
-        "gemini",
-        "gpt",
-        "claude",
-        "llama",
-        "mistral",
-        "deepseek",
-        "qwen",
+        'gemini',
+        'gpt',
+        'claude',
+        'llama',
+        'mistral',
+        'deepseek',
+        'qwen',
     ]
     return any(indicator in value for indicator in indicators)
 
@@ -262,7 +261,7 @@ def _sanitize_llm_base_url(settings: Settings, provider: str | None) -> None:
     base_url_lower = base_url_str.lower()
 
     if _looks_like_model_identifier(base_url_lower) and not base_url_lower.startswith(
-        ("http://", "https://")
+        ('http://', 'https://')
     ):
         logger.warning(
             "🚨 CRITICAL: base_url appears to be a model name, not a URL: '%s' - CLEARING IT",
@@ -271,7 +270,7 @@ def _sanitize_llm_base_url(settings: Settings, provider: str | None) -> None:
         settings.llm_base_url = None
         return
 
-    if provider == "google":
+    if provider == 'google':
         logger.info(
             "Clearing base URL for Google provider as it handles routing internally: '%s'",
             settings.llm_base_url,
@@ -279,8 +278,8 @@ def _sanitize_llm_base_url(settings: Settings, provider: str | None) -> None:
         settings.llm_base_url = None
         return
 
-    if provider in {"openrouter", "openai", "openhands", "anthropic", "google"}:
-        if not base_url_lower.startswith(("http://", "https://")):
+    if provider in {'openrouter', 'openai', 'anthropic', 'google'}:
+        if not base_url_lower.startswith(('http://', 'https://')):
             logger.info(
                 "Clearing invalid base URL '%s' for %s model - missing protocol",
                 settings.llm_base_url,
@@ -288,9 +287,9 @@ def _sanitize_llm_base_url(settings: Settings, provider: str | None) -> None:
             )
             settings.llm_base_url = None
             return
-        if provider == "openrouter" and any(
+        if provider == 'openrouter' and any(
             incorrect in base_url_lower
-            for incorrect in ("gemini", "anthropic", "openai")
+            for incorrect in ('gemini', 'anthropic', 'openai')
         ):
             logger.info(
                 "Clearing incorrect base URL '%s' for %s model",
@@ -306,11 +305,11 @@ def _process_llm_model_configuration(settings: Settings) -> None:
 
     _validate_llm_provider_selection(settings)
 
-    logger.info("🔧 PROCESSING LLM SETTINGS")
+    logger.info('🔧 PROCESSING LLM SETTINGS')
 
     if settings.llm_api_key:
         _set_environment_variables(
-            settings.llm_model, settings.llm_api_key, "🔑 Initial"
+            settings.llm_model, settings.llm_api_key, '🔑 Initial'
         )
 
     correct_api_key = api_key_manager.get_api_key_for_model(
@@ -319,12 +318,12 @@ def _process_llm_model_configuration(settings: Settings) -> None:
 
     if correct_api_key:
         settings.llm_api_key = cast(SecretStr | None, correct_api_key)
-        logger.info("✅ Validated API key for model")
-        _set_environment_variables(settings.llm_model, correct_api_key, "✅ Validated")
+        logger.info('✅ Validated API key for model')
+        _set_environment_variables(settings.llm_model, correct_api_key, '✅ Validated')
     elif settings.llm_api_key:
-        logger.warning("⚠️ Using provided API key as fallback")
+        logger.warning('⚠️ Using provided API key as fallback')
         _set_environment_variables(
-            settings.llm_model, settings.llm_api_key, "⚠️ Fallback"
+            settings.llm_model, settings.llm_api_key, '⚠️ Fallback'
         )
 
     provider = _resolve_settings_provider(settings)
@@ -337,8 +336,8 @@ def _apply_runtime_and_git_overrides(settings: Settings) -> None:
 
     # Some deployments/versions use a leaner Settings model that doesn't include
     # VCS identity fields.
-    vcs_user_name = getattr(settings, "vcs_user_name", None)
-    vcs_user_email = getattr(settings, "vcs_user_email", None)
+    vcs_user_name = getattr(settings, 'vcs_user_name', None)
+    vcs_user_email = getattr(settings, 'vcs_user_email', None)
 
     if vcs_user_name is not None:
         app_config.vcs_user_name = vcs_user_name
@@ -348,9 +347,9 @@ def _apply_runtime_and_git_overrides(settings: Settings) -> None:
         git_config_updated = True
     if git_config_updated:
         logger.info(
-            "Updated global git configuration: name=%s, email=%s",
-            getattr(app_config, "vcs_user_name", None),
-            getattr(app_config, "vcs_user_email", None),
+            'Updated global git configuration: name=%s, email=%s',
+            getattr(app_config, 'vcs_user_name', None),
+            getattr(app_config, 'vcs_user_email', None),
         )
 
 
@@ -361,46 +360,44 @@ def invalidate_settings_cache(user_id: str | None = None) -> None:
         user_id: User ID to invalidate (None = invalidate all)
     """
     if user_id:
-        cache_key = user_id if user_id else "default"
+        cache_key = user_id if user_id else 'default'
         _settings_cache.pop(cache_key, None)
         logger.info("Invalidated settings cache for user '%s'", cache_key)
     else:
         _settings_cache.clear()
-        logger.info("Cleared all settings cache entries")
+        logger.info('Cleared all settings cache entries')
 
 
 @router.get(
-    "/settings",
+    '/settings',
     response_model=GETSettingsModel,
     responses={
         200: {
-            "description": "Settings retrieved successfully",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "basic": {
-                            "summary": "Basic configuration",
-                            "value": {
-                                "LLM_MODEL": "anthropic/claude-3-5-sonnet-20241022",
-                                "LLM_API_KEY": "sk-ant-***",
-                                "AGENT": "Orchestrator",
-                                "LANGUAGE": "en",
-                                "LLM_NUM_RETRIES": 6,
-                                "LLM_TIMEOUT": 180,
+            'description': 'Settings retrieved successfully',
+            'content': {
+                'application/json': {
+                    'examples': {
+                        'basic': {
+                            'summary': 'Basic configuration',
+                            'value': {
+                                'LLM_MODEL': 'anthropic/claude-3-5-sonnet-20241022',
+                                'LLM_API_KEY': 'sk-ant-***',
+                                'AGENT': 'Orchestrator',
+                                'LANGUAGE': 'en',
+                                'LLM_NUM_RETRIES': 6,
+                                'LLM_TIMEOUT': 180,
                             },
                         }
                     }
                 }
             },
         },
-        404: {"description": "Settings not found"},
-        401: {"description": "Invalid token"},
+        404: {'description': 'Settings not found'},
+        401: {'description': 'Invalid token'},
     },
 )
 async def load_settings(
-    provider_tokens: Annotated[
-        ProviderTokenType | None, Depends(get_provider_tokens)
-    ],
+    provider_tokens: Annotated[ProviderTokenType | None, Depends(get_provider_tokens)],
     settings_store: Annotated[Any, Depends(get_user_settings_store)],
     settings: Annotated[Settings, Depends(get_user_settings)],
     secrets_store: Annotated[Any, Depends(get_secrets_store)],
@@ -427,12 +424,12 @@ async def load_settings(
     try:
         if not settings:
             # Return default settings for development when no settings exist
-            logger.info("No settings found, returning default settings for development")
+            logger.info('No settings found, returning default settings for development')
             return _build_default_settings_response()
 
         # 🚀 PERFORMANCE FIX: Check cache first with proper user_id key
         # Use user_id as cache key (fallback to 'default' for single-tenant mode)
-        cache_key = user_id if user_id else "default"
+        cache_key = user_id if user_id else 'default'
         current_time = time_module.time()
 
         if cache_key in _settings_cache:
@@ -459,7 +456,7 @@ async def load_settings(
 
     except Exception as e:
         logger.warning(
-            "Error loading settings: %s, returning default settings for development", e
+            'Error loading settings: %s, returning default settings for development', e
         )
         return _build_default_settings_response()
 
@@ -501,18 +498,18 @@ def _merge_app_mcp_for_api(settings: Settings) -> Settings:
 
         app_mcp = load_app_config().mcp
     except Exception as exc:
-        logger.debug("App MCP merge skipped: %s", exc)
+        logger.debug('App MCP merge skipped: %s', exc)
         return settings
 
     # Shallow copy only: deep=True can raise "cannot pickle 'mappingproxy' object"
     # when copying frozen UserSecrets / nested immutables, which forces GET /settings
     # into the exception path and the UI shows llm_api_key_set=False despite settings.json.
-    mcp_config = getattr(settings, "mcp_config", None)
+    mcp_config = getattr(settings, 'mcp_config', None)
     if mcp_config is None:
         merged_mcp = app_mcp
     else:
         merged_mcp = app_mcp.merge(mcp_config)
-    return settings.model_copy(update={"mcp_config": merged_mcp})
+    return settings.model_copy(update={'mcp_config': merged_mcp})
 
 
 def _llm_model_supports_vision(llm_model: str | None) -> bool:
@@ -520,7 +517,7 @@ def _llm_model_supports_vision(llm_model: str | None) -> bool:
     try:
         from backend.inference.catalog_loader import lookup
 
-        model = (llm_model or "").strip()
+        model = (llm_model or '').strip()
         if not model:
             return False
         entry = lookup(model)
@@ -544,15 +541,15 @@ def _build_settings_response(
 
     """
     logger.debug(
-        "Loading settings for user_id=%s autonomy_level=%s",
-        getattr(settings, "user_id", "unknown"),
-        getattr(settings, "autonomy_level", "NOT_FOUND"),
+        'Loading settings for user_id=%s autonomy_level=%s',
+        getattr(settings, 'user_id', 'unknown'),
+        getattr(settings, 'autonomy_level', 'NOT_FOUND'),
     )
     api_key_raw = _secret_value(settings.llm_api_key)
     startup_snapshot = get_app_state().get_startup_snapshot() or None
     recovery_snapshot = _build_recovery_snapshot()
     settings_with_token_data = GETSettingsModel(
-        **model_dump_with_options(settings, exclude={"secrets_store"}),
+        **model_dump_with_options(settings, exclude={'secrets_store'}),
         llm_api_key_set=bool(api_key_raw and str(api_key_raw).strip()),
         provider_tokens_set=provider_tokens_set or None,
         llm_model_supports_vision=_llm_model_supports_vision(settings.llm_model),
@@ -563,7 +560,7 @@ def _build_settings_response(
     # Mask sensitive data without mutating original instance
     return settings_with_token_data.model_copy(
         update={
-            "llm_api_key": None,
+            'llm_api_key': None,
         },
     )
 
@@ -578,11 +575,11 @@ def _build_unauthorized_response(settings: Settings | None) -> JSONResponse:
         401 Unauthorized JSON response
 
     """
-    logger.info("Returning 401 Unauthorized - Invalid token")
+    logger.info('Returning 401 Unauthorized - Invalid token')
 
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        content={"error": "Invalid token"},
+        content={'error': 'Invalid token'},
     )
 
 
@@ -605,7 +602,7 @@ async def store_llm_settings(
         Merged settings with existing values preserved
 
     """
-    _log_api_key_state("INCOMING", settings.llm_api_key)
+    _log_api_key_state('INCOMING', settings.llm_api_key)
 
     existing_settings = existing_settings or await settings_store.load()
     settings = _merge_with_existing_settings(settings, existing_settings)
@@ -619,24 +616,24 @@ async def store_llm_settings(
 
     settings = _ensure_openrouter_base_url(settings)
 
-    _log_api_key_state("OUTGOING", settings.llm_api_key)
+    _log_api_key_state('OUTGOING', settings.llm_api_key)
     return settings
 
 
 @router.patch(
-    "/settings",
+    '/settings',
     response_model=None,
     responses={
-        200: {"description": "Settings patched successfully", "model": dict},
-        500: {"description": "Error patching settings", "model": dict},
+        200: {'description': 'Settings patched successfully', 'model': dict},
+        500: {'description': 'Error patching settings', 'model': dict},
     },
 )
 @router.post(
-    "/settings",
+    '/settings',
     response_model=None,
     responses={
-        200: {"description": "Settings stored successfully", "model": dict},
-        500: {"description": "Error storing settings", "model": dict},
+        200: {'description': 'Settings stored successfully', 'model': dict},
+        500: {'description': 'Error storing settings', 'model': dict},
     },
 )
 async def store_settings(
@@ -656,7 +653,7 @@ async def store_settings(
 
     """
     try:
-        logger.info("Storing settings with clean API key handling")
+        logger.info('Storing settings with clean API key handling')
         existing_settings = await settings_store.load()
 
         _preserve_llm_api_key(settings, existing_settings)
@@ -668,44 +665,42 @@ async def store_settings(
             )
             # Some deployments/versions use a leaner Settings model that
             # doesn't include analytics consent fields.
-            if "user_consents_to_analytics" in Settings.model_fields:
-                current_consent = getattr(settings, "user_consents_to_analytics", None)
+            if 'user_consents_to_analytics' in Settings.model_fields:
+                current_consent = getattr(settings, 'user_consents_to_analytics', None)
                 if current_consent is None:
                     setattr(
                         settings,
-                        "user_consents_to_analytics",
-                        getattr(
-                            existing_settings, "user_consents_to_analytics", None
-                        ),
+                        'user_consents_to_analytics',
+                        getattr(existing_settings, 'user_consents_to_analytics', None),
                     )
 
         _apply_runtime_and_git_overrides(settings)
 
         settings = convert_to_settings(settings)
-        logger.info("Settings validation complete, storing clean settings")
+        logger.info('Settings validation complete, storing clean settings')
 
-        _set_environment_variables(settings.llm_model, settings.llm_api_key, "🌐 Final")
+        _set_environment_variables(settings.llm_model, settings.llm_api_key, '🌐 Final')
 
         await settings_store.store(settings)
 
         try:
-            user_id = "default"  # Simplified for single-tenant mode
+            user_id = 'default'  # Simplified for single-tenant mode
             invalidate_settings_cache(user_id)
             logger.info(
                 "Invalidated settings cache for user '%s' after update", user_id
             )
         except Exception as e:  # pragma: no cover - cache invalidation guard
-            logger.warning("Settings cache invalidation failed: %s", e)
+            logger.warning('Settings cache invalidation failed: %s', e)
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"message": "Settings stored"},
+            content={'message': 'Settings stored'},
         )
     except Exception as e:
-        logger.warning("Something went wrong storing settings: %s", e)
+        logger.warning('Something went wrong storing settings: %s', e)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": "Something went wrong storing settings"},
+            content={'error': 'Something went wrong storing settings'},
         )
 
 
@@ -725,7 +720,7 @@ def convert_to_settings(settings_with_token_data: Settings) -> Settings:
     _preserve_secret_field(
         filtered_settings_data,
         settings_with_token_data.llm_api_key,
-        "llm_api_key",
+        'llm_api_key',
     )
     _apply_final_openrouter_fixes(filtered_settings_data)
     return Settings(**filtered_settings_data)
@@ -733,20 +728,20 @@ def convert_to_settings(settings_with_token_data: Settings) -> Settings:
 
 def _filtered_settings_data(settings: Settings) -> dict[str, Any]:
     settings_data = model_dump_with_options(settings, exclude_none=False)
-    _log_settings_snapshot("before filtering", settings_data)
+    _log_settings_snapshot('before filtering', settings_data)
 
     filtered = {k: v for k, v in settings_data.items() if k in Settings.model_fields}
-    _log_settings_snapshot("after filtering", filtered)
+    _log_settings_snapshot('after filtering', filtered)
     return filtered
 
 
 def _log_settings_snapshot(label: str, data: dict[str, Any]) -> None:
     logger.info(
-        "Settings data %s: autonomy_level=%s",
+        'Settings data %s: autonomy_level=%s',
         label,
-        data.get("autonomy_level", "NOT_FOUND"),
+        data.get('autonomy_level', 'NOT_FOUND'),
     )
-    logger.info("API key presence logged")
+    logger.info('API key presence logged')
 
 
 def _preserve_secret_field(
@@ -759,57 +754,57 @@ def _preserve_secret_field(
     elif isinstance(value, str):
         target[field_name] = SecretStr(value)
 
-    if field_name == "llm_api_key":
-        logger.info("API key preserved")
+    if field_name == 'llm_api_key':
+        logger.info('API key preserved')
 
 
 def _apply_final_openrouter_fixes(settings_data: dict[str, Any]) -> None:
-    model = settings_data.get("llm_model")
+    model = settings_data.get('llm_model')
     if not _is_openrouter_model(model):
         return
 
-    logger.debug("Final settings fix: openrouter base_url normalization")
+    logger.debug('Final settings fix: openrouter base_url normalization')
     _clear_invalid_openrouter_base_url(settings_data)
     _replace_openrouter_api_key_if_needed(settings_data)
 
 
 def _is_openrouter_model(model: str | None) -> bool:
-    return bool(model and model.startswith("openrouter/"))
+    return bool(model and model.startswith('openrouter/'))
 
 
 def _clear_invalid_openrouter_base_url(settings_data: dict[str, Any]) -> None:
-    base_url = settings_data.get("llm_base_url")
+    base_url = settings_data.get('llm_base_url')
     if not base_url:
         return
-    if "gemini" in base_url.lower() or base_url == "gemini-2.5-pro":
-        logger.debug("Final settings fix: clearing mismatched base_url")
-        settings_data["llm_base_url"] = ""
+    if 'gemini' in base_url.lower() or base_url == 'gemini-2.5-pro':
+        logger.debug('Final settings fix: clearing mismatched base_url')
+        settings_data['llm_base_url'] = ''
 
 
 def _replace_openrouter_api_key_if_needed(settings_data: dict[str, Any]) -> None:
-    api_key = settings_data.get("llm_api_key")
+    api_key = settings_data.get('llm_api_key')
     if not api_key:
         return
     try:
         key_value = (
             api_key.get_secret_value()
-            if hasattr(api_key, "get_secret_value")
+            if hasattr(api_key, 'get_secret_value')
             else str(api_key)
         )
     except Exception:  # pragma: no cover - defensive logging
-        logger.debug("Final settings fix: error checking API key")
+        logger.debug('Final settings fix: error checking API key')
         return
 
-    if not key_value.startswith("AIza"):
+    if not key_value.startswith('AIza'):
         return
 
-    logger.debug("Final settings fix: attempting API key replacement from env")
-    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+    logger.debug('Final settings fix: attempting API key replacement from env')
+    openrouter_key = os.environ.get('OPENROUTER_API_KEY')
     if not openrouter_key:
         return
 
-    settings_data["llm_api_key"] = SecretStr(openrouter_key)
-    logger.debug("Final settings fix: replaced API key from env")
+    settings_data['llm_api_key'] = SecretStr(openrouter_key)
+    logger.debug('Final settings fix: replaced API key from env')
 
 
 def _build_default_settings_response() -> GETSettingsModel:
@@ -821,24 +816,24 @@ def _build_default_settings_response() -> GETSettingsModel:
     """
     # Create default settings similar to client DEFAULT_SETTINGS
     default_settings = Settings(
-        llm_model="anthropic/claude-3-5-sonnet-latest",
-        llm_base_url="",
-        agent="Orchestrator",
-        language="en",
+        llm_model='anthropic/claude-3-5-sonnet-latest',
+        llm_base_url='',
+        agent='Orchestrator',
+        language='en',
         confirmation_mode=False,
-        security_analyzer="llm",
+        security_analyzer='llm',
         enable_sound_notifications=False,
         user_consents_to_analytics=False,
         enable_proactive_conversation_starters=False,
         enable_solvability_analysis=False,
         max_budget_per_task=None,
-        email="",
+        email='',
         email_verified=True,
         mcp_config=None,
-        vcs_user_name="app",
-        vcs_user_email="App@app.dev",
+        vcs_user_name='app',
+        vcs_user_email='App@app.dev',
         # Autonomy Configuration
-        autonomy_level="balanced",
+        autonomy_level='balanced',
         enable_permissions=True,
         enable_checkpoints=True,
         # Advanced LLM Configuration
@@ -854,17 +849,19 @@ def _build_default_settings_response() -> GETSettingsModel:
 
     # Build response similar to _build_settings_response
     settings_with_token_data = GETSettingsModel(
-        **model_dump_with_options(default_settings, exclude={"secrets_store"}),
+        **model_dump_with_options(default_settings, exclude={'secrets_store'}),
         llm_api_key_set=False,
         provider_tokens_set=None,
-        llm_model_supports_vision=_llm_model_supports_vision(default_settings.llm_model),
+        llm_model_supports_vision=_llm_model_supports_vision(
+            default_settings.llm_model
+        ),
         startup_snapshot=get_app_state().get_startup_snapshot() or None,
         recovery_snapshot=_build_recovery_snapshot(),
     )
 
     return settings_with_token_data.model_copy(
         update={
-            "llm_api_key": None,
+            'llm_api_key': None,
         },
     )
 
@@ -876,17 +873,17 @@ def _build_recovery_snapshot(limit: int = 5) -> dict[str, Any] | None:
 
         state_restores = get_app_state().get_state_restore_snapshot(limit=limit)
         event_streams = get_aggregated_event_stream_stats()
-        health_status = "ok"
-        if event_streams.get("persist_failures", 0) > 0 or event_streams.get(
-            "durable_writer_errors", 0
-        ) > 0:
-            health_status = "degraded"
+        health_status = 'ok'
+        if (
+            event_streams.get('persist_failures', 0) > 0
+            or event_streams.get('durable_writer_errors', 0) > 0
+        ):
+            health_status = 'degraded'
         return {
-            "status": health_status,
-            "state_restores": state_restores,
-            "event_streams": event_streams,
+            'status': health_status,
+            'state_restores': state_restores,
+            'event_streams': event_streams,
         }
     except Exception as exc:  # pragma: no cover - defensive status surface
-        logger.debug("Recovery snapshot unavailable: %s", exc)
-        return {"status": "error", "detail": str(exc)}
-
+        logger.debug('Recovery snapshot unavailable: %s', exc)
+        return {'status': 'error', 'detail': str(exc)}

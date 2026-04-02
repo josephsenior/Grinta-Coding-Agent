@@ -16,7 +16,7 @@ from backend.core.logger import app_logger as logger
 
 from .provider_config import provider_config_manager
 
-_INSTANCE_NAME = "app_api_key_manager_instance"
+_INSTANCE_NAME = 'app_api_key_manager_instance'
 
 
 class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
@@ -55,18 +55,18 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         """Post-initialization hook."""
         super().model_post_init(__context)
         # Ensure we don't accidentally suppress if we're not in a context
-        if not hasattr(self, "suppress_env_export"):
-            object.__setattr__(self, "suppress_env_export", False)
+        if not hasattr(self, 'suppress_env_export'):
+            object.__setattr__(self, 'suppress_env_export', False)
 
     @contextmanager
     def suppress_env_export_context(self) -> Iterator[None]:
         """Context manager to temporarily disable environment export."""
         previous = self.suppress_env_export
-        object.__setattr__(self, "suppress_env_export", True)
+        object.__setattr__(self, 'suppress_env_export', True)
         try:
             yield
         finally:
-            object.__setattr__(self, "suppress_env_export", previous)
+            object.__setattr__(self, 'suppress_env_export', previous)
 
     def get_api_key_for_model(
         self, model: str | None, provided_key: SecretStr | None = None
@@ -119,9 +119,9 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         fallback_key: SecretStr | None = None
 
         provider = self._extract_provider(model)
-        if provider == "unknown":
+        if provider == 'unknown':
             logger.error(
-                "Cannot determine API-key provider for model %s. Use an explicit provider prefix.",
+                'Cannot determine API-key provider for model %s. Use an explicit provider prefix.',
                 model,
             )
             return None
@@ -129,29 +129,29 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if provided_key:
             key_value = provided_key.get_secret_value()
             if self._is_correct_provider_key(provided_key, provider):
-                logger.debug("Using provided API key for %s", provider)
+                logger.debug('Using provided API key for %s', provider)
                 return provided_key
             if key_value and len(key_value) > 10:
                 fallback_key = provided_key
                 logger.warning(
-                    "Provided API key does not match provider %s; will try env/stored keys first",
+                    'Provided API key does not match provider %s; will try env/stored keys first',
                     provider,
                 )
             else:
                 logger.warning(
-                    "Provided API key appears to be for wrong provider. Expected %s",
+                    'Provided API key appears to be for wrong provider. Expected %s',
                     provider,
                 )
 
         # Try to get key from environment variables
         env_key = self._get_provider_key_from_env(provider)
         if env_key:
-            logger.debug("Loaded %s API key from environment", provider)
+            logger.debug('Loaded %s API key from environment', provider)
             return SecretStr(env_key)
 
         # Try provider-specific mappings
         if provider in self.provider_api_keys:
-            logger.debug("Using stored %s API key", provider)
+            logger.debug('Using stored %s API key', provider)
             return self.provider_api_keys[provider]
 
         # If we still haven't found a provider-specific key, fall back to any
@@ -160,7 +160,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if fallback_key:
             key_value = fallback_key.get_secret_value()
             logger.info(
-                "Using provided API key as last-resort fallback for %s (key length: %s)",
+                'Using provided API key as last-resort fallback for %s (key length: %s)',
                 provider,
                 len(key_value) if key_value else 0,
             )
@@ -176,24 +176,24 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             if cfg_path.is_file():
                 import json
 
-                with cfg_path.open("r", encoding="utf-8") as f:
+                with cfg_path.open('r', encoding='utf-8') as f:
                     data = json.load(f)
-                raw_key = data.get("llm_api_key")
+                raw_key = data.get('llm_api_key')
                 if raw_key:
                     key = SecretStr(str(raw_key))
                     # Prefer llm_model from the same file so the key is indexed and
                     # logged under the user's chosen provider (not e.g. default gemini).
-                    file_model_raw = data.get("llm_model")
+                    file_model_raw = data.get('llm_model')
                     file_model = (
                         str(file_model_raw).strip()
                         if file_model_raw is not None
-                        else ""
+                        else ''
                     )
                     model_for_store = file_model or model
                     store_provider = self._extract_provider(model_for_store)
                     self.set_api_key(model_for_store, key)
                     logger.info(
-                        "Loaded API key from %s for provider %s (model %s)",
+                        'Loaded API key from %s for provider %s (model %s)',
                         cfg_path.name,
                         store_provider,
                         model_for_store,
@@ -201,7 +201,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
                     return key
         except Exception as exc:  # pragma: no cover - best-effort fallback
             logger.debug(
-                "Failed to load API key for provider %s from settings file: %s",
+                'Failed to load API key for provider %s from settings file: %s',
                 provider,
                 exc,
             )
@@ -211,12 +211,12 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         env_var = (
             provider_config.env_var
             if provider_config
-            else f"{provider.upper()}_API_KEY"
+            else f'{provider.upper()}_API_KEY'
         )
 
-        logger.error("No API key found for provider: %s", provider)
+        logger.error('No API key found for provider: %s', provider)
         logger.info(
-            "To fix this, set the %s environment variable with your %s API key",
+            'To fix this, set the %s environment variable with your %s API key',
             env_var,
             provider,
         )
@@ -227,14 +227,14 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if not model or not str(model).strip():
             return
         provider = self._extract_provider(model)
-        if provider == "unknown":
+        if provider == 'unknown':
             logger.warning(
-                "Skipping API key storage for ambiguous model %s; provider must be explicit",
+                'Skipping API key storage for ambiguous model %s; provider must be explicit',
                 model,
             )
             return
         self.provider_api_keys[provider] = api_key
-        logger.debug("Set API key for %s", provider)
+        logger.debug('Set API key for %s', provider)
 
     def set_environment_variables(
         self, model: str, api_key: SecretStr | None = None
@@ -248,23 +248,23 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         """
         if self.suppress_env_export:
             logger.debug(
-                "Skipping environment variable export for %s (suppressed)", model
+                'Skipping environment variable export for %s (suppressed)', model
             )
             return
 
         if not model or not str(model).strip():
-            logger.debug("Skipping environment variable export (no model set)")
+            logger.debug('Skipping environment variable export (no model set)')
             return
 
         provider = self._extract_provider(model)
-        if provider == "unknown":
+        if provider == 'unknown':
             logger.warning(
-                "Skipping environment export for ambiguous model %s; provider must be explicit",
+                'Skipping environment export for ambiguous model %s; provider must be explicit',
                 model,
             )
             return
         logger.debug(
-            "Setting environment variables for model: %s, provider: %s", model, provider
+            'Setting environment variables for model: %s, provider: %s', model, provider
         )
 
         # Get provider configuration
@@ -274,68 +274,68 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         key_to_use: SecretStr | None = None
         if api_key:
             key_to_use = api_key
-            logger.debug("Using provided API key for %s", provider)
+            logger.debug('Using provided API key for %s', provider)
 
             # Validate API key format using provider configuration (warn only, don't fail)
             if api_key_value := api_key.get_secret_value():
                 provider_config_manager.validate_api_key_format(provider, api_key_value)
-                logger.debug("API key format validation completed for %s", provider)
+                logger.debug('API key format validation completed for %s', provider)
         else:
             key_to_use = self.get_api_key_for_model(model)
             if key_to_use:
-                logger.debug("Retrieved API key from manager for %s", provider)
+                logger.debug('Retrieved API key from manager for %s', provider)
 
         if not key_to_use:
             # Check if API key is actually required for this provider
-            if "api_key" in provider_config.required_params:
+            if 'api_key' in provider_config.required_params:
                 env_var = provider_config.env_var
                 logger.error(
-                    "CRITICAL: No API key available for %s model %s", provider, model
+                    'CRITICAL: No API key available for %s model %s', provider, model
                 )
                 logger.info(
-                    "Please set the %s environment variable with your %s API key",
+                    'Please set the %s environment variable with your %s API key',
                     env_var,
                     provider,
                 )
                 # Try to get from environment as last resort
                 env_key = self._get_provider_key_from_env(provider)
                 if env_key:
-                    logger.info("Found API key in environment for %s", provider)
+                    logger.info('Found API key in environment for %s', provider)
                     key_to_use = SecretStr(env_key)
                 else:
-                    logger.error("FAILED: No API key found anywhere for %s", provider)
+                    logger.error('FAILED: No API key found anywhere for %s', provider)
                     logger.info(
-                        "Set %s environment variable to use %s models",
+                        'Set %s environment variable to use %s models',
                         env_var,
                         provider,
                     )
                     return
             else:
-                logger.debug("API key not required for provider %s", provider)
+                logger.debug('API key not required for provider %s', provider)
                 return
 
         api_key_value = key_to_use.get_secret_value()
-        logger.debug("Using API key for %s (length: %d)", provider, len(api_key_value))
+        logger.debug('Using API key for %s (length: %d)', provider, len(api_key_value))
 
         # Use provider configuration for environment variable mapping
         env_var = provider_config_manager.get_environment_variable(provider)
         if env_var:
             os.environ[env_var] = api_key_value
-            logger.debug("Set %s environment variable for %s", env_var, provider)
+            logger.debug('Set %s environment variable for %s', env_var, provider)
 
             # CRITICAL: For Google/Gemini, also set GOOGLE_API_KEY as some SDKs expect this too
-            if provider == "google":
-                os.environ["GOOGLE_API_KEY"] = api_key_value
+            if provider == 'google':
+                os.environ['GOOGLE_API_KEY'] = api_key_value
                 logger.debug(
-                    "Set GOOGLE_API_KEY environment variable for Google provider"
+                    'Set GOOGLE_API_KEY environment variable for Google provider'
                 )
         else:
-            logger.debug("No environment variable specified for provider: %s", provider)
+            logger.debug('No environment variable specified for provider: %s', provider)
 
         # ALSO set generic fallback ONLY if not already set
-        if "LLM_API_KEY" not in os.environ:
-            os.environ["LLM_API_KEY"] = api_key_value
-            logger.debug("Set LLM_API_KEY fallback environment variable")
+        if 'LLM_API_KEY' not in os.environ:
+            os.environ['LLM_API_KEY'] = api_key_value
+            logger.debug('Set LLM_API_KEY fallback environment variable')
 
     def _check_prefix_match(self, model: str, model_lower: str) -> str | None:
         """Check for provider prefix matches.
@@ -350,17 +350,16 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         """
         # Explicit provider prefixes only.
         prefix_patterns = {
-            "openai": ["openai/"],
-            "anthropic": ["anthropic/"],
-            "google": ["google/"],
-            "xai": ["xai/"],
-            "groq": ["groq/"],
-            "openhands": ["openhands/"],
-            "mistral": ["mistral/"],
-            "openrouter": ["openrouter/"],
-            "nvidia": ["nvidia/"],
-            "ollama": ["ollama/"],
-            "deepseek": ["deepseek/"],
+            'openai': ['openai/'],
+            'anthropic': ['anthropic/'],
+            'google': ['google/'],
+            'xai': ['xai/'],
+            'groq': ['groq/'],
+            'mistral': ['mistral/'],
+            'openrouter': ['openrouter/'],
+            'nvidia': ['nvidia/'],
+            'ollama': ['ollama/'],
+            'deepseek': ['deepseek/'],
         }
 
         for provider, prefixes in prefix_patterns.items():
@@ -375,7 +374,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
 
     def _check_fallback_patterns(self, model_lower: str) -> str:
         """Legacy no-op retained for compatibility with older tests/helpers."""
-        return "unknown"
+        return 'unknown'
 
     def extract_provider(self, model: str) -> str:
         """Return the provider identifier for a model string."""
@@ -394,22 +393,22 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
 
         """
         if not model:
-            return "unknown"
+            return 'unknown'
 
         try:
             from backend.inference.provider_resolver import get_resolver
 
             resolver = get_resolver()
             provider = resolver.resolve_provider(model)
-            logger.debug("Resolved model=%s to provider=%s", model, provider)
+            logger.debug('Resolved model=%s to provider=%s', model, provider)
             return provider
         except Exception as e:
             logger.warning(
-                "Failed to determine provider for model %s without heuristics: %s",
+                'Failed to determine provider for model %s without heuristics: %s',
                 model,
                 e,
             )
-            return "unknown"
+            return 'unknown'
 
     def _is_correct_provider_key(
         self, api_key: SecretStr, expected_provider: str
@@ -423,10 +422,10 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
 
             # Basic format validation based on provider conventions
             provider_patterns = {
-                "openai": lambda k: k.startswith("sk-"),
-                "anthropic": lambda k: k.startswith("sk-ant-"),
-                "google": lambda k: k.startswith("AIza"),
-                "xai": lambda k: k.startswith("xai-"),
+                'openai': lambda k: k.startswith('sk-'),
+                'anthropic': lambda k: k.startswith('sk-ant-'),
+                'google': lambda k: k.startswith('AIza'),
+                'xai': lambda k: k.startswith('xai-'),
             }
 
             pattern_check = provider_patterns.get(expected_provider)
@@ -441,7 +440,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
 
     def _get_provider_key_from_env(self, provider: str) -> str | None:
         """Get API key for provider from environment variables using provider configuration."""
-        if not provider or provider == "unknown":
+        if not provider or provider == 'unknown':
             return None
         # Use provider configuration to get the correct environment variable
         env_var = provider_config_manager.get_environment_variable(provider)
@@ -449,7 +448,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             return os.environ.get(env_var)
 
         # Fallback to generic
-        return os.environ.get("LLM_API_KEY")
+        return os.environ.get('LLM_API_KEY')
 
     def get_provider_key_from_env(self, provider: str) -> str | None:
         """Return the configured environment API key for a provider, if present."""
@@ -469,7 +468,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
 
         """
         provider = self._extract_provider(model)
-        logger.debug("Validating completion parameters for provider: %s", provider)
+        logger.debug('Validating completion parameters for provider: %s', provider)
 
         # Use the provider configuration manager to validate and clean parameters
         cleaned_params = provider_config_manager.validate_and_clean_params(
@@ -477,7 +476,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         )
 
         logger.debug(
-            "Parameter validation completed: %d -> %d parameters",
+            'Parameter validation completed: %d -> %d parameters',
             len(params),
             len(cleaned_params),
         )

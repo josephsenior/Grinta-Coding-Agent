@@ -20,7 +20,6 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'xai': 'https://api.x.ai/v1',
     'deepseek': 'https://api.deepseek.com/v1',
     'openrouter': 'https://openrouter.ai/api/v1',
-    'openhands': 'https://llm-proxy.app.all-hands.dev/v1',
     'nvidia': 'https://integrate.api.nvidia.com/v1',
     'lightning': 'https://lightning.ai/api/v1',
 }
@@ -38,7 +37,6 @@ KNOWN_PROVIDER_PREFIXES: set[str] = {
     'nvidia',
     'ollama',
     'openai',
-    'openhands',
     'openrouter',
     'perplexity',
     'replicate',
@@ -81,16 +79,13 @@ def canonicalize_model_selection(
 ) -> tuple[str | None, str | None]:
     """Canonicalize a settings-level provider/model pair.
 
-    Returns a tuple of (model, provider) where model is prefixed with the
-    explicit provider when possible, and provider is inferred from a known
-    prefix if the caller omitted it.
+    Returns a tuple of (model, provider) where model is prefixed for litellm
+    routing and provider is normalized.
 
-    When the model already carries a namespace prefix that differs from the
-    explicit provider (e.g. ``google/gemini-3-flash-preview`` routed through
-    ``lightning``), the model name is kept verbatim.  Proxy/aggregator APIs
-    such as Lightning AI and OpenRouter expect the full original model
-    identifier (e.g. ``google/gemini-3-flash-preview``), not the provider
-    name prepended (``lightning/gemini-3-flash-preview``).
+    Proxy/aggregator providers (Lightning AI, OpenRouter, etc.) expose
+    OpenAI-compatible APIs.  litellm doesn't recognise all of them natively,
+    so we prepend ``openai/`` to ensure litellm routes through the
+    OpenAI-compatible path with the configured ``base_url``.
     """
     if model_name is None:
         return None, normalize_provider_name(provider)
@@ -102,14 +97,23 @@ def canonicalize_model_selection(
     normalized_provider = normalize_provider_name(provider)
     prefixed_provider = extract_provider_prefix(model)
 
+    # Proxy providers that need openai/ prefix for correct routing.
+    _OPENAI_COMPAT_PROVIDERS = {'lightning'}
+
     if normalized_provider:
+        if normalized_provider in _OPENAI_COMPAT_PROVIDERS:
+            # Strip any redundant provider prefix, keep the model identifier
+            # the proxy API expects, and prepend openai/.
+            if prefixed_provider == normalized_provider:
+                bare = model.split('/', 1)[1]
+            else:
+                bare = model
+            return f'openai/{bare}', normalized_provider
+
         if prefixed_provider and prefixed_provider != normalized_provider:
-            # Model has a DIFFERENT namespace prefix from the explicit provider
-            # (e.g. google/gemini-3-flash-preview on lightning).  Keep the
-            # original model name — the proxy needs the full identifier.
+            # Cross-provider routing (e.g. anthropic model on openrouter).
             return model, normalized_provider
         if prefixed_provider:
-            # Same prefix as provider — normalise by re-prefixing.
             prefix = model.split('/', 1)[0]
             stripped = model[len(prefix) + 1 :]
         else:
