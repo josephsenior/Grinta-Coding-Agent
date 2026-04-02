@@ -247,15 +247,16 @@ class CLIEventRenderer:
             pass
 
     def drain_events(self) -> None:
-        """Process all queued events and refresh once.  MUST be called from
-        the main thread (the one that owns the Live display)."""
-        drained = False
+        """Process all queued events and refresh.  MUST be called from
+        the main thread (the one that owns the Live display).
+
+        Always refreshes even when no events were queued so that
+        time-based widgets (e.g. the Thinking… timer) stay up to date.
+        """
         while self._pending_events:
             event = self._pending_events.popleft()
             self._process_event_data(event)
-            drained = True
-        if drained:
-            self.refresh()
+        self.refresh()
 
     def _process_event_data(self, event: Any) -> None:
         """Update internal state for one event.  Does NOT call refresh()."""
