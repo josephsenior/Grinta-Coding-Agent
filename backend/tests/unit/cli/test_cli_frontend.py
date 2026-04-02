@@ -179,11 +179,9 @@ def test_show_grinta_splash_renders_logo_text() -> None:
     show_grinta_splash(console)
     output = _console_output(console)
 
-    assert 'GGGGGG' in output
-    assert 'RRRRRR' in output
-    assert 'TTTTTTTT' in output
+    assert 'GRINTA' in output
     assert '>_' in output
-    assert 'o  o' in output
+    assert 'AI coding agent' in output
 
 
 def test_prompt_session_requires_tty_streams() -> None:
@@ -537,6 +535,16 @@ def test_find_sessions_root_prefers_workspace_conversations(tmp_path: Path) -> N
         assert _find_sessions_root() == conversations
 
 
+def test_find_sessions_root_prefers_hidden_storage_sessions(tmp_path: Path) -> None:
+    from backend.cli.session_manager import _find_sessions_root
+
+    sessions = tmp_path / '.grinta' / 'storage' / 'sessions'
+    sessions.mkdir(parents=True)
+
+    with patch.dict(os.environ, {'APP_ROOT': str(tmp_path)}, clear=False):
+        assert _find_sessions_root() == sessions
+
+
 # ── New tests: Ctrl+C handling ───────────────────────────────────────────
 
 
@@ -557,6 +565,24 @@ async def test_cancel_agent_stops_task() -> None:
     assert task.cancelled()
     mock_renderer.add_system_message.assert_called_once()
     assert 'Interrupted' in mock_renderer.add_system_message.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_repl_run_saves_controller_state_on_exit() -> None:
+    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    controller = MagicMock()
+    repl.set_controller(controller)
+
+    with (
+        patch(
+            'backend.core.bootstrap.main._initialize_session_components',
+            side_effect=RuntimeError('bootstrap failed'),
+        ),
+        patch('backend.cli.repl.load_app_config'),
+    ):
+        await repl.run()
+
+    controller.save_state.assert_called_once()
 
 
 # ── New tests: Reasoning elapsed time ────────────────────────────────────

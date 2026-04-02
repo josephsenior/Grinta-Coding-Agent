@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import sys
 from pathlib import Path
@@ -10,17 +11,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 logger = logging.getLogger(__name__)
 
-from prompt_toolkit import PromptSession
-from prompt_toolkit.history import FileHistory
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.keys import Keys
-from prompt_toolkit.patch_stdout import patch_stdout
 from rich.console import Console
 from rich.live import Live
-
-from backend.core.config import AppConfig, load_app_config
-from backend.core.enums import AgentState, EventSource
-from backend.ledger.action import MessageAction
 
 from backend.cli.config_manager import get_current_model
 from backend.cli.confirmation import build_confirmation_action, render_confirmation
@@ -28,15 +20,28 @@ from backend.cli.event_renderer import CLIEventRenderer
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.settings_tui import open_settings
+from backend.core.config import AppConfig, load_app_config
+from backend.core.enums import AgentState, EventSource
+from backend.ledger.action import MessageAction
 
 if TYPE_CHECKING:
     from backend.ledger.stream import EventStream
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.key_binding import KeyBindings
+
+
+def _prompt_toolkit_available() -> bool:
+    try:
+        import prompt_toolkit  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 # ---------------------------------------------------------------------------
 # History file
 # ---------------------------------------------------------------------------
-_HISTORY_DIR = Path.home() / ".grinta"
-_HISTORY_FILE = _HISTORY_DIR / "history.txt"
+_HISTORY_DIR = Path.home() / '.grinta'
+_HISTORY_FILE = _HISTORY_DIR / 'history.txt'
 
 
 def _ensure_history() -> Path:
@@ -50,28 +55,32 @@ def _ensure_history() -> Path:
 # Key bindings for prompt_toolkit
 # ---------------------------------------------------------------------------
 
-def _build_bindings() -> KeyBindings:
+
+def _build_bindings() -> Any:
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.keys import Keys
+
     kb = KeyBindings()
 
     @kb.add(Keys.Escape, Keys.Enter)
     def _newline(event):
         """Alt+Enter inserts a newline (multi-line input)."""
-        event.current_buffer.insert_text("\n")
+        event.current_buffer.insert_text('\n')
 
     return kb
 
 
 def _supports_prompt_session(input_stream: Any, output_stream: Any) -> bool:
     """Use prompt_toolkit only when both streams are attached to a TTY."""
-
-    input_is_tty = bool(getattr(input_stream, "isatty", lambda: False)())
-    output_is_tty = bool(getattr(output_stream, "isatty", lambda: False)())
-    return input_is_tty and output_is_tty
+    input_is_tty = bool(getattr(input_stream, 'isatty', lambda: False)())
+    output_is_tty = bool(getattr(output_stream, 'isatty', lambda: False)())
+    return input_is_tty and output_is_tty and _prompt_toolkit_available()
 
 
 # ---------------------------------------------------------------------------
 # REPL class
 # ---------------------------------------------------------------------------
+
 
 class Repl:
     """Interactive REPL that drives an in-process agent session."""
@@ -93,6 +102,7 @@ class Repl:
         self._conversation_stats: Any | None = None
         self._acquire_result: Any | None = None
         self._pending_resume: str | None = None
+        self._queued_input: list[str] = []
 
     @property
     def pending_resume(self) -> str | None:
@@ -129,6 +139,10 @@ class Repl:
             self._event_stream = event_stream
         if acquire_result is not None:
             self._acquire_result = acquire_result
+
+    def queue_initial_input(self, text: str) -> None:
+        if text:
+            self._queued_input.append(text)
 
     async def ensure_controller_loop(
         self,
@@ -189,11 +203,13 @@ class Repl:
         return self._handle_command(text)
 
     async def _read_non_interactive_input(self) -> str:
+        if self._queued_input:
+            return self._queued_input.pop(0)
         if self._renderer is not None:
             with self._renderer.suspend_live():
-                self._console.print(">>> ", end="")
+                self._console.print('>>> ', end='')
         else:
-            self._console.print(">>> ", end="")
+            self._console.print('>>> ', end='')
         return await asyncio.to_thread(sys.stdin.readline)
 
     # -- public entry point ------------------------------------------------
@@ -210,101 +226,120 @@ class Repl:
         repo_directory: Any
         acquire_result: Any
         memory: Any
+        agent_task: asyncio.Task | None = None
 
         # -- initialize engine components ----------------------------------
+        from backend.core.bootstrap.agent_control_loop import run_agent_until_done
         from backend.core.bootstrap.main import (
-            _initialize_session_components,
-            _setup_runtime_for_controller,
-            _setup_memory_and_mcp,
             _create_early_status_callback,
+            _initialize_session_components,
+            _setup_memory_and_mcp,
+            _setup_runtime_for_controller,
         )
         from backend.core.bootstrap.setup import create_controller
-        from backend.core.bootstrap.agent_control_loop import run_agent_until_done
 
         try:
-            bootstrap_state = _initialize_session_components(self._config, None)
-            session_id = bootstrap_state[0]
-            llm_registry = bootstrap_state[1]
-            conversation_stats = bootstrap_state[2]
-            config = bootstrap_state[3]
-            agent = bootstrap_state[4]
-        except Exception as exc:
-            exc_name = type(exc).__name__
-            if "AuthenticationError" in exc_name or "api_key" in str(exc).lower():
-                self._console.print(
-                    "[bold red]No API key or model configured.[/bold red]\n"
-                    "Run [cyan]grinta[/cyan] again and complete onboarding, "
-                    "or edit [cyan]settings.json[/cyan] directly.\n"
-                    f"[dim]{exc}[/dim]"
+            try:
+                bootstrap_state = _initialize_session_components(self._config, None)
+                session_id = bootstrap_state[0]
+                llm_registry = bootstrap_state[1]
+                conversation_stats = bootstrap_state[2]
+                config = bootstrap_state[3]
+                agent = bootstrap_state[4]
+            except Exception as exc:
+                exc_name = type(exc).__name__
+                if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
+                    self._console.print(
+                        '[bold red]No API key or model configured.[/bold red]\n'
+                        'Run [cyan]grinta[/cyan] again and complete onboarding, '
+                        'or edit [cyan]settings.json[/cyan] directly.\n'
+                        f'[dim]{exc}[/dim]'
+                    )
+                else:
+                    self._console.print(
+                        f'[bold red]Bootstrap failed:[/bold red] {exc}\n'
+                        '[dim]Check settings.json and try again.[/dim]'
+                    )
+                return
+
+            self._agent = agent
+            self._llm_registry = llm_registry
+            self._conversation_stats = conversation_stats
+            self._config = config
+            self._hud.update_model(get_current_model(config))
+
+            try:
+                runtime_state = _setup_runtime_for_controller(
+                    config,
+                    llm_registry,
+                    session_id,
+                    True,
+                    agent,
+                    None,
                 )
-            else:
+                runtime = runtime_state[0]
+                repo_directory = runtime_state[1]
+                acquire_result = runtime_state[2]
+            except Exception as exc:
                 self._console.print(
-                    f"[bold red]Bootstrap failed:[/bold red] {exc}\n"
-                    "[dim]Check settings.json and try again.[/dim]"
+                    f'[bold red]Runtime setup failed:[/bold red] {exc}\n'
+                    '[dim]Check logs for details.[/dim]'
                 )
-            return
+                return
 
-        self._agent = agent
-        self._llm_registry = llm_registry
-        self._conversation_stats = conversation_stats
-        self._config = config
-        self._hud.update_model(get_current_model(config))
+            event_stream = runtime.event_stream
+            if event_stream is None:
+                self._console.print(
+                    '[bold red]Runtime did not produce an event stream.[/bold red]'
+                )
+                return
+            self._event_stream = event_stream
+            self._runtime = runtime
+            self._acquire_result = acquire_result
 
-        try:
-            runtime_state = _setup_runtime_for_controller(
-                config, llm_registry, session_id, True, agent, None,
+            memory = await _setup_memory_and_mcp(
+                config,
+                runtime,
+                session_id,
+                repo_directory,
+                None,
+                None,
+                agent,
             )
-            runtime = runtime_state[0]
-            repo_directory = runtime_state[1]
-            acquire_result = runtime_state[2]
-        except Exception as exc:
-            self._console.print(
-                f"[bold red]Runtime setup failed:[/bold red] {exc}\n"
-                "[dim]Check logs for details.[/dim]"
+            self._memory = memory
+
+            # -- renderer subscribes to event stream ---------------------------
+            self._renderer = CLIEventRenderer(
+                self._console,
+                self._hud,
+                self._reasoning,
+                loop=loop,
+                max_budget=config.max_budget_per_task,
             )
-            return
+            self._renderer.subscribe(event_stream, event_stream.sid)
 
-        event_stream = runtime.event_stream
-        if event_stream is None:
-            self._console.print("[bold red]Runtime did not produce an event stream.[/bold red]")
-            return
-        self._event_stream = event_stream
-        self._runtime = runtime
-        self._acquire_result = acquire_result
+            # -- setup prompt_toolkit session ----------------------------------
+            session: Any | None = None
+            if _supports_prompt_session(sys.stdin, sys.stdout):
+                from prompt_toolkit import PromptSession
+                from prompt_toolkit.history import FileHistory
 
-        memory = await _setup_memory_and_mcp(
-            config, runtime, session_id, repo_directory, None, None, agent,
-        )
-        self._memory = memory
+                session = PromptSession(
+                    history=FileHistory(str(_ensure_history())),
+                    key_bindings=_build_bindings(),
+                    multiline=False,  # Alt+Enter adds lines; Enter submits
+                )
 
-        # -- renderer subscribes to event stream ---------------------------
-        self._renderer = CLIEventRenderer(
-            self._console, self._hud, self._reasoning, loop=loop,
-            max_budget=config.max_budget_per_task,
-        )
-        self._renderer.subscribe(event_stream, event_stream.sid)
+            # -- controller & agent loop setup ---------------------------------
+            controller = None
+            end_states = [
+                AgentState.FINISHED,
+                AgentState.REJECTED,
+                AgentState.ERROR,
+                AgentState.PAUSED,
+                AgentState.STOPPED,
+            ]
 
-        # -- setup prompt_toolkit session ----------------------------------
-        session: PromptSession[str] | None = None
-        if _supports_prompt_session(sys.stdin, sys.stdout):
-            session = PromptSession(
-                history=FileHistory(str(_ensure_history())),
-                key_bindings=_build_bindings(),
-                multiline=False,  # Alt+Enter adds lines; Enter submits
-            )
-
-        # -- controller & agent loop setup ---------------------------------
-        controller = None
-        agent_task: asyncio.Task | None = None
-        end_states = [
-            AgentState.FINISHED,
-            AgentState.REJECTED,
-            AgentState.ERROR,
-            AgentState.PAUSED,
-            AgentState.STOPPED,
-        ]
-
-        try:
             with Live(
                 self._renderer,
                 console=self._console,
@@ -314,19 +349,21 @@ class Repl:
             ) as live:
                 self._renderer.attach_live(live)
                 self._renderer.add_system_message(
-                    "grinta ready. Type a task or /help for commands.",
-                    title="grinta",
+                    'grinta ready. Type a task or /help for commands.',
+                    title='grinta',
                 )
 
                 while self._running:
                     try:
                         if session is None:
                             user_input = await self._read_non_interactive_input()
-                            if user_input == "":
+                            if user_input == '':
                                 raise EOFError
                         else:
+                            from prompt_toolkit.patch_stdout import patch_stdout
+
                             with patch_stdout():
-                                user_input = await session.prompt_async(">>> ")
+                                user_input = await session.prompt_async('>>> ')
                     except KeyboardInterrupt:
                         continue
                     except EOFError:
@@ -336,7 +373,7 @@ class Repl:
                     if not text:
                         continue
 
-                    if text.startswith("/"):
+                    if text.startswith('/'):
                         should_continue = self._handle_command(text)
                         if not should_continue:
                             break
@@ -347,9 +384,12 @@ class Repl:
                             controller = None
                             agent_task = None
                             result = await self._resume_session(
-                                target, config, create_controller,
+                                target,
+                                config,
+                                create_controller,
                                 _create_early_status_callback,
-                                run_agent_until_done, end_states,
+                                run_agent_until_done,
+                                end_states,
                             )
                             if result is not None:
                                 controller, agent_task = result
@@ -380,15 +420,21 @@ class Repl:
                     try:
                         controller.step()
                     except Exception:
-                        logger.debug("controller.step() failed, agent loop will retry", exc_info=True)
+                        logger.debug(
+                            'controller.step() failed, agent loop will retry',
+                            exc_info=True,
+                        )
 
                     try:
                         await self._wait_for_agent_idle(controller, agent_task)
                     except (KeyboardInterrupt, asyncio.CancelledError):
                         await self._cancel_agent(agent_task)
                         continue
-
         finally:
+            controller = self._controller
+            if controller is not None:
+                with contextlib.suppress(Exception):
+                    controller.save_state()
             self._reasoning.stop()
             if agent_task and not agent_task.done():
                 agent_task.cancel()
@@ -398,7 +444,14 @@ class Repl:
                     pass
             if self._acquire_result is not None:
                 from backend.execution import runtime_orchestrator
+
                 runtime_orchestrator.release(self._acquire_result)
+            event_stream = self._event_stream
+            if event_stream is not None:
+                close = getattr(event_stream, 'close', None)
+                if callable(close):
+                    with contextlib.suppress(Exception):
+                        close()
 
     async def _ensure_controller_loop(
         self,
@@ -416,13 +469,15 @@ class Repl:
         end_states: list[AgentState],
     ) -> tuple[Any, asyncio.Task[Any] | None]:
         if controller is None:
-            controller, _ = create_controller(agent, runtime, config, conversation_stats)
-            setattr(runtime, "controller", controller)
+            controller, _ = create_controller(
+                agent, runtime, config, conversation_stats
+            )
+            setattr(runtime, 'controller', controller)
             early_cb = create_status_callback(controller)
             try:
                 memory.status_callback = early_cb
             except Exception:
-                logger.debug("Could not set memory status callback", exc_info=True)
+                logger.debug('Could not set memory status callback', exc_info=True)
             self._controller = controller
 
         current_state = controller.get_agent_state()
@@ -438,7 +493,7 @@ class Repl:
         if agent_task is None or agent_task.done():
             agent_task = asyncio.create_task(
                 run_agent_until_done(controller, runtime, memory, end_states),
-                name="grinta-agent-loop",
+                name='grinta-agent-loop',
             )
 
         return controller, agent_task
@@ -460,9 +515,12 @@ class Repl:
 
         while True:
             if agent_task and agent_task.done():
-                state = controller.get_agent_state()
-                if state in idle_states:
-                    break
+                # Break immediately when the background task has finished.
+                # The renderer's current_state may still lag (the final
+                # AgentStateChangedObservation hasn't propagated yet), which
+                # would make the fallback check below loop forever waiting for
+                # an event that will never arrive.
+                break
 
             renderer = cast(Any, self._renderer)
             if renderer is None:
@@ -479,7 +537,7 @@ class Repl:
             if renderer is None:
                 await asyncio.sleep(0.25)
             else:
-                await renderer.wait_for_state_change(timeout=0.25)
+                await renderer.wait_for_state_change(wait_timeout_sec=0.25)
 
     # -- interrupt handler -------------------------------------------------
 
@@ -494,7 +552,7 @@ class Repl:
         self._reasoning.stop()
         if self._renderer is not None:
             self._renderer.add_system_message(
-                "Interrupted. Ready for input.", title="grinta"
+                'Interrupted. Ready for input.', title='grinta'
             )
 
     # -- session resume ----------------------------------------------------
@@ -514,8 +572,8 @@ class Repl:
         """
         from backend.cli.session_manager import get_session_id_by_index
         from backend.core.bootstrap.main import (
-            _setup_runtime_for_controller,
             _setup_memory_and_mcp,
+            _setup_runtime_for_controller,
         )
 
         llm_registry = self._llm_registry
@@ -524,8 +582,8 @@ class Repl:
         if llm_registry is None or agent is None or conversation_stats is None:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    "Resume failed: session bootstrap state is incomplete.",
-                    title="error",
+                    'Resume failed: session bootstrap state is incomplete.',
+                    title='error',
                 )
             return None
 
@@ -535,7 +593,7 @@ class Repl:
             if resolved_id is None:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f"No session at index {target}.", title="warning"
+                        f'No session at index {target}.', title='warning'
                     )
                 return None
         else:
@@ -543,12 +601,17 @@ class Repl:
 
         if self._renderer is not None:
             self._renderer.add_system_message(
-                f"Resuming session: {resolved_id}", title="grinta"
+                f'Resuming session: {resolved_id}', title='grinta'
             )
 
         try:
             runtime_state = _setup_runtime_for_controller(
-                config, llm_registry, resolved_id, True, agent, None,
+                config,
+                llm_registry,
+                resolved_id,
+                True,
+                agent,
+                None,
             )
             runtime = runtime_state[0]
             repo_directory = runtime_state[1]
@@ -556,7 +619,7 @@ class Repl:
         except Exception as exc:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    f"Resume failed: {exc}", title="error"
+                    f'Resume failed: {exc}', title='error'
                 )
             return None
 
@@ -569,7 +632,7 @@ class Repl:
         if event_stream is None:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    "Resume failed: no event stream.", title="error"
+                    'Resume failed: no event stream.', title='error'
                 )
             return None
 
@@ -578,7 +641,13 @@ class Repl:
         self._acquire_result = acquire_result
 
         memory = await _setup_memory_and_mcp(
-            config, runtime, resolved_id, repo_directory, None, None, agent,
+            config,
+            runtime,
+            resolved_id,
+            repo_directory,
+            None,
+            None,
+            agent,
         )
         self._memory = memory
 
@@ -589,26 +658,29 @@ class Repl:
             renderer.subscribe(event_stream, event_stream.sid)
 
         controller, _ = create_controller(
-            agent, runtime, config, conversation_stats,
+            agent,
+            runtime,
+            config,
+            conversation_stats,
         )
-        setattr(runtime, "controller", controller)
+        setattr(runtime, 'controller', controller)
         self._controller = controller
 
         early_cb = create_status_callback(controller)
         try:
             memory.status_callback = early_cb
         except Exception:
-            logger.debug("Could not set memory status callback", exc_info=True)
+            logger.debug('Could not set memory status callback', exc_info=True)
 
         agent_task = asyncio.create_task(
             run_agent_until_done(controller, runtime, memory, end_states),
-            name="grinta-agent-loop",
+            name='grinta-agent-loop',
         )
 
         if self._renderer is not None:
             self._renderer.add_system_message(
-                f"Session {resolved_id} resumed. Send a message to continue.",
-                title="grinta",
+                f'Session {resolved_id} resumed. Send a message to continue.',
+                title='grinta',
             )
 
         return controller, agent_task
@@ -621,8 +693,8 @@ class Repl:
         try:
             pending = controller.get_pending_action()
         except Exception:
-            logger.debug("get_pending_action() failed, trying fallback", exc_info=True)
-            pending = getattr(controller, "_pending_action", None)
+            logger.debug('get_pending_action() failed, trying fallback', exc_info=True)
+            pending = getattr(controller, '_pending_action', None)
 
         if pending is not None:
             if self._renderer is not None:
@@ -633,15 +705,16 @@ class Repl:
         else:
             # Fallback: generic prompt if we can't get the pending action.
             from rich.prompt import Confirm
+
             if self._renderer is not None:
                 with self._renderer.suspend_live():
                     approved = Confirm.ask(
-                        "[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]",
+                        '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
                         console=self._console,
                     )
             else:
                 approved = Confirm.ask(
-                    "[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]",
+                    '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
                     console=self._console,
                 )
 
@@ -654,19 +727,19 @@ class Repl:
     def _handle_autonomy_command(self, text: str) -> None:
         """View or change the autonomy level."""
         parts = text.strip().split()
-        valid_levels = ("supervised", "balanced", "full")
+        valid_levels = ('supervised', 'balanced', 'full')
 
         if len(parts) < 2:
             # Show current level
             level = self._get_current_autonomy()
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    f"Autonomy: {level}\n"
-                    "  supervised — always ask for confirmation\n"
-                    "  balanced   — ask for high-risk actions only\n"
-                    "  full       — never ask for confirmation\n"
-                    f"Change with: /autonomy <{'|'.join(valid_levels)}>",
-                    title="autonomy",
+                    f'Autonomy: {level}\n'
+                    '  supervised — always ask for confirmation\n'
+                    '  balanced   — ask for high-risk actions only\n'
+                    '  full       — never ask for confirmation\n'
+                    f'Change with: /autonomy <{"|".join(valid_levels)}>',
+                    title='autonomy',
                 )
             return
 
@@ -675,34 +748,34 @@ class Repl:
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     f"Invalid level '{new_level}'. Use: {', '.join(valid_levels)}",
-                    title="warning",
+                    title='warning',
                 )
             return
 
         controller = self._controller
         if controller is not None:
-            ac = getattr(controller, "autonomy_controller", None)
+            ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
                 ac.autonomy_level = new_level
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f"Autonomy set to: {new_level}", title="autonomy"
+                        f'Autonomy set to: {new_level}', title='autonomy'
                     )
                 return
 
         if self._renderer is not None:
             self._renderer.add_system_message(
-                "No active controller. Send a message first to initialize, then set autonomy.",
-                title="warning",
+                'No active controller. Send a message first to initialize, then set autonomy.',
+                title='warning',
             )
 
     def _get_current_autonomy(self) -> str:
         controller = self._controller
         if controller is not None:
-            ac = getattr(controller, "autonomy_controller", None)
+            ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
-                return str(getattr(ac, "autonomy_level", "balanced"))
-        return "balanced (default)"
+                return str(getattr(ac, 'autonomy_level', 'balanced'))
+        return 'balanced (default)'
 
     # -- slash commands ----------------------------------------------------
 
@@ -710,12 +783,12 @@ class Repl:
         """Handle a /command. Returns True to continue REPL, False to exit."""
         cmd = text.lower().split()[0]
 
-        if cmd in ("/exit", "/quit"):
+        if cmd in ('/exit', '/quit'):
             if self._renderer is not None:
-                self._renderer.add_system_message("Goodbye.", title="grinta")
+                self._renderer.add_system_message('Goodbye.', title='grinta')
             return False
 
-        if cmd == "/settings":
+        if cmd == '/settings':
             if self._renderer is not None:
                 with self._renderer.suspend_live():
                     open_settings(self._console)
@@ -724,25 +797,28 @@ class Repl:
             self._config = load_app_config()
             self._hud.update_model(get_current_model(self._config))
             if self._renderer is not None:
-                self._renderer.add_system_message("Settings updated.", title="settings")
+                self._renderer.add_system_message('Settings updated.', title='settings')
             return True
 
-        if cmd == "/clear":
+        if cmd == '/clear':
             if self._renderer is not None:
                 self._renderer.clear_history()
                 self._renderer.add_system_message(
-                    "Screen cleared. Type a task or /help for commands.",
-                    title="grinta",
+                    'Screen cleared. Type a task or /help for commands.',
+                    title='grinta',
                 )
             return True
 
-        if cmd == "/status":
+        if cmd == '/status':
             if self._renderer is not None:
-                self._renderer.add_system_message(self._hud.plain_text(), title="status")
+                self._renderer.add_system_message(
+                    self._hud.plain_text(), title='status'
+                )
             return True
 
-        if cmd == "/sessions":
+        if cmd == '/sessions':
             from backend.cli.session_manager import list_sessions
+
             if self._renderer is not None:
                 with self._renderer.suspend_live():
                     list_sessions(self._console)
@@ -750,26 +826,26 @@ class Repl:
                 list_sessions(self._console)
             return True
 
-        if cmd == "/resume":
+        if cmd == '/resume':
             parts = text.strip().split()
             if len(parts) < 2:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        "Usage: /resume <N> or /resume <session_id>",
-                        title="warning",
+                        'Usage: /resume <N> or /resume <session_id>',
+                        title='warning',
                     )
                 return True
             self._pending_resume = parts[1]
             return True
 
-        if cmd.startswith("/autonomy"):
+        if cmd.startswith('/autonomy'):
             self._handle_autonomy_command(text)
             return True
 
-        if cmd == "/help":
+        if cmd == '/help':
             if self._renderer is not None:
                 self._renderer.add_markdown_block(
-                    "Help",
+                    'Help',
                     """
 **Commands**
 
@@ -787,5 +863,7 @@ Alt+Enter inserts a newline.
             return True
 
         if self._renderer is not None:
-            self._renderer.add_system_message(f"Unknown command: {cmd}", title="warning")
+            self._renderer.add_system_message(
+                f'Unknown command: {cmd}', title='warning'
+            )
         return True

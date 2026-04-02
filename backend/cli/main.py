@@ -21,11 +21,6 @@ from rich.align import Align
 from rich.console import Console, Group
 from rich.text import Text
 
-_CRIMSON = 'bold #DC143C'
-_PROMPT_WHITE = 'bold #FFFFFF'
-_EYE_WHITE = 'bold #FFFFFF'
-
-
 def _configure_redirected_streams(*streams: io.TextIOBase | None) -> None:
     """Prefer UTF-8 when writing Rich output to redirected streams."""
     for stream in streams:
@@ -41,13 +36,6 @@ def _configure_redirected_streams(*streams: io.TextIOBase | None) -> None:
                 continue
 
 
-def _styled_line(*segments: tuple[str, str]) -> Text:
-    line = Text()
-    for text, style in segments:
-        line.append(text, style=style)
-    return line
-
-
 def show_grinta_splash(console: Console | None = None) -> None:
     """Render the GRINTA boot splash in the terminal."""
     console = console or Console()
@@ -55,145 +43,13 @@ def show_grinta_splash(console: Console | None = None) -> None:
     splash = Group(
         Text(''),
         Align.center(
-            _styled_line(
-                (
-                    '                _________________________________                ',
-                    _CRIMSON,
-                ),
-            )
+            Text('  GRINTA  ', style='bold white on #DC143C'),
         ),
         Align.center(
-            _styled_line(
-                (
-                    '          ______/                                 \\______          ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                ('         /_____/    ', _CRIMSON),
-                (' .-^^^^-. ', _EYE_WHITE),
-                ('         ', _CRIMSON),
-                (' .-^^^^-. ', _EYE_WHITE),
-                ('    \\_____\\         ', _CRIMSON),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                ('        /_____/    ', _CRIMSON),
-                ('/ o  o \\', _EYE_WHITE),
-                ('_________', _CRIMSON),
-                ('/ o  o \\', _EYE_WHITE),
-                ('    \\_____\\        ', _CRIMSON),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                ('            ||      ', _CRIMSON),
-                ('\\  --  /', _EYE_WHITE),
-                ('  _____  ', _CRIMSON),
-                ('\\  --  /', _EYE_WHITE),
-                ('      ||            ', _CRIMSON),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                ('            ||           \\____/           ||            ', _CRIMSON),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                ('      _____||_______', _CRIMSON),
-                ("'----'", _EYE_WHITE),
-                ('  | ', _CRIMSON),
-                ('>', _PROMPT_WHITE),
-                ('_', _PROMPT_WHITE),
-                (' |  ', _CRIMSON),
-                ("'----'", _EYE_WHITE),
-                ('_______||_____      ', _CRIMSON),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                (
-                    '     /_______________________|_____|_______________________\\     ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                (
-                    '                 \\              /_____|              /                 ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                (
-                    '                  \\____________/      \\____________/                  ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                (
-                    '                   |_____|              |_____|                   ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Text(''),
-        Align.center(
-            _styled_line(
-                (
-                    '  GGGGGG   RRRRRR   IIIIIIII  NNN   NN  TTTTTTTT   AAAAAA   ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                (
-                    ' GG    GG  RR   RR     II     NNNN  NN     TT     AA    AA  ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                (
-                    ' GG        RRRRRR      II     NN NN NN     TT     AAAAAAAA  ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                (
-                    ' GG  GGGG  RR  RR      II     NN  NNNN     TT     AA    AA  ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                (
-                    ' GG    GG  RR   RR     II     NN   NNN     TT     AA    AA  ',
-                    _CRIMSON,
-                ),
-            )
-        ),
-        Align.center(
-            _styled_line(
-                (
-                    '  GGGGGG   RR    RR  IIIIIIII NN    NN     TT     AA    AA  ',
-                    _CRIMSON,
-                ),
-            )
+            Text.assemble(
+                ('>_', 'bold #DC143C'),
+                ('  AI coding agent', 'dim'),
+            ),
         ),
         Text(''),
     )
