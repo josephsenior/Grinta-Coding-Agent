@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from backend.core.config.llm_config import LLMConfig, suppress_llm_env_export
 
-
 # ---------------------------------------------------------------------------
 # Basic construction and defaults
 # ---------------------------------------------------------------------------
@@ -24,13 +23,13 @@ class TestLLMConfigDefaults:
 
     def test_empty_model_string_normalizes_to_none(self):
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="")
+            cfg = LLMConfig(model='')
         assert cfg.model is None
 
     def test_extra_fields_rejected(self):
         with suppress_llm_env_export():
             with pytest.raises(ValidationError):
-                LLMConfig(**{"model": "gpt-4o", "totally_unknown_field": "oops"})
+                LLMConfig(**{'model': 'gpt-4o', 'totally_unknown_field': 'oops'})
 
 
 # ---------------------------------------------------------------------------
@@ -72,18 +71,18 @@ class TestFieldValidation:
 class TestURLValidation:
     def test_auto_prepend_http(self):
         with suppress_llm_env_export():
-            cfg = LLMConfig(base_url="localhost:8080")
-        assert cfg.base_url == "http://localhost:8080"
+            cfg = LLMConfig(base_url='localhost:8080')
+        assert cfg.base_url == 'http://localhost:8080'
 
     def test_https_preserved(self):
         with suppress_llm_env_export():
-            cfg = LLMConfig(base_url="https://api.example.com")
-        assert cfg.base_url == "https://api.example.com"
+            cfg = LLMConfig(base_url='https://api.example.com')
+        assert cfg.base_url == 'https://api.example.com'
 
     def test_http_preserved(self):
         with suppress_llm_env_export():
-            cfg = LLMConfig(base_url="http://localhost:11434/v1")
-        assert cfg.base_url == "http://localhost:11434/v1"
+            cfg = LLMConfig(base_url='http://localhost:11434/v1')
+        assert cfg.base_url == 'http://localhost:11434/v1'
 
 
 # ---------------------------------------------------------------------------
@@ -94,23 +93,23 @@ class TestURLValidation:
 class TestSetDefaults:
     def test_non_gemini_gets_reasoning_effort_high(self):
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="gpt-4o")
-        assert cfg.reasoning_effort == "high"
+            cfg = LLMConfig(model='gpt-4o')
+        assert cfg.reasoning_effort == 'high'
 
     def test_gemini_keeps_none_reasoning_effort(self):
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="gemini-2.5-pro")
+            cfg = LLMConfig(model='gemini-2.5-pro')
         assert cfg.reasoning_effort is None
 
     def test_custom_google_provider_keeps_none_reasoning_effort(self):
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="custom-model", custom_llm_provider="google")
+            cfg = LLMConfig(model='custom-model', custom_llm_provider='google')
         assert cfg.reasoning_effort is None
 
     def test_explicit_reasoning_effort_preserved(self):
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="gpt-4o", reasoning_effort="low")
-        assert cfg.reasoning_effort == "low"
+            cfg = LLMConfig(model='gpt-4o', reasoning_effort='low')
+        assert cfg.reasoning_effort == 'low'
 
 
 # ---------------------------------------------------------------------------
@@ -122,41 +121,41 @@ class TestFromTomlSection:
     def test_base_section_only(self):
         with suppress_llm_env_export():
             mapping = LLMConfig.from_toml_section(
-                {"model": "gpt-4o", "temperature": 0.3}
+                {'model': 'gpt-4o', 'temperature': 0.3}
             )
-        assert "llm" in mapping
-        assert mapping["llm"].model == "gpt-4o"
-        assert mapping["llm"].temperature == 0.3
+        assert 'llm' in mapping
+        assert mapping['llm'].model == 'gpt-4o'
+        assert mapping['llm'].temperature == 0.3
 
     def test_custom_section_inherits_base(self):
         with suppress_llm_env_export():
             mapping = LLMConfig.from_toml_section(
                 {
-                    "model": "gpt-4o",
-                    "num_retries": 5,
-                    "claude": {"model": "claude-3.5-sonnet"},
+                    'model': 'gpt-4o',
+                    'num_retries': 5,
+                    'claude': {'model': 'claude-3.5-sonnet'},
                 }
             )
-        assert "llm" in mapping
-        assert "claude" in mapping
-        assert mapping["claude"].model == "claude-3.5-sonnet"
-        assert mapping["claude"].num_retries == 5  # inherited
+        assert 'llm' in mapping
+        assert 'claude' in mapping
+        assert mapping['claude'].model == 'claude-3.5-sonnet'
+        assert mapping['claude'].num_retries == 5  # inherited
 
     def test_invalid_custom_section_skipped(self):
         with suppress_llm_env_export():
             mapping = LLMConfig.from_toml_section(
                 {
-                    "model": "gpt-4o",
-                    "bad": {"temperature": 999},  # invalid
+                    'model': 'gpt-4o',
+                    'bad': {'temperature': 999},  # invalid
                 }
             )
-        assert "llm" in mapping
-        assert "bad" not in mapping
+        assert 'llm' in mapping
+        assert 'bad' not in mapping
 
     def test_invalid_base_falls_back_to_defaults(self):
         with suppress_llm_env_export():
-            mapping = LLMConfig.from_toml_section({"temperature": 999})
-        assert "llm" in mapping
+            mapping = LLMConfig.from_toml_section({'temperature': 999})
+        assert 'llm' in mapping
         # Should get a default config since base was invalid
 
 
@@ -183,8 +182,8 @@ class TestSuppressEnvExport:
 class TestAPIKeyHandling:
     def test_api_key_loaded_from_env(self, monkeypatch):
         """Test API key loading from environment."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test123456789012345678901234567890")
-        cfg = LLMConfig(model="openai/gpt-4")
+        monkeypatch.setenv('OPENAI_API_KEY', 'sk-test123456789012345678901234567890')
+        cfg = LLMConfig(model='openai/gpt-4')
         # Should have loaded API key from environment
         assert cfg.api_key is not None
 
@@ -192,23 +191,23 @@ class TestAPIKeyHandling:
         """Test explicit API key is preserved."""
         from pydantic import SecretStr
 
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-env-key")
-        cfg = LLMConfig(model="openai/gpt-4", api_key=SecretStr("sk-explicit-key"))
+        monkeypatch.setenv('OPENAI_API_KEY', 'sk-env-key')
+        cfg = LLMConfig(model='openai/gpt-4', api_key=SecretStr('sk-explicit-key'))
         # Should preserve explicit key
         assert cfg.api_key is not None
-        assert cfg.api_key.get_secret_value() == "sk-explicit-key"
+        assert cfg.api_key.get_secret_value() == 'sk-explicit-key'
 
     def test_no_api_key_warning(self, monkeypatch):
         """Test warning when no API key is available."""
         # Clear all common API keys
         for key in [
-            "OPENAI_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "GOOGLE_API_KEY",
-            "XAI_API_KEY",
-            "GEMINI_API_KEY",
-            "DEEPSEEK_API_KEY",
-            "OPENROUTER_API_KEY",
+            'OPENAI_API_KEY',
+            'ANTHROPIC_API_KEY',
+            'GOOGLE_API_KEY',
+            'XAI_API_KEY',
+            'GEMINI_API_KEY',
+            'DEEPSEEK_API_KEY',
+            'OPENROUTER_API_KEY',
         ]:
             monkeypatch.delenv(key, raising=False)
 
@@ -218,33 +217,33 @@ class TestAPIKeyHandling:
         api_key_manager.provider_api_keys.clear()
 
         # Should create config but log warning about missing key (lines 349-350)
-        cfg = LLMConfig(model="openai/gpt-4")
-        assert cfg.model == "openai/gpt-4"
+        cfg = LLMConfig(model='openai/gpt-4')
+        assert cfg.model == 'openai/gpt-4'
         # API key will be None since no key was found anywhere
         assert cfg.api_key is None
 
     def test_api_key_plain_string(self, monkeypatch):
         """Test API key as plain string (AttributeError path)."""
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv('OPENAI_API_KEY', raising=False)
         # Pass plain string as api_key to trigger AttributeError path
-        cfg = LLMConfig(model="openai/gpt-4", api_key="plain-string-key")
+        cfg = LLMConfig(model='openai/gpt-4', api_key='plain-string-key')
         assert cfg.api_key is not None
 
     def test_api_key_from_environment_fallback(self, monkeypatch):
         """Test fallback to environment when api_key_manager doesn't return key."""
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test12345678901234567890")
-        cfg = LLMConfig(model="anthropic/claude-3-5-sonnet-20241022")
+        monkeypatch.setenv('ANTHROPIC_API_KEY', 'sk-ant-test12345678901234567890')
+        cfg = LLMConfig(model='anthropic/claude-3-5-sonnet-20241022')
         # Should pick up from environment
         assert cfg.api_key is not None
 
     def test_model_post_init_completes(self, monkeypatch):
         """Test model_post_init completes successfully."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
+        monkeypatch.setenv('OPENAI_API_KEY', 'sk-test-key')
         # Create without suppress_llm_env_export to ensure full model_post_init runs
-        cfg = LLMConfig(model="openai/gpt-4")
+        cfg = LLMConfig(model='openai/gpt-4')
         # If model_post_init completed, config should be fully initialized
-        assert cfg.model == "openai/gpt-4"
-        assert hasattr(cfg, "_has_explicit_api_key")
+        assert cfg.model == 'openai/gpt-4'
+        assert hasattr(cfg, '_has_explicit_api_key')
 
 
 # ---------------------------------------------------------------------------
@@ -253,28 +252,36 @@ class TestAPIKeyHandling:
 
 
 class TestBaseURLCleaning:
-    def test_base_url_cleaned_for_google(self):
-        """Test base_url is cleared for providers with handles_own_routing."""
+    def test_base_url_preserved_when_proxy_used_for_google(self):
+        """Test base_url is preserved for Google models when an explicit proxy is used."""
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="gemini-pro", base_url="https://custom.com")
-        # Google handles own routing, so base_url should be cleared
+            cfg = LLMConfig(model='gemini-pro', base_url='https://lightning.ai/api/v1')
+        # base_url is set — indicates a proxy (e.g. Lightning AI); must be preserved
+        assert cfg.base_url == 'https://lightning.ai/api/v1'
+
+    def test_base_url_cleared_for_google_without_proxy(self):
+        """Test base_url is cleared for native Google Gemini models (no proxy)."""
+        with suppress_llm_env_export():
+            # Google models without an explicit base_url should not pass through
+            # a stale/empty base_url.
+            cfg = LLMConfig(model='gemini-pro', base_url=None)
         assert cfg.base_url is None
 
     def test_base_url_preserved_for_openai(self):
         """Test base_url is preserved for providers that allow it."""
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="gpt-4", base_url="https://api.custom.com")
-        assert cfg.base_url == "https://api.custom.com"
+            cfg = LLMConfig(model='gpt-4', base_url='https://api.custom.com')
+        assert cfg.base_url == 'https://api.custom.com'
 
     def test_custom_llm_provider_forbidden_logged(self):
         """Test custom_llm_provider forbidden for some providers."""
         with suppress_llm_env_export():
             # Anthropic forbids custom_llm_provider
             cfg = LLMConfig(
-                model="claude-3-5-sonnet-20241022", custom_llm_provider="anthropic"
+                model='claude-3-5-sonnet-20241022', custom_llm_provider='anthropic'
             )
         # Should still create config (just logs warning)
-        assert cfg.model == "claude-3-5-sonnet-20241022"
+        assert cfg.model == 'claude-3-5-sonnet-20241022'
 
 
 # ---------------------------------------------------------------------------
@@ -286,21 +293,21 @@ class TestModelDefaults:
     def test_gemini_25_pro_no_reasoning_effort(self):
         """Test gemini-2.5-pro specifically doesn't get reasoning_effort."""
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="gemini-2.5-pro")
+            cfg = LLMConfig(model='gemini-2.5-pro')
         assert cfg.reasoning_effort is None
 
     def test_non_gemini_25_gets_reasoning_effort(self):
         """Test non-gemini-2.5-pro models get reasoning_effort='high'."""
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="gemini-1.5-pro")
-        assert cfg.reasoning_effort == "high"
+            cfg = LLMConfig(model='gemini-1.5-pro')
+        assert cfg.reasoning_effort == 'high'
 
     def test_non_gemini_gets_default_reasoning_effort(self):
         """Test non-Gemini models get reasoning_effort='high' in set_defaults."""
         with suppress_llm_env_export():
-            cfg = LLMConfig(model="gpt-4o")  # Non-Gemini, no reasoning_effort specified
+            cfg = LLMConfig(model='gpt-4o')  # Non-Gemini, no reasoning_effort specified
         # Should be set to "high" in set_defaults validator (line 207)
-        assert cfg.reasoning_effort == "high"
+        assert cfg.reasoning_effort == 'high'
 
 
 # ---------------------------------------------------------------------------
@@ -313,13 +320,13 @@ class TestValidatorEdgeCases:
         """Test validate_required_strings on log_completions_folder."""
         with suppress_llm_env_export():
             with pytest.raises(ValidationError):
-                LLMConfig(log_completions_folder="")
+                LLMConfig(log_completions_folder='')
 
     def test_validate_required_strings_valid_log_folder(self):
         """Test validate_required_strings accepts valid log_completions_folder."""
         with suppress_llm_env_export():
-            cfg = LLMConfig(log_completions_folder="/tmp/logs")
-        assert cfg.log_completions_folder == "/tmp/logs"
+            cfg = LLMConfig(log_completions_folder='/tmp/logs')
+        assert cfg.log_completions_folder == '/tmp/logs'
 
     def test_validate_urls_with_none(self):
         """Test validate_urls returns None for None input."""
@@ -330,17 +337,17 @@ class TestValidatorEdgeCases:
     def test_validate_urls_strips_whitespace(self):
         """Test validate_urls strips whitespace."""
         with suppress_llm_env_export():
-            cfg = LLMConfig(base_url="  https://api.com  ")
-        assert cfg.base_url == "https://api.com"
+            cfg = LLMConfig(base_url='  https://api.com  ')
+        assert cfg.base_url == 'https://api.com'
 
     def test_validate_urls_empty_after_strip(self):
         """Test validate_urls with whitespace-only string."""
         with suppress_llm_env_export():
-            cfg = LLMConfig(base_url="   ")
+            cfg = LLMConfig(base_url='   ')
             assert cfg.base_url is None
 
     def test_validate_urls_invalid_protocol(self):
         """Test validate_urls rejects invalid protocols."""
         with suppress_llm_env_export():
-            with pytest.raises(ValidationError, match="must start with http"):
-                LLMConfig(base_url="ftp://invalid.com")
+            with pytest.raises(ValidationError, match='must start with http'):
+                LLMConfig(base_url='ftp://invalid.com')

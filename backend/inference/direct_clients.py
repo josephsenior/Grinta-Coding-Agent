@@ -1280,6 +1280,34 @@ def get_direct_client(
         stripped_model,
     )
 
+    # When a custom base_url is provided that differs from the provider's own
+    # native endpoint, the caller is routing the model through a third-party
+    # proxy (e.g. Lightning AI, OpenRouter, LiteLLM).  In that case we MUST
+    # use the OpenAI-compatible client with the *original* model name so the
+    # proxy receives the full identifier it expects (e.g.
+    # "google/gemini-3-flash-preview" on Lightning AI, not just
+    # "gemini-3-flash-preview").
+    if resolved_base_url:
+        # Collect known native endpoints for providers that have their own SDK
+        # clients (i.e. Anthropic and Google).  All other providers already use
+        # the OpenAI-compatible client so no special handling is needed.
+        _NATIVE_ENDPOINTS: dict[str, str] = {
+            'anthropic': 'https://api.anthropic.com',
+            'google': 'https://generativelanguage.googleapis.com',
+        }
+        native = _NATIVE_ENDPOINTS.get(provider or '', '')
+        is_native = native and resolved_base_url.rstrip('/').startswith(
+            native.rstrip('/')
+        )
+        if not is_native and provider in ('anthropic', 'google'):
+            # Proxy route: use OpenAI-compatible client with full model name
+            return OpenAIClient(
+                model_name=model,
+                api_key=api_key,
+                base_url=resolved_base_url,
+                supports_request_metadata=False,
+            )
+
     # Route to appropriate client based on provider
     if provider == 'anthropic':
         return AnthropicClient(model_name=stripped_model, api_key=api_key)

@@ -84,6 +84,13 @@ def canonicalize_model_selection(
     Returns a tuple of (model, provider) where model is prefixed with the
     explicit provider when possible, and provider is inferred from a known
     prefix if the caller omitted it.
+
+    When the model already carries a namespace prefix that differs from the
+    explicit provider (e.g. ``google/gemini-3-flash-preview`` routed through
+    ``lightning``), the model name is kept verbatim.  Proxy/aggregator APIs
+    such as Lightning AI and OpenRouter expect the full original model
+    identifier (e.g. ``google/gemini-3-flash-preview``), not the provider
+    name prepended (``lightning/gemini-3-flash-preview``).
     """
     if model_name is None:
         return None, normalize_provider_name(provider)
@@ -96,7 +103,13 @@ def canonicalize_model_selection(
     prefixed_provider = extract_provider_prefix(model)
 
     if normalized_provider:
+        if prefixed_provider and prefixed_provider != normalized_provider:
+            # Model has a DIFFERENT namespace prefix from the explicit provider
+            # (e.g. google/gemini-3-flash-preview on lightning).  Keep the
+            # original model name — the proxy needs the full identifier.
+            return model, normalized_provider
         if prefixed_provider:
+            # Same prefix as provider — normalise by re-prefixing.
             prefix = model.split('/', 1)[0]
             stripped = model[len(prefix) + 1 :]
         else:

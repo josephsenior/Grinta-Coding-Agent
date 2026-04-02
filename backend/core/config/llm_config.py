@@ -86,146 +86,146 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     model: str | None = Field(
         default=DEFAULT_LLM_MODEL,
         description=(
-            "LLM model id (e.g. openai/gpt-4o). None until set via settings.json "
-            "llm_model or LLM_MODEL env; settings.json wins when both are set."
+            'LLM model id (e.g. openai/gpt-4o). None until set via settings.json '
+            'llm_model or LLM_MODEL env; settings.json wins when both are set.'
         ),
     )
     api_key: SecretStr | None = Field(
-        default=None, description="The API key to use for authentication"
+        default=None, description='The API key to use for authentication'
     )
-    base_url: str | None = Field(default=None, description="The base URL for the API")
-    api_version: str | None = Field(default=None, description="The version of the API")
+    base_url: str | None = Field(default=None, description='The base URL for the API')
+    api_version: str | None = Field(default=None, description='The version of the API')
     num_retries: int = Field(
         default=DEFAULT_LLM_NUM_RETRIES,
         ge=0,
-        description="The number of retries to attempt on API failures",
+        description='The number of retries to attempt on API failures',
     )
     retry_multiplier: float = Field(
         default=DEFAULT_LLM_RETRY_MULTIPLIER,
         ge=1.0,
-        description="The multiplier for exponential backoff retry delays",
+        description='The multiplier for exponential backoff retry delays',
     )
     retry_min_wait: int = Field(
         default=DEFAULT_LLM_RETRY_MIN_WAIT,
         ge=0,
-        description="The minimum time to wait between retries, in seconds",
+        description='The minimum time to wait between retries, in seconds',
     )
     retry_max_wait: int = Field(
         default=DEFAULT_LLM_RETRY_MAX_WAIT,
         ge=0,
-        description="The maximum time to wait between retries, in seconds",
+        description='The maximum time to wait between retries, in seconds',
     )
     timeout: int | None = Field(
-        default=None, ge=1, description="The timeout in seconds for the API requests"
+        default=None, ge=1, description='The timeout in seconds for the API requests'
     )
     max_message_chars: int = Field(
         default=DEFAULT_LLM_MAX_MESSAGE_CHARS,
         ge=1,
-        description="The approximate max number of characters in the content of an event included in the prompt",
+        description='The approximate max number of characters in the content of an event included in the prompt',
     )
     temperature: float = Field(
         default=DEFAULT_LLM_TEMPERATURE,
         ge=0.0,
         le=2.0,
-        description="The temperature for the API (0.0 to 2.0)",
+        description='The temperature for the API (0.0 to 2.0)',
     )
     top_p: float = Field(
         default=DEFAULT_LLM_TOP_P,
         ge=0.0,
         le=1.0,
-        description="The top_p (nucleus sampling) parameter for the API (0.0 to 1.0)",
+        description='The top_p (nucleus sampling) parameter for the API (0.0 to 1.0)',
     )
     top_k: float | None = Field(
-        default=None, ge=1.0, description="The top_k parameter for the API"
+        default=None, ge=1.0, description='The top_k parameter for the API'
     )
     custom_llm_provider: str | None = Field(
         default=None,
-        description="The custom LLM provider to use (openai, anthropic, google, xai)",
+        description='The custom LLM provider to use (openai, anthropic, google, xai)',
     )
     max_input_tokens: int | None = Field(
-        default=None, ge=1, description="The maximum number of input tokens"
+        default=None, ge=1, description='The maximum number of input tokens'
     )
     max_output_tokens: int | None = Field(
-        default=None, ge=1, description="The maximum number of output tokens"
+        default=None, ge=1, description='The maximum number of output tokens'
     )
     input_cost_per_token: float | None = Field(
-        default=None, ge=0.0, description="The cost per input token"
+        default=None, ge=0.0, description='The cost per input token'
     )
     output_cost_per_token: float | None = Field(
-        default=None, ge=0.0, description="The cost per output token"
+        default=None, ge=0.0, description='The cost per output token'
     )
     drop_params: bool = Field(
         default=True,
-        description="Drop any unmapped (unsupported) params without causing an exception",
+        description='Drop any unmapped (unsupported) params without causing an exception',
     )
     modify_params: bool = Field(
-        default=True, description="Modify params allows the SDK to do transformations"
+        default=True, description='Modify params allows the SDK to do transformations'
     )
     disable_vision: bool | None = Field(
         default=None,
-        description="If model is vision capable, this option allows to disable image processing",
+        description='If model is vision capable, this option allows to disable image processing',
     )
     disable_stop_word: bool | None = Field(
-        default=False, description="Whether to disable stop word handling"
+        default=False, description='Whether to disable stop word handling'
     )
     caching_prompt: bool = Field(
         default=True,
-        description="Use the prompt caching feature if provided by the LLM",
+        description='Use the prompt caching feature if provided by the LLM',
     )
     log_completions: bool = Field(
-        default=False, description="Whether to log LLM completions to the state"
+        default=False, description='Whether to log LLM completions to the state'
     )
     log_completions_folder: str = Field(
-        default=os.path.join(LOG_DIR, "completions"),
+        default=os.path.join(LOG_DIR, 'completions'),
         min_length=1,
-        description="The folder to log LLM completions to",
+        description='The folder to log LLM completions to',
     )
     custom_tokenizer: str | None = Field(
-        default=None, description="A custom tokenizer to use for token counting"
+        default=None, description='A custom tokenizer to use for token counting'
     )
     native_tool_calling: bool | None = Field(
         default=None,
-        description="Whether to use native tool calling if supported by the model",
+        description='Whether to use native tool calling if supported by the model',
     )
     reasoning_effort: str | None = Field(
         default=None,
         description="The effort to put into reasoning ('low', 'medium', 'high', 'none')",
     )
-    seed: int | None = Field(default=None, description="The seed to use for the LLM")
+    seed: int | None = Field(default=None, description='The seed to use for the LLM')
 
-    @model_validator(mode="after")
+    @model_validator(mode='after')
     def set_defaults(self) -> LLMConfig:
         """Set default values for reasoning_effort and base_url."""
         # Set reasoning_effort default if not provided
         if self.reasoning_effort is None:
-            model_l = (self.model or "").lower()
+            model_l = (self.model or '').lower()
             # Gemini models keep None for optimization
             if not (
-                "gemini" in model_l
+                'gemini' in model_l
                 or (
                     self.custom_llm_provider
-                    and "google" in self.custom_llm_provider.lower()
+                    and 'google' in self.custom_llm_provider.lower()
                 )
             ):
-                self.reasoning_effort = "high"
+                self.reasoning_effort = 'high'
 
         return self
 
     safety_settings: list[dict[str, str]] | None = Field(
         default=None,
-        description="Safety settings for models that support them (like Gemini)",
+        description='Safety settings for models that support them (like Gemini)',
     )
     correct_num: int = Field(
         default=DEFAULT_LLM_CORRECT_NUM,
-        description="The number of times the draft editor LLM tries to fix an error",
+        description='The number of times the draft editor LLM tries to fix an error',
     )
     for_routing: bool = Field(
         default=False,
-        description="Whether this LLM config is used for routing decisions",
+        description='Whether this LLM config is used for routing decisions',
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
-    @field_validator("model", mode="before")
+    @field_validator('model', mode='before')
     @classmethod
     def normalize_optional_model(cls, v: object) -> str | None:
         """Allow unset model; normalize empty strings to None."""
@@ -234,14 +234,14 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         s = str(v).strip()
         return s or None
 
-    @field_validator("log_completions_folder")
+    @field_validator('log_completions_folder')
     @classmethod
     def validate_log_completions_folder(cls, v: str) -> str:
         from backend.core.type_safety.type_safety import validate_non_empty_string
 
-        return validate_non_empty_string(v, name="log_completions_folder")
+        return validate_non_empty_string(v, name='log_completions_folder')
 
-    @field_validator("base_url")
+    @field_validator('base_url')
     @classmethod
     def validate_urls(cls, v: str | None) -> str | None:
         """Validate URL fields if provided."""
@@ -251,12 +251,12 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 return None
             from backend.core.type_safety.type_safety import validate_non_empty_string
 
-            validate_non_empty_string(v, name="url")
+            validate_non_empty_string(v, name='url')
             # Basic URL format check - auto-patch if protocol is missing
-            if v and "://" not in v:
-                v = f"http://{v}"
-            if not v.startswith(("http://", "https://")):
-                raise ValueError("URL must start with http:// or https://")
+            if v and '://' not in v:
+                v = f'http://{v}'
+            if not v.startswith(('http://', 'https://')):
+                raise ValueError('URL must start with http:// or https://')
         return v
 
     @classmethod
@@ -296,16 +296,16 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         # Try to create the base config
         try:
             base_config = cls.model_validate(base_data)
-            llm_mapping["llm"] = base_config
+            llm_mapping['llm'] = base_config
         except ValidationError as e:
             logger.warning(
-                "Cannot parse [llm] config from toml. Continuing with defaults.\nError: %s",
+                'Cannot parse [llm] config from toml. Continuing with defaults.\nError: %s',
                 e,
             )
             # If base config fails, create a default one
             base_config = cls()
             # Still add it to the mapping
-            llm_mapping["llm"] = base_config
+            llm_mapping['llm'] = base_config
 
         # Process each custom section independently
         for name, overrides in custom_sections.items():
@@ -316,7 +316,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 llm_mapping[name] = custom_config
             except ValidationError:
                 logger.debug(
-                    "Cannot parse [%s] config from toml. This section will be skipped.",
+                    'Cannot parse [%s] config from toml. This section will be skipped.',
                     name,
                 )
                 # Skip this custom section but continue with others
@@ -333,13 +333,13 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         if not api_key_manager.suppress_env_export:
             # SECURE API KEY HANDLING - Use the new API key manager
-            key_val = ""
+            key_val = ''
             if self.api_key is not None:
                 # Pydantic ensures api_key is always SecretStr | None, so get_secret_value always exists
                 key_val = self.api_key.get_secret_value()
 
             has_explicit_key = bool(key_val and key_val.strip())
-            object.__setattr__(self, "_has_explicit_api_key", has_explicit_key)
+            object.__setattr__(self, '_has_explicit_api_key', has_explicit_key)
 
             if self.model:
                 if not has_explicit_key:
@@ -350,7 +350,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
                     if correct_api_key:
                         self.api_key = correct_api_key
-                        logger.debug("Set correct API key for model: %s", self.model)
+                        logger.debug('Set correct API key for model: %s', self.model)
                     else:
                         # Try to set from environment as fallback
                         provider = api_key_manager.extract_provider(self.model)
@@ -358,11 +358,11 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                         if env_key:
                             self.api_key = SecretStr(env_key)
                             logger.debug(
-                                "Loaded API key from environment for %s", provider
+                                'Loaded API key from environment for %s', provider
                             )
                         else:
                             logger.warning(
-                                "No API key available for model: %s", self.model
+                                'No API key available for model: %s', self.model
                             )
 
                 # ALWAYS sync with api_key_manager if we have a key (explicit or loaded)
@@ -383,6 +383,13 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         provider = api_key_manager.extract_provider(self.model)
         provider_config = provider_config_manager.get_provider_config(provider)
 
+        # When the model's native provider handles its own routing (e.g. Google
+        # Gemini) but an explicit base_url is set, the caller is routing through
+        # a proxy (e.g. Lightning AI, OpenRouter).  In that case we must NOT
+        # clear the base_url — let the inference layer decide how to route.
+        if provider_config.handles_own_routing and self.base_url:
+            return
+
         # Use provider configuration to validate and clean base_url
         cleaned_url = provider_config.validate_base_url(self.base_url)
         if cleaned_url != self.base_url:
@@ -395,9 +402,9 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             self.base_url = cleaned_url
 
         # Additional validation for custom_llm_provider based on provider configuration
-        if hasattr(self, "custom_llm_provider") and self.custom_llm_provider:
+        if hasattr(self, 'custom_llm_provider') and self.custom_llm_provider:
             # Check if custom_llm_provider is forbidden for this provider
-            if not provider_config.is_param_allowed("custom_llm_provider"):
+            if not provider_config.is_param_allowed('custom_llm_provider'):
                 logger.info(
                     "Clearing custom_llm_provider '%s' for %s - not allowed for this provider",
                     self.custom_llm_provider,
@@ -410,12 +417,12 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         # Set reasoning_effort to 'high' by default for non-Google Gemini models.
         uses_google_provider = bool(
             self.custom_llm_provider
-            and self.custom_llm_provider.strip().lower() == "google"
+            and self.custom_llm_provider.strip().lower() == 'google'
         )
         if (
             self.model
             and self.reasoning_effort is None
-            and "gemini-2.5-pro" not in self.model
+            and 'gemini-2.5-pro' not in self.model
             and not uses_google_provider
         ):
-            self.reasoning_effort = "high"
+            self.reasoning_effort = 'high'

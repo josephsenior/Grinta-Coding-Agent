@@ -176,12 +176,15 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
             if 'llm_base_url' in data and data['llm_base_url']:
                 raw_url = str(data['llm_base_url']).strip()
                 model_str = str(llm_dict.get('model') or '').lower()
-                # Google Gemini routes through the SDK — a custom base_url breaks
-                # litellm and is always ignored in the API route; replicate that here.
-                _is_google = model_str.startswith('google/') or model_str.startswith(
-                    'gemini-'
-                )
-                if not _is_google:
+                # Native Google Gemini routes through the Gemini SDK client and
+                # does not use a base_url.  Skip only when there is no explicit
+                # provider override (which would indicate a proxy like Lightning
+                # AI or OpenRouter is being used).
+                _native_google = (
+                    model_str.startswith('google/')
+                    or model_str.startswith('gemini-')
+                ) and not provider
+                if not _native_google:
                     llm_dict['base_url'] = raw_url
 
             model_value, provider_value = canonicalize_model_selection(
@@ -190,6 +193,21 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
             )
             if model_value:
                 llm_dict['model'] = model_value
+            # When the explicit provider differs from the model's own namespace
+            # prefix (e.g. google/gemini-3-flash-preview routed through
+            # lightning), resolve and store the base_url from the explicit
+            # provider so the inference layer can route to the correct API.
+            if provider_value:
+                from backend.inference.provider_resolver import (
+                    _PROVIDER_DEFAULT_URLS,
+                    extract_provider_prefix,
+                )
+
+                model_prefix = extract_provider_prefix(model_value or '')
+                if model_prefix != provider_value and not llm_dict.get('base_url'):
+                    provider_url = _PROVIDER_DEFAULT_URLS.get(provider_value)
+                    if provider_url:
+                        llm_dict['base_url'] = provider_url
             if llm_dict.get('model') and not provider_value:
                 msg = 'llm_provider is required when llm_model does not include a provider prefix'
                 if strict_config:

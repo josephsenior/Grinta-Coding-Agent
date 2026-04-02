@@ -6,20 +6,20 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from backend.core.logger import app_logger as logger
 from backend.core.providers import (
     DEFAULT_API_KEY_MIN_LENGTH,
     PROVIDER_CONFIGURATIONS,
     UNKNOWN_PROVIDER_CONFIG,
 )
-from backend.core.logger import app_logger as logger
 
 
 class ParameterType(Enum):
     """Types of parameters for provider validation."""
 
-    REQUIRED = "required"
-    OPTIONAL = "optional"
-    FORBIDDEN = "forbidden"
+    REQUIRED = 'required'
+    OPTIONAL = 'optional'
+    FORBIDDEN = 'forbidden'
 
 
 @dataclass
@@ -67,16 +67,16 @@ class ProviderConfig:
         # If provider handles its own routing, don't use custom base_url
         if self.handles_own_routing:
             logger.debug(
-                "Provider %s handles own routing - clearing base_url", self.name
+                'Provider %s handles own routing - clearing base_url', self.name
             )
             return None
 
         # Check protocol requirement
         if self.requires_protocol and not any(
-            base_url.startswith(proto) for proto in ["http://", "https://"]
+            base_url.startswith(proto) for proto in ['http://', 'https://']
         ):
             logger.warning(
-                "Provider %s requires base_url with protocol - clearing invalid URL: %s",
+                'Provider %s requires base_url with protocol - clearing invalid URL: %s',
                 self.name,
                 base_url,
             )
@@ -152,9 +152,9 @@ class ProviderConfigurationManager:
         """
         cleaned_value = config.validate_base_url(param_value)
         if cleaned_value is not None:
-            cleaned_params["base_url"] = cleaned_value
+            cleaned_params['base_url'] = cleaned_value
         elif param_value is not None:
-            logger.debug("Cleaned base_url for %s: %s -> None", provider, param_value)
+            logger.debug('Cleaned base_url for %s: %s -> None', provider, param_value)
 
     def _process_known_param(
         self,
@@ -172,8 +172,8 @@ class ProviderConfigurationManager:
             cleaned_params: Cleaned parameters dict
 
         """
-        if param_name == "base_url":
-            self._process_base_url_param(param_value, "", cleaned_params, config)
+        if param_name == 'base_url':
+            self._process_base_url_param(param_value, '', cleaned_params, config)
         else:
             cleaned_params[param_name] = param_value
 
@@ -194,7 +194,7 @@ class ProviderConfigurationManager:
 
         """
         cleaned_params[param_name] = param_value
-        if provider == "unknown":
+        if provider == 'unknown':
             logger.debug(
                 "Allowing unknown parameter '%s' for unknown provider", param_name
             )
@@ -222,7 +222,7 @@ class ProviderConfigurationManager:
         cleaned_params: dict[str, Any] = {}
         warnings: list[str] = []
 
-        logger.debug("Validating parameters for provider: %s", provider)
+        logger.debug('Validating parameters for provider: %s', provider)
 
         required = config.required_params
         optional = config.optional_params
@@ -245,18 +245,18 @@ class ProviderConfigurationManager:
         missing_required = config.required_params - set(cleaned_params.keys())
         if missing_required:
             warnings.append(
-                f"Missing required parameters for {provider}: {', '.join(missing_required)}"
+                f'Missing required parameters for {provider}: {", ".join(missing_required)}'
             )
 
         if warnings:
             logger.warning(
-                "Parameter validation warnings for %s: %s",
+                'Parameter validation warnings for %s: %s',
                 provider,
-                "; ".join(warnings),
+                '; '.join(warnings),
             )
 
         logger.debug(
-            "Parameter validation complete for %s: %s params kept",
+            'Parameter validation complete for %s: %s params kept',
             provider,
             len(cleaned_params),
         )
@@ -275,30 +275,29 @@ class ProviderConfigurationManager:
         """
         if not api_key:
             config = self.get_provider_config(provider)
-            return "api_key" not in config.required_params
+            return 'api_key' not in config.required_params
 
         config = self.get_provider_config(provider)
 
         # Check minimum length
         if len(api_key) < config.api_key_min_length:
             logger.warning(
-                "API key for %s is shorter than expected minimum (%s)",
+                'API key for %s is shorter than expected minimum (%s)',
                 provider,
                 config.api_key_min_length,
             )
             return False
 
-        # Check prefixes if specified - warn but don't fail validation
+        # Check prefixes if specified - log at debug level only (proxy/custom keys are common)
         prefixes = config.api_key_prefixes
         if prefixes:
             if not any(api_key.startswith(prefix) for prefix in prefixes):
-                logger.warning(
-                    "API key for %s doesn't match expected prefixes: %s",
+                logger.debug(
+                    "API key for %s doesn't match expected prefixes %s "
+                    "(may be a proxy/custom key — continuing)",
                     provider,
                     config.api_key_prefixes,
                 )
-                # Don't return False here - just warn and continue
-                # This allows for API key variations and updates from providers
 
         return True
 
