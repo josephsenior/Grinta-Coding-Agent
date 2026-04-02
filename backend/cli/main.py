@@ -15,11 +15,53 @@ import io
 import logging
 import os
 import sys
+import warnings
 from pathlib import Path
+
+# Suppress third-party DeprecationWarnings (belt-and-suspenders with entry.py).
+warnings.filterwarnings('ignore', message='importing.*from.*astroid', category=DeprecationWarning)
+
+import time
 
 from rich.align import Align
 from rich.console import Console, Group
 from rich.text import Text
+
+
+# ── Silence logging immediately at import time ──────────────────────
+# This MUST run before any backend modules are imported so their
+# module-level handlers never write to stdout/stderr.
+def _silence_all_loggers() -> None:
+    """Nuke every handler that could write to stdout/stderr."""
+    root = logging.getLogger()
+    for h in root.handlers[:]:
+        if isinstance(h, logging.StreamHandler) and not isinstance(
+            h, logging.FileHandler
+        ):
+            root.removeHandler(h)
+    root.addHandler(logging.NullHandler())
+    root.setLevel(logging.WARNING)
+
+    for name in ('app', 'app.access'):
+        lg = logging.getLogger(name)
+        for h in lg.handlers[:]:
+            if isinstance(h, logging.StreamHandler) and not isinstance(
+                h, logging.FileHandler
+            ):
+                lg.removeHandler(h)
+        lg.addHandler(logging.NullHandler())
+        lg.setLevel(logging.ERROR)
+        lg.propagate = False
+
+    for name in (
+        'uvicorn', 'httpcore', 'httpx', 'asyncio', 'filelock',
+        'litellm', 'openai', 'httpx._client', 'charset_normalizer',
+    ):
+        logging.getLogger(name).setLevel(logging.CRITICAL)
+
+
+_silence_all_loggers()
+
 
 def _configure_redirected_streams(*streams: io.TextIOBase | None) -> None:
     """Prefer UTF-8 when writing Rich output to redirected streams."""
@@ -37,46 +79,59 @@ def _configure_redirected_streams(*streams: io.TextIOBase | None) -> None:
 
 
 def show_grinta_splash(console: Console | None = None) -> None:
-    """Render the GRINTA boot splash in the terminal."""
+    """Render the GRINTA boot splash — animated drop-in on TTY, static otherwise."""
+    from rich.live import Live
+
     console = console or Console()
 
-    splash = Group(
-        Text(''),
-        Align.center(
-            Text('  GRINTA  ', style='bold white on #DC143C'),
-        ),
-        Align.center(
-            Text.assemble(
-                ('>_', 'bold #DC143C'),
-                ('  AI coding agent', 'dim'),
-            ),
-        ),
-        Text(''),
-    )
+    _LINES = [
+        ' ██████  ██████  ██ ██    ██ ████████  █████  ',
+        '██       ██   ██ ██ ███   ██    ██    ██   ██ ',
+        '██  ███  ██████  ██ ██ ██ ██    ██    ███████ ',
+        '██   ██  ██  ██  ██ ██  ████    ██    ██   ██ ',
+        ' ██████  ██   ██ ██ ██   ███    ██    ██   ██ ',
+    ]
+    _SUBTITLE = 'think · code · ship'
+    _HINT     = 'Type a task or /help to get started'
 
-    console.print(splash)
+    def _frame(visible: int, *, subtitle: bool = False, flash: bool = False) -> Group:
+        style = 'bold white' if flash else 'bold red'
+        rows: list = [Text('')]
+        for i, line in enumerate(_LINES):
+            rows.append(Align.center(Text(line if i < visible else '', style=style)))
+        rows.append(Text(''))
+        if subtitle:
+            rows.append(Align.center(Text(_SUBTITLE, style='bold red')))
+            rows.append(Align.center(Text(_HINT, style='dim')))
+        else:
+            rows.append(Text(''))
+            rows.append(Text(''))
+        rows.append(Text(''))
+        return Group(*rows)
+
+    # Non-interactive (piped / redirected): print static splash and return.
+    if not console.is_terminal:
+        console.print(_frame(len(_LINES), subtitle=True))
+        return
+
+    # Animated: lines drop in one by one, brief flash, subtitle fades in.
+    with Live(_frame(0), console=console, refresh_per_second=30, transient=False) as live:
+        for i in range(1, len(_LINES) + 1):
+            live.update(_frame(i))
+            time.sleep(0.055)
+        # Quick white flash → settle to red
+        live.update(_frame(len(_LINES), flash=True))
+        time.sleep(0.08)
+        live.update(_frame(len(_LINES)))
+        time.sleep(0.06)
+        # Subtitle appears
+        live.update(_frame(len(_LINES), subtitle=True))
+        time.sleep(0.15)
 
 
 def _setup_logging() -> None:
-    """Redirect all backend logging through RichHandler so stray prints don't break the TUI layout."""
-    from rich.logging import RichHandler
-
-    handler = RichHandler(
-        show_time=False,
-        show_path=False,
-        markup=True,
-        rich_tracebacks=True,
-        tracebacks_show_locals=False,
-        level=logging.WARNING,
-    )
-    # Replace root handlers.
-    root = logging.getLogger()
-    root.handlers = [handler]
-    root.setLevel(logging.WARNING)
-
-    # Also silence noisy libraries.
-    for name in ('uvicorn', 'httpcore', 'httpx', 'asyncio', 'filelock'):
-        logging.getLogger(name).setLevel(logging.ERROR)
+    """Re-silence loggers after backend imports add their handlers."""
+    _silence_all_loggers()
 
 
 def _read_piped_stdin() -> str | None:
@@ -149,6 +204,9 @@ async def _async_main(
     from backend.cli.repl import Repl
     from backend.core.config import load_app_config
 
+    # Backend imports above trigger module-level logger setup — re-silence.
+    _silence_all_loggers()
+
     console = Console()
     show_grinta_splash(console)
     initial_input = _read_piped_stdin()
@@ -189,9 +247,6 @@ async def _async_main(
         else:
             ensure_default_model(config)
 
-        # -- redirect backend noise --------------------------------------------
-        _setup_logging()
-
         # -- launch REPL -------------------------------------------------------
         repl = Repl(config, console)
         if initial_input:
@@ -210,6 +265,10 @@ def main(
     project: str | None = None,
 ) -> None:
     """Synchronous entry point for the ``grinta`` console_script."""
+    # Silence all logging immediately — before any backend imports fire their
+    # module-level handlers (backend/core/logger.py installs a JSON→stdout
+    # handler when imported, which would spew INFO noise into the terminal).
+    _setup_logging()
     _configure_redirected_streams(sys.stdout, sys.stderr)
     model, project, handled = _resolve_invocation(model=model, project=project)
     if handled:

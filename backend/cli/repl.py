@@ -325,8 +325,7 @@ class Repl:
             with Live(
                 self._renderer,
                 console=self._console,
-                refresh_per_second=12,
-                auto_refresh=True,
+                auto_refresh=False,
                 transient=False,
             ) as live:
                 self._renderer.attach_live(live)
@@ -537,7 +536,10 @@ class Repl:
         while True:
             renderer = cast(Any, self._renderer)
 
+            # Drain queued events and render — this is the ONLY place
+            # where Live.update() happens during agent execution.
             if renderer is not None:
+                renderer.drain_events()
                 state = renderer.current_state or controller.get_agent_state()
             else:
                 state = controller.get_agent_state()
@@ -549,17 +551,19 @@ class Repl:
                 await self._handle_confirmation(controller)
                 continue
 
-            # Agent task finished — events are processed directly in the
-            # delivery thread (no async hop), so just yield once.
+            # Agent task finished — drain any remaining events, then break.
             if agent_task and agent_task.done():
-                await asyncio.sleep(0.05)
+                if renderer is not None:
+                    await asyncio.sleep(0.05)
+                    renderer.drain_events()
                 break
 
-            # Normal poll: yield so pending callbacks run.
+            # Yield to the event loop.  wait_for_state_change will return
+            # early when the delivery thread sets _state_event.
             if renderer is None:
-                await asyncio.sleep(0.25)
+                await asyncio.sleep(0.1)
             else:
-                await renderer.wait_for_state_change(wait_timeout_sec=0.25)
+                await renderer.wait_for_state_change(wait_timeout_sec=0.1)
 
             # Hard timeout — surface error and return to prompt instead of
             # hanging forever (e.g. LLM API unresponsive).
@@ -570,7 +574,7 @@ class Repl:
                         'Agent timed out after 5 minutes. Returning to prompt.',
                         title='⏱ Timeout',
                     )
-                    renderer.refresh()
+                    renderer.drain_events()
                 break
 
     # -- interrupt handler -------------------------------------------------

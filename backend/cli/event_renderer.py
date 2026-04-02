@@ -103,6 +103,7 @@ class CLIEventRenderer:
         self._body_title = 'Grinta'
         self._subscribed = False
         self._max_budget = max_budget
+        self._pending_events: deque[Any] = deque()
         self._budget_warned_80 = False
         self._budget_warned_100 = False
         # Per-turn metric snapshots (used to compute deltas at turn completion)
@@ -135,7 +136,8 @@ class CLIEventRenderer:
         self.refresh()
 
     async def handle_event(self, event: Any) -> None:
-        self._process_event(event)
+        self._process_event_data(event)
+        self.refresh()
 
     def reset_subscription(self) -> None:
         self._subscribed = False
@@ -232,21 +234,31 @@ class CLIEventRenderer:
     def _on_event_threadsafe(self, event: Any) -> None:
         """Called from the EventStream's delivery thread pool.
 
-        Process events directly here instead of posting to the main asyncio
-        event loop.  This eliminates the 3rd hop in the delivery pipeline
-        (queue-thread → thread-pool → *here*) so streaming chunks render
-        immediately.  ``Live.update()`` is thread-safe (uses threading.Lock
-        internally).  Only ``_state_event.set()`` is forwarded to the main
-        loop because ``asyncio.Event`` is not cross-thread safe.
-
-        No explicit lock is needed: CPython's GIL protects simple attribute
-        mutations, ``deque`` operations are atomic, and ``Live`` serialises
-        its own rendering via its internal ``_lock``.
+        Appends the event to a thread-safe deque for later processing.
+        NO terminal writes happen here — all rendering is done by
+        ``drain_events()`` on the main thread.  This avoids two threads
+        (delivery pool + Live auto-refresh timer) fighting over stdout.
         """
-        self._process_event(event)
+        self._pending_events.append(event)
+        # Wake the main-thread waiter so it drains promptly.
+        try:
+            self._loop.call_soon_threadsafe(self._state_event.set)
+        except RuntimeError:
+            pass
 
-    def _process_event(self, event: Any) -> None:
-        """Core event dispatch — called from the delivery thread pool."""
+    def drain_events(self) -> None:
+        """Process all queued events and refresh once.  MUST be called from
+        the main thread (the one that owns the Live display)."""
+        drained = False
+        while self._pending_events:
+            event = self._pending_events.popleft()
+            self._process_event_data(event)
+            drained = True
+        if drained:
+            self.refresh()
+
+    def _process_event_data(self, event: Any) -> None:
+        """Update internal state for one event.  Does NOT call refresh()."""
         if isinstance(event, _SKIP_ACTIONS) or isinstance(event, _SKIP_OBSERVATIONS):
             return
 
@@ -261,8 +273,6 @@ class CLIEventRenderer:
         if isinstance(event, Observation):
             self._handle_observation(event)
             return
-
-        self.refresh()
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
