@@ -217,18 +217,9 @@ class Repl:
     async def run(self) -> None:
         """Boot the engine, subscribe to events, and loop on user input."""
         loop = asyncio.get_running_loop()
-        session_id: str
-        llm_registry: Any
-        conversation_stats: Any
-        config: AppConfig
-        agent: Any
-        runtime: Any
-        repo_directory: Any
-        acquire_result: Any
-        memory: Any
         agent_task: asyncio.Task | None = None
 
-        # -- initialize engine components ----------------------------------
+        # -- imports (always needed) ----------------------------------------
         from backend.core.bootstrap.agent_control_loop import run_agent_until_done
         from backend.core.bootstrap.main import (
             _create_early_status_callback,
@@ -239,6 +230,7 @@ class Repl:
         from backend.core.bootstrap.setup import create_controller
 
         try:
+            # -- fast init: agent + LLM registry from config ------------------
             try:
                 bootstrap_state = _initialize_session_components(self._config, None)
                 session_id = bootstrap_state[0]
@@ -268,57 +260,7 @@ class Repl:
             self._config = config
             self._hud.update_model(get_current_model(config))
 
-            try:
-                runtime_state = _setup_runtime_for_controller(
-                    config,
-                    llm_registry,
-                    session_id,
-                    True,
-                    agent,
-                    None,
-                )
-                runtime = runtime_state[0]
-                repo_directory = runtime_state[1]
-                acquire_result = runtime_state[2]
-            except Exception as exc:
-                self._console.print(
-                    f'[bold red]Runtime setup failed:[/bold red] {exc}\n'
-                    '[dim]Check logs for details.[/dim]'
-                )
-                return
-
-            event_stream = runtime.event_stream
-            if event_stream is None:
-                self._console.print(
-                    '[bold red]Runtime did not produce an event stream.[/bold red]'
-                )
-                return
-            self._event_stream = event_stream
-            self._runtime = runtime
-            self._acquire_result = acquire_result
-
-            memory = await _setup_memory_and_mcp(
-                config,
-                runtime,
-                session_id,
-                repo_directory,
-                None,
-                None,
-                agent,
-            )
-            self._memory = memory
-
-            # -- renderer subscribes to event stream ---------------------------
-            self._renderer = CLIEventRenderer(
-                self._console,
-                self._hud,
-                self._reasoning,
-                loop=loop,
-                max_budget=config.max_budget_per_task,
-            )
-            self._renderer.subscribe(event_stream, event_stream.sid)
-
-            # -- setup prompt_toolkit session ----------------------------------
+            # -- prompt session (fast, no I/O) --------------------------------
             session: Any | None = None
             if _supports_prompt_session(sys.stdin, sys.stdout):
                 from prompt_toolkit import PromptSession
@@ -327,12 +269,51 @@ class Repl:
                 session = PromptSession(
                     history=FileHistory(str(_ensure_history())),
                     key_bindings=_build_bindings(),
-                    multiline=False,  # Alt+Enter adds lines; Enter submits
+                    multiline=False,
                 )
 
-            # -- controller & agent loop setup ---------------------------------
+            # -- renderer (no event-stream subscription yet) ------------------
+            self._renderer = CLIEventRenderer(
+                self._console,
+                self._hud,
+                self._reasoning,
+                loop=loop,
+                max_budget=config.max_budget_per_task,
+            )
+
+            # -- heavy init runs in background while user sees the prompt -----
+            async def _heavy_init() -> None:
+                """Runtime + memory + MCP — runs concurrently with the prompt."""
+                runtime_state = await asyncio.to_thread(
+                    _setup_runtime_for_controller,
+                    config, llm_registry, session_id, True, agent, None,
+                )
+                runtime = runtime_state[0]
+                repo_directory = runtime_state[1]
+                acquire_result = runtime_state[2]
+
+                event_stream = runtime.event_stream
+                if event_stream is None:
+                    raise RuntimeError('Runtime did not produce an event stream.')
+
+                self._event_stream = event_stream
+                self._runtime = runtime
+                self._acquire_result = acquire_result
+
+                memory = await _setup_memory_and_mcp(
+                    config, runtime, session_id, repo_directory, None, None, agent,
+                )
+                self._memory = memory
+
+                # Subscribe renderer now that the stream exists.
+                self._renderer.subscribe(event_stream, event_stream.sid)
+
+            init_task = asyncio.create_task(_heavy_init())
+
+            # -- enter Live + input loop IMMEDIATELY --------------------------
             controller = None
             end_states = [
+                AgentState.AWAITING_USER_INPUT,
                 AgentState.FINISHED,
                 AgentState.REJECTED,
                 AgentState.ERROR,
@@ -360,9 +341,13 @@ class Repl:
                             if user_input == '':
                                 raise EOFError
                         else:
-                            from prompt_toolkit.patch_stdout import patch_stdout
-
-                            with patch_stdout():
+                            # Suspend the Live display so it stops auto-refreshing
+                            # while prompt_toolkit owns the terminal for input.
+                            # patch_stdout() alone can't intercept Rich's direct
+                            # console writes, causing the display to redraw over
+                            # the user's cursor indefinitely.
+                            renderer = cast(Any, self._renderer)
+                            with renderer.suspend_live():
                                 user_input = await session.prompt_async('>>> ')
                     except KeyboardInterrupt:
                         continue
@@ -393,10 +378,30 @@ class Repl:
                             )
                             if result is not None:
                                 controller, agent_task = result
-                                runtime = self._runtime or runtime
-                                memory = self._memory or memory
-                                event_stream = self._event_stream or event_stream
                         continue
+
+                    # -- ensure heavy init is done before first message --------
+                    if not init_task.done():
+                        self._renderer.add_system_message(
+                            'Initializing engine…', title='grinta'
+                        )
+                        try:
+                            await init_task
+                        except Exception as exc:
+                            self._renderer.add_system_message(
+                                f'Initialization failed: {exc}', title='error'
+                            )
+                            break
+                    elif init_task.exception():
+                        self._renderer.add_system_message(
+                            f'Initialization failed: {init_task.exception()}',
+                            title='error',
+                        )
+                        break
+
+                    runtime = self._runtime
+                    memory = self._memory
+                    event_stream = self._event_stream
 
                     initial_action = MessageAction(content=text)
                     self._renderer.add_user_message(text)
@@ -431,6 +436,11 @@ class Repl:
                         await self._cancel_agent(agent_task)
                         continue
         finally:
+            # Cancel background init if it never completed.
+            if not init_task.done():
+                init_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await init_task
             controller = self._controller
             if controller is not None:
                 with contextlib.suppress(Exception):
@@ -503,7 +513,13 @@ class Repl:
     async def _wait_for_agent_idle(
         self, controller: Any, agent_task: asyncio.Task[Any] | None
     ) -> None:
-        """Wait until agent is idle, handling confirmation prompts inline."""
+        """Wait until agent is idle, handling confirmation prompts inline.
+
+        Events are now processed directly in the EventStream delivery thread
+        (no 3rd hop to the main loop), so the renderer state stays nearly in
+        sync with the agent.  A brief yield after task completion is enough to
+        let any in-flight deliveries finish.
+        """
         idle_states = {
             AgentState.AWAITING_USER_INPUT,
             AgentState.FINISHED,
@@ -514,19 +530,13 @@ class Repl:
         }
 
         while True:
-            if agent_task and agent_task.done():
-                # Break immediately when the background task has finished.
-                # The renderer's current_state may still lag (the final
-                # AgentStateChangedObservation hasn't propagated yet), which
-                # would make the fallback check below loop forever waiting for
-                # an event that will never arrive.
-                break
-
             renderer = cast(Any, self._renderer)
-            if renderer is None:
-                state = controller.get_agent_state()
-            else:
+
+            if renderer is not None:
                 state = renderer.current_state or controller.get_agent_state()
+            else:
+                state = controller.get_agent_state()
+
             if state in idle_states:
                 break
 
@@ -534,6 +544,16 @@ class Repl:
                 await self._handle_confirmation(controller)
                 continue
 
+            # Agent task finished — give delivery threads a moment to process
+            # the final events, then break regardless.
+            if agent_task and agent_task.done():
+                for _ in range(4):
+                    if renderer is not None and renderer.current_state in idle_states:
+                        break
+                    await asyncio.sleep(0.05)
+                break
+
+            # Normal poll: yield so pending callbacks run.
             if renderer is None:
                 await asyncio.sleep(0.25)
             else:

@@ -10,11 +10,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
+import threading
 from collections import deque
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
+
+# Patterns for extracting / stripping <think> blocks from reasoning models.
+_THINK_EXTRACT_RE = re.compile(r'<think>(.*?)(?:</think>|$)', re.DOTALL | re.IGNORECASE)
+_THINK_STRIP_RE = re.compile(r'<think>.*?(?:</think>|$)', re.DOTALL | re.IGNORECASE)
 
 from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.layout import Layout
@@ -98,6 +104,7 @@ class CLIEventRenderer:
         self._body_title = 'Grinta'
         self._subscribed = False
         self._max_budget = max_budget
+        self._event_lock = threading.Lock()
         self._budget_warned_80 = False
         self._budget_warned_100 = False
         # Per-turn metric snapshots (used to compute deltas at turn completion)
@@ -130,7 +137,7 @@ class CLIEventRenderer:
         self.refresh()
 
     async def handle_event(self, event: Any) -> None:
-        await self._on_event(event)
+        self._process_event(event)
 
     def reset_subscription(self) -> None:
         self._subscribed = False
@@ -225,8 +232,36 @@ class CLIEventRenderer:
         self._subscribed = True
 
     def _on_event_threadsafe(self, event: Any) -> None:
-        """Called from the EventStream's background thread."""
-        self._loop.call_soon_threadsafe(asyncio.ensure_future, self._on_event(event))
+        """Called from the EventStream's delivery thread pool.
+
+        Process events directly here instead of posting to the main asyncio
+        event loop.  This eliminates the 3rd hop in the delivery pipeline
+        (queue-thread → thread-pool → *here*) so streaming chunks render
+        immediately.  ``Live.update()`` is thread-safe (uses threading.Lock
+        internally).  Only ``_state_event.set()`` is forwarded to the main
+        loop because ``asyncio.Event`` is not cross-thread safe.
+        """
+        with self._event_lock:
+            self._process_event(event)
+
+    def _process_event(self, event: Any) -> None:
+        """Core event dispatch — called from any thread (under _event_lock)."""
+        if isinstance(event, _SKIP_ACTIONS) or isinstance(event, _SKIP_OBSERVATIONS):
+            return
+
+        self._update_metrics(event)
+
+        source = getattr(event, 'source', None)
+
+        if isinstance(event, Action) and source == EventSource.AGENT:
+            self._handle_agent_action(event)
+            return
+
+        if isinstance(event, Observation):
+            self._handle_observation(event)
+            return
+
+        self.refresh()
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
@@ -254,29 +289,6 @@ class CLIEventRenderer:
             Layout(self._hud, size=1, name='footer'),
         )
         yield layout
-
-    # -- main dispatch -----------------------------------------------------
-
-    async def _on_event(self, event: Any) -> None:
-        # --- filter -------------------------------------------------------
-        if isinstance(event, _SKIP_ACTIONS) or isinstance(event, _SKIP_OBSERVATIONS):
-            return
-
-        self._update_metrics(event)
-
-        source = getattr(event, 'source', None)
-
-        # --- actions from AGENT -------------------------------------------
-        if isinstance(event, Action) and source == EventSource.AGENT:
-            self._handle_agent_action(event)
-            return
-
-        # --- observations -------------------------------------------------
-        if isinstance(event, Observation):
-            self._handle_observation(event)
-            return
-
-        self.refresh()
 
     # -- action handlers ---------------------------------------------------
 
@@ -344,8 +356,25 @@ class CLIEventRenderer:
         self.refresh()
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
-        self._streaming_accumulated = action.accumulated
+        raw = action.accumulated
+
+        # Route <think> content to the reasoning display so the user sees
+        # the model's chain-of-thought in real time.
+        think_match = _THINK_EXTRACT_RE.search(raw)
+        if think_match:
+            thinking_text = think_match.group(1)
+            if thinking_text.strip():
+                self._ensure_reasoning()
+                self._reasoning.set_streaming_thought(thinking_text)
+            # Strip thinking from the streaming preview.
+            display_text = _THINK_STRIP_RE.sub('', raw).strip()
+            self._streaming_accumulated = display_text
+        else:
+            self._streaming_accumulated = raw
+
         self._streaming_final = action.is_final
+        if action.is_final:
+            self._hud.state.llm_calls += 1
         self.refresh()
 
     # -- observation handlers ----------------------------------------------
@@ -470,7 +499,11 @@ class CLIEventRenderer:
                 logger.debug('Ignoring unknown agent state: %s', state)
                 return
         self._current_state = state
-        self._state_event.set()
+        # Signal waiters on the main event loop (asyncio.Event is not thread-safe).
+        try:
+            self._loop.call_soon_threadsafe(self._state_event.set)
+        except RuntimeError:
+            pass
 
         # Update HUD ledger indicator on terminal states.
         if state in (AgentState.ERROR, AgentState.REJECTED):

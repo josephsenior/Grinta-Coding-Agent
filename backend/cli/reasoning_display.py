@@ -26,7 +26,7 @@ class ReasoningDisplay:
     def __init__(self) -> None:
         self._active = False
         self._thought_lines: list[str] = []
-        self._current_action: str = ""
+        self._current_action: str = ''
         self._max_lines: int = 8
         self._start_time: float | None = None
 
@@ -40,7 +40,7 @@ class ReasoningDisplay:
     def stop(self) -> None:
         self._active = False
         self._thought_lines.clear()
-        self._current_action = ""
+        self._current_action = ''
         self._start_time = None
 
     @property
@@ -65,6 +65,17 @@ class ReasoningDisplay:
         if len(self._thought_lines) > self._max_lines:
             self._thought_lines = self._thought_lines[-self._max_lines :]
 
+    def set_streaming_thought(self, text: str) -> None:
+        """Replace thought lines with new content (for cumulative streaming updates)."""
+        self.start()
+        self._thought_lines.clear()
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped:
+                self._thought_lines.append(stripped)
+        if len(self._thought_lines) > self._max_lines:
+            self._thought_lines = self._thought_lines[-self._max_lines :]
+
     def update_action(self, label: str) -> None:
         self.start()
         self._current_action = label
@@ -82,22 +93,22 @@ class ReasoningDisplay:
         grid = Table.grid(expand=True, padding=(0, 1))
         grid.add_column(width=2)
         grid.add_column(ratio=1)
-        elapsed = ""
+        elapsed = ''
         secs = self.elapsed_seconds
         if secs is not None:
-            elapsed = f" ({secs}s)"
+            elapsed = f' ({secs}s)'
         grid.add_row(
-            Spinner("dots", style="cyan"),
+            Spinner('dots', style='cyan'),
             Text(
-                (self._current_action or "Thinking…") + elapsed,
-                style="bold cyan",
+                (self._current_action or 'Thinking…') + elapsed,
+                style='bold cyan',
             ),
         )
         for line in self._thought_lines:
-            grid.add_row(Text(""), Text(line, style="dim italic"))
+            grid.add_row(Text(''), Text(line, style='dim italic'))
         return Panel(
             grid,
-            border_style="bright_black",
+            border_style='bright_black',
             padding=(0, 1),
-            title="Reasoning",
+            title='Reasoning',
         )
