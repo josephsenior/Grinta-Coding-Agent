@@ -7,30 +7,33 @@ from typing import TYPE_CHECKING
 
 from backend.core.errors import AgentRuntimeError, LLMContextWindowExceedError
 from backend.core.logger import app_logger as logger
-from backend.ledger import EventSource
-from backend.ledger.observation import ErrorObservation
+from backend.core.schemas import AgentState
 from backend.inference.exceptions import (
     AuthenticationError,
     ContentPolicyViolationError,
     ContextWindowExceededError,
     Timeout,
 )
+from backend.ledger import EventSource
+from backend.ledger.observation import ErrorObservation
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
 
 
 def _resolve_pending_action_service(controller):
-    controller_dict = getattr(controller, "__dict__", {})
-    services = controller_dict.get("services")
+    controller_dict = getattr(controller, '__dict__', {})
+    services = controller_dict.get('services')
     if services is not None:
-        service = getattr(services, "pending_action", None)
+        service = getattr(services, 'pending_action', None)
         if service is not None:
             return service
-    service = controller_dict.get("pending_action_service")
+    service = controller_dict.get('pending_action_service')
     if service is not None:
         return service
-    return getattr(controller, "pending_action_service", None)
+    return getattr(controller, 'pending_action_service', None)
 
 
 class RecoveryService:
@@ -47,7 +50,7 @@ class RecoveryService:
         try:
             controller.circuit_breaker_service.record_error(exc)
         except Exception:
-            logger.debug("circuit_breaker record_error failed", exc_info=True)
+            logger.debug('circuit_breaker record_error failed', exc_info=True)
 
         pending_svc = _resolve_pending_action_service(controller)
         if pending_svc is not None:
@@ -66,41 +69,44 @@ class RecoveryService:
             EventSource.ENVIRONMENT,
         )
 
-        retry_scheduled = False
         try:
-            retry_scheduled = await controller.retry_service.schedule_retry_after_failure(
-                exc
-            )
+            await controller.retry_service.schedule_retry_after_failure(exc)
         except Exception:
-            logger.debug("schedule_retry_after_failure failed", exc_info=True)
+            logger.debug('schedule_retry_after_failure failed', exc_info=True)
 
-        if not retry_scheduled:
-            self._context.trigger_step()
+        # Always leave RUNNING state after an error.  If a retry was
+        # scheduled the retry worker will transition back to RUNNING
+        # when the delay expires (see _resume_agent_after_retry).
+        # Without this the _step drain loop immediately re-calls the
+        # LLM and hits the same error in an infinite loop.
+        await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
 
     def _apply_timeout_planning_routing(self, controller, exc: Exception) -> None:
         """Route timeout recoveries based on recent MCP validation failures."""
         if not isinstance(exc, Timeout):
             return
 
-        state = getattr(controller, "state", None)
-        if state is None or not hasattr(state, "set_planning_directive"):
+        state = getattr(controller, 'state', None)
+        if state is None or not hasattr(state, 'set_planning_directive'):
             return
 
         # Avoid clobbering any directive that is already queued for this turn.
-        turn_signals = getattr(state, "turn_signals", None)
-        existing = getattr(turn_signals, "planning_directive", None) if turn_signals else None
+        turn_signals = getattr(state, 'turn_signals', None)
+        existing = (
+            getattr(turn_signals, 'planning_directive', None) if turn_signals else None
+        )
         if existing:
             return
 
-        history = getattr(state, "history", []) or []
+        history = getattr(state, 'history', []) or []
         recent = history[-3:] if isinstance(history, list) else []
 
         for event in reversed(recent):
-            observation_type = str(getattr(event, "observation", "")).lower()
-            content = getattr(event, "content", "")
+            observation_type = str(getattr(event, 'observation', '')).lower()
+            content = getattr(event, 'content', '')
             if not isinstance(content, str):
                 continue
-            if observation_type != "mcp":
+            if observation_type != 'mcp':
                 continue
 
             payload = None
@@ -110,21 +116,21 @@ class RecoveryService:
                 payload = None
 
             if isinstance(payload, dict):
-                error_code = str(payload.get("error_code") or "")
-                error_text = str(payload.get("error") or "")
-                if error_code == "MCP_TOOL_VALIDATION_ERROR" or "-32602" in error_text:
+                error_code = str(payload.get('error_code') or '')
+                error_text = str(payload.get('error') or '')
+                if error_code == 'MCP_TOOL_VALIDATION_ERROR' or '-32602' in error_text:
                     directive = (
-                        "Recent MCP call failed due to tool argument validation. "
-                        "Before any broad reasoning, select exactly one MCP tool, "
-                        "rebuild arguments to match its schema types, and retry once. "
-                        "If still invalid, explain the exact required argument shape to the user."
+                        'Recent MCP call failed due to tool argument validation. '
+                        'Before any broad reasoning, select exactly one MCP tool, '
+                        'rebuild arguments to match its schema types, and retry once. '
+                        'If still invalid, explain the exact required argument shape to the user.'
                     )
                     state.set_planning_directive(
                         directive,
-                        source="RecoveryService.mcp_validation_timeout",
+                        source='RecoveryService.mcp_validation_timeout',
                     )
                     logger.warning(
-                        "Injected planning directive after Timeout due to recent MCP validation error"
+                        'Injected planning directive after Timeout due to recent MCP validation error'
                     )
                     return
 
@@ -134,17 +140,17 @@ class RecoveryService:
             exc,
             (AuthenticationError, ContentPolicyViolationError),
         )
-        err_id = "AGENT_STEP_EXCEPTION"
+        err_id = 'AGENT_STEP_EXCEPTION'
         if isinstance(exc, Timeout):
-            err_id = "LLM_TIMEOUT"
+            err_id = 'LLM_TIMEOUT'
         elif isinstance(exc, LLMContextWindowExceedError | ContextWindowExceededError):
-            err_id = "LLM_CONTEXT_WINDOW_EXCEEDED"
+            err_id = 'LLM_CONTEXT_WINDOW_EXCEEDED'
         elif isinstance(exc, AgentRuntimeError):
-            err_id = "AGENT_RUNTIME_ERROR"
+            err_id = 'AGENT_RUNTIME_ERROR'
 
-        text = f"{type(exc).__name__}: {exc}"
+        text = f'{type(exc).__name__}: {exc}'
         guidance = (
-            "The agent step failed with the error above. Adjust strategy "
-            "(different tool, smaller change, or confirm configuration) and continue."
+            'The agent step failed with the error above. Adjust strategy '
+            '(different tool, smaller change, or confirm configuration) and continue.'
         )
-        return f"{text}\n\n{guidance}", err_id, notify_ui_only
+        return f'{text}\n\n{guidance}', err_id, notify_ui_only

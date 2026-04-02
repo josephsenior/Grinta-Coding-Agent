@@ -20,14 +20,15 @@ from backend.ledger.action.agent import (
 )
 from backend.ledger.observation import (
     AgentStateChangedObservation,
+    ErrorObservation,
     NullObservation,
     Observation,
 )
 from backend.ledger.observation.agent import RecallObservation
 
 if TYPE_CHECKING:
-    from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.ledger.event import Event
+    from backend.orchestration.session_orchestrator import SessionOrchestrator
 
 
 class StepDecisionService:
@@ -38,7 +39,7 @@ class StepDecisionService:
     - Agent messages → step unless waiting for user input
     - Condensation actions → always step
     - NullObservation → step only when it has a cause
-    - AgentStateChangedObservation, RecallObservation → never step
+    - AgentStateChangedObservation, RecallObservation, ErrorObservation → never step
     - All other observations → step
     """
 
@@ -70,4 +71,9 @@ class StepDecisionService:
     def _for_observation(self, event: Observation) -> bool:
         if isinstance(event, NullObservation):
             return bool(event.cause)
-        return not isinstance(event, AgentStateChangedObservation | RecallObservation)
+        # ErrorObservation is handled by recovery_service (retry or
+        # transition to AWAITING_USER_INPUT).  Triggering a step here
+        # would bypass retry delays and cause infinite retry loops.
+        return not isinstance(
+            event, AgentStateChangedObservation | RecallObservation | ErrorObservation
+        )

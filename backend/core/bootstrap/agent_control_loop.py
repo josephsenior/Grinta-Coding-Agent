@@ -1,21 +1,15 @@
-﻿"""Agent control loop helpers for running runtimes and handling status callbacks."""
+"""Agent control loop helpers for running runtimes and handling status callbacks."""
 
 import asyncio
 from collections.abc import Callable
 
-from backend.orchestration import SessionOrchestrator
+from backend.context.agent_memory import Memory
+from backend.core.enums import RuntimeStatus
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
-from backend.context.agent_memory import Memory
 from backend.execution.base import Runtime
-from backend.core.enums import RuntimeStatus
+from backend.orchestration import SessionOrchestrator
 from backend.utils.async_utils import run_or_schedule
-
-# Backoff parameters for the polling loop
-_INITIAL_POLL_INTERVAL = 0.1  # 100ms
-_MAX_POLL_INTERVAL = 2.0  # 2s cap
-_BACKOFF_FACTOR = 1.5
-_MAX_CONSECUTIVE_ERRORS = 20  # Force ERROR state after this many step failures
 
 
 def _handle_error_status(
@@ -23,26 +17,26 @@ def _handle_error_status(
 ) -> None:
     """Handle error status in the status callback."""
     if controller:
-        controller.state.set_last_error(msg, source="loop.status_callback")
+        controller.state.set_last_error(msg, source='loop.status_callback')
         try:
             if runtime_status == RuntimeStatus.ERROR_MEMORY:
                 setattr(
                     controller.state,
-                    "_memory_error_boundary",
+                    '_memory_error_boundary',
                     controller.state.iteration_flag.current_value,
                 )
                 logger.info(
-                    "LOOP.status_callback: memory error boundary recorded at iteration %s",
+                    'LOOP.status_callback: memory error boundary recorded at iteration %s',
                     controller.state.iteration_flag.current_value,
                 )
         except Exception:
-            logger.debug("Failed to record memory error boundary", exc_info=True)
+            logger.debug('Failed to record memory error boundary', exc_info=True)
         # Schedule safely across threads without requiring a running loop
         try:
             run_or_schedule(controller.set_agent_state_to(AgentState.ERROR))
         except Exception:
             logger.warning(
-                "Failed to schedule ERROR state transition via run_or_schedule",
+                'Failed to schedule ERROR state transition via run_or_schedule',
                 exc_info=True,
             )
             try:
@@ -50,11 +44,11 @@ def _handle_error_status(
 
                 create_tracked_task(
                     controller.set_agent_state_to(AgentState.ERROR),
-                    name="error-state-fallback",
+                    name='error-state-fallback',
                 )
             except Exception:
                 logger.error(
-                    "All attempts to transition agent to ERROR state failed",
+                    'All attempts to transition agent to ERROR state failed',
                     exc_info=True,
                 )
 
@@ -73,7 +67,7 @@ def _create_status_callback(
             msg: Status message
 
         """
-        if msg_type == "error":
+        if msg_type == 'error':
             logger.error(msg)
             _handle_error_status(controller, runtime_status, msg)
         else:
@@ -82,12 +76,14 @@ def _create_status_callback(
     return status_callback
 
 
-def _validate_status_callbacks(runtime: Runtime, controller: SessionOrchestrator) -> None:
+def _validate_status_callbacks(
+    runtime: Runtime, controller: SessionOrchestrator
+) -> None:
     """Validate that status callbacks are not already set."""
-    if getattr(runtime, "status_callback", None):
-        logger.warning("Runtime status_callback already set; overriding in run loop")
-    if getattr(controller, "status_callback", None):
-        logger.warning("Controller status_callback already set; overriding in run loop")
+    if getattr(runtime, 'status_callback', None):
+        logger.warning('Runtime status_callback already set; overriding in run loop')
+    if getattr(controller, 'status_callback', None):
+        logger.warning('Controller status_callback already set; overriding in run loop')
 
 
 def _set_status_callbacks(
@@ -123,35 +119,11 @@ async def run_agent_until_done(
     try:
         controller.step()
     except Exception:
-        logger.warning("Initial controller.step() failed", exc_info=True)
+        logger.warning('Initial controller.step() failed', exc_info=True)
 
-    # Actively drive the loop with exponential backoff on consecutive errors
-    poll_interval = _INITIAL_POLL_INTERVAL
-    consecutive_errors = 0
-
+    # Wait for the agent to reach an end state.  Steps are driven by the
+    # event-driven mechanism (observation_service.trigger_step, _on_event →
+    # should_step, etc.) — NOT by polling.  The initial step() above kicks
+    # things off; all subsequent steps are triggered by events.
     while controller.state.agent_state not in end_states:
-        await asyncio.sleep(poll_interval)
-        try:
-            controller.step()
-            # Reset backoff on successful step
-            poll_interval = _INITIAL_POLL_INTERVAL
-            consecutive_errors = 0
-        except Exception:
-            consecutive_errors += 1
-            logger.warning(
-                "controller.step() error (%d consecutive)",
-                consecutive_errors,
-                exc_info=True,
-            )
-            # Exponential backoff to avoid busy-loop on persistent errors
-            poll_interval = min(poll_interval * _BACKOFF_FACTOR, _MAX_POLL_INTERVAL)
-            if consecutive_errors >= _MAX_CONSECUTIVE_ERRORS:
-                logger.error(
-                    "Agent loop exceeded %d consecutive step errors; forcing ERROR state",
-                    _MAX_CONSECUTIVE_ERRORS,
-                )
-                try:
-                    await controller.set_agent_state_to(AgentState.ERROR)
-                except Exception:
-                    logger.error("Failed to force ERROR state", exc_info=True)
-                break
+        await asyncio.sleep(0.5)

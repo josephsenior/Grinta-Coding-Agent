@@ -9,7 +9,6 @@ import os
 import time
 import uuid
 from dataclasses import dataclass, field
-from collections.abc import Awaitable
 from typing import Any, cast
 
 from backend.core.logger import app_logger as logger
@@ -41,32 +40,32 @@ class RetryTask:
     def to_dict(self) -> dict[str, Any]:
         """Serialize retry task to dictionary."""
         return {
-            "id": self.id,
-            "controller_id": self.controller_id,
-            "payload": self.payload,
-            "reason": self.reason,
-            "attempts": self.attempts,
-            "max_attempts": self.max_attempts,
-            "next_attempt_at": self.next_attempt_at,
-            "created_at": self.created_at,
-            "last_error": self.last_error,
-            "metadata": self.metadata,
+            'id': self.id,
+            'controller_id': self.controller_id,
+            'payload': self.payload,
+            'reason': self.reason,
+            'attempts': self.attempts,
+            'max_attempts': self.max_attempts,
+            'next_attempt_at': self.next_attempt_at,
+            'created_at': self.created_at,
+            'last_error': self.last_error,
+            'metadata': self.metadata,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RetryTask:
         """Deserialize retry task from dictionary."""
         return cls(
-            id=data["id"],
-            controller_id=data["controller_id"],
-            payload=data.get("payload", {}),
-            reason=data.get("reason", ""),
-            attempts=int(data.get("attempts", 0)),
-            max_attempts=int(data.get("max_attempts", 3)),
-            next_attempt_at=float(data.get("next_attempt_at", time.time())),
-            created_at=float(data.get("created_at", time.time())),
-            last_error=data.get("last_error"),
-            metadata=data.get("metadata", {}),
+            id=data['id'],
+            controller_id=data['controller_id'],
+            payload=data.get('payload', {}),
+            reason=data.get('reason', ''),
+            attempts=int(data.get('attempts', 0)),
+            max_attempts=int(data.get('max_attempts', 3)),
+            next_attempt_at=float(data.get('next_attempt_at', time.time())),
+            created_at=float(data.get('created_at', time.time())),
+            last_error=data.get('last_error'),
+            metadata=data.get('metadata', {}),
         )
 
 
@@ -104,7 +103,7 @@ class InMemoryRetryBackend(BaseRetryBackend):
         async with self._lock:
             self._tasks[task.id] = task
             heapq.heappush(self._heap, (task.next_attempt_at, task.id))
-        logger.debug("Scheduled retry task %s (attempts=%s)", task.id, task.attempts)
+        logger.debug('Scheduled retry task %s (attempts=%s)', task.id, task.attempts)
         return task
 
     async def fetch_ready(self, controller_id: str, limit: int) -> list[RetryTask]:
@@ -131,7 +130,7 @@ class InMemoryRetryBackend(BaseRetryBackend):
     async def mark_success(self, task: RetryTask) -> None:
         async with self._lock:
             self._tasks.pop(task.id, None)
-        logger.debug("Retry task %s succeeded, removed from queue", task.id)
+        logger.debug('Retry task %s succeeded, removed from queue', task.id)
 
     async def mark_failure(
         self, task: RetryTask, backoff_seconds: float
@@ -142,7 +141,7 @@ class InMemoryRetryBackend(BaseRetryBackend):
                 self._dead_letter.append(task)
                 self._tasks.pop(task.id, None)
                 logger.warning(
-                    "Retry task %s exceeded max attempts (%s)",
+                    'Retry task %s exceeded max attempts (%s)',
                     task.id,
                     task.max_attempts,
                 )
@@ -151,7 +150,7 @@ class InMemoryRetryBackend(BaseRetryBackend):
             self._tasks[task.id] = task
             heapq.heappush(self._heap, (task.next_attempt_at, task.id))
             logger.info(
-                "Retry task %s scheduled again in %.1fs (attempt %s/%s)",
+                'Retry task %s scheduled again in %.1fs (attempt %s/%s)',
                 task.id,
                 backoff_seconds,
                 task.attempts,
@@ -163,7 +162,7 @@ class InMemoryRetryBackend(BaseRetryBackend):
         async with self._lock:
             self._dead_letter.append(task)
             self._tasks.pop(task.id, None)
-        logger.error("Retry task %s moved to dead letter queue", task.id)
+        logger.error('Retry task %s moved to dead letter queue', task.id)
 
 
 class RedisRetryBackend(BaseRetryBackend):
@@ -176,7 +175,7 @@ class RedisRetryBackend(BaseRetryBackend):
         connection_timeout: float = 5.0,
     ) -> None:
         if not redis_available:
-            raise RuntimeError("redis.asyncio is required for RedisRetryBackend")
+            raise RuntimeError('redis.asyncio is required for RedisRetryBackend')
         self.redis_url = redis_url
         self._pool = redis.ConnectionPool.from_url(
             redis_url,
@@ -190,13 +189,13 @@ class RedisRetryBackend(BaseRetryBackend):
         self._client = redis.Redis(connection_pool=self._pool)
 
     def _schedule_key(self, controller_id: str) -> str:
-        return f"retry_queue:{controller_id}:schedule"
+        return f'retry_queue:{controller_id}:schedule'
 
     def _tasks_key(self, controller_id: str) -> str:
-        return f"retry_queue:{controller_id}:tasks"
+        return f'retry_queue:{controller_id}:tasks'
 
     def _dead_letter_key(self, controller_id: str) -> str:
-        return f"retry_queue:{controller_id}:dead_letter"
+        return f'retry_queue:{controller_id}:dead_letter'
 
     async def schedule(self, task: RetryTask) -> RetryTask:
         tasks_key = self._tasks_key(task.controller_id)
@@ -207,7 +206,7 @@ class RedisRetryBackend(BaseRetryBackend):
             pipe.zadd(schedule_key, {task.id: task.next_attempt_at})
             await pipe.execute()
         logger.debug(
-            "Scheduled retry task %s for controller %s (next_at=%.2f)",
+            'Scheduled retry task %s for controller %s (next_at=%.2f)',
             task.id,
             task.controller_id,
             task.next_attempt_at,
@@ -242,7 +241,7 @@ class RedisRetryBackend(BaseRetryBackend):
         tasks_key = self._tasks_key(task.controller_id)
         await cast(Any, self._client.hdel(tasks_key, task.id))
         logger.debug(
-            "Retry task %s acknowledged by controller %s", task.id, task.controller_id
+            'Retry task %s acknowledged by controller %s', task.id, task.controller_id
         )
 
     async def mark_failure(
@@ -262,7 +261,7 @@ class RedisRetryBackend(BaseRetryBackend):
             pipe.zadd(schedule_key, {task.id: task.next_attempt_at})
             await pipe.execute()
         logger.info(
-            "Retry task %s requeued for controller %s in %.1fs (attempt %s/%s)",
+            'Retry task %s requeued for controller %s in %.1fs (attempt %s/%s)',
             task.id,
             task.controller_id,
             backoff_seconds,
@@ -280,7 +279,7 @@ class RedisRetryBackend(BaseRetryBackend):
             pipe.lpush(dead_key, payload)
             await pipe.execute()
         logger.error(
-            "Retry task %s moved to dead letter queue for controller %s",
+            'Retry task %s moved to dead letter queue for controller %s',
             task.id,
             task.controller_id,
         )
@@ -360,30 +359,30 @@ def get_retry_queue() -> RetryQueue | None:
     if _retry_queue is not None:
         return _retry_queue
 
-    enabled = os.getenv("RETRY_QUEUE_ENABLED", "true").lower() in ("true", "1", "yes")
+    enabled = os.getenv('RETRY_QUEUE_ENABLED', 'true').lower() in ('true', '1', 'yes')
     if not enabled:
         return None
 
     # Prefer in-memory backend when running under pytest to avoid Redis noise
-    is_pytest = os.getenv("PYTEST_CURRENT_TEST") is not None or os.getenv(
-        "PYTEST_RUNNING", ""
+    is_pytest = os.getenv('PYTEST_CURRENT_TEST') is not None or os.getenv(
+        'PYTEST_RUNNING', ''
     ).lower() in (
-        "1",
-        "true",
-        "yes",
+        '1',
+        'true',
+        'yes',
     )
-    default_backend = "memory" if is_pytest else "redis"
-    backend_name = os.getenv("RETRY_QUEUE_BACKEND", default_backend).lower()
-    base_delay = float(os.getenv("RETRY_QUEUE_RETRY_DELAY_SECONDS", "60.0"))
-    max_delay = float(os.getenv("RETRY_QUEUE_MAX_DELAY_SECONDS", "3600.0"))
-    max_retries = int(os.getenv("RETRY_QUEUE_MAX_RETRIES", "3"))
-    poll_interval = float(os.getenv("RETRY_QUEUE_POLL_INTERVAL", "5.0"))
+    default_backend = 'memory' if is_pytest else 'redis'
+    backend_name = os.getenv('RETRY_QUEUE_BACKEND', default_backend).lower()
+    base_delay = float(os.getenv('RETRY_QUEUE_RETRY_DELAY_SECONDS', '15.0'))
+    max_delay = float(os.getenv('RETRY_QUEUE_MAX_DELAY_SECONDS', '120.0'))
+    max_retries = int(os.getenv('RETRY_QUEUE_MAX_RETRIES', '3'))
+    poll_interval = float(os.getenv('RETRY_QUEUE_POLL_INTERVAL', '5.0'))
 
     backend: BaseRetryBackend
-    if backend_name == "redis" and redis_available:
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        pool_size = int(os.getenv("REDIS_POOL_SIZE", "10"))
-        timeout = float(os.getenv("REDIS_TIMEOUT", "5.0"))
+    if backend_name == 'redis' and redis_available:
+        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+        pool_size = int(os.getenv('REDIS_POOL_SIZE', '10'))
+        timeout = float(os.getenv('REDIS_TIMEOUT', '5.0'))
         try:
             backend = RedisRetryBackend(
                 redis_url, pool_size=pool_size, connection_timeout=timeout
@@ -391,19 +390,20 @@ def get_retry_queue() -> RetryQueue | None:
             # Verify Redis is reachable; connection is lazy so init may not fail
             # We use a synchronous ping here since get_retry_queue is not async
             import redis as redis_sync
+
             sync_client = redis_sync.from_url(redis_url, socket_timeout=timeout)
             sync_client.ping()
             sync_client.close()
-            logger.info("RetryQueue configured with Redis backend (%s)", redis_url)
+            logger.info('RetryQueue configured with Redis backend (%s)', redis_url)
         except Exception as exc:  # pragma: no cover - fallback path
             logger.warning(
-                "Redis unreachable (%s). RetryQueue falling back to in-memory backend.",
+                'Redis unreachable (%s). RetryQueue falling back to in-memory backend.',
                 exc,
             )
             backend = InMemoryRetryBackend()
     else:
         backend = InMemoryRetryBackend()
-        logger.info("RetryQueue using in-memory backend")
+        logger.info('RetryQueue using in-memory backend')
 
     _retry_queue = RetryQueue(
         backend,
