@@ -33,7 +33,7 @@ class HUDBar:
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         width = options.max_width
-        bar = self._format()
+        bar = self._format_compact() if width < 80 else self._format()
         pad = max(0, width - len(bar.plain))
         line = Text(' ') + bar + Text(' ' * pad)
         line.stylize('on grey15')
@@ -66,6 +66,39 @@ class HUDBar:
         for content, style in parts:
             txt.append(content, style=style)
         return txt
+
+    def _format_compact(self) -> Text:
+        """Compact format for narrow terminals (< 80 cols)."""
+        ctx = self._format_tokens(self.state.context_tokens)
+        if self.state.context_tokens == 0 and self.state.context_limit == 0:
+            token_display = '—'
+        else:
+            token_display = ctx
+        parts = [
+            (self.state.model.split('/')[-1][:12], 'cyan'),  # last segment, truncated
+            (' ', 'dim'),
+            (token_display, 'yellow'),
+            (' ', 'dim'),
+            (f'${self.state.cost_usd:.3f}', 'green'),
+            (' ', 'dim'),
+            (self._ledger_icon(), self._ledger_style()),
+        ]
+        txt = Text()
+        for content, style in parts:
+            txt.append(content, style=style)
+        return txt
+
+    def _ledger_icon(self) -> str:
+        """Single-char status icon for compact mode."""
+        mapping = {
+            'Healthy': '●',
+            'Ready': '○',
+            'Idle': '○',
+            'Review': '◆',
+            'Paused': '⏸',
+            'Error': '✗',
+        }
+        return mapping.get(self.state.ledger_status, '?')
 
     def _ledger_style(self) -> str:
         if self.state.ledger_status == 'Healthy':
@@ -233,7 +266,7 @@ class HUDBar:
     def render_line(self, console: Console) -> None:
         """Print the HUD as a single bottom-of-screen line."""
         width = console.width
-        bar = self._format()
+        bar = self._format_compact() if width < 80 else self._format()
         pad = max(0, width - len(bar.plain) - 2)
         console.print(
             Text('  ') + bar + Text(' ' * pad),

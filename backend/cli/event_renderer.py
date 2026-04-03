@@ -546,6 +546,7 @@ class CLIEventRenderer:
         self._turn_start_cost = self._hud.state.cost_usd
         self._turn_start_tokens = self._hud.state.context_tokens
         self._turn_start_calls = self._hud.state.llm_calls
+        self._reasoning.set_cost_baseline(self._hud.state.cost_usd)
         self.refresh()
 
     async def wait_for_state_change(
@@ -1088,28 +1089,48 @@ class CLIEventRenderer:
                 self._append_history(Group(*body_parts))
                 return
 
-            # Expanded display for failures or long output
+            # Head+tail truncation for long output (2K head + 1K tail)
             header_style = 'green' if success else 'red'
             header = f'command · exit {exit_code}' if exit_code is not None else 'command output'
-            truncated = len(output) > 4000
-            display_output = output[:4000]
-            body_parts: list[Any] = [Text(f'$ {command_display}', style='cyan')]
-            if display_output:
-                body_parts.append(
-                    Syntax(display_output, 'text', word_wrap=True, theme='monokai')
-                )
-            else:
-                body_parts.append(Text('(no output)', style='dim'))
+            total_len = len(output)
+            head_limit = 2000
+            tail_limit = 1000
+            truncated = total_len > (head_limit + tail_limit)
             if truncated:
-                body_parts.append(
+                head_part = output[:head_limit]
+                tail_part = output[-tail_limit:]
+                skipped = total_len - head_limit - tail_limit
+                display_parts: list[Any] = [Text(f'$ {command_display}', style='cyan')]
+                display_parts.append(
+                    Syntax(head_part, 'text', word_wrap=True, theme='monokai')
+                )
+                display_parts.append(
                     Text(
-                        f'\n⚠ Truncated ({len(output):,} chars, showing 4K)',
+                        f'\n  ··· {skipped:,} chars skipped ···\n',
                         style='yellow dim',
                     )
                 )
+                display_parts.append(
+                    Syntax(tail_part, 'text', word_wrap=True, theme='monokai')
+                )
+                display_parts.append(
+                    Text(
+                        f'\n⚠ Truncated ({total_len:,} chars total)',
+                        style='yellow dim',
+                    )
+                )
+            else:
+                display_parts: list[Any] = [Text(f'$ {command_display}', style='cyan')]
+                if output:
+                    display_parts.append(
+                        Syntax(output, 'text', word_wrap=True, theme='monokai')
+                    )
+                else:
+                    display_parts.append(Text('(no output)', style='dim'))
+
             self._append_history(
                 Panel(
-                    Group(*body_parts),
+                    Group(*display_parts),
                     title=f'[{header_style}]{header}[/{header_style}]',
                     border_style='bright_black',
                     padding=(0, 1),
@@ -1477,6 +1498,7 @@ class CLIEventRenderer:
         llm_metrics = getattr(event, 'llm_metrics', None)
         if llm_metrics is not None:
             self._hud.update_from_llm_metrics(llm_metrics)
+            self._reasoning.update_cost(self._hud.state.cost_usd)
             self._check_budget()
 
     def _check_budget(self) -> None:
