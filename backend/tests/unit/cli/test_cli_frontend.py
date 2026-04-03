@@ -1228,3 +1228,307 @@ async def test_resume_session_uses_persisted_session_index(tmp_path: Path) -> No
         if not agent_task.done():
             agent_task.cancel()
         await agent_task
+
+
+# ===========================================================================
+# Tests for new action/observation handlers (Phase 1)
+# ===========================================================================
+
+
+def _make_renderer_sync() -> tuple[Console, HUDBar, CLIEventRenderer]:
+    """Create a renderer without needing an event loop (for sync tests)."""
+    console = _make_console()
+    hud = HUDBar()
+    loop = asyncio.new_event_loop()
+    reasoning = ReasoningDisplay()
+    renderer = CLIEventRenderer(console, hud, reasoning, loop=loop)
+    return console, hud, renderer
+
+
+@pytest.mark.asyncio
+async def test_renderer_handles_file_read_action() -> None:
+    from backend.ledger.action import FileReadAction
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    action = FileReadAction(path='/workspace/src/main.py')
+    action.source = EventSource.AGENT
+    await renderer.handle_event(action)
+    output = _console_output(console)
+    assert 'main.py' in output
+    assert '👁' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_handles_file_read_observation() -> None:
+    from backend.ledger.observation import FileReadObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    obs = FileReadObservation(content='line1\nline2\nline3', path='/workspace/test.py')
+    await renderer.handle_event(obs)
+    output = _console_output(console)
+    assert 'test.py' in output
+    assert '3 lines' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_handles_mcp_action() -> None:
+    from backend.ledger.action import MCPAction
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    action = MCPAction(name='search_code', arguments={'query': 'test'})
+    action.source = EventSource.AGENT
+    await renderer.handle_event(action)
+    output = _console_output(console)
+    assert 'search_code' in output
+    assert '🔧' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_handles_success_observation() -> None:
+    from backend.ledger.observation import SuccessObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    obs = SuccessObservation(content='File written successfully')
+    await renderer.handle_event(obs)
+    output = _console_output(console)
+    assert 'File written successfully' in output
+    assert '✓' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_handles_delegate_task_action() -> None:
+    from backend.ledger.action import DelegateTaskAction
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    action = DelegateTaskAction(task_description='Write unit tests')
+    action.source = EventSource.AGENT
+    await renderer.handle_event(action)
+    output = _console_output(console)
+    assert 'Delegating' in output or 'Write unit tests' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_handles_condensation_action() -> None:
+    from backend.ledger.action import CondensationAction
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    action = CondensationAction(pruned_event_ids=[1, 2, 3])
+    action.source = EventSource.AGENT
+    await renderer.handle_event(action)
+    output = _console_output(console)
+    assert 'compress' in output.lower() or '🗜' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_handles_task_tracking_action() -> None:
+    from backend.ledger.action import TaskTrackingAction
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    action = TaskTrackingAction(command='add', thought='Track progress')
+    action.source = EventSource.AGENT
+    await renderer.handle_event(action)
+    output = _console_output(console)
+    assert 'task' in output.lower() or '📋' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_handles_user_reject_with_content() -> None:
+    from backend.ledger.observation import UserRejectObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    obs = UserRejectObservation(content='Too risky')
+    await renderer.handle_event(obs)
+    output = _console_output(console)
+    assert 'Too risky' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_handles_agent_condensation_observation() -> None:
+    from backend.ledger.observation import AgentCondensationObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    obs = AgentCondensationObservation(content='condensed')
+    await renderer.handle_event(obs)
+    output = _console_output(console)
+    assert 'compressed' in output.lower() or '🗜' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_cmd_output_head_tail_truncation() -> None:
+    """Long command output should show head+tail with skipped chars indicator."""
+    from backend.ledger.observation import CmdOutputObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    # Create output longer than head_limit + tail_limit (3000 chars)
+    long_output = 'A' * 5000
+    obs = CmdOutputObservation(content=long_output, command='cat bigfile.txt', exit_code=0)
+    await renderer.handle_event(obs)
+    output = _console_output(console)
+    assert 'skipped' in output.lower()
+    assert 'Truncated' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_message_action_shows_attachment_indicators() -> None:
+    """MessageAction with file_urls should show attachment indicator."""
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    msg = MessageAction(content='Here is the analysis', wait_for_response=False)
+    msg.source = EventSource.AGENT
+    msg.file_urls = ['file1.txt', 'file2.py']
+    await renderer.handle_event(msg)
+    output = _console_output(console)
+    assert 'analysis' in output
+    assert '2 file(s)' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_cmd_run_shows_thought() -> None:
+    """CmdRunAction with thought should pass thought to reasoning display."""
+    console = _make_console()
+    hud = HUDBar()
+    reasoning = ReasoningDisplay()
+    renderer = CLIEventRenderer(
+        console, hud, reasoning, loop=asyncio.get_running_loop()
+    )
+    action = CmdRunAction(command='npm test', thought='Checking if tests pass')
+    action.source = EventSource.AGENT
+    await renderer.handle_event(action)
+    output = _console_output(console)
+    assert 'npm test' in output
+    assert reasoning._thought_lines  # thought was passed
+
+
+def test_reasoning_display_tool_icons() -> None:
+    """ReasoningDisplay should show tool-specific icons."""
+    rd = ReasoningDisplay()
+    rd.start()
+    rd.update_action('Reading file src/main.py')
+    panel = rd.renderable()
+    assert panel is not None
+    # Verify compact max lines
+    assert rd._max_lines == 4
+
+
+def test_reasoning_display_budget_burn() -> None:
+    """ReasoningDisplay should track cost for budget burn display."""
+    rd = ReasoningDisplay()
+    rd.start()
+    rd.set_cost_baseline(0.0)
+    rd.update_cost(0.05)
+    # Turn cost is 0.05 which is > 0.01 threshold
+    panel = rd.renderable()
+    assert panel is not None
+
+
+def test_hud_compact_format_for_narrow_terminal() -> None:
+    """HUD should use compact format for narrow terminals."""
+    hud = HUDBar()
+    hud.state.model = 'openai/gpt-4.1'
+    hud.state.context_tokens = 5000
+    hud.state.context_limit = 128000
+    hud.state.cost_usd = 0.1234
+    hud.state.llm_calls = 3
+    hud.state.ledger_status = 'Healthy'
+
+    full = hud._format()
+    compact = hud._format_compact()
+    # Compact should be shorter
+    assert len(compact.plain) < len(full.plain)
+    # Compact should have the status icon
+    assert '●' in compact.plain
+
+
+def test_hud_ledger_icon() -> None:
+    """HUD ledger icon returns correct single-char indicators."""
+    hud = HUDBar()
+    hud.state.ledger_status = 'Healthy'
+    assert hud._ledger_icon() == '●'
+    hud.state.ledger_status = 'Error'
+    assert hud._ledger_icon() == '✗'
+    hud.state.ledger_status = 'Paused'
+    assert hud._ledger_icon() == '⏸'
+
+
+def test_auto_detect_api_keys_finds_env_var() -> None:
+    """auto_detect_api_keys should detect OPENAI_API_KEY from env."""
+    from backend.cli.config_manager import auto_detect_api_keys
+
+    config = MagicMock()
+    llm_cfg = MagicMock()
+    llm_cfg.model = ''
+    config.get_llm_config.return_value = llm_cfg
+
+    with patch.dict(os.environ, {'OPENAI_API_KEY': 'sk-test-key-12345'}, clear=False):
+        result = auto_detect_api_keys(config)
+
+    assert result == 'openai'
+
+
+def test_auto_detect_api_keys_returns_none_when_no_env() -> None:
+    """auto_detect_api_keys should return None when no env vars set."""
+    from backend.cli.config_manager import auto_detect_api_keys
+
+    config = MagicMock()
+    llm_cfg = MagicMock()
+    llm_cfg.model = 'some-model'
+    config.get_llm_config.return_value = llm_cfg
+
+    # Clear all known API key env vars
+    env_clear = {
+        'OPENAI_API_KEY': '',
+        'ANTHROPIC_API_KEY': '',
+        'GEMINI_API_KEY': '',
+        'XAI_API_KEY': '',
+        'GROQ_API_KEY': '',
+        'OPENROUTER_API_KEY': '',
+        'NVIDIA_API_KEY': '',
+        'LIGHTNING_API_KEY': '',
+    }
+    with patch.dict(os.environ, env_clear, clear=False):
+        result = auto_detect_api_keys(config)
+
+    assert result is None
