@@ -195,11 +195,11 @@ def ensure_default_model(config: AppConfig) -> str | None:
         llm_cfg.model = inferred_model
         return inferred_model
 
-    inferred_model = _default_model_from_environment()
-    if not inferred_model:
+    env_model = _default_model_from_environment()
+    if not env_model:
         return None
-    llm_cfg.model = inferred_model
-    return inferred_model
+    llm_cfg.model = env_model
+    return env_model
 
 
 def auto_detect_api_keys(config: AppConfig) -> str | None:
@@ -385,10 +385,13 @@ def _select_model(provider_key: str, custom_name: str | None = None) -> str:
     else:
         _console.print('[bold]Model[/bold] [dim](e.g. provider/model-name)[/dim]\n')
 
-    model_input = Prompt.ask(
-        '  Model',
-        default=default or None,
-        console=_console,
+    model_input = (
+        Prompt.ask(
+            '  Model',
+            default=default or None,
+            console=_console,
+        )
+        or ''
     ).strip()
 
     if not model_input:

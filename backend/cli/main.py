@@ -17,6 +17,7 @@ import os
 import sys
 import warnings
 from pathlib import Path
+from typing import IO
 
 # Suppress third-party DeprecationWarnings (belt-and-suspenders with entry.py).
 warnings.filterwarnings('ignore', message='importing.*from.*astroid', category=DeprecationWarning)
@@ -63,7 +64,7 @@ def _silence_all_loggers() -> None:
 _silence_all_loggers()
 
 
-def _configure_redirected_streams(*streams: io.TextIOBase | None) -> None:
+def _configure_redirected_streams(*streams: io.TextIOBase | IO[str] | None) -> None:
     """Prefer UTF-8 when writing Rich output to redirected streams."""
     for stream in streams:
         if stream is None:
@@ -174,7 +175,15 @@ def _resolve_invocation(
         '-p',
         help='Set project root directory',
     )
+    parser.add_argument(
+        '--cleanup-storage',
+        action='store_true',
+        default=False,
+        help='Migrate legacy project-local storage to the global Grinta data directory',
+    )
     args = parser.parse_args(argv)
+    if args.cleanup_storage:
+        return args.model, args.project, True
     return args.model, args.project, False
 
 
@@ -259,6 +268,7 @@ def main(
     *,
     model: str | None = None,
     project: str | None = None,
+    cleanup_storage: bool = False,
 ) -> None:
     """Synchronous entry point for the ``grinta`` console_script."""
     # Silence all logging immediately — before any backend imports fire their
@@ -266,8 +276,14 @@ def main(
     # handler when imported, which would spew INFO noise into the terminal).
     _setup_logging()
     _configure_redirected_streams(sys.stdout, sys.stderr)
+    if cleanup_storage:
+        from backend.cli.storage_cleanup import run_storage_cleanup_command
+        run_storage_cleanup_command(project)
+        return
     model, project, handled = _resolve_invocation(model=model, project=project)
     if handled:
+        from backend.cli.storage_cleanup import run_storage_cleanup_command
+        run_storage_cleanup_command(project)
         return
     try:
         asyncio.run(_async_main(model=model, project=project))

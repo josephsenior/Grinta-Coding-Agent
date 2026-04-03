@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import shutil
 import sys
 import time
 from dataclasses import dataclass
@@ -315,58 +316,218 @@ class Repl:
     def _prompt_message(self) -> str:
         state = self._current_prompt_state()
         if state == AgentState.PAUSED:
-            label = 'paused'
+            label = 'paused '
         elif state in {AgentState.ERROR, AgentState.REJECTED}:
-            label = 'retry'
+            label = 'retry '
         else:
             label = ''
-        if not label:
-            return '❯ '
-        return f'{label} ❯ '
+        return f'{label}❯ '
+
+    def _prompt_placeholder(self) -> Any:
+        from prompt_toolkit.formatted_text import HTML
+
+        return HTML(
+            '<style fg="#5d7286" italic>'
+            'Describe the task, or type /help'
+            '</style>'
+        )
+
+    def _prompt_state_label(self) -> str:
+        state = self._current_prompt_state()
+        if state == AgentState.PAUSED:
+            return 'Paused'
+        if state == AgentState.AWAITING_USER_CONFIRMATION:
+            return 'Needs approval'
+        if state in {AgentState.ERROR, AgentState.REJECTED}:
+            return 'Needs attention'
+        if state == AgentState.RUNNING:
+            return 'Running'
+        if state == AgentState.FINISHED:
+            return 'Done'
+        if state == AgentState.STOPPED:
+            return 'Stopped'
+        return 'Ready'
+
+    def _prompt_autonomy_label(self) -> str:
+        controller = self._controller
+        if controller is not None:
+            ac = getattr(controller, 'autonomy_controller', None)
+            if ac is not None:
+                level = str(getattr(ac, 'autonomy_level', 'balanced')).strip().lower()
+                if level in _AUTONOMY_LEVEL_HINTS:
+                    return f'{level} autonomy'
+        return 'balanced autonomy'
+
+    @staticmethod
+    def _truncate_prompt_value(value: str, max_len: int) -> str:
+        clean = ' '.join(str(value).split())
+        if len(clean) <= max_len:
+            return clean
+        if max_len <= 1:
+            return clean[:max_len]
+        if max_len <= 5:
+            return clean[: max_len - 1] + '…'
+        head = (max_len - 1) // 2
+        tail = max_len - head - 1
+        return f'{clean[:head]}…{clean[-tail:]}'
+
+    def _prompt_panel_data(self) -> dict[str, str]:
+        hud = self._hud.state
+        model = hud.model if hud.model and hud.model != '(not set)' else 'model n/a'
+        tokens = HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
+        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else '?'
+        if hud.context_tokens == 0 and hud.context_limit == 0:
+            token_display = '0 tkns'
+        elif hud.context_limit == 0:
+            token_display = f'{tokens} tkns'
+        else:
+            token_display = f'{tokens}/{lim}'
+        return {
+            'state_label': self._prompt_state_label(),
+            'autonomy_label': self._prompt_autonomy_label(),
+            'model': model,
+            'token_display': token_display,
+            'cost': f'${hud.cost_usd:.4f}',
+            'calls': f'{hud.llm_calls} calls',
+            'ledger': hud.ledger_status,
+        }
+
+    def _prompt_state_style(self) -> str:
+        state = self._current_prompt_state()
+        if state == AgentState.PAUSED:
+            return 'class:prompt.badge.paused'
+        if state == AgentState.AWAITING_USER_CONFIRMATION:
+            return 'class:prompt.badge.review'
+        if state in {AgentState.ERROR, AgentState.REJECTED}:
+            return 'class:prompt.badge.error'
+        if state == AgentState.RUNNING:
+            return 'class:prompt.badge.running'
+        return 'class:prompt.badge.ready'
+
+    def _prompt_autonomy_style(self) -> str:
+        label = self._prompt_autonomy_label()
+        if label.startswith('full'):
+            return 'class:prompt.autonomy.full'
+        if label.startswith('supervised'):
+            return 'class:prompt.autonomy.supervised'
+        return 'class:prompt.autonomy.balanced'
+
+    @staticmethod
+    def _prompt_ledger_style(ledger_status: str) -> str:
+        if ledger_status in {'Healthy', 'Ready', 'Idle'}:
+            return 'class:prompt.health.good'
+        if ledger_status in {'Review', 'Paused'}:
+            return 'class:prompt.health.warn'
+        return 'class:prompt.health.bad'
 
     def _prompt_toolbar_text(self) -> str:
-        state = self._current_prompt_state()
-        status = {
-            AgentState.RUNNING: 'Running',
-            AgentState.AWAITING_USER_CONFIRMATION: 'Needs approval',
-            AgentState.AWAITING_USER_INPUT: 'Ready',
-            AgentState.PAUSED: 'Paused',
-            AgentState.FINISHED: 'Done',
-            AgentState.ERROR: 'Error',
-            AgentState.REJECTED: 'Rejected',
-            AgentState.STOPPED: 'Stopped',
-        }.get(state, 'Ready')
-        follow_up = {
-            AgentState.PAUSED: 'Send guidance to continue',
-            AgentState.ERROR: 'Send a retry instruction or /status',
-            AgentState.REJECTED: 'Adjust the task and retry',
-            AgentState.AWAITING_USER_CONFIRMATION: 'Approval prompt opens automatically',
-            AgentState.AWAITING_USER_INPUT: 'Continue the task or ask a new question',
-        }.get(state, 'Type a task or /help')
-        autonomy = self._get_current_autonomy().replace(' (default)', '')
-        return (
-            f' {status} · {autonomy} autonomy │ Tab for commands │ '
-            f'Alt+Enter newline │ {follow_up} '
+        data = self._prompt_panel_data()
+        state_label = data['state_label']
+        autonomy_label = data['autonomy_label']
+        controls = f'{state_label}  │  {autonomy_label}  │  Tab for commands'
+        telemetry = (
+            f"{data['model']}  │  {data['token_display']}  │  {data['cost']}  │  "
+            f"{data['calls']}  │  {data['ledger']}"
         )
+        return f' {controls}\n {telemetry} '
+
+    def _prompt_panel_message(self) -> Any:
+        width = shutil.get_terminal_size((110, 24)).columns
+        if width < 72:
+            return self._prompt_message()
+
+        data = self._prompt_panel_data()
+        compact = width < 110
+        model_limit = 24 if compact else 36
+        model = self._truncate_prompt_value(data['model'], model_limit)
+
+        fragments: list[tuple[str, str]] = []
+
+        def add(style: str, text: str) -> None:
+            fragments.append((style, text))
+
+        add('class:prompt.border', '╭─ ')
+        add('class:prompt.brand', 'GRINTA')
+        add('class:prompt.dim', '  ')
+        add(self._prompt_state_style(), f" {data['state_label'].upper()} ")
+        add('class:prompt.dim', '  ')
+        add(self._prompt_autonomy_style(), data['autonomy_label'])
+        if not compact:
+            add('class:prompt.dim', '  ')
+            add('class:prompt.hint', 'Tab for commands')
+
+        add('', '\n')
+        add('class:prompt.border', '│  ')
+        add('class:prompt.model', model)
+        add('class:prompt.sep', '  •  ')
+        add('class:prompt.value', data['token_display'])
+        add('class:prompt.sep', '  •  ')
+        add('class:prompt.value', data['cost'])
+        if not compact:
+            add('class:prompt.sep', '  •  ')
+            add('class:prompt.value', data['calls'])
+        add('class:prompt.sep', '  •  ')
+        add(self._prompt_ledger_style(data['ledger']), data['ledger'])
+        if compact:
+            add('class:prompt.sep', '  •  ')
+            add('class:prompt.hint', '/help')
+
+        add('', '\n')
+        add('class:prompt.border', '╰─')
+        add('class:prompt.arrow', '▶ ')
+        return fragments
 
     def _create_prompt_session(self) -> Any:
         from prompt_toolkit import PromptSession
         from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
         from prompt_toolkit.history import FileHistory
+        from prompt_toolkit.styles import Style
 
         from backend.cli.session_manager import get_session_suggestions
 
+        prompt_style = Style.from_dict({
+            '': 'bg:#08111d #e6eef7',
+            'prompt.border': 'bg:#08111d #385168',
+            'prompt.brand': 'bg:#08111d bold #7dd3fc',
+            'prompt.dim': 'bg:#08111d #5c7287',
+            'prompt.model': 'bg:#08111d bold #dbe7f3',
+            'prompt.value': 'bg:#08111d #b4c4d5',
+            'prompt.sep': 'bg:#08111d #2f465b',
+            'prompt.arrow': 'bg:#08111d bold #7dd3fc',
+            'prompt.hint': 'bg:#08111d bold #f1bf63',
+            'prompt.badge.ready': 'bg:#163d34 #c9ffe9 bold',
+            'prompt.badge.running': 'bg:#173650 #c8e8ff bold',
+            'prompt.badge.review': 'bg:#4a3310 #ffe0a1 bold',
+            'prompt.badge.paused': 'bg:#4a3310 #ffe0a1 bold',
+            'prompt.badge.error': 'bg:#4a1f25 #ffd3d9 bold',
+            'prompt.autonomy.balanced': 'bg:#08111d #8bd8ff',
+            'prompt.autonomy.full': 'bg:#08111d #f1bf63 bold',
+            'prompt.autonomy.supervised': 'bg:#08111d #f0a3ff bold',
+            'prompt.health.good': 'bg:#08111d #8fdfb1 bold',
+            'prompt.health.warn': 'bg:#08111d #f1bf63 bold',
+            'prompt.health.bad': 'bg:#08111d #ff9ea8 bold',
+            'completion-menu': 'bg:#0f1824 #b8c7d8',
+            'completion-menu.completion': 'bg:#0f1824 #b8c7d8',
+            'completion-menu.completion.current': 'bg:#21425d #ffffff',
+            'completion-menu.meta': 'bg:#0f1824 #6c849a',
+            'completion-menu.multi-column-meta': 'bg:#0f1824 #6c849a',
+        })
+
         return PromptSession(
-            message=self._prompt_message,
+            message=self._prompt_panel_message,
             history=FileHistory(str(_ensure_history())),
             key_bindings=_build_bindings(),
-            completer=_build_command_completer(get_session_suggestions),
+            completer=_build_command_completer(
+                lambda: get_session_suggestions(self._config)
+            ),
             auto_suggest=AutoSuggestFromHistory(),
             complete_while_typing=True,
-            reserve_space_for_menu=8,
-            bottom_toolbar=self._prompt_toolbar_text,
+            reserve_space_for_menu=4,
             enable_history_search=True,
             multiline=False,
+            style=prompt_style,
+            erase_when_done=True,
+            placeholder=self._prompt_placeholder,
         )
 
     async def ensure_controller_loop(
@@ -439,7 +600,6 @@ class Repl:
         """Boot the engine, subscribe to events, and loop on user input."""
         loop = asyncio.get_running_loop()
         agent_task: asyncio.Task | None = None
-        init_task: asyncio.Task[None] | None = None
 
         # -- imports (always needed) ----------------------------------------
         from backend.core.bootstrap.agent_control_loop import run_agent_until_done
@@ -468,6 +628,9 @@ class Repl:
                 loop=loop,
                 max_budget=config.max_budget_per_task,
             )
+            renderer = self._renderer
+            if renderer is None:
+                raise RuntimeError('CLI renderer did not initialize.')
 
             # -- heavy init runs in background while user sees the prompt -----
             async def _heavy_init() -> None:
@@ -521,9 +684,9 @@ class Repl:
                 self._memory = memory
 
                 # Subscribe renderer now that the stream exists.
-                self._renderer.subscribe(event_stream, event_stream.sid)
+                renderer.subscribe(event_stream, event_stream.sid)
 
-            # -- enter Live + input loop IMMEDIATELY --------------------------
+            # -- enter input loop ---------------------------------------------
             controller = None
             end_states = [
                 AgentState.AWAITING_USER_INPUT,
@@ -534,18 +697,26 @@ class Repl:
                 AgentState.STOPPED,
             ]
 
-            # -- enter input loop IMMEDIATELY ----------------------------------
-            controller = None
-            end_states = [
-                AgentState.AWAITING_USER_INPUT,
-                AgentState.FINISHED,
-                AgentState.REJECTED,
-                AgentState.ERROR,
-                AgentState.PAUSED,
-                AgentState.STOPPED,
-            ]
-
-            init_task = asyncio.create_task(_heavy_init(), name='grinta-init')
+            # -- init engine before showing prompt
+            renderer.add_system_message('Initializing engine...', title='system')
+            try:
+                await _heavy_init()
+                renderer.add_system_message('Ready.', title='system')
+            except Exception as exc:
+                exc_name = type(exc).__name__
+                if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
+                    renderer.add_system_message(
+                        'No API key or model configured.\n'
+                        'Run grinta again and complete onboarding, '
+                        'or edit settings.json directly.\n'
+                        f'{exc}',
+                        title='error',
+                    )
+                else:
+                    renderer.add_system_message(
+                        f'Initialization failed: {exc}', title='error'
+                    )
+                return
 
             while self._running:
                 try:
@@ -586,40 +757,8 @@ class Repl:
                             controller, agent_task = result
                     continue
 
-                # -- ensure heavy init is done before first message --------
-                if not init_task.done():
-                    self._renderer.add_system_message(
-                        'Initializing engine…', title='grinta'
-                    )
-                    try:
-                        await init_task
-                    except Exception as exc:
-                        exc_name = type(exc).__name__
-                        if (
-                            'AuthenticationError' in exc_name
-                            or 'api_key' in str(exc).lower()
-                        ):
-                            self._renderer.add_system_message(
-                                'No API key or model configured.\n'
-                                'Run grinta again and complete onboarding, '
-                                'or edit settings.json directly.\n'
-                                f'{exc}',
-                                title='error',
-                            )
-                        else:
-                            self._renderer.add_system_message(
-                                f'Initialization failed: {exc}', title='error'
-                            )
-                        break
-                elif init_task.cancelled():
-                    break
-                elif init_task.exception():
-                    self._renderer.add_system_message(
-                        f'Initialization failed: {init_task.exception()}',
-                        title='error',
-                    )
-                    break
-
+                # -- heavy init is already done before the loop
+                # we just need to use the components
                 agent = self._agent
                 llm_registry = self._llm_registry
                 conversation_stats = self._conversation_stats
@@ -641,9 +780,11 @@ class Repl:
                     )
                     break
 
-                # -- user message: print statically, then start Live for agent turn
-                initial_action = MessageAction(content=text)
+                # -- user message: start Live for agent turn
+                # Print the user message statically since prompt_toolkit erases it
                 self._renderer.add_user_message(text)
+
+                initial_action = MessageAction(content=text)
                 self._renderer.start_live()
                 self._renderer.begin_turn()
 
@@ -677,15 +818,6 @@ class Repl:
                 finally:
                     self._renderer.stop_live()
         finally:
-            # Cancel background init if it never completed.
-            if init_task is not None:
-                if not init_task.done():
-                    init_task.cancel()
-                    with contextlib.suppress(asyncio.CancelledError, Exception):
-                        await init_task
-                else:
-                    with contextlib.suppress(asyncio.CancelledError, Exception):
-                        init_task.exception()
             controller = self._controller
             if controller is not None:
                 with contextlib.suppress(Exception):
@@ -900,7 +1032,7 @@ class Repl:
 
         # Resolve target to a session ID.
         if target.isdigit():
-            resolved_id = get_session_id_by_index(int(target))
+            resolved_id = get_session_id_by_index(int(target), config)
             if resolved_id is None:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
@@ -1135,9 +1267,9 @@ class Repl:
 
             if self._renderer is not None:
                 with self._renderer.suspend_live():
-                    list_sessions(self._console)
+                    list_sessions(self._console, config=self._config)
             else:
-                list_sessions(self._console)
+                list_sessions(self._console, config=self._config)
             return True
 
         if cmd == '/resume':
