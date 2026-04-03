@@ -23,7 +23,7 @@ class MessageAction(Action):
 
     """
 
-    content: str = ""
+    content: str = ''
     file_urls: list[str] | None = None
     image_urls: list[str] | None = None
     wait_for_response: bool = False
@@ -37,16 +37,15 @@ class MessageAction(Action):
 
     def __str__(self) -> str:
         """Return a readable summary including content and attachments."""
-        ret = f"**MessageAction** (source={self.source})\n"
-        ret += f"CONTENT: {self.content}"
+        ret = f'**MessageAction** (source={self.source})\n'
+        ret += f'CONTENT: {self.content}'
         if self.image_urls:
             for url in self.image_urls:
-                ret += f"\nIMAGE_URL: {url}"
+                ret += f'\nIMAGE_URL: {url}'
         if self.file_urls:
             for url in self.file_urls:
-                ret += f"\nFILE_URL: {url}"
+                ret += f'\nFILE_URL: {url}'
         return ret
-
 
 
 @dataclass
@@ -56,7 +55,7 @@ class SystemMessageAction(Action):
     This should be the first message in the event stream.
     """
 
-    content: str = ""
+    content: str = ''
     tools: list[Any] | None = None
     APP_version: str | None = backend.__version__
     agent_class: str | None = None
@@ -69,14 +68,13 @@ class SystemMessageAction(Action):
 
     def __str__(self) -> str:
         """Return a readable summary including tools and agent metadata."""
-        ret = f"**SystemMessageAction** (source={self.source})\n"
-        ret += f"CONTENT: {self.content}"
+        ret = f'**SystemMessageAction** (source={self.source})\n'
+        ret += f'CONTENT: {self.content}'
         if self.tools:
-            ret += f"\nTOOLS: {len(self.tools)} tools available"
+            ret += f'\nTOOLS: {len(self.tools)} tools available'
         if self.agent_class:
-            ret += f"\nAGENT_CLASS: {self.agent_class}"
+            ret += f'\nAGENT_CLASS: {self.agent_class}'
         return ret
-
 
 
 @dataclass
@@ -87,15 +85,16 @@ class StreamingChunkAction(Action):
     providing instant feedback (ChatGPT/Cursor style).
     """
 
-    chunk: str = ""  # The new token/chunk text
-    accumulated: str = ""  # All text accumulated so far
+    chunk: str = ''  # The new token/chunk text
+    accumulated: str = ''  # All text accumulated so far
     is_final: bool = False  # True when streaming is complete
+    is_tool_call: bool = False  # True when streaming tool call arguments (not content)
+    tool_call_name: str = ''  # Name of the tool being called (e.g. "execute_bash")
     action: ClassVar[str] = ActionType.STREAMING_CHUNK
     runnable: ClassVar[bool] = False  # Not executable, just informational
 
     def __str__(self) -> str:
         """Return a concise description of streaming progress."""
-        status = "FINAL" if self.is_final else "STREAMING"
+        status = 'FINAL' if self.is_final else 'STREAMING'
         char_count = len(self.accumulated)
-        return f"**StreamingChunkAction** ({status}) - {char_count} chars"
-
+        return f'**StreamingChunkAction** ({status}) - {char_count} chars'

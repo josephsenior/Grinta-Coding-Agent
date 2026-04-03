@@ -315,6 +315,10 @@ class OrchestratorExecutor:
                                             'arguments'
                                         ],
                                         is_final=False,
+                                        is_tool_call=True,
+                                        tool_call_name=tool_calls_dict[idx]['function'][
+                                            'name'
+                                        ],
                                     )
                                     ev.source = EventSource.AGENT
                                     event_stream.add_event(ev, EventSource.AGENT)

@@ -324,6 +324,64 @@ def _system_message_style(title: str) -> tuple[str, str]:
     return 'ℹ', 'cyan'
 
 
+# -- Tool call display helpers ------------------------------------------------
+
+_TOOL_DISPLAY = {
+    'execute_bash': ('$', 'cyan', 'command'),
+    'str_replace_editor': ('✏', 'yellow', 'edit'),
+    'create': ('✏', 'yellow', 'create'),
+    'create_file': ('✏', 'yellow', 'create'),
+    'view': ('👁', 'blue', 'view'),
+    'replace_text': ('✏', 'yellow', 'edit'),
+    'insert_text': ('✏', 'yellow', 'insert'),
+    'undo_edit': ('↩', 'yellow', 'undo'),
+}
+
+
+def _friendly_tool_name(tool_name: str) -> str:
+    """Convert an internal tool name to a user-friendly label."""
+    info = _TOOL_DISPLAY.get(tool_name)
+    if info:
+        return info[2]
+    # Fallback: strip common prefixes and snake_case → spaces.
+    name = tool_name.replace('_', ' ').strip()
+    return name or 'tool'
+
+
+def _extract_tool_hint(partial_json: str) -> str:
+    """Try to extract a readable hint from partial tool call JSON.
+
+    Returns a short string like ``command: git status`` or ``path: src/main.py``
+    when enough of the JSON has streamed. Returns '' if nothing useful yet.
+    """
+    import json as _json
+
+    # First try a full parse (arguments may already be complete).
+    try:
+        args = _json.loads(partial_json)
+        if isinstance(args, dict):
+            parts: list[str] = []
+            if 'command' in args:
+                parts.append(f'$ {args["command"]}')
+            if 'path' in args:
+                parts.append(args['path'])
+            return '\n'.join(parts) if parts else ''
+    except (ValueError, TypeError):
+        pass
+
+    # Fallback: regex extraction for partially-streamed keys.
+    hints: list[str] = []
+    import re as _re
+
+    m = _re.search(r'"command"\s*:\s*"([^"]*)', partial_json)
+    if m:
+        hints.append(f'$ {m.group(1)}')
+    m = _re.search(r'"path"\s*:\s*"([^"]*)', partial_json)
+    if m:
+        hints.append(m.group(1))
+    return '\n'.join(hints)
+
+
 class CLIEventRenderer:
     """Bridges EventStream → live rich layout.
 
@@ -631,30 +689,47 @@ class CLIEventRenderer:
             return
 
         if isinstance(action, CmdRunAction):
-            self._ensure_reasoning()
+            self._clear_streaming_preview()
             cmd_display = action.command
             if len(cmd_display) > 120:
                 cmd_display = cmd_display[:117] + '…'
+            self._append_history(
+                Text(f'  ⚡ $ {cmd_display}', style='bold cyan'),
+            )
+            self._ensure_reasoning()
             self._reasoning.update_action(f'Running: {cmd_display}')
             self.refresh()
             return
 
         if isinstance(action, FileEditAction):
+            self._clear_streaming_preview()
+            op = getattr(action, 'command', 'edit')
+            self._append_history(
+                Text(f'  ✏️  {op}: {action.path}', style='bold yellow'),
+            )
             self._ensure_reasoning()
             self._reasoning.update_action(f'Editing: {action.path}')
             self.refresh()
             return
 
         if isinstance(action, FileWriteAction):
+            self._clear_streaming_preview()
+            self._append_history(
+                Text(f'  ✏️  write: {action.path}', style='bold yellow'),
+            )
             self._ensure_reasoning()
             self._reasoning.update_action(f'Writing: {action.path}')
             self.refresh()
             return
 
         if isinstance(action, RecallAction):
-            self._ensure_reasoning()
+            self._clear_streaming_preview()
             query = getattr(action, 'query', '')
             label = f'Recalling: {query}' if query else 'Recalling context…'
+            self._append_history(
+                Text(f'  📚 {label}', style='dim blue'),
+            )
+            self._ensure_reasoning()
             self._reasoning.update_action(label)
             self.refresh()
             return
@@ -663,6 +738,20 @@ class CLIEventRenderer:
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         raw = action.accumulated
+
+        # Tool call argument streaming: show progress in reasoning panel
+        # instead of the content preview (avoids raw JSON in the preview).
+        if action.is_tool_call:
+            tool_name = action.tool_call_name or 'tool'
+            friendly = _friendly_tool_name(tool_name)
+            self._ensure_reasoning()
+            self._reasoning.update_action(f'Preparing {friendly}…')
+            # Try to extract useful info from partial JSON args
+            hint = _extract_tool_hint(raw)
+            if hint:
+                self._reasoning.set_streaming_thought(hint)
+            self.refresh()
+            return
 
         # Route <think> content to the reasoning display so the user sees
         # the model's chain-of-thought in real time.

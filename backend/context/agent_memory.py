@@ -1,4 +1,4 @@
-﻿"""Runtime memory coordinator for handling recall actions and playbook context."""
+"""Runtime memory coordinator for handling recall actions and playbook context."""
 
 from __future__ import annotations
 
@@ -13,34 +13,33 @@ from typing import TYPE_CHECKING, Any
 
 import backend
 from backend.core.constants import RECALL_PIPELINE_TIMEOUT_SECONDS
+from backend.core.enums import RecallType, RuntimeStatus
 from backend.core.logger import app_logger as logger
+from backend.knowledge import KnowledgeBaseManager
 from backend.ledger.action.agent import RecallAction
-from backend.core.enums import RecallType
 from backend.ledger.event import Event, EventSource
-from backend.ledger.observation_cause import attach_observation_cause
 from backend.ledger.observation.agent import (
     PlaybookKnowledge,
     RecallFailureObservation,
     RecallObservation,
 )
+from backend.ledger.observation_cause import attach_observation_cause
 from backend.ledger.stream import EventStream, EventStreamSubscriber
-from backend.knowledge import KnowledgeBaseManager
-from backend.core.enums import RuntimeStatus
 from backend.utils.async_utils import run_or_schedule
 from backend.utils.prompt import ConversationInstructions, RepositoryInfo, RuntimeInfo
 
 if TYPE_CHECKING:
     from backend.core.config.mcp_config import MCPConfig
+    from backend.execution.base import Runtime
+    from backend.persistence.data_models.knowledge_base import KnowledgeBaseSettings
     from backend.playbooks.engine import (
         BasePlaybook,
         KnowledgePlaybook,
         RepoPlaybook,
     )
-    from backend.execution.base import Runtime
-    from backend.persistence.data_models.knowledge_base import KnowledgeBaseSettings
 
-GLOBAL_PLAYBOOKS_DIR = os.path.join(os.path.dirname(backend.__file__), "playbooks")
-USER_PLAYBOOKS_DIR = Path.home() / ".app" / "playbooks"
+GLOBAL_PLAYBOOKS_DIR = os.path.join(os.path.dirname(backend.__file__), 'playbooks')
+USER_PLAYBOOKS_DIR = Path.home() / '.grinta' / 'playbooks'
 
 
 class Memory:
@@ -80,7 +79,7 @@ class Memory:
         self.conversation_instructions: ConversationInstructions | None = None
         self._load_global_playbooks()
         self._load_user_playbooks()
-        self._kb_manager = KnowledgeBaseManager(user_id=user_id or "default")
+        self._kb_manager = KnowledgeBaseManager(user_id=user_id or 'default')
 
     def on_event(self, event: Event) -> None:
         """Handle an event from the event stream."""
@@ -100,25 +99,27 @@ class Memory:
                 )
             except asyncio.TimeoutError:
                 logger.error(
-                    "Recall pipeline timed out after %.0fs (event id=%s, type=%s)",
+                    'Recall pipeline timed out after %.0fs (event id=%s, type=%s)',
                     RECALL_PIPELINE_TIMEOUT_SECONDS,
-                    getattr(event, "id", None),
+                    getattr(event, 'id', None),
                     event.recall_type,
                 )
                 observation = RecallFailureObservation(
                     recall_type=event.recall_type,
-                    error_message="Recall timed out",
+                    error_message='Recall timed out',
                     content=(
-                        f"Recall timed out after {RECALL_PIPELINE_TIMEOUT_SECONDS:.0f}s "
-                        "(knowledge-base / vector search may be overloaded)."
+                        f'Recall timed out after {RECALL_PIPELINE_TIMEOUT_SECONDS:.0f}s '
+                        '(knowledge-base / vector search may be overloaded).'
                     ),
                 )
-            attach_observation_cause(observation, event, context="agent_memory.recall")
+            attach_observation_cause(observation, event, context='agent_memory.recall')
             self.event_stream.add_event(observation, EventSource.ENVIRONMENT)
         except Exception as exc:
             await self._handle_recall_exception(event, exc)
 
-    def _complete_recall_pipeline_sync(self, event: RecallAction) -> RecallObservation | RecallFailureObservation:
+    def _complete_recall_pipeline_sync(
+        self, event: RecallAction
+    ) -> RecallObservation | RecallFailureObservation:
         """Run retry loop in a worker thread (see _on_event). Always returns an observation."""
         observation = self._process_recall_with_retry_sync(event)
         if observation is None:
@@ -141,7 +142,7 @@ class Memory:
             except Exception as exc:  # pragma: no cover - defensive
                 if not self._is_transient_error(exc):
                     logger.warning(
-                        "Permanent recall error encountered on attempt %s: %s",
+                        'Permanent recall error encountered on attempt %s: %s',
                         attempt,
                         exc,
                     )
@@ -158,14 +159,14 @@ class Memory:
             event.recall_type == RecallType.WORKSPACE_CONTEXT
             and event.source == EventSource.USER
         ):
-            logger.debug("Workspace context recall (attempt %s)", attempt)
+            logger.debug('Workspace context recall (attempt %s)', attempt)
             return self._on_workspace_context_recall(event)
         if event.recall_type == RecallType.KNOWLEDGE and event.source in (
             EventSource.USER,
             EventSource.AGENT,
         ):
             logger.debug(
-                "Playbook knowledge recall from %s message (attempt %s)",
+                'Playbook knowledge recall from %s message (attempt %s)',
                 event.source,
                 attempt,
             )
@@ -177,7 +178,7 @@ class Memory:
         jitter = 0.05 * attempt
         sleep_time = backoff + jitter
         logger.warning(
-            "Transient recall attempt %s failed: %s; backoff %.2fs",
+            'Transient recall attempt %s failed: %s; backoff %.2fs',
             attempt,
             exc,
             sleep_time,
@@ -192,36 +193,40 @@ class Memory:
             conversation_instructions = self._get_conversation_instructions()
             return RecallObservation(
                 recall_type=RecallType.WORKSPACE_CONTEXT,
-                repo_name=repo_info["repo_name"],
-                repo_directory=repo_info["repo_directory"],
-                repo_branch=repo_info["repo_branch"],
-                repo_instructions="",
-                runtime_hosts=runtime_info["runtime_hosts"],
-                additional_agent_instructions=runtime_info["additional_agent_instructions"],
+                repo_name=repo_info['repo_name'],
+                repo_directory=repo_info['repo_directory'],
+                repo_branch=repo_info['repo_branch'],
+                repo_instructions='',
+                runtime_hosts=runtime_info['runtime_hosts'],
+                additional_agent_instructions=runtime_info[
+                    'additional_agent_instructions'
+                ],
                 playbook_knowledge=[],
-                content="",
-                date=runtime_info["date"],
-                custom_secrets_descriptions=runtime_info["custom_secrets_descriptions"],
+                content='',
+                date=runtime_info['date'],
+                custom_secrets_descriptions=runtime_info['custom_secrets_descriptions'],
                 conversation_instructions=conversation_instructions,
-                working_dir=runtime_info["working_dir"],
+                working_dir=runtime_info['working_dir'],
             )
         return RecallObservation(
             recall_type=RecallType.KNOWLEDGE,
             playbook_knowledge=[],
             knowledge_base_results=[],
-            content="",
+            content='',
         )
 
     async def _handle_recall_exception(self, event: Event, exc: Exception) -> None:
-        error_str = f"Recall error: {exc.__class__.__name__}: {exc}"[:500]
+        error_str = f'Recall error: {exc.__class__.__name__}: {exc}'[:500]
         logger.error(error_str)
         self.set_runtime_status(RuntimeStatus.ERROR_MEMORY, error_str)
         failure_obs = RecallFailureObservation(
-            recall_type=getattr(event, "recall_type", None),
+            recall_type=getattr(event, 'recall_type', None),
             error_message=error_str,
             content=error_str,
         )
-        attach_observation_cause(failure_obs, event, context="agent_memory.recall_failure")
+        attach_observation_cause(
+            failure_obs, event, context='agent_memory.recall_failure'
+        )
         try:
             self.event_stream.add_event(failure_obs, EventSource.ENVIRONMENT)
         except Exception:
@@ -240,20 +245,20 @@ class Memory:
         return any(
             key in msg
             for key in (
-                "timeout",
-                "rate limit",
-                "temporarily unavailable",
-                "try again",
-                "connection reset",
+                'timeout',
+                'rate limit',
+                'temporarily unavailable',
+                'try again',
+                'connection reset',
             )
         )
 
     def _collect_repo_instructions(self) -> str:
         """Collect repository instructions from all repo playbooks."""
-        repo_instructions = ""
+        repo_instructions = ''
         for playbook in self.repo_playbooks.values():
             if repo_instructions:
-                repo_instructions += "\n\n"
+                repo_instructions += '\n\n'
             repo_instructions += playbook.content
         return repo_instructions
 
@@ -276,31 +281,31 @@ class Memory:
     def _get_repo_info_fields(self) -> dict[str, str]:
         """Get repository information fields."""
         return {
-            "repo_name": (
+            'repo_name': (
                 self.repository_info.repo_name
                 if self.repository_info and self.repository_info.repo_name is not None
-                else ""
+                else ''
             ),
-            "repo_directory": (
+            'repo_directory': (
                 self.repository_info.repo_directory
                 if self.repository_info
                 and self.repository_info.repo_directory is not None
-                else ""
+                else ''
             ),
-            "repo_branch": (
+            'repo_branch': (
                 self.repository_info.branch_name
                 if self.repository_info and self.repository_info.branch_name is not None
-                else ""
+                else ''
             ),
         }
 
     def _get_runtime_info_fields(self) -> dict[str, Any]:
         """Get runtime information fields."""
         runtime_hosts: dict[str, int] = {}
-        additional_instructions = ""
+        additional_instructions = ''
         custom_secrets: dict[str, str] = {}
-        working_dir = ""
-        date = ""
+        working_dir = ''
+        date = ''
 
         if self.runtime_info is not None:
             runtime_hosts = self.runtime_info.available_hosts
@@ -310,16 +315,17 @@ class Memory:
             date = self.runtime_info.date
 
         # Present /workspace as the working directory so the LLM uses
-        # virtual paths. The runtime normalizes /workspace → real temp path.
-        if working_dir and "app_workspace" in working_dir:
-            working_dir = "/workspace"
+        # virtual paths consistently. The runtime path-mapping layer
+        # translates /workspace → the real project root automatically.
+        if working_dir:
+            working_dir = '/workspace'
 
         return {
-            "runtime_hosts": runtime_hosts,
-            "additional_agent_instructions": additional_instructions,
-            "date": date,
-            "custom_secrets_descriptions": custom_secrets,
-            "working_dir": working_dir,
+            'runtime_hosts': runtime_hosts,
+            'additional_agent_instructions': additional_instructions,
+            'date': date,
+            'custom_secrets_descriptions': custom_secrets,
+            'working_dir': working_dir,
         }
 
     def _get_conversation_instructions(self) -> str:
@@ -327,7 +333,7 @@ class Memory:
         return (
             self.conversation_instructions.content
             if self.conversation_instructions is not None
-            else ""
+            else ''
         )
 
     def _on_workspace_context_recall(
@@ -355,34 +361,36 @@ class Memory:
         ):
             return RecallObservation(
                 recall_type=RecallType.WORKSPACE_CONTEXT,
-                repo_name=repo_info["repo_name"],
-                repo_directory=repo_info["repo_directory"],
-                repo_branch=repo_info["repo_branch"],
-                repo_instructions="",
-                runtime_hosts=runtime_info["runtime_hosts"],
-                additional_agent_instructions=runtime_info["additional_agent_instructions"],
+                repo_name=repo_info['repo_name'],
+                repo_directory=repo_info['repo_directory'],
+                repo_branch=repo_info['repo_branch'],
+                repo_instructions='',
+                runtime_hosts=runtime_info['runtime_hosts'],
+                additional_agent_instructions=runtime_info[
+                    'additional_agent_instructions'
+                ],
                 playbook_knowledge=[],
-                content="",
-                date=runtime_info["date"],
-                custom_secrets_descriptions=runtime_info["custom_secrets_descriptions"],
+                content='',
+                date=runtime_info['date'],
+                custom_secrets_descriptions=runtime_info['custom_secrets_descriptions'],
                 conversation_instructions=conversation_instructions,
-                working_dir=runtime_info["working_dir"],
+                working_dir=runtime_info['working_dir'],
             )
 
         return RecallObservation(
             recall_type=RecallType.WORKSPACE_CONTEXT,
-            repo_name=repo_info["repo_name"],
-            repo_directory=repo_info["repo_directory"],
-            repo_branch=repo_info["repo_branch"],
-            repo_instructions=repo_instructions or "",
-            runtime_hosts=runtime_info["runtime_hosts"],
-            additional_agent_instructions=runtime_info["additional_agent_instructions"],
+            repo_name=repo_info['repo_name'],
+            repo_directory=repo_info['repo_directory'],
+            repo_branch=repo_info['repo_branch'],
+            repo_instructions=repo_instructions or '',
+            runtime_hosts=runtime_info['runtime_hosts'],
+            additional_agent_instructions=runtime_info['additional_agent_instructions'],
             playbook_knowledge=playbook_knowledge,
-            content="Added workspace context",
-            date=runtime_info["date"],
-            custom_secrets_descriptions=runtime_info["custom_secrets_descriptions"],
+            content='Added workspace context',
+            date=runtime_info['date'],
+            custom_secrets_descriptions=runtime_info['custom_secrets_descriptions'],
             conversation_instructions=conversation_instructions,
-            working_dir=runtime_info["working_dir"],
+            working_dir=runtime_info['working_dir'],
         )
 
     def _on_playbook_recall(self, event: RecallAction) -> RecallObservation | None:
@@ -399,7 +407,7 @@ class Memory:
             kb_collections = None
 
             # Use settings if available
-            if hasattr(self, "_kb_settings") and self._kb_settings:
+            if hasattr(self, '_kb_settings') and self._kb_settings:
                 kb_enabled = self._kb_settings.auto_search
                 kb_threshold = self._kb_settings.relevance_threshold
                 kb_top_k = self._kb_settings.search_top_k
@@ -414,26 +422,26 @@ class Memory:
                     collection_ids=kb_collections,
                 )
         except Exception as e:
-            logger.error("Error searching knowledge base during recall: %s", e)
+            logger.error('Error searching knowledge base during recall: %s', e)
 
         if playbook_knowledge or kb_results:
             return RecallObservation(
                 recall_type=RecallType.KNOWLEDGE,
                 playbook_knowledge=playbook_knowledge,
                 knowledge_base_results=kb_results,
-                content="Retrieved knowledge from playbooks and knowledge base",
+                content='Retrieved knowledge from playbooks and knowledge base',
             )
         return RecallObservation(
             recall_type=RecallType.KNOWLEDGE,
             playbook_knowledge=[],
             knowledge_base_results=[],
-            content="",
+            content='',
         )
 
     def set_knowledge_base_settings(self, settings: KnowledgeBaseSettings) -> None:
         """Update knowledge base settings for this memory instance."""
         self._kb_settings = settings
-        logger.info("Knowledge base settings updated for session %s", self.sid)
+        logger.info('Knowledge base settings updated for session %s', self.sid)
 
     def _find_playbook_knowledge(self, query: str) -> list[PlaybookKnowledge]:
         """Find playbook knowledge based on a query.
@@ -468,7 +476,7 @@ class Memory:
         from backend.playbooks.engine import KnowledgePlaybook, RepoPlaybook
 
         logger.info(
-            "Loading user workspace playbooks: %s", [m.name for m in user_playbooks]
+            'Loading user workspace playbooks: %s', [m.name for m in user_playbooks]
         )
         for user_playbook in user_playbooks:
             if isinstance(user_playbook, KnowledgePlaybook):
@@ -502,7 +510,7 @@ class Memory:
                 self.repo_playbooks[name] = agent_repo
         except Exception as e:
             logger.warning(
-                "Failed to load user playbooks from %s: %s",
+                'Failed to load user playbooks from %s: %s',
                 USER_PLAYBOOKS_DIR,
                 str(e),
             )
@@ -519,7 +527,7 @@ class Memory:
             if agent.metadata.mcp_tools:
                 mcp_configs.append(agent.metadata.mcp_tools)
                 logger.debug(
-                    "Found MCP tools in repo playbook %s: %s",
+                    'Found MCP tools in repo playbook %s: %s',
                     agent.name,
                     agent.metadata.mcp_tools,
                 )
@@ -546,7 +554,7 @@ class Memory:
         utc_now = datetime.now(UTC)
         date = str(utc_now.date())
 
-        web_hosts_attr = getattr(runtime, "web_hosts", None)
+        web_hosts_attr = getattr(runtime, 'web_hosts', None)
         web_hosts: dict[str, int] = {}
         if isinstance(web_hosts_attr, dict):
             web_hosts = {
@@ -556,7 +564,7 @@ class Memory:
             }
 
         additional_instructions_attr = getattr(
-            runtime, "additional_agent_instructions", None
+            runtime, 'additional_agent_instructions', None
         )
         additional_instructions_result: Any
         if callable(additional_instructions_attr):
@@ -567,7 +575,7 @@ class Memory:
         if isinstance(additional_instructions_result, str):
             additional_instructions = additional_instructions_result
         elif additional_instructions_result is None:
-            additional_instructions = ""
+            additional_instructions = ''
         else:
             additional_instructions = str(additional_instructions_result)
 
@@ -594,7 +602,7 @@ class Memory:
         This is information the agent may require.
         """
         self.conversation_instructions = ConversationInstructions(
-            content=conversation_instructions or ""
+            content=conversation_instructions or ''
         )
 
     def set_runtime_status(self, status: RuntimeStatus, message: str) -> None:
@@ -610,27 +618,27 @@ class Memory:
                     self.loop = asyncio.get_running_loop()
                 try:
                     asyncio.run_coroutine_threadsafe(
-                        self._set_runtime_status("error", status, message), self.loop
+                        self._set_runtime_status('error', status, message), self.loop
                     )
                 except RuntimeError:
                     try:
                         logger.info(
-                            "MEMORY.set_runtime_status: calling status_callback synchronously"
+                            'MEMORY.set_runtime_status: calling status_callback synchronously'
                         )
-                        self.status_callback("error", status, message)
+                        self.status_callback('error', status, message)
                         logger.info(
-                            "MEMORY.set_runtime_status: status_callback returned"
+                            'MEMORY.set_runtime_status: status_callback returned'
                         )
                     except Exception:
                         from backend.utils.async_utils import create_tracked_task
 
                         create_tracked_task(
-                            self._set_runtime_status("error", status, message),
-                            name="memory-status-fallback",
+                            self._set_runtime_status('error', status, message),
+                            name='memory-status-fallback',
                         )
             except (RuntimeError, KeyError) as e:
                 logger.error(
-                    "Error sending status message: %s",
+                    'Error sending status message: %s',
                     e.__class__.__name__,
                     stack_info=False,
                 )
@@ -641,9 +649,9 @@ class Memory:
         """Sends a status message to the client."""
         if self.status_callback:
             logger.info(
-                "MEMORY._set_runtime_status: invoking status_callback (msg_type=%s, runtime_status=%s)",
+                'MEMORY._set_runtime_status: invoking status_callback (msg_type=%s, runtime_status=%s)',
                 msg_type,
                 runtime_status,
             )
             self.status_callback(msg_type, runtime_status, message)
-            logger.info("MEMORY._set_runtime_status: status_callback finished")
+            logger.info('MEMORY._set_runtime_status: status_callback finished')
