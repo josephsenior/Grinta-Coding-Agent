@@ -258,6 +258,18 @@ def _sanitize_openai_compatible_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]
     return sanitized
 
 
+def _supports_native_openai_request_metadata(base_url: str | None) -> bool:
+    """Return True only for the real OpenAI API.
+
+    OpenAI-compatible proxies often reject the `metadata` request field even
+    when the configured model is canonicalized to an ``openai/...`` name.
+    """
+    if not base_url:
+        return True
+    normalized = str(base_url).strip().rstrip('/').lower()
+    return normalized.startswith('https://api.openai.com')
+
+
 class DirectLLMClient(ABC):
     """Abstract base class for direct LLM clients."""
 
@@ -1316,11 +1328,15 @@ def get_direct_client(
 
     # All OpenAI-compatible providers use OpenAI client
     # (OpenAI, xAI, DeepSeek, Mistral, Ollama, LM Studio, vLLM, Lightning, etc.)
-    # Only the real OpenAI API supports the `metadata` request field; all other
-    # compatible providers (Groq, Mistral, etc.) reject it with a 400 error.
+    # Only the real OpenAI API supports the `metadata` request field; proxy or
+    # custom OpenAI-compatible endpoints (Lightning, OpenRouter, localhost,
+    # etc.) may reject it even when the model is canonicalized to `openai/...`.
     return OpenAIClient(
         model_name=stripped_model,
         api_key=api_key,
         base_url=resolved_base_url,
-        supports_request_metadata=(provider == 'openai'),
+        supports_request_metadata=(
+            provider == 'openai'
+            and _supports_native_openai_request_metadata(resolved_base_url)
+        ),
     )
