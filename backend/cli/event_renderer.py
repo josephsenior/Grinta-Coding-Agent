@@ -78,6 +78,28 @@ _IDLE_STATES = {
 _SUBSCRIBER = EventStreamSubscriber.CLI
 
 
+def _error_hint(error_text: str) -> str:
+    """Return actionable guidance for common error patterns."""
+    lower = error_text.lower()
+    if 'timeout' in lower or 'timed out' in lower:
+        return 'API timed out. Check your network or try a faster model.'
+    if '401' in lower or 'unauthorized' in lower or 'invalid api key' in lower:
+        return 'API key rejected. Update it with /settings → k.'
+    if '429' in lower or 'rate limit' in lower or 'too many requests' in lower:
+        return 'Rate limited. Wait a moment or switch to a different model.'
+    if '404' in lower or 'model not found' in lower or 'does not exist' in lower:
+        return 'Model not found. Check the name with /settings → m.'
+    if 'connection' in lower or 'connect error' in lower or 'unreachable' in lower:
+        return 'Cannot reach API. Check your internet connection.'
+    if 'context' in lower and ('length' in lower or 'window' in lower or 'limit' in lower):
+        return 'Context limit hit. Try a model with a larger context window.'
+    if 'budget' in lower:
+        return 'Budget exceeded. Increase it with /settings → b.'
+    if 'permission' in lower or 'forbidden' in lower or '403' in lower:
+        return 'Permission denied. Your API key may lack access to this model.'
+    return ''
+
+
 class CLIEventRenderer:
     """Bridges EventStream → live rich layout."""
 
@@ -194,34 +216,16 @@ class CLIEventRenderer:
         self.refresh()
 
     def add_user_message(self, text: str) -> None:
-        self._append_history(
-            Panel(
-                Markdown(text),
-                title='[bold cyan]You[/bold cyan]',
-                border_style='cyan',
-                padding=(0, 1),
-            )
-        )
+        msg = Text()
+        msg.append('❯ ', style='bold cyan')
+        msg.append(text)
+        self._append_history(msg)
 
     def add_system_message(self, text: str, *, title: str = 'Info') -> None:
-        self._append_history(
-            Panel(
-                Text(text, style='dim'),
-                title=title,
-                border_style='bright_black',
-                padding=(0, 1),
-            )
-        )
+        self._append_history(Text(f'  {text}', style='dim'))
 
     def add_markdown_block(self, title: str, text: str) -> None:
-        self._append_history(
-            Panel(
-                Markdown(text),
-                title=title,
-                border_style='bright_black',
-                padding=(0, 1),
-            )
-        )
+        self._append_history(Markdown(text))
 
     # -- subscription ------------------------------------------------------
 
@@ -284,20 +288,11 @@ class CLIEventRenderer:
         if self._reasoning.active:
             body_items.append(self._reasoning.renderable())
         if not body_items:
-            body_items.append(Text('Ready for input.', style='dim'))
+            body_items.append(Text(''))
 
         layout = Layout()
         layout.split_column(
-            Layout(
-                Panel(
-                    Group(*body_items),
-                    title=self._body_title,
-                    border_style='bright_black',
-                    padding=(0, 1),
-                ),
-                ratio=1,
-                name='body',
-            ),
+            Layout(Group(*body_items), ratio=1, name='body'),
             Layout(self._hud, size=1, name='footer'),
         )
         yield layout
@@ -313,14 +308,8 @@ class CLIEventRenderer:
             self._reasoning.stop()
             self._clear_streaming_preview()
             if action.content.strip():
-                self._append_history(
-                    Panel(
-                        Markdown(action.content),
-                        title='[bold magenta]Grinta[/bold magenta]',
-                        border_style='magenta',
-                        padding=(0, 1),
-                    )
-                )
+                self._append_history(Text(''))  # breathing room
+                self._append_history(Markdown(action.content))
             else:
                 self.refresh()
             return
@@ -408,7 +397,20 @@ class CLIEventRenderer:
             self._reasoning.stop()
             exit_code = getattr(obs, 'exit_code', None)
             output = getattr(obs, 'content', '')
-            header_style = 'green' if exit_code == 0 else 'red'
+            success = exit_code == 0
+
+            # Compact display for successful commands with short output
+            if success and len(output) < 500:
+                if output.strip():
+                    self._append_history(
+                        Syntax(output.rstrip(), 'text', word_wrap=True, theme='monokai')
+                    )
+                else:
+                    self._append_history(Text('  ✓ done', style='green dim'))
+                return
+
+            # Expanded display for failures or long output
+            header_style = 'green' if success else 'red'
             header = f'exit {exit_code}' if exit_code is not None else 'output'
             truncated = len(output) > 4000
             display_output = output[:4000]
@@ -422,7 +424,7 @@ class CLIEventRenderer:
             if truncated:
                 body_parts.append(
                     Text(
-                        f'\n⚠ Output truncated ({len(output):,} chars total, showing first 4,000)',
+                        f'\n⚠ Truncated ({len(output):,} chars, showing 4K)',
                         style='yellow dim',
                     )
                 )
@@ -454,6 +456,7 @@ class CLIEventRenderer:
             error_content = getattr(obs, 'content', str(obs))
             error_lines = error_content.strip().split('\n')
             summary = error_lines[0] if error_lines else 'Unknown error'
+
             body = Text()
             body.append(summary + '\n', style='red bold')
             if len(error_lines) > 1:
@@ -461,13 +464,14 @@ class CLIEventRenderer:
                 if len(detail) > 2000:
                     detail = detail[:2000] + '\n… (truncated)'
                 body.append(detail, style='red dim')
+
+            # Actionable hint based on common error patterns
+            hint = _error_hint(error_content)
+            if hint:
+                body.append(f'\n\n💡 {hint}', style='yellow')
+
             self._append_history(
-                Panel(
-                    body,
-                    title='[red bold]Error[/red bold]',
-                    border_style='red',
-                    padding=(0, 1),
-                ),
+                Panel(body, title='[red bold]Error[/red bold]', border_style='red', padding=(0, 1)),
             )
             self._hud.update_ledger('Error')
             return
@@ -545,9 +549,7 @@ class CLIEventRenderer:
             self._clear_streaming_preview()
             stats = self._turn_stats_text()
             self._append_history(
-                Text(
-                    f'  ✓ Task complete. Enter a new task or /exit.{stats}', style='green dim'
-                ),
+                Text(f'  ✓ Done.{stats}', style='green'),
             )
             return
 
@@ -557,8 +559,7 @@ class CLIEventRenderer:
             stats = self._turn_stats_text()
             self._append_history(
                 Text(
-                    f'  ✗ Agent stopped with an error. '
-                    f'Enter a follow-up message to retry, or /exit.{stats}',
+                    f'  ✗ Error — send a follow-up to retry.{stats}',
                     style='red dim',
                 ),
             )
@@ -598,16 +599,8 @@ class CLIEventRenderer:
         self._streaming_final = False
         self.refresh()
 
-    def _render_streaming_preview(self) -> Panel:
-        title = '[bold cyan]Streaming[/bold cyan]'
-        if self._streaming_final:
-            title = '[bold cyan]Streaming (finalizing)[/bold cyan]'
-        return Panel(
-            Markdown(self._streaming_accumulated or ''),
-            title=title,
-            border_style='cyan',
-            padding=(0, 1),
-        )
+    def _render_streaming_preview(self) -> Any:
+        return Markdown(self._streaming_accumulated or '')
 
     def _update_metrics(self, event: Any) -> None:
         llm_metrics = getattr(event, 'llm_metrics', None)

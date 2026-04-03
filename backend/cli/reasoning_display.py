@@ -106,9 +106,4 @@ class ReasoningDisplay:
         )
         for line in self._thought_lines:
             grid.add_row(Text(''), Text(line, style='dim italic'))
-        return Panel(
-            grid,
-            border_style='bright_black',
-            padding=(0, 1),
-            title='Reasoning',
-        )
+        return Panel(grid, border_style='bright_black', padding=(0, 1))
