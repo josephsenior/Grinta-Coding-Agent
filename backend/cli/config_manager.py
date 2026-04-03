@@ -202,6 +202,42 @@ def ensure_default_model(config: AppConfig) -> str | None:
     return inferred_model
 
 
+def auto_detect_api_keys(config: AppConfig) -> str | None:
+    """Auto-detect API keys from environment variables.
+
+    Checks standard env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+    and configures the LLM config if a key is found.
+
+    Returns the detected provider name, or None if nothing found.
+    """
+    try:
+        from pydantic import SecretStr
+
+        from backend.core.providers import PROVIDER_CONFIGURATIONS
+    except Exception:
+        logger.debug('Could not import provider configurations', exc_info=True)
+        return None
+
+    llm_cfg = config.get_llm_config()
+
+    for provider, cfg in PROVIDER_CONFIGURATIONS.items():
+        env_var = cfg.get('env_var')
+        if not env_var:
+            continue
+        env_key = (os.environ.get(env_var) or '').strip()
+        if not env_key:
+            continue
+
+        # Found a key — set it in the config
+        llm_cfg.api_key = SecretStr(env_key)
+        if not (getattr(llm_cfg, 'model', None) or '').strip():
+            llm_cfg.model = _default_model_for_provider(provider)
+        logger.info('Auto-detected API key from %s for provider %s', env_var, provider)
+        return provider
+
+    return None
+
+
 def run_onboarding() -> AppConfig:
     """Interactive first-run setup. Clean, minimal, validates before saving."""
     if not os.isatty(0):

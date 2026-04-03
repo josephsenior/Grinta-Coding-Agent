@@ -92,7 +92,7 @@ def show_grinta_splash(console: Console | None = None) -> None:
         ' ██████  ██   ██ ██ ██   ███    ██    ██   ██ ',
     ]
     _SUBTITLE = 'think · code · ship'
-    _HINT     = 'Type a task or /help to get started'
+    _HINT     = 'Type a task or press Tab after / for commands'
 
     def _frame(visible: int, *, subtitle: bool = False, flash: bool = False) -> Group:
         style = 'bold white' if flash else 'bold red'
@@ -184,6 +184,7 @@ async def _async_main(
     project: str | None = None,
 ) -> None:
     from backend.cli.config_manager import (
+        auto_detect_api_keys,
         ensure_default_model,
         needs_onboarding,
         run_onboarding,
@@ -219,18 +220,26 @@ async def _async_main(
 
         # -- onboarding if needed ----------------------------------------------
         if needs_onboarding(config):
-            config = run_onboarding()
-            config.get_agent_config(config.default_agent).cli_mode = True
-            ensure_default_model(config)
-            if model:
-                llm_cfg = config.get_llm_config()
-                llm_cfg.model = model
-            config.project_root = resolved_project
-            # local_data_root intentionally NOT set to project root.
-            # Re-check after onboarding.
-            if needs_onboarding(config):
-                console.print('[red]No API key configured. Exiting.[/red]')
-                return
+            # Try auto-detecting API keys from environment first
+            detected_provider = auto_detect_api_keys(config)
+            if detected_provider and not needs_onboarding(config):
+                console.print(
+                    f'  [green]✓[/green] Auto-detected API key from environment '
+                    f'([cyan]{detected_provider}[/cyan])',
+                )
+                ensure_default_model(config)
+            else:
+                config = run_onboarding()
+                config.get_agent_config(config.default_agent).cli_mode = True
+                ensure_default_model(config)
+                if model:
+                    llm_cfg = config.get_llm_config()
+                    llm_cfg.model = model
+                config.project_root = resolved_project
+                # Re-check after onboarding.
+                if needs_onboarding(config):
+                    console.print('[red]No API key configured. Exiting.[/red]')
+                    return
         else:
             ensure_default_model(config)
 
