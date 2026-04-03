@@ -179,9 +179,11 @@ def test_show_grinta_splash_renders_logo_text() -> None:
     show_grinta_splash(console)
     output = _console_output(console)
 
-    assert 'GRINTA' in output
-    assert '>_' in output
-    assert 'AI coding agent' in output
+    # Banner uses block-char art — just verify the subtitle lines are present.
+    assert 'think' in output
+    assert 'code' in output
+    assert 'ship' in output
+    assert 'Type a task or /help to get started' in output
 
 
 def test_prompt_session_requires_tty_streams() -> None:
@@ -573,16 +575,61 @@ async def test_repl_run_saves_controller_state_on_exit() -> None:
     controller = MagicMock()
     repl.set_controller(controller)
 
+    async def fake_read() -> str:
+        return ''
+
     with (
         patch(
             'backend.core.bootstrap.main._initialize_session_components',
             side_effect=RuntimeError('bootstrap failed'),
         ),
+        patch('backend.cli.repl.get_current_model', return_value='test-model'),
+        patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
         patch('backend.cli.repl.load_app_config'),
     ):
         await repl.run()
 
     controller.save_state.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
+    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    events: list[str] = []
+    original_add_system_message = CLIEventRenderer.add_system_message
+
+    async def fake_read() -> str:
+        await asyncio.sleep(0)
+        return ''
+
+    def record_message(self, message: str, title: str = 'system'):
+        events.append(message)
+        return original_add_system_message(self, message, title=title)
+
+    def fail_bootstrap(*_args, **_kwargs):
+        events.append('bootstrap')
+        raise RuntimeError('bootstrap failed')
+
+    with (
+        patch.object(
+            CLIEventRenderer,
+            'add_system_message',
+            autospec=True,
+            side_effect=record_message,
+        ),
+        patch('backend.cli.repl.get_current_model', return_value='test-model'),
+        patch('backend.cli.repl._supports_prompt_session', return_value=False),
+        patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
+        patch(
+            'backend.core.bootstrap.main._initialize_session_components',
+            side_effect=fail_bootstrap,
+        ),
+    ):
+        await repl.run()
+
+    assert events
+    assert events[0] == 'grinta ready. Type a task or /help for commands.'
+    assert 'bootstrap' in events[1:]
 
 
 # ── New tests: Reasoning elapsed time ────────────────────────────────────

@@ -219,6 +219,7 @@ class Repl:
         """Boot the engine, subscribe to events, and loop on user input."""
         loop = asyncio.get_running_loop()
         agent_task: asyncio.Task | None = None
+        init_task: asyncio.Task[None] | None = None
 
         # -- imports (always needed) ----------------------------------------
         from backend.core.bootstrap.agent_control_loop import run_agent_until_done
@@ -231,34 +232,7 @@ class Repl:
         from backend.core.bootstrap.setup import create_controller
 
         try:
-            # -- fast init: agent + LLM registry from config ------------------
-            try:
-                bootstrap_state = _initialize_session_components(self._config, None)
-                session_id = bootstrap_state[0]
-                llm_registry = bootstrap_state[1]
-                conversation_stats = bootstrap_state[2]
-                config = bootstrap_state[3]
-                agent = bootstrap_state[4]
-            except Exception as exc:
-                exc_name = type(exc).__name__
-                if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
-                    self._console.print(
-                        '[bold red]No API key or model configured.[/bold red]\n'
-                        'Run [cyan]grinta[/cyan] again and complete onboarding, '
-                        'or edit [cyan]settings.json[/cyan] directly.\n'
-                        f'[dim]{exc}[/dim]'
-                    )
-                else:
-                    self._console.print(
-                        f'[bold red]Bootstrap failed:[/bold red] {exc}\n'
-                        '[dim]Check settings.json and try again.[/dim]'
-                    )
-                return
-
-            self._agent = agent
-            self._llm_registry = llm_registry
-            self._conversation_stats = conversation_stats
-            self._config = config
+            config = self._config
             self._hud.update_model(get_current_model(config))
 
             # -- prompt session (fast, no I/O) --------------------------------
@@ -284,10 +258,31 @@ class Repl:
 
             # -- heavy init runs in background while user sees the prompt -----
             async def _heavy_init() -> None:
-                """Runtime + memory + MCP — runs concurrently with the prompt."""
+                """Session bootstrap + runtime + memory + MCP in the background."""
+                bootstrap_state = await asyncio.to_thread(
+                    _initialize_session_components,
+                    config,
+                    None,
+                )
+                session_id = bootstrap_state[0]
+                llm_registry = bootstrap_state[1]
+                conversation_stats = bootstrap_state[2]
+                config_ = bootstrap_state[3]
+                agent = bootstrap_state[4]
+
+                self._agent = agent
+                self._llm_registry = llm_registry
+                self._conversation_stats = conversation_stats
+                self._config = config_
+
                 runtime_state = await asyncio.to_thread(
                     _setup_runtime_for_controller,
-                    config, llm_registry, session_id, True, agent, None,
+                    config_,
+                    llm_registry,
+                    session_id,
+                    True,
+                    agent,
+                    None,
                 )
                 runtime = runtime_state[0]
                 repo_directory = runtime_state[1]
@@ -302,14 +297,18 @@ class Repl:
                 self._acquire_result = acquire_result
 
                 memory = await _setup_memory_and_mcp(
-                    config, runtime, session_id, repo_directory, None, None, agent,
+                    config_,
+                    runtime,
+                    session_id,
+                    repo_directory,
+                    None,
+                    None,
+                    agent,
                 )
                 self._memory = memory
 
                 # Subscribe renderer now that the stream exists.
                 self._renderer.subscribe(event_stream, event_stream.sid)
-
-            init_task = asyncio.create_task(_heavy_init())
 
             # -- enter Live + input loop IMMEDIATELY --------------------------
             controller = None
@@ -333,6 +332,7 @@ class Repl:
                     'grinta ready. Type a task or /help for commands.',
                     title='grinta',
                 )
+                init_task = asyncio.create_task(_heavy_init(), name='grinta-init')
 
                 while self._running:
                     try:
@@ -388,10 +388,25 @@ class Repl:
                         try:
                             await init_task
                         except Exception as exc:
-                            self._renderer.add_system_message(
-                                f'Initialization failed: {exc}', title='error'
-                            )
+                            exc_name = type(exc).__name__
+                            if (
+                                'AuthenticationError' in exc_name
+                                or 'api_key' in str(exc).lower()
+                            ):
+                                self._renderer.add_system_message(
+                                    'No API key or model configured.\n'
+                                    'Run grinta again and complete onboarding, '
+                                    'or edit settings.json directly.\n'
+                                    f'{exc}',
+                                    title='error',
+                                )
+                            else:
+                                self._renderer.add_system_message(
+                                    f'Initialization failed: {exc}', title='error'
+                                )
                             break
+                    elif init_task.cancelled():
+                        break
                     elif init_task.exception():
                         self._renderer.add_system_message(
                             f'Initialization failed: {init_task.exception()}',
@@ -399,9 +414,26 @@ class Repl:
                         )
                         break
 
+                    agent = self._agent
+                    llm_registry = self._llm_registry
+                    conversation_stats = self._conversation_stats
                     runtime = self._runtime
                     memory = self._memory
                     event_stream = self._event_stream
+
+                    if (
+                        agent is None
+                        or llm_registry is None
+                        or conversation_stats is None
+                        or runtime is None
+                        or memory is None
+                        or event_stream is None
+                    ):
+                        self._renderer.add_system_message(
+                            'Initialization failed: engine components were not created.',
+                            title='error',
+                        )
+                        break
 
                     initial_action = MessageAction(content=text)
                     self._renderer.add_user_message(text)
@@ -437,10 +469,14 @@ class Repl:
                         continue
         finally:
             # Cancel background init if it never completed.
-            if not init_task.done():
-                init_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await init_task
+            if init_task is not None:
+                if not init_task.done():
+                    init_task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        await init_task
+                else:
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        init_task.exception()
             controller = self._controller
             if controller is not None:
                 with contextlib.suppress(Exception):
