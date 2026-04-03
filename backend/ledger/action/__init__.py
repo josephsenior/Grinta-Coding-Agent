@@ -21,6 +21,7 @@ from backend.ledger.action.agent import (
     UncertaintyAction,
 )
 from backend.ledger.action.browse import BrowseInteractiveAction
+from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.empty import NullAction
 from backend.ledger.action.files import (
@@ -29,46 +30,49 @@ from backend.ledger.action.files import (
     FileWriteAction,
 )
 from backend.ledger.action.mcp import MCPAction
-from backend.ledger.action.terminal import (
-    TerminalInputAction,
-    TerminalReadAction,
-    TerminalRunAction,
-)
 from backend.ledger.action.message import (
     MessageAction,
     StreamingChunkAction,
     SystemMessageAction,
 )
+from backend.ledger.action.signal import SignalProgressAction
+from backend.ledger.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 
 __all__ = [
-    "Action",
-    "ActionConfirmationStatus",
-    "ActionSecurityRisk",
-    "PlaybookFinishAction",
-    "AgentRejectAction",
-    "AgentThinkAction",
-    "BlackboardAction",
-    "ChangeAgentStateAction",
-    "ClarificationRequestAction",
-    "CmdRunAction",
-    "CondensationAction",
-    "CondensationRequestAction",
-    "BrowseInteractiveAction",
-    "DelegateTaskAction",
-    "EscalateToHumanAction",
-    "FileEditAction",
-    "FileReadAction",
-    "FileWriteAction",
-    "MCPAction",
-    "MessageAction",
-    "NullAction",
-    "ProposalAction",
-    "RecallAction",
-    "StreamingChunkAction",  # ⚡ CRITICAL FIX: Enable real-time LLM streaming!
-    "SystemMessageAction",
-    "TaskTrackingAction",
-    "TerminalInputAction",
-    "TerminalReadAction",
-    "TerminalRunAction",
-    "UncertaintyAction",
+    'Action',
+    'ActionConfirmationStatus',
+    'ActionSecurityRisk',
+    'PlaybookFinishAction',
+    'AgentRejectAction',
+    'AgentThinkAction',
+    'BlackboardAction',
+    'ChangeAgentStateAction',
+    'ClarificationRequestAction',
+    'CmdRunAction',
+    'CondensationAction',
+    'CondensationRequestAction',
+    'BrowseInteractiveAction',
+    'DelegateTaskAction',
+    'EscalateToHumanAction',
+    'FileEditAction',
+    'FileReadAction',
+    'FileWriteAction',
+    'LspQueryAction',
+    'MCPAction',
+    'MessageAction',
+    'NullAction',
+    'ProposalAction',
+    'RecallAction',
+    'SignalProgressAction',
+    'StreamingChunkAction',
+    'SystemMessageAction',
+    'TaskTrackingAction',
+    'TerminalInputAction',
+    'TerminalReadAction',
+    'TerminalRunAction',
+    'UncertaintyAction',
 ]

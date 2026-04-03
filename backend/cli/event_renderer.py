@@ -36,25 +36,52 @@ from backend.ledger import EventStreamSubscriber
 from backend.ledger.action import (
     Action,
     AgentThinkAction,
+    BrowseInteractiveAction,
+    ClarificationRequestAction,
     CmdRunAction,
+    CondensationAction,
+    DelegateTaskAction,
+    EscalateToHumanAction,
     FileEditAction,
+    FileReadAction,
     FileWriteAction,
+    LspQueryAction,
+    MCPAction,
     MessageAction,
     NullAction,
+    PlaybookFinishAction,
+    ProposalAction,
     RecallAction,
+    SignalProgressAction,
     StreamingChunkAction,
+    TaskTrackingAction,
+    TerminalInputAction,
+    TerminalRunAction,
+    UncertaintyAction,
 )
 from backend.ledger.observation import (
+    AgentCondensationObservation,
     AgentStateChangedObservation,
     AgentThinkObservation,
     CmdOutputObservation,
+    DelegateTaskObservation,
     ErrorObservation,
+    FileDownloadObservation,
     FileEditObservation,
+    FileReadObservation,
     FileWriteObservation,
+    LspQueryObservation,
+    MCPObservation,
     NullObservation,
     Observation,
+    RecallFailureObservation,
     RecallObservation,
+    ServerReadyObservation,
+    SignalProgressObservation,
     StatusObservation,
+    SuccessObservation,
+    TaskTrackingObservation,
+    TerminalObservation,
     UserRejectObservation,
 )
 
@@ -665,6 +692,15 @@ class CLIEventRenderer:
             self._reasoning.stop()
             self._clear_streaming_preview()
             if action.content.strip():
+                # Show file/image attachment indicators
+                file_urls = getattr(action, 'file_urls', None) or []
+                image_urls = getattr(action, 'image_urls', None) or []
+                attachments: list[Any] = []
+                if file_urls:
+                    attachments.append(Text(f'  📎 {len(file_urls)} file(s) attached', style='dim'))
+                if image_urls:
+                    attachments.append(Text(f'  🖼️  {len(image_urls)} image(s) attached', style='dim'))
+
                 self._append_history(
                     Panel(
                         Markdown(action.content),
@@ -673,6 +709,8 @@ class CLIEventRenderer:
                         padding=(0, 1),
                     )
                 )
+                for att in attachments:
+                    self._append_history(att)
             else:
                 self.refresh()
             return
@@ -698,6 +736,9 @@ class CLIEventRenderer:
             )
             self._ensure_reasoning()
             self._reasoning.update_action(f'Running: {cmd_display}')
+            thought = getattr(action, 'thought', '')
+            if thought:
+                self._reasoning.update_thought(thought)
             self.refresh()
             return
 
@@ -709,16 +750,25 @@ class CLIEventRenderer:
             )
             self._ensure_reasoning()
             self._reasoning.update_action(f'Editing: {action.path}')
+            thought = getattr(action, 'thought', '')
+            if thought:
+                self._reasoning.update_thought(thought)
             self.refresh()
             return
 
         if isinstance(action, FileWriteAction):
             self._clear_streaming_preview()
+            content = getattr(action, 'content', '')
+            line_count = content.count('\n') + 1 if content else 0
+            suffix = f' ({line_count} lines)' if line_count > 0 else ''
             self._append_history(
-                Text(f'  ✏️  write: {action.path}', style='bold yellow'),
+                Text(f'  ✏️  write: {action.path}{suffix}', style='bold yellow'),
             )
             self._ensure_reasoning()
             self._reasoning.update_action(f'Writing: {action.path}')
+            thought = getattr(action, 'thought', '')
+            if thought:
+                self._reasoning.update_thought(thought)
             self.refresh()
             return
 
@@ -731,6 +781,238 @@ class CLIEventRenderer:
             )
             self._ensure_reasoning()
             self._reasoning.update_action(label)
+            self.refresh()
+            return
+
+        # -- File read --------------------------------------------------------
+        if isinstance(action, FileReadAction):
+            self._clear_streaming_preview()
+            path = getattr(action, 'path', '')
+            self._append_history(
+                Text(f'  👁  read: {path}', style='bold blue'),
+            )
+            self._ensure_reasoning()
+            self._reasoning.update_action(f'Reading: {path}')
+            thought = getattr(action, 'thought', '')
+            if thought:
+                self._reasoning.update_thought(thought)
+            self.refresh()
+            return
+
+        # -- MCP tool call ----------------------------------------------------
+        if isinstance(action, MCPAction):
+            self._clear_streaming_preview()
+            name = getattr(action, 'name', 'tool')
+            self._append_history(
+                Text(f'  🔧 mcp: {name}', style='bold magenta'),
+            )
+            self._ensure_reasoning()
+            self._reasoning.update_action(f'MCP: {name}')
+            thought = getattr(action, 'thought', '')
+            if thought:
+                self._reasoning.update_thought(thought)
+            self.refresh()
+            return
+
+        # -- Browser ----------------------------------------------------------
+        if isinstance(action, BrowseInteractiveAction):
+            self._clear_streaming_preview()
+            self._append_history(
+                Text('  🌐 browsing…', style='bold blue'),
+            )
+            self._ensure_reasoning()
+            self._reasoning.update_action('Browsing')
+            thought = getattr(action, 'thought', '')
+            if thought:
+                self._reasoning.update_thought(thought)
+            self.refresh()
+            return
+
+        # -- Code navigation --------------------------------------------------
+        if isinstance(action, LspQueryAction):
+            self._clear_streaming_preview()
+            cmd = getattr(action, 'command', 'query')
+            file = getattr(action, 'file', '')
+            symbol = getattr(action, 'symbol', '')
+            label = f'{cmd}: {symbol}' if symbol else f'{cmd}: {file}'
+            self._append_history(
+                Text(f'  🔍 code nav: {label}', style='bold blue'),
+            )
+            self._ensure_reasoning()
+            self._reasoning.update_action(f'Code nav: {label}')
+            self.refresh()
+            return
+
+        # -- Task tracking ----------------------------------------------------
+        if isinstance(action, TaskTrackingAction):
+            cmd = getattr(action, 'command', 'update')
+            self._append_history(
+                Text(f'  📋 tasks: {cmd}', style='dim cyan'),
+            )
+            self.refresh()
+            return
+
+        # -- Context condensation ---------------------------------------------
+        if isinstance(action, CondensationAction):
+            self._append_history(
+                Text('  🗜️  compressing context…', style='dim'),
+            )
+            self._ensure_reasoning()
+            self._reasoning.update_action('Compressing context')
+            self.refresh()
+            return
+
+        # -- Progress signal --------------------------------------------------
+        if isinstance(action, SignalProgressAction):
+            note = getattr(action, 'progress_note', '')
+            if note:
+                self._append_history(
+                    Text(f'  📡 {note}', style='cyan'),
+                )
+            self.refresh()
+            return
+
+        # -- Terminal session -------------------------------------------------
+        if isinstance(action, TerminalRunAction):
+            self._clear_streaming_preview()
+            cmd = getattr(action, 'command', '')
+            cmd_display = cmd[:100] + '…' if len(cmd) > 100 else cmd
+            self._append_history(
+                Text(f'  💻 terminal: {cmd_display}', style='bold cyan'),
+            )
+            self._ensure_reasoning()
+            self._reasoning.update_action(f'Terminal: {cmd_display}')
+            self.refresh()
+            return
+
+        if isinstance(action, TerminalInputAction):
+            inp = getattr(action, 'input', '')
+            inp_display = inp[:60] + '…' if len(inp) > 60 else inp
+            self._append_history(
+                Text(f'  💻 terminal input: {inp_display}', style='dim cyan'),
+            )
+            self.refresh()
+            return
+
+        # -- Delegation -------------------------------------------------------
+        if isinstance(action, DelegateTaskAction):
+            self._clear_streaming_preview()
+            desc = getattr(action, 'task_description', '')
+            desc_display = desc[:80] + '…' if len(desc) > 80 else desc
+            self._append_history(
+                Text(f'  🔀 delegating: {desc_display}', style='bold magenta'),
+            )
+            self._ensure_reasoning()
+            self._reasoning.update_action(f'Delegating: {desc_display}')
+            self.refresh()
+            return
+
+        # -- Playbook finish --------------------------------------------------
+        if isinstance(action, PlaybookFinishAction):
+            self._reasoning.stop()
+            self._clear_streaming_preview()
+            thought = getattr(action, 'final_thought', '') or getattr(action, 'thought', '')
+            if thought:
+                self._append_history(
+                    Text(f'  ✅ {thought[:120]}', style='green'),
+                )
+            else:
+                self._append_history(
+                    Text('  ✅ Task complete', style='green'),
+                )
+            self.refresh()
+            return
+
+        # -- Escalation to human ----------------------------------------------
+        if isinstance(action, EscalateToHumanAction):
+            self._reasoning.stop()
+            self._clear_streaming_preview()
+            reason = getattr(action, 'reason', '')
+            help_needed = getattr(action, 'specific_help_needed', '')
+            body_parts: list[Any] = []
+            if reason:
+                body_parts.append(Text(reason, style='yellow'))
+            if help_needed:
+                body_parts.append(Text(f'Help needed: {help_needed}', style='yellow bold'))
+            self._append_history(
+                Panel(
+                    Group(*body_parts) if body_parts else Text('Agent needs your help', style='yellow'),
+                    title='[bold yellow]🆘 Escalation[/bold yellow]',
+                    border_style='yellow',
+                    padding=(0, 1),
+                )
+            )
+            self.refresh()
+            return
+
+        # -- Clarification request --------------------------------------------
+        if isinstance(action, ClarificationRequestAction):
+            self._reasoning.stop()
+            self._clear_streaming_preview()
+            question = getattr(action, 'question', '')
+            options = getattr(action, 'options', []) or []
+            body_parts: list[Any] = []
+            if question:
+                body_parts.append(Text(question, style='yellow'))
+            for i, opt in enumerate(options, 1):
+                body_parts.append(Text(f'  {i}. {opt}', style='yellow dim'))
+            self._append_history(
+                Panel(
+                    Group(*body_parts) if body_parts else Text('Agent has a question', style='yellow'),
+                    title='[bold yellow]❓ Clarification needed[/bold yellow]',
+                    border_style='yellow',
+                    padding=(0, 1),
+                )
+            )
+            self.refresh()
+            return
+
+        # -- Uncertainty signal -----------------------------------------------
+        if isinstance(action, UncertaintyAction):
+            concerns = getattr(action, 'specific_concerns', []) or []
+            info_needed = getattr(action, 'requested_information', '')
+            body_parts: list[Any] = []
+            for concern in concerns[:5]:
+                body_parts.append(Text(f'• {concern}', style='yellow'))
+            if info_needed:
+                body_parts.append(Text(f'Needs: {info_needed}', style='yellow dim'))
+            if body_parts:
+                self._append_history(
+                    Panel(
+                        Group(*body_parts),
+                        title='[bold yellow]⚠️  Uncertain[/bold yellow]',
+                        border_style='yellow',
+                        padding=(0, 1),
+                    )
+                )
+            self.refresh()
+            return
+
+        # -- Proposal with options --------------------------------------------
+        if isinstance(action, ProposalAction):
+            self._reasoning.stop()
+            self._clear_streaming_preview()
+            options = getattr(action, 'options', []) or []
+            recommended = getattr(action, 'recommended', 0)
+            rationale = getattr(action, 'rationale', '')
+            body_parts: list[Any] = []
+            if rationale:
+                body_parts.append(Text(rationale, style='cyan'))
+            for i, opt in enumerate(options):
+                label = opt.get('name', opt.get('title', f'Option {i + 1}'))
+                desc = opt.get('description', '')
+                marker = ' ★' if i == recommended else ''
+                body_parts.append(Text(f'  {i + 1}. {label}{marker}', style='bold cyan'))
+                if desc:
+                    body_parts.append(Text(f'     {desc}', style='cyan dim'))
+            self._append_history(
+                Panel(
+                    Group(*body_parts) if body_parts else Text('Agent has a proposal', style='cyan'),
+                    title='[bold cyan]💡 Proposal[/bold cyan]',
+                    border_style='cyan',
+                    padding=(0, 1),
+                )
+            )
             self.refresh()
             return
 
@@ -858,7 +1140,11 @@ class CLIEventRenderer:
             return
 
         if isinstance(obs, UserRejectObservation):
-            self._append_history(Text('  Action rejected.', style='yellow'))
+            content = getattr(obs, 'content', '')
+            if content:
+                self._append_history(Text(f'  ✗ Rejected: {content}', style='yellow'))
+            else:
+                self._append_history(Text('  ✗ Action rejected.', style='yellow'))
             return
 
         if isinstance(obs, RecallObservation):
@@ -886,6 +1172,152 @@ class CLIEventRenderer:
             content = getattr(obs, 'content', '')
             if content:
                 self._append_history(Text(f'  ℹ {content}', style='dim'))
+            return
+
+        # -- File read result -------------------------------------------------
+        if isinstance(obs, FileReadObservation):
+            self._reasoning.stop()
+            path = getattr(obs, 'path', '')
+            content = getattr(obs, 'content', '')
+            lines = content.count('\n') + 1 if content else 0
+            self._append_history(
+                Text(f'  👁  read {path} ({lines} lines)', style='dim blue'),
+            )
+            return
+
+        # -- MCP tool result --------------------------------------------------
+        if isinstance(obs, MCPObservation):
+            self._reasoning.stop()
+            name = getattr(obs, 'name', 'tool')
+            content = getattr(obs, 'content', '')
+            content_preview = content[:200].strip() if content else ''
+            if content_preview:
+                body_parts: list[Any] = [
+                    Text(f'  🔧 {name}', style='magenta'),
+                    Syntax(content_preview, 'text', word_wrap=True, theme='monokai'),
+                ]
+                if len(content) > 200:
+                    body_parts.append(Text(f'  … ({len(content):,} chars total)', style='dim'))
+                self._append_history(Group(*body_parts))
+            else:
+                self._append_history(Text(f'  🔧 {name} ✓', style='dim magenta'))
+            return
+
+        # -- Terminal output --------------------------------------------------
+        if isinstance(obs, TerminalObservation):
+            self._reasoning.stop()
+            session_id = getattr(obs, 'session_id', '')
+            content = getattr(obs, 'content', '')
+            if content.strip():
+                display = content[:2000]
+                body_parts: list[Any] = [
+                    Syntax(display, 'text', word_wrap=True, theme='monokai'),
+                ]
+                if len(content) > 2000:
+                    body_parts.append(
+                        Text(f'  … ({len(content):,} chars total)', style='dim')
+                    )
+                self._append_history(
+                    Panel(
+                        Group(*body_parts),
+                        title=f'[cyan]💻 terminal[/cyan]',
+                        border_style='bright_black',
+                        padding=(0, 1),
+                    )
+                )
+            return
+
+        # -- LSP / code navigation result -------------------------------------
+        if isinstance(obs, LspQueryObservation):
+            self._reasoning.stop()
+            content = getattr(obs, 'content', '')
+            available = getattr(obs, 'available', True)
+            if not available:
+                self._append_history(
+                    Text('  🔍 code nav: not available', style='dim yellow'),
+                )
+            elif content:
+                preview = content[:300].strip()
+                self._append_history(
+                    Text(f'  🔍 code nav result ({len(content)} chars)', style='dim blue'),
+                )
+            return
+
+        # -- Server ready -----------------------------------------------------
+        if isinstance(obs, ServerReadyObservation):
+            url = getattr(obs, 'url', '')
+            port = getattr(obs, 'port', '')
+            health = getattr(obs, 'health_status', 'unknown')
+            label = url or f'port {port}'
+            self._append_history(
+                Text(f'  🚀 Server ready at {label} ({health})', style='bold green'),
+            )
+            return
+
+        # -- Success ----------------------------------------------------------
+        if isinstance(obs, SuccessObservation):
+            content = getattr(obs, 'content', '')
+            self._append_history(
+                Text(f'  ✓ {content}' if content else '  ✓ Done', style='green'),
+            )
+            return
+
+        # -- Recall failure ---------------------------------------------------
+        if isinstance(obs, RecallFailureObservation):
+            error_msg = getattr(obs, 'error_message', '')
+            recall_type = getattr(obs, 'recall_type', None)
+            label = str(recall_type.value) if recall_type else 'recall'
+            self._append_history(
+                Text(
+                    f'  ⚠ {label} failed: {error_msg}' if error_msg else f'  ⚠ {label} failed',
+                    style='yellow',
+                )
+            )
+            return
+
+        # -- File download ----------------------------------------------------
+        if isinstance(obs, FileDownloadObservation):
+            path = getattr(obs, 'file_path', '')
+            self._append_history(
+                Text(f'  📥 Downloaded: {path}', style='green'),
+            )
+            return
+
+        # -- Delegation result ------------------------------------------------
+        if isinstance(obs, DelegateTaskObservation):
+            self._reasoning.stop()
+            success = getattr(obs, 'success', True)
+            error = getattr(obs, 'error_message', '')
+            if success:
+                self._append_history(
+                    Text('  🔀 Delegation completed ✓', style='green'),
+                )
+            else:
+                self._append_history(
+                    Text(f'  🔀 Delegation failed: {error}' if error else '  🔀 Delegation failed', style='red'),
+                )
+            return
+
+        # -- Task tracking result ---------------------------------------------
+        if isinstance(obs, TaskTrackingObservation):
+            cmd = getattr(obs, 'command', '')
+            self._append_history(
+                Text(f'  📋 Tasks updated ({cmd})', style='dim cyan'),
+            )
+            return
+
+        # -- Context condensation result --------------------------------------
+        if isinstance(obs, AgentCondensationObservation):
+            self._append_history(
+                Text('  🗜️  Context compressed', style='dim'),
+            )
+            return
+
+        # -- Progress signal --------------------------------------------------
+        if isinstance(obs, SignalProgressObservation):
+            note = getattr(obs, 'progress_note', '')
+            if note:
+                self._append_history(Text(f'  📡 {note}', style='dim cyan'))
             return
 
         self.refresh()
