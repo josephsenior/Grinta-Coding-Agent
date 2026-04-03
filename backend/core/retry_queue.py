@@ -373,9 +373,9 @@ def get_retry_queue() -> RetryQueue | None:
     )
     default_backend = 'memory' if is_pytest else 'redis'
     backend_name = os.getenv('RETRY_QUEUE_BACKEND', default_backend).lower()
-    base_delay = float(os.getenv('RETRY_QUEUE_RETRY_DELAY_SECONDS', '15.0'))
-    max_delay = float(os.getenv('RETRY_QUEUE_MAX_DELAY_SECONDS', '120.0'))
-    max_retries = int(os.getenv('RETRY_QUEUE_MAX_RETRIES', '3'))
+    base_delay = float(os.getenv('RETRY_QUEUE_RETRY_DELAY_SECONDS', '5.0'))
+    max_delay = float(os.getenv('RETRY_QUEUE_MAX_DELAY_SECONDS', '30.0'))
+    max_retries = int(os.getenv('RETRY_QUEUE_MAX_RETRIES', '2'))
     poll_interval = float(os.getenv('RETRY_QUEUE_POLL_INTERVAL', '5.0'))
 
     backend: BaseRetryBackend

@@ -53,7 +53,7 @@ def get_shared_http_client(provider: str, base_url: str | None = None) -> httpx.
             if key not in _shared_sync_clients:
                 _shared_sync_clients[key] = httpx.Client(
                     limits=_POOL_LIMITS,
-                    timeout=httpx.Timeout(timeout=600.0, connect=10.0),
+                    timeout=httpx.Timeout(timeout=60.0, connect=10.0),
                     follow_redirects=True,
                 )
                 logger.debug('Created shared sync httpx pool for %s', key)
@@ -70,7 +70,7 @@ def get_shared_async_http_client(
             if key not in _shared_async_clients:
                 _shared_async_clients[key] = httpx.AsyncClient(
                     limits=_POOL_LIMITS,
-                    timeout=httpx.Timeout(timeout=600.0, connect=10.0),
+                    timeout=httpx.Timeout(timeout=60.0, connect=10.0),
                     follow_redirects=True,
                 )
                 logger.debug('Created shared async httpx pool for %s', key)
@@ -831,7 +831,7 @@ class GeminiClient(DirectLLMClient):
         # Add timeout to prevent infinite hanging when the API is overloaded
         from google.genai.types import HttpOptions
 
-        http_options = HttpOptions(timeout=120000)  # 2 minutes
+        http_options = HttpOptions(timeout=45000)  # 45 seconds
         self.client = genai.Client(api_key=api_key, http_options=http_options)
 
     def _resolve_gemini_model_name(self, model_name: str | None) -> str:

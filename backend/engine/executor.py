@@ -214,9 +214,9 @@ class OrchestratorExecutor:
             logger.info('OrchestratorExecutor.async_execute: calling LLM.astream')
             stream_iter = self._llm.astream(**call_params)
 
-            first_chunk_timeout: float | None = 45.0
+            first_chunk_timeout: float | None = 20.0
             first_chunk_timeout_raw = os.getenv(
-                'APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '45'
+                'APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '20'
             ).strip()
             try:
                 parsed_first_chunk_timeout = float(first_chunk_timeout_raw)
@@ -226,7 +226,7 @@ class OrchestratorExecutor:
                     else None
                 )
             except ValueError:
-                first_chunk_timeout = 45.0
+                first_chunk_timeout = 20.0
 
             async def _consume_stream():
                 nonlocal content_accumulate
@@ -336,18 +336,26 @@ class OrchestratorExecutor:
                             first_chunk_timeout,
                         )
 
+                        # Notify the UI so the user doesn't think it's hung.
+                        if event_stream:
+                            from backend.ledger.observation import StatusObservation
+                            status_ev = StatusObservation(
+                                content='Stream timed out — retrying without streaming…'
+                            )
+                            event_stream.add_event(status_ev, EventSource.ENVIRONMENT)
+
                         fallback_params = dict(call_params)
                         fallback_params['stream'] = False
 
-                        fallback_timeout = 120.0
+                        fallback_timeout = 30.0
                         try:
                             _fb_raw = os.getenv(
-                                'APP_LLM_FALLBACK_TIMEOUT_SECONDS', '120'
+                                'APP_LLM_FALLBACK_TIMEOUT_SECONDS', '30'
                             )
                             _fb_parsed = float(_fb_raw)
-                            fallback_timeout = _fb_parsed if _fb_parsed > 0 else 120.0
+                            fallback_timeout = _fb_parsed if _fb_parsed > 0 else 30.0
                         except (TypeError, ValueError):
-                            fallback_timeout = 120.0
+                            fallback_timeout = 30.0
                         logger.warning(
                             'Attempting non-streaming fallback with %.1fs timeout',
                             fallback_timeout,

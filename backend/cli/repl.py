@@ -530,7 +530,7 @@ class Repl:
             AgentState.REJECTED,
         }
 
-        _HARD_TIMEOUT = 300  # 5 minutes absolute ceiling
+        _HARD_TIMEOUT = 120  # 2 minutes absolute ceiling
         _start = time.monotonic()
 
         while True:
