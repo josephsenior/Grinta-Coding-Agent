@@ -9,7 +9,7 @@ from rich.table import Table
 from rich.text import Text
 
 from backend.cli.config_manager import (
-    _ONBOARDING_PROVIDERS,
+    _PROVIDERS,
     add_mcp_server,
     get_budget,
     get_current_model,
@@ -26,16 +26,22 @@ def _prompt_model_change(console: Console) -> bool:
     """Prompt user to change model via Provider → Model flow. Returns True if changed."""
     console.print()
     console.print('[bold]Select provider:[/bold]')
-    for i, (_, label) in enumerate(_ONBOARDING_PROVIDERS, 1):
-        console.print(f'  [cyan]{i:>2}[/cyan]  {label}')
-    console.print(f'  [cyan]{len(_ONBOARDING_PROVIDERS) + 1:>2}[/cyan]  [dim]Custom (OpenAI-compatible)[/dim]')
+
+    idx = 1
+    provider_map: dict[int, tuple[str, str]] = {}
+    for key, label, _ in _PROVIDERS:
+        console.print(f'  [cyan]{idx:>2}[/cyan]  {label}')
+        provider_map[idx] = (key, label)
+        idx += 1
+    custom_idx = idx
+    console.print(f'  [cyan]{custom_idx:>2}[/cyan]  [dim]Custom (OpenAI-compatible)[/dim]')
     console.print()
 
     choice = Prompt.ask('  Provider number', default='', console=console).strip()
     if not choice:
         return False
     try:
-        idx = int(choice)
+        num = int(choice)
     except ValueError:
         console.print('[red]  Invalid selection.[/red]')
         return False
@@ -43,9 +49,9 @@ def _prompt_model_change(console: Console) -> bool:
     base_url: str | None = None
     provider_key: str | None = None
 
-    if 1 <= idx <= len(_ONBOARDING_PROVIDERS):
-        provider_key, _ = _ONBOARDING_PROVIDERS[idx - 1]
-    elif idx == len(_ONBOARDING_PROVIDERS) + 1:
+    if num in provider_map:
+        provider_key, _ = provider_map[num]
+    elif num == custom_idx:
         provider_key = Prompt.ask(
             '  Provider name [dim](e.g. together)[/dim]', console=console
         ).strip()

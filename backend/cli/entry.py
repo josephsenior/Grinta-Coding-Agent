@@ -1,54 +1,49 @@
-"""Unified CLI entry point for the ``app`` console script.
+"""Unified CLI entry point for the ``grinta`` console script.
 
-Subcommands::
+Usage::
 
-    app             # Launch interactive REPL (default)
-    app serve       # Start the backend API server
-
-REPL flags::
-
-    app --model anthropic/claude-sonnet-4-20250514
-    app --project /path/to/repo
+    grinta                           # Launch interactive REPL
+    grinta --model anthropic/...     # Override model
+    grinta --project /path/to/repo   # Set project root
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import warnings
+
+# Suppress ALL DeprecationWarnings before any package is imported.
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 
 def main() -> None:
-    """Dispatch to the appropriate mode based on the first positional arg."""
-    subcommand = sys.argv[1] if len(sys.argv) > 1 else None
+    """Parse flags and launch the interactive REPL."""
+    # Mark CLI mode before ANY backend imports so backend/core/logger.py
+    # skips its stdout handlers when it's imported for the first time.
+    os.environ.setdefault('AGENT_CLI_MODE', 'true')
 
-    if subcommand == "serve":
-        # Strip the subcommand so embedded's argparse sees only flags.
-        sys.argv = [sys.argv[0]] + sys.argv[2:]
-        from backend.embedded import main as serve_main
-
-        serve_main()
-        return
-
-    # REPL mode — parse optional flags.
     parser = argparse.ArgumentParser(
-        prog="app",
-        description="Grinta interactive CLI",
-        epilog="Subcommands: 'app serve' starts the backend API server.",
+        prog='grinta',
+        description='Grinta — AI coding agent for the terminal',
     )
     parser.add_argument(
-        "--model", "-m",
-        help="Override LLM model (e.g. anthropic/claude-sonnet-4-20250514)",
+        '--model',
+        '-m',
+        help='Override LLM model (e.g. anthropic/claude-sonnet-4-20250514)',
     )
     parser.add_argument(
-        "--project", "-p",
-        help="Set project root directory",
+        '--project',
+        '-p',
+        help='Set project root directory',
     )
-    args = parser.parse_args()
+    args = parser.parse_args(sys.argv[1:])
 
     from backend.cli.main import main as repl_main
 
     repl_main(model=args.model, project=args.project)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

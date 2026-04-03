@@ -152,12 +152,7 @@ def _resolve_invocation(
     model: str | None,
     project: str | None,
 ) -> tuple[str | None, str | None, bool]:
-    """Resolve CLI flags when grinta is invoked as the console script.
-
-    ``backend.cli.entry`` already parses these flags before calling ``main()``.
-    This fallback keeps ``grinta`` and ``python -m backend.cli.main`` working
-    when they are invoked directly.
-    """
+    """Resolve CLI flags when grinta is invoked as the console script."""
     if model is not None or project is not None:
         return model, project, False
 
@@ -165,17 +160,9 @@ def _resolve_invocation(
     if not argv:
         return None, None, False
 
-    if argv[0] == 'serve':
-        sys.argv = [sys.argv[0]] + argv[1:]
-        from backend.embedded import main as serve_main
-
-        serve_main()
-        return None, None, True
-
     parser = argparse.ArgumentParser(
         prog='grinta',
-        description='Grinta interactive CLI',
-        epilog="Subcommands: 'grinta serve' starts the backend API server.",
+        description='Grinta — AI coding agent for the terminal',
     )
     parser.add_argument(
         '--model',
