@@ -22,7 +22,7 @@ class HUDState:
 
 
 class HUDBar:
-    """Renderable footer bar: [Model] | [Context] | [Cost] | [Ledger]."""
+    """Renderable footer bar: [Model] | [Context] | [Cost] | [LLM calls] | [State]."""
 
     def __init__(self) -> None:
         self.state = HUDState()
@@ -70,8 +70,12 @@ class HUDBar:
     def _ledger_style(self) -> str:
         if self.state.ledger_status == 'Healthy':
             return 'green'
-        if self.state.ledger_status == 'Idle':
+        if self.state.ledger_status in {'Ready', 'Idle'}:
             return 'yellow'
+        if self.state.ledger_status == 'Review':
+            return 'magenta'
+        if self.state.ledger_status == 'Paused':
+            return 'cyan'
         return 'red bold'
 
     @staticmethod
@@ -97,29 +101,61 @@ class HUDBar:
     def update_ledger(self, status: str) -> None:
         self.state.ledger_status = status
 
+    @staticmethod
+    def _has_usage_signal(usage: Any) -> bool:
+        if usage is None:
+            return False
+        return any(
+            int(getattr(usage, field_name, 0) or 0) > 0
+            for field_name in (
+                'prompt_tokens',
+                'completion_tokens',
+                'cache_read_tokens',
+                'cache_write_tokens',
+                'context_window',
+            )
+        )
+
+    def _resolve_call_count(
+        self,
+        *,
+        usages: list[Any] | None,
+        response_latencies: list[Any] | None = None,
+        costs: list[Any] | None = None,
+        accumulated_usage: Any = None,
+        accumulated_cost: float = 0.0,
+    ) -> int:
+        usage_count = len(usages or [])
+        latency_count = len(response_latencies or [])
+        cost_count = len(costs or [])
+        call_count = max(usage_count, latency_count, cost_count)
+        if call_count == 0 and (
+            self._has_usage_signal(accumulated_usage) or accumulated_cost > 0.0
+        ):
+            return 1
+        return call_count
+
     def update_from_llm_metrics(self, metrics: Any) -> None:
         if metrics is None:
             return
 
         if hasattr(metrics, 'accumulated_cost'):
-            self.state.cost_usd = float(
-                getattr(metrics, 'accumulated_cost', 0.0) or 0.0
-            )
+            accumulated_cost = float(getattr(metrics, 'accumulated_cost', 0.0) or 0.0)
+            self.state.cost_usd = accumulated_cost
 
             usages = getattr(metrics, 'token_usages', []) or []
-            self.state.llm_calls = len(usages)
-
+            response_latencies = getattr(metrics, 'response_latencies', []) or []
+            costs = getattr(metrics, 'costs', []) or []
             accumulated_usage = getattr(metrics, 'accumulated_token_usage', None)
-            if accumulated_usage is not None and any(
-                int(getattr(accumulated_usage, field_name, 0) or 0) > 0
-                for field_name in (
-                    'prompt_tokens',
-                    'completion_tokens',
-                    'cache_read_tokens',
-                    'cache_write_tokens',
-                    'context_window',
-                )
-            ):
+            self.state.llm_calls = self._resolve_call_count(
+                usages=usages,
+                response_latencies=response_latencies,
+                costs=costs,
+                accumulated_usage=accumulated_usage,
+                accumulated_cost=accumulated_cost,
+            )
+
+            if self._has_usage_signal(accumulated_usage):
                 prompt_tokens = int(getattr(accumulated_usage, 'prompt_tokens', 0) or 0)
                 completion_tokens = int(
                     getattr(accumulated_usage, 'completion_tokens', 0) or 0
@@ -141,7 +177,6 @@ class HUDBar:
                 )
                 return
 
-            usages = getattr(metrics, 'token_usages', []) or []
             if usages:
                 latest = usages[-1]
                 self.state.context_tokens = int(
@@ -153,17 +188,44 @@ class HUDBar:
             return
 
         if isinstance(metrics, dict):
-            if 'accumulated_cost' in metrics:
-                self.state.cost_usd = float(metrics['accumulated_cost'] or 0.0)
+            accumulated_cost = float(metrics.get('accumulated_cost') or 0.0)
+            self.state.cost_usd = accumulated_cost
             usages = metrics.get('token_usages', [])
+            accumulated_usage = metrics.get('accumulated_token_usage')
+            self.state.llm_calls = self._resolve_call_count(
+                usages=usages if isinstance(usages, list) else [],
+                response_latencies=metrics.get('response_latencies', []),
+                costs=metrics.get('costs', []),
+                accumulated_usage=accumulated_usage,
+                accumulated_cost=accumulated_cost,
+            )
+
+            if isinstance(accumulated_usage, dict):
+                total = (
+                    int(accumulated_usage.get('prompt_tokens', 0) or 0)
+                    + int(accumulated_usage.get('completion_tokens', 0) or 0)
+                    + int(accumulated_usage.get('cache_read_tokens', 0) or 0)
+                    + int(accumulated_usage.get('cache_write_tokens', 0) or 0)
+                )
+                if total > 0 or int(accumulated_usage.get('context_window', 0) or 0) > 0:
+                    self.state.context_tokens = total
+                    self.state.context_limit = int(
+                        accumulated_usage.get('context_window', 0) or 0
+                    )
+                    return
+
             if usages:
                 latest = usages[-1] if isinstance(usages, list) else usages
                 if isinstance(latest, dict):
-                    total = latest.get('prompt_tokens', 0) + latest.get(
-                        'completion_tokens', 0
+                    total = (
+                        int(latest.get('prompt_tokens', 0) or 0)
+                        + int(latest.get('completion_tokens', 0) or 0)
                     )
                     self.state.context_tokens = total
-                    self.state.context_limit = latest.get('context_window', 0)
+                    self.state.context_limit = int(
+                        latest.get('context_window', 0) or 0
+                    )
+            return
 
     def plain_text(self) -> str:
         return self._format().plain

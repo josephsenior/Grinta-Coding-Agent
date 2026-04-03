@@ -13,6 +13,7 @@ import logging
 import re
 from collections import deque
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
 
+from backend.cli.hud import HUDBar
 from backend.core.enums import AgentState, EventSource
 from backend.ledger import EventStreamSubscriber
 from backend.ledger.action import (
@@ -56,8 +58,6 @@ from backend.ledger.observation import (
     UserRejectObservation,
 )
 
-from backend.cli.hud import HUDBar
-
 if TYPE_CHECKING:
     from backend.cli.reasoning_display import ReasoningDisplay
     from backend.ledger.stream import EventStream
@@ -78,30 +78,264 @@ _IDLE_STATES = {
 _SUBSCRIBER = EventStreamSubscriber.CLI
 
 
-def _error_hint(error_text: str) -> str:
-    """Return actionable guidance for common error patterns."""
+@dataclass(frozen=True)
+class ErrorGuidance:
+    """Actionable recovery copy for a rendered error."""
+
+    summary: str
+    steps: tuple[str, ...]
+
+
+def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
+    """Return True when any pattern appears in the target text."""
+    return any(pattern in text for pattern in patterns)
+
+
+def _split_error_text(error_text: str) -> tuple[str, str]:
+    """Split error text into a short summary line and optional detail block."""
+    stripped = error_text.strip()
+    if not stripped:
+        return 'Unknown error', ''
+    lines = stripped.splitlines()
+    summary = lines[0].strip() or 'Unknown error'
+    detail = '\n'.join(line.rstrip() for line in lines[1:]).strip()
+    if len(detail) > 2000:
+        detail = detail[:2000] + '\n... (truncated)'
+    return summary, detail
+
+
+def _error_guidance(error_text: str) -> ErrorGuidance | None:
+    """Return actionable recovery steps for common CLI error patterns."""
     lower = error_text.lower()
-    if 'timeout' in lower or 'timed out' in lower:
-        return 'API timed out. Check your network or try a faster model.'
-    if '401' in lower or 'unauthorized' in lower or 'invalid api key' in lower:
-        return 'API key rejected. Update it with /settings → k.'
-    if '429' in lower or 'rate limit' in lower or 'too many requests' in lower:
-        return 'Rate limited. Wait a moment or switch to a different model.'
-    if '404' in lower or 'model not found' in lower or 'does not exist' in lower:
-        return 'Model not found. Check the name with /settings → m.'
-    if 'connection' in lower or 'connect error' in lower or 'unreachable' in lower:
-        return 'Cannot reach API. Check your internet connection.'
-    if 'context' in lower and ('length' in lower or 'window' in lower or 'limit' in lower):
-        return 'Context limit hit. Try a model with a larger context window.'
+    if 'no api key or model configured' in lower or (
+        'initialization failed' in lower
+        and _contains_any(
+            lower,
+            (
+                'authenticationerror',
+                'invalid api key',
+                'api_key',
+                'unauthorized',
+                '401',
+            ),
+        )
+    ):
+        return ErrorGuidance(
+            summary='The engine could not finish startup with the current credentials.',
+            steps=(
+                'Restart grinta and complete onboarding so it can prompt for a model and API key.',
+                'Or update settings.json with a valid provider, model, and API key before retrying.',
+                'Rerun the same task after saving the new settings.',
+            ),
+        )
+    if _contains_any(
+        lower,
+        (
+            'resume failed',
+            'no event stream',
+            'session bootstrap state is incomplete',
+        ),
+    ):
+        return ErrorGuidance(
+            summary='This saved session could not be reopened cleanly.',
+            steps=(
+                'Run /sessions and try a different session if the current one is stale or incomplete.',
+                'If the session files were removed, start a new task in the current project.',
+            ),
+        )
+    if _contains_any(lower, ('timeout', 'timed out')):
+        return ErrorGuidance(
+            summary='The provider did not answer before the CLI gave up waiting.',
+            steps=(
+                'Check your network connection and the provider status page.',
+                'Retry with a shorter request or switch to a faster model in /settings.',
+            ),
+        )
+    if _contains_any(
+        lower,
+        (
+            '401',
+            'unauthorized',
+            'invalid api key',
+            'authenticationerror',
+            'api key rejected',
+        ),
+    ):
+        return ErrorGuidance(
+            summary='The provider rejected the configured credentials.',
+            steps=(
+                'Open /settings, press k, and update the API key.',
+                'Press m in /settings to confirm the selected model belongs to that provider.',
+                'Send the request again after saving the updated settings.',
+            ),
+        )
+    if _contains_any(
+        lower,
+        (
+            '429',
+            'rate limit',
+            'too many requests',
+            'insufficient_quota',
+            'quota',
+            'billing',
+        ),
+    ):
+        return ErrorGuidance(
+            summary='The provider is rejecting more requests because of rate or billing limits.',
+            steps=(
+                'Wait a moment and retry.',
+                'Switch to another model in /settings if you need to keep working right now.',
+                'Check the provider dashboard for quota, spend, or billing problems.',
+            ),
+        )
+    if _contains_any(
+        lower,
+        (
+            '404',
+            'model not found',
+            'does not exist',
+            'unknown model',
+        ),
+    ):
+        return ErrorGuidance(
+            summary='The configured model name is not available from the selected provider.',
+            steps=(
+                'Open /settings, press m, and pick a supported model.',
+                'If you entered the model manually, include the correct provider prefix.',
+            ),
+        )
+    if _contains_any(
+        lower,
+        (
+            'connection',
+            'connect error',
+            'unreachable',
+            'dns',
+            'ssl',
+            'certificate',
+        ),
+    ):
+        return ErrorGuidance(
+            summary='Grinta could not reach the model provider.',
+            steps=(
+                'Check your internet connection, VPN, proxy, or firewall rules.',
+                'Retry after the connection is stable.',
+            ),
+        )
+    if 'context' in lower and _contains_any(
+        lower,
+        ('length', 'window', 'limit', 'too many tokens'),
+    ):
+        return ErrorGuidance(
+            summary='The request is larger than the model can accept.',
+            steps=(
+                'Retry with a shorter prompt or less pasted context.',
+                'If you need the larger context, switch models in /settings.',
+            ),
+        )
     if 'budget' in lower:
-        return 'Budget exceeded. Increase it with /settings → b.'
-    if 'permission' in lower or 'forbidden' in lower or '403' in lower:
-        return 'Permission denied. Your API key may lack access to this model.'
-    return ''
+        return ErrorGuidance(
+            summary='The task budget blocked another model call.',
+            steps=(
+                'Open /settings, press b, and raise the budget.',
+                'Use 0 if you want to remove the per-task budget limit.',
+                'Retry the request after saving the new budget.',
+            ),
+        )
+    if _contains_any(lower, ('file not found', 'no such file', 'path does not exist')):
+        return ErrorGuidance(
+            summary='The requested file or path was not available in the current project.',
+            steps=(
+                'Double-check the path and make sure the file still exists.',
+                'If you moved the project, reopen grinta from the correct directory and retry.',
+            ),
+        )
+    if _contains_any(lower, ('permission denied', 'access is denied', 'forbidden', '403')):
+        return ErrorGuidance(
+            summary='The current account or filesystem permissions are blocking the action.',
+            steps=(
+                'Verify the API key has access to the selected model or endpoint.',
+                'If this is a local file action, reopen grinta from a writable directory and retry.',
+            ),
+        )
+    if 'initialization failed' in lower:
+        return ErrorGuidance(
+            summary='Startup did not complete successfully.',
+            steps=(
+                'Restart grinta to try the bootstrap flow again.',
+                'If it fails again, use the detail above to inspect the specific exception.',
+            ),
+        )
+    return None
+
+
+def _build_recovery_text(guidance: ErrorGuidance) -> Text:
+    """Render a guidance block for the error panel."""
+    recovery = Text()
+    recovery.append('What you can try\n', style='yellow bold')
+    recovery.append(guidance.summary, style='yellow')
+    if guidance.steps:
+        recovery.append('\n', style='yellow')
+    for index, step in enumerate(guidance.steps, start=1):
+        recovery.append(f'{index}. {step}', style='yellow')
+        if index < len(guidance.steps):
+            recovery.append('\n', style='yellow')
+    return recovery
+
+
+def _build_error_panel(
+    error_text: str,
+    *,
+    title: str = 'Error',
+    accent_style: str = 'red',
+) -> Panel:
+    """Render a structured error panel with recovery guidance when available."""
+    summary, detail = _split_error_text(error_text)
+    body_parts: list[Any] = [Text(summary, style=f'{accent_style} bold')]
+    if detail:
+        body_parts.append(Text(detail, style=f'{accent_style} dim'))
+
+    guidance = _error_guidance(error_text)
+    if guidance is not None:
+        body_parts.append(_build_recovery_text(guidance))
+
+    panel_title = Text(title.strip() or 'Error', style=f'{accent_style} bold')
+    return Panel(
+        Group(*body_parts),
+        title=panel_title,
+        border_style=accent_style,
+        padding=(0, 1),
+    )
+
+
+def _system_message_style(title: str) -> tuple[str, str]:
+    """Return a stable icon/color pair for non-agent status messages."""
+    normalized = title.strip().lower()
+    if normalized == 'warning':
+        return '⚠', 'yellow'
+    if normalized == 'autonomy':
+        return '⚙', 'magenta'
+    if normalized == 'status':
+        return '●', 'blue'
+    if normalized == 'settings':
+        return '⚙', 'cyan'
+    if 'timeout' in normalized:
+        return '⏱', 'yellow'
+    return 'ℹ', 'cyan'
 
 
 class CLIEventRenderer:
-    """Bridges EventStream → live rich layout."""
+    """Bridges EventStream → live rich layout.
+
+    Operates in two modes:
+
+    * **Live mode** (during an agent turn): a Rich ``Live`` display is active
+      and the renderer continuously redraws the streaming panel, reasoning
+      spinner, and HUD footer.
+    * **Static mode** (idle / prompt): no ``Live`` display.  Output is printed
+      once via ``console.print()`` so prompt_toolkit can own the terminal for
+      user input without any contention.
+    """
 
     def __init__(
         self,
@@ -116,13 +350,11 @@ class CLIEventRenderer:
         self._hud = hud
         self._reasoning = reasoning
         self._loop = loop or asyncio.get_event_loop()
-        self._history: deque[Any] = deque(maxlen=96)
         self._live: Live | None = None
         self._streaming_accumulated = ''
         self._streaming_final = False
         self._current_state: AgentState | None = None
         self._state_event = asyncio.Event()
-        self._body_title = 'Grinta'
         self._subscribed = False
         self._max_budget = max_budget
         self._pending_events: deque[Any] = deque()
@@ -132,14 +364,12 @@ class CLIEventRenderer:
         self._turn_start_cost: float = 0.0
         self._turn_start_tokens: int = 0
         self._turn_start_calls: int = 0
+        # Items queued during Live mode; flushed as static output on stop_live.
+        self._live_items: list[Any] = []
 
     @property
     def current_state(self) -> AgentState | None:
         return self._current_state
-
-    @property
-    def history(self) -> tuple[Any, ...]:
-        return tuple(self._history)
 
     @property
     def streaming_preview(self) -> str:
@@ -153,9 +383,48 @@ class CLIEventRenderer:
     def budget_warned_100(self) -> bool:
         return self._budget_warned_100
 
-    def attach_live(self, live: Live) -> None:
+    @property
+    def pending_event_count(self) -> int:
+        return len(self._pending_events)
+
+    # -- Live lifecycle (per agent turn) -----------------------------------
+
+    def start_live(self) -> None:
+        """Create and start a Rich Live display for the current agent turn."""
+        if self._live is not None:
+            return
+        self._live_items.clear()
+        live = Live(
+            self,
+            console=self._console,
+            auto_refresh=False,
+            transient=True,  # erases on stop — we print final output ourselves
+        )
+        live.start()
         self._live = live
         self.refresh()
+
+    def stop_live(self) -> None:
+        """Stop the Rich Live display and flush buffered items as static output."""
+        live = self._live
+        if live is None:
+            return
+        self._live = None
+        try:
+            live.stop()
+        except Exception:
+            logger.debug('Live.stop() failed', exc_info=True)
+        # Print all items that accumulated during the live phase as permanent
+        # static output so the transcript persists in the scrollback.
+        for item in self._live_items:
+            self._console.print(item)
+        self._live_items.clear()
+        self._hud.render_line(self._console)
+
+    def refresh(self) -> None:
+        """Redraw the Live display if active."""
+        if self._live is not None:
+            self._live.update(self, refresh=True)
 
     async def handle_event(self, event: Any) -> None:
         self._process_event_data(event)
@@ -166,16 +435,15 @@ class CLIEventRenderer:
 
     @contextmanager
     def suspend_live(self):
+        """Stop/start Live around a block (fallback for non-interactive input)."""
         live = self._live
         if live is None:
             yield
             return
-
         try:
             live.stop()
         except Exception:
             logger.debug('Live.stop() failed during suspend', exc_info=True)
-
         try:
             yield
         finally:
@@ -185,15 +453,11 @@ class CLIEventRenderer:
                 logger.debug('Live.start() failed during resume', exc_info=True)
             self.refresh()
 
-    def refresh(self) -> None:
-        if self._live is not None:
-            self._live.update(self, refresh=True)
-
     def begin_turn(self) -> None:
+        """Snapshot metrics and mark the agent as running."""
         self._current_state = AgentState.RUNNING
         self._hud.update_ledger('Healthy')
         self._state_event.clear()
-        # Snapshot metrics so we can compute per-turn deltas at completion.
         self._turn_start_cost = self._hud.state.cost_usd
         self._turn_start_tokens = self._hud.state.context_tokens
         self._turn_start_calls = self._hud.state.llm_calls
@@ -210,22 +474,53 @@ class CLIEventRenderer:
         return self._current_state
 
     def clear_history(self) -> None:
-        self._history.clear()
+        self._live_items.clear()
         self._clear_streaming_preview()
         self._reasoning.stop()
         self.refresh()
 
     def add_user_message(self, text: str) -> None:
+        """Print a user message. Always printed statically (prompt is idle)."""
         msg = Text()
-        msg.append('❯ ', style='bold cyan')
-        msg.append(text)
-        self._append_history(msg)
+        msg.append('\n❯ ', style='bold cyan')
+        msg.append(text, style='bold')
+        self._console.print(msg)
 
     def add_system_message(self, text: str, *, title: str = 'Info') -> None:
-        self._append_history(Text(f'  {text}', style='dim'))
+        lower_title = title.strip().lower()
+        if lower_title == 'error':
+            self._print_or_buffer(_build_error_panel(text, title='Error'))
+            self._hud.update_ledger('Error')
+            return
+        if 'timeout' in lower_title:
+            self._print_or_buffer(
+                _build_error_panel(text, title=title, accent_style='yellow')
+            )
+            self._hud.update_ledger('Error')
+            return
+        if lower_title == 'warning':
+            icon, color = _system_message_style(title)
+            warning = Text()
+            warning.append(f'  {icon} {title}: ', style=f'bold {color}')
+            warning.append(text, style=color)
+            self._print_or_buffer(warning)
+            return
+
+        icon, color = _system_message_style(title)
+        message = Text()
+        message.append(f'  {icon} {title}: ', style=f'bold {color}')
+        message.append(text, style='dim' if color == 'cyan' else color)
+        self._print_or_buffer(message)
 
     def add_markdown_block(self, title: str, text: str) -> None:
-        self._append_history(Markdown(text))
+        self._print_or_buffer(
+            Panel(
+                Markdown(text),
+                title=title,
+                border_style='bright_black',
+                padding=(0, 1),
+            )
+        )
 
     # -- subscription ------------------------------------------------------
 
@@ -251,7 +546,9 @@ class CLIEventRenderer:
             pass
 
     def drain_events(self) -> None:
-        """Process all queued events and refresh.  MUST be called from
+        """Process all queued events and refresh.
+
+        MUST be called from
         the main thread (the one that owns the Live display).
 
         Always refreshes even when no events were queued so that
@@ -282,7 +579,9 @@ class CLIEventRenderer:
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        body_items = list(self._history)[-12:]
+        # During Live mode, show the last few buffered items plus
+        # any active streaming panel and reasoning spinner.
+        body_items = self._live_items[-12:]
         if self._streaming_accumulated:
             body_items.append(self._render_streaming_preview())
         if self._reasoning.active:
@@ -308,8 +607,14 @@ class CLIEventRenderer:
             self._reasoning.stop()
             self._clear_streaming_preview()
             if action.content.strip():
-                self._append_history(Text(''))  # breathing room
-                self._append_history(Markdown(action.content))
+                self._append_history(
+                    Panel(
+                        Markdown(action.content),
+                        title='[bold green]grinta[/bold green]',
+                        border_style='green',
+                        padding=(0, 1),
+                    )
+                )
             else:
                 self.refresh()
             return
@@ -398,23 +703,26 @@ class CLIEventRenderer:
             exit_code = getattr(obs, 'exit_code', None)
             output = getattr(obs, 'content', '')
             success = exit_code == 0
+            command_display = self._format_command_display(getattr(obs, 'command', ''))
 
             # Compact display for successful commands with short output
             if success and len(output) < 500:
+                body_parts: list[Any] = [Text(f'  $ {command_display}', style='cyan')]
                 if output.strip():
-                    self._append_history(
+                    body_parts.append(
                         Syntax(output.rstrip(), 'text', word_wrap=True, theme='monokai')
                     )
                 else:
-                    self._append_history(Text('  ✓ done', style='green dim'))
+                    body_parts.append(Text('  ✓ done', style='green dim'))
+                self._append_history(Group(*body_parts))
                 return
 
             # Expanded display for failures or long output
             header_style = 'green' if success else 'red'
-            header = f'exit {exit_code}' if exit_code is not None else 'output'
+            header = f'command · exit {exit_code}' if exit_code is not None else 'command output'
             truncated = len(output) > 4000
             display_output = output[:4000]
-            body_parts: list[Any] = []
+            body_parts: list[Any] = [Text(f'$ {command_display}', style='cyan')]
             if display_output:
                 body_parts.append(
                     Syntax(display_output, 'text', word_wrap=True, theme='monokai')
@@ -454,24 +762,8 @@ class CLIEventRenderer:
         if isinstance(obs, ErrorObservation):
             self._reasoning.stop()
             error_content = getattr(obs, 'content', str(obs))
-            error_lines = error_content.strip().split('\n')
-            summary = error_lines[0] if error_lines else 'Unknown error'
-
-            body = Text()
-            body.append(summary + '\n', style='red bold')
-            if len(error_lines) > 1:
-                detail = '\n'.join(error_lines[1:])
-                if len(detail) > 2000:
-                    detail = detail[:2000] + '\n… (truncated)'
-                body.append(detail, style='red dim')
-
-            # Actionable hint based on common error patterns
-            hint = _error_hint(error_content)
-            if hint:
-                body.append(f'\n\n💡 {hint}', style='yellow')
-
             self._append_history(
-                Panel(body, title='[red bold]Error[/red bold]', border_style='red', padding=(0, 1)),
+                _build_error_panel(error_content),
             )
             self._hud.update_ledger('Error')
             return
@@ -519,6 +811,7 @@ class CLIEventRenderer:
             except ValueError:
                 logger.debug('Ignoring unknown agent state: %s', state)
                 return
+        previous_state = self._current_state
         self._current_state = state
         # Signal waiters on the main event loop (asyncio.Event is not thread-safe).
         try:
@@ -529,6 +822,12 @@ class CLIEventRenderer:
         # Update HUD ledger indicator on terminal states.
         if state in (AgentState.ERROR, AgentState.REJECTED):
             self._hud.update_ledger('Error')
+        elif state == AgentState.AWAITING_USER_CONFIRMATION:
+            self._hud.update_ledger('Review')
+        elif state == AgentState.AWAITING_USER_INPUT:
+            self._hud.update_ledger('Ready')
+        elif state == AgentState.PAUSED:
+            self._hud.update_ledger('Paused')
         elif state in (AgentState.FINISHED, AgentState.STOPPED):
             self._hud.update_ledger('Idle')
         elif state == AgentState.RUNNING:
@@ -536,12 +835,30 @@ class CLIEventRenderer:
 
         if state == AgentState.AWAITING_USER_CONFIRMATION:
             self._reasoning.stop()
+            self._clear_streaming_preview()
+            if previous_state != state:
+                self._append_history(
+                    Text(
+                        '  ⚠ Approval required — review the pending action.',
+                        style='yellow',
+                    )
+                )
             self.refresh()
             return
 
         if state == AgentState.AWAITING_USER_INPUT:
             self._reasoning.stop()
+            self._clear_streaming_preview()
             self.refresh()
+            return
+
+        if state == AgentState.PAUSED:
+            self._reasoning.stop()
+            self._clear_streaming_preview()
+            if previous_state != state:
+                self._append_history(
+                    Text('  ⏸ Paused — send guidance to continue.', style='yellow')
+                )
             return
 
         if state == AgentState.FINISHED:
@@ -562,6 +879,14 @@ class CLIEventRenderer:
                     f'  ✗ Error — send a follow-up to retry.{stats}',
                     style='red dim',
                 ),
+            )
+            return
+
+        if state == AgentState.REJECTED:
+            self._reasoning.stop()
+            self._clear_streaming_preview()
+            self._append_history(
+                Text('  ✗ Action rejected — adjust the task and retry.', style='yellow')
             )
             return
 
@@ -591,8 +916,16 @@ class CLIEventRenderer:
             self._reasoning.start()
 
     def _append_history(self, renderable: Any) -> None:
-        self._history.append(renderable)
-        self.refresh()
+        """Add a renderable: buffer during Live, print otherwise."""
+        self._print_or_buffer(renderable)
+
+    def _print_or_buffer(self, renderable: Any) -> None:
+        """Print statically if idle, or buffer for Live if active."""
+        if self._live is not None:
+            self._live_items.append(renderable)
+            self.refresh()
+        else:
+            self._console.print(renderable)
 
     def _clear_streaming_preview(self) -> None:
         self._streaming_accumulated = ''
@@ -600,7 +933,24 @@ class CLIEventRenderer:
         self.refresh()
 
     def _render_streaming_preview(self) -> Any:
-        return Markdown(self._streaming_accumulated or '')
+        body: list[Any] = [Markdown(self._streaming_accumulated or '')]
+        if not self._streaming_final:
+            body.append(Text('▌', style='bold green'))
+        return Panel(
+            Group(*body),
+            title='[bold green]grinta[/bold green]',
+            border_style='green',
+            padding=(0, 1),
+        )
+
+    @staticmethod
+    def _format_command_display(command: str, *, limit: int = 96) -> str:
+        display = ' '.join(command.split())
+        if not display:
+            return '(empty command)'
+        if len(display) > limit:
+            return display[: limit - 1] + '…'
+        return display
 
     def _update_metrics(self, event: Any) -> None:
         llm_metrics = getattr(event, 'llm_metrics', None)
@@ -614,7 +964,7 @@ class CLIEventRenderer:
         cost = self._hud.state.cost_usd
         if cost >= self._max_budget and not self._budget_warned_100:
             self._budget_warned_100 = True
-            self._append_history(
+            self._print_or_buffer(
                 Panel(
                     Text(
                         f'Budget limit reached: ${cost:.4f} / ${self._max_budget:.4f}',
@@ -627,7 +977,7 @@ class CLIEventRenderer:
             )
         elif cost >= self._max_budget * 0.8 and not self._budget_warned_80:
             self._budget_warned_80 = True
-            self._append_history(
+            self._print_or_buffer(
                 Panel(
                     Text(
                         f'Approaching budget: ${cost:.4f} / ${self._max_budget:.4f} (80%)',

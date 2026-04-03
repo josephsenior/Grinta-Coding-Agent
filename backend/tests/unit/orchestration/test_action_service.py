@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.orchestration.services.action_service import ActionService
+from backend.inference.metrics import Metrics
 from backend.ledger.action import Action
+from backend.orchestration.services.action_service import ActionService
 
 
 def _make_context() -> MagicMock:
@@ -63,8 +64,8 @@ class TestRunTypeCheck:
         svc = ActionService(
             _make_context(), _make_pending_service(), _make_confirmation_service()
         )
-        with pytest.raises(TypeError, match="requires an Action"):
-            await svc.run(cast(Any, "not_an_action"), None)
+        with pytest.raises(TypeError, match='requires an Action'):
+            await svc.run(cast(Any, 'not_an_action'), None)
 
 
 # ── run: blocked ─────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ class TestRunBlocked:
         action.source = None
         inv_ctx = MagicMock()
         inv_ctx.blocked = True
-        inv_ctx.block_reason = "too risky"
+        inv_ctx.block_reason = 'too risky'
         await svc.run(action, inv_ctx)
         controller.telemetry_service.handle_blocked_invocation.assert_called_once()
 
@@ -128,3 +129,23 @@ class TestPrepareMetrics:
         svc._prepare_metrics_for_action(action)
         assert action.llm_metrics is not None
         assert action.llm_metrics.accumulated_cost == 0.5
+
+    def test_copies_token_usage_history_from_real_metrics(self):
+        ctx_mock = _make_context()
+        controller = ctx_mock.get_controller.return_value
+        metrics = Metrics()
+        metrics.accumulated_cost = 0.5
+        metrics.add_token_usage(100, 50, 0, 0, 8192, 'resp-1')
+        controller.conversation_stats.get_combined_metrics.return_value = metrics
+
+        svc = ActionService(
+            ctx_mock, _make_pending_service(), _make_confirmation_service()
+        )
+        action = MagicMock(spec=Action)
+        action.llm_metrics = None
+
+        svc._prepare_metrics_for_action(action)
+
+        assert action.llm_metrics is not None
+        assert len(action.llm_metrics.token_usages) == 1
+        assert action.llm_metrics.token_usages[0].prompt_tokens == 100

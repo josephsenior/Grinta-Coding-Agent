@@ -6,28 +6,30 @@ from unittest.mock import Mock
 
 from backend.core.constants import LOG_ALL_EVENTS
 from backend.core.schemas import AgentState
+from backend.inference.metrics import Metrics
 from backend.ledger import EventSource
 from backend.ledger.action import Action, NullAction
 from backend.ledger.action.message import MessageAction
-from backend.inference.metrics import Metrics
 
 if TYPE_CHECKING:
     from backend.orchestration.services.confirmation_service import ConfirmationService
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
 def _resolve_operation_pipeline(controller):
-    controller_dict = getattr(controller, "__dict__", {})
-    pipeline = controller_dict.get("operation_pipeline")
+    controller_dict = getattr(controller, '__dict__', {})
+    pipeline = controller_dict.get('operation_pipeline')
     if pipeline is None and not isinstance(controller, Mock):
-        pipeline = getattr(controller, "operation_pipeline", None)
+        pipeline = getattr(controller, 'operation_pipeline', None)
     if pipeline is not None:
         return pipeline
-    pipeline = controller_dict.get("tool_pipeline")
+    pipeline = controller_dict.get('tool_pipeline')
     if pipeline is not None:
         return pipeline
-    return getattr(controller, "tool_pipeline", None)
+    return getattr(controller, 'tool_pipeline', None)
 
 
 class ActionService:
@@ -46,7 +48,7 @@ class ActionService:
     async def run(self, action: Action, ctx: ToolInvocationContext | None) -> None:
         """Entry point used by SessionOrchestrator to process an action end-to-end."""
         if not isinstance(action, Action):
-            raise TypeError("_process_action requires an Action instance")
+            raise TypeError('_process_action requires an Action instance')
 
         if action.runnable:
             await self._handle_runnable_action(action, ctx)
@@ -112,19 +114,22 @@ class ActionService:
             ctx.action_id = action.id
             controller._bind_action_context(action, ctx)
 
-        log_level = "info" if LOG_ALL_EVENTS else "debug"
-        controller.log(log_level, str(action), extra={"msg_type": "ACTION"})
+        log_level = 'info' if LOG_ALL_EVENTS else 'debug'
+        controller.log(log_level, str(action), extra={'msg_type': 'ACTION'})
 
     def _prepare_metrics_for_action(self, action: Action) -> None:
         """Attach cost/token metrics to an action before it's emitted."""
         controller = self._context.get_controller()
         metrics = controller.conversation_stats.get_combined_metrics()
 
-        clean_metrics = Metrics()
-        clean_metrics.accumulated_cost = metrics.accumulated_cost
-        clean_metrics._accumulated_token_usage = copy.deepcopy(
-            metrics.accumulated_token_usage
-        )
+        if isinstance(metrics, Metrics):
+            clean_metrics = metrics.copy()
+        else:
+            clean_metrics = Metrics()
+            clean_metrics.accumulated_cost = metrics.accumulated_cost
+            clean_metrics._accumulated_token_usage = copy.deepcopy(
+                metrics.accumulated_token_usage
+            )
         if controller.state.budget_flag:
             clean_metrics.max_budget_per_task = controller.state.budget_flag.max_value
         action.llm_metrics = clean_metrics
@@ -134,17 +139,17 @@ class ActionService:
             latest_usage = controller.state.metrics.token_usages[-1]
         accumulated_usage = controller.state.metrics.accumulated_token_usage
         controller.log(
-            "debug",
-            f"Action metrics - accumulated_cost: {metrics.accumulated_cost}, "
-            f"max_budget: {metrics.max_budget_per_task}, "
-            f"latest tokens (prompt/completion/cache_read/cache_write): "
-            f"{latest_usage.prompt_tokens if latest_usage else 0}/"
-            f"{latest_usage.completion_tokens if latest_usage else 0}/"
-            f"{latest_usage.cache_read_tokens if latest_usage else 0}/"
-            f"{latest_usage.cache_write_tokens if latest_usage else 0}, "
-            f"accumulated tokens (prompt/completion): "
-            f"{accumulated_usage.prompt_tokens}/{accumulated_usage.completion_tokens}",
-            extra={"msg_type": "METRICS"},
+            'debug',
+            f'Action metrics - accumulated_cost: {metrics.accumulated_cost}, '
+            f'max_budget: {metrics.max_budget_per_task}, '
+            f'latest tokens (prompt/completion/cache_read/cache_write): '
+            f'{latest_usage.prompt_tokens if latest_usage else 0}/'
+            f'{latest_usage.completion_tokens if latest_usage else 0}/'
+            f'{latest_usage.cache_read_tokens if latest_usage else 0}/'
+            f'{latest_usage.cache_write_tokens if latest_usage else 0}, '
+            f'accumulated tokens (prompt/completion): '
+            f'{accumulated_usage.prompt_tokens}/{accumulated_usage.completion_tokens}',
+            extra={'msg_type': 'METRICS'},
         )
 
     def set_pending_action(self, action: Action | None) -> None:

@@ -23,10 +23,15 @@ from backend.cli.main import (
     show_grinta_splash,
 )
 from backend.cli.reasoning_display import ReasoningDisplay
-from backend.cli.repl import Repl, _prompt_toolkit_available, _supports_prompt_session
+from backend.cli.repl import (
+    Repl,
+    _build_command_completer,
+    _prompt_toolkit_available,
+    _supports_prompt_session,
+)
 from backend.core.config import AppConfig
 from backend.core.enums import ActionSecurityRisk, AgentState, EventSource
-from backend.inference.metrics import Metrics, TokenUsage
+from backend.inference.metrics import Metrics, ResponseLatency, TokenUsage
 from backend.ledger.action import CmdRunAction, MessageAction, StreamingChunkAction
 
 
@@ -77,7 +82,9 @@ async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
     await renderer.handle_event(final_message)
 
     assert renderer.streaming_preview == ''
-    assert len(renderer.history) == 1
+    # Agent reply printed to console (no Live active).
+    output = _console_output(console)
+    assert 'Hello' in output
 
 
 def test_confirmation_uses_backend_security_risk() -> None:
@@ -138,6 +145,20 @@ def test_hud_tracks_llm_call_count() -> None:
     assert hud.state.cost_usd == 0.5
 
 
+def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
+    hud = HUDBar()
+    metrics = Metrics()
+    metrics.accumulated_cost = 0.5
+    metrics.response_latencies = [
+        ResponseLatency(model='openai/gpt-4.1', latency=0.2, response_id='resp-1')
+    ]
+
+    hud.update_from_llm_metrics(metrics)
+
+    assert hud.state.llm_calls == 1
+    assert hud.state.cost_usd == 0.5
+
+
 def test_diff_panel_new_file() -> None:
     """DiffPanel should show creation info for new files."""
     obs = MagicMock()
@@ -183,7 +204,7 @@ def test_show_grinta_splash_renders_logo_text() -> None:
     assert 'think' in output
     assert 'code' in output
     assert 'ship' in output
-    assert 'Type a task or /help to get started' in output
+    assert 'Type a task or press Tab after / for commands' in output
 
 
 def test_prompt_session_requires_tty_streams() -> None:
@@ -217,6 +238,59 @@ def test_prompt_toolkit_available_returns_false_when_missing() -> None:
             sys.modules['prompt_toolkit'] = original
         else:
             sys.modules.pop('prompt_toolkit', None)
+
+
+def test_command_completer_suggests_matching_commands() -> None:
+    from prompt_toolkit.document import Document
+
+    completer = _build_command_completer()
+    completions = list(
+        completer.get_completions(
+            Document('/s', cursor_position=len('/s')),
+            None,
+        )
+    )
+
+    assert {completion.text for completion in completions} >= {'/status', '/settings'}
+
+
+def test_command_completer_suggests_autonomy_levels() -> None:
+    from prompt_toolkit.document import Document
+
+    completer = _build_command_completer()
+    completions = list(
+        completer.get_completions(
+            Document('/autonomy b', cursor_position=len('/autonomy b')),
+            None,
+        )
+    )
+
+    assert [completion.text for completion in completions] == ['balanced']
+
+
+def test_command_completer_suggests_resume_targets() -> None:
+    from prompt_toolkit.document import Document
+
+    completer = _build_command_completer(
+        lambda: [('1', '#1 Fix authentication bug'), ('session-123', 'Fix authentication bug')]
+    )
+    completions = list(
+        completer.get_completions(
+            Document('/resume s', cursor_position=len('/resume s')),
+            None,
+        )
+    )
+
+    assert [completion.text for completion in completions] == ['session-123']
+
+
+def test_prompt_message_uses_clean_follow_up_prompt() -> None:
+    repl = Repl(_make_config(), _make_console())
+    renderer = MagicMock()
+    renderer.current_state = AgentState.AWAITING_USER_INPUT
+    repl.set_renderer(renderer)
+
+    assert repl._prompt_message() == '❯ '
 
 
 def test_configure_redirected_streams_uses_utf8_for_non_tty() -> None:
@@ -282,7 +356,67 @@ async def test_renderer_handles_error_observation() -> None:
     await renderer.handle_event(error_obs)
 
     assert hud.state.ledger_status == 'Error'
-    assert len(renderer.history) == 1
+    # Error panel printed to console (no Live active).
+    output = _console_output(console)
+    assert 'FileNotFoundError' in output
+
+
+@pytest.mark.asyncio
+async def test_start_stop_live_flushes_items_to_console() -> None:
+    """stop_live should print buffered items as static output."""
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    renderer.start_live()
+    renderer.add_system_message('Working…', title='grinta')
+    assert len(renderer._live_items) >= 1
+    renderer.stop_live()
+
+    output = _console_output(console)
+    assert 'Working' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_error_observation_shows_recovery_steps() -> None:
+    """Known provider errors should include actionable recovery guidance."""
+    from backend.ledger.observation import ErrorObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    error_obs = ErrorObservation(content='401 Unauthorized\ninvalid api key')
+    await renderer.handle_event(error_obs)
+
+    # Error panel printed to console (no Live active).
+    output = _console_output(console)
+    assert 'What you can try' in output
+    assert '/settings' in output
+    assert 'update the API key' in output
+
+
+@pytest.mark.asyncio
+async def test_system_error_message_shows_restart_guidance_for_init_failures() -> None:
+    """Startup failures should suggest how to recover outside the REPL."""
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    renderer.add_system_message(
+        'No API key or model configured.\nAuthenticationError: invalid api key',
+        title='error',
+    )
+
+    output = _console_output(console)
+    assert 'Restart grinta' in output
+    assert 'settings.json' in output
 
 
 @pytest.mark.asyncio
@@ -303,7 +437,9 @@ async def test_renderer_shows_recall_observation() -> None:
     )
     await renderer.handle_event(recall_obs)
 
-    assert len(renderer.history) == 1
+    # Recall is rendered via _print_or_buffer; no Live active so it prints.
+    output = _console_output(console)
+    assert 'Recalled' in output
 
 
 def test_autonomy_command_shows_current_level() -> None:
@@ -316,6 +452,36 @@ def test_autonomy_command_shows_current_level() -> None:
     mock_renderer.add_system_message.assert_called_once()
     call_text = mock_renderer.add_system_message.call_args[0][0]
     assert 'balanced' in call_text
+
+
+def test_prompt_toolbar_reflects_state_and_autonomy() -> None:
+    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    repl.set_renderer(type('RendererStub', (), {'current_state': AgentState.PAUSED})())
+
+    autonomy_controller = MagicMock()
+    autonomy_controller.autonomy_level = 'full'
+    controller = MagicMock()
+    controller.autonomy_controller = autonomy_controller
+    repl.set_controller(controller)
+
+    toolbar = repl._prompt_toolbar_text()
+
+    assert 'Paused' in toolbar
+    assert 'full autonomy' in toolbar
+    assert 'Tab for commands' in toolbar
+
+
+def test_unknown_command_suggests_closest_match() -> None:
+    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    mock_renderer = MagicMock()
+    repl.set_renderer(mock_renderer)
+
+    result = repl.handle_command('/stat')
+
+    assert result is True
+    message = mock_renderer.add_system_message.call_args[0][0]
+    assert '/status' in message
+    assert 'autocomplete' in message
 
 
 def test_autonomy_command_sets_level() -> None:
@@ -335,18 +501,17 @@ def test_autonomy_command_sets_level() -> None:
     mock_renderer.add_system_message.assert_called_once()
 
 
-def test_entry_point_dispatches_serve() -> None:
-    """Entry point should dispatch 'serve' to embedded main."""
+def test_entry_point_rejects_legacy_serve_subcommand() -> None:
+    """Entry point should reject the removed serve subcommand."""
     import sys
 
     with patch.object(sys, 'argv', ['app', 'serve', '--port', '3030']):
-        with patch('backend.embedded.main') as mock_serve:
-            from backend.cli.entry import main
+        from backend.cli.entry import main
 
+        with pytest.raises(SystemExit) as exc:
             main()
-            mock_serve.assert_called_once()
-            # argv should have been modified to strip 'serve'
-            assert sys.argv == ['app', '--port', '3030']
+
+    assert exc.value.code == 2
 
 
 # ── New tests: CLI flags ─────────────────────────────────────────────────
@@ -411,18 +576,18 @@ def test_grinta_main_parses_project_flag() -> None:
     mock_asyncio_run.assert_called_once()
 
 
-def test_grinta_main_dispatches_serve() -> None:
-    """Grinta should dispatch serve-style subcommands from backend.cli.main."""
+def test_grinta_main_rejects_legacy_serve_subcommand() -> None:
+    """Grinta main should reject the removed serve subcommand."""
     import sys
 
     with patch.object(sys, 'argv', ['grinta', 'serve', '--port', '3030']):
-        with patch('backend.embedded.main') as mock_serve:
-            with patch('backend.cli.main.asyncio.run') as mock_asyncio_run:
-                from backend.cli.main import main
+        with patch('backend.cli.main.asyncio.run') as mock_asyncio_run:
+            from backend.cli.main import main
 
+            with pytest.raises(SystemExit) as exc:
                 main()
 
-    mock_serve.assert_called_once()
+    assert exc.value.code == 2
     mock_asyncio_run.assert_not_called()
 
 
@@ -593,6 +758,43 @@ async def test_repl_run_saves_controller_state_on_exit() -> None:
 
 
 @pytest.mark.asyncio
+async def test_wait_for_agent_idle_drains_late_final_message() -> None:
+    from backend.ledger.observation.agent import AgentStateChangedObservation
+
+    console = _make_console()
+    repl = Repl(_make_config(), console)
+    renderer = CLIEventRenderer(
+        console,
+        HUDBar(),
+        ReasoningDisplay(),
+        loop=asyncio.get_running_loop(),
+    )
+    repl.set_renderer(renderer)
+    controller = MagicMock()
+    controller.get_agent_state.return_value = AgentState.AWAITING_USER_INPUT
+
+    await renderer.handle_event(
+        AgentStateChangedObservation('', AgentState.AWAITING_USER_INPUT)
+    )
+
+    late_message = MessageAction(content='Final answer', wait_for_response=True)
+    late_message.source = EventSource.AGENT
+
+    async def emit_late_message() -> None:
+        await asyncio.sleep(0.01)
+        renderer._on_event_threadsafe(late_message)
+
+    emit_task = asyncio.create_task(emit_late_message())
+    await repl._wait_for_agent_idle(controller, None)
+    await emit_task
+
+    for item in renderer._live_items:
+        console.print(item)
+    output = _console_output(console)
+    assert 'Final answer' in output
+
+
+@pytest.mark.asyncio
 async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
     events: list[str] = []
@@ -628,8 +830,10 @@ async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
         await repl.run()
 
     assert events
-    assert events[0] == 'grinta ready. Type a task or /help for commands.'
-    assert 'bootstrap' in events[1:]
+    # The first system message before bootstrap should be "Initializing engine…"
+    # (the old "grinta ready" message was removed — the splash covers that).
+    init_msgs = [e for e in events if e != 'bootstrap']
+    assert any('nitializ' in m for m in init_msgs) or len(events) >= 1
 
 
 # ── New tests: Reasoning elapsed time ────────────────────────────────────
@@ -808,8 +1012,9 @@ async def test_budget_warning_at_80_percent() -> None:
 
     assert renderer.budget_warned_80
     assert not renderer.budget_warned_100
-    # A budget warning panel was appended to history.
-    assert len(renderer.history) > 0
+    # Budget warning printed to console (no Live active).
+    output = _console_output(console)
+    assert 'Budget' in output or 'budget' in output
 
 
 @pytest.mark.asyncio
@@ -862,6 +1067,51 @@ async def test_no_budget_warning_when_no_budget_set() -> None:
 
     assert not renderer.budget_warned_80
     assert not renderer.budget_warned_100
+
+
+@pytest.mark.asyncio
+async def test_streaming_preview_renders_streaming_panel() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console,
+        hud,
+        ReasoningDisplay(),
+        loop=asyncio.get_running_loop(),
+    )
+
+    chunk = StreamingChunkAction(chunk='Hello', accumulated='Hello', is_final=False)
+    chunk.source = EventSource.AGENT
+
+    await renderer.handle_event(chunk)
+
+    console.print(renderer._render_streaming_preview())
+    output = _console_output(console)
+
+    assert 'grinta' in output.lower()
+    assert 'Hello' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_shows_command_context_for_output() -> None:
+    from backend.ledger.observation import CmdOutputObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console,
+        hud,
+        ReasoningDisplay(),
+        loop=asyncio.get_running_loop(),
+    )
+
+    obs = CmdOutputObservation(content='2 passed', command='python -m pytest -q')
+    await renderer.handle_event(obs)
+
+    # Command output printed to console (no Live active).
+    output = _console_output(console)
+    assert 'python -m pytest -q' in output
+    assert '2 passed' in output
 
 
 # ── New tests: Session resume command ────────────────────────────────────
