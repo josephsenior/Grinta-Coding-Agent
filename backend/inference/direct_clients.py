@@ -258,6 +258,79 @@ def _sanitize_openai_compatible_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]
     return sanitized
 
 
+def _extract_openai_message_text(content: Any) -> str:
+    """Extract plain text from OpenAI-style message content."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict) and item.get('type') == 'text':
+                text = item.get('text')
+                if text:
+                    parts.append(str(text))
+        return '\n'.join(parts)
+    if content is None:
+        return ''
+    return str(content)
+
+
+def _requires_gemini_history_normalization(model_name: str) -> bool:
+    """Return True when a Gemini-family model is routed through OpenAI-compatible APIs."""
+    normalized = str(model_name or '').strip().lower()
+    return normalized.startswith('gemini-') or '/gemini' in normalized
+
+
+def _normalize_gemini_openai_compatible_messages(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Flatten Gemini tool-call history into plain text for OpenAI-compatible proxies.
+
+    Google/Gemini expects proprietary `thought_signature` data when replaying prior
+    function-call content blocks. OpenAI-style histories do not include that hidden
+    field, so replaying assistant tool calls verbatim can fail on later turns.
+    """
+    cleaned: list[dict[str, Any]] = []
+    for raw_msg in messages:
+        msg = dict(raw_msg)
+        msg.pop('tool_ok', None)
+
+        role = msg.get('role')
+        if role == 'assistant' and isinstance(msg.get('tool_calls'), list):
+            text = _extract_openai_message_text(msg.get('content'))
+            tool_lines: list[str] = []
+            for tc in msg.get('tool_calls', []) or []:
+                if not isinstance(tc, dict):
+                    continue
+                fn = tc.get('function') or {}
+                name = str(fn.get('name') or 'tool')
+                arguments = str(fn.get('arguments') or '{}')
+                tool_lines.append(f'[Tool call] {name}({arguments})')
+            normalized = {k: v for k, v in msg.items() if k != 'tool_calls'}
+            normalized['content'] = '\n'.join(
+                part for part in [text, *tool_lines] if part
+            ) or '[Assistant requested tool execution.]'
+            cleaned.append(normalized)
+            continue
+
+        if role == 'tool':
+            tool_name = str(msg.get('name') or 'tool')
+            tool_output = _extract_openai_message_text(msg.get('content'))
+            cleaned.append(
+                {
+                    'role': 'user',
+                    'content': (
+                        f'[Tool result from {tool_name}]\n{tool_output}'.strip()
+                        or f'[Tool result from {tool_name}]'
+                    ),
+                }
+            )
+            continue
+
+        cleaned.append(msg)
+    return cleaned
+
+
 def _supports_native_openai_request_metadata(base_url: str | None) -> bool:
     """Return True only for the real OpenAI API.
 
@@ -449,13 +522,17 @@ class OpenAIClient(DirectLLMClient):
 
     def _clean_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Remove OpenAI-specific fields from messages for providers that don't support them."""
-        if self._supports_request_metadata:
-            return messages
         cleaned = []
         for msg in messages:
             if isinstance(msg, dict) and 'tool_ok' in msg:
                 msg = {k: v for k, v in msg.items() if k != 'tool_ok'}
             cleaned.append(msg)
+        if not self._supports_request_metadata and _requires_gemini_history_normalization(
+            self.model_name
+        ):
+            return _normalize_gemini_openai_compatible_messages(cleaned)
+        if self._supports_request_metadata:
+            return cleaned
         return cleaned
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
