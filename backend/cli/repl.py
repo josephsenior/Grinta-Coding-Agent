@@ -327,8 +327,8 @@ class Repl:
         from prompt_toolkit.formatted_text import HTML
 
         return HTML(
-            '<style fg="#5d7286" italic>'
-            'Describe the task, or type /help'
+            '<style fg="#5d7286">'
+            '<i>Describe the task, or type /help</i>'
             '</style>'
         )
 
@@ -729,6 +729,12 @@ class Repl:
                 except KeyboardInterrupt:
                     continue
                 except EOFError:
+                    self._console.print("EOF Error received in prompt loop.")
+                    break
+                except Exception as e:
+                    self._console.print(f"CRASH: {e}")
+                    import traceback
+                    traceback.print_exc()
                     break
 
                 text = user_input.strip()
@@ -1242,8 +1248,8 @@ class Repl:
                 open_settings(self._console)
             self._config = load_app_config()
             self._hud.update_model(get_current_model(self._config))
-            if self._renderer is not None:
-                self._renderer.add_system_message('Settings updated.', title='settings')
+            # Don't add_system_message — settings are navigational, not part of
+            # the agentic conversation and should not appear in chat history.
             return True
 
         if cmd == '/clear':

@@ -314,10 +314,12 @@ class Memory:
             working_dir = self.runtime_info.working_dir
             date = self.runtime_info.date
 
-        # Present /workspace as the working directory so the LLM uses
-        # virtual paths consistently. The runtime path-mapping layer
-        # translates /workspace → the real project root automatically.
-        if working_dir:
+        # In CLI mode the shell executes on the real host filesystem — /workspace
+        # does not exist as a mount. Use the actual project root so the LLM
+        # navigates the real directory tree. The /workspace virtualisation is only
+        # relevant for sandboxed/Docker runtimes.
+        import os as _os
+        if working_dir and not _os.environ.get('AGENT_CLI_MODE'):
             working_dir = '/workspace'
 
         return {

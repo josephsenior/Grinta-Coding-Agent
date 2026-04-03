@@ -1160,10 +1160,9 @@ async def test_renderer_shows_command_context_for_output() -> None:
     obs = CmdOutputObservation(content='2 passed', command='python -m pytest -q')
     await renderer.handle_event(obs)
 
-    # Command output printed to console (no Live active).
+    # Command output is hidden from the chat view (display-only choice).
     output = _console_output(console)
-    assert 'python -m pytest -q' in output
-    assert '2 passed' in output
+    assert output == ''
 
 
 # ── New tests: Session resume command ────────────────────────────────────
@@ -1450,7 +1449,7 @@ async def test_renderer_handles_agent_condensation_observation() -> None:
 
 @pytest.mark.asyncio
 async def test_renderer_cmd_output_head_tail_truncation() -> None:
-    """Long command output should show head+tail with skipped chars indicator."""
+    """CmdOutputObservation is hidden from chat — no console output regardless of length."""
     from backend.ledger.observation import CmdOutputObservation
 
     console = _make_console()
@@ -1458,13 +1457,11 @@ async def test_renderer_cmd_output_head_tail_truncation() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    # Create output longer than head_limit + tail_limit (3000 chars)
     long_output = 'A' * 5000
     obs = CmdOutputObservation(content=long_output, command='cat bigfile.txt', exit_code=0)
     await renderer.handle_event(obs)
     output = _console_output(console)
-    assert 'skipped' in output.lower()
-    assert 'truncated' in output.lower()
+    assert output == ''
 
 
 @pytest.mark.asyncio
