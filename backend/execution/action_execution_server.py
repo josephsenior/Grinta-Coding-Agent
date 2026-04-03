@@ -160,8 +160,9 @@ class RuntimeExecutor:
         self.start_time = time.time()
         self.last_execution_time = time.time()
         self.downloaded_files: list[str] = []
-        self.downloads_directory = os.path.join(work_dir, 'downloads')
-        # Ensure downloads directory exists
+        self.downloads_directory = os.path.join(work_dir, '.grinta', 'downloads')
+        # Ensure downloads directory exists (hidden under .grinta/ so it doesn't
+        # clutter the user's project root)
         os.makedirs(self.downloads_directory, exist_ok=True)
 
         # Track repeated identical command failures to nudge strategy pivots

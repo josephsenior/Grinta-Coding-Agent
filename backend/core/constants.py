@@ -128,6 +128,7 @@ FILES_TO_IGNORE = [
     'lost+found/',
     '.vscode/',
     '.downloads/',
+    '.grinta/downloads/',
 ]
 
 # ── Agent Behavior Defaults ─────────────────────────────────────────
