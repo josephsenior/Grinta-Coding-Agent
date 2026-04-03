@@ -9,6 +9,7 @@ from __future__ import annotations
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from typing import Any, cast
 
 import httpx
@@ -275,20 +276,72 @@ def _extract_openai_message_text(content: Any) -> str:
     return str(content)
 
 
-def _requires_gemini_history_normalization(model_name: str) -> bool:
-    """Return True when a Gemini-family model is routed through OpenAI-compatible APIs."""
-    normalized = str(model_name or '').strip().lower()
-    return normalized.startswith('gemini-') or '/gemini' in normalized
+@dataclass(frozen=True)
+class TransportProfile:
+    """Capabilities of the transport layer between client and LLM backend.
+
+    Resolved once at client creation based on model family vs transport
+    protocol. Replaces ad-hoc model-name pattern matching with deterministic
+    cross-family detection.
+    """
+
+    supports_request_metadata: bool = True
+    """True only for the real OpenAI API (api.openai.com)."""
+
+    supports_tool_replay: bool = True
+    """True when prior tool-call messages can be replayed verbatim.
+
+    False for Google-family models on OpenAI-compatible proxies — Google
+    backends expect proprietary ``thought_signature`` data that gets lost
+    in the OpenAI translation.
+    """
 
 
-def _normalize_gemini_openai_compatible_messages(
+def _resolve_transport_profile(
+    model_family: str | None,
+    base_url: str | None,
+) -> TransportProfile:
+    """Resolve transport capabilities for an OpenAI-compatible client.
+
+    The decision is based on whether the **model family** (the provider that
+    created the model, e.g. ``"google"``) matches the **transport protocol**
+    (OpenAI-compatible).  Native SDK clients (AnthropicClient, GeminiClient)
+    don't need this — they speak their own protocol natively.
+
+    Args:
+        model_family: Provider that owns the model (e.g. "openai", "google",
+            "anthropic", "deepseek"). Comes from ``resolve_provider()``.
+        base_url: The endpoint URL being used.  ``None`` means the SDK default.
+    """
+    # Metadata: only the real OpenAI API accepts the `metadata` request field.
+    is_native_openai = model_family == 'openai' and (
+        not base_url
+        or str(base_url).strip().rstrip('/').lower().startswith(
+            'https://api.openai.com'
+        )
+    )
+
+    # Tool replay: Google-family models require proprietary thought_signature
+    # data on replayed function-call blocks.  That data is lost when routed
+    # through OpenAI-compatible proxies, causing INVALID_ARGUMENT errors on
+    # later turns.  All other families translate cleanly.
+    is_google_family = model_family == 'google'
+
+    return TransportProfile(
+        supports_request_metadata=is_native_openai,
+        supports_tool_replay=not is_google_family,
+    )
+
+
+def _normalize_cross_family_tool_messages(
     messages: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Flatten Gemini tool-call history into plain text for OpenAI-compatible proxies.
+    """Flatten tool-call history into plain text for cross-family proxy routes.
 
-    Google/Gemini expects proprietary `thought_signature` data when replaying prior
-    function-call content blocks. OpenAI-style histories do not include that hidden
-    field, so replaying assistant tool calls verbatim can fail on later turns.
+    When a model family (e.g. Google) is routed through a different transport
+    protocol (e.g. OpenAI-compatible), prior tool-call content blocks may lack
+    proprietary fields the backend expects. Flattening them into readable text
+    preserves the information without triggering protocol-level errors.
     """
     cleaned: list[dict[str, Any]] = []
     for raw_msg in messages:
@@ -329,18 +382,6 @@ def _normalize_gemini_openai_compatible_messages(
 
         cleaned.append(msg)
     return cleaned
-
-
-def _supports_native_openai_request_metadata(base_url: str | None) -> bool:
-    """Return True only for the real OpenAI API.
-
-    OpenAI-compatible proxies often reject the `metadata` request field even
-    when the configured model is canonicalized to an ``openai/...`` name.
-    """
-    if not base_url:
-        return True
-    normalized = str(base_url).strip().rstrip('/').lower()
-    return normalized.startswith('https://api.openai.com')
 
 
 class DirectLLMClient(ABC):
@@ -395,10 +436,10 @@ class OpenAIClient(DirectLLMClient):
         model_name: str,
         api_key: str,
         base_url: str | None = None,
-        supports_request_metadata: bool = True,
+        profile: TransportProfile | None = None,
     ):
         self._model_name = model_name
-        self._supports_request_metadata = supports_request_metadata
+        self._profile = profile or TransportProfile()
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
@@ -510,7 +551,7 @@ class OpenAIClient(DirectLLMClient):
 
     def _strip_unsupported_params(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """Remove request parameters not supported by this provider."""
-        if not self._supports_request_metadata:
+        if not self._profile.supports_request_metadata:
             extra_body = kwargs.get('extra_body')
             if isinstance(extra_body, dict) and 'metadata' in extra_body:
                 extra_body = {k: v for k, v in extra_body.items() if k != 'metadata'}
@@ -527,12 +568,8 @@ class OpenAIClient(DirectLLMClient):
             if isinstance(msg, dict) and 'tool_ok' in msg:
                 msg = {k: v for k, v in msg.items() if k != 'tool_ok'}
             cleaned.append(msg)
-        if not self._supports_request_metadata and _requires_gemini_history_normalization(
-            self.model_name
-        ):
-            return _normalize_gemini_openai_compatible_messages(cleaned)
-        if self._supports_request_metadata:
-            return cleaned
+        if not self._profile.supports_tool_replay:
+            return _normalize_cross_family_tool_messages(cleaned)
         return cleaned
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
@@ -1389,11 +1426,12 @@ def get_direct_client(
         )
         if not is_native and provider in ('anthropic', 'google'):
             # Proxy route: use OpenAI-compatible client with full model name
+            profile = _resolve_transport_profile(provider, resolved_base_url)
             return OpenAIClient(
                 model_name=model,
                 api_key=api_key,
                 base_url=resolved_base_url,
-                supports_request_metadata=False,
+                profile=profile,
             )
 
     # Route to appropriate client based on provider
@@ -1405,15 +1443,10 @@ def get_direct_client(
 
     # All OpenAI-compatible providers use OpenAI client
     # (OpenAI, xAI, DeepSeek, Mistral, Ollama, LM Studio, vLLM, Lightning, etc.)
-    # Only the real OpenAI API supports the `metadata` request field; proxy or
-    # custom OpenAI-compatible endpoints (Lightning, OpenRouter, localhost,
-    # etc.) may reject it even when the model is canonicalized to `openai/...`.
+    profile = _resolve_transport_profile(provider, resolved_base_url)
     return OpenAIClient(
         model_name=stripped_model,
         api_key=api_key,
         base_url=resolved_base_url,
-        supports_request_metadata=(
-            provider == 'openai'
-            and _supports_native_openai_request_metadata(resolved_base_url)
-        ),
+        profile=profile,
     )

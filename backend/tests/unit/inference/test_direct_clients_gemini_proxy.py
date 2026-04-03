@@ -1,9 +1,9 @@
 from unittest.mock import MagicMock, patch
 
-from backend.inference.direct_clients import OpenAIClient
+from backend.inference.direct_clients import OpenAIClient, TransportProfile
 
 
-class TestGeminiProxyMessageNormalization:
+class TestCrossFamilyMessageNormalization:
     @patch('backend.inference.direct_clients.AsyncOpenAI')
     @patch('backend.inference.direct_clients.OpenAI')
     @patch(
@@ -14,12 +14,17 @@ class TestGeminiProxyMessageNormalization:
         'backend.inference.direct_clients.get_shared_http_client',
         return_value=MagicMock(),
     )
-    def test_gemini_proxy_flattens_tool_history(self, _h, _ah, _oai, _aoai):
+    def test_cross_family_proxy_flattens_tool_history(self, _h, _ah, _oai, _aoai):
+        """Google-family model on OpenAI-compatible proxy → flatten tool history."""
+        profile = TransportProfile(
+            supports_request_metadata=False,
+            supports_tool_replay=False,
+        )
         client = OpenAIClient(
             'google/gemini-3-flash-preview',
             'key',
             base_url='https://lightning.ai/api/v1',
-            supports_request_metadata=False,
+            profile=profile,
         )
 
         cleaned = client._clean_messages(
@@ -69,12 +74,17 @@ class TestGeminiProxyMessageNormalization:
         'backend.inference.direct_clients.get_shared_http_client',
         return_value=MagicMock(),
     )
-    def test_non_gemini_proxy_keeps_openai_tool_history(self, _h, _ah, _oai, _aoai):
+    def test_same_family_proxy_keeps_tool_history(self, _h, _ah, _oai, _aoai):
+        """OpenAI model on OpenAI-compatible proxy → keep tool history intact."""
+        profile = TransportProfile(
+            supports_request_metadata=False,
+            supports_tool_replay=True,
+        )
         client = OpenAIClient(
             'gpt-4o-mini',
             'key',
             base_url='http://localhost:8080/v1',
-            supports_request_metadata=False,
+            profile=profile,
         )
         original = [
             {

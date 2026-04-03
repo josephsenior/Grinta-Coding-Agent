@@ -16,7 +16,7 @@ class TestOpenAICompatibleMetadataRouting:
     )
     def test_default_openai_endpoint_keeps_metadata(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('gpt-4o', api_key='sk-test')
-        assert client._supports_request_metadata is True
+        assert client._profile.supports_request_metadata is True
 
     @patch('backend.inference.direct_clients.AsyncOpenAI')
     @patch('backend.inference.direct_clients.OpenAI')
@@ -36,7 +36,7 @@ class TestOpenAICompatibleMetadataRouting:
             api_key='key',
             base_url='http://localhost:8080/v1',
         )
-        assert client._supports_request_metadata is False
+        assert client._profile.supports_request_metadata is False
 
     @patch('backend.inference.direct_clients.AsyncOpenAI')
     @patch('backend.inference.direct_clients.OpenAI')
@@ -56,4 +56,4 @@ class TestOpenAICompatibleMetadataRouting:
             api_key='key',
             base_url='https://lightning.ai/api/v1',
         )
-        assert client._supports_request_metadata is False
+        assert client._profile.supports_request_metadata is False
