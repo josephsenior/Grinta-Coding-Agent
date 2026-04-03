@@ -1443,7 +1443,20 @@ def get_direct_client(
 
     # All OpenAI-compatible providers use OpenAI client
     # (OpenAI, xAI, DeepSeek, Mistral, Ollama, LM Studio, vLLM, Lightning, etc.)
-    profile = _resolve_transport_profile(provider, resolved_base_url)
+    #
+    # Detect true model family from stripped_model, not provider.
+    # Example: model='openai/google/gemini-3-flash-preview' → provider='openai'
+    # but stripped_model='google/gemini-3-flash-preview' → family='google'.
+    # Lightning AI canonicalizes all models with an 'openai/' transport prefix,
+    # which hides the actual model family from the outer provider field.
+    model_family = provider
+    if '/' in stripped_model:
+        try:
+            model_family = resolver.resolve_provider(stripped_model)
+        except (ValueError, Exception):
+            pass
+
+    profile = _resolve_transport_profile(model_family, resolved_base_url)
     return OpenAIClient(
         model_name=stripped_model,
         api_key=api_key,

@@ -150,12 +150,39 @@ class TestClientRouting:
         'backend.inference.direct_clients.get_shared_http_client',
         return_value=MagicMock(),
     )
-    def test_gemini_lightning_profile_is_cross_family(self, _h, _ah, _oai, _aoai):
-        """Profile on the returned client must reflect cross-family routing."""
-        client = get_direct_client(GEMINI_MODEL, api_key='key', base_url=LIGHTNING_URL)
+    def test_gemini_lightning_with_transport_prefix_gets_cross_family_profile(
+        self, _h, _ah, _oai, _aoai
+    ):
+        """openai/google/gemini-* (Lightning-canonicalized) must still get cross-family profile."""
+        client = get_direct_client(
+            'openai/google/gemini-3-flash-preview',
+            api_key='key',
+            base_url=LIGHTNING_URL,
+        )
         assert isinstance(client, OpenAIClient)
         assert client._profile.supports_request_metadata is False
         assert client._profile.supports_tool_replay is False
+
+    @patch('backend.inference.direct_clients.AsyncOpenAI')
+    @patch('backend.inference.direct_clients.OpenAI')
+    @patch(
+        'backend.inference.direct_clients.get_shared_async_http_client',
+        return_value=MagicMock(),
+    )
+    @patch(
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
+    )
+    def test_gemini_lightning_transport_prefix_model_name_is_stripped(
+        self, _h, _ah, _oai, _aoai
+    ):
+        """Model name sent to proxy should be 'google/gemini-*', not 'openai/google/gemini-*'."""
+        client = get_direct_client(
+            'openai/google/gemini-3-flash-preview',
+            api_key='key',
+            base_url=LIGHTNING_URL,
+        )
+        assert client.model_name == 'google/gemini-3-flash-preview'
 
 
 # ---------------------------------------------------------------------------
