@@ -3,7 +3,7 @@ sys.path.insert(0, '.')
 os.environ['APP_SETTINGS_FILE'] = 'settings.json'
 
 from backend.engine.planner import OrchestratorPlanner
-from backend.gateway.settings import Settings
+from backend.persistence.data_models.settings import Settings
 
 settings = Settings.model_validate(json.load(open('settings.json')))
 planner = OrchestratorPlanner(settings)
